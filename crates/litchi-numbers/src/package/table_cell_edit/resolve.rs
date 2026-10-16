@@ -4267,7 +4267,17 @@ fn validate_formula_owner_reference(
             // ArchiveInfo object-reference metadata.
             validate_selected_table_info_target(source, native, id, path)?;
         } else {
-            require_declared(owner, owner_message, id, &[11], path)?;
+            // Another table's owner: native packages leave this weak
+            // back-reference undeclared too (record 0301), so a declaration
+            // is checked only when the header carries one.
+            let declared = owner
+                .archive_info
+                .message_infos
+                .get(owner_message)
+                .is_some_and(|info| info.object_references.contains(&id));
+            if declared {
+                require_declared(owner, owner_message, id, &[11], path)?;
+            }
             identities.claim(id, Role::EngineOwner, true, budget, path)?;
             let _ = resolve_exact_message(
                 source,

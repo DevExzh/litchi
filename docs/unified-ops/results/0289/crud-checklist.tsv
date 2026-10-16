@@ -29,8 +29,8 @@ docx	paragraph	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/writ
 docx	paragraph	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx` /body/p[1]
 docx	paragraph	query	supported		ok matches in seed
 docx	paragraph	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx` /body/p[1]
-docx	paragraph	set	supported		ok `seed + add paragraph` /body/p[1] style=Litchi
-docx	paragraph	add	supported		ok /body/p[3] on `seed` under /body []
+docx	paragraph	set	supported		ok `seed + add paragraph` /body/p[1] {"style":"Litchi"}
+docx	paragraph	add	supported		ok /body/p[3] on `seed` under /body {}
 docx	paragraph	remove	supported		ok `seed + add paragraph` /body/p[1]
 docx	paragraph	move	format-verb		ok `seed + add paragraph` /body/p[1] /body/p[2]
 docx	paragraph	swap	format-verb		ok `seed + add paragraph` /body/p[1] /body/p[2]
@@ -42,8 +42,8 @@ docx	run	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilt
 docx	run	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx` /body/p[1]/r[1]
 docx	run	query	supported		ok matches in seed
 docx	run	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx` /body/p[1]/r[1]
-docx	run	set	supported		ok `seed + add paragraph` /body/p[1]/r[1] font.latin=Litchi
-docx	run	add	supported		ok /body/p[1]/r[2] on `seed + add paragraph` under /body/p[1] []
+docx	run	set	supported		ok `seed + add paragraph` /body/p[1]/r[1] {"font.latin":"Litchi"}
+docx	run	add	supported		ok /body/p[1]/r[2] on `seed + add paragraph` under /body/p[1] {}
 docx	run	remove	supported		ok `seed + add paragraph` /body/p[1]/r[1]
 docx	run	move	format-verb		ok `seed + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
 docx	run	swap	format-verb		ok `seed + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
@@ -55,8 +55,8 @@ docx	hyperlink	get	supported		ok 6 instances, first `ooxml/docx/Hyperlink.docx` 
 docx	hyperlink	find	supported		ok 6 instances, first `ooxml/docx/Hyperlink.docx` /body/p[2]/hyperlink[1]
 docx	hyperlink	query	supported		ok matches in ooxml/docx/Hyperlink.docx
 docx	hyperlink	view	supported		ok 6 instances, first `ooxml/docx/Hyperlink.docx` /body/p[2]/hyperlink[1]
-docx	hyperlink	set	supported		ok `seed + add hyperlink` /body/p[1]/hyperlink[1] url=Litchi
-docx	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `seed` under /body/p[1] [url,text]
+docx	hyperlink	set	supported		ok `seed + add hyperlink` /body/p[1]/hyperlink[1] {"url":"Litchi"}
+docx	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `seed` under /body/p[1] {"url":"https://example.test/","text":"link"}
 docx	hyperlink	remove	supported		ok `seed + add hyperlink` /body/p[1]/hyperlink[1]
 docx	hyperlink	move	format-verb		ok `seed + add hyperlink` /body/p[1]/hyperlink[1] /body/p[1]/hyperlink[2]
 docx	hyperlink	swap	format-verb		refused unsupported_capability
@@ -69,7 +69,7 @@ docx	table	find	supported		ok 8 instances, first `officecli/examples/word/revisi
 docx	table	query	supported		ok matches in officecli/examples/word/revisions.docx
 docx	table	view	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]
 docx	table	set	n/a	set not offered for this element	-
-docx	table	add	supported		ok /body/tbl[1] on `seed` under /body [rows,cols]
+docx	table	add	supported		ok /body/tbl[1] on `seed` under /body {"rows":"2","cols":"2"}
 docx	table	remove	supported		ok `seed + add table` /body/tbl[1]
 docx	table	move	format-verb		ok `seed + add table` /body/tbl[1] /body/tbl[2]
 docx	table	swap	format-verb		refused unsupported_capability
@@ -82,7 +82,7 @@ docx	row	find	supported		ok 8 instances, first `officecli/examples/word/revision
 docx	row	query	supported		ok matches in officecli/examples/word/revisions.docx
 docx	row	view	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]
 docx	row	set	n/a	set not offered for this element	-
-docx	row	add	supported		ok /body/tbl[1]/tr[3] on `seed + add table` under /body/tbl[1] []
+docx	row	add	supported		ok /body/tbl[1]/tr[3] on `seed + add table` under /body/tbl[1] {}
 docx	row	remove	supported		ok `seed + add table` /body/tbl[1]/tr[1]
 docx	row	move	format-verb		ok `seed + add table` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
 docx	row	swap	format-verb		refused unsupported_capability
@@ -94,7 +94,7 @@ docx	cell	get	supported		ok 8 instances, first `officecli/examples/word/revision
 docx	cell	find	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]/tc[1]
 docx	cell	query	supported		ok matches in officecli/examples/word/revisions.docx
 docx	cell	view	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]/tc[1]
-docx	cell	set	supported		ok `seed + add table` /body/tbl[1]/tr[1]/tc[1] text=Litchi
+docx	cell	set	supported		ok `seed + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 docx	cell	add	n/a	add not offered for this element	-
 docx	cell	remove	supported		ok `seed + add table` /body/tbl[1]/tr[1]/tc[1]
 docx	cell	move	format-verb		ok `seed + add table` /body/tbl[1]/tr[1]/tc[1] /body/tbl[1]/tr[1]/tc[2]
@@ -238,7 +238,7 @@ docx	comment	find	supported		ok 3 instances, first `ooxml/docx/comment.docx` /co
 docx	comment	query	supported		ok matches in ooxml/docx/comment.docx
 docx	comment	view	supported		ok 3 instances, first `ooxml/docx/comment.docx` /comments/comment[1]
 docx	comment	set	n/a	set not offered for this element	-
-docx	comment	add	supported		ok /comments/comment[1] on `seed` under /body/p[1] [author,text]
+docx	comment	add	supported		ok /comments/comment[1] on `seed` under /body/p[1] {"author":"Ada","text":"Check"}
 docx	comment	remove	supported		ok `seed + add comment` /comments/comment[1]
 docx	comment	move	format-verb		refused unsupported_capability
 docx	comment	swap	format-verb		refused unsupported_capability
@@ -394,7 +394,7 @@ docx	picture	find	supported		ok 2 instances, first `libreoffice-core/sw/qa/extra
 docx	picture	query	n/a	query not offered for this element	-
 docx	picture	view	supported		ok 2 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
 docx	picture	set	n/a	set not offered for this element	-
-docx	picture	add	supported		ok /body/p[1]/picture[1] on `seed` under /body/p[1] [src,alt]
+docx	picture	add	supported		ok /body/p[1]/picture[1] on `seed` under /body/p[1] {"src":"<PNG>","alt":"Logo"}
 docx	picture	remove	n/a	remove not offered for this element	-
 docx	picture	move	format-verb		unreached
 docx	picture	swap	format-verb		unreached
@@ -406,8 +406,8 @@ docx	chart	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/o
 docx	chart	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]
 docx	chart	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
 docx	chart	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]
-docx	chart	set	supported		ok `seed + add chart` /body/p[1]/chart[1] title=Litchi
-docx	chart	add	supported		ok /body/p[1]/chart[1] on `seed` under /body/p[1] [chartType,data]
+docx	chart	set	supported		ok `seed + add chart` /body/p[1]/chart[1] {"title":"Litchi"}
+docx	chart	add	supported		ok /body/p[1]/chart[1] on `seed` under /body/p[1] {"chartType":"column","data":"A:1,2;B:3,4"}
 docx	chart	remove	supported		ok `seed + add chart` /body/p[1]/chart[1]
 docx	chart	move	format-verb		refused unsupported_capability
 docx	chart	swap	format-verb		refused unsupported_capability
@@ -524,7 +524,7 @@ docx	smartart	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extr
 docx	smartart	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
 docx	smartart	view	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
 docx	smartart	set	n/a	set not offered for this element	-
-docx	smartart	add	supported		ok /smartart[1] on `seed` under /body/p[1] [layout,text]
+docx	smartart	add	supported		ok /smartart[1] on `seed` under /body/p[1] {"layout":"process","text":"Plan\nBuild"}
 docx	smartart	remove	n/a	remove not offered for this element	-
 docx	smartart	move	format-verb		refused unsupported_capability
 docx	smartart	swap	format-verb		refused unsupported_capability
@@ -549,8 +549,8 @@ xlsx	sheet	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTo
 xlsx	sheet	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]
 xlsx	sheet	query	supported		ok matches in create()
 xlsx	sheet	view	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]
-xlsx	sheet	set	supported		ok `create() + add sheet` /sheet[1] name=Litchi
-xlsx	sheet	add	supported		ok /sheet[2] on `create()` under / []
+xlsx	sheet	set	supported		ok `create() + add sheet` /sheet[1] {"name":"Litchi"}
+xlsx	sheet	add	supported		ok /sheet[2] on `create()` under / {}
 xlsx	sheet	remove	supported		ok `create() + add sheet` /sheet[1]
 xlsx	sheet	move	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
 xlsx	sheet	swap	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
@@ -562,7 +562,7 @@ xlsx	cell	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListToo
 xlsx	cell	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/A1
 xlsx	cell	query	supported		ok matches in ooxml/xlsx/DataValidationListTooLong.xlsx
 xlsx	cell	view	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/A1
-xlsx	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 formula=Litchi
+xlsx	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 {"formula":"Litchi"}
 xlsx	cell	add	n/a	add not offered for this element	-
 xlsx	cell	remove	n/a	remove not offered for this element	-
 xlsx	cell	move	format-verb		refused unsupported_type
@@ -575,7 +575,7 @@ xlsx	range	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTo
 xlsx	range	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/A1:B2
 xlsx	range	query	n/a	query not offered for this element	-
 xlsx	range	view	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/A1:B2
-xlsx	range	set	supported		ok `create() + add sheet` /sheet[1]/A1:B2 merge=true
+xlsx	range	set	supported		ok `create() + add sheet` /sheet[1]/A1:B2 {"merge":"true"}
 xlsx	range	add	n/a	add not offered for this element	-
 xlsx	range	remove	n/a	remove not offered for this element	-
 xlsx	range	move	format-verb		unreached
@@ -588,7 +588,7 @@ xlsx	row	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooL
 xlsx	row	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/row[1]
 xlsx	row	query	supported		ok matches in ooxml/xlsx/DataValidationListTooLong.xlsx
 xlsx	row	view	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/row[1]
-xlsx	row	set	supported		ok `create() + add sheet` /sheet[1]/row[1] height=12pt
+xlsx	row	set	supported		ok `create() + add sheet` /sheet[1]/row[1] {"height":"12pt"}
 xlsx	row	add	n/a	add not offered for this element	-
 xlsx	row	remove	n/a	remove not offered for this element	-
 xlsx	row	move	format-verb		refused unsupported_type
@@ -601,7 +601,7 @@ xlsx	column	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListT
 xlsx	column	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/col[A]
 xlsx	column	query	supported		ok matches in poi/test-data/spreadsheet/47889.xlsx
 xlsx	column	view	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/col[A]
-xlsx	column	set	supported		ok `create() + add sheet` /sheet[1]/col[A] width=127.5
+xlsx	column	set	supported		ok `create() + add sheet` /sheet[1]/col[A] {"width":"127.5"}
 xlsx	column	add	n/a	add not offered for this element	-
 xlsx	column	remove	n/a	remove not offered for this element	-
 xlsx	column	move	format-verb		refused unsupported_type
@@ -653,8 +653,8 @@ xlsx	chart	get	supported		ok 4 instances, first `ooxml/xlsx/SimpleScatterChart.x
 xlsx	chart	find	supported		ok 4 instances, first `ooxml/xlsx/SimpleScatterChart.xlsx` /sheet[1]/chart[1]
 xlsx	chart	query	supported		ok matches in ooxml/xlsx/SimpleScatterChart.xlsx
 xlsx	chart	view	supported		ok 4 instances, first `ooxml/xlsx/SimpleScatterChart.xlsx` /sheet[1]/chart[1]
-xlsx	chart	set	supported		ok `create() + add chart` /sheet[1]/chart[1] title=Litchi
-xlsx	chart	add	supported		ok /sheet[1]/chart[1] on `create()` under /Sheet1 [chartType,data]
+xlsx	chart	set	supported		ok `create() + add chart` /sheet[1]/chart[1] {"title":"Litchi"}
+xlsx	chart	add	supported		ok /sheet[1]/chart[1] on `create()` under /Sheet1 {"chartType":"column","data":"A:1,2;B:3,4"}
 xlsx	chart	remove	supported		ok `create() + add chart` /sheet[1]/chart[1]
 xlsx	chart	move	format-verb		refused unsupported_type
 xlsx	chart	swap	format-verb		refused unsupported_type
@@ -666,7 +666,7 @@ xlsx	series	get	supported		ok 8 instances, first `ooxml/xlsx/SimpleScatterChart.
 xlsx	series	find	supported		ok 8 instances, first `ooxml/xlsx/SimpleScatterChart.xlsx` /sheet[1]/chart[1]/series[1]
 xlsx	series	query	supported		ok matches in ooxml/xlsx/SimpleScatterChart.xlsx
 xlsx	series	view	supported		ok 8 instances, first `ooxml/xlsx/SimpleScatterChart.xlsx` /sheet[1]/chart[1]/series[1]
-xlsx	series	set	supported		ok `create() + add chart` /sheet[1]/chart[1]/series[1] name=Litchi
+xlsx	series	set	supported		ok `create() + add chart` /sheet[1]/chart[1]/series[1] {"name":"Litchi"}
 xlsx	series	add	n/a	add not offered for this element	-
 xlsx	series	remove	n/a	remove not offered for this element	-
 xlsx	series	move	format-verb		refused unsupported_type
@@ -679,7 +679,7 @@ xlsx	axis	get	supported		ok 8 instances, first `ooxml/xlsx/SimpleScatterChart.xl
 xlsx	axis	find	supported		ok 8 instances, first `ooxml/xlsx/SimpleScatterChart.xlsx` /sheet[1]/chart[1]/axis[1]
 xlsx	axis	query	supported		ok matches in ooxml/xlsx/SimpleScatterChart.xlsx
 xlsx	axis	view	supported		ok 8 instances, first `ooxml/xlsx/SimpleScatterChart.xlsx` /sheet[1]/chart[1]/axis[1]
-xlsx	axis	set	supported		ok `create() + add chart` /sheet[1]/chart[1]/axis[1] title=Litchi
+xlsx	axis	set	supported		ok `create() + add chart` /sheet[1]/chart[1]/axis[1] {"title":"Litchi"}
 xlsx	axis	add	n/a	add not offered for this element	-
 xlsx	axis	remove	n/a	remove not offered for this element	-
 xlsx	axis	move	format-verb		refused unsupported_type
@@ -887,8 +887,8 @@ pptx	slide	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/dat
 pptx	slide	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]
 pptx	slide	query	supported		ok matches in seed
 pptx	slide	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]
-pptx	slide	set	supported		ok `create() + add slide` /slide[1] name=Litchi
-pptx	slide	add	supported		ok /slide[1] on `create()` under / [layout]
+pptx	slide	set	supported		ok `create() + add slide` /slide[1] {"name":"Litchi"}
+pptx	slide	add	supported		ok /slide[1] on `create()` under / {"layout":"Blank"}
 pptx	slide	remove	supported		ok `create() + add slide` /slide[1]
 pptx	slide	move	format-verb		ok `create() + add slide` /slide[1] /slide[2]
 pptx	slide	swap	format-verb		ok `create() + add slide` /slide[1] /slide[2]
@@ -900,8 +900,8 @@ pptx	shape	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/dat
 pptx	shape	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/shape[1]
 pptx	shape	query	supported		ok matches in create()
 pptx	shape	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/shape[1]
-pptx	shape	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1] x=12pt
-pptx	shape	add	supported		ok /slide[1]/shape[1] on `create() + add slide` under /slide[1] [text,width,height]
+pptx	shape	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1] {"x":"12pt"}
+pptx	shape	add	supported		ok /slide[1]/shape[1] on `create() + add slide` under /slide[1] {"text":"Box","width":"1in","height":"1in"}
 pptx	shape	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]
 pptx	shape	move	format-verb		refused unsupported_type
 pptx	shape	swap	format-verb		refused unsupported_type
@@ -913,7 +913,7 @@ pptx	placeholder	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/un
 pptx	placeholder	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
 pptx	placeholder	query	supported		ok matches in create()
 pptx	placeholder	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
-pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx` /slide[2]/shape[2] font=Litchi
+pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx` /slide[2]/shape[2] {"font":"Litchi"}
 pptx	placeholder	add	n/a	add not offered for this element	-
 pptx	placeholder	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[2]/shape[2]
 pptx	placeholder	move	format-verb		refused unsupported_type
@@ -922,10 +922,10 @@ pptx	placeholder	edit	supported		ok tx.set
 pptx	placeholder	batch	supported		ok set item
 pptx	placeholder	create	supported		ok format
 pptx	placeholder	save	supported		ok format
-pptx	picture	get	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
-pptx	picture	find	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx
-pptx	picture	view	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	set	n/a	set not offered for this element	-
 pptx	picture	add	n/a	add not offered for this element	-
 pptx	picture	remove	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx` /slide[1]/picture[1]
@@ -935,10 +935,10 @@ pptx	picture	edit	n/a	edit not offered for this element	-
 pptx	picture	batch	n/a	batch not offered for this element	-
 pptx	picture	create	supported		ok format
 pptx	picture	save	supported		ok format
-pptx	table	get	supported		ok 3 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
-pptx	table	find	supported		ok 3 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	get	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	find	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	table	view	supported		ok 3 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	view	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	set	n/a	set not offered for this element	-
 pptx	table	add	n/a	add not offered for this element	-
 pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
@@ -948,10 +948,10 @@ pptx	table	edit	n/a	edit not offered for this element	-
 pptx	table	batch	n/a	batch not offered for this element	-
 pptx	table	create	supported		ok format
 pptx	table	save	supported		ok format
-pptx	tr	get	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
-pptx	tr	find	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
+pptx	tr	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
+pptx	tr	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
 pptx	tr	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	tr	view	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
+pptx	tr	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
 pptx	tr	set	n/a	set not offered for this element	-
 pptx	tr	add	n/a	add not offered for this element	-
 pptx	tr	remove	n/a	remove not offered for this element	-
@@ -961,10 +961,10 @@ pptx	tr	edit	n/a	edit not offered for this element	-
 pptx	tr	batch	n/a	batch not offered for this element	-
 pptx	tr	create	supported		ok format
 pptx	tr	save	supported		ok format
-pptx	tc	get	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
-pptx	tc	find	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
+pptx	tc	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
+pptx	tc	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
 pptx	tc	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	tc	view	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
+pptx	tc	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
 pptx	tc	set	n/a	set not offered for this element	-
 pptx	tc	add	n/a	add not offered for this element	-
 pptx	tc	remove	n/a	remove not offered for this element	-
@@ -978,8 +978,8 @@ pptx	chart	get	supported		ok 4 instances, first `ooxml/pptx/radar-chart.pptx` /s
 pptx	chart	find	supported		ok 4 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]
 pptx	chart	query	supported		ok matches in ooxml/pptx/radar-chart.pptx
 pptx	chart	view	supported		ok 4 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]
-pptx	chart	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1] x=12pt
-pptx	chart	add	supported		ok /slide[1]/chart[1] on `create() + add slide` under /slide[1] [chartType,data]
+pptx	chart	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1] {"x":"12pt"}
+pptx	chart	add	supported		ok /slide[1]/chart[1] on `create() + add slide` under /slide[1] {"chartType":"column","data":"A:1,2;B:3,4"}
 pptx	chart	remove	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]
 pptx	chart	move	format-verb		refused unsupported_type
 pptx	chart	swap	format-verb		refused unsupported_type
@@ -987,10 +987,10 @@ pptx	chart	edit	supported		ok tx.set
 pptx	chart	batch	supported		ok set item
 pptx	chart	create	supported		ok format
 pptx	chart	save	supported		ok format
-pptx	group	get	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
-pptx	group	find	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	get	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	find	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
 pptx	group	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	group	view	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	view	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
 pptx	group	set	n/a	set not offered for this element	-
 pptx	group	add	n/a	add not offered for this element	-
 pptx	group	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
@@ -1000,10 +1000,10 @@ pptx	group	edit	n/a	edit not offered for this element	-
 pptx	group	batch	n/a	batch not offered for this element	-
 pptx	group	create	supported		ok format
 pptx	group	save	supported		ok format
-pptx	connector	get	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
-pptx	connector	find	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
+pptx	connector	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
+pptx	connector	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
 pptx	connector	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	connector	view	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
+pptx	connector	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
 pptx	connector	set	n/a	set not offered for this element	-
 pptx	connector	add	n/a	add not offered for this element	-
 pptx	connector	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
@@ -1013,12 +1013,12 @@ pptx	connector	edit	n/a	edit not offered for this element	-
 pptx	connector	batch	n/a	batch not offered for this element	-
 pptx	connector	create	supported		ok format
 pptx	connector	save	supported		ok format
-pptx	smartart	get	supported		ok 5 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
-pptx	smartart	find	supported		ok 5 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	get	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	find	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
 pptx	smartart	query	supported		ok matches in ooxml/pptx/smartart-composite-infer-right.pptx
-pptx	smartart	view	supported		ok 5 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
-pptx	smartart	set	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1] text=Litchi
-pptx	smartart	add	supported		ok /slide[1]/smartart[1] on `create() + add slide` under /slide[1] [layout,text]
+pptx	smartart	view	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	set	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1] {"text":"Litchi"}
+pptx	smartart	add	supported		ok /slide[1]/smartart[1] on `create() + add slide` under /slide[1] {"layout":"process","text":"Plan\nBuild\nShip"}
 pptx	smartart	remove	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1]
 pptx	smartart	move	format-verb		refused unsupported_type
 pptx	smartart	swap	format-verb		refused unsupported_type
@@ -1026,10 +1026,10 @@ pptx	smartart	edit	supported		ok tx.set
 pptx	smartart	batch	supported		ok set item
 pptx	smartart	create	supported		ok format
 pptx	smartart	save	supported		ok format
-pptx	ole	get	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
-pptx	ole	find	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/ole.pptx
-pptx	ole	view	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	set	n/a	set not offered for this element	-
 pptx	ole	add	n/a	add not offered for this element	-
 pptx	ole	remove	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
@@ -1065,10 +1065,10 @@ pptx	run	edit	n/a	edit not offered for this element	-
 pptx	run	batch	n/a	batch not offered for this element	-
 pptx	run	create	supported		ok format
 pptx	run	save	supported		ok format
-pptx	linebreak	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
-pptx	linebreak	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
 pptx	linebreak	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx
-pptx	linebreak	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
 pptx	linebreak	set	n/a	set not offered for this element	-
 pptx	linebreak	add	n/a	add not offered for this element	-
 pptx	linebreak	remove	n/a	remove not offered for this element	-
@@ -1078,10 +1078,10 @@ pptx	linebreak	edit	n/a	edit not offered for this element	-
 pptx	linebreak	batch	n/a	batch not offered for this element	-
 pptx	linebreak	create	supported		ok format
 pptx	linebreak	save	supported		ok format
-pptx	notes	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
-pptx	notes	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
 pptx	notes	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
-pptx	notes	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
 pptx	notes	set	n/a	set not offered for this element	-
 pptx	notes	add	n/a	add not offered for this element	-
 pptx	notes	remove	n/a	remove not offered for this element	-
@@ -1091,15 +1091,15 @@ pptx	notes	edit	n/a	edit not offered for this element	-
 pptx	notes	batch	n/a	batch not offered for this element	-
 pptx	notes	create	supported		ok format
 pptx	notes	save	supported		ok format
-pptx	comment	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
-pptx	comment	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	get	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	find	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
-pptx	comment	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	view	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	set	n/a	set not offered for this element	-
 pptx	comment	add	n/a	add not offered for this element	-
 pptx	comment	remove	n/a	remove not offered for this element	-
-pptx	comment	move	format-verb		unreached
-pptx	comment	swap	format-verb		unreached
+pptx	comment	move	format-verb		refused unsupported_type
+pptx	comment	swap	format-verb		refused unsupported_type
 pptx	comment	edit	n/a	edit not offered for this element	-
 pptx	comment	batch	n/a	batch not offered for this element	-
 pptx	comment	create	supported		ok format
@@ -1221,26 +1221,26 @@ pptx	theme	edit	gap	L-PPTX-R4	-
 pptx	theme	batch	gap	L-PPTX-R4	-
 pptx	theme	create	gap	L-PPTX-R4	ok format
 pptx	theme	save	gap	L-PPTX-R4	ok format
-pptx	modernComment	get	supported		unreached
-pptx	modernComment	find	supported		unreached
-pptx	modernComment	query	supported		unreached
-pptx	modernComment	view	supported		unreached
-pptx	modernComment	set	n/a	set not offered for this element	unreached
+pptx	modernComment	get	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	find	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
+pptx	modernComment	view	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	set	n/a	set not offered for this element	-
 pptx	modernComment	add	n/a	add not offered for this element	-
-pptx	modernComment	remove	n/a	remove not offered for this element	unreached
-pptx	modernComment	move	format-verb		unreached
-pptx	modernComment	swap	format-verb		unreached
+pptx	modernComment	remove	n/a	remove not offered for this element	-
+pptx	modernComment	move	format-verb		refused unsupported_type
+pptx	modernComment	swap	format-verb		refused unsupported_type
 pptx	modernComment	edit	n/a	edit not offered for this element	-
 pptx	modernComment	batch	n/a	batch not offered for this element	-
 pptx	modernComment	create	supported		ok format
 pptx	modernComment	save	supported		ok format
-pptx	reply	get	supported		unreached
-pptx	reply	find	supported		unreached
-pptx	reply	query	supported		unreached
-pptx	reply	view	supported		unreached
-pptx	reply	set	n/a	set not offered for this element	unreached
+pptx	reply	get	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	find	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
+pptx	reply	view	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	set	n/a	set not offered for this element	-
 pptx	reply	add	n/a	add not offered for this element	-
-pptx	reply	remove	n/a	remove not offered for this element	unreached
+pptx	reply	remove	n/a	remove not offered for this element	-
 pptx	reply	move	format-verb		unreached
 pptx	reply	swap	format-verb		unreached
 pptx	reply	edit	n/a	edit not offered for this element	-
@@ -1277,7 +1277,7 @@ pptx	series	get	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /
 pptx	series	find	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/series[1]
 pptx	series	query	supported		ok matches in ooxml/pptx/radar-chart.pptx
 pptx	series	view	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/series[1]
-pptx	series	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]/series[1] name=Litchi
+pptx	series	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]/series[1] {"name":"Litchi"}
 pptx	series	add	n/a	add not offered for this element	-
 pptx	series	remove	n/a	remove not offered for this element	-
 pptx	series	move	format-verb		refused unsupported_type
@@ -1290,7 +1290,7 @@ pptx	axis	get	supported		ok 8 instances, first `ooxml/pptx/radar-chart.pptx` /sl
 pptx	axis	find	supported		ok 8 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/axis[1]
 pptx	axis	query	supported		ok matches in ooxml/pptx/radar-chart.pptx
 pptx	axis	view	supported		ok 8 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/axis[1]
-pptx	axis	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]/axis[1] title=Litchi
+pptx	axis	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]/axis[1] {"title":"Litchi"}
 pptx	axis	add	n/a	add not offered for this element	-
 pptx	axis	remove	n/a	remove not offered for this element	-
 pptx	axis	move	format-verb		refused unsupported_type
@@ -1342,8 +1342,8 @@ pptx	node	get	supported		ok 8 instances, first `ooxml/pptx/smartart-composite-in
 pptx	node	find	supported		ok 8 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]/node[1]
 pptx	node	query	supported		ok matches in ooxml/pptx/smartart-composite-infer-right.pptx
 pptx	node	view	supported		ok 8 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]/node[1]
-pptx	node	set	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1]/node[1] text=Litchi
-pptx	node	add	supported		ok /slide[1]/smartart[1]/node[4] on `create() + add slide + add smartart` under /slide[1]/smartart[1] [text]
+pptx	node	set	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1]/node[1] {"text":"Litchi"}
+pptx	node	add	supported		ok /slide[1]/smartart[1]/node[4] on `create() + add slide + add smartart` under /slide[1]/smartart[1] {"text":"Learn"}
 pptx	node	remove	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1]/node[1]
 pptx	node	move	format-verb		refused unsupported_type
 pptx	node	swap	format-verb		refused unsupported_type
@@ -1351,10 +1351,10 @@ pptx	node	edit	supported		ok tx.set
 pptx	node	batch	supported		ok set item
 pptx	node	create	supported		ok format
 pptx	node	save	supported		ok format
-xlsb	workbook	get	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /
-xlsb	workbook	find	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	get	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	find	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
 xlsb	workbook	query	n/a	query not offered for this element	-
-xlsb	workbook	view	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	view	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
 xlsb	workbook	set	n/a	set not offered for this element	-
 xlsb	workbook	add	n/a	add not offered for this element	-
 xlsb	workbook	remove	n/a	remove not offered for this element	-
@@ -1368,8 +1368,8 @@ xlsb	sheet	get	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]
 xlsb	sheet	find	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]
 xlsb	sheet	query	supported		ok matches in create()
 xlsb	sheet	view	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]
-xlsb	sheet	set	supported		ok `create() + add sheet` /sheet[1] name=Litchi
-xlsb	sheet	add	supported		ok /sheet[2] on `create()` under / []
+xlsb	sheet	set	supported		ok `create() + add sheet` /sheet[1] {"name":"Litchi"}
+xlsb	sheet	add	supported		ok /sheet[2] on `create()` under / {}
 xlsb	sheet	remove	supported		ok `create() + add sheet` /sheet[1]
 xlsb	sheet	move	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
 xlsb	sheet	swap	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
@@ -1381,7 +1381,7 @@ xlsb	cell	get	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/
 xlsb	cell	find	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1
 xlsb	cell	query	supported		ok matches in ooxml/xlsb/date.xlsb
 xlsb	cell	view	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1
-xlsb	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 formula=7
+xlsb	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 {"formula":"7"}
 xlsb	cell	add	n/a	add not offered for this element	-
 xlsb	cell	remove	supported		ok `create() + add sheet` /sheet[1]/A1
 xlsb	cell	move	format-verb		refused unsupported_type
@@ -1390,11 +1390,11 @@ xlsb	cell	edit	supported		ok tx.set
 xlsb	cell	batch	supported		ok set item
 xlsb	cell	create	supported		ok format
 xlsb	cell	save	supported		ok format
-xlsb	range	get	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
-xlsb	range	find	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	get	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	find	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
 xlsb	range	query	n/a	query not offered for this element	-
-xlsb	range	view	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
-xlsb	range	set	supported		ok `create() + add sheet` /sheet[1]/A1:B2 value=Litchi
+xlsb	range	view	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	set	supported		ok `create() + add sheet` /sheet[1]/A1:B2 {"value":"Litchi"}
 xlsb	range	add	n/a	add not offered for this element	-
 xlsb	range	remove	n/a	remove not offered for this element	-
 xlsb	range	move	format-verb		unreached
@@ -1429,13 +1429,13 @@ xlsb	column	edit	n/a	edit not offered for this element	-
 xlsb	column	batch	n/a	batch not offered for this element	-
 xlsb	column	create	supported		ok format
 xlsb	column	save	supported		ok format
-xlsb	table	get	supported		unreached
-xlsb	table	find	supported		unreached
-xlsb	table	query	supported		unreached
-xlsb	table	view	supported		unreached
-xlsb	table	set	n/a	set not offered for this element	unreached
+xlsb	table	get	supported		ok 1 instances, first `unified-ops/0294/table.xlsb` /sheet[1]/table[1]
+xlsb	table	find	supported		ok 1 instances, first `unified-ops/0294/table.xlsb` /sheet[1]/table[1]
+xlsb	table	query	supported		ok matches in unified-ops/0294/table.xlsb
+xlsb	table	view	supported		ok 1 instances, first `unified-ops/0294/table.xlsb` /sheet[1]/table[1]
+xlsb	table	set	n/a	set not offered for this element	-
 xlsb	table	add	n/a	add not offered for this element	-
-xlsb	table	remove	n/a	remove not offered for this element	unreached
+xlsb	table	remove	n/a	remove not offered for this element	-
 xlsb	table	move	format-verb		unreached
 xlsb	table	swap	format-verb		unreached
 xlsb	table	edit	n/a	edit not offered for this element	-
@@ -1719,8 +1719,8 @@ doc	paragraph	get	supported		ok 8 instances, first `ole/doc/documentProperties.d
 doc	paragraph	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /body/p[1]
 doc	paragraph	query	supported		ok matches in create()
 doc	paragraph	view	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /body/p[1]
-doc	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] text=Litchi
-doc	paragraph	add	supported		ok /body/p[2] on `create()` under /body []
+doc	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] {"text":"Litchi"}
+doc	paragraph	add	supported		ok /body/p[2] on `create()` under /body {}
 doc	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
 doc	paragraph	move	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
 doc	paragraph	swap	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
@@ -1732,7 +1732,7 @@ doc	run	get	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /b
 doc	run	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /body/p[1]/r[1]
 doc	run	query	supported		ok matches in ole/doc/documentProperties.doc
 doc	run	view	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /body/p[1]/r[1]
-doc	run	set	supported		ok `ole/doc/documentProperties.doc` /body/p[1]/r[1] text=Litchi
+doc	run	set	supported		ok `ole/doc/documentProperties.doc` /body/p[1]/r[1] {"text":"Litchi"}
 doc	run	add	n/a	add not offered for this element	-
 doc	run	remove	supported		ok `ole/doc/documentProperties.doc` /body/p[1]/r[1]
 doc	run	move	format-verb		refused unsupported_type
@@ -1875,8 +1875,8 @@ xls	sheet	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data
 xls	sheet	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]
 xls	sheet	query	supported		ok matches in create()
 xls	sheet	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]
-xls	sheet	set	supported		ok `create() + add sheet` /sheet[1] name=Litchi
-xls	sheet	add	supported		ok /sheet[2] on `create()` under / []
+xls	sheet	set	supported		ok `create() + add sheet` /sheet[1] {"name":"Litchi"}
+xls	sheet	add	supported		ok /sheet[2] on `create()` under / {}
 xls	sheet	remove	supported		ok `create() + add sheet` /sheet[1]
 xls	sheet	move	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
 xls	sheet	swap	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
@@ -1888,7 +1888,7 @@ xls	cell	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /
 xls	cell	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
 xls	cell	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
 xls	cell	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
-xls	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 formula=7
+xls	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 {"formula":"7"}
 xls	cell	add	n/a	add not offered for this element	-
 xls	cell	remove	supported		ok `create() + add sheet` /sheet[1]/A1
 xls	cell	move	format-verb		refused unsupported_type
@@ -1914,8 +1914,8 @@ xls	row	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /s
 xls	row	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
 xls	row	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
 xls	row	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
-xls	row	set	supported		ok `create() + add sheet` /sheet[1]/row[1] height=12pt
-xls	row	add	supported		ok /sheet[1]/row[1] on `create()` under /sheet[1] []
+xls	row	set	supported		ok `create() + add sheet` /sheet[1]/row[1] {"height":"12pt"}
+xls	row	add	supported		ok /sheet[1]/row[1] on `create()` under /sheet[1] {} at start
 xls	row	remove	supported		ok `create() + add row` /sheet[1]/row[1]
 xls	row	move	format-verb		refused unsupported_type
 xls	row	swap	format-verb		refused unsupported_type
@@ -1927,8 +1927,8 @@ xls	column	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls`
 xls	column	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
 xls	column	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
 xls	column	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
-xls	column	set	supported		ok `create() + add sheet` /sheet[1]/col[A] width=1.5
-xls	column	add	supported		ok /sheet[1]/col[A] on `create()` under /sheet[1] []
+xls	column	set	supported		ok `create() + add sheet` /sheet[1]/col[A] {"width":"1.5"}
+xls	column	add	supported		ok /sheet[1]/col[A] on `create()` under /sheet[1] {} at start
 xls	column	remove	supported		ok `create() + add column` /sheet[1]/col[A]
 xls	column	move	format-verb		refused unsupported_type
 xls	column	swap	format-verb		refused unsupported_type
@@ -2213,8 +2213,8 @@ ppt	slide	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrec
 ppt	slide	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]
 ppt	slide	query	supported		ok matches in poi/test-data/slideshow/incorrect_slide_order.ppt
 ppt	slide	view	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]
-ppt	slide	set	supported		ok `create() + add slide` /slide[1] hidden=true
-ppt	slide	add	supported		ok /slide[1] on `create()` under / []
+ppt	slide	set	supported		ok `create() + add slide` /slide[1] {"hidden":"true"}
+ppt	slide	add	supported		ok /slide[1] on `create()` under / {}
 ppt	slide	remove	supported		ok `create() + add slide` /slide[1]
 ppt	slide	move	format-verb		ok `create() + add slide` /slide[1] /slide[2]
 ppt	slide	swap	format-verb		ok `create() + add slide` /slide[1] /slide[2]
@@ -2226,7 +2226,7 @@ ppt	shape	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrec
 ppt	shape	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]
 ppt	shape	query	supported		ok matches in ole/ppt/text_shapes.ppt
 ppt	shape	view	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]
-ppt	shape	set	supported		ok `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1] x=12pt
+ppt	shape	set	supported		ok `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1] {"x":"12pt"}
 ppt	shape	add	n/a	add not offered for this element	-
 ppt	shape	remove	n/a	remove not offered for this element	-
 ppt	shape	move	format-verb		refused unsupported_type
@@ -2239,7 +2239,7 @@ ppt	placeholder	get	supported		ok 8 instances, first `poi/test-data/slideshow/in
 ppt	placeholder	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[2]/shape[2]
 ppt	placeholder	query	supported		ok matches in poi/test-data/slideshow/incorrect_slide_order.ppt
 ppt	placeholder	view	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[2]/shape[2]
-ppt	placeholder	set	supported		ok `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[2]/shape[2] x=12pt
+ppt	placeholder	set	supported		ok `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[2]/shape[2] {"x":"12pt"}
 ppt	placeholder	add	n/a	add not offered for this element	-
 ppt	placeholder	remove	n/a	remove not offered for this element	-
 ppt	placeholder	move	format-verb		refused unsupported_type
@@ -2248,10 +2248,10 @@ ppt	placeholder	edit	supported		ok tx.set
 ppt	placeholder	batch	supported		ok set item
 ppt	placeholder	create	supported		ok format
 ppt	placeholder	save	supported		ok format
-ppt	picture	get	supported		ok 1 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
-ppt	picture	find	supported		ok 1 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	get	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	find	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	query	supported		ok matches in ole/ppt/ppt_with_png.ppt
-ppt	picture	view	supported		ok 1 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	view	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	set	n/a	set not offered for this element	-
 ppt	picture	add	n/a	add not offered for this element	-
 ppt	picture	remove	n/a	remove not offered for this element	-
@@ -2261,13 +2261,13 @@ ppt	picture	edit	n/a	edit not offered for this element	-
 ppt	picture	batch	n/a	batch not offered for this element	-
 ppt	picture	create	supported		ok format
 ppt	picture	save	supported		ok format
-ppt	table	get	supported		unreached
-ppt	table	find	supported		unreached
-ppt	table	query	supported		unreached
-ppt	table	view	supported		unreached
-ppt	table	set	n/a	set not offered for this element	unreached
+ppt	table	get	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	find	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
+ppt	table	view	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	set	n/a	set not offered for this element	-
 ppt	table	add	n/a	add not offered for this element	-
-ppt	table	remove	n/a	remove not offered for this element	unreached
+ppt	table	remove	n/a	remove not offered for this element	-
 ppt	table	move	format-verb		unreached
 ppt	table	swap	format-verb		unreached
 ppt	table	edit	n/a	edit not offered for this element	-
@@ -2313,10 +2313,10 @@ ppt	chart	edit	gap	M1-extended	-
 ppt	chart	batch	gap	M1-extended	-
 ppt	chart	create	gap	M1-extended	ok format
 ppt	chart	save	gap	M1-extended	ok format
-ppt	group	get	supported		ok 2 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
-ppt	group	find	supported		ok 2 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
+ppt	group	get	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
+ppt	group	find	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
 ppt	group	query	supported		ok matches in poi/test-data/slideshow/42485.ppt
-ppt	group	view	supported		ok 2 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
+ppt	group	view	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
 ppt	group	set	n/a	set not offered for this element	-
 ppt	group	add	n/a	add not offered for this element	-
 ppt	group	remove	n/a	remove not offered for this element	-
@@ -2326,15 +2326,15 @@ ppt	group	edit	n/a	edit not offered for this element	-
 ppt	group	batch	n/a	batch not offered for this element	-
 ppt	group	create	supported		ok format
 ppt	group	save	supported		ok format
-ppt	connector	get	supported		unreached
-ppt	connector	find	supported		unreached
-ppt	connector	query	supported		unreached
-ppt	connector	view	supported		unreached
-ppt	connector	set	n/a	set not offered for this element	unreached
+ppt	connector	get	supported		ok 2 instances, first `unified-ops/0294/connectors.ppt` /slide[1]/connector[1]
+ppt	connector	find	supported		ok 2 instances, first `unified-ops/0294/connectors.ppt` /slide[1]/connector[1]
+ppt	connector	query	supported		ok matches in unified-ops/0294/connectors.ppt
+ppt	connector	view	supported		ok 2 instances, first `unified-ops/0294/connectors.ppt` /slide[1]/connector[1]
+ppt	connector	set	n/a	set not offered for this element	-
 ppt	connector	add	n/a	add not offered for this element	-
-ppt	connector	remove	n/a	remove not offered for this element	unreached
-ppt	connector	move	format-verb		unreached
-ppt	connector	swap	format-verb		unreached
+ppt	connector	remove	n/a	remove not offered for this element	-
+ppt	connector	move	format-verb		refused unsupported_type
+ppt	connector	swap	format-verb		refused unsupported_type
 ppt	connector	edit	n/a	edit not offered for this element	-
 ppt	connector	batch	n/a	batch not offered for this element	-
 ppt	connector	create	supported		ok format
@@ -2369,7 +2369,7 @@ ppt	paragraph	get	supported		ok 8 instances, first `poi/test-data/slideshow/inco
 ppt	paragraph	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1]
 ppt	paragraph	query	supported		ok matches in poi/test-data/slideshow/incorrect_slide_order.ppt
 ppt	paragraph	view	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1]
-ppt	paragraph	set	supported		ok `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1] text=Litchi
+ppt	paragraph	set	supported		ok `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1] {"text":"Litchi"}
 ppt	paragraph	add	n/a	add not offered for this element	-
 ppt	paragraph	remove	n/a	remove not offered for this element	-
 ppt	paragraph	move	format-verb		refused unsupported_type
@@ -2404,11 +2404,11 @@ ppt	linebreak	edit	gap	M1-extended	-
 ppt	linebreak	batch	gap	M1-extended	-
 ppt	linebreak	create	gap	M1-extended	ok format
 ppt	linebreak	save	gap	M1-extended	ok format
-ppt	notes	get	supported		ok 4 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
-ppt	notes	find	supported		ok 4 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
+ppt	notes	get	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
+ppt	notes	find	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
 ppt	notes	query	supported		ok matches in poi/test-data/slideshow/headers_footers.ppt
-ppt	notes	view	supported		ok 4 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
-ppt	notes	set	supported		ok `poi/test-data/slideshow/basic_test_ppt_file.ppt` /slide[1]/notes text=Litchi
+ppt	notes	view	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
+ppt	notes	set	supported		ok `poi/test-data/slideshow/basic_test_ppt_file.ppt` /slide[1]/notes {"text":"Litchi"}
 ppt	notes	add	n/a	add not offered for this element	-
 ppt	notes	remove	n/a	remove not offered for this element	-
 ppt	notes	move	format-verb		unreached
@@ -2694,8 +2694,8 @@ rtf	paragraph	get	supported		ok 8 instances, first `rtf/testDefaultEncodingParse
 rtf	paragraph	find	supported		ok 8 instances, first `rtf/testDefaultEncodingParse.rtf` /body/p[1]
 rtf	paragraph	query	supported		ok matches in seed
 rtf	paragraph	view	supported		ok 8 instances, first `rtf/testDefaultEncodingParse.rtf` /body/p[1]
-rtf	paragraph	set	supported		ok `seed + add paragraph` /body/p[1] text=Litchi
-rtf	paragraph	add	supported		ok /body/p[3] on `seed` under /body []
+rtf	paragraph	set	supported		ok `seed + add paragraph` /body/p[1] {"text":"Litchi"}
+rtf	paragraph	add	supported		ok /body/p[3] on `seed` under /body {}
 rtf	paragraph	remove	supported		ok `seed + add paragraph` /body/p[1]
 rtf	paragraph	move	format-verb		ok `seed + add paragraph` /body/p[1] /body/p[2]
 rtf	paragraph	swap	format-verb		ok `seed + add paragraph` /body/p[1] /body/p[2]
@@ -2707,8 +2707,8 @@ rtf	run	get	supported		ok 8 instances, first `rtf/testDefaultEncodingParse.rtf` 
 rtf	run	find	supported		ok 8 instances, first `rtf/testDefaultEncodingParse.rtf` /body/p[1]/r[1]
 rtf	run	query	supported		ok matches in seed
 rtf	run	view	supported		ok 8 instances, first `rtf/testDefaultEncodingParse.rtf` /body/p[1]/r[1]
-rtf	run	set	supported		ok `seed + add paragraph` /body/p[1]/r[1] text=Litchi
-rtf	run	add	supported		ok /body/p[1]/r[2] on `seed + add paragraph` under /body/p[1] [text]
+rtf	run	set	supported		ok `seed + add paragraph` /body/p[1]/r[1] {"text":"Litchi"}
+rtf	run	add	supported		ok /body/p[1]/r[2] on `seed + add paragraph` under /body/p[1] {"text":"Litchi"}
 rtf	run	remove	supported		ok `seed + add paragraph` /body/p[1]/r[1]
 rtf	run	move	format-verb		refused unsupported_type
 rtf	run	swap	format-verb		refused unsupported_type
@@ -2746,7 +2746,7 @@ rtf	cell	get	supported		ok 2 instances, first `libreoffice-core/sw/qa/extras/rtf
 rtf	cell	find	supported		ok 2 instances, first `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf` /body/tbl[1]/tr[1]/tc[1]
 rtf	cell	query	supported		ok matches in libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf
 rtf	cell	view	supported		ok 2 instances, first `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf` /body/tbl[1]/tr[1]/tc[1]
-rtf	cell	set	supported		ok `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf` /body/tbl[1]/tr[1]/tc[1] text=Litchi
+rtf	cell	set	supported		ok `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 rtf	cell	add	n/a	add not offered for this element	-
 rtf	cell	remove	n/a	remove not offered for this element	-
 rtf	cell	move	format-verb		refused unsupported_type
@@ -2759,7 +2759,7 @@ rtf	header	get	supported		ok 1 instances, first `rtf/test437Encoding.rtf` /heade
 rtf	header	find	supported		ok 1 instances, first `rtf/test437Encoding.rtf` /header[1]
 rtf	header	query	supported		ok matches in rtf/test437Encoding.rtf
 rtf	header	view	supported		ok 1 instances, first `rtf/test437Encoding.rtf` /header[1]
-rtf	header	set	supported		ok `rtf/test437Encoding.rtf` /header[1] text=Litchi
+rtf	header	set	supported		ok `rtf/test437Encoding.rtf` /header[1] {"text":"Litchi"}
 rtf	header	add	n/a	add not offered for this element	-
 rtf	header	remove	n/a	remove not offered for this element	-
 rtf	header	move	format-verb		unreached
@@ -2772,7 +2772,7 @@ rtf	footer	get	supported		ok 1 instances, first `rtf/test437Encoding.rtf` /foote
 rtf	footer	find	supported		ok 1 instances, first `rtf/test437Encoding.rtf` /footer[1]
 rtf	footer	query	supported		ok matches in rtf/test437Encoding.rtf
 rtf	footer	view	supported		ok 1 instances, first `rtf/test437Encoding.rtf` /footer[1]
-rtf	footer	set	supported		ok `rtf/test437Encoding.rtf` /footer[1] text=Litchi
+rtf	footer	set	supported		ok `rtf/test437Encoding.rtf` /footer[1] {"text":"Litchi"}
 rtf	footer	add	n/a	add not offered for this element	-
 rtf	footer	remove	n/a	remove not offered for this element	-
 rtf	footer	move	format-verb		unreached
@@ -2785,7 +2785,7 @@ rtf	footnote	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras
 rtf	footnote	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf` /footnote[1]
 rtf	footnote	query	supported		ok matches in libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf
 rtf	footnote	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf` /footnote[1]
-rtf	footnote	set	supported		ok `libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf` /footnote[1] text=Litchi
+rtf	footnote	set	supported		ok `libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf` /footnote[1] {"text":"Litchi"}
 rtf	footnote	add	n/a	add not offered for this element	-
 rtf	footnote	remove	n/a	remove not offered for this element	-
 rtf	footnote	move	format-verb		unreached
@@ -2798,7 +2798,7 @@ rtf	endnote	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/writerf
 rtf	endnote	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf` /endnote[1]
 rtf	endnote	query	supported		ok matches in libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf
 rtf	endnote	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf` /endnote[1]
-rtf	endnote	set	supported		ok `libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf` /endnote[1] text=Litchi
+rtf	endnote	set	supported		ok `libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf` /endnote[1] {"text":"Litchi"}
 rtf	endnote	add	n/a	add not offered for this element	-
 rtf	endnote	remove	n/a	remove not offered for this element	-
 rtf	endnote	move	format-verb		unreached
@@ -2824,7 +2824,7 @@ rtf	comment	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/
 rtf	comment	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf` /comments/comment[1]
 rtf	comment	query	supported		ok matches in libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf
 rtf	comment	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf` /comments/comment[1]
-rtf	comment	set	supported		ok `libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf` /comments/comment[1] text=Litchi
+rtf	comment	set	supported		ok `libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf` /comments/comment[1] {"text":"Litchi"}
 rtf	comment	add	n/a	add not offered for this element	-
 rtf	comment	remove	n/a	remove not offered for this element	-
 rtf	comment	move	format-verb		unreached
@@ -2967,8 +2967,8 @@ odt	paragraph	get	supported		ok 8 instances, first `odf/corpus/writer-header-foo
 odt	paragraph	find	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /body/p[1]
 odt	paragraph	query	supported		ok matches in odf/corpus/writer-header-footer.odt
 odt	paragraph	view	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /body/p[1]
-odt	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] text=Litchi
-odt	paragraph	add	supported		ok /body/p[1] on `create()` under /body []
+odt	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] {"text":"Litchi"}
+odt	paragraph	add	supported		ok /body/p[1] on `create()` under /body {}
 odt	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
 odt	paragraph	move	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
 odt	paragraph	swap	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
@@ -2980,8 +2980,8 @@ odt	heading	get	supported		ok 7 instances, first `odf/corpus/writer-header-foote
 odt	heading	find	supported		ok 7 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
 odt	heading	query	supported		ok matches in odf/corpus/writer-header-footer.odt
 odt	heading	view	supported		ok 7 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
-odt	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] text=Litchi
-odt	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body []
+odt	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] {"text":"Litchi"}
+odt	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body {}
 odt	heading	remove	supported		ok `create() + add paragraph + add heading` /body/h[1]
 odt	heading	move	format-verb		ok `create() + add paragraph + add heading` /body/h[1] /body/h[2]
 odt	heading	swap	format-verb		ok `create() + add paragraph + add heading` /body/h[1] /body/h[2]
@@ -2993,8 +2993,8 @@ odt	run	get	supported		ok 8 instances, first `odf/corpus/writer-header-footer.od
 odt	run	find	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]/r[1]
 odt	run	query	supported		ok matches in odf/corpus/writer-header-footer.odt
 odt	run	view	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]/r[1]
-odt	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] text=Litchi
-odt	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] []
+odt	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] {"text":"Litchi"}
+odt	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] {}
 odt	run	remove	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1]
 odt	run	move	format-verb		ok `create() + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
 odt	run	swap	format-verb		ok `create() + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
@@ -3006,8 +3006,8 @@ odt	hyperlink	get	supported		ok 7 instances, first `odf/corpus/writer-definition
 odt	hyperlink	find	supported		ok 7 instances, first `odf/corpus/writer-definition-lists.odt` /body/p[8]/hyperlink[1]
 odt	hyperlink	query	supported		ok matches in odf/corpus/writer-definition-lists.odt
 odt	hyperlink	view	supported		ok 7 instances, first `odf/corpus/writer-definition-lists.odt` /body/p[8]/hyperlink[1]
-odt	hyperlink	set	supported		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] text=Litchi
-odt	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `create() + add paragraph` under /body/p[1] [text,url]
+odt	hyperlink	set	supported		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] {"text":"Litchi"}
+odt	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `create() + add paragraph` under /body/p[1] {"text":"Litchi","url":"Litchi"}
 odt	hyperlink	remove	supported		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1]
 odt	hyperlink	move	format-verb		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] /body/p[1]/hyperlink[2]
 odt	hyperlink	swap	format-verb		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] /body/p[1]/hyperlink[2]
@@ -3020,7 +3020,7 @@ odt	list	find	supported		ok 6 instances, first `odf/corpus/writer-definition-lis
 odt	list	query	supported		ok matches in odf/corpus/writer-definition-lists.odt
 odt	list	view	supported		ok 6 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]
 odt	list	set	n/a	set not offered for this element	-
-odt	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body []
+odt	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body {}
 odt	list	remove	supported		ok `create() + add paragraph + add list` /body/list[1]
 odt	list	move	format-verb		ok `create() + add paragraph + add list` /body/list[1] /body/list[2]
 odt	list	swap	format-verb		ok `create() + add paragraph + add list` /body/list[1] /body/list[2]
@@ -3032,8 +3032,8 @@ odt	listItem	get	supported		ok 8 instances, first `odf/corpus/writer-definition-
 odt	listItem	find	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]/listItem[1]
 odt	listItem	query	supported		ok matches in odf/corpus/writer-definition-lists.odt
 odt	listItem	view	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]/listItem[1]
-odt	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] text=Litchi
-odt	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] []
+odt	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] {"text":"Litchi"}
+odt	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] {}
 odt	listItem	remove	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1]
 odt	listItem	move	format-verb		ok `create() + add paragraph + add list + add listItem` /body/list[1]/listItem[1] /body/list[1]/listItem[2]
 odt	listItem	swap	format-verb		ok `create() + add paragraph + add list + add listItem` /body/list[1]/listItem[1] /body/list[1]/listItem[2]
@@ -3045,8 +3045,8 @@ odt	table	get	supported		ok 5 instances, first `odf/corpus/writer-table.odt` /bo
 odt	table	find	supported		ok 5 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
 odt	table	query	supported		ok matches in odf/corpus/writer-table.odt
 odt	table	view	supported		ok 5 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
-odt	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] name=Litchi
-odt	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body []
+odt	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] {"name":"Litchi"}
+odt	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body {}
 odt	table	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]
 odt	table	move	format-verb		ok `create() + add paragraph + add table` /body/tbl[1] /body/tbl[2]
 odt	table	swap	format-verb		ok `create() + add paragraph + add table` /body/tbl[1] /body/tbl[2]
@@ -3059,7 +3059,7 @@ odt	row	find	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /bod
 odt	row	query	supported		ok matches in odf/corpus/writer-table.odt
 odt	row	view	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]/tr[1]
 odt	row	set	n/a	set not offered for this element	-
-odt	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] []
+odt	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] {}
 odt	row	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]
 odt	row	move	format-verb		ok `create() + add paragraph + add table + add row` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
 odt	row	swap	format-verb		ok `create() + add paragraph + add table + add row` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
@@ -3071,7 +3071,7 @@ odt	cell	get	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /bod
 odt	cell	find	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]/tr[1]/tc[1]
 odt	cell	query	supported		ok matches in odf/corpus/writer-table.odt
 odt	cell	view	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]/tr[1]/tc[1]
-odt	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] text=Litchi
+odt	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 odt	cell	add	n/a	add not offered for this element	-
 odt	cell	remove	n/a	remove not offered for this element	-
 odt	cell	move	format-verb		refused invalid_value
@@ -3084,8 +3084,8 @@ odt	section	get	supported		ok 2 instances, first `create() + add paragraph + add
 odt	section	find	supported		ok 2 instances, first `create() + add paragraph + add section` /body/section[1]
 odt	section	query	supported		ok matches in create() + add paragraph + add section
 odt	section	view	supported		ok 2 instances, first `create() + add paragraph + add section` /body/section[1]
-odt	section	set	supported		ok `create() + add paragraph + add section` /body/section[1] name=7
-odt	section	add	supported		ok /body/section[1] on `create() + add paragraph` under /body [name]
+odt	section	set	supported		ok `create() + add paragraph + add section` /body/section[1] {"name":"7"}
+odt	section	add	supported		ok /body/section[1] on `create() + add paragraph` under /body {"name":"Litchi"}
 odt	section	remove	supported		ok `create() + add paragraph + add section` /body/section[1]
 odt	section	move	format-verb		ok `create() + add paragraph + add section` /body/section[1] /body/section[2]
 odt	section	swap	format-verb		ok `create() + add paragraph + add section` /body/section[1] /body/section[2]
@@ -3097,7 +3097,7 @@ odt	frame	get	supported		ok 7 instances, first `odf/corpus/writer-images-frames.
 odt	frame	find	supported		ok 7 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
 odt	frame	query	supported		ok matches in odf/corpus/writer-images-frames.odt
 odt	frame	view	supported		ok 7 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
-odt	frame	set	supported		ok `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1] name=Litchi
+odt	frame	set	supported		ok `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1] {"name":"Litchi"}
 odt	frame	add	n/a	add not offered for this element	-
 odt	frame	remove	supported		ok `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
 odt	frame	move	format-verb		ok `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt` /body/p[1]/frame[1] /body/p[1]/frame[2]
@@ -3123,7 +3123,7 @@ odt	textbox	get	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/
 odt	textbox	find	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt` /body/p[1]/frame[1]/textbox[1]
 odt	textbox	query	supported		ok matches in libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt
 odt	textbox	view	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt` /body/p[1]/frame[1]/textbox[1]
-odt	textbox	set	supported		ok `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt` /body/p[1]/frame[1]/textbox[1] text=Litchi
+odt	textbox	set	supported		ok `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt` /body/p[1]/frame[1]/textbox[1] {"text":"Litchi"}
 odt	textbox	add	n/a	add not offered for this element	-
 odt	textbox	remove	supported		ok `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt` /body/p[1]/frame[1]/textbox[1]
 odt	textbox	move	format-verb		refused unsupported_type
@@ -3136,8 +3136,8 @@ odt	footnote	get	supported		ok 2 instances, first `create() + add paragraph + ad
 odt	footnote	find	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 odt	footnote	query	supported		ok matches in create() + add paragraph + add footnote
 odt	footnote	view	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
-odt	footnote	set	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] text=Litchi
-odt	footnote	add	supported		ok /body/p[1]/footnote[1] on `create() + add paragraph` under /body/p[1] []
+odt	footnote	set	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] {"text":"Litchi"}
+odt	footnote	add	supported		ok /body/p[1]/footnote[1] on `create() + add paragraph` under /body/p[1] {}
 odt	footnote	remove	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 odt	footnote	move	format-verb		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] /body/p[1]/footnote[2]
 odt	footnote	swap	format-verb		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] /body/p[1]/footnote[2]
@@ -3149,8 +3149,8 @@ odt	endnote	get	supported		ok 2 instances, first `create() + add paragraph + add
 odt	endnote	find	supported		ok 2 instances, first `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
 odt	endnote	query	supported		ok matches in create() + add paragraph + add endnote
 odt	endnote	view	supported		ok 2 instances, first `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
-odt	endnote	set	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] text=Litchi
-odt	endnote	add	supported		ok /body/p[1]/endnote[1] on `create() + add paragraph` under /body/p[1] []
+odt	endnote	set	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] {"text":"Litchi"}
+odt	endnote	add	supported		ok /body/p[1]/endnote[1] on `create() + add paragraph` under /body/p[1] {}
 odt	endnote	remove	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
 odt	endnote	move	format-verb		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] /body/p[1]/endnote[2]
 odt	endnote	swap	format-verb		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] /body/p[1]/endnote[2]
@@ -3162,8 +3162,8 @@ odt	comment	get	supported		ok 2 instances, first `create() + add paragraph + add
 odt	comment	find	supported		ok 2 instances, first `create() + add paragraph + add comment` /body/p[1]/comment[1]
 odt	comment	query	supported		ok matches in create() + add paragraph + add comment
 odt	comment	view	supported		ok 2 instances, first `create() + add paragraph + add comment` /body/p[1]/comment[1]
-odt	comment	set	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] text=Litchi
-odt	comment	add	supported		ok /body/p[1]/comment[1] on `create() + add paragraph` under /body/p[1] []
+odt	comment	set	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] {"text":"Litchi"}
+odt	comment	add	supported		ok /body/p[1]/comment[1] on `create() + add paragraph` under /body/p[1] {}
 odt	comment	remove	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1]
 odt	comment	move	format-verb		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] /body/p[1]/comment[2]
 odt	comment	swap	format-verb		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] /body/p[1]/comment[2]
@@ -3175,8 +3175,8 @@ odt	bookmark	get	supported		ok 6 instances, first `odf/corpus/writer-table-of-co
 odt	bookmark	find	supported		ok 6 instances, first `odf/corpus/writer-table-of-contents.odt` /body/h[1]/bookmark[1]
 odt	bookmark	query	supported		ok matches in odf/corpus/writer-table-of-contents.odt
 odt	bookmark	view	supported		ok 6 instances, first `odf/corpus/writer-table-of-contents.odt` /body/h[1]/bookmark[1]
-odt	bookmark	set	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] name=7
-odt	bookmark	add	supported		ok /body/p[1]/bookmark[1] on `create() + add paragraph` under /body/p[1] [name]
+odt	bookmark	set	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] {"name":"7"}
+odt	bookmark	add	supported		ok /body/p[1]/bookmark[1] on `create() + add paragraph` under /body/p[1] {"name":"Litchi"}
 odt	bookmark	remove	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1]
 odt	bookmark	move	format-verb		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] /body/p[1]/bookmark[2]
 odt	bookmark	swap	format-verb		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] /body/p[1]/bookmark[2]
@@ -3214,7 +3214,7 @@ odt	metadata	get	supported		ok 8 instances, first `odf/corpus/writer-header-foot
 odt	metadata	find	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /metadata
 odt	metadata	query	supported		ok matches in create()
 odt	metadata	view	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /metadata
-odt	metadata	set	supported		ok `create() + add paragraph` /metadata title=Litchi
+odt	metadata	set	supported		ok `create() + add paragraph` /metadata {"title":"Litchi"}
 odt	metadata	add	n/a	add not offered for this element	-
 odt	metadata	remove	n/a	remove not offered for this element	-
 odt	metadata	move	format-verb		unreached
@@ -3240,8 +3240,8 @@ ods	sheet	get	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /s
 ods	sheet	find	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sheet[1]
 ods	sheet	query	supported		ok matches in create()
 ods	sheet	view	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sheet[1]
-ods	sheet	set	supported		ok `seed + add sheet` /sheet[1] name=Litchi
-ods	sheet	add	supported		ok /sheet[2] on `seed` under / []
+ods	sheet	set	supported		ok `seed + add sheet` /sheet[1] {"name":"Litchi"}
+ods	sheet	add	supported		ok /sheet[2] on `seed` under / {}
 ods	sheet	remove	supported		ok `seed + add sheet` /sheet[1]
 ods	sheet	move	format-verb		ok `seed + add sheet` /sheet[1] /sheet[2]
 ods	sheet	swap	format-verb		ok `seed + add sheet` /sheet[1] /sheet[2]
@@ -3253,7 +3253,7 @@ ods	cell	get	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sh
 ods	cell	find	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sheet[1]/A1
 ods	cell	query	supported		ok matches in seed
 ods	cell	view	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sheet[1]/A1
-ods	cell	set	supported		ok `seed + add sheet` /sheet[1]/A1 formula=Litchi
+ods	cell	set	supported		ok `seed + add sheet` /sheet[1]/A1 {"formula":"Litchi"}
 ods	cell	add	n/a	add not offered for this element	-
 ods	cell	remove	supported		ok `seed + add sheet` /sheet[1]/A1
 ods	cell	move	format-verb		refused unsupported_element
@@ -3266,7 +3266,7 @@ ods	range	get	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /s
 ods	range	find	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sheet[1]/A1:B2
 ods	range	query	n/a	query not offered for this element	-
 ods	range	view	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sheet[1]/A1:B2
-ods	range	set	supported		ok `seed + add sheet` /sheet[1]/A1:B2 merge=false
+ods	range	set	supported		ok `seed + add sheet` /sheet[1]/A1:B2 {"merge":"false"}
 ods	range	add	n/a	add not offered for this element	-
 ods	range	remove	supported		ok `seed + add sheet` /sheet[1]/A1:B2
 ods	range	move	format-verb		unreached
@@ -3280,7 +3280,7 @@ ods	row	find	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sh
 ods	row	query	supported		ok matches in seed
 ods	row	view	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /sheet[1]/row[1]
 ods	row	set	n/a	set not offered for this element	-
-ods	row	add	supported		ok /sheet[1]/row[1] on `create()` under /sheet[1] []
+ods	row	add	supported		ok /sheet[1]/row[1] on `create()` under /sheet[1] {}
 ods	row	remove	supported		ok `create() + add row` /sheet[1]/row[1]
 ods	row	move	format-verb		refused unsupported_capability
 ods	row	swap	format-verb		refused unsupported_capability
@@ -3318,8 +3318,8 @@ ods	namedrange	get	supported		ok 3 instances, first `odfdo/tests/samples/simple_
 ods	namedrange	find	supported		ok 3 instances, first `odfdo/tests/samples/simple_table_named_range.ods` /namedrange[1]
 ods	namedrange	query	supported		ok matches in odfdo/tests/samples/simple_table_named_range.ods
 ods	namedrange	view	supported		ok 3 instances, first `odfdo/tests/samples/simple_table_named_range.ods` /namedrange[1]
-ods	namedrange	set	supported		ok `odf/corpus/calc-two-sheets.ods + add namedrange` /namedrange[1] name=Litchi
-ods	namedrange	add	supported		ok /namedrange[1] on `odf/corpus/calc-two-sheets.ods` under / [name,ref]
+ods	namedrange	set	supported		ok `odf/corpus/calc-two-sheets.ods + add namedrange` /namedrange[1] {"name":"Litchi"}
+ods	namedrange	add	supported		ok /namedrange[1] on `odf/corpus/calc-two-sheets.ods` under / {"name":"Totals","ref":"sheet1!$A$1:$C$2"}
 ods	namedrange	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add namedrange` /namedrange[1]
 ods	namedrange	move	format-verb		refused unsupported_element
 ods	namedrange	swap	format-verb		refused unsupported_element
@@ -3331,8 +3331,8 @@ ods	comment	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods
 ods	comment	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add comment` /sheet[1]/comment[1]
 ods	comment	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add comment
 ods	comment	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add comment` /sheet[1]/comment[1]
-ods	comment	set	supported		ok `odf/corpus/calc-two-sheets.ods + add comment` /sheet[1]/comment[1] author=Litchi
-ods	comment	add	supported		ok /sheet[1]/comment[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1/B2 [text,author]
+ods	comment	set	supported		ok `odf/corpus/calc-two-sheets.ods + add comment` /sheet[1]/comment[1] {"author":"Litchi"}
+ods	comment	add	supported		ok /sheet[1]/comment[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1/B2 {"text":"check","author":"Reviewer"}
 ods	comment	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add comment` /sheet[1]/comment[1]
 ods	comment	move	format-verb		unreached
 ods	comment	swap	format-verb		unreached
@@ -3578,8 +3578,8 @@ odp	slide	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]
 odp	slide	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]
 odp	slide	query	supported		ok matches in create()
 odp	slide	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]
-odp	slide	set	supported		ok `create() + add slide` /slide[1] name=Litchi
-odp	slide	add	supported		ok /slide[2] on `create()` under / []
+odp	slide	set	supported		ok `create() + add slide` /slide[1] {"name":"Litchi"}
+odp	slide	add	supported		ok /slide[2] on `create()` under / {}
 odp	slide	remove	supported		ok `create() + add slide` /slide[1]
 odp	slide	move	format-verb		ok `create() + add slide` /slide[1] /slide[2]
 odp	slide	swap	format-verb		ok `create() + add slide` /slide[1] /slide[2]
@@ -3591,8 +3591,8 @@ odp	shape	get	supported		ok 8 instances, first `odf/odp/tdf169979.odp` /slide[1]
 odp	shape	find	supported		ok 8 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
 odp	shape	query	supported		ok matches in odf/odp/tdf169979.odp
 odp	shape	view	supported		ok 8 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
-odp	shape	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1] name=Litchi
-odp	shape	add	supported		ok /slide[1]/shape[1] on `create() + add slide` under /slide[1] [text,width,height]
+odp	shape	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1] {"name":"Litchi"}
+odp	shape	add	supported		ok /slide[1]/shape[1] on `create() + add slide` under /slide[1] {"text":"Box","width":"8cm","height":"2cm"}
 odp	shape	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]
 odp	shape	move	format-verb		ok `create() + add slide + add shape` /slide[1]/shape[1] /slide[1]/shape[2]
 odp	shape	swap	format-verb		ok `create() + add slide + add shape` /slide[1]/shape[1] /slide[1]/shape[2]
@@ -3600,11 +3600,11 @@ odp	shape	edit	supported		ok tx.set
 odp	shape	batch	supported		ok set item
 odp	shape	create	supported		ok format
 odp	shape	save	supported		ok format
-odp	placeholder	get	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
-odp	placeholder	find	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	get	supported		ok 7 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	find	supported		ok 7 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
 odp	placeholder	query	supported		ok matches in odf/odp/tdf169979.odp
-odp	placeholder	view	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
-odp	placeholder	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/shape[1] name=Litchi
+odp	placeholder	view	supported		ok 7 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/shape[1] {"name":"Litchi"}
 odp	placeholder	add	n/a	add not offered for this element	-
 odp	placeholder	remove	supported		ok `odf/odp/tdf169979.odp` /slide[1]/shape[1]
 odp	placeholder	move	format-verb		ok `odf/corpus/impress-basic.odp` /slide[1]/shape[2] /slide[1]/shape[1]
@@ -3617,7 +3617,7 @@ odp	picture	get	supported		ok 1 instances, first `odf/odp/text-in-image.odp` /sl
 odp	picture	find	supported		ok 1 instances, first `odf/odp/text-in-image.odp` /slide[1]/picture[1]
 odp	picture	query	supported		ok matches in odf/odp/text-in-image.odp
 odp	picture	view	supported		ok 1 instances, first `odf/odp/text-in-image.odp` /slide[1]/picture[1]
-odp	picture	set	supported		ok `odf/odp/text-in-image.odp` /slide[1]/picture[1] name=Litchi
+odp	picture	set	supported		ok `odf/odp/text-in-image.odp` /slide[1]/picture[1] {"name":"Litchi"}
 odp	picture	add	n/a	add not offered for this element	-
 odp	picture	remove	supported		ok `odf/odp/text-in-image.odp` /slide[1]/picture[1]
 odp	picture	move	format-verb		unreached
@@ -3630,7 +3630,7 @@ odp	table	get	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]
 odp	table	find	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
 odp	table	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	table	view	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
-odp	table	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1] name=Litchi
+odp	table	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1] {"name":"Litchi"}
 odp	table	add	n/a	add not offered for this element	-
 odp	table	remove	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1]
 odp	table	move	format-verb		unreached
@@ -3656,7 +3656,7 @@ odp	tc	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/ta
 odp	tc	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]
 odp	tc	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	tc	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]
-odp	tc	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1] text=Litchi
+odp	tc	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
 odp	tc	add	n/a	add not offered for this element	-
 odp	tc	remove	n/a	remove not offered for this element	-
 odp	tc	move	format-verb		refused unsupported_capability
@@ -3669,7 +3669,7 @@ odp	chart	get	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extra
 odp	chart	find	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
 odp	chart	query	supported		ok matches in libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp
 odp	chart	view	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
-odp	chart	set	supported		ok `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1] name=Litchi
+odp	chart	set	supported		ok `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1] {"name":"Litchi"}
 odp	chart	add	n/a	add not offered for this element	-
 odp	chart	remove	supported		ok `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
 odp	chart	move	format-verb		unreached
@@ -3682,7 +3682,7 @@ odp	group	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data
 odp	group	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp` /slide[1]/group[1]
 odp	group	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp
 odp	group	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp` /slide[1]/group[1]
-odp	group	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp` /slide[1]/group[1] name=Litchi
+odp	group	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp` /slide[1]/group[1] {"name":"Litchi"}
 odp	group	add	n/a	add not offered for this element	-
 odp	group	remove	supported		ok `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp` /slide[1]/group[1]
 odp	group	move	format-verb		unreached
@@ -3695,7 +3695,7 @@ odp	connector	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/
 odp	connector	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp` /slide[1]/connector[1]
 odp	connector	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp
 odp	connector	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp` /slide[1]/connector[1]
-odp	connector	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp` /slide[1]/connector[1] name=Litchi
+odp	connector	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp` /slide[1]/connector[1] {"name":"Litchi"}
 odp	connector	add	n/a	add not offered for this element	-
 odp	connector	remove	supported		ok `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp` /slide[1]/connector[1]
 odp	connector	move	format-verb		unreached
@@ -3708,7 +3708,7 @@ odp	ole	get	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/o
 odp	ole	find	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
 odp	ole	query	supported		ok matches in odf/odp/tdf169979.odp
 odp	ole	view	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
-odp	ole	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/ole[1] name=Litchi
+odp	ole	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/ole[1] {"name":"Litchi"}
 odp	ole	add	n/a	add not offered for this element	-
 odp	ole	remove	supported		ok `odf/odp/tdf169979.odp` /slide[1]/ole[1]
 odp	ole	move	format-verb		unreached
@@ -3721,7 +3721,7 @@ odp	media	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data
 odp	media	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
 odp	media	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp
 odp	media	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
-odp	media	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1] name=Litchi
+odp	media	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1] {"name":"Litchi"}
 odp	media	add	n/a	add not offered for this element	-
 odp	media	remove	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
 odp	media	move	format-verb		unreached
@@ -3760,8 +3760,8 @@ odp	paragraph	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slid
 odp	paragraph	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
 odp	paragraph	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	paragraph	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
-odp	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] text=Litchi
-odp	paragraph	add	supported		ok /slide[1]/shape[1]/paragraph[2] on `create() + add slide + add shape` under /slide[1]/shape[1] []
+odp	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] {"text":"Litchi"}
+odp	paragraph	add	supported		ok /slide[1]/shape[1]/paragraph[2] on `create() + add slide + add shape` under /slide[1]/shape[1] {}
 odp	paragraph	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]
 odp	paragraph	move	format-verb		refused unsupported_capability
 odp	paragraph	swap	format-verb		refused unsupported_capability
@@ -3773,7 +3773,7 @@ odp	run	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/t
 odp	run	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]/run[1]
 odp	run	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	run	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]/run[1]
-odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] text=Litchi
+odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"text":"Litchi"}
 odp	run	add	n/a	add not offered for this element	-
 odp	run	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1]
 odp	run	move	format-verb		unreached
@@ -3812,7 +3812,7 @@ odp	notes	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]
 odp	notes	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/notes
 odp	notes	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	notes	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/notes
-odp	notes	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/notes text=Litchi
+odp	notes	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/notes {"text":"Litchi"}
 odp	notes	add	n/a	add not offered for this element	-
 odp	notes	remove	n/a	remove not offered for this element	-
 odp	notes	move	format-verb		unreached
@@ -3821,15 +3821,15 @@ odp	notes	edit	supported		ok tx.set
 odp	notes	batch	supported		ok set item
 odp	notes	create	supported		ok format
 odp	notes	save	supported		ok format
-odp	comment	get	supported		unreached
-odp	comment	find	supported		unreached
-odp	comment	query	supported		unreached
-odp	comment	view	supported		unreached
-odp	comment	set	n/a	set not offered for this element	unreached
+odp	comment	get	supported		ok 2 instances, first `unified-ops/0294/comments.odp` /slide[1]/comment[1]
+odp	comment	find	supported		ok 2 instances, first `unified-ops/0294/comments.odp` /slide[1]/comment[1]
+odp	comment	query	supported		ok matches in unified-ops/0294/comments.odp
+odp	comment	view	supported		ok 2 instances, first `unified-ops/0294/comments.odp` /slide[1]/comment[1]
+odp	comment	set	n/a	set not offered for this element	-
 odp	comment	add	n/a	add not offered for this element	-
-odp	comment	remove	n/a	remove not offered for this element	unreached
-odp	comment	move	format-verb		unreached
-odp	comment	swap	format-verb		unreached
+odp	comment	remove	n/a	remove not offered for this element	-
+odp	comment	move	format-verb		refused unsupported_capability
+odp	comment	swap	format-verb		refused unsupported_capability
 odp	comment	edit	n/a	edit not offered for this element	-
 odp	comment	batch	n/a	batch not offered for this element	-
 odp	comment	create	supported		ok format
@@ -3951,10 +3951,10 @@ odp	col	edit	gap	M6 ODP table columns	-
 odp	col	batch	gap	M6 ODP table columns	-
 odp	col	create	gap	M6 ODP table columns	ok format
 odp	col	save	gap	M6 ODP table columns	ok format
-odg	drawing	get	supported		ok 6 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
-odg	drawing	find	supported		ok 6 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
+odg	drawing	get	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
+odg	drawing	find	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	query	n/a	query not offered for this element	-
-odg	drawing	view	supported		ok 6 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
+odg	drawing	view	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	set	n/a	set not offered for this element	-
 odg	drawing	add	n/a	add not offered for this element	-
 odg	drawing	remove	n/a	remove not offered for this element	-
@@ -3968,8 +3968,8 @@ odg	page	get	supported		ok 8 instances, first `libreoffice-core/desktop/qa/data/
 odg	page	find	supported		ok 8 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /page[1]
 odg	page	query	supported		ok matches in libreoffice-core/desktop/qa/data/BlankDrawDocument.odg
 odg	page	view	supported		ok 8 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /page[1]
-odg	page	set	supported		ok `create() + add page` /page[1] name=Litchi
-odg	page	add	supported		ok /page[1] on `create()` under / []
+odg	page	set	supported		ok `create() + add page` /page[1] {"name":"Litchi"}
+odg	page	add	supported		ok /page[1] on `create()` under / {}
 odg	page	remove	supported		ok `create() + add page` /page[1]
 odg	page	move	format-verb		ok `create() + add page` /page[1] /page[2]
 odg	page	swap	format-verb		ok `create() + add page` /page[1] /page[2]
@@ -3977,12 +3977,12 @@ odg	page	edit	supported		ok tx.set
 odg	page	batch	supported		ok set item
 odg	page	create	supported		ok format
 odg	page	save	supported		ok format
-odg	shape	get	supported		ok 6 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
-odg	shape	find	supported		ok 6 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
+odg	shape	get	supported		ok 7 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
+odg	shape	find	supported		ok 7 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
 odg	shape	query	supported		ok matches in libreoffice-core/svx/qa/unit/data/FontWork.odg
-odg	shape	view	supported		ok 6 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
-odg	shape	set	supported		ok `create() + add page + add shape` /page[1]/shape[1] text=Litchi
-odg	shape	add	supported		ok /page[1]/shape[1] on `create() + add page` under /page[1] [x,y,width,height,text]
+odg	shape	view	supported		ok 7 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
+odg	shape	set	supported		ok `create() + add page + add shape` /page[1]/shape[1] {"text":"Litchi"}
+odg	shape	add	supported		ok /page[1]/shape[1] on `create() + add page` under /page[1] {"x":"1cm","y":"1cm","width":"4cm","height":"2cm","text":"Added"}
 odg	shape	remove	supported		ok `create() + add page + add shape` /page[1]/shape[1]
 odg	shape	move	format-verb		ok `create() + add page + add shape` /page[1]/shape[1] /page[1]/shape[2]
 odg	shape	swap	format-verb		ok `create() + add page + add shape` /page[1]/shape[1] /page[1]/shape[2]
@@ -3990,15 +3990,15 @@ odg	shape	edit	supported		ok tx.set
 odg	shape	batch	supported		ok set item
 odg	shape	create	supported		ok format
 odg	shape	save	supported		ok format
-odg	layer	get	supported		unreached
-odg	layer	find	supported		unreached
-odg	layer	query	supported		unreached
-odg	layer	view	supported		unreached
-odg	layer	set	n/a	set not offered for this element	unreached
+odg	layer	get	supported		ok 2 instances, first `unified-ops/0294/layers.odg` /page[1]/layer[1]
+odg	layer	find	supported		ok 2 instances, first `unified-ops/0294/layers.odg` /page[1]/layer[1]
+odg	layer	query	supported		ok matches in unified-ops/0294/layers.odg
+odg	layer	view	supported		ok 2 instances, first `unified-ops/0294/layers.odg` /page[1]/layer[1]
+odg	layer	set	n/a	set not offered for this element	-
 odg	layer	add	n/a	add not offered for this element	-
-odg	layer	remove	n/a	remove not offered for this element	unreached
-odg	layer	move	format-verb		unreached
-odg	layer	swap	format-verb		unreached
+odg	layer	remove	n/a	remove not offered for this element	-
+odg	layer	move	format-verb		refused unsupported_capability
+odg	layer	swap	format-verb		refused unsupported_capability
 odg	layer	edit	n/a	edit not offered for this element	-
 odg	layer	batch	n/a	batch not offered for this element	-
 odg	layer	create	supported		ok format
@@ -4007,7 +4007,7 @@ odc	chart	get	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom
 odc	chart	find	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
 odc	chart	query	n/a	query not offered for this element	-
 odc	chart	view	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
-odc	chart	set	supported		ok `create() + add axis` / title=Litchi
+odc	chart	set	supported		ok `create() + add axis` / {"title":"Litchi"}
 odc	chart	add	n/a	add not offered for this element	-
 odc	chart	remove	n/a	remove not offered for this element	-
 odc	chart	move	format-verb		unreached
@@ -4020,8 +4020,8 @@ odc	axis	get	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-
 odc	axis	find	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
 odc	axis	query	supported		ok matches in odf/odc-producer-evidence/odfdom-created.odc
 odc	axis	view	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
-odc	axis	set	supported		ok `create() + add axis` /axis[1] name=Litchi
-odc	axis	add	supported		ok /axis[1] on `create()` under / [dimension]
+odc	axis	set	supported		ok `create() + add axis` /axis[1] {"name":"Litchi"}
+odc	axis	add	supported		ok /axis[1] on `create()` under / {"dimension":"x"}
 odc	axis	remove	supported		ok `create() + add axis` /axis[1]
 odc	axis	move	format-verb		ok `create() + add axis` /axis[1] /axis[2]
 odc	axis	swap	format-verb		ok `create() + add axis` /axis[1] /axis[2]
@@ -4033,8 +4033,8 @@ odc	series	get	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdo
 odc	series	find	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
 odc	series	query	supported		ok matches in odf/odc-producer-evidence/odfdom-created.odc
 odc	series	view	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
-odc	series	set	supported		ok `create() + add series` /series[1] values=Sheet1.B1:B3 (value unchanged: no-op only)
-odc	series	add	supported		ok /series[1] on `create()` under / [values]
+odc	series	set	supported		ok `create() + add series` /series[1] {"values":"Sheet1.B1:B3"} (value unchanged: no-op only)
+odc	series	add	supported		ok /series[1] on `create()` under / {"values":"Sheet1.B1:B3"}
 odc	series	remove	supported		ok `create() + add series` /series[1]
 odc	series	move	format-verb		ok `create() + add series` /series[1] /series[2]
 odc	series	swap	format-verb		ok `create() + add series` /series[1] /series[2]
@@ -4046,8 +4046,8 @@ odc	legend	get	supported		ok 1 instances, first `create() + add legend` /legend
 odc	legend	find	supported		ok 1 instances, first `create() + add legend` /legend
 odc	legend	query	supported		ok matches in create() + add legend
 odc	legend	view	supported		ok 1 instances, first `create() + add legend` /legend
-odc	legend	set	supported		ok `create() + add legend` /legend position=bottom (value unchanged: no-op only)
-odc	legend	add	supported		ok /legend on `create()` under / [position]
+odc	legend	set	supported		ok `create() + add legend` /legend {"position":"bottom"} (value unchanged: no-op only)
+odc	legend	add	supported		ok /legend on `create()` under / {"position":"bottom"}
 odc	legend	remove	supported		ok `create() + add legend` /legend
 odc	legend	move	format-verb		unreached
 odc	legend	swap	format-verb		unreached
@@ -4072,7 +4072,7 @@ odi	frame	get	supported		ok 1 instances, first `create()` /frame[1]
 odi	frame	find	supported		ok 1 instances, first `create()` /frame[1]
 odi	frame	query	supported		ok matches in create()
 odi	frame	view	supported		ok 1 instances, first `create()` /frame[1]
-odi	frame	set	supported		ok `create()` /frame[1] name=Litchi
+odi	frame	set	supported		ok `create()` /frame[1] {"name":"Litchi"}
 odi	frame	add	gap	0282 ODI single frame	-
 odi	frame	remove	gap	0282 ODI single frame	-
 odi	frame	move	format-verb		unreached
@@ -4085,7 +4085,7 @@ odi	metadata	get	supported		ok 1 instances, first `create()` /metadata
 odi	metadata	find	supported		ok 1 instances, first `create()` /metadata
 odi	metadata	query	supported		ok matches in create()
 odi	metadata	view	supported		ok 1 instances, first `create()` /metadata
-odi	metadata	set	supported		ok `create()` /metadata title=Litchi
+odi	metadata	set	supported		ok `create()` /metadata {"title":"Litchi"}
 odi	metadata	add	n/a	add not offered for this element	-
 odi	metadata	remove	supported		ok `create()` /metadata
 odi	metadata	move	format-verb		unreached
@@ -4111,7 +4111,7 @@ odb	table	get	supported		ok 3 instances, first `libreoffice-core/extras/source/d
 odb	table	find	supported		ok 3 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]
 odb	table	query	supported		ok matches in libreoffice-core/extras/source/database/biblio.odb
 odb	table	view	supported		ok 3 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]
-odb	table	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] name=Litchi
+odb	table	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] {"name":"Litchi"}
 odb	table	add	gap	0282 ODB typed table creation	-
 odb	table	remove	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]
 odb	table	move	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] /table[2]
@@ -4124,7 +4124,7 @@ odb	column	get	supported		ok 8 instances, first `libreoffice-core/extras/source/
 odb	column	find	supported		ok 8 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1]
 odb	column	query	supported		ok matches in libreoffice-core/extras/source/database/biblio.odb
 odb	column	view	supported		ok 8 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1]
-odb	column	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] name=Litchi
+odb	column	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] {"name":"Litchi"}
 odb	column	add	gap	0282 ODB typed column creation	-
 odb	column	remove	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1]
 odb	column	move	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] /table[1]/column[2]
@@ -4137,8 +4137,8 @@ odb	query	get	supported		ok 2 instances, first `libreoffice-core/dbaccess/qa/uni
 odb	query	find	supported		ok 2 instances, first `libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb` /query[1]
 odb	query	query	supported		ok matches in libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb
 odb	query	view	supported		ok 2 instances, first `libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb` /query[1]
-odb	query	set	supported		ok `create() + add query` /query[1] command=7
-odb	query	add	supported		ok /query[1] on `create()` under / [name,command]
+odb	query	set	supported		ok `create() + add query` /query[1] {"command":"7"}
+odb	query	add	supported		ok /query[1] on `create()` under / {"name":"Litchi","command":"Litchi"}
 odb	query	remove	supported		ok `create() + add query` /query[1]
 odb	query	move	format-verb		unreached
 odb	query	swap	format-verb		unreached
@@ -4146,10 +4146,10 @@ odb	query	edit	supported		ok tx.set
 odb	query	batch	supported		ok set item
 odb	query	create	supported		ok format
 odb	query	save	supported		ok format
-oth	document	get	supported		ok 8 instances, first `create()` /
-oth	document	find	supported		ok 8 instances, first `create()` /
+oth	document	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /
+oth	document	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /
 oth	document	query	n/a	query not offered for this element	-
-oth	document	view	supported		ok 8 instances, first `create()` /
+oth	document	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /
 oth	document	set	n/a	set not offered for this element	-
 oth	document	add	n/a	add not offered for this element	-
 oth	document	remove	n/a	remove not offered for this element	-
@@ -4159,10 +4159,10 @@ oth	document	edit	n/a	edit not offered for this element	-
 oth	document	batch	n/a	batch not offered for this element	-
 oth	document	create	supported		ok format
 oth	document	save	supported		ok format
-oth	body	get	supported		ok 8 instances, first `create()` /body
-oth	body	find	supported		ok 8 instances, first `create()` /body
+oth	body	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body
+oth	body	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body
 oth	body	query	supported		ok matches in create()
-oth	body	view	supported		ok 8 instances, first `create()` /body
+oth	body	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body
 oth	body	set	n/a	set not offered for this element	-
 oth	body	add	n/a	add not offered for this element	-
 oth	body	remove	n/a	remove not offered for this element	-
@@ -4172,12 +4172,12 @@ oth	body	edit	n/a	edit not offered for this element	-
 oth	body	batch	n/a	batch not offered for this element	-
 oth	body	create	supported		ok format
 oth	body	save	supported		ok format
-oth	paragraph	get	supported		ok 8 instances, first `create() + add paragraph` /body/p[1]
-oth	paragraph	find	supported		ok 8 instances, first `create() + add paragraph` /body/p[1]
-oth	paragraph	query	supported		ok matches in create() + add paragraph
-oth	paragraph	view	supported		ok 8 instances, first `create() + add paragraph` /body/p[1]
-oth	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] text=Litchi
-oth	paragraph	add	supported		ok /body/p[1] on `create()` under /body []
+oth	paragraph	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]
+oth	paragraph	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]
+oth	paragraph	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	paragraph	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]
+oth	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] {"text":"Litchi"}
+oth	paragraph	add	supported		ok /body/p[1] on `create()` under /body {}
 oth	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
 oth	paragraph	move	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
 oth	paragraph	swap	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
@@ -4189,8 +4189,8 @@ oth	heading	get	supported		ok 2 instances, first `create() + add paragraph + add
 oth	heading	find	supported		ok 2 instances, first `create() + add paragraph + add heading` /body/h[1]
 oth	heading	query	supported		ok matches in create() + add paragraph + add heading
 oth	heading	view	supported		ok 2 instances, first `create() + add paragraph + add heading` /body/h[1]
-oth	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] text=Litchi
-oth	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body []
+oth	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] {"text":"Litchi"}
+oth	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body {}
 oth	heading	remove	supported		ok `create() + add paragraph + add heading` /body/h[1]
 oth	heading	move	format-verb		ok `create() + add paragraph + add heading` /body/h[1] /body/h[2]
 oth	heading	swap	format-verb		ok `create() + add paragraph + add heading` /body/h[1] /body/h[2]
@@ -4198,12 +4198,12 @@ oth	heading	edit	supported		ok tx.set
 oth	heading	batch	supported		ok set item
 oth	heading	create	supported		ok format
 oth	heading	save	supported		ok format
-oth	run	get	supported		ok 4 instances, first `create() + add paragraph + add run` /body/p[1]/r[1]
-oth	run	find	supported		ok 4 instances, first `create() + add paragraph + add run` /body/p[1]/r[1]
-oth	run	query	supported		ok matches in create() + add paragraph + add run
-oth	run	view	supported		ok 4 instances, first `create() + add paragraph + add run` /body/p[1]/r[1]
-oth	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] text=Litchi
-oth	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] []
+oth	run	get	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	find	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	run	view	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] {"text":"Litchi"}
+oth	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] {}
 oth	run	remove	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1]
 oth	run	move	format-verb		ok `create() + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
 oth	run	swap	format-verb		ok `create() + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
@@ -4215,8 +4215,8 @@ oth	hyperlink	get	supported		ok 2 instances, first `create() + add paragraph + a
 oth	hyperlink	find	supported		ok 2 instances, first `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1]
 oth	hyperlink	query	supported		ok matches in create() + add paragraph + add hyperlink
 oth	hyperlink	view	supported		ok 2 instances, first `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1]
-oth	hyperlink	set	supported		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] text=Litchi
-oth	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `create() + add paragraph` under /body/p[1] [text,url]
+oth	hyperlink	set	supported		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] {"text":"Litchi"}
+oth	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `create() + add paragraph` under /body/p[1] {"text":"Litchi","url":"Litchi"}
 oth	hyperlink	remove	supported		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1]
 oth	hyperlink	move	format-verb		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] /body/p[1]/hyperlink[2]
 oth	hyperlink	swap	format-verb		ok `create() + add paragraph + add hyperlink` /body/p[1]/hyperlink[1] /body/p[1]/hyperlink[2]
@@ -4229,7 +4229,7 @@ oth	list	find	supported		ok 4 instances, first `create() + add paragraph + add l
 oth	list	query	supported		ok matches in create() + add paragraph + add list
 oth	list	view	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
 oth	list	set	n/a	set not offered for this element	-
-oth	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body []
+oth	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body {}
 oth	list	remove	supported		ok `create() + add paragraph + add list` /body/list[1]
 oth	list	move	format-verb		ok `create() + add paragraph + add list` /body/list[1] /body/list[2]
 oth	list	swap	format-verb		ok `create() + add paragraph + add list` /body/list[1] /body/list[2]
@@ -4241,8 +4241,8 @@ oth	listItem	get	supported		ok 6 instances, first `create() + add paragraph + ad
 oth	listItem	find	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
 oth	listItem	query	supported		ok matches in create() + add paragraph + add list
 oth	listItem	view	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
-oth	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] text=Litchi
-oth	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] []
+oth	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] {"text":"Litchi"}
+oth	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] {}
 oth	listItem	remove	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1]
 oth	listItem	move	format-verb		ok `create() + add paragraph + add list + add listItem` /body/list[1]/listItem[1] /body/list[1]/listItem[2]
 oth	listItem	swap	format-verb		ok `create() + add paragraph + add list + add listItem` /body/list[1]/listItem[1] /body/list[1]/listItem[2]
@@ -4254,8 +4254,8 @@ oth	table	get	supported		ok 4 instances, first `create() + add paragraph + add t
 oth	table	find	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
 oth	table	query	supported		ok matches in create() + add paragraph + add table
 oth	table	view	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
-oth	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] name=Litchi
-oth	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body []
+oth	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] {"name":"Litchi"}
+oth	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body {}
 oth	table	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]
 oth	table	move	format-verb		ok `create() + add paragraph + add table` /body/tbl[1] /body/tbl[2]
 oth	table	swap	format-verb		ok `create() + add paragraph + add table` /body/tbl[1] /body/tbl[2]
@@ -4268,7 +4268,7 @@ oth	row	find	supported		ok 6 instances, first `create() + add paragraph + add ta
 oth	row	query	supported		ok matches in create() + add paragraph + add table
 oth	row	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
 oth	row	set	n/a	set not offered for this element	-
-oth	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] []
+oth	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] {}
 oth	row	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]
 oth	row	move	format-verb		ok `create() + add paragraph + add table + add row` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
 oth	row	swap	format-verb		ok `create() + add paragraph + add table + add row` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
@@ -4280,7 +4280,7 @@ oth	cell	get	supported		ok 6 instances, first `create() + add paragraph + add ta
 oth	cell	find	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
 oth	cell	query	supported		ok matches in create() + add paragraph + add table
 oth	cell	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
-oth	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] text=Litchi
+oth	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 oth	cell	add	n/a	add not offered for this element	-
 oth	cell	remove	n/a	remove not offered for this element	-
 oth	cell	move	format-verb		unreached
@@ -4293,8 +4293,8 @@ oth	section	get	supported		ok 2 instances, first `create() + add paragraph + add
 oth	section	find	supported		ok 2 instances, first `create() + add paragraph + add section` /body/section[1]
 oth	section	query	supported		ok matches in create() + add paragraph + add section
 oth	section	view	supported		ok 2 instances, first `create() + add paragraph + add section` /body/section[1]
-oth	section	set	supported		ok `create() + add paragraph + add section` /body/section[1] name=7
-oth	section	add	supported		ok /body/section[1] on `create() + add paragraph` under /body [name]
+oth	section	set	supported		ok `create() + add paragraph + add section` /body/section[1] {"name":"7"}
+oth	section	add	supported		ok /body/section[1] on `create() + add paragraph` under /body {"name":"Litchi"}
 oth	section	remove	supported		ok `create() + add paragraph + add section` /body/section[1]
 oth	section	move	format-verb		ok `create() + add paragraph + add section` /body/section[1] /body/section[2]
 oth	section	swap	format-verb		ok `create() + add paragraph + add section` /body/section[1] /body/section[2]
@@ -4302,51 +4302,51 @@ oth	section	edit	supported		ok tx.set
 oth	section	batch	supported		ok set item
 oth	section	create	supported		ok format
 oth	section	save	supported		ok format
-oth	frame	get	supported		unreached
-oth	frame	find	supported		unreached
-oth	frame	query	supported		unreached
-oth	frame	view	supported		unreached
-oth	frame	set	supported		unreached
+oth	frame	get	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	find	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	frame	view	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	set	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1] {"name":"Litchi"}
 oth	frame	add	n/a	add not offered for this element	-
-oth	frame	remove	supported		unreached
-oth	frame	move	format-verb		unreached
-oth	frame	swap	format-verb		unreached
-oth	frame	edit	supported		-
-oth	frame	batch	supported		-
+oth	frame	remove	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	move	format-verb		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1] /body/p[1]/frame[2]
+oth	frame	swap	format-verb		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1] /body/p[1]/frame[2]
+oth	frame	edit	supported		ok tx.set
+oth	frame	batch	supported		ok set item
 oth	frame	create	supported		ok format
 oth	frame	save	supported		ok format
-oth	picture	get	supported		unreached
-oth	picture	find	supported		unreached
-oth	picture	query	supported		unreached
-oth	picture	view	supported		unreached
-oth	picture	set	n/a	set not offered for this element	unreached
+oth	picture	get	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
+oth	picture	find	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
+oth	picture	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	picture	view	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
+oth	picture	set	n/a	set not offered for this element	-
 oth	picture	add	n/a	add not offered for this element	-
-oth	picture	remove	supported		unreached
+oth	picture	remove	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
 oth	picture	move	format-verb		unreached
 oth	picture	swap	format-verb		unreached
 oth	picture	edit	n/a	edit not offered for this element	-
 oth	picture	batch	n/a	batch not offered for this element	-
 oth	picture	create	supported		ok format
 oth	picture	save	supported		ok format
-oth	textbox	get	supported		unreached
-oth	textbox	find	supported		unreached
-oth	textbox	query	supported		unreached
-oth	textbox	view	supported		unreached
-oth	textbox	set	supported		unreached
+oth	textbox	get	supported		ok 1 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
+oth	textbox	find	supported		ok 1 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
+oth	textbox	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	textbox	view	supported		ok 1 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
+oth	textbox	set	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1] {"text":"Litchi"}
 oth	textbox	add	n/a	add not offered for this element	-
-oth	textbox	remove	supported		unreached
+oth	textbox	remove	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
 oth	textbox	move	format-verb		unreached
 oth	textbox	swap	format-verb		unreached
-oth	textbox	edit	supported		-
-oth	textbox	batch	supported		-
+oth	textbox	edit	supported		ok tx.set
+oth	textbox	batch	supported		ok set item
 oth	textbox	create	supported		ok format
 oth	textbox	save	supported		ok format
 oth	footnote	get	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 oth	footnote	find	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 oth	footnote	query	supported		ok matches in create() + add paragraph + add footnote
 oth	footnote	view	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
-oth	footnote	set	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] text=Litchi
-oth	footnote	add	supported		ok /body/p[1]/footnote[1] on `create() + add paragraph` under /body/p[1] []
+oth	footnote	set	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] {"text":"Litchi"}
+oth	footnote	add	supported		ok /body/p[1]/footnote[1] on `create() + add paragraph` under /body/p[1] {}
 oth	footnote	remove	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 oth	footnote	move	format-verb		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] /body/p[1]/footnote[2]
 oth	footnote	swap	format-verb		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] /body/p[1]/footnote[2]
@@ -4358,8 +4358,8 @@ oth	endnote	get	supported		ok 2 instances, first `create() + add paragraph + add
 oth	endnote	find	supported		ok 2 instances, first `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
 oth	endnote	query	supported		ok matches in create() + add paragraph + add endnote
 oth	endnote	view	supported		ok 2 instances, first `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
-oth	endnote	set	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] text=Litchi
-oth	endnote	add	supported		ok /body/p[1]/endnote[1] on `create() + add paragraph` under /body/p[1] []
+oth	endnote	set	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] {"text":"Litchi"}
+oth	endnote	add	supported		ok /body/p[1]/endnote[1] on `create() + add paragraph` under /body/p[1] {}
 oth	endnote	remove	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
 oth	endnote	move	format-verb		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] /body/p[1]/endnote[2]
 oth	endnote	swap	format-verb		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] /body/p[1]/endnote[2]
@@ -4371,8 +4371,8 @@ oth	comment	get	supported		ok 2 instances, first `create() + add paragraph + add
 oth	comment	find	supported		ok 2 instances, first `create() + add paragraph + add comment` /body/p[1]/comment[1]
 oth	comment	query	supported		ok matches in create() + add paragraph + add comment
 oth	comment	view	supported		ok 2 instances, first `create() + add paragraph + add comment` /body/p[1]/comment[1]
-oth	comment	set	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] text=Litchi
-oth	comment	add	supported		ok /body/p[1]/comment[1] on `create() + add paragraph` under /body/p[1] []
+oth	comment	set	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] {"text":"Litchi"}
+oth	comment	add	supported		ok /body/p[1]/comment[1] on `create() + add paragraph` under /body/p[1] {}
 oth	comment	remove	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1]
 oth	comment	move	format-verb		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] /body/p[1]/comment[2]
 oth	comment	swap	format-verb		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] /body/p[1]/comment[2]
@@ -4384,8 +4384,8 @@ oth	bookmark	get	supported		ok 2 instances, first `create() + add paragraph + ad
 oth	bookmark	find	supported		ok 2 instances, first `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1]
 oth	bookmark	query	supported		ok matches in create() + add paragraph + add bookmark
 oth	bookmark	view	supported		ok 2 instances, first `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1]
-oth	bookmark	set	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] name=7
-oth	bookmark	add	supported		ok /body/p[1]/bookmark[1] on `create() + add paragraph` under /body/p[1] [name]
+oth	bookmark	set	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] {"name":"7"}
+oth	bookmark	add	supported		ok /body/p[1]/bookmark[1] on `create() + add paragraph` under /body/p[1] {"name":"Litchi"}
 oth	bookmark	remove	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1]
 oth	bookmark	move	format-verb		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] /body/p[1]/bookmark[2]
 oth	bookmark	swap	format-verb		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] /body/p[1]/bookmark[2]
@@ -4393,10 +4393,10 @@ oth	bookmark	edit	supported		ok tx.set
 oth	bookmark	batch	supported		ok set item
 oth	bookmark	create	supported		ok format
 oth	bookmark	save	supported		ok format
-oth	styles	get	supported		ok 8 instances, first `create()` /styles
-oth	styles	find	supported		ok 8 instances, first `create()` /styles
+oth	styles	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /styles
+oth	styles	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /styles
 oth	styles	query	supported		ok matches in create()
-oth	styles	view	supported		ok 8 instances, first `create()` /styles
+oth	styles	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /styles
 oth	styles	set	n/a	set not offered for this element	-
 oth	styles	add	n/a	add not offered for this element	-
 oth	styles	remove	n/a	remove not offered for this element	-
@@ -4406,24 +4406,24 @@ oth	styles	edit	n/a	edit not offered for this element	-
 oth	styles	batch	n/a	batch not offered for this element	-
 oth	styles	create	supported		ok format
 oth	styles	save	supported		ok format
-oth	style	get	supported		unreached
-oth	style	find	supported		unreached
-oth	style	query	supported		unreached
-oth	style	view	supported		unreached
-oth	style	set	n/a	set not offered for this element	unreached
+oth	style	get	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	find	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	style	view	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	set	n/a	set not offered for this element	-
 oth	style	add	n/a	add not offered for this element	-
-oth	style	remove	n/a	remove not offered for this element	unreached
-oth	style	move	format-verb		unreached
-oth	style	swap	format-verb		unreached
+oth	style	remove	n/a	remove not offered for this element	-
+oth	style	move	format-verb		refused unsupported_type
+oth	style	swap	format-verb		refused unsupported_type
 oth	style	edit	n/a	edit not offered for this element	-
 oth	style	batch	n/a	batch not offered for this element	-
 oth	style	create	supported		ok format
 oth	style	save	supported		ok format
-oth	metadata	get	supported		ok 8 instances, first `create()` /metadata
-oth	metadata	find	supported		ok 8 instances, first `create()` /metadata
+oth	metadata	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /metadata
+oth	metadata	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /metadata
 oth	metadata	query	supported		ok matches in create()
-oth	metadata	view	supported		ok 8 instances, first `create()` /metadata
-oth	metadata	set	supported		ok `create() + add paragraph` /metadata title=Litchi
+oth	metadata	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /metadata
+oth	metadata	set	supported		ok `create() + add paragraph` /metadata {"title":"Litchi"}
 oth	metadata	add	n/a	add not offered for this element	-
 oth	metadata	remove	n/a	remove not offered for this element	-
 oth	metadata	move	format-verb		unreached
@@ -4462,8 +4462,8 @@ odm	paragraph	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extra
 odm	paragraph	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/p[1]
 odm	paragraph	query	supported		ok matches in libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm
 odm	paragraph	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/p[1]
-odm	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] text=Litchi
-odm	paragraph	add	supported		ok /body/p[1] on `create()` under /body []
+odm	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] {"text":"Litchi"}
+odm	paragraph	add	supported		ok /body/p[1] on `create()` under /body {}
 odm	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
 odm	paragraph	move	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
 odm	paragraph	swap	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
@@ -4475,8 +4475,8 @@ odm	heading	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/
 odm	heading	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/section[1]/h[1]
 odm	heading	query	supported		ok matches in libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm
 odm	heading	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/section[1]/h[1]
-odm	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] text=Litchi
-odm	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body []
+odm	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] {"text":"Litchi"}
+odm	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body {}
 odm	heading	remove	supported		ok `create() + add paragraph + add heading` /body/h[1]
 odm	heading	move	format-verb		ok `create() + add paragraph + add heading` /body/h[1] /body/h[2]
 odm	heading	swap	format-verb		ok `create() + add paragraph + add heading` /body/h[1] /body/h[2]
@@ -4488,8 +4488,8 @@ odm	run	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwr
 odm	run	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/p[1]/r[1]
 odm	run	query	supported		ok matches in libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm
 odm	run	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/p[1]/r[1]
-odm	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] text=Litchi
-odm	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] []
+odm	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] {"text":"Litchi"}
+odm	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] {}
 odm	run	remove	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1]
 odm	run	move	format-verb		ok `create() + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
 odm	run	swap	format-verb		ok `create() + add paragraph + add run` /body/p[1]/r[1] /body/p[1]/r[2]
@@ -4501,8 +4501,8 @@ odm	hyperlink	get	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppu
 odm	hyperlink	find	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /body/p[10]/hyperlink[1]
 odm	hyperlink	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
 odm	hyperlink	view	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /body/p[10]/hyperlink[1]
-odm	hyperlink	set	supported		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/p[1]/hyperlink[1] text=Litchi
-odm	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` under /body/p[1] [text,url]
+odm	hyperlink	set	supported		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/p[1]/hyperlink[1] {"text":"Litchi"}
+odm	hyperlink	add	supported		ok /body/p[1]/hyperlink[1] on `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` under /body/p[1] {"text":"Litchi","url":"Litchi"}
 odm	hyperlink	remove	supported		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/p[1]/hyperlink[1]
 odm	hyperlink	move	format-verb		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/p[1]/hyperlink[1] /body/p[1]/hyperlink[2]
 odm	hyperlink	swap	format-verb		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/p[1]/hyperlink[1] /body/p[1]/hyperlink[2]
@@ -4515,7 +4515,7 @@ odm	list	find	supported		ok 4 instances, first `create() + add paragraph + add l
 odm	list	query	supported		ok matches in create() + add paragraph + add list
 odm	list	view	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
 odm	list	set	n/a	set not offered for this element	-
-odm	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body []
+odm	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body {}
 odm	list	remove	supported		ok `create() + add paragraph + add list` /body/list[1]
 odm	list	move	format-verb		ok `create() + add paragraph + add list` /body/list[1] /body/list[2]
 odm	list	swap	format-verb		ok `create() + add paragraph + add list` /body/list[1] /body/list[2]
@@ -4527,8 +4527,8 @@ odm	listItem	get	supported		ok 6 instances, first `create() + add paragraph + ad
 odm	listItem	find	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
 odm	listItem	query	supported		ok matches in create() + add paragraph + add list
 odm	listItem	view	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
-odm	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] text=Litchi
-odm	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] []
+odm	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] {"text":"Litchi"}
+odm	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] {}
 odm	listItem	remove	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1]
 odm	listItem	move	format-verb		ok `create() + add paragraph + add list + add listItem` /body/list[1]/listItem[1] /body/list[1]/listItem[2]
 odm	listItem	swap	format-verb		ok `create() + add paragraph + add list + add listItem` /body/list[1]/listItem[1] /body/list[1]/listItem[2]
@@ -4540,8 +4540,8 @@ odm	table	get	supported		ok 4 instances, first `create() + add paragraph + add t
 odm	table	find	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
 odm	table	query	supported		ok matches in create() + add paragraph + add table
 odm	table	view	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
-odm	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] name=Litchi
-odm	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body []
+odm	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] {"name":"Litchi"}
+odm	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body {}
 odm	table	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]
 odm	table	move	format-verb		ok `create() + add paragraph + add table` /body/tbl[1] /body/tbl[2]
 odm	table	swap	format-verb		ok `create() + add paragraph + add table` /body/tbl[1] /body/tbl[2]
@@ -4554,7 +4554,7 @@ odm	row	find	supported		ok 6 instances, first `create() + add paragraph + add ta
 odm	row	query	supported		ok matches in create() + add paragraph + add table
 odm	row	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
 odm	row	set	n/a	set not offered for this element	-
-odm	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] []
+odm	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] {}
 odm	row	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]
 odm	row	move	format-verb		ok `create() + add paragraph + add table + add row` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
 odm	row	swap	format-verb		ok `create() + add paragraph + add table + add row` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
@@ -4566,7 +4566,7 @@ odm	cell	get	supported		ok 6 instances, first `create() + add paragraph + add ta
 odm	cell	find	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
 odm	cell	query	supported		ok matches in create() + add paragraph + add table
 odm	cell	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
-odm	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] text=Litchi
+odm	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 odm	cell	add	n/a	add not offered for this element	-
 odm	cell	remove	n/a	remove not offered for this element	-
 odm	cell	move	format-verb		unreached
@@ -4579,8 +4579,8 @@ odm	section	get	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/
 odm	section	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/section[1]
 odm	section	query	supported		ok matches in libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm
 odm	section	view	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /body/section[1]
-odm	section	set	supported		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/section[1] name=Litchi
-odm	section	add	supported		ok /body/section[1] on `create() + add paragraph` under /body [name]
+odm	section	set	supported		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/section[1] {"name":"Litchi"}
+odm	section	add	supported		ok /body/section[1] on `create() + add paragraph` under /body {"name":"Litchi"}
 odm	section	remove	supported		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /body/section[1]
 odm	section	move	format-verb		ok `create() + add paragraph + add section` /body/section[1] /body/section[2]
 odm	section	swap	format-verb		ok `create() + add paragraph + add section` /body/section[1] /body/section[2]
@@ -4588,51 +4588,51 @@ odm	section	edit	supported		ok tx.set
 odm	section	batch	supported		ok set item
 odm	section	create	supported		ok format
 odm	section	save	supported		ok format
-odm	frame	get	supported		unreached
-odm	frame	find	supported		unreached
-odm	frame	query	supported		unreached
-odm	frame	view	supported		unreached
-odm	frame	set	supported		unreached
+odm	frame	get	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	find	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	query	supported		ok matches in unified-ops/0294/frames.odm
+odm	frame	view	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	set	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1] {"name":"Litchi"}
 odm	frame	add	n/a	add not offered for this element	-
-odm	frame	remove	supported		unreached
-odm	frame	move	format-verb		unreached
-odm	frame	swap	format-verb		unreached
-odm	frame	edit	supported		-
-odm	frame	batch	supported		-
+odm	frame	remove	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	move	format-verb		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1] /body/p[1]/frame[2]
+odm	frame	swap	format-verb		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1] /body/p[1]/frame[2]
+odm	frame	edit	supported		ok tx.set
+odm	frame	batch	supported		ok set item
 odm	frame	create	supported		ok format
 odm	frame	save	supported		ok format
-odm	picture	get	supported		unreached
-odm	picture	find	supported		unreached
-odm	picture	query	supported		unreached
-odm	picture	view	supported		unreached
-odm	picture	set	n/a	set not offered for this element	unreached
+odm	picture	get	supported		ok 2 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
+odm	picture	find	supported		ok 2 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
+odm	picture	query	supported		ok matches in unified-ops/0294/frames.odm
+odm	picture	view	supported		ok 2 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
+odm	picture	set	n/a	set not offered for this element	-
 odm	picture	add	n/a	add not offered for this element	-
-odm	picture	remove	supported		unreached
+odm	picture	remove	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
 odm	picture	move	format-verb		unreached
 odm	picture	swap	format-verb		unreached
 odm	picture	edit	n/a	edit not offered for this element	-
 odm	picture	batch	n/a	batch not offered for this element	-
 odm	picture	create	supported		ok format
 odm	picture	save	supported		ok format
-odm	textbox	get	supported		unreached
-odm	textbox	find	supported		unreached
-odm	textbox	query	supported		unreached
-odm	textbox	view	supported		unreached
-odm	textbox	set	supported		unreached
+odm	textbox	get	supported		ok 1 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
+odm	textbox	find	supported		ok 1 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
+odm	textbox	query	supported		ok matches in unified-ops/0294/frames.odm
+odm	textbox	view	supported		ok 1 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
+odm	textbox	set	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1] {"text":"Litchi"}
 odm	textbox	add	n/a	add not offered for this element	-
-odm	textbox	remove	supported		unreached
+odm	textbox	remove	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
 odm	textbox	move	format-verb		unreached
 odm	textbox	swap	format-verb		unreached
-odm	textbox	edit	supported		-
-odm	textbox	batch	supported		-
+odm	textbox	edit	supported		ok tx.set
+odm	textbox	batch	supported		ok set item
 odm	textbox	create	supported		ok format
 odm	textbox	save	supported		ok format
 odm	footnote	get	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 odm	footnote	find	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 odm	footnote	query	supported		ok matches in create() + add paragraph + add footnote
 odm	footnote	view	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
-odm	footnote	set	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] text=Litchi
-odm	footnote	add	supported		ok /body/p[1]/footnote[1] on `create() + add paragraph` under /body/p[1] []
+odm	footnote	set	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] {"text":"Litchi"}
+odm	footnote	add	supported		ok /body/p[1]/footnote[1] on `create() + add paragraph` under /body/p[1] {}
 odm	footnote	remove	supported		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
 odm	footnote	move	format-verb		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] /body/p[1]/footnote[2]
 odm	footnote	swap	format-verb		ok `create() + add paragraph + add footnote` /body/p[1]/footnote[1] /body/p[1]/footnote[2]
@@ -4644,8 +4644,8 @@ odm	endnote	get	supported		ok 2 instances, first `create() + add paragraph + add
 odm	endnote	find	supported		ok 2 instances, first `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
 odm	endnote	query	supported		ok matches in create() + add paragraph + add endnote
 odm	endnote	view	supported		ok 2 instances, first `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
-odm	endnote	set	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] text=Litchi
-odm	endnote	add	supported		ok /body/p[1]/endnote[1] on `create() + add paragraph` under /body/p[1] []
+odm	endnote	set	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] {"text":"Litchi"}
+odm	endnote	add	supported		ok /body/p[1]/endnote[1] on `create() + add paragraph` under /body/p[1] {}
 odm	endnote	remove	supported		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1]
 odm	endnote	move	format-verb		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] /body/p[1]/endnote[2]
 odm	endnote	swap	format-verb		ok `create() + add paragraph + add endnote` /body/p[1]/endnote[1] /body/p[1]/endnote[2]
@@ -4657,8 +4657,8 @@ odm	comment	get	supported		ok 2 instances, first `create() + add paragraph + add
 odm	comment	find	supported		ok 2 instances, first `create() + add paragraph + add comment` /body/p[1]/comment[1]
 odm	comment	query	supported		ok matches in create() + add paragraph + add comment
 odm	comment	view	supported		ok 2 instances, first `create() + add paragraph + add comment` /body/p[1]/comment[1]
-odm	comment	set	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] text=Litchi
-odm	comment	add	supported		ok /body/p[1]/comment[1] on `create() + add paragraph` under /body/p[1] []
+odm	comment	set	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] {"text":"Litchi"}
+odm	comment	add	supported		ok /body/p[1]/comment[1] on `create() + add paragraph` under /body/p[1] {}
 odm	comment	remove	supported		ok `create() + add paragraph + add comment` /body/p[1]/comment[1]
 odm	comment	move	format-verb		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] /body/p[1]/comment[2]
 odm	comment	swap	format-verb		ok `create() + add paragraph + add comment` /body/p[1]/comment[1] /body/p[1]/comment[2]
@@ -4670,8 +4670,8 @@ odm	bookmark	get	supported		ok 3 instances, first `libreoffice-core/vcl/qa/cppun
 odm	bookmark	find	supported		ok 3 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /body/p[1]/bookmark[1]
 odm	bookmark	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
 odm	bookmark	view	supported		ok 3 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /body/p[1]/bookmark[1]
-odm	bookmark	set	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] name=7
-odm	bookmark	add	supported		ok /body/p[1]/bookmark[1] on `create() + add paragraph` under /body/p[1] [name]
+odm	bookmark	set	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] {"name":"7"}
+odm	bookmark	add	supported		ok /body/p[1]/bookmark[1] on `create() + add paragraph` under /body/p[1] {"name":"Litchi"}
 odm	bookmark	remove	supported		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1]
 odm	bookmark	move	format-verb		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] /body/p[1]/bookmark[2]
 odm	bookmark	swap	format-verb		ok `create() + add paragraph + add bookmark` /body/p[1]/bookmark[1] /body/p[1]/bookmark[2]
@@ -4709,7 +4709,7 @@ odm	metadata	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras
 odm	metadata	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /metadata
 odm	metadata	query	supported		ok matches in create()
 odm	metadata	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /metadata
-odm	metadata	set	supported		ok `create() + add paragraph` /metadata title=Litchi
+odm	metadata	set	supported		ok `create() + add paragraph` /metadata {"title":"Litchi"}
 odm	metadata	add	n/a	add not offered for this element	-
 odm	metadata	remove	n/a	remove not offered for this element	-
 odm	metadata	move	format-verb		unreached
@@ -4722,7 +4722,7 @@ odf	math	get	supported		ok 4 instances, first `odf/native-resave/source/font-sty
 odf	math	find	supported		ok 4 instances, first `odf/native-resave/source/font-styles.odf` /
 odf	math	query	n/a	query not offered for this element	-
 odf	math	view	supported		ok 4 instances, first `odf/native-resave/source/font-styles.odf` /
-odf	math	set	supported		ok `odf/native-resave/source/font-styles.odf` / starmath=Litchi
+odf	math	set	supported		ok `odf/native-resave/source/font-styles.odf` / {"starmath":"Litchi"}
 odf	math	add	n/a	add not offered for this element	-
 odf	math	remove	n/a	remove not offered for this element	-
 odf	math	move	format-verb		unreached
@@ -4735,8 +4735,8 @@ odf	element	get	supported		ok 8 instances, first `odf/native-resave/source/font-
 odf	element	find	supported		ok 8 instances, first `odf/native-resave/source/font-styles.odf` /element[1]
 odf	element	query	supported		ok matches in create()
 odf	element	view	supported		ok 8 instances, first `odf/native-resave/source/font-styles.odf` /element[1]
-odf	element	set	supported		ok `create() + add element` /element[2] text=Litchi
-odf	element	add	supported		ok /element[2] on `create()` under / [tag,text]
+odf	element	set	supported		ok `create() + add element` /element[2] {"text":"Litchi"}
+odf	element	add	supported		ok /element[2] on `create()` under / {"tag":"mi","text":"x"}
 odf	element	remove	supported		ok `create() + add element` /element[1]
 odf	element	move	format-verb		ok `create() + add element` /element[1] /element[2]
 odf	element	swap	format-verb		ok `create() + add element` /element[1] /element[2]
@@ -4774,8 +4774,8 @@ pages	paragraph	get	supported		ok 8 instances, first `iwork/pages/body-sections-
 pages	paragraph	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
 pages	paragraph	query	supported		ok matches in create()
 pages	paragraph	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
-pages	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] text=Litchi
-pages	paragraph	add	supported		ok /body/p[2] on `create()` under /body []
+pages	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] {"text":"Litchi"}
+pages	paragraph	add	supported		ok /body/p[2] on `create()` under /body {}
 pages	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
 pages	paragraph	move	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
 pages	paragraph	swap	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
@@ -4787,7 +4787,7 @@ pages	section	get	supported		ok 7 instances, first `iwork/pages/body-sections-un
 pages	section	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
 pages	section	query	supported		ok matches in create()
 pages	section	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
-pages	section	set	supported		ok `create() + add paragraph` /section[1] name=Litchi
+pages	section	set	supported		ok `create() + add paragraph` /section[1] {"name":"Litchi"}
 pages	section	add	n/a	add not offered for this element	-
 pages	section	remove	n/a	remove not offered for this element	-
 pages	section	move	format-verb		refused invalid_argument
@@ -4839,7 +4839,7 @@ pages	header	get	supported		ok 8 instances, first `iwork/pages/body-sections-uni
 pages	header	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
 pages	header	query	supported		ok matches in create()
 pages	header	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
-pages	header	set	supported		ok `create() + add paragraph` /section[1]/header[1] text=Litchi
+pages	header	set	supported		ok `create() + add paragraph` /section[1]/header[1] {"text":"Litchi"}
 pages	header	add	n/a	add not offered for this element	-
 pages	header	remove	n/a	remove not offered for this element	-
 pages	header	move	format-verb		refused invalid_argument
@@ -4852,7 +4852,7 @@ pages	footer	get	supported		ok 8 instances, first `iwork/pages/body-sections-uni
 pages	footer	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/footer[1]
 pages	footer	query	supported		ok matches in create()
 pages	footer	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/footer[1]
-pages	footer	set	supported		ok `create() + add paragraph` /section[1]/footer[1] text=Litchi
+pages	footer	set	supported		ok `create() + add paragraph` /section[1]/footer[1] {"text":"Litchi"}
 pages	footer	add	n/a	add not offered for this element	-
 pages	footer	remove	n/a	remove not offered for this element	-
 pages	footer	move	format-verb		refused invalid_argument
@@ -4878,8 +4878,8 @@ pages	footnote	get	supported		ok 2 instances, first `create() + add paragraph + 
 pages	footnote	find	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
 pages	footnote	query	supported		ok matches in create() + add paragraph + add footnote
 pages	footnote	view	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
-pages	footnote	set	supported		ok `create() + add paragraph + add footnote` /footnotes/footnote[1] text=Litchi
-pages	footnote	add	supported		ok /footnotes/footnote[1] on `create() + add paragraph` under /footnotes []
+pages	footnote	set	supported		ok `create() + add paragraph + add footnote` /footnotes/footnote[1] {"text":"Litchi"}
+pages	footnote	add	supported		ok /footnotes/footnote[1] on `create() + add paragraph` under /footnotes {}
 pages	footnote	remove	supported		ok `create() + add paragraph + add footnote` /footnotes/footnote[1]
 pages	footnote	move	format-verb		refused invalid_argument
 pages	footnote	swap	format-verb		refused invalid_argument
@@ -4904,8 +4904,8 @@ keynote	slide	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.ke
 keynote	slide	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]
 keynote	slide	query	supported		ok matches in create()
 keynote	slide	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]
-keynote	slide	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1] hidden=true
-keynote	slide	add	supported		ok /slide[6] on `iwork/keynote/multi-slide.key` under / [from]
+keynote	slide	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1] {"hidden":"true"}
+keynote	slide	add	supported		ok /slide[6] on `iwork/keynote/multi-slide.key` under / {"from":"/slide[2]"}
 keynote	slide	remove	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]
 keynote	slide	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1] /slide[2]
 keynote	slide	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1] /slide[2]
@@ -4917,7 +4917,7 @@ keynote	placeholder	get	supported		ok 8 instances, first `iwork/keynote/multi-sl
 keynote	placeholder	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]
 keynote	placeholder	query	supported		ok matches in create()
 keynote	placeholder	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]
-keynote	placeholder	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] text=Litchi
+keynote	placeholder	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] {"text":"Litchi"}
 keynote	placeholder	add	n/a	add not offered for this element	-
 keynote	placeholder	remove	n/a	remove not offered for this element	-
 keynote	placeholder	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] /slide[1]/placeholder[2]
@@ -4930,7 +4930,7 @@ keynote	notes	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.ke
 keynote	notes	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/notes
 keynote	notes	query	supported		ok matches in iwork/keynote/multi-slide.key
 keynote	notes	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/notes
-keynote	notes	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes text=Litchi
+keynote	notes	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes {"text":"Litchi"}
 keynote	notes	add	n/a	add not offered for this element	-
 keynote	notes	remove	n/a	remove not offered for this element	-
 keynote	notes	move	format-verb		unreached
@@ -4943,8 +4943,8 @@ keynote	paragraph	get	supported		ok 8 instances, first `iwork/keynote/multi-slid
 keynote	paragraph	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]
 keynote	paragraph	query	supported		ok matches in create()
 keynote	paragraph	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]
-keynote	paragraph	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1]/paragraph[1] text=Litchi
-keynote	paragraph	add	supported		ok /slide[1]/placeholder[1]/paragraph[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1]/placeholder[1] []
+keynote	paragraph	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1]/paragraph[1] {"text":"Litchi"}
+keynote	paragraph	add	supported		ok /slide[1]/placeholder[1]/paragraph[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1]/placeholder[1] {}
 keynote	paragraph	remove	supported		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1]
 keynote	paragraph	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1] /slide[1]/placeholder[1]/paragraph[2]
 keynote	paragraph	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1] /slide[1]/placeholder[1]/paragraph[2]
@@ -4969,8 +4969,8 @@ keynote	shape	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.ke
 keynote	shape	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
 keynote	shape	query	supported		ok matches in iwork/keynote/multi-slide.key
 keynote	shape	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
-keynote	shape	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1] text=Litchi
-keynote	shape	add	supported		ok /slide[1]/shape[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1] []
+keynote	shape	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1] {"text":"Litchi"}
+keynote	shape	add	supported		ok /slide[1]/shape[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1] {}
 keynote	shape	remove	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1]
 keynote	shape	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add shape` /slide[1]/shape[1] /slide[1]/shape[2]
 keynote	shape	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add shape` /slide[1]/shape[1] /slide[1]/shape[2]
@@ -4982,8 +4982,8 @@ keynote	picture	get	supported		ok 3 instances, first `iwork/keynote/image-adjust
 keynote	picture	find	supported		ok 3 instances, first `iwork/keynote/image-adjustments-native.key` /slide[1]/picture[1]
 keynote	picture	query	supported		ok matches in iwork/keynote/image-adjustments-native.key
 keynote	picture	view	supported		ok 3 instances, first `iwork/keynote/image-adjustments-native.key` /slide[1]/picture[1]
-keynote	picture	set	supported		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1] x=12pt
-keynote	picture	add	supported		ok /slide[1]/picture[1] on `iwork/keynote/multi-slide.key` under /slide[1] [src]
+keynote	picture	set	supported		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1] {"x":"12pt"}
+keynote	picture	add	supported		ok /slide[1]/picture[1] on `iwork/keynote/multi-slide.key` under /slide[1] {"src":"<PNG>"}
 keynote	picture	remove	supported		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1]
 keynote	picture	move	format-verb		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1] /slide[1]/picture[2]
 keynote	picture	swap	format-verb		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1] /slide[1]/picture[2]
@@ -5095,10 +5095,10 @@ keynote	group	edit	n/a	edit not offered for this element	-
 keynote	group	batch	n/a	batch not offered for this element	-
 keynote	group	create	supported		ok format
 keynote	group	save	supported		ok format
-numbers	workbook	get	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
-numbers	workbook	find	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
+numbers	workbook	get	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /
+numbers	workbook	find	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /
 numbers	workbook	query	n/a	query not offered for this element	-
-numbers	workbook	view	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
+numbers	workbook	view	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /
 numbers	workbook	set	n/a	set not offered for this element	-
 numbers	workbook	add	n/a	add not offered for this element	-
 numbers	workbook	remove	n/a	remove not offered for this element	-
@@ -5108,28 +5108,28 @@ numbers	workbook	edit	n/a	edit not offered for this element	-
 numbers	workbook	batch	n/a	batch not offered for this element	-
 numbers	workbook	create	supported		ok format
 numbers	workbook	save	supported		ok format
-numbers	sheet	get	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]
-numbers	sheet	find	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]
+numbers	sheet	get	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]
+numbers	sheet	find	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]
 numbers	sheet	query	supported		ok matches in create()
-numbers	sheet	view	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]
-numbers	sheet	set	supported		ok `create() + add mergeCell` /sheet[1] name=Litchi
-numbers	sheet	add	n/a	add not offered for this element	-
-numbers	sheet	remove	n/a	remove not offered for this element	-
-numbers	sheet	move	format-verb		ok `iwork/numbers/table-relocation-native.numbers` /sheet[1] /sheet[2]
+numbers	sheet	view	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]
+numbers	sheet	set	supported		ok `create() + add sheet` /sheet[1] {"name":"Litchi"}
+numbers	sheet	add	supported		ok /sheet[2] on `create()` under / {}
+numbers	sheet	remove	supported		ok `create() + add sheet` /sheet[1]
+numbers	sheet	move	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
 numbers	sheet	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
 numbers	sheet	edit	supported		ok tx.set
 numbers	sheet	batch	supported		ok set item
 numbers	sheet	create	supported		ok format
 numbers	sheet	save	supported		ok format
-numbers	table	get	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
-numbers	table	find	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
+numbers	table	get	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
+numbers	table	find	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
 numbers	table	query	supported		ok matches in create()
-numbers	table	view	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
-numbers	table	set	supported		ok `create() + add mergeCell` /sheet[1]/table[1] name=Litchi
-numbers	table	add	n/a	add not offered for this element	-
-numbers	table	remove	n/a	remove not offered for this element	-
-numbers	table	move	format-verb		unreached
-numbers	table	swap	gap	IWORK_API_REQUESTS.md	unreached
+numbers	table	view	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
+numbers	table	set	supported		ok `create() + add sheet` /sheet[1]/table[1] {"name":"Litchi"}
+numbers	table	add	supported		ok /sheet[1]/table[2] on `create() + add sheet` under /sheet[1] {}
+numbers	table	remove	supported		ok `create() + add sheet` /sheet[1]/table[1]
+numbers	table	move	format-verb		ok `create() + add sheet + add table` /sheet[1]/table[1] /sheet[1]/table[2]
+numbers	table	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
 numbers	table	edit	supported		ok tx.set
 numbers	table	batch	supported		ok set item
 numbers	table	create	supported		ok format
@@ -5138,7 +5138,7 @@ numbers	cell	get	supported		ok 8 instances, first `iwork/numbers/basic.numbers` 
 numbers	cell	find	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
 numbers	cell	query	supported		ok matches in iwork/numbers/basic.numbers
 numbers	cell	view	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
-numbers	cell	set	supported		ok `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2 value=Litchi
+numbers	cell	set	supported		ok `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2 {"value":"Litchi"}
 numbers	cell	add	n/a	add not offered for this element	-
 numbers	cell	remove	supported		ok `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
 numbers	cell	move	format-verb		refused unsupported_capability
@@ -5152,7 +5152,7 @@ numbers	mergeCell	find	supported		ok 2 instances, first `iwork/numbers/table-mer
 numbers	mergeCell	query	supported		ok matches in iwork/numbers/table-merges-native.numbers
 numbers	mergeCell	view	supported		ok 2 instances, first `iwork/numbers/table-merges-native.numbers` /sheet[1]/table[1]/mergeCell[1]
 numbers	mergeCell	set	n/a	set not offered for this element	-
-numbers	mergeCell	add	supported		ok /sheet[1]/table[1]/mergeCell[1] on `create()` under /sheet[1]/table[1] [ref]
+numbers	mergeCell	add	supported		ok /sheet[1]/table[1]/mergeCell[1] on `create()` under /sheet[1]/table[1] {"ref":"B2:C3"}
 numbers	mergeCell	remove	supported		ok `create() + add mergeCell` /sheet[1]/table[1]/mergeCell[1]
 numbers	mergeCell	move	format-verb		unreached
 numbers	mergeCell	swap	gap	IWORK_API_REQUESTS.md	unreached

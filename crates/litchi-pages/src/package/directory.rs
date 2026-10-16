@@ -197,3 +197,74 @@ pub(super) fn converted_limits(
     )?
     .with_archive_limits(limits.archive_limits())?)
 }
+
+/// The bundle form of `catalog`: `Index.zip` (every `Index/` member, its
+/// record copied unchanged) and every other member as a plain file.
+fn bundle_members(
+    catalog: &litchi_iwa_archive::SourceCatalog,
+) -> Result<(Vec<u8>, Vec<(String, Vec<u8>)>), super::SaveError> {
+    let mut others = Vec::new();
+    let mut outside: Vec<&str> = Vec::new();
+    for entry in catalog.package().iter() {
+        if entry.name().starts_with("Index/") {
+            continue;
+        }
+        let name = entry.name();
+        if name == INDEX_ZIP
+            || name.is_empty()
+            || name.starts_with('/')
+            || name.ends_with('/')
+            || name
+                .split('/')
+                .any(|part| part.is_empty() || part == "." || part == "..")
+        {
+            return Err(super::SaveError::Bundle(
+                litchi_iwa_archive::Error::InvalidBundle(
+                    "a member name cannot be written as a bundle file".to_owned(),
+                ),
+            ));
+        }
+        outside.push(name);
+        others.push((name.to_owned(), entry.data().to_vec()));
+    }
+    let index = catalog
+        .package()
+        .reassemble_with_changes_to_bytes(&[], &[], &outside, catalog.limits())
+        .map_err(super::SaveError::Bundle)?;
+    Ok((index, others))
+}
+
+/// Write the bundle into the fresh staging directory `root`; the
+/// publication boundary synchronizes and swaps it into place.
+fn write_bundle(root: &Path, index: &[u8], others: &[(String, Vec<u8>)]) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let write_file = |path: &Path, data: &[u8]| -> std::io::Result<()> {
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?
+            .write_all(data)
+    };
+    write_file(&root.join(INDEX_ZIP), index)?;
+    for (name, data) in others {
+        let path = root.join(name);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        write_file(&path, data)?;
+    }
+    Ok(())
+}
+
+/// Save `catalog` as a package directory at `path` through the archive
+/// layer's directory publication boundary (a sibling staging directory,
+/// synchronized, then swapped in).
+pub(super) fn save_bundle(
+    catalog: &litchi_iwa_archive::SourceCatalog,
+    path: &Path,
+) -> Result<(), super::SaveError> {
+    let (index, others) = bundle_members(catalog)?;
+    litchi_iwa_archive::publication::replace_directory_with::<super::SaveError>(path, |root| {
+        write_bundle(root, &index, &others).map_err(super::SaveError::Bundling)
+    })
+}

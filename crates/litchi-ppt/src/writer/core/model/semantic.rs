@@ -766,6 +766,55 @@ impl Builder {
         Ok(())
     }
 
+    /// Add a straight connector to a slide
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index
+    /// * `x1`, `y1` - Start point (in points)
+    /// * `x2`, `y2` - End point (in points)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn add_connector(
+        &mut self,
+        slide: usize,
+        x1: i32,
+        y1: i32,
+        x2: i32,
+        y2: i32,
+    ) -> Result<(), WriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
+
+        let x = x1.min(x2);
+        let y = y1.min(y2);
+        let width = (x2 - x1).abs();
+        let height = (y2 - y1).abs();
+
+        let shape = WritableShape {
+            properties: ShapeProperties {
+                shape_type: ShapeType::Connector,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
+                fill: Some(FillStyle::none()),
+                line: Some(LineStyleConfig::default_line()),
+                flip_h: x2 < x1,
+                flip_v: y2 < y1,
+                ..Default::default()
+            },
+            animation_info: None,
+        };
+
+        slide_data.shapes.push(shape);
+        Ok(())
+    }
+
     /// Add an arrow line to a slide
     ///
     /// # Arguments

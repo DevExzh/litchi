@@ -147,10 +147,21 @@ fn moves_sheets_and_relocates_tables() {
         prop(&reopened, "/sheet[2]/table[2]", "name").as_deref(),
         Some("Table 1")
     );
-    let error = file
-        .move_to("/sheet[1]/table[1]", Placement::Start)
-        .expect_err("in-sheet order");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+    // Within one sheet (record 0301): the relocated table goes back first.
+    let reordered = relocated
+        .edit(|tx| tx.move_to("/sheet[2]/table[2]", Placement::Start))
+        .expect("in-sheet order");
+    let reopened = reopen(&reordered.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[2]/table[1]", "name").as_deref(),
+        Some("Table 1")
+    );
+    let restored = reordered
+        .patch
+        .inverse()
+        .apply(&reordered.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), relocated.to_bytes().unwrap());
 }
 
 #[test]
@@ -315,22 +326,130 @@ fn batch_cell_sets_share_one_leaf_commit_per_table() {
 }
 
 #[test]
-fn lifecycle_operations_are_typed_gaps() {
-    let file = read("table-relocation-native.numbers");
-    for (parent, kind) in [
-        ("/", "sheet"),
-        ("/sheet[1]", "table"),
-        ("/sheet[1]/table[1]", "row"),
-    ] {
-        let error = file
-            .add(parent, NewNode::new(kind))
-            .expect_err("lifecycle add");
-        assert_eq!(error.code(), Code::UnsupportedCapability, "{kind}");
+fn sheets_and_tables_are_added_and_removed() {
+    let file = create(FileFormat::Numbers).expect("create");
+    // A sheet, placed first, with a default name.
+    let added = file
+        .add("/", NewNode::new("sheet").at(Placement::Start))
+        .expect("add sheet");
+    assert_eq!(added.path.to_string(), "/sheet[1]");
+    let reopened = reopen(&added.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]", "name").as_deref(),
+        Some("Sheet 2")
+    );
+    assert_eq!(prop(&reopened, "/", "sheetCount").as_deref(), Some("2"));
+    // A table in it, sized and named.
+    let table = added
+        .file
+        .add(
+            "/sheet[1]",
+            NewNode::new("table")
+                .prop("name", "Data")
+                .prop("rowCount", 4_i64)
+                .prop("columnCount", 3_i64),
+        )
+        .expect("add table");
+    assert_eq!(table.path.to_string(), "/sheet[1]/table[1]");
+    let reopened = reopen(&table.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]", "name").as_deref(),
+        Some("Data")
+    );
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]", "rowCount").as_deref(),
+        Some("4")
+    );
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]", "columnCount").as_deref(),
+        Some("3")
+    );
+    // It takes values.
+    let written = table
+        .file
+        .set("/sheet[1]/table[1]/B2", props! { "value" => 7_i64 })
+        .expect("value");
+    assert_eq!(
+        prop(&reopen(&written), "/sheet[1]/table[1]/B2", "value").as_deref(),
+        Some("7")
+    );
+    // A second table placed before the first.
+    let before = table
+        .file
+        .add(
+            "/sheet[1]",
+            NewNode::new("table").at(Placement::before("/sheet[1]/table[1]").expect("placement")),
+        )
+        .expect("placed table");
+    assert_eq!(before.path.to_string(), "/sheet[1]/table[1]");
+    assert_eq!(
+        prop(&reopen(&before.file), "/sheet[1]/table[2]", "name").as_deref(),
+        Some("Data")
+    );
+    // Remove the table, then the sheet; each inverse restores the bytes.
+    let removed = table
+        .file
+        .edit(|tx| tx.remove("/sheet[1]/table[1]"))
+        .expect("remove table");
+    assert_eq!(
+        prop(&reopen(&removed.file), "/sheet[1]", "tableCount").as_deref(),
+        Some("0")
+    );
+    let restored = removed
+        .patch
+        .inverse()
+        .apply(&removed.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), table.file.to_bytes().unwrap());
+    let gone = table
+        .file
+        .remove("/sheet[1]")
+        .expect("remove sheet with its table");
+    let reopened = reopen(&gone);
+    assert_eq!(prop(&reopened, "/", "sheetCount").as_deref(), Some("1"));
+    // The last sheet stays; rows and columns are still a typed gap.
+    let error = reopened.remove("/sheet[1]").expect_err("last sheet");
+    assert_eq!(error.code(), Code::InvalidArgument);
+    let error = reopened
+        .add("/sheet[1]/table[1]", NewNode::new("row"))
+        .expect_err("rows");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    let error = file
+        .add("/", NewNode::new("sheet").prop("name", "Sheet 1"))
+        .expect_err("duplicate");
+    assert_eq!(error.code(), Code::InvalidValue);
+}
+
+#[test]
+fn corpus_tables_round_trip_through_add_and_remove() {
+    let mut round_trips = 0;
+    for entry in std::fs::read_dir(fixture("")).expect("corpus") {
+        let path = entry.expect("entry").path();
+        if path
+            .extension()
+            .is_none_or(|extension| extension != "numbers")
+        {
+            continue;
+        }
+        let file = litchi_ops::open_bytes(std::fs::read(&path).expect("read")).expect("open");
+        let before = snapshot(&file);
+        let added = file
+            .add("/sheet[1]", NewNode::new("table"))
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        match added.file.remove(added.path.to_string().as_str()) {
+            Ok(removed) => {
+                assert_eq!(snapshot(&reopen(&removed)), before, "{}", path.display());
+                round_trips += 1;
+            },
+            Err(error) => assert_eq!(
+                error.code(),
+                Code::UnsupportedCapability,
+                "{}",
+                path.display()
+            ),
+        }
     }
-    for path in ["/sheet[1]", "/sheet[1]/table[1]"] {
-        let error = file.remove(path).expect_err("lifecycle remove");
-        assert_eq!(error.code(), Code::UnsupportedCapability, "{path}");
-    }
+    assert!(round_trips > 30, "{round_trips}");
 }
 
 /// The tree of a file, as `(path, value)` pairs of every cell and the

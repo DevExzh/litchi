@@ -2409,3 +2409,20 @@ ADR 0034 W1 for `litchi-keynote`, part 4 (slide drawables):
 | `Edit::{add_text_box(slide, Geometry, &str), add_shape(slide, Preset, Geometry, &str), add_image(slide, &[u8], &str, Geometry)}` | `drawable::Preset::{Rectangle, RoundedRectangle { radius }, Ellipse}`; `ImageFormat::{Png, Jpeg, Gif}` sniffed; `Commit::created() -> &[Created { slide(), drawable() }]` | ✅ 0298 |
 | `Edit::set_text_style(slide, drawable, TextSpan, Style)` | Validates, then typed `Error::Unsupported { reason: Unsupported::TextStyling }`; `Package::slide_drawable_text_runs` reads `TextRun { span, text, style }` | 🔴 write refused (0298) |
 | `Package::apply_slide_drawables(&Patch)` | Exact source check, reopen; `Patch::{is_noop, inverse, operations}` | ✅ 0298 |
+
+## Numbers structure (record 0301)
+
+Three new complete `litchi-numbers` transaction families, each with the
+canonical `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` set and
+`Package::{edit_x, apply_x}` entry points:
+
+- `sheet::lifecycle` — `Package::{edit_sheet_lifecycle,
+  apply_sheet_lifecycle}`; `Edit::{add, remove}` (one operation per edit),
+  plus `sheet::lifecycle::InvalidName`.
+- `table::lifecycle` — `Package::{edit_table_lifecycle,
+  apply_table_lifecycle}` over one sheet selector; `Edit::{add, remove}`.
+- `table::order` — `Package::{edit_table_order, apply_table_order}` over one
+  sheet selector; `Edit::move_table(selector, destination)` with a final
+  zero-based `destination`, as `sheet::order` does.
+
+Both profiles now register 30 families.

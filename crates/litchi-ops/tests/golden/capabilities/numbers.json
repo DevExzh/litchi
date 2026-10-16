@@ -161,11 +161,11 @@
       "element": "sheet",
       "parent": "workbook",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -184,7 +184,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -208,11 +208,11 @@
       "element": "table",
       "parent": "sheet",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -235,19 +235,19 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "rowCount": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "columnCount": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -398,47 +398,11 @@
     {
       "subject": "operation",
       "verb": "add",
-      "element": "sheet",
-      "context": "a new sheet",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 4",
-      "reason": "the Numbers leaf has no sheet creation transaction"
-    },
-    {
-      "subject": "operation",
-      "verb": "remove",
-      "element": "sheet",
-      "context": "a sheet and its graph",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 4",
-      "reason": "the Numbers leaf has no sheet deletion transaction"
-    },
-    {
-      "subject": "operation",
-      "verb": "add",
       "element": "table",
-      "context": "a new table",
+      "context": "a workbook without a table",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 5",
-      "reason": "the Numbers leaf has no table creation transaction"
-    },
-    {
-      "subject": "operation",
-      "verb": "remove",
-      "element": "table",
-      "context": "a table and its storage",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 5",
-      "reason": "the Numbers leaf has no table deletion transaction"
-    },
-    {
-      "subject": "operation",
-      "verb": "move",
-      "element": "table",
-      "context": "a position within its sheet",
-      "code": "unsupported_capability",
-      "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
-      "reason": "the leaf relocates a table into another sheet (appended there); it has no transaction that reorders tables within one sheet"
+      "followUp": "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
+      "reason": "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet"
     },
     {
       "subject": "view",

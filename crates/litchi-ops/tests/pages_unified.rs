@@ -134,7 +134,7 @@ fn paragraphs_move_across_sections() {
 }
 
 #[test]
-fn anchored_objects_survive_paragraph_writes_and_block_removal() {
+fn anchored_objects_survive_paragraph_writes_and_go_with_their_paragraph() {
     let file = read("pages/body-table-read-native.pages");
     let anchored = file
         .query("p[objects>0]")
@@ -154,8 +154,26 @@ fn anchored_objects_survive_paragraph_writes_and_block_removal() {
         prop(&reopened, "/", "tableCount"),
         prop(&file, "/", "tableCount")
     );
-    let error = file.remove(&anchored).unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+    // A paragraph whose anchors are body tables goes with its tables
+    // (record 0301).
+    let tables: i64 = prop(&file, "/", "tableCount")
+        .expect("table count")
+        .parse()
+        .expect("count");
+    let paragraphs: i64 = prop(&file, "/", "paragraphCount")
+        .expect("paragraph count")
+        .parse()
+        .expect("count");
+    let removed = file.remove(&anchored).expect("remove with its table");
+    let reopened = reopen(&removed);
+    assert_eq!(
+        prop(&reopened, "/", "tableCount"),
+        Some((tables - 1).to_string())
+    );
+    assert_eq!(
+        prop(&reopened, "/", "paragraphCount"),
+        Some((paragraphs - 1).to_string())
+    );
     // Every other paragraph of the 16 corpus files that 0296 refused now
     // takes a set (see `corpus_fidelity`); a plain one here.
     let first = file
@@ -336,7 +354,7 @@ fn create_builds_the_minimal_document() {
 }
 
 #[test]
-fn package_directories_open_and_save_as_single_files() {
+fn package_directories_open_save_in_place_and_save_as_single_files() {
     let file = open(fixture("directory/pages/basic.pages")).expect("open directory");
     assert!(matches!(file, File::Pages(_)));
     assert_eq!(
@@ -355,6 +373,37 @@ fn package_directories_open_and_save_as_single_files() {
         text(&reopened, "/body/p[1]").as_deref(),
         Some("From a directory")
     );
+    assert!(path.is_file());
+
+    // `save()` writes a directory-opened package back as a directory
+    // (record 0301), and the bundle reopens to the same bytes.
+    let bundle = directory.path().join("bundle.pages");
+    copy_tree(&fixture("directory/pages/basic.pages"), &bundle);
+    let file = open(&bundle).expect("open copy");
+    let edited = file
+        .set("/body/p[1]", props! { "text" => "Saved in place" })
+        .expect("set");
+    edited.save().expect("save in place");
+    assert!(bundle.join("Index.zip").is_file());
+    let reopened = open(&bundle).expect("reopen bundle");
+    assert_eq!(
+        text(&reopened, "/body/p[1]").as_deref(),
+        Some("Saved in place")
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), edited.to_bytes().unwrap());
+}
+
+fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).expect("mkdir");
+    for entry in std::fs::read_dir(from).expect("read dir") {
+        let entry = entry.expect("entry");
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("type").is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).expect("copy");
+        }
+    }
 }
 
 #[test]

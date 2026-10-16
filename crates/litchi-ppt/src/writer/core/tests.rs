@@ -258,6 +258,34 @@ fn test_add_rectangle() {
 }
 
 #[test]
+fn connector_reads_back_as_a_connector() {
+    let mut writer = Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer.add_line(slide, 0, 0, 100, 100).unwrap();
+    writer.add_connector(slide, 10, 10, 200, 50).unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    crate::raw::encode(&mut writer, &mut bytes).unwrap();
+    let package = crate::Package::from_bytes(&bytes.into_inner()).unwrap();
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let shapes = slides[0].shapes().unwrap();
+    let kinds: Vec<_> = shapes
+        .iter()
+        .map(|shape| match shape {
+            crate::shapes::ShapeEnum::Line(line) => Some(line.shape_type()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            Some(crate::shapes::ShapeType::Line),
+            Some(crate::shapes::ShapeType::Connector)
+        ]
+    );
+}
+
+#[test]
 fn test_add_arrow_line() {
     let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
@@ -461,6 +489,7 @@ fn test_shape_type_variants() {
         ShapeType::TextBox,
         ShapeType::Placeholder,
         ShapeType::Line,
+        ShapeType::Connector,
         ShapeType::Ellipse,
         ShapeType::RoundRectangle,
         ShapeType::Diamond,

@@ -17,9 +17,14 @@
 /// three).
 /// Public diagnostics and errors are content-free and do not expose retained
 /// implementation identifiers.
+pub mod order;
+
 /// Sheet-chart transaction families.
 pub mod chart;
-pub mod order;
+
+/// Exact-source transactions that add an empty sheet or remove a sheet and
+/// its private graph. Start with [`crate::Package::edit_sheet_lifecycle`].
+pub mod lifecycle;
 
 use std::collections::HashSet;
 

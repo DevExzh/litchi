@@ -49,7 +49,9 @@ mod save;
     reason = "Decoded sheets expose only the construction path used at package ingress."
 )]
 mod sheet;
+pub(crate) mod sheet_lifecycle;
 pub(crate) mod sheet_order;
+mod structure;
 #[allow(
     dead_code,
     reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."
@@ -75,8 +77,10 @@ pub(crate) mod table_cell_text_format;
 pub(crate) mod table_cells;
 pub(crate) mod table_dimension;
 pub(crate) mod table_headers;
+pub(crate) mod table_lifecycle;
 pub(crate) mod table_lock;
 pub(crate) mod table_merges;
+pub(crate) mod table_order;
 pub(crate) mod table_relocation;
 #[cfg(feature = "internal-iwork-source")]
 #[allow(

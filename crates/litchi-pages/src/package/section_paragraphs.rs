@@ -516,6 +516,50 @@ impl Package {
         Ok(self.section_text(selector)?.split(BREAK).collect())
     }
 
+    /// The body tables each paragraph of one section anchors: for every
+    /// paragraph, in order, the catalog positions
+    /// ([`crate::table::catalog::Snapshot::position`]) of the tables whose
+    /// object anchor sits in it (record 0301).
+    ///
+    /// A paragraph whose anchor count is larger than its table count also
+    /// anchors other objects (charts, images, footnotes).
+    ///
+    /// # Errors
+    ///
+    /// The section-text selection errors; [`section_text::Error::InvalidSource`]
+    /// when the rooted body tables cannot be resolved.
+    pub fn section_paragraph_tables<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<Vec<Vec<Position>>, Error> {
+        let edit = self.edit_section_text(selector)?;
+        let position = edit.position();
+        let text = edit.text();
+        let start = super::section_text::section_start(self, position)?;
+        let invalid = || Error::Text(section_text::Error::InvalidSource);
+        let mut budget = super::table_lock::WireBudget::new(self.state.source.limits())
+            .map_err(|_error| invalid())?;
+        let targets = super::table_lock::native_body_table_targets_with_budget(self, &mut budget)
+            .unwrap_or_default();
+        let mut ranges = Vec::new();
+        let mut offset = start;
+        for paragraph in text.split(BREAK) {
+            let length = paragraph.encode_utf16().count();
+            ranges.push(offset..offset + length);
+            offset += length + 1;
+        }
+        let mut tables = vec![Vec::new(); ranges.len()];
+        for target in targets {
+            if let Some(index) = ranges
+                .iter()
+                .position(|range| range.contains(&target.anchor_character_index))
+            {
+                tables[index].push(Position::new(target.table_position));
+            }
+        }
+        Ok(tables)
+    }
+
     /// Start a paragraph edit of one section.
     ///
     /// # Errors
