@@ -118,3 +118,57 @@ fn refusals_are_typed() -> TestResult {
     ));
     Ok(())
 }
+
+/// Every corpus document with body text takes a bold span, or refuses
+/// typed; the inverse restores each source byte for byte.
+#[test]
+fn corpus_bodies_take_bold_or_refuse_typed() -> TestResult {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/pages");
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(root)?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<_, _>>()?;
+    paths.retain(|path| {
+        path.extension()
+            .is_some_and(|extension| extension == "pages")
+    });
+    paths.sort();
+    let mut styled = 0_usize;
+    let mut refused = Vec::new();
+    for path in paths {
+        let Ok(package) = Package::open(&path) else {
+            continue;
+        };
+        let Some(length) = package
+            .sections()
+            .first()
+            .and_then(|section| section.body_text())
+            .map(|text| text.encode_utf16().count())
+            .filter(|length| *length >= 2)
+        else {
+            continue;
+        };
+        let source = bytes(&package)?;
+        let mut bold = CharacterProperties::new();
+        bold.bold = Some(true);
+        let mut edit = package.edit_section_text_style(0)?;
+        edit.set(span(0, length.min(4))?, bold)?;
+        match edit.commit() {
+            Ok(commit) => {
+                let runs = commit.package().section_text_runs(0)?;
+                assert_eq!(runs[0].style().bold, Some(true), "{}", path.display());
+                let restored = commit
+                    .package()
+                    .apply_section_text_style(&commit.patch().inverse())?;
+                assert_eq!(bytes(restored.package())?, source, "{}", path.display());
+                styled += 1;
+            },
+            Err(error @ (Error::UnsupportedDependency | Error::UnsupportedSource)) => {
+                refused.push((path, error));
+            },
+            Err(error) => panic!("{}: {error:?}", path.display()),
+        }
+    }
+    eprintln!("styled {styled}; refused {refused:?}");
+    assert!(styled >= 10, "only {styled} styled");
+    Ok(())
+}

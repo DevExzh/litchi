@@ -19,7 +19,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts};
+use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
     Batch, ComponentDescriptor, ComponentSelector, ExternalReferenceAddition, ObjectUuidAddition,
@@ -354,8 +354,8 @@ impl Edit<'_> {
         {
             return Err(Error::Verification);
         }
-        let source_owner = self.source.state.source.__source_owner();
-        let target_owner = candidate.state.source.__source_owner();
+        let source_owner = SharedBytes::from_shared_slice(self.source.state.source.shared_source());
+        let target_owner = SharedBytes::from_shared_slice(candidate.state.source.shared_source());
         Ok(Commit {
             package: candidate,
             patch: Patch {
@@ -770,19 +770,33 @@ fn publish(
                 .clone();
             let mut after = before.clone();
             after.push(identifier);
-            sheet.replace_message_transitioning_object_references_preserving_header_with_limits(
-                sheet_index,
-                RawMessage {
-                    type_: STYLESHEET_MESSAGE_TYPE,
-                    data: sheet_data,
-                },
-                litchi_iwa_core::archive::ObjectReferenceTransition {
-                    aggregate_before: &before,
-                    aggregate_after: &after,
-                    fields: &[],
-                },
-                archive_limits,
-            )?;
+            // A native header whose field-local references the aggregate
+            // list does not repeat cannot be transitioned; its payload is
+            // then replaced with the header kept as it is.
+            let declared = sheet
+                .replace_message_transitioning_object_references_preserving_header_with_limits(
+                    sheet_index,
+                    RawMessage {
+                        type_: STYLESHEET_MESSAGE_TYPE,
+                        data: sheet_data.clone(),
+                    },
+                    litchi_iwa_core::archive::ObjectReferenceTransition {
+                        aggregate_before: &before,
+                        aggregate_after: &after,
+                        fields: &[],
+                    },
+                    archive_limits,
+                );
+            if declared.is_err() {
+                sheet.replace_message_preserving_header_with_limits(
+                    sheet_index,
+                    RawMessage {
+                        type_: STYLESHEET_MESSAGE_TYPE,
+                        data: sheet_data,
+                    },
+                    archive_limits,
+                )?;
+            }
             uuids.push((identifier, style_uuid(identifier, &mut taken)));
             created.push(identifier);
             mapping.push((parent, identifier));
@@ -984,7 +998,7 @@ impl Package {
     /// [`Error::PatchConflict`] when this package is not the patch's exact
     /// source.
     pub fn apply_section_text_style(&self, patch: &Patch) -> Result<Commit, Error> {
-        let source_owner = self.state.source.__source_owner();
+        let source_owner = SharedBytes::from_shared_slice(self.state.source.shared_source());
         if !patch.artifacts.authorizes_owner(&source_owner) {
             return Err(Error::PatchConflict);
         }

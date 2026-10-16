@@ -759,3 +759,59 @@ fn text_spans_take_character_styles() -> TestResult {
     assert_eq!(runs[1].style().bold, Some(true));
     Ok(())
 }
+
+/// Every corpus deck takes a styled span in a new text box, or refuses
+/// typed; the inverse restores the bytes.
+#[test]
+fn corpus_text_boxes_take_character_styles() -> TestResult {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(keynote_dir())?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<_, _>>()?;
+    paths.retain(|path| path.extension().is_some_and(|extension| extension == "key"));
+    paths.sort();
+    let mut styled = 0_usize;
+    let mut refused = Vec::new();
+    for path in paths {
+        let Ok(package) = Package::open(&path) else {
+            continue;
+        };
+        if package.slides().map_or(true, <[_]>::is_empty) {
+            continue;
+        }
+        let slide = SlideSelector::index(0);
+        let mut edit = package.edit_slide_drawables();
+        if edit
+            .add_text_box(slide, Geometry::new(10.0, 10.0, 200.0, 40.0), "Styled text")
+            .is_err()
+        {
+            continue;
+        }
+        let Ok(added) = edit.commit() else { continue };
+        let added = added.into_package();
+        let before = bytes(&added)?;
+        let drawable = DrawableSelector::index(list(&added, 0)?.len() - 1);
+        let mut edit = added.edit_slide_drawables();
+        edit.set_text_style(
+            slide,
+            drawable,
+            TextSpan::new(0, 6),
+            Style::new().with_bold(true),
+        )?;
+        match edit.commit() {
+            Ok(commit) => {
+                let runs = commit.package().slide_drawable_text_runs(slide, drawable)?;
+                assert_eq!(runs[0].style().bold, Some(true), "{}", path.display());
+                let restored = commit
+                    .package()
+                    .apply_slide_drawables(&commit.patch().inverse())?;
+                assert_eq!(bytes(restored.package())?, before, "{}", path.display());
+                styled += 1;
+            },
+            Err(error @ Error::Unsupported { .. }) => refused.push((path, error)),
+            Err(error) => panic!("{}: {error:?}", path.display()),
+        }
+    }
+    eprintln!("styled {styled}; refused {refused:?}");
+    assert!(styled >= 10, "only {styled} styled");
+    Ok(())
+}

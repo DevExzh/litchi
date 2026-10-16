@@ -688,14 +688,17 @@ pub(super) fn set_text_style(
                 .map_err(map_style)?;
         let mut sheet_after = sheet_refs.clone();
         sheet_after.push(identifier);
-        workspace
+        // A native header whose field-local references the aggregate list
+        // does not repeat cannot be transitioned; its payload is then
+        // replaced with the header kept as it is.
+        let declared = workspace
             .object_mut(stylesheet)
             .map_err(lift)?
             .replace_message_transitioning_object_references_preserving_header_with_limits(
                 sheet_index,
                 RawMessage {
                     type_: STYLESHEET,
-                    data: sheet_data,
+                    data: sheet_data.clone(),
                 },
                 litchi_iwa_core::archive::ObjectReferenceTransition {
                     aggregate_before: &sheet_refs,
@@ -703,8 +706,11 @@ pub(super) fn set_text_style(
                     fields: &[],
                 },
                 limits,
-            )
-            .map_err(|error| lift(StructureError::from(error)))?;
+            );
+        if declared.is_err() {
+            replace_payload(workspace, stylesheet, sheet_index, STYLESHEET, sheet_data)
+                .map_err(lift)?;
+        }
         created.push((*parent, identifier));
     }
     let restyled = litchi_iwa_text_wire::restyle_span(&payload, text_len, range, |style| {
