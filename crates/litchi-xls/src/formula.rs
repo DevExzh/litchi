@@ -427,6 +427,30 @@ pub(crate) fn formula_reference_spans(tokens: &[u8]) -> Option<FormulaReferences
     })
 }
 
+/// The references of a `ShrFmla` template (`SharedParsedFormula`):
+/// `(same_sheet, shared_relative, three_d)`, where `shared_relative` are the
+/// `PtgRefN`/`PtgAreaN` fields, whose relative components are offsets from
+/// each formula cell (record 0308).
+pub(crate) fn shared_formula_reference_spans(
+    tokens: &[u8],
+) -> Option<(
+    Vec<FormulaReferenceSpan>,
+    Vec<FormulaReferenceSpan>,
+    Vec<Formula3dSpan>,
+)> {
+    if tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+        return None;
+    }
+    let mut decoder = FormulaDecoder::new(tokens, None, Some((0, 0)));
+    decoder.locate_only = true;
+    decoder.decode().ok()?;
+    Some((
+        decoder.references,
+        decoder.references_relative,
+        decoder.references_3d,
+    ))
+}
+
 /// Render a shared formula template at a particular formula-cell origin.
 pub(crate) fn render_shared_formula(
     tokens: &[u8],
@@ -468,6 +492,8 @@ struct FormulaDecoder<'a> {
     /// prefixes render as placeholders and 3-D references are recorded.
     locate_only: bool,
     references_3d: Vec<Formula3dSpan>,
+    /// The shared-relative `PtgRefN`/`PtgAreaN` fields (record 0308).
+    references_relative: Vec<FormulaReferenceSpan>,
 }
 
 impl<'a> FormulaDecoder<'a> {
@@ -487,6 +513,7 @@ impl<'a> FormulaDecoder<'a> {
             references: Vec::new(),
             locate_only: false,
             references_3d: Vec::new(),
+            references_relative: Vec::new(),
         }
     }
 
@@ -702,6 +729,15 @@ impl<'a> FormulaDecoder<'a> {
             0x26 | 0x27 => self.skip(6),
             0x29 => self.skip(2),
             0x2c => {
+                if self.locate_only {
+                    self.references_relative
+                        .try_reserve(1)
+                        .map_err(|_error| ())?;
+                    self.references_relative.push(FormulaReferenceSpan::Cell {
+                        row: self.pos,
+                        column: self.pos + 2,
+                    });
+                }
                 let row = self.u16()?;
                 let col = self.u16()?;
                 let origin = self.shared_origin.ok_or(())?;
@@ -709,6 +745,17 @@ impl<'a> FormulaDecoder<'a> {
                 self.push_text(cell_reference(row, col)?)
             },
             0x2d => {
+                if self.locate_only {
+                    self.references_relative
+                        .try_reserve(1)
+                        .map_err(|_error| ())?;
+                    self.references_relative.push(FormulaReferenceSpan::Area {
+                        first_row: self.pos,
+                        last_row: self.pos + 2,
+                        first_column: self.pos + 4,
+                        last_column: self.pos + 6,
+                    });
+                }
                 let first_row = self.u16()?;
                 let last_row = self.u16()?;
                 let first_col = self.u16()?;

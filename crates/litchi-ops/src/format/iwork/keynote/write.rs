@@ -78,20 +78,21 @@ impl Text {
 
     /// The item holding this text in `file`'s tree.
     fn item(self, file: &Iwork) -> Option<&super::super::tree::Item> {
-        let tree = file.tree();
-        let slide = *tree.item(super::ROOT).children().get(self.slide)?;
-        tree.item(slide)
-            .children()
-            .iter()
-            .map(|child| tree.item(*child))
-            .find(|item| {
-                let leaf = item.leaf().map(|value| value as usize);
-                match (item.type_name(), self.container) {
-                    ("placeholder", TITLE | BODY) | ("notes", NOTES) => leaf[1] == self.container,
-                    ("shape", DRAWABLE) => leaf[3] == self.drawable,
-                    _ => false,
-                }
-            })
+        self.at(file).map(|at| file.item(at))
+    }
+
+    /// The place of the item holding this text in `file`'s tree.
+    fn at(self, file: &Iwork) -> Option<super::super::At> {
+        let slide = file.kids(super::super::At::ROOT).get(self.slide)?;
+        file.kids(slide).iter().find(|&child| {
+            let item = file.item(child);
+            let leaf = item.leaf().map(|value| value as usize);
+            match (item.type_name(), self.container) {
+                ("placeholder", TITLE | BODY) | ("notes", NOTES) => leaf[1] == self.container,
+                ("shape", DRAWABLE) => leaf[3] == self.drawable,
+                _ => false,
+            }
+        })
     }
 }
 
@@ -399,39 +400,44 @@ impl Pending {
             )
             .with_property(key.to_owned()));
         }
-        let tree = file.tree();
         // A placeholder's runs have no shape item: their text keeps its
         // layout's styles.
-        let shape = text.item(file).ok_or_else(|| {
+        let shape = text.at(file).ok_or_else(|| {
             refusal(
                 Code::UnsupportedCapability,
                 "character properties are written on runs of text boxes and shapes; placeholder and notes runs keep their layout's styles",
             )
             .with_property(key.to_owned())
         })?;
-        let paragraphs: Vec<_> = shape
-            .children()
-            .iter()
-            .map(|child| tree.item(*child))
-            .filter(|item| item.type_name() == "paragraph")
-            .collect();
+        let of_kind = |parent, kind: &str| -> Vec<super::super::At> {
+            file.kids(parent)
+                .iter()
+                .filter(|&child| file.item(child).type_name() == kind)
+                .collect()
+        };
+        let paragraphs = of_kind(shape, "paragraph");
         let mut start = 0;
-        for paragraph in paragraphs.iter().take(line) {
-            start += paragraph.text().unwrap_or_default().chars().count() + 1;
+        for &paragraph in paragraphs.iter().take(line) {
+            start += file
+                .item(paragraph)
+                .text()
+                .unwrap_or_default()
+                .chars()
+                .count()
+                + 1;
         }
-        let paragraph = paragraphs
+        let paragraph = *paragraphs
             .get(line)
             .ok_or_else(|| refusal(Code::PathNotFound, "the run's paragraph is missing"))?;
-        let runs: Vec<_> = paragraph
-            .children()
-            .iter()
-            .map(|child| tree.item(*child))
-            .filter(|item| item.type_name() == "run")
+        let runs: Vec<_> = of_kind(paragraph, "run")
+            .into_iter()
+            .map(|run| (run, file.item(run)))
             .collect();
         let ordinal = runs
             .iter()
-            .position(|run| std::ptr::eq(*run, node.item()))
+            .position(|(run, _)| *run == node.at())
             .ok_or_else(|| refusal(Code::InternalError, "the run is not in its paragraph"))?;
+        let runs: Vec<_> = runs.into_iter().map(|(_, run)| run).collect();
         for run in runs.iter().take(ordinal) {
             start += run.text().unwrap_or_default().chars().count();
         }
@@ -461,32 +467,29 @@ impl Pending {
     ) -> Result<()> {
         use super::super::write::CellScalar;
         let [slide, _, row, drawable] = node.item().leaf().map(|value| value as usize);
-        let tree = file.tree();
-        let slide_item = tree
-            .item(super::ROOT)
-            .children()
+        let slide_at = file
+            .kids(super::super::At::ROOT)
             .get(slide)
-            .map(|child| tree.item(*child))
             .ok_or_else(|| refusal(Code::PathNotFound, "the cell's slide is missing"))?;
-        let table = slide_item
-            .children()
+        let table = file
+            .kids(slide_at)
             .iter()
-            .map(|child| tree.item(*child))
-            .find(|item| item.type_name() == "table" && item.leaf()[3] as usize == drawable)
+            .find(|&child| {
+                let item = file.item(child);
+                item.type_name() == "table" && item.leaf()[3] as usize == drawable
+            })
             .ok_or_else(|| refusal(Code::PathNotFound, "the cell's table is missing"))?;
-        let row_item = table
-            .children()
+        let row_at = file
+            .kids(table)
             .iter()
-            .map(|child| tree.item(*child))
-            .filter(|item| item.type_name() == "tr")
+            .filter(|&child| file.item(child).type_name() == "tr")
             .nth(row)
             .ok_or_else(|| refusal(Code::PathNotFound, "the cell's row is missing"))?;
-        let column = row_item
-            .children()
+        let column = file
+            .kids(row_at)
             .iter()
-            .map(|child| tree.item(*child))
-            .filter(|item| item.type_name() == "tc")
-            .position(|item| std::ptr::eq(item, node.item()))
+            .filter(|&child| file.item(child).type_name() == "tc")
+            .position(|child| child == node.at())
             .ok_or_else(|| refusal(Code::InternalError, "the cell is not in its row"))?;
         let cell = match super::super::write::cell_scalar(key, value)? {
             CellScalar::Text(text) => TableCellValue::Text(text),
@@ -1136,7 +1139,7 @@ pub(crate) fn add(
                 Some(from) => SlideSource::Duplicate(slide_position(file, &from)?),
                 None => SlideSource::Layout(layout),
             };
-            let count = file.tree().item(super::ROOT).children().len();
+            let count = file.kids(super::super::At::ROOT).len();
             let destination = insertion(count, node.placement(), |anchor| slide_at(file, anchor))?;
             let mut chain = Chain::new(package.clone());
             create_slides(&mut chain, &[(source, destination, 0)]).map_err(|(error, _)| error)?;
@@ -1164,12 +1167,9 @@ pub(crate) fn add(
             let element = request.element;
             // A new drawable joins the end of its slide's drawables: its
             // ordinal among the slide's elements of its kind is their count.
-            let tree = file.tree();
-            let ordinal = tree
-                .item(parent_node.index())
-                .children()
-                .iter()
-                .filter(|child| tree.item(**child).type_name() == element)
+            let ordinal = parent_node
+                .child_nodes()
+                .filter(|child| child.item().type_name() == element)
                 .count();
             let mut pending = Pending::default();
             pending.stage_add(request.add, 0);
@@ -1450,7 +1450,7 @@ pub(crate) fn move_to(
     let mut chain = Chain::new(package.clone());
     let [slide, _, line, drawable] = node.item().leaf().map(|value| value as usize);
     if kind == "slide" {
-        let slides = file.tree().item(super::ROOT).children().len();
+        let slides = file.kids(super::super::At::ROOT).len();
         let to = destination(slide, slides, placement, |anchor| slide_at(file, anchor))?;
         move_slide(&mut chain, slide, to)?;
     } else if kind == "paragraph" {

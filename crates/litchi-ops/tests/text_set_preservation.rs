@@ -635,6 +635,27 @@ mod doc {
             .unwrap();
         assert_eq!(text(&changed, "/body/p[5]"), "Shape:");
     }
+
+    /// Record 0304 F4: `FloatingPictures.doc` tags its style names as smart
+    /// tags whose ends lie inside paragraphs 5 onwards. The set is a typed
+    /// refusal naming the range, not a corrupt file (record 0308).
+    #[test]
+    fn a_smart_tag_boundary_inside_the_paragraph_is_refused() {
+        let file = open("ole/doc/FloatingPictures.doc");
+        let error = refused(&file, "/body/p[5]", "Replaced");
+        assert_eq!(error.code(), Code::UnsupportedCapability, "{error}");
+        let chain =
+            std::iter::successors(std::error::Error::source(&error), |cause| cause.source())
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(" / ");
+        assert!(chain.contains("smart tag"), "{chain}");
+        // A tag that ends at its paragraph's edge stays editable.
+        let changed = file
+            .set("/body/p[1]", props! { "text" => "Plain" })
+            .unwrap();
+        assert_eq!(text(&changed, "/body/p[1]"), "Plain");
+    }
 }
 
 /// RTF: a paragraph text set is refused while the body holds fields,
@@ -762,10 +783,10 @@ mod odg {
     #[test]
     fn links_are_refused_and_plain_text_is_set() {
         let file = open("libreoffice-core/desktop/qa/data/3page.odg");
-        // The leaf reports a text box it cannot replace losslessly as an
-        // invalid value.
+        // A text box the leaf cannot replace losslessly is an unsupported
+        // capability, as in the other formats (record 0308).
         let error = refused(&file, "/page[2]/shape[1]", "No link");
-        assert_eq!(error.code(), Code::InvalidValue, "{error}");
+        assert_eq!(error.code(), Code::UnsupportedCapability, "{error}");
         let changed = file
             .set("/page[1]/shape[1]", props! { "text" => "Other" })
             .unwrap();

@@ -536,8 +536,8 @@ impl File {
         match self {
             #[cfg(feature = "docx")]
             Self::Docx(handle) => handle
-                .set(&_target.into_target()?, _props)
-                .map(|commit| Self::Docx(commit.into_file())),
+                .set_file(&_target.into_target()?, _props)
+                .map(Self::Docx),
             #[cfg(feature = "xlsb")]
             Self::Xlsb(handle) => handle
                 .set(_target.into_target()?, _props)

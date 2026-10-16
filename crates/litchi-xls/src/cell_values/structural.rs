@@ -2181,16 +2181,36 @@ fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift
         0x009e,
     ];
     let records = raw_records(workbook)?;
-    if let Some(record) = records
-        .iter()
-        .find(|record| GLOBAL_OR_CROSS_SHEET_DEPENDENCIES.contains(&record.kind))
-    {
+    let sheets = extern_sheets(workbook, &records)?;
+    // A record of another worksheet reaches the shifted one only through a
+    // 3-D reference, which needs an XTI of this workbook covering its tab;
+    // the shifted worksheet's own records are certified with it
+    // (`certify_coordinate_shift`). Record 0308.
+    let bounds = bound_sheets_in(workbook, &records)?;
+    let target = worksheet_range_in(&bounds, workbook.len(), tab)?;
+    let target_name = bounds
+        .get(tab)
+        .map(|bound| {
+            record_payload(workbook, &bound.record, "BoundSheet").and_then(decode_bound_name)
+        })
+        .transpose()?
+        .unwrap_or_default();
+    let reachable = sheets.entries.iter().any(|&(book, first, last)| {
+        Some(book) == sheets.self_book
+            && first >= 0
+            && last >= 0
+            && (first.min(last)..=first.max(last)).contains(&i16::try_from(tab).unwrap_or(i16::MAX))
+    });
+    if let Some(record) = records.iter().find(|record| {
+        GLOBAL_OR_CROSS_SHEET_DEPENDENCIES.contains(&record.kind)
+            && (reachable || target.contains(&record.start))
+            && !(target.contains(&record.start) && IN_SHEET_SHIFTED.contains(&record.kind))
+    }) {
         return Err(Error::UnsafeEdit(format!(
             "row/column movement cannot close workbook dependency record 0x{:04X}",
             record.kind
         )));
     }
-    let sheets = extern_sheets(workbook, &records)?;
     let mut current_book_is_self = false;
     for (position, record) in records.iter().enumerate() {
         let continued = records
@@ -2268,16 +2288,145 @@ fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift
                     .ok_or_else(|| Error::InvalidData("Formula payload is truncated".into()))?;
                 let length = formula_tokens(payload)?.len();
                 let tokens = &mut payload[22..22 + length];
-                patch_3d_references(tokens, &sheets, tab, shift, false)?;
+                // A shared formula cell's PtgExp holds no 3-D reference.
+                if crate::formula::ptg_exp_anchor(tokens).is_none() {
+                    patch_3d_references(tokens, &sheets, tab, shift, false)?;
+                }
             },
             HLINK => {
                 let payload = record_payload(workbook, record, "HLINK")?;
-                certify_hyperlink_target(payload)?;
+                certify_hyperlink_target(payload, target.contains(&record.start), &target_name)?;
             },
             _ => {},
         }
     }
     Ok(())
+}
+
+/// Dependency records of the shifted worksheet that its rebuild shifts
+/// itself (record 0308).
+const IN_SHEET_SHIFTED: &[u16] = &[SHARED_FORMULA, CONDFMT, DV];
+
+const CONDFMT: u16 = 0x01b0;
+const CF: u16 = 0x01b1;
+const DV: u16 = 0x01be;
+
+/// Shifts a `CondFmt` record (`[MS-XLS]` 2.4.42): its bounding range and
+/// every range of its `sqref`. Its `CF` rules are certified separately
+/// (`cf_formulas`); record 0308.
+fn patch_condfmt(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    if payload.len() < 14 {
+        return Err(Error::InvalidData("CondFmt record is truncated".into()));
+    }
+    patch_ref8(&mut payload[4..12], shift)?;
+    patch_sqref(&mut payload[12..], shift)
+}
+
+/// Shifts every `Ref8U` of a `SqRefU` (count, then the ranges), which must
+/// fill `payload`.
+fn patch_sqref(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let count = usize::from(binary::read_u16_le_at(payload, 0)?);
+    if payload.len() != 2 + count * 8 {
+        return Err(Error::UnsafeEdit(
+            "a range list does not fill its record and is not shifted".into(),
+        ));
+    }
+    for range in payload[2..].as_chunks_mut::<8>().0.iter_mut() {
+        patch_ref8(range, shift)?;
+    }
+    Ok(())
+}
+
+/// The two formulas of a `CF` rule (`[MS-XLS]` 2.4.42): `cce1` and `cce2`
+/// bytes at the end of the record, after its differential format.
+fn cf_formulas(payload: &[u8]) -> Result<[&[u8]; 2]> {
+    if payload.len() < 6 {
+        return Err(Error::InvalidData("CF record is truncated".into()));
+    }
+    let first = usize::from(binary::read_u16_le_at(payload, 2)?);
+    let second = usize::from(binary::read_u16_le_at(payload, 4)?);
+    let start = payload
+        .len()
+        .checked_sub(first + second)
+        .filter(|start| *start >= 6)
+        .ok_or_else(|| Error::InvalidData("CF formulas exceed the record".into()))?;
+    Ok([&payload[start..start + first], &payload[start + first..]])
+}
+
+/// Refuses formulas that hold a cell, area, shared-relative or 3-D
+/// reference: their relative references are offsets this shift does not
+/// rewrite.
+fn certify_reference_free(formulas: [&[u8]; 2], what: &str) -> Result<()> {
+    for formula in formulas {
+        if formula.is_empty() {
+            continue;
+        }
+        let free = crate::formula::shared_formula_reference_spans(formula).is_some_and(
+            |(same_sheet, relative, three_d)| {
+                same_sheet.is_empty() && relative.is_empty() && three_d.is_empty()
+            },
+        );
+        if !free {
+            return Err(Error::UnsafeEdit(format!(
+                "row/column movement cannot close a {what} formula with cell references"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Shifts a `DV` record (`[MS-XLS]` 2.4.112): its `sqref`, after its four
+/// strings and two formulas, which must hold no cell references.
+fn patch_dv(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let mut offset = 4_usize;
+    for _ in 0..4 {
+        let characters = usize::from(binary::read_u16_le_at(payload, offset)?);
+        let flags = *payload
+            .get(offset + 2)
+            .ok_or_else(|| Error::InvalidData("DV string is truncated".into()))?;
+        offset += 3 + characters * if flags & 1 != 0 { 2 } else { 1 };
+    }
+    let mut formulas: [std::ops::Range<usize>; 2] = [0..0, 0..0];
+    for formula in &mut formulas {
+        let length = usize::from(binary::read_u16_le_at(payload, offset)?);
+        let start = offset + 4;
+        *formula = start..start + length;
+        offset = start + length;
+    }
+    let first = payload
+        .get(formulas[0].clone())
+        .ok_or_else(|| Error::InvalidData("DV formula is truncated".into()))?;
+    let second = payload
+        .get(formulas[1].clone())
+        .ok_or_else(|| Error::InvalidData("DV formula is truncated".into()))?;
+    certify_reference_free([first, second], "data validation")?;
+    let sqref = payload
+        .get_mut(offset..)
+        .ok_or_else(|| Error::InvalidData("DV range list is truncated".into()))?;
+    patch_sqref(sqref, shift)
+}
+
+/// The byte range of the worksheet substream at workbook tab `tab`.
+fn worksheet_range_in(
+    bounds: &[BoundSheet],
+    length: usize,
+    tab: usize,
+) -> Result<std::ops::Range<usize>> {
+    let Some(bound) = bounds.get(tab) else {
+        // A stream without the tab's BoundSheet holds none of its records.
+        return Ok(0..0);
+    };
+    let start = usize::try_from(bound.position)
+        .map_err(|_error| Error::InvalidData("worksheet position exceeds usize".into()))?;
+    let end = bounds
+        .iter()
+        .filter_map(|candidate| {
+            let position = usize::try_from(candidate.position).ok()?;
+            (position > start).then_some(position)
+        })
+        .min()
+        .unwrap_or(length);
+    Ok(start..end)
 }
 
 fn rebuild_sheet(
@@ -2291,18 +2440,62 @@ fn rebuild_sheet(
     shared_strings: &[String],
 ) -> Result<Vec<u8>> {
     let records = raw_records(worksheet)?;
-    let index = unique_kind(&records, INDEX, "INDEX")?;
-    let dimensions = unique_kind(&records, DIMENSIONS, "DIMENSIONS")?;
-    let def_col = unique_kind(&records, DEF_COL_WIDTH, "DEFCOLWIDTH")?;
+    // An embedded chart substream (BOF ... EOF inside the worksheet) has
+    // its own DIMENSIONS; the worksheet's records are the top-level ones.
+    let top = top_level(&records);
+    let dimensions = unique_kind(&top, DIMENSIONS, "DIMENSIONS")?;
+    let def_col = unique_kind(&top, DEF_COL_WIDTH, "DEFCOLWIDTH")?;
     let first_row = records.iter().position(|record| record.kind == ROW);
     let last_dbcell = records.iter().rposition(|record| record.kind == DBCELL);
-    let (row_records, row_table_start, row_table_end) = match (first_row, last_dbcell) {
+    // A producer may write no INDEX and no DBCELL (the grammar requires
+    // INDEX; readers do not). The row table is then regenerated in the same
+    // row blocks and written back without either record (record 0308).
+    let unindexed = !top.iter().any(|(_, record)| record.kind == INDEX) && last_dbcell.is_none();
+    let index = if unindexed {
+        def_col
+    } else {
+        unique_kind(&top, INDEX, "INDEX")?
+    };
+    let last_row_record = if unindexed {
+        first_row.map(|first| {
+            first
+                + records[first..]
+                    .iter()
+                    .take_while(|record| {
+                        is_cell_record(record.kind)
+                            || matches!(
+                                record.kind,
+                                ROW | STRING | CONTINUE | TABLE | ARRAY | SHARED_FORMULA
+                            )
+                    })
+                    .count()
+                - 1
+        })
+    } else {
+        last_dbcell
+    };
+    let (row_records, row_table_start, row_table_end) = match (first_row, last_row_record) {
         (Some(first), Some(last)) if first > index && last >= first => (
             &records[first..=last],
             records[first].start,
             records[last].end,
         ),
-        (None, None) => {
+        (None, None) if unindexed => {
+            if records.iter().any(|record| {
+                is_cell_record(record.kind)
+                    || matches!(record.kind, STRING | TABLE | ARRAY | SHARED_FORMULA)
+            }) {
+                return Err(Error::UnsafeEdit(
+                    "empty worksheet row-table metadata is inconsistent".into(),
+                ));
+            }
+            (
+                &records[0..0],
+                records[dimensions].end,
+                records[dimensions].end,
+            )
+        },
+        (None, None) if !unindexed => {
             // An empty indexed sheet has no row blocks. Require empty extents,
             // no INDEX block pointers and no orphaned cells before creating its
             // first row block directly after DIMENSIONS.
@@ -2388,9 +2581,15 @@ fn rebuild_sheet(
     apply_row_layout(&mut rows, layout)?;
     patch_row_extents(&mut rows)?;
 
-    let index_record = &records[index];
+    // Without INDEX, the records from DEFCOLWIDTH on stand where the
+    // records after INDEX stand.
+    let (index_start, index_end) = if unindexed {
+        (records[def_col].start, records[def_col].start)
+    } else {
+        (records[index].start, records[index].end)
+    };
     let source_between = worksheet
-        .get(index_record.end..row_table_start)
+        .get(index_end..row_table_start)
         .ok_or_else(|| Error::InvalidData("INDEX-to-row range is invalid".into()))?;
     // Column layout rewrites the ColInfo run after DefColWidth, which can
     // change the length of this region; DIMENSIONS is located again below.
@@ -2398,7 +2597,7 @@ fn rebuild_sheet(
     let between = between.as_slice();
     let def_offset = records[def_col]
         .start
-        .checked_sub(index_record.end)
+        .checked_sub(index_end)
         .ok_or_else(|| Error::InvalidData("DEFCOLWIDTH precedes INDEX".into()))?;
     let layout_rows = rows
         .into_iter()
@@ -2411,7 +2610,7 @@ fn rebuild_sheet(
         })
         .collect();
     let absolute_index = absolute_start
-        .checked_add(index_record.start)
+        .checked_add(index_start)
         .ok_or_else(|| Error::InvalidData("absolute INDEX offset overflow".into()))?;
     let plan = RowBlockLayoutPlan::generate(
         u64::try_from(absolute_index)
@@ -2425,8 +2624,41 @@ fn rebuild_sheet(
     .map_err(|error| Error::UnsafeEdit(format!("BIFF8 row-block regeneration: {error}")))?;
     let (new_index, new_rows) = plan.into_records();
 
-    let (first_used_row, last_used_row, first_used_col, last_used_col) =
-        dimensions_from_row_table(&new_rows)?;
+    let computed = dimensions_from_row_table(&new_rows)?;
+    // Producers write DIMENSIONS wider than the cells span (rows with only a
+    // ROW record, say). When the source's extents are wider than its cells,
+    // they are kept, moved by the shifts, while they still cover the cells,
+    // so an edit and its inverse leave the record byte-identical (record
+    // 0308). Exact source extents stay exact.
+    let source_dimensions = worksheet
+        .get(records[dimensions].start + 4..records[dimensions].end)
+        .unwrap_or_default();
+    // The source's exactness matters only when the shifted extents differ
+    // from the regenerated ones, so the source row table is read only then.
+    let stored = match stored_dimensions(source_dimensions, operations) {
+        Some(stored) if stored != computed => {
+            let source_exact = stored_dimensions(source_dimensions, &[])
+                == Some(dimensions_from_row_table(
+                    worksheet
+                        .get(row_table_start..row_table_end)
+                        .unwrap_or_default(),
+                )?);
+            (!source_exact).then_some(stored)
+        },
+        _ => None,
+    };
+    let (first_used_row, last_used_row, first_used_col, last_used_col) = match stored {
+        Some(stored)
+            if computed == (0, 0, 0, 0)
+                || (stored.0 <= computed.0
+                    && stored.1 >= computed.1
+                    && stored.2 <= computed.2
+                    && stored.3 >= computed.3) =>
+        {
+            stored
+        },
+        _ => computed,
+    };
     let mut new_dimensions = Vec::new();
     crate::writer::biff::write_dimensions(
         &mut new_dimensions,
@@ -2443,7 +2675,7 @@ fn rebuild_sheet(
     let mut between = between.to_vec();
     let dimensions_relative = records[dimensions]
         .start
-        .checked_sub(index_record.end)
+        .checked_sub(index_end)
         .ok_or_else(|| Error::InvalidData("DIMENSIONS precedes INDEX".into()))?
         .checked_add(between.len())
         .and_then(|value| value.checked_sub(source_between.len()))
@@ -2456,14 +2688,37 @@ fn rebuild_sheet(
         .ok_or_else(|| Error::InvalidData("DIMENSIONS is outside INDEX gap".into()))?
         .copy_from_slice(&new_dimensions);
 
+    let new_rows = if unindexed {
+        without_dbcells(&new_rows)?
+    } else {
+        new_rows
+    };
     let mut result = Vec::new();
-    result.extend_from_slice(&worksheet[..index_record.start]);
-    result.extend_from_slice(&new_index);
+    result.extend_from_slice(&worksheet[..index_start]);
+    if !unindexed {
+        result.extend_from_slice(&new_index);
+    }
     result.extend_from_slice(&between);
     result.extend_from_slice(&new_rows);
     result.extend_from_slice(&worksheet[row_table_end..]);
     patch_coordinate_dependencies(&mut result, operations)?;
     Ok(result)
+}
+
+/// `rows`, a regenerated row table, without its DBCELL records.
+fn without_dbcells(rows: &[u8]) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    out.try_reserve_exact(rows.len())
+        .map_err(|_error| Error::Allocation("unindexed row table"))?;
+    for record in raw_records(rows)? {
+        if record.kind != DBCELL {
+            out.extend_from_slice(
+                rows.get(record.start..record.end)
+                    .ok_or_else(|| Error::InvalidData("row table record is truncated".into()))?,
+            );
+        }
+    }
+    Ok(out)
 }
 
 /// Patch, create or reset `Row` records for staged row layout changes.
@@ -2611,10 +2866,12 @@ fn patch_coordinate_dependencies(
                 })?;
             match record.kind {
                 FORMULA => patch_formula_record(payload, shift)?,
+                SHARED_FORMULA => patch_shared_formula(payload, shift)?,
+                CONDFMT => patch_condfmt(payload, shift)?,
+                DV => patch_dv(payload, shift)?,
                 MERGED_CELLS => patch_merged_cells(payload, shift)?,
                 HLINK => patch_hyperlink(payload, shift)?,
                 HLINK_TOOLTIP => patch_hyperlink_tooltip(payload, shift)?,
-                MSO_DRAWING => patch_officeart(payload, shift)?,
                 COL_INFO => patch_col_info(payload, shift)?,
                 NOTE => patch_note(payload, shift)?,
                 VERTICAL_PAGE_BREAKS => patch_vertical_breaks(payload, shift)?,
@@ -2622,6 +2879,74 @@ fn patch_coordinate_dependencies(
                 _ => {},
             }
         }
+        patch_drawing_stream(worksheet, &records, shift)?;
+    }
+    Ok(())
+}
+
+/// The payload ranges of the worksheet's OfficeArt stream: every top-level
+/// `MsoDrawing` record and the `Continue` records that directly follow one.
+/// A drawing's records are split across them (record 0308).
+fn drawing_ranges(records: &[RawRecord]) -> Vec<std::ops::Range<usize>> {
+    let mut ranges = Vec::new();
+    let mut chained = false;
+    for (_, record) in top_level(records) {
+        chained = match record.kind {
+            MSO_DRAWING => true,
+            CONTINUE if chained => true,
+            _ => false,
+        };
+        if chained {
+            ranges.push(record.start + 4..record.end);
+        }
+    }
+    ranges
+}
+
+/// The worksheet's OfficeArt stream, read as the concatenation of its
+/// `MsoDrawing` payloads, with its ClientAnchors shifted (anchors keep their
+/// width, so every record keeps its length). `None` without a drawing.
+fn shifted_drawing_stream(
+    worksheet: &[u8],
+    ranges: &[std::ops::Range<usize>],
+    shift: AxisShift,
+) -> Result<Option<Vec<u8>>> {
+    if ranges.is_empty() {
+        return Ok(None);
+    }
+    let mut stream = Vec::new();
+    for range in ranges {
+        stream.extend_from_slice(
+            worksheet
+                .get(range.clone())
+                .ok_or_else(|| Error::InvalidData("MsoDrawing payload is truncated".into()))?,
+        );
+    }
+    patch_officeart(&mut stream, shift)?;
+    Ok(Some(stream))
+}
+
+/// Shifts the ClientAnchors of the worksheet's OfficeArt stream in place.
+fn patch_drawing_stream(
+    worksheet: &mut [u8],
+    records: &[RawRecord],
+    shift: AxisShift,
+) -> Result<()> {
+    let ranges = drawing_ranges(records);
+    let Some(stream) = shifted_drawing_stream(worksheet, &ranges, shift)? else {
+        return Ok(());
+    };
+    let mut offset = 0;
+    for range in ranges {
+        let length = range.len();
+        let source = stream
+            .get(offset..offset + length)
+            .ok_or_else(|| Error::InvalidData("OfficeArt stream is truncated".into()))?;
+        worksheet
+            .get_mut(range)
+            .ok_or_else(|| Error::InvalidData("MsoDrawing payload is truncated".into()))?
+            .copy_from_slice(source);
+        offset += length;
     }
     Ok(())
 }
@@ -3023,47 +3348,55 @@ fn patch_officeart_records(data: &mut [u8], shift: AxisShift) -> Result<()> {
     Ok(())
 }
 
+/// Shifts one `OfficeArtClientAnchorSheet` (`[MS-XLS]` 2.5.193).
+///
+/// Its first word holds `fMove` (bit 0) and `fSize` (bit 1), each set when
+/// the shape is kept intact as cells move or resize: 0 is "move and size
+/// with cells", 2 "move but don't size", 3 "don't move or size" (Apache
+/// POI's `AnchorType` values; LibreOffice's position- and size-locked
+/// flags). Record 0308 corrected this patch, which had read 0 as fixed and
+/// 3 as moving: a moving anchor's endpoints shift like cells; a
+/// size-locked one shifts whole when the shift point is outside it; a
+/// position-locked one is unchanged by a shift after it and refused
+/// otherwise, since keeping its place would need the row and column sizes.
 fn patch_client_anchor(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     let behavior = binary::read_u16_le_at(payload, 0)?;
-    match behavior {
-        0 => return Ok(()),
-        0b10 => {
-            return Err(Error::UnsafeEdit(
-                "size-only drawing anchors are not reversibly shiftable".into(),
-            ));
-        },
-        0b11 => {},
-        _ => {
-            return Err(Error::InvalidData(
-                "worksheet ClientAnchor has reserved behavior flags".into(),
-            ));
-        },
-    }
-    match shift {
+    let (first_offset, last_offset, start, count, insert, limit) = match shift {
         AxisShift::Rows {
             start,
             count,
             insert,
-        } => {
-            let first = binary::read_u16_le_at(payload, 6)?;
-            let last = binary::read_u16_le_at(payload, 14)?;
-            let (first, last) = shift_axis_range(first, last, start, count, insert, 65_536)?;
-            payload[6..8].copy_from_slice(&first.to_le_bytes());
-            payload[14..16].copy_from_slice(&last.to_le_bytes());
-        },
+        } => (6, 14, start, count, insert, 65_536),
         AxisShift::Columns {
             start,
             count,
             insert,
-        } => {
-            let first = binary::read_u16_le_at(payload, 2)?;
-            let last = binary::read_u16_le_at(payload, 10)?;
-            let (first, last) =
-                shift_axis_range(first, last, u16::from(start), u16::from(count), insert, 256)?;
-            payload[2..4].copy_from_slice(&first.to_le_bytes());
-            payload[10..12].copy_from_slice(&last.to_le_bytes());
+        } => (2, 10, u16::from(start), u16::from(count), insert, 256),
+    };
+    let first = binary::read_u16_le_at(payload, first_offset)?;
+    let last = binary::read_u16_le_at(payload, last_offset)?;
+    let (first, last) = match behavior {
+        0 => shift_axis_range(first, last, start, count, insert, limit)?,
+        _ if start > last => return Ok(()),
+        0b10 if (insert && start <= first) || (!insert && start + count <= first) => (
+            shift_axis_point(first, start, count, insert, limit)?,
+            shift_axis_point(last, start, count, insert, limit)?,
+        ),
+        0b10 => {
+            return Err(Error::UnsafeEdit(
+                "a size-locked drawing anchor that spans the shift point is not reversibly shiftable"
+                    .into(),
+            ));
         },
-    }
+        _ => {
+            return Err(Error::UnsafeEdit(
+                "a position-locked drawing anchor is not shiftable without row and column sizes"
+                    .into(),
+            ));
+        },
+    };
+    payload[first_offset..first_offset + 2].copy_from_slice(&first.to_le_bytes());
+    payload[last_offset..last_offset + 2].copy_from_slice(&last.to_le_bytes());
     Ok(())
 }
 
@@ -4020,7 +4353,7 @@ fn shift_columns(
         let mut retained = Vec::new();
         for mut record in std::mem::take(&mut data.cell_records) {
             let kind = record_kind(&record)?;
-            if matches!(kind, TABLE | SHARED_FORMULA | ARRAY) {
+            if matches!(kind, TABLE | ARRAY) {
                 return Err(Error::UnsafeEdit(
                     "column movement of formula ownership records is refused".into(),
                 ));
@@ -4030,9 +4363,43 @@ fn shift_columns(
                 continue;
             }
             if kind == MUL_RK || kind == MUL_BLANK {
-                return Err(Error::UnsafeEdit(
-                    "column movement across packed cell records is refused".into(),
-                ));
+                // A packed run moves whole when the shift point is outside
+                // it; a run the point falls inside is not split (record
+                // 0308).
+                let length = record.len();
+                if length < 10 {
+                    return Err(Error::InvalidData("packed cell record is truncated".into()));
+                }
+                let first = binary::read_u16_le_at(&record, 6)?;
+                let last = binary::read_u16_le_at(&record, length - 2)?;
+                let (start16, count16) = (u16::from(start), u16::from(count));
+                let delta: Option<i32> = if last < start16 {
+                    Some(0)
+                } else if insert && first >= start16 {
+                    Some(i32::from(count16))
+                } else if !insert && first >= start16 + count16 {
+                    Some(-i32::from(count16))
+                } else {
+                    None
+                };
+                let Some(delta) = delta else {
+                    return Err(Error::UnsafeEdit(
+                        "column movement across packed cell records is refused".into(),
+                    ));
+                };
+                let moved = |value: u16| {
+                    u16::try_from(i32::from(value) + delta)
+                        .ok()
+                        .filter(|value| *value < 256)
+                        .ok_or_else(|| {
+                            Error::UnsafeEdit("column insertion moves content outside BIFF8".into())
+                        })
+                };
+                let (first, last) = (moved(first)?, moved(last)?);
+                record[6..8].copy_from_slice(&first.to_le_bytes());
+                record[length - 2..].copy_from_slice(&last.to_le_bytes());
+                retained.push(record);
+                continue;
             }
             let column = cell_column(&record)?;
             let target = if insert {
@@ -4065,7 +4432,7 @@ fn patch_row_number(data: &mut RowData, row: u16) -> Result<()> {
         .copy_from_slice(&row.to_le_bytes());
     for record in &mut data.cell_records {
         let kind = record_kind(record)?;
-        if matches!(kind, TABLE | SHARED_FORMULA | ARRAY) {
+        if matches!(kind, TABLE | ARRAY) {
             return Err(Error::UnsafeEdit(
                 "row movement of formula ownership records is refused".into(),
             ));
@@ -4102,6 +4469,68 @@ fn patch_row_extents(rows: &mut BTreeMap<u16, RowData>) -> Result<()> {
             .copy_from_slice(&last_plus_one.to_le_bytes());
     }
     Ok(())
+}
+
+/// The source DIMENSIONS `(rwMic, rwMac, colMic, colMac)` moved by the row
+/// and column shifts of `operations`, or `None` when the record is not the
+/// BIFF8 14-byte form or a shift leaves its range.
+fn stored_dimensions(
+    payload: &[u8],
+    operations: &[&StructuralChange],
+) -> Option<(u32, u32, u16, u16)> {
+    if payload.len() != 14 {
+        return None;
+    }
+    let mut rows = (
+        binary::read_u32_le_at(payload, 0).ok()?,
+        binary::read_u32_le_at(payload, 4).ok()?,
+    );
+    let mut columns = (
+        u32::from(binary::read_u16_le_at(payload, 8).ok()?),
+        u32::from(binary::read_u16_le_at(payload, 10).ok()?),
+    );
+    // Moves a `[first, end)` extent by one insertion or deletion.
+    let shift = |(first, end): (u32, u32), start: u32, count: u32, insert: bool| {
+        if insert {
+            (
+                if first >= start { first + count } else { first },
+                if end > start { end + count } else { end },
+            )
+        } else {
+            let moved = |value: u32| {
+                if value >= start + count {
+                    value - count
+                } else {
+                    value.min(start)
+                }
+            };
+            (moved(first), moved(end))
+        }
+    };
+    for operation in operations {
+        match axis_shift(operation) {
+            Some(AxisShift::Rows {
+                start,
+                count,
+                insert,
+            }) => rows = shift(rows, u32::from(start), u32::from(count), insert),
+            Some(AxisShift::Columns {
+                start,
+                count,
+                insert,
+            }) => columns = shift(columns, u32::from(start), u32::from(count), insert),
+            None => {},
+        }
+    }
+    if rows.1 > 65_536 || columns.1 > 256 || rows.0 > rows.1 || columns.0 > columns.1 {
+        return None;
+    }
+    Some((
+        rows.0,
+        rows.1,
+        u16::try_from(columns.0).ok()?,
+        u16::try_from(columns.1).ok()?,
+    ))
 }
 
 fn dimensions_from_row_table(bytes: &[u8]) -> Result<(u32, u32, u16, u16)> {
@@ -4331,19 +4760,7 @@ fn certify_coordinate_shift(
     records: &[RawRecord],
     shift: AxisShift,
 ) -> Result<()> {
-    const DEPENDENT: &[u16] = &[
-        TABLE,
-        SHARED_FORMULA,
-        ARRAY,
-        0x01be,
-        0x01b2,
-        0x01b0,
-        0x0879,
-        0x087a,
-        0x009e,
-        0x0041,
-        0x0090,
-    ];
+    const DEPENDENT: &[u16] = &[TABLE, ARRAY, 0x0879, 0x087a, 0x009e, 0x0041, 0x0090];
     if let Some(record) = records
         .iter()
         .find(|record| DEPENDENT.contains(&record.kind))
@@ -4353,6 +4770,7 @@ fn certify_coordinate_shift(
             record.kind
         )));
     }
+    shifted_drawing_stream(worksheet, &drawing_ranges(records), shift)?;
     for record in records {
         let payload_start = record
             .start
@@ -4363,11 +4781,14 @@ fn certify_coordinate_shift(
             .ok_or_else(|| Error::InvalidData("dependency record payload is truncated".into()))?;
         match record.kind {
             FORMULA => certify_mutation(payload, shift, patch_formula_record)?,
+            SHARED_FORMULA => certify_mutation(payload, shift, patch_shared_formula)?,
+            CONDFMT => certify_mutation(payload, shift, patch_condfmt)?,
+            CF => certify_reference_free(cf_formulas(payload)?, "conditional format")?,
+            DV => certify_mutation(payload, shift, patch_dv)?,
             SELECTION => certify_mutation(payload, shift, patch_selection_shift)?,
             MERGED_CELLS => certify_mutation(payload, shift, patch_merged_cells)?,
             HLINK => certify_mutation(payload, shift, patch_hyperlink)?,
             HLINK_TOOLTIP => certify_mutation(payload, shift, patch_hyperlink_tooltip)?,
-            MSO_DRAWING => certify_mutation(payload, shift, patch_officeart)?,
             OBJ => certify_simple_drawing_obj(payload)?,
             COL_INFO => certify_mutation(payload, shift, patch_col_info)?,
             NOTE => certify_mutation(payload, shift, patch_note)?,
@@ -4381,14 +4802,75 @@ fn certify_coordinate_shift(
     Ok(())
 }
 
-fn certify_hyperlink_target(payload: &[u8]) -> Result<()> {
+/// Refuses a hyperlink whose location can name a cell of the shifted
+/// worksheet (record 0308): a location on another sheet of this workbook,
+/// a defined name (which moves with its own record) and a location inside
+/// another document do not.
+fn certify_hyperlink_target(payload: &[u8], in_target: bool, target_name: &str) -> Result<()> {
     let hyperlink = crate::hyperlinks::parse_hlink_record(payload)?;
-    if hyperlink.location().is_some() {
-        return Err(Error::UnsafeEdit(
-            "row/column movement refuses a hyperlink with an internal location dependency".into(),
-        ));
+    let Some(location) = hyperlink.location() else {
+        return Ok(());
+    };
+    if hyperlink.moniker().is_some() || !location_reaches(location, in_target, target_name) {
+        return Ok(());
     }
-    Ok(())
+    Err(Error::UnsafeEdit(
+        "row/column movement refuses a hyperlink with an internal location dependency".into(),
+    ))
+}
+
+/// Whether a hyperlink location of this workbook can name a cell of the
+/// worksheet `target_name` (`in_target`: the hyperlink is on that sheet).
+fn location_reaches(location: &str, in_target: bool, target_name: &str) -> bool {
+    let location = location.trim().trim_start_matches('#');
+    let Some((sheet, _cell)) = location.rsplit_once('!') else {
+        return in_target && looks_like_reference(location);
+    };
+    let sheet = sheet.trim();
+    let sheet = match sheet
+        .strip_prefix('\'')
+        .and_then(|inner| inner.strip_suffix('\''))
+    {
+        Some(inner) => inner.replace("''", "'"),
+        None => sheet.to_owned(),
+    };
+    if sheet.contains(':') || sheet.contains('[') {
+        return true;
+    }
+    sheet.eq_ignore_ascii_case(target_name)
+}
+
+/// Whether `text` reads as an A1 cell, range, row or column reference
+/// rather than a defined name.
+fn looks_like_reference(text: &str) -> bool {
+    // `(letters, digits)` of one `$`-optional part such as `$B$12`.
+    let split = |part: &str| {
+        let part = part.trim_start_matches('$');
+        let letters = part.bytes().take_while(u8::is_ascii_alphabetic).count();
+        let rest = part
+            .get(letters..)
+            .unwrap_or_default()
+            .trim_start_matches('$');
+        let digits = rest.bytes().all(|byte| byte.is_ascii_digit());
+        (letters, rest.len(), digits)
+    };
+    let cell = |part: &str| {
+        let (letters, rest, digits) = split(part);
+        (1..=3).contains(&letters) && rest > 0 && digits
+    };
+    let line = |part: &str| {
+        let (letters, rest, digits) = split(part);
+        ((1..=3).contains(&letters) && rest == 0) || (letters == 0 && rest > 0 && digits)
+    };
+    let reference = match text.split_once(':') {
+        None => cell(text),
+        Some((first, last)) => (cell(first) && cell(last)) || (line(first) && line(last)),
+    };
+    // R1C1-style and anything unusual are treated as references.
+    reference
+        || text
+            .bytes()
+            .any(|byte| !(byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'.'))
 }
 
 fn certify_mutation(
@@ -4436,7 +4918,174 @@ fn patch_formula_record(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     let tokens = payload
         .get_mut(22..22 + token_length)
         .ok_or_else(|| Error::InvalidData("Formula tokens are truncated".into()))?;
+    if crate::formula::ptg_exp_anchor(tokens).is_some() {
+        // A cell of a shared formula: its PtgExp names the shared range's
+        // first cell, which moves with the range (record 0308).
+        return match shift {
+            AxisShift::Rows {
+                start,
+                count,
+                insert,
+            } => patch_formula_row(tokens, 1, start, count, insert),
+            AxisShift::Columns {
+                start,
+                count,
+                insert,
+            } => {
+                let column = binary::read_u16_le_at(tokens, 3)?;
+                let column =
+                    shift_axis_point(column, u16::from(start), u16::from(count), insert, 256)?;
+                write_formula_u16(tokens, 3, column)
+            },
+        };
+    }
     patch_formula_tokens(tokens, shift)
+}
+
+/// Shifts a `ShrFmla` record (`[MS-XLS]` 2.4.260): its range moves whole
+/// (a shift point inside it would split it and is refused), absolute
+/// references shift like ordinary ones, and a relative `PtgRefN`/`PtgAreaN`
+/// component stays when every cell and the cell it names lie on the same
+/// side of the shift point. 3-D references are refused. Record 0308.
+fn patch_shared_formula(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    if payload.len() < 10 {
+        return Err(Error::InvalidData("ShrFmla record is truncated".into()));
+    }
+    let token_length = usize::from(binary::read_u16_le_at(payload, 8)?);
+    let (range_first, range_last, start, count, insert, limit) = match shift {
+        AxisShift::Rows {
+            start,
+            count,
+            insert,
+        } => (
+            binary::read_u16_le_at(payload, 0)?,
+            binary::read_u16_le_at(payload, 2)?,
+            start,
+            count,
+            insert,
+            65_536_u32,
+        ),
+        AxisShift::Columns {
+            start,
+            count,
+            insert,
+        } => (
+            u16::from(payload[4]),
+            u16::from(payload[5]),
+            u16::from(start),
+            u16::from(count),
+            insert,
+            256,
+        ),
+    };
+    let end = start.saturating_add(count);
+    let moves = if range_last < start {
+        false
+    } else if (insert && range_first >= start) || (!insert && range_first >= end) {
+        true
+    } else {
+        return Err(Error::UnsafeEdit(
+            "a row/column shift through a shared formula's range would split it".into(),
+        ));
+    };
+    let tokens = payload
+        .get_mut(10..10 + token_length)
+        .ok_or_else(|| Error::InvalidData("ShrFmla tokens are truncated".into()))?;
+    let (same_sheet, relative, three_d) = crate::formula::shared_formula_reference_spans(tokens)
+        .ok_or_else(|| {
+            Error::UnsafeEdit(
+                "row/column movement cannot read a shared formula's references".into(),
+            )
+        })?;
+    if !three_d.is_empty() {
+        return Err(Error::UnsafeEdit(
+            "row/column movement cannot close a shared formula's 3-D reference".into(),
+        ));
+    }
+    for reference in same_sheet {
+        patch_reference_span(tokens, reference, shift)?;
+    }
+    // Whether a relative offset keeps naming the same cell for every cell
+    // of the range.
+    let relative_kept = |offset: i32| {
+        let (low, high) = (
+            i32::from(range_first) + offset,
+            i32::from(range_last) + offset,
+        );
+        let (start, end) = (i32::from(start), i32::from(end));
+        if !moves {
+            high < start
+        } else if insert {
+            low >= start
+        } else {
+            low >= end
+        }
+    };
+    let rows = matches!(shift, AxisShift::Rows { .. });
+    let component = |tokens: &mut [u8], row_offset: usize, flags_offset: usize| -> Result<()> {
+        let flags = binary::read_u16_le_at(tokens, flags_offset)?;
+        if rows {
+            if flags & 0x8000 != 0 {
+                let offset = i32::from(binary::read_u16_le_at(tokens, row_offset)? as i16);
+                return if relative_kept(offset) {
+                    Ok(())
+                } else {
+                    Err(Error::UnsafeEdit(
+                        "a shared formula's relative reference would cross the shift point".into(),
+                    ))
+                };
+            }
+            patch_formula_row(tokens, row_offset, start, count, insert)
+        } else {
+            if flags & 0x4000 != 0 {
+                let offset = i32::from((flags & 0x00ff) as u8 as i8);
+                return if relative_kept(offset) {
+                    Ok(())
+                } else {
+                    Err(Error::UnsafeEdit(
+                        "a shared formula's relative reference would cross the shift point".into(),
+                    ))
+                };
+            }
+            let column = flags & 0x00ff;
+            let column = shift_axis_point(column, start, count, insert, limit)?;
+            write_formula_u16(tokens, flags_offset, (flags & 0xff00) | column)
+        }
+    };
+    for reference in relative {
+        match reference {
+            crate::formula::FormulaReferenceSpan::Cell { row, column } => {
+                component(tokens, row, column)?;
+            },
+            crate::formula::FormulaReferenceSpan::Area {
+                first_row,
+                last_row,
+                first_column,
+                last_column,
+            } => {
+                component(tokens, first_row, first_column)?;
+                component(tokens, last_row, last_column)?;
+            },
+        }
+    }
+    if moves {
+        let shifted = |value: u16| shift_axis_point(value, start, count, insert, limit);
+        match shift {
+            AxisShift::Rows { .. } => {
+                let (first, last) = (shifted(range_first)?, shifted(range_last)?);
+                payload[0..2].copy_from_slice(&first.to_le_bytes());
+                payload[2..4].copy_from_slice(&last.to_le_bytes());
+            },
+            AxisShift::Columns { .. } => {
+                let (first, last) = (shifted(range_first)?, shifted(range_last)?);
+                payload[4] = u8::try_from(first)
+                    .map_err(|_error| Error::UnsafeEdit("column outside BIFF8".into()))?;
+                payload[5] = u8::try_from(last)
+                    .map_err(|_error| Error::UnsafeEdit("column outside BIFF8".into()))?;
+            },
+        }
+    }
+    Ok(())
 }
 
 fn patch_formula_tokens(tokens: &mut [u8], shift: AxisShift) -> Result<()> {
@@ -4591,6 +5240,10 @@ fn certify_simple_drawing_obj(payload: &[u8]) -> Result<()> {
         match (subrecord, kind, length) {
             (0, 0x0015, 18) => {},
             (_, 0x0006, 2) if subrecord == 1 => {},
+            // FtNts (a comment's note data), FtCf (picture clipboard
+            // format) and FtPioGrbit (picture flags) hold no cell
+            // coordinates ([MS-XLS] 2.5.200, 2.5.140, 2.5.200; record 0308).
+            (1.., 0x000d, 22) | (1.., 0x0007 | 0x0008, 2) => {},
             (_, 0, 0) if end == payload.len() => return Ok(()),
             _ => {
                 return Err(Error::UnsafeEdit(
@@ -4838,9 +5491,13 @@ fn adjusted_offset(offset: usize, start: usize, end: usize, delta: i64) -> Resul
 }
 
 fn bound_sheets(workbook: &[u8]) -> Result<Vec<BoundSheet>> {
-    let records = raw_records(workbook)?;
+    bound_sheets_in(workbook, &raw_records(workbook)?)
+}
+
+/// The BoundSheet records among `records`, the records of `workbook`.
+fn bound_sheets_in(workbook: &[u8], records: &[RawRecord]) -> Result<Vec<BoundSheet>> {
     let mut bounds = Vec::new();
-    for record in records {
+    for record in records.iter().cloned() {
         if record.kind == 0x000a {
             break;
         }
@@ -4948,14 +5605,66 @@ fn raw_records(bytes: &[u8]) -> Result<Vec<RawRecord>> {
     Ok(records)
 }
 
-fn unique_kind(records: &[RawRecord], kind: u16, label: &str) -> Result<usize> {
+/// A record of a record list, with its position in the worksheet's list.
+trait TopRecord {
+    fn kind(&self) -> u16;
+    fn position(&self, index: usize) -> usize;
+}
+
+impl TopRecord for RawRecord {
+    fn kind(&self) -> u16 {
+        self.kind
+    }
+
+    fn position(&self, index: usize) -> usize {
+        index
+    }
+}
+
+impl TopRecord for (usize, RawRecord) {
+    fn kind(&self) -> u16 {
+        self.1.kind
+    }
+
+    fn position(&self, _index: usize) -> usize {
+        self.0
+    }
+}
+
+/// The records of `records` outside embedded substreams (a nested
+/// `BOF` through its `EOF`), with their positions in `records`.
+fn top_level(records: &[RawRecord]) -> Vec<(usize, RawRecord)> {
+    let mut depth = 0_usize;
+    let mut top = Vec::with_capacity(records.len());
+    for (position, record) in records.iter().enumerate() {
+        match record.kind {
+            0x0809 => {
+                depth += 1;
+                if depth == 1 {
+                    top.push((position, record.clone()));
+                }
+            },
+            0x000a => {
+                if depth == 1 {
+                    top.push((position, record.clone()));
+                }
+                depth = depth.saturating_sub(1);
+            },
+            _ if depth <= 1 => top.push((position, record.clone())),
+            _ => {},
+        }
+    }
+    top
+}
+
+fn unique_kind<R: TopRecord>(records: &[R], kind: u16, label: &str) -> Result<usize> {
     let mut matches = records
         .iter()
         .enumerate()
-        .filter(|(_, record)| record.kind == kind);
+        .filter(|(_, record)| record.kind() == kind);
     let index = matches
         .next()
-        .map(|(index, _)| index)
+        .map(|(index, record)| record.position(index))
         .ok_or_else(|| Error::UnsafeEdit(format!("worksheet has no {label} record")))?;
     if matches.next().is_some() {
         return Err(Error::UnsafeEdit(format!(
@@ -5006,11 +5715,36 @@ mod tests {
         patch_ref8(&mut range, delete_rows).unwrap();
         assert_eq!(range, original_range);
 
-        let original_anchor = [3, 0, 2, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0];
+        // "Move and size with cells" (flags 0) shifts like cells.
+        let original_anchor = [0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0];
         let mut anchor = original_anchor;
         patch_client_anchor(&mut anchor, insert_rows).unwrap();
+        assert_eq!(&anchor[14..16], &[7, 0]);
         patch_client_anchor(&mut anchor, delete_rows).unwrap();
         assert_eq!(anchor, original_anchor);
+        // "Don't move or size" (3) is refused when the shift reaches it and
+        // unchanged after it; "move but don't size" (2) moves whole only
+        // when the shift point is outside it (record 0308).
+        let mut locked = original_anchor;
+        locked[0] = 3;
+        assert!(patch_client_anchor(&mut locked, insert_rows).is_err());
+        let late = AxisShift::Rows {
+            start: 9,
+            count: 2,
+            insert: true,
+        };
+        patch_client_anchor(&mut locked, late).unwrap();
+        assert_eq!(&locked[6..8], &[1, 0]);
+        let mut moving = original_anchor;
+        moving[0] = 2;
+        assert!(patch_client_anchor(&mut moving, insert_rows).is_err());
+        let early = AxisShift::Rows {
+            start: 0,
+            count: 2,
+            insert: true,
+        };
+        patch_client_anchor(&mut moving, early).unwrap();
+        assert_eq!((&moving[6..8], &moving[14..16]), (&[3, 0][..], &[7, 0][..]));
 
         let insert_columns = AxisShift::Columns {
             start: 3,
@@ -5490,6 +6224,74 @@ mod tests {
             &worksheet[4..],
             [3, 5, 0, 2, 0, 0, 0, 1, 0, 5, 0, 6, 0, 2, 5]
         );
+    }
+
+    /// A `ShrFmla` over rows 5..=7 whose template is `=A{r-1}` (a
+    /// row-relative `PtgRefN` of offset -1) and `+$B$2` (absolute).
+    fn shared_formula(offset: i16) -> Vec<u8> {
+        let mut payload = vec![5, 0, 7, 0, 2, 2, 0, 3];
+        let tokens = [
+            [0x2c].as_slice(),
+            &offset.to_le_bytes(),
+            &[0x00, 0xc0],
+            &[0x24, 1, 0, 1, 0],
+            &[0x03],
+        ]
+        .concat();
+        payload.extend_from_slice(&u16::try_from(tokens.len()).unwrap().to_le_bytes());
+        payload.extend_from_slice(&tokens);
+        payload
+    }
+
+    #[test]
+    fn shared_formulas_move_with_their_range_and_keep_relative_offsets() {
+        let original = shared_formula(-1);
+        let mut payload = original.clone();
+        // Rows 3 and 4 inserted: the range (5..=7) and its targets (4..=6)
+        // are below the shift point.
+        patch_shared_formula(&mut payload, INSERT_ROWS).unwrap();
+        assert_eq!(&payload[0..4], &[7, 0, 9, 0]);
+        // The absolute $B$2 is above it and stays; the offset stays.
+        assert_eq!(&payload[10..20], &original[10..20]);
+        patch_shared_formula(&mut payload, DELETE_ROWS).unwrap();
+        assert_eq!(payload, original);
+        // An offset of -3 names rows 2..=4 for cells 5..=7: across the
+        // point, so the shift is refused.
+        assert!(patch_shared_formula(&mut shared_formula(-3), INSERT_ROWS).is_err());
+        // A shift point inside the range would split it.
+        let inside = AxisShift::Rows {
+            start: 6,
+            count: 1,
+            insert: true,
+        };
+        assert!(patch_shared_formula(&mut shared_formula(-1), inside).is_err());
+    }
+
+    #[test]
+    fn packed_runs_move_whole_outside_the_shift_point() {
+        let mut row = RowData {
+            row_record: raw_record(ROW, &[0; 16]),
+            cell_records: vec![raw_record(MUL_BLANK, &[0, 0, 4, 0, 15, 0, 15, 0, 5, 0])],
+            stored_extents: None,
+        };
+        let mut rows = BTreeMap::from([(0, row)]);
+        shift_columns(&mut rows, 2, 2, true).unwrap();
+        row = rows.remove(&0).unwrap();
+        assert_eq!(&row.cell_records[0][4..], &[0, 0, 6, 0, 15, 0, 15, 0, 7, 0]);
+        let mut rows = BTreeMap::from([(0, row)]);
+        assert!(shift_columns(&mut rows, 7, 1, true).is_err());
+    }
+
+    #[test]
+    fn hyperlink_locations_reach_only_the_shifted_sheet() {
+        assert!(location_reaches("Data!B3", false, "data"));
+        assert!(location_reaches("'Q1 ''24'!A1:B2", false, "Q1 '24"));
+        assert!(!location_reaches("Other!B3", true, "Data"));
+        assert!(location_reaches("B3", true, "Data"));
+        assert!(!location_reaches("B3", false, "Data"));
+        assert!(!location_reaches("SalesTotal", true, "Data"));
+        assert!(location_reaches("A:A", true, "Data"));
+        assert!(location_reaches("Sheet1:Sheet3!A1", false, "Data"));
     }
 }
 

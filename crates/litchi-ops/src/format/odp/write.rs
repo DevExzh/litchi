@@ -14,7 +14,9 @@ pub(crate) mod refresh;
 use std::collections::HashSet;
 
 use litchi_core::{FileFormat, Position};
-use litchi_odp::scene::{Attribute, Change, NewPage, NewTextBox, Scene, Scope, StoryRef};
+use litchi_odp::scene::{
+    Attribute, Change, NewPage, NewTextBox, Scene, Scope, StoryRef, TextPropertyEdit,
+};
 
 use super::node::{Item, Node, object_kind};
 use super::registry::{
@@ -31,7 +33,7 @@ use crate::props::{IntoProps, Props};
 use crate::registry::Operation;
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
-use crate::value::Scalar;
+use crate::value::{Base, Color, Length, Scalar};
 
 /// The native proof of one unified ODP write.
 pub(crate) enum Patch {
@@ -73,6 +75,43 @@ struct Values {
     text: Option<String>,
     name: Option<String>,
     geometry: [Option<String>; 4],
+    /// Character formatting (paragraphs and runs, record 0308).
+    format: TextPropertyEdit,
+}
+
+/// A font size as ODF points (`18pt`, `10.5pt`).
+fn points(length: Length) -> String {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "EMU values of font sizes are far below 2^52"
+    )]
+    let points = length.emu() as f64 / 12_700.0;
+    let mut text = format!("{points:.4}");
+    while text.ends_with('0') {
+        text.pop();
+    }
+    if text.ends_with('.') {
+        text.pop();
+    }
+    text.push_str("pt");
+    text
+}
+
+/// An opaque colour as `#rrggbb`.
+fn rgb(color: Color) -> Result<String> {
+    match color.base() {
+        Base::Rgb(rgba) if rgba.is_opaque() && color.transforms().is_empty() => Ok(format!(
+            "#{:02x}{:02x}{:02x}",
+            rgba.red(),
+            rgba.green(),
+            rgba.blue()
+        )),
+        _ => Err(
+            Error::new(Code::InvalidValue, "ODP colours are opaque #RRGGBB values")
+                .with_format(FileFormat::Odp)
+                .with_property("color"),
+        ),
+    }
 }
 
 /// Set properties on a path, a scoped query or `/metadata`.
@@ -187,12 +226,51 @@ fn admit_table<const N: usize, const A: usize>(
                         };
                         values.geometry[index] = Some(crate::format::odf_odp::odf_length(length));
                     },
+                    Setter::Bold | Setter::Italic | Setter::Underline => {
+                        let Some(Scalar::Bool(flag)) = value else {
+                            unreachable!("ODP boolean coercion returned a non-boolean scalar");
+                        };
+                        let slot = match setter {
+                            Setter::Bold => &mut values.format.bold,
+                            Setter::Italic => &mut values.format.italic,
+                            _ => &mut values.format.underline,
+                        };
+                        *slot = Some(flag);
+                    },
+                    Setter::Size => {
+                        let Some(Scalar::Length(length)) = value else {
+                            unreachable!("ODP size coercion returned a non-length scalar");
+                        };
+                        if length.emu() <= 0 {
+                            return Err(Error::new(
+                                Code::OutOfRange,
+                                "ODP font sizes are positive",
+                            )
+                            .with_property("size"));
+                        }
+                        values.format.size = Some(points(length));
+                    },
+                    Setter::Color => {
+                        let Some(Scalar::Color(color)) = value else {
+                            unreachable!("ODP colour coercion returned a non-colour scalar");
+                        };
+                        values.format.color = Some(rgb(color)?);
+                    },
+                    Setter::Font => {
+                        let Some(Scalar::Text(font)) = value else {
+                            unreachable!("ODP font coercion returned a non-text scalar");
+                        };
+                        values.format.font = Some(font.to_owned());
+                    },
                 }
                 Ok(())
             })
             .map_err(|error| error.with_format(FileFormat::Odp))?;
     }
-    if values.text.is_none() && values.name.is_none() && values.geometry.iter().all(Option::is_none)
+    if values.text.is_none()
+        && values.name.is_none()
+        && values.geometry.iter().all(Option::is_none)
+        && values.format.is_empty()
     {
         return Err(Error::new(
             Code::InvalidArgument,
@@ -258,6 +336,14 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
                     text,
                 });
             }
+            if !values.format.is_empty() {
+                plan.changes.push(Change::SetTextProperties {
+                    story: story.clone(),
+                    paragraph: *paragraph,
+                    run: None,
+                    properties: values.format,
+                });
+            }
         },
         Item::Run(story, paragraph, run) => {
             if let Some(text) = values.text {
@@ -277,6 +363,14 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
                     paragraph: *paragraph,
                     run: *run,
                     text,
+                });
+            }
+            if !values.format.is_empty() {
+                plan.changes.push(Change::SetTextProperties {
+                    story: story.clone(),
+                    paragraph: *paragraph,
+                    run: Some(*run),
+                    properties: values.format,
                 });
             }
         },

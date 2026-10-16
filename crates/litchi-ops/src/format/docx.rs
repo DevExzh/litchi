@@ -180,8 +180,10 @@ impl fmt::Debug for DocxEditor {
 pub(crate) enum DocxOwner {
     /// Deferred part payloads over the retained positional source.
     Source(Box<source_backed::Package>),
-    /// The owning package, validated by one text pass at open.
-    Eager(Box<litchi_docx::Package>),
+    /// The owning package, validated by one text pass at open. Unboxed: the
+    /// package is a few handles, and a commit adopts it without an
+    /// allocation (record 0305).
+    Eager(litchi_docx::Package),
 }
 
 const _: () = {
@@ -307,7 +309,6 @@ impl Docx {
         options: &OpenOptions,
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
-        let package = Box::new(package);
         // `document()` pins the main payload but defers XML traversal; the
         // eager route keeps its historical validation boundary with one
         // linear text pass, whose report then holds the packaging, metadata
@@ -355,7 +356,7 @@ impl Docx {
     /// publication boundary and carries the original limits and retention
     /// policy onto the new immutable handle.
     pub(crate) fn adopt_eager_package(&self, package: litchi_docx::Package) -> Self {
-        self.adopt_owner(DocxOwner::Eager(Box::new(package)))
+        self.adopt_owner(DocxOwner::Eager(package))
     }
 
     /// Adopt a committed source-backed package without serializing and

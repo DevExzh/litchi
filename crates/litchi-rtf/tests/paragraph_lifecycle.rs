@@ -506,11 +506,18 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
         assert_eq!(commit.package().to_bytes().unwrap(), expected.as_bytes());
         assert_eq!(source.to_bytes().unwrap(), input.as_bytes());
     }
-    // Unknown syntax and tables stay refused.
-    let cases = [
-        Package::parse(r"{\rtf1\ansi One\future42 Two\par Three}").unwrap(),
-        Package::parse(r"{\rtf1\ansi One\par\trowd\cellx1000\intbl Cell\cell\row}").unwrap(),
-    ];
+    // A table row after the paragraph stays (record 0308).
+    let table =
+        Package::parse(r"{\rtf1\ansi One\par\trowd\cellx1000\intbl Cell\cell\row}").unwrap();
+    let mut edit = table.edit();
+    edit.remove_paragraph(Position::new(0)).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1\ansi \trowd\cellx1000\intbl Cell\cell\row}"
+    );
+    // Unknown syntax stays refused.
+    let cases = [Package::parse(r"{\rtf1\ansi One\future42 Two\par Three}").unwrap()];
     for source in cases {
         let exact = source.to_bytes().unwrap();
         let mut edit = source.edit();
