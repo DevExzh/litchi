@@ -3,9 +3,13 @@
 //! Version 3 carries both complete source states.  A state includes the
 //! presentation root, its stable catalog order, the topology proof supplied by
 //! the owner, and the exact root metadata images.  Resource changes carry the
-//! exact before/after images for one stable slide identity.  This module only
-//! checks transport integrity and bounds; semantic XML and relationship
-//! validation belongs to the application layer.
+//! exact before/after images for one stable slide identity.  Version 5
+//! (record 0303) appends the Parts that removed slides owned exclusively:
+//! notes slides, pictures, diagrams, VML drawings, comments and embedded
+//! objects, each with its exact payload and relationship images.  A patch
+//! without such Parts is still encoded as version 3.  This module only
+//! checks transport integrity and bounds; semantic XML, relationship and
+//! ownership validation belongs to the application layer.
 
 use super::super::MAX_SOURCE_BACKED_SLIDE_BATCH;
 use crate::presentation::order::{StableSlideKey, stable_slide_key};
@@ -17,8 +21,15 @@ use std::sync::Arc;
 
 const MAGIC: &[u8; 8] = b"LPSX0003";
 const VERSION: u32 = 3;
+/// Version 5 adds owned dependent Parts. `LPSX0004` is the durable envelope
+/// for shape removals, so the topology wire skips that number.
+pub(super) const DEPENDENT_MAGIC: &[u8; 8] = b"LPSX0005";
+const DEPENDENT_VERSION: u32 = 5;
 const CHECKSUM_BYTES: usize = 32;
 const CHECKSUM_DOMAIN: &[u8] = b"litchi-pptx-source-topology-wire-v3\0";
+const DEPENDENT_CHECKSUM_DOMAIN: &[u8] = b"litchi-pptx-source-topology-wire-v5\0";
+/// The most dependent Parts one patch may carry.
+pub(super) const MAX_DEPENDENTS: usize = 4096;
 
 // magic + version + three counts + two state headers + checksum.  A state
 // header contains three payload lengths and one topology digest.
@@ -32,6 +43,31 @@ pub(super) struct Data {
     pub(super) before: State,
     pub(super) after: State,
     pub(super) changes: Arc<[Change]>,
+    /// Parts owned exclusively by removed or restored slides, sorted by
+    /// folded Part name.
+    pub(super) dependents: Arc<[Dependent]>,
+}
+
+/// The exact before/after image of one Part that a removed slide owned
+/// exclusively (record 0303). `before` is present when the Part exists in
+/// the state before the patch, `after` when it exists after it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Dependent {
+    pub(super) part_uri: PackURI,
+    pub(super) content_type: String,
+    pub(super) before: Option<PartImage>,
+    pub(super) after: Option<PartImage>,
+}
+
+impl Dependent {
+    pub(super) fn inverse(&self) -> Self {
+        Self {
+            part_uri: self.part_uri.clone(),
+            content_type: self.content_type.clone(),
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -60,7 +96,7 @@ pub(super) struct PartImage {
 
 impl Data {
     pub(super) fn is_noop(&self) -> bool {
-        self.before == self.after && self.changes.is_empty()
+        self.before == self.after && self.changes.is_empty() && self.dependents.is_empty()
     }
 
     /// Reverse complete topology and resource state while retaining every
@@ -80,6 +116,7 @@ impl Data {
                     after: change.before.clone(),
                 })
                 .collect(),
+            dependents: self.dependents.iter().map(Dependent::inverse).collect(),
         }
     }
 
@@ -100,7 +137,16 @@ impl Data {
             write_image(&mut output, change.before.as_ref())?;
             write_image(&mut output, change.after.as_ref())?;
         }
-        let checksum = checksum(&output);
+        if !self.dependents.is_empty() {
+            put_u32(&mut output, self.dependents.len())?;
+            for dependent in self.dependents.iter() {
+                write_string(&mut output, dependent.part_uri.as_str())?;
+                write_string(&mut output, &dependent.content_type)?;
+                write_image(&mut output, dependent.before.as_ref())?;
+                write_image(&mut output, dependent.after.as_ref())?;
+            }
+        }
+        let checksum = checksum(&output, self.version());
         output.extend_from_slice(&checksum);
         if output.len() != length {
             return Err(invalid("wire length accounting mismatch"));
@@ -127,7 +173,12 @@ impl Data {
         let expected: [u8; 32] = bytes[body_len..]
             .try_into()
             .map_err(|_| invalid("checksum width"))?;
-        if checksum(&bytes[..body_len]) != expected {
+        let version = match bytes.get(..MAGIC.len()) {
+            Some(magic) if magic == MAGIC => Version::Three,
+            Some(magic) if magic == DEPENDENT_MAGIC => Version::Five,
+            _ => return Err(invalid("unsupported wire version")),
+        };
+        if checksum(&bytes[..body_len], version) != expected {
             return Err(invalid("checksum mismatch"));
         }
 
@@ -136,8 +187,8 @@ impl Data {
             bytes: body,
             offset: 0,
         };
-        let header = read_header(&mut scan, limits)?;
-        preflight_body(&mut scan, &header, limits)?;
+        let header = read_header(&mut scan, limits, version)?;
+        preflight_body(&mut scan, &header, limits, version)?;
         if scan.offset != body.len() {
             return Err(invalid("trailing bytes"));
         }
@@ -146,19 +197,27 @@ impl Data {
             bytes: body,
             offset: 0,
         };
-        let header = read_header(&mut input, limits)?;
+        let header = read_header(&mut input, limits, version)?;
         let before_order = read_order(&mut input, header.before_count, limits)?;
         let after_order = read_order(&mut input, header.after_count, limits)?;
         let before = read_state(&mut input, header.before, before_order, limits)?;
         let after = read_state(&mut input, header.after, after_order, limits)?;
         let changes = read_changes(&mut input, header.change_count, limits)?;
+        let dependents = match version {
+            Version::Three => Vec::new(),
+            Version::Five => read_dependents(&mut input, limits)?,
+        };
         if input.offset != body.len() {
             return Err(invalid("trailing bytes"));
+        }
+        if version == Version::Five && dependents.is_empty() {
+            return Err(invalid("version 5 carries no dependent Part"));
         }
         let data = Self {
             before,
             after,
             changes: changes.into(),
+            dependents: dependents.into(),
         };
         validate_data(&data, limits)?;
         Ok(data)
@@ -182,11 +241,31 @@ impl Data {
         for change in self.changes.iter() {
             add_len(&mut total, change_len(change)?)?;
         }
+        if !self.dependents.is_empty() {
+            add_len(&mut total, 4)?;
+            for dependent in self.dependents.iter() {
+                add_len(&mut total, dependent_len(dependent)?)?;
+            }
+        }
         if total > MAX_WIRE_BYTES {
             return Err(wire_limit());
         }
         Ok(total)
     }
+
+    fn version(&self) -> Version {
+        if self.dependents.is_empty() {
+            Version::Three
+        } else {
+            Version::Five
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Version {
+    Three,
+    Five,
 }
 
 #[derive(Clone, Copy)]
@@ -207,8 +286,16 @@ struct StateHeader {
 }
 
 fn write_header(output: &mut Vec<u8>, data: &Data) -> Result<()> {
-    output.extend_from_slice(MAGIC);
-    output.extend_from_slice(&VERSION.to_le_bytes());
+    match data.version() {
+        Version::Three => {
+            output.extend_from_slice(MAGIC);
+            output.extend_from_slice(&VERSION.to_le_bytes());
+        },
+        Version::Five => {
+            output.extend_from_slice(DEPENDENT_MAGIC);
+            output.extend_from_slice(&DEPENDENT_VERSION.to_le_bytes());
+        },
+    }
     put_u32(output, data.before.order.len())?;
     put_u32(output, data.after.order.len())?;
     put_u32(output, data.changes.len())?;
@@ -273,11 +360,15 @@ fn write_image(output: &mut Vec<u8>, image: Option<&PartImage>) -> Result<()> {
     Ok(())
 }
 
-fn read_header(input: &mut Input<'_>, limits: SourceLimits) -> Result<Header> {
-    if input.take(MAGIC.len())? != MAGIC {
+fn read_header(input: &mut Input<'_>, limits: SourceLimits, version: Version) -> Result<Header> {
+    let (magic, number) = match version {
+        Version::Three => (MAGIC, VERSION),
+        Version::Five => (DEPENDENT_MAGIC, DEPENDENT_VERSION),
+    };
+    if input.take(magic.len())? != magic {
         return Err(invalid("unsupported wire version"));
     }
-    if input.u32()? != VERSION {
+    if input.u32()? != number {
         return Err(invalid("unsupported wire version"));
     }
     let before_count = input.count()?;
@@ -342,7 +433,12 @@ fn read_state_header(input: &mut Input<'_>, limits: SourceLimits) -> Result<Stat
     })
 }
 
-fn preflight_body(input: &mut Input<'_>, header: &Header, limits: SourceLimits) -> Result<()> {
+fn preflight_body(
+    input: &mut Input<'_>,
+    header: &Header,
+    limits: SourceLimits,
+    version: Version,
+) -> Result<()> {
     for _ in 0..header.before_count {
         scan_key(input, limits)?;
     }
@@ -383,6 +479,29 @@ fn preflight_body(input: &mut Input<'_>, header: &Header, limits: SourceLimits) 
         )?;
         scan_image(input, limits, &mut before_parts, &mut before_relationships)?;
         scan_image(input, limits, &mut after_parts, &mut after_relationships)?;
+    }
+    if version == Version::Five {
+        let count = input.count()?;
+        if count > MAX_DEPENDENTS {
+            return Err(limit(
+                "source-backed topology dependent Parts",
+                MAX_DEPENDENTS,
+            ));
+        }
+        for _ in 0..count {
+            scan_string(
+                input,
+                string_limit_u64(limits.max_archive_member_name_bytes()),
+                "dependent URI",
+            )?;
+            scan_string(
+                input,
+                string_limit(limits.max_xml_attribute_bytes()),
+                "content type",
+            )?;
+            scan_image(input, limits, &mut before_parts, &mut before_relationships)?;
+            scan_image(input, limits, &mut after_parts, &mut after_relationships)?;
+        }
     }
     if before_parts > limits.max_total_part_bytes() {
         return Err(source_limit(
@@ -621,6 +740,40 @@ fn read_changes(input: &mut Input<'_>, count: usize, limits: SourceLimits) -> Re
     Ok(changes)
 }
 
+fn read_dependents(input: &mut Input<'_>, limits: SourceLimits) -> Result<Vec<Dependent>> {
+    let count = input.count()?;
+    if count > MAX_DEPENDENTS {
+        return Err(limit(
+            "source-backed topology dependent Parts",
+            MAX_DEPENDENTS,
+        ));
+    }
+    let mut dependents = Vec::new();
+    dependents.try_reserve_exact(count).map_err(allocation)?;
+    for _ in 0..count {
+        let uri = read_string(
+            input,
+            string_limit_u64(limits.max_archive_member_name_bytes()),
+            "dependent URI",
+        )?;
+        let part_uri = PackURI::new(uri).map_err(|_| invalid("invalid dependent Part URI"))?;
+        let content_type = read_string(
+            input,
+            string_limit(limits.max_xml_attribute_bytes()),
+            "content type",
+        )?;
+        let before = read_image(input, limits)?;
+        let after = read_image(input, limits)?;
+        dependents.push(Dependent {
+            part_uri,
+            content_type,
+            before,
+            after,
+        });
+    }
+    Ok(dependents)
+}
+
 fn read_string(input: &mut Input<'_>, maximum: u64, name: &'static str) -> Result<String> {
     let length = input.count()?;
     check_string_length(length, maximum, name)?;
@@ -749,7 +902,65 @@ fn validate_data(data: &Data, limits: SourceLimits) -> Result<()> {
             require_change_presence(&data.changes, key, false, true)?;
         }
     }
+    validate_dependents(data, &change_uris, limits)?;
     validate_change_aggregates(data, limits)?;
+    Ok(())
+}
+
+/// Dependent Parts are unique, sorted by folded name, distinct from every
+/// slide the patch changes, and each one changes presence: the wire carries
+/// only Parts that a slide removal deletes or its inverse restores.
+fn validate_dependents(
+    data: &Data,
+    change_uris: &HashSet<String>,
+    limits: SourceLimits,
+) -> Result<()> {
+    if data.dependents.len() > MAX_DEPENDENTS {
+        return Err(limit(
+            "source-backed topology dependent Parts",
+            MAX_DEPENDENTS,
+        ));
+    }
+    let mut previous: Option<String> = None;
+    for dependent in data.dependents.iter() {
+        let uri = dependent.part_uri.as_str();
+        if uri.len() > u32::MAX as usize {
+            return Err(invalid("dependent URI exceeds wire width"));
+        }
+        check_string_length(
+            uri.len(),
+            string_limit_u64(limits.max_archive_member_name_bytes()),
+            "dependent URI",
+        )?;
+        validate_string(
+            &dependent.content_type,
+            string_limit(limits.max_xml_attribute_bytes()),
+            "content type",
+        )?;
+        if dependent.content_type.is_empty() {
+            return Err(invalid("dependent content type must not be empty"));
+        }
+        let folded = folded_ascii(uri)?;
+        if change_uris.contains(&folded) {
+            return Err(invalid("a dependent Part is also a changed slide"));
+        }
+        if previous
+            .as_ref()
+            .is_some_and(|previous| previous >= &folded)
+        {
+            return Err(invalid("dependent Parts are not sorted and unique"));
+        }
+        previous = Some(folded);
+        if dependent.before.is_some() == dependent.after.is_some() {
+            return Err(invalid("a dependent Part must be removed or restored"));
+        }
+        for image in [dependent.before.as_ref(), dependent.after.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            validate_image(image, limits)?;
+        }
+    }
     Ok(())
 }
 
@@ -865,11 +1076,20 @@ fn validate_change_aggregates(data: &Data, limits: SourceLimits) -> Result<()> {
             u64::try_from(state.root.len()).map_err(|_| invalid("part aggregate overflows"))?;
         let mut relationships = u64::try_from(state.presentation_relationships.len())
             .map_err(|_| invalid("relationship aggregate overflows"))?;
-        for change in data.changes.iter() {
+        let images = data
+            .changes
+            .iter()
+            .map(|change| (&change.before, &change.after))
+            .chain(
+                data.dependents
+                    .iter()
+                    .map(|dependent| (&dependent.before, &dependent.after)),
+            );
+        for (before_image, after_image) in images {
             let image = if before {
-                change.before.as_ref()
+                before_image.as_ref()
             } else {
-                change.after.as_ref()
+                after_image.as_ref()
             };
             if let Some(image) = image {
                 parts = parts
@@ -982,6 +1202,22 @@ fn change_len(change: &Change) -> Result<usize> {
     Ok(total)
 }
 
+fn dependent_len(dependent: &Dependent) -> Result<usize> {
+    if dependent.part_uri.as_str().len() > u32::MAX as usize
+        || dependent.content_type.len() > u32::MAX as usize
+    {
+        return Err(invalid("dependent Part exceeds wire width"));
+    }
+    let before_len = image_len(dependent.before.as_ref())?;
+    let after_len = image_len(dependent.after.as_ref())?;
+    8usize
+        .checked_add(dependent.part_uri.as_str().len())
+        .and_then(|length| length.checked_add(dependent.content_type.len()))
+        .and_then(|length| length.checked_add(before_len))
+        .and_then(|length| length.checked_add(after_len))
+        .ok_or_else(|| invalid("dependent length overflows"))
+}
+
 fn image_len(image: Option<&PartImage>) -> Result<usize> {
     let mut total = 1usize;
     if let Some(image) = image {
@@ -1070,9 +1306,12 @@ fn put_u64(output: &mut Vec<u8>, value: usize) -> Result<()> {
     Ok(())
 }
 
-fn checksum(bytes: &[u8]) -> [u8; 32] {
+fn checksum(bytes: &[u8], version: Version) -> [u8; 32] {
     let mut hash = Sha256::new();
-    hash.update(CHECKSUM_DOMAIN);
+    hash.update(match version {
+        Version::Three => CHECKSUM_DOMAIN,
+        Version::Five => DEPENDENT_CHECKSUM_DOMAIN,
+    });
     hash.update(bytes);
     hash.finalize().into()
 }
@@ -1257,6 +1496,7 @@ mod tests {
         let third = key(3);
         let added = key(4);
         Data {
+            dependents: Arc::from([]),
             before: state(
                 b"<presentation before='1'/>",
                 vec![first.clone(), second.clone(), third.clone()],
@@ -1312,6 +1552,7 @@ mod tests {
     fn empty_transition() -> Data {
         let added = key(7);
         Data {
+            dependents: Arc::from([]),
             before: state(
                 b"<p:presentation><p:sldIdLst/></p:presentation>",
                 Vec::new(),
@@ -1338,8 +1579,81 @@ mod tests {
 
     fn resign(bytes: &mut [u8]) {
         let body = bytes.len() - CHECKSUM_BYTES;
-        let digest = checksum(&bytes[..body]);
+        let version = if bytes.starts_with(DEPENDENT_MAGIC) {
+            Version::Five
+        } else {
+            Version::Three
+        };
+        let digest = checksum(&bytes[..body], version);
         bytes[body..].copy_from_slice(&digest);
+    }
+
+    fn with_dependents() -> Data {
+        let mut data = sample();
+        data.dependents = vec![
+            Dependent {
+                part_uri: PackURI::new("/ppt/media/image1.png").expect("test URI"),
+                content_type: "image/png".into(),
+                before: Some(image(b"\x89PNG binary", None)),
+                after: None,
+            },
+            Dependent {
+                part_uri: PackURI::new("/ppt/notesSlides/notesSlide2.xml").expect("test URI"),
+                content_type:
+                    "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"
+                        .into(),
+                before: Some(image(b"<p:notes/>", Some(b"<Relationships/>"))),
+                after: None,
+            },
+        ]
+        .into();
+        data
+    }
+
+    #[test]
+    fn dependents_roundtrip_as_version_five_and_invert() {
+        let data = with_dependents();
+        let bytes = data.to_bytes().unwrap();
+        assert!(bytes.starts_with(DEPENDENT_MAGIC));
+        assert_eq!(bytes.len(), data.encoded_len().unwrap());
+        let decoded = Data::from_bytes(&bytes, SourceLimits::default()).unwrap();
+        assert_eq!(decoded, data);
+        let inverse = decoded.inverse();
+        assert!(
+            inverse
+                .dependents
+                .iter()
+                .all(|dependent| dependent.before.is_none())
+        );
+        assert_eq!(inverse.inverse(), data);
+        // Without dependents the wire stays version 3.
+        assert!(sample().to_bytes().unwrap().starts_with(MAGIC));
+    }
+
+    #[test]
+    fn dependents_must_be_sorted_unique_and_change_presence() {
+        let mut unsorted = with_dependents();
+        let mut parts = unsorted.dependents.to_vec();
+        parts.reverse();
+        unsorted.dependents = parts.into();
+        assert!(unsorted.to_bytes().is_err());
+
+        let mut unchanged = with_dependents();
+        let mut parts = unchanged.dependents.to_vec();
+        parts[0].after = parts[0].before.clone();
+        unchanged.dependents = parts.into();
+        assert!(unchanged.to_bytes().is_err());
+
+        // A version-5 frame must carry a dependent.
+        let mut bytes = sample().to_bytes().unwrap();
+        bytes[..8].copy_from_slice(DEPENDENT_MAGIC);
+        bytes[8..12].copy_from_slice(&DEPENDENT_VERSION.to_le_bytes());
+        let body = bytes.len() - CHECKSUM_BYTES;
+        bytes.truncate(body);
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        let digest = checksum(&bytes, Version::Five);
+        bytes.extend_from_slice(&digest);
+        assert!(Data::from_bytes(&bytes, SourceLimits::default()).is_err());
     }
 
     #[test]
@@ -1401,6 +1715,7 @@ mod tests {
         let relationship_type =
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
         let data = Data {
+            dependents: Arc::from([]),
             before: state(
                 b"<p:presentation before='1'/>",
                 vec![removed.clone(), replaced.clone()],
@@ -1448,6 +1763,7 @@ mod tests {
     fn absent_and_present_empty_are_distinct() {
         let stable = key(1);
         let data = Data {
+            dependents: Arc::from([]),
             before: state(b"<before/>", vec![stable.clone()], 1),
             after: state(b"<after/>", vec![stable.clone()], 2),
             changes: vec![Change {

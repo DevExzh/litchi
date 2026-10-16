@@ -152,7 +152,9 @@ impl Patch {
         let (shape_removals, bytes) = bytes
             .strip_prefix(REMOVAL_MAGIC)
             .map_or((false, bytes), |body| (true, body));
-        if bytes.starts_with(b"LPSX0003") {
+        if bytes.starts_with(b"LPSX0003")
+            || bytes.starts_with(super::topology_wire::DEPENDENT_MAGIC)
+        {
             return Ok(Self {
                 shape_removals,
                 data: PatchData::Topology(Arc::new(super::topology::Patch::from_bytes(bytes)?)),

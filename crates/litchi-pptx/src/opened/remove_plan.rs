@@ -1,4 +1,4 @@
-//! Bounded planning for atomic dependency-free whole-slide removal.
+//! Bounded planning for atomic whole-slide removal with the Parts the slide owns.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -207,12 +207,12 @@ impl SlideRemovalPatch {
     }
 }
 
-/// Immutable source-bound plan for removing one dependency-free slide.
+/// Immutable source-bound plan for removing one slide.
 ///
-/// The supported deletion boundary is deliberately narrow: the selected slide
-/// may have exactly one internal relationship to a registered shared layout and
-/// no other outgoing relationship. No other package resource may target the
-/// slide. The durable patch therefore removes exactly the slide part and edits
+/// The selected slide has exactly one internal relationship to a registered
+/// shared layout. No package resource other than its presentation binding
+/// and the Parts it owns may target the slide. The durable patch removes the
+/// slide Part and the Parts it owns exclusively (record 0303) and edits
 /// exactly the presentation owner; every other resource remains outside the
 /// write set.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -244,7 +244,7 @@ impl SlideRemovalPlan {
         &self.layout
     }
 
-    /// Bounded bytes in the two-resource removal write set before encoding.
+    /// Bounded bytes in the removal write set before encoding.
     #[must_use]
     pub const fn planned_bytes(&self) -> usize {
         self.planned_bytes
@@ -267,13 +267,14 @@ impl SlideRemovalPlan {
 }
 
 impl Snapshot {
-    /// Plan removal of one dependency-free slide without mutation.
+    /// Plan removal of one slide without mutation.
     ///
     /// Signed, macro-enabled, protected, MCE-bearing, and final-slide packages
     /// are refused. The selected slide must have exactly one registered layout
-    /// relationship, no notes, charts, media, custom XML, external links, or
-    /// other dependencies, and no incoming owner except its one presentation
-    /// relationship.
+    /// relationship and no incoming owner except its one presentation
+    /// relationship and the Parts it owns. Its notes slide, charts, media and
+    /// other Parts that nothing else targets are removed with it; Parts that
+    /// another owner still targets stay (record 0303).
     ///
     /// # Errors
     ///
@@ -339,31 +340,48 @@ impl Snapshot {
         crate::parts::validate_content_type(owner, ct::PML_SLIDE)?;
         validate_removal_slide_surface(owner.blob())?;
         let layout = dependency_free_layout(self.package.as_ref(), owner)?;
+        let max_relationships = self
+            .limits
+            .max_parts()
+            .checked_mul(16)
+            .ok_or_else(|| invalid("slide-removal relationship limit overflow"))?;
+        // The Parts the slide owns exclusively leave with it (record 0303).
+        let owned = if crate::presentation::owned_parts::may_own(owner.rels()) {
+            crate::presentation::owned_parts::Graph::from_opc(
+                self.package.as_ref(),
+                max_relationships,
+            )?
+            .owned_by(&selected.part_name)?
+        } else {
+            crate::presentation::owned_parts::Owned::none()
+        };
         crate::master_layout::validate_master_layout_graph(self.package.as_ref())?;
         map_copy_refusal(validate_registered_layout(
             self.package.as_ref(),
             presentation,
             &layout,
         ))?;
-        let max_relationships = self
-            .limits
-            .max_parts()
-            .checked_mul(16)
-            .ok_or_else(|| invalid("slide-removal relationship limit overflow"))?;
         validate_unique_incoming_owner(
             self.package.as_ref(),
             &self.presentation_name,
             &selected,
             max_relationships,
+            &owned,
         )?;
 
-        let planned_bytes = presentation
+        let mut planned_bytes = presentation
             .blob()
             .len()
             .checked_add(owner.blob().len())
             .and_then(|bytes| bytes.checked_add(self.presentation_name.as_str().len()))
             .and_then(|bytes| bytes.checked_add(selected.part_name.as_str().len()))
             .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
+        for dependent in owned.parts() {
+            planned_bytes = planned_bytes
+                .checked_add(self.package.get_part(dependent)?.blob().len())
+                .and_then(|bytes| bytes.checked_add(dependent.as_str().len()))
+                .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
+        }
         if planned_bytes > self.limits.max_patch_bytes() {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::PatchBytes,
@@ -371,7 +389,7 @@ impl Snapshot {
             });
         }
 
-        let candidate = build_candidate(self, &selected)?;
+        let candidate = build_candidate(self, &selected, owned.parts())?;
         let exact_patch = Patch::capture(
             self.package.as_ref(),
             &candidate,
@@ -380,11 +398,20 @@ impl Snapshot {
         )?;
         let mut resources: Vec<_> = exact_patch.resources().collect();
         resources.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
-        let mut expected = [&self.presentation_name, &selected.part_name];
+        let mut expected: Vec<&PackURI> = [&self.presentation_name, &selected.part_name]
+            .into_iter()
+            .chain(owned.parts())
+            .collect();
         expected.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
-        if resources != expected || !exact_patch.removes_resource(&selected.part_name) {
+        if resources != expected
+            || !exact_patch.removes_resource(&selected.part_name)
+            || !owned
+                .parts()
+                .iter()
+                .all(|dependent| exact_patch.removes_resource(dependent))
+        {
             return Err(invalid(
-                "slide-removal candidate escaped its exact two-resource write set",
+                "slide-removal candidate escaped its exact write set",
             ));
         }
         let target_revision = super::model::package_fingerprint(&candidate)?;
@@ -501,7 +528,11 @@ fn take_revision(bytes: &[u8], position: &mut usize) -> Result<[u8; 32]> {
     Ok(revision)
 }
 
-fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> {
+fn build_candidate(
+    snapshot: &Snapshot,
+    selected: &Slide,
+    dependents: &[PackURI],
+) -> Result<OpcPackage> {
     let mut candidate = snapshot.package.as_ref().clone();
     let xml = super::xml::remove_slide(
         candidate.get_part(&snapshot.presentation_name)?.blob(),
@@ -523,6 +554,11 @@ fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> 
     }
     if !candidate.remove_part(&selected.part_name) {
         return Err(invalid("slide-removal selected part disappeared"));
+    }
+    for dependent in dependents {
+        if !candidate.remove_part(dependent) {
+            return Err(invalid("slide-removal dependent part disappeared"));
+        }
     }
     let captured = super::model::capture(
         &candidate,
@@ -553,10 +589,11 @@ fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> 
 /// Removal deletes the slide Part with its relationship Part, so an edge
 /// whose target outlives the slide without depending on it is admitted:
 /// external targets (hyperlinks, linked media) and internal jumps to slides
-/// (`slide` relationships, which other slides keep owning). An internal edge
-/// of any other type points at a Part the slide may own exclusively (a notes
-/// slide, a picture, a chart, comments); removal cannot prove whether that
-/// Part becomes an orphan, so it stays a typed refusal naming the type.
+/// (`slide` relationships, which other slides keep owning). Any other
+/// internal edge names a Part the slide may own (a notes slide, a picture,
+/// a diagram, comments): [`crate::presentation::owned_parts`] removes it with
+/// the slide when nothing else targets it, and keeps it otherwise
+/// (record 0303).
 pub(crate) fn removal_layout_edge(
     relationships: &litchi_opc::Relationships,
 ) -> Result<&litchi_opc::Relationship> {
@@ -585,19 +622,7 @@ pub(crate) fn removal_layout_edge(
                     "a slide jump of the selected slide contains a query or fragment",
                 );
             }
-            continue;
         }
-        let kind = relationship
-            .reltype()
-            .rsplit('/')
-            .next()
-            .unwrap_or_else(|| relationship.reltype());
-        return refusal(
-            SlideRemovalRefusal::UnsupportedRelationship,
-            format!(
-                "the selected slide owns a dependent `{kind}` part, which removal does not delete"
-            ),
-        );
     }
     layout.map_or_else(
         || {
@@ -634,6 +659,7 @@ fn validate_unique_incoming_owner(
     presentation_name: &PackURI,
     selected: &Slide,
     max_relationships: usize,
+    owned: &crate::presentation::owned_parts::Owned,
 ) -> Result<()> {
     let mut scanned = 0_usize;
     let mut selected_owners = 0_usize;
@@ -656,9 +682,11 @@ fn validate_unique_incoming_owner(
         }
     }
     for owner in package.iter_parts() {
+        // The Parts the slide owns leave with it (record 0303).
+        let leaves = owned.contains(owner.partname());
         for relationship in owner.rels().iter() {
             scanned = checked_relationship_count(scanned, max_relationships)?;
-            if relationship.is_external() {
+            if relationship.is_external() || leaves {
                 continue;
             }
             if relationship.target_query().is_some() || relationship.target_fragment().is_some() {

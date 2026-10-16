@@ -2812,7 +2812,7 @@ fn slide_removal_plan_handles_first_middle_and_last_durably() -> Result<()> {
 }
 
 #[test]
-fn slide_removal_plan_refuses_dependencies_shared_owners_and_hostile_layouts() -> Result<()> {
+fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<()> {
     let dependency_cases = [
         (
             litchi_opc::constants::relationship_type::CHART,
@@ -2856,14 +2856,28 @@ fn slide_removal_plan_refuses_dependencies_shared_owners_and_hostile_layouts() -
                 TargetMode::Internal,
             )?;
         let before = part_states(&package);
-        assert!(matches!(
-            package.opened_presentation()?.plan_slide_removal(0_usize),
-            Err(Error::SlideRemovalPlan {
-                kind: SlideRemovalRefusal::UnsupportedRelationship,
-                ..
-            })
-        ));
+        // A Part only the removed slide targets leaves with it (record 0303).
+        let plan = package.opened_presentation()?.plan_slide_removal(0_usize)?;
+        assert_eq!(plan.patch().resource_count(), 3, "{target_name}");
+        assert!(plan.patch().resources().any(|name| name == &target));
         assert_eq!(part_states(&package), before);
+
+        // A Part another slide also targets stays.
+        let other = package.opened_presentation()?.slides()[1]
+            .part_name()
+            .clone();
+        package
+            .opc
+            .get_part_mut(&other)?
+            .rels_mut()
+            .try_add_relationship(
+                relationship_type.into(),
+                target.relative_ref(other.base_uri()),
+                "rIdSharedDependency".into(),
+                TargetMode::Internal,
+            )?;
+        let plan = package.opened_presentation()?.plan_slide_removal(0_usize)?;
+        assert_eq!(plan.patch().resource_count(), 2, "{target_name}");
     }
 
     let mut external = opened_plain_slides_package(2)?;

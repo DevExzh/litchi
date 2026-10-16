@@ -1,4 +1,5 @@
-//! Source-native planning for a bounded, dependency-free slide removal.
+//! Source-native planning for a bounded slide removal. The slide leaves with
+//! the Parts it owns exclusively (record 0303).
 //!
 //! The plan in this module retains a source-authorized symbolic removal
 //! description. It is therefore reusable by the primary source editor, but it
@@ -28,7 +29,8 @@ const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatib
 
 /// A checked source-native whole-slide removal prerequisite.
 ///
-/// The topology removes one presentation relationship and one slide Part. Each
+/// The topology removes one presentation relationship, one slide Part and
+/// the Parts that slide owns exclusively (record 0303). Each
 /// raw candidate keeps untouched members as lazy source transfers. The plan is
 /// process-local and one-way: it carries no durable revision patch and no
 /// inverse operation.
@@ -53,6 +55,8 @@ struct RemovalDescription {
     candidate_presentation_xml: Arc<Vec<u8>>,
     source_xml: Option<litchi_opc::SourceXmlPart>,
     removed_slide: PackURI,
+    /// Parts the removed slide owned exclusively (record 0303).
+    removed_dependents: Vec<PackURI>,
 }
 
 impl SourceBackedSlideRemovalPlan {
@@ -119,16 +123,22 @@ impl SourceBackedSlideRemovalPlan {
             self.description.presentation_relationship_id.clone(),
         )?;
         topology.try_remove_part(self.description.removed_slide.clone())?;
+        for dependent in &self.description.removed_dependents {
+            topology.try_remove_part(dependent.clone())?;
+        }
         Ok(topology)
     }
 }
 
 impl SourceBackedPresentationEditor {
-    /// Plan removal of one dependency-free slide without mutating this editor.
+    /// Plan removal of one slide without mutating this editor.
     ///
     /// The selected slide must be one of at least two slides, have exactly one
-    /// internal registered slide-layout relationship, and have no other
-    /// outgoing or incoming owner relationship. Signature, macro, protected,
+    /// internal registered slide-layout relationship, and no incoming owner
+    /// relationship besides its presentation binding and the Parts it owns.
+    /// The Parts it owns exclusively (notes slide, pictures, diagrams, VML
+    /// drawings, comments, embedded objects) are removed with it; Parts that
+    /// another owner still targets stay (record 0303). Signature, macro, protected,
     /// MCE, unknown-physical-member, positional, and unknown semantic surfaces
     /// are refused through the typed [`SlideRemovalRefusal`] boundary.
     pub fn plan_slide_removal(
@@ -225,13 +235,15 @@ impl SourceBackedPresentationEditor {
         let slide = self.package.part(&selected.part_uri)?;
         validate_view_content_type(&slide, ct::PML_SLIDE)?;
         let layout = dependency_free_layout(&self.package, &slide)?;
-        map_copy_refusal(super::source_cross_copy::validate_registered_source_layout(
-            &self.package,
-            &presentation,
-            presentation_xml,
-            &layout,
-            self.package.execution_context().as_ref(),
-        ))?;
+        map_copy_refusal(
+            super::source_cross_copy::validate_registered_removal_layout(
+                &self.package,
+                &presentation,
+                presentation_xml,
+                &layout,
+                self.package.execution_context().as_ref(),
+            ),
+        )?;
         let slide_data = slide.data()?;
         crate::source_limits::validate_xml_limits(slide_data.as_bytes(), self.limits)?;
         validate_removal_slide_surface(slide_data.as_bytes())?;
@@ -249,6 +261,15 @@ impl SourceBackedPresentationEditor {
                 "the source relationship or content-type manifests required ingress repairs",
             );
         }
+        let owned = if crate::presentation::owned_parts::may_own(slide.rels()) {
+            crate::presentation::owned_parts::Graph::from_source(
+                &self.package,
+                relationship_scan_limit(self.limits)?,
+            )?
+            .owned_by(&selected.part_uri)?
+        } else {
+            crate::presentation::owned_parts::Owned::none()
+        };
         validate_unique_incoming_owner(
             &self.package,
             presentation.partname(),
@@ -256,6 +277,7 @@ impl SourceBackedPresentationEditor {
             relationship_id,
             self.limits,
             allow_unrelated_opaque_targets,
+            &owned,
         )?;
 
         self.package.check_execution()?;
@@ -285,6 +307,9 @@ impl SourceBackedPresentationEditor {
         topology
             .try_remove_relationship(presentation.partname().clone(), relationship_id.to_owned())?;
         topology.try_remove_part(selected.part_uri.clone())?;
+        for dependent in owned.parts() {
+            topology.try_remove_part(dependent.clone())?;
+        }
 
         self.package.check_execution()?;
         // Run the complete OPC admission phase before publishing the plan.
@@ -309,6 +334,7 @@ impl SourceBackedPresentationEditor {
                 candidate_presentation_xml: candidate_xml,
                 source_xml,
                 removed_slide: selected.part_uri.clone(),
+                removed_dependents: owned.parts().to_vec(),
             },
             _candidate_xml_reservation: candidate_xml_reservation,
         })
@@ -519,11 +545,9 @@ fn validate_unique_incoming_owner(
     selected_relationship_id: &str,
     limits: SourceLimits,
     allow_unrelated_opaque_targets: bool,
+    owned: &crate::presentation::owned_parts::Owned,
 ) -> Result<()> {
-    let maximum = limits
-        .max_parts()
-        .checked_mul(16)
-        .ok_or_else(|| Error::Invalid("slide-removal relationship limit overflow".into()))?;
+    let maximum = relationship_scan_limit(limits)?;
     let mut scanned = 0usize;
     let mut selected_owners = 0usize;
     for relationship in package.rels().iter() {
@@ -556,8 +580,14 @@ fn validate_unique_incoming_owner(
         );
     }
     for owner in package.iter_parts() {
+        // The Parts the slide owns leave with it, so their edges (a notes
+        // slide names its slide) are not owners that survive the removal.
+        let leaves = owned.contains(owner.partname());
         for relationship in owner.rels().iter() {
             scanned = checked_relationship_count(scanned, maximum, package)?;
+            if leaves {
+                continue;
+            }
             if relationship.is_external() {
                 continue;
             }
@@ -602,6 +632,14 @@ fn validate_unique_incoming_owner(
         );
     }
     Ok(())
+}
+
+/// The bound on relationships one removal proof scans.
+pub(crate) fn relationship_scan_limit(limits: SourceLimits) -> Result<usize> {
+    limits
+        .max_parts()
+        .checked_mul(16)
+        .ok_or_else(|| Error::Invalid("slide-removal relationship limit overflow".into()))
 }
 
 fn checked_relationship_count(

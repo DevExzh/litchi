@@ -41,6 +41,8 @@ const TRANSITIONAL_REL_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 const STRICT_PML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
+const TRANSITIONAL_PML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const TRANSITIONAL_DML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const TRANSITIONAL_CHART_NAMESPACE: &[u8] =
@@ -1244,6 +1246,7 @@ fn prepare(
         destination_presentation_data.as_bytes(),
         destination_dialect,
         "destination",
+        false,
         execution_context,
     )?;
     let destination_anchor = editor.slides[destination_slide_position].clone();
@@ -3567,12 +3570,19 @@ enum Dialect {
     Strict,
 }
 
+/// The layouts the presentation's slide masters register. With `lenient`
+/// (slide removal, record 0303), a master's own content is not held to the
+/// copy surface: unknown extension namespaces, relationships besides its
+/// layouts and theme (background pictures, for instance) and a theme with
+/// its own relationships are admitted, because removal reads only the
+/// layout registration.
 fn registered_layouts(
     package: &SourceBackedPackage,
     presentation: &PartView<'_>,
     xml: &[u8],
     dialect: Dialect,
     context: &'static str,
+    lenient: bool,
     execution_context: Option<&ExecutionContext>,
 ) -> Result<Vec<PackURI>> {
     let master_ids = relationship_list(xml, b"sldMasterIdLst", b"sldMasterId", execution_context)?;
@@ -3636,19 +3646,23 @@ fn registered_layouts(
         }
         let master_data = master.data()?;
         crate::source_limits::validate_xml_limits(master_data.as_bytes(), package.read_limits())?;
-        if validate_xml(
-            master_data.as_bytes(),
-            b"sldMaster",
-            RootNamespace::PresentationMl,
-            true,
-            true,
-            true,
-            false,
-            false,
-            "slide master",
-            execution_context,
-        )? != dialect
-        {
+        let master_dialect = if lenient {
+            root_dialect(master_data.as_bytes(), b"sldMaster", "slide master")?
+        } else {
+            validate_xml(
+                master_data.as_bytes(),
+                b"sldMaster",
+                RootNamespace::PresentationMl,
+                true,
+                true,
+                true,
+                false,
+                false,
+                "slide master",
+                execution_context,
+            )?
+        };
+        if master_dialect != dialect {
             return refusal(
                 SlideCopyRefusal::UnknownSemanticSurface,
                 format!("{context} slide master mixes dialects"),
@@ -3673,7 +3687,7 @@ fn registered_layouts(
                 relation_count = relation_count
                     .checked_add(1)
                     .ok_or_else(|| invalid("relationship count overflow"))?;
-            } else {
+            } else if !lenient {
                 return refusal(
                     SlideCopyRefusal::UnsupportedRelationship,
                     format!("{context} slide master has an unsupported relationship"),
@@ -3737,7 +3751,8 @@ fn registered_layouts(
         check_execution(execution_context)?;
         validate_internal(theme, dialect, rt::THEME, STRICT_THEME_REL, "theme")?;
         let theme_part = package.part(&theme.target_partname()?)?;
-        if theme_part.content_type() != ct::OFC_THEME || !theme_part.rels().is_empty() {
+        if theme_part.content_type() != ct::OFC_THEME || (!lenient && !theme_part.rels().is_empty())
+        {
             return refusal(
                 SlideCopyRefusal::UnsupportedRelationship,
                 format!("{context} theme is not a leaf part"),
@@ -3784,6 +3799,7 @@ pub(super) fn registered_source_layout_by_name(
         xml,
         dialect,
         CONTEXT,
+        false,
         execution_context,
     )?;
     let mut selected = None;
@@ -3817,6 +3833,46 @@ pub(super) fn validate_registered_source_layout(
     selected: &PackURI,
     execution_context: Option<&ExecutionContext>,
 ) -> Result<()> {
+    registered_source_layout(
+        package,
+        presentation,
+        xml,
+        selected,
+        true,
+        execution_context,
+    )
+}
+
+/// Prove that `selected` is a layout a slide master registers, for a slide
+/// removal. Removal leaves the presentation root's extensions and other
+/// surfaces untouched; the removal planner proves separately that none of
+/// them names the removed slide (record 0303). Only the root's dialect and
+/// the master/layout graph are checked here.
+pub(super) fn validate_registered_removal_layout(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    selected: &PackURI,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    registered_source_layout(
+        package,
+        presentation,
+        xml,
+        selected,
+        false,
+        execution_context,
+    )
+}
+
+fn registered_source_layout(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    selected: &PackURI,
+    reject_presentation_surfaces: bool,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
     const CONTEXT: &str = "source";
 
     check_execution(execution_context)?;
@@ -3828,8 +3884,8 @@ pub(super) fn validate_registered_source_layout(
         true,
         true,
         true,
-        true,
-        false,
+        reject_presentation_surfaces,
+        !reject_presentation_surfaces,
         CONTEXT,
         execution_context,
     )?;
@@ -3839,6 +3895,7 @@ pub(super) fn validate_registered_source_layout(
         xml,
         dialect,
         CONTEXT,
+        !reject_presentation_surfaces,
         execution_context,
     )?;
     if registered
@@ -5403,6 +5460,41 @@ fn validate_xml_with_policy(
             format!("{context} has no OOXML namespace"),
         ),
     }
+}
+
+/// The PresentationML dialect of a document element named `root`, without
+/// checking the rest of the XML (lenient slide-removal reads, record 0303).
+fn root_dialect(xml: &[u8], root: &[u8], context: &'static str) -> Result<Dialect> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if element.local_name().as_ref() != root {
+                    break;
+                }
+                return match namespace {
+                    ResolveResult::Bound(Namespace(value))
+                        if value == TRANSITIONAL_PML_NAMESPACE =>
+                    {
+                        Ok(Dialect::Transitional)
+                    },
+                    ResolveResult::Bound(Namespace(value)) if value == STRICT_PML_NAMESPACE => {
+                        Ok(Dialect::Strict)
+                    },
+                    _ => break,
+                };
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    refusal(
+        SlideCopyRefusal::UnknownSemanticSurface,
+        format!("{context} has an unexpected root"),
+    )
 }
 
 fn valid_xml_reference(reference: &BytesRef<'_>) -> bool {

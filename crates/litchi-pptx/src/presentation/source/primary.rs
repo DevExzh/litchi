@@ -248,6 +248,7 @@ impl Package {
                         && left.data.after.presentation_relationships
                             == right.data.after.presentation_relationships
                         && left.data.after.content_types == right.data.after.content_types
+                        && left.data.dependents == right.data.dependents
                         && left.data.changes.len() == right.data.changes.len()
                         && left.data.changes.iter().all(|change| {
                             right.data.changes.iter().any(|candidate| {
@@ -1155,13 +1156,17 @@ impl Edit {
         Ok(shape_id)
     }
 
-    /// Remove one dependency-free slide from the currently staged logical
-    /// order.  Admission is delegated to the shared source-native planner;
-    /// the resulting candidate retains a prepared effective topology and can
-    /// therefore be read before it is published. The final slide, hidden or
-    /// referenced slides, and unmodeled dependencies are refused. Durable
-    /// inversion currently requires canonical owner-relative relationship
-    /// targets for the presentation binding and the slide's layout edge.
+    /// Remove one slide from the currently staged logical order, with the
+    /// Parts it owns exclusively: its notes slide, pictures, diagrams, VML
+    /// drawings, comments and embedded objects (record 0303). A Part that
+    /// another owner still targets stays. Admission is delegated to the
+    /// shared source-native planner; the resulting candidate retains a
+    /// prepared effective topology and can therefore be read before it is
+    /// published. The final slide, referenced slides, and unmodeled surfaces
+    /// are refused. Durable inversion requires canonical owner-relative
+    /// relationship targets for the presentation binding and every internal
+    /// edge of the slide and its owned Parts, and refuses an edge to a
+    /// missing Part, which an inverse could not restore after reopening.
     ///
     /// ```
     /// # fn main() -> litchi_pptx::Result<()> {
