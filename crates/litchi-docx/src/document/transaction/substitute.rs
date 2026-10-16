@@ -219,6 +219,8 @@ pub struct Paragraph {
     /// The complex fields open where the paragraph starts.
     entry: Vec<Phase>,
     item: Option<usize>,
+    /// Text offsets of the [`OBJECT`]s that stand for alternate content.
+    alternate: Vec<usize>,
 }
 
 impl Paragraph {
@@ -263,6 +265,19 @@ impl Paragraph {
         })
     }
 
+    /// The byte offsets in [`Self::text`] of the [`OBJECT`]s that stand for
+    /// `mc:AlternateContent` wrappers held by the paragraph's runs (a
+    /// drawing or text box with a fallback; record 0307), in order.
+    ///
+    /// Each wrapper is one opaque object: readers show the text of the
+    /// branch the projection selects, which the story never lists, so a
+    /// caller that matches text the reader shows can tell where that text
+    /// would sit.
+    #[must_use]
+    pub fn alternate_content(&self) -> &[usize] {
+        &self.alternate
+    }
+
     /// For a part story, the position of the part root's child holding the
     /// paragraph among all the root's element children: the comment,
     /// footnote or endnote it belongs to. `None` for the main document.
@@ -296,6 +311,9 @@ struct Block {
 /// paragraphs, tables and block content controls (text boxes included);
 /// paragraphs in other body children (custom XML blocks, alternate
 /// content) are not listed. A part story lists every paragraph of the part.
+/// Neither lists anything inside an `mc:AlternateContent` wrapper, whose
+/// branches differ: a run holding one reads it as one [`OBJECT`]
+/// ([`Paragraph::alternate_content`]; record 0307).
 #[derive(Clone)]
 pub struct Story {
     part: Option<String>,

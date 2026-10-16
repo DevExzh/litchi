@@ -2173,6 +2173,27 @@ table-cell runs (`opened::TextTarget::{CellRun, CellRunSpan}`, read through
 
 See [0285](unified-ops/0285-find-merge-consolidation.md).
 
+## DOCX run-level markup compatibility (record 0307)
+
+Document transactions admit a main document whose `mc:AlternateContent`
+wrappers all lie inside runs (drawings and text boxes with a fallback). The
+shared proof that establishes it, `litchi_ooxml_common::mce::admission::
+admit_held`, takes the holder element (`Holder`) and reports the verdict
+outside the wrappers and their count (`Held`); it does not cover processing
+inside a wrapper, which the caller runs. The story of
+`litchi_docx::document::substitute` lists each wrapper as one `OBJECT` and
+`Paragraph::alternate_content` gives their offsets. A text set over a wrapper
+whose branches hold text is refused with `document::Refusal::
+AlternateContentText`.
+
+| Name | Status |
+|---|---|
+| `litchi_ooxml_common::mce::admission::{admit_held, Holder, Held}` | adopted (0307) |
+| `litchi_docx::document::substitute::Paragraph::alternate_content` | adopted (0307) |
+| `litchi_docx::document::Refusal::AlternateContentText` | adopted (0307) |
+
+See [0307](unified-ops/0307-docx-run-markup-compatibility.md).
+
 ## Typed SmartArt CRUD (record 0284)
 
 `litchi_drawingml::diagram::authoring` is the host-neutral way to author a

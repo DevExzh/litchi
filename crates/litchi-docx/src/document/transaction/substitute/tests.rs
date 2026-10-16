@@ -653,3 +653,44 @@ mod unified {
         }
     }
 }
+
+const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+#[test]
+fn alternate_content_is_one_opaque_object() {
+    // Record 0307: a text box with a fallback, each branch holding its own
+    // paragraph. Neither branch's paragraph is listed, and the run reads the
+    // wrapper as one object.
+    let wrapper = r#"<mc:AlternateContent xmlns:wps="urn:wps"><mc:Choice Requires="wps"><w:drawing><w:txbxContent><w:p><w:r><w:t>CHOICE {{a}}</w:t></w:r></w:p></w:txbxContent></w:drawing></mc:Choice><mc:Fallback><w:pict><w:txbxContent><w:p><w:r><w:t>FALLBACK {{a}}</w:t></w:r></w:p></w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent>"#;
+    let body = format!(
+        r#"<w:p><w:r><w:t>ab</w:t>{wrapper}<w:t>cd</w:t></w:r><w:r><mc:AlternateContent/></w:r></w:p><w:p><w:r><w:t>{{{{a}}}}</w:t></w:r></w:p>"#
+    );
+    for (xml, main) in [
+        (
+            document(&body).replace("<w:document ", &format!(r#"<w:document xmlns:mc="{MC}" "#)),
+            true,
+        ),
+        (
+            header(&body).replace("<w:hdr ", &format!(r#"<w:hdr xmlns:mc="{MC}" "#)),
+            false,
+        ),
+    ] {
+        let paragraphs = scan(xml.as_bytes(), main).unwrap();
+        assert_eq!(paragraphs.len(), 2, "{xml}");
+        assert_eq!(paragraphs[0].text(), format!("ab{OBJECT}cd{OBJECT}"));
+        assert_eq!(paragraphs[0].alternate_content(), [2, 7]);
+        assert!(paragraphs[1].alternate_content().is_empty());
+        // The two text pieces around the wrapper are separate groups.
+        let groups: Vec<usize> = paragraphs[0]
+            .segments()
+            .map(|segment| segment.group())
+            .collect();
+        assert_eq!(groups.len(), 2);
+        assert_ne!(groups[0], groups[1]);
+    }
+    // A merge fills the placeholder outside the wrapper and nowhere else.
+    let xml = header(&body).replace("<w:hdr ", &format!(r#"<w:hdr xmlns:mc="{MC}" "#));
+    let filled = fill(&xml, |_| "X".to_owned());
+    assert!(filled.contains("CHOICE {{a}}") && filled.contains("FALLBACK {{a}}"));
+    assert!(filled.contains("<w:t>X</w:t>"), "{filled}");
+}
