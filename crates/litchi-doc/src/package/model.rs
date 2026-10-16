@@ -575,7 +575,15 @@ pub struct Package {
     pub(super) source_limits: SourceLimits,
     pub(super) leniency: crate::leniency::Leniency,
     pub(super) edit_profile: Option<EditProfile>,
+    /// The body-text snapshot of these exact bytes the last edit opened, with
+    /// the options it was opened under (record 0311), shared by clones.
+    pub(super) body_source: BodySourceMemo,
 }
+
+/// See [`Package::body_source`]; one entry, replaced by an edit under other
+/// options.
+pub(super) type BodySourceMemo =
+    Arc<std::sync::Mutex<Option<(crate::body_text::OpenOptions, crate::body_text::Snapshot)>>>;
 
 impl Clone for Package {
     fn clone(&self) -> Self {
@@ -586,6 +594,7 @@ impl Clone for Package {
             source_limits: self.source_limits,
             leniency: self.leniency,
             edit_profile: self.edit_profile.clone(),
+            body_source: Arc::clone(&self.body_source),
         }
     }
 }
