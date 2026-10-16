@@ -51,7 +51,7 @@ use litchi_core::Result;
 
 use change::Fragment;
 pub use change::{Attribute, Change, NewPage, NewTextBox, ObjectRef, Scope, StoryRef};
-pub use styles::{AutomaticStyle, AutomaticStyles, TextProperties, TextPropertyEdit};
+pub use styles::{AutomaticStyle, AutomaticStyles, CommonStyles, TextProperties, TextPropertyEdit};
 
 /// Apply `changes` to the `content.xml` of `source` as checked splices.
 ///
@@ -673,7 +673,9 @@ pub enum RunKind {
     Span,
     /// A `text:a` hyperlink.
     Link,
-    /// Another inline element: a field, bookmark or reference mark.
+    /// Another inline element: a field, bookmark or reference mark. A
+    /// `text:span` whose whole content is one field with text is that
+    /// field, formatted by the span's style (record 0316).
     Field,
 }
 
@@ -683,9 +685,23 @@ pub struct Run {
     pub(crate) kind: RunKind,
     pub(crate) range: Range<usize>,
     pub(crate) content: Range<usize>,
+    /// The start tag of the run's element; empty for a plain-text run.
+    pub(crate) start_tag: Range<usize>,
     pub(crate) style_name: Option<String>,
     pub(crate) href: Option<String>,
     pub(crate) text: String,
+    /// The field element of a field run its formatting span wraps.
+    pub(crate) field: Option<WrappedField>,
+    /// The start tag and style of the one span a link's content is.
+    pub(crate) inner_span: Option<(Range<usize>, Option<String>)>,
+}
+
+/// The field element inside the span of a formatted field run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WrappedField {
+    pub(crate) range: Range<usize>,
+    pub(crate) start_tag: Range<usize>,
+    pub(crate) content: Range<usize>,
 }
 
 impl Run {
@@ -701,10 +717,18 @@ impl Run {
         self.range.clone()
     }
 
-    /// A span's `text:style-name`.
+    /// The `text:style-name` of a span, of a link (its link character
+    /// style) or of the span that formats a field run.
     #[must_use]
     pub fn style_name(&self) -> Option<&str> {
         self.style_name.as_deref()
+    }
+
+    /// The `text:style-name` of the one `text:span` a link's whole content
+    /// is: the formatting of the link text (record 0316).
+    #[must_use]
+    pub fn link_text_style_name(&self) -> Option<&str> {
+        self.inner_span.as_ref()?.1.as_deref()
     }
 
     /// A link's `xlink:href`.

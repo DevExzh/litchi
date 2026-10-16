@@ -643,3 +643,162 @@ fn formatting_no_ops_and_refusals() {
     );
     assert!(matches!(refused, Err(litchi_core::Error::Unsupported(_))));
 }
+
+/// A styled page whose one text box holds a link and a page-number field.
+fn links_and_fields() -> String {
+    styled().replacen(
+        r#"<draw:custom-shape draw:name="Star""#,
+        concat!(
+            r#"<draw:frame draw:name="Links"><draw:text-box><text:p>"#,
+            r#"<text:a xlink:href="https://example.com" text:style-name="Internet_20_link">site</text:a>"#,
+            r#" page <text:page-number>4</text:page-number>"#,
+            r#"</text:p></draw:text-box></draw:frame>"#,
+            r#"<draw:custom-shape draw:name="Star""#,
+        ),
+        1,
+    )
+}
+
+fn links(object: usize) -> StoryRef {
+    StoryRef::object(ObjectRef::new(0, object))
+}
+
+#[test]
+fn link_and_field_runs_take_formatting() {
+    let xml = links_and_fields();
+    let scene = Scene::parse(&xml).unwrap();
+    let story = scene.story(&links(2)).unwrap();
+    let kinds: Vec<_> = story.paragraphs()[0].runs().iter().map(Run::kind).collect();
+    assert_eq!(kinds, [RunKind::Link, RunKind::Text, RunKind::Field]);
+    let bold = edit(|properties| properties.bold = Some(true));
+    let changed = apply(
+        &xml,
+        &[
+            Change::SetTextProperties {
+                story: links(2),
+                paragraph: 0,
+                run: Some(0),
+                properties: bold.clone(),
+            },
+            Change::SetTextProperties {
+                story: links(2),
+                paragraph: 0,
+                run: Some(2),
+                properties: bold.clone(),
+            },
+        ],
+    );
+    // The link keeps its link style; a span inside it formats the text,
+    // and a span around the field formats the field.
+    assert!(
+        changed.contains(r#"text:style-name="Internet_20_link"><text:span text:style-name="T3">site</text:span></text:a>"#),
+        "{changed}"
+    );
+    assert!(
+        changed.contains(
+            r#"<text:span text:style-name="T4"><text:page-number>4</text:page-number></text:span>"#
+        ),
+        "{changed}"
+    );
+    let scene = Scene::parse(&changed).unwrap();
+    let styles = scene.automatic_styles(&changed).unwrap();
+    let common = CommonStyles::default();
+    let runs = scene.story(&links(2)).unwrap().paragraphs()[0]
+        .runs()
+        .to_vec();
+    assert_eq!(runs[0].kind(), RunKind::Link);
+    assert_eq!(runs[0].href(), Some("https://example.com"));
+    assert_eq!(runs[0].link_text_style_name(), Some("T3"));
+    assert_eq!(runs[2].kind(), RunKind::Field);
+    assert_eq!(runs[2].style_name(), Some("T4"));
+    for run in [&runs[0], &runs[2]] {
+        assert_eq!(styles.resolve_run(&common, run).bold(), Some(true));
+    }
+    // The formatted field still refreshes, inside its span.
+    let refreshed = apply(
+        &changed,
+        &[Change::SetFieldText {
+            story: links(2),
+            paragraph: 0,
+            run: 2,
+            text: "5".into(),
+        }],
+    );
+    assert!(refreshed.contains(
+        r#"<text:span text:style-name="T4"><text:page-number>5</text:page-number></text:span>"#
+    ));
+    // A second format derives from the link's text span.
+    let italic = apply(
+        &changed,
+        &[Change::SetTextProperties {
+            story: links(2),
+            paragraph: 0,
+            run: Some(0),
+            properties: edit(|properties| properties.italic = Some(true)),
+        }],
+    );
+    let scene = Scene::parse(&italic).unwrap();
+    let styles = scene.automatic_styles(&italic).unwrap();
+    let link = &scene.story(&links(2)).unwrap().paragraphs()[0].runs()[0];
+    let resolved = styles.resolve_run(&common, link);
+    assert_eq!(
+        (resolved.bold(), resolved.italic()),
+        (Some(true), Some(true))
+    );
+    assert_eq!(
+        italic.matches("<text:span").count(),
+        changed.matches("<text:span").count()
+    );
+}
+
+#[test]
+fn formatting_resolves_through_common_styles() {
+    let styles_xml = concat!(
+        r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+        r#"xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:styles>"#,
+        r#"<style:default-style style:family="paragraph"><style:text-properties fo:font-size="18pt"/></style:default-style>"#,
+        r#"<style:style style:name="Base" style:family="paragraph"><style:text-properties fo:font-style="italic" style:font-name="Liberation Sans"/></style:style>"#,
+        r#"<style:style style:name="Heading" style:family="paragraph" style:parent-style-name="Base"><style:text-properties fo:font-weight="bold"/></style:style>"#,
+        r#"<style:style style:name="Loop" style:family="paragraph" style:parent-style-name="Loop"/>"#,
+        r#"</office:styles></office:document-styles>"#,
+    );
+    let common = CommonStyles::parse(styles_xml).unwrap();
+    // A byte-order mark is skipped; the styles are the same.
+    let marked = CommonStyles::parse(&format!("\u{feff}{styles_xml}")).unwrap();
+    let none = AutomaticStyles::default();
+    assert_eq!(
+        none.resolve(&marked, "paragraph", Some("Heading")),
+        none.resolve(&common, "paragraph", Some("Heading"))
+    );
+    let xml = styled().replacen(
+        r#"<style:style style:name="P1" style:family="paragraph">"#,
+        r#"<style:style style:name="P1" style:family="paragraph" style:parent-style-name="Heading">"#,
+        1,
+    );
+    let scene = Scene::parse(&xml).unwrap();
+    let styles = scene.automatic_styles(&xml).unwrap();
+    let paragraph = &scene.story(&title(0)).unwrap().paragraphs()[0];
+    let resolved = styles.resolve_paragraph(&common, paragraph);
+    // Heading's bold, Base's italic and font, the default size.
+    assert_eq!(resolved.bold(), Some(true));
+    assert_eq!(resolved.italic(), Some(true));
+    assert_eq!(resolved.font(), Some("Liberation Sans"));
+    assert_eq!(resolved.size(), Some("18pt"));
+    // The local properties alone are unchanged.
+    assert_eq!(
+        styles.paragraph_text_properties(paragraph),
+        Some(&TextProperties::default())
+    );
+    // A cycle ends; a missing style resolves to the defaults.
+    assert_eq!(
+        styles.resolve(&common, "paragraph", Some("Loop")).size(),
+        Some("18pt")
+    );
+    assert_eq!(
+        styles.resolve(&common, "paragraph", Some("Missing")).bold(),
+        None
+    );
+    // A document without office:styles has none.
+    assert_eq!(CommonStyles::parse(&xml).unwrap(), CommonStyles::default());
+}

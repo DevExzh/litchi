@@ -15,7 +15,7 @@ use litchi_odp::scene::{
 
 use super::Odp;
 use super::children::Children;
-use super::spec::Kind;
+use super::spec::{CHARACTER_KEYS, Kind};
 use crate::error::Result;
 use crate::node::{
     Children as ViewChildren, Format, NodePath, PathStep, Preview, Project, Source, Value,
@@ -485,17 +485,21 @@ enum PropValues<'a> {
         page: &'a litchi_odp::scene::Page,
         number: usize,
     },
-    Object(&'a Object),
+    /// An object, with its text story for the shared character
+    /// formatting read on demand (record 0316).
+    Object(&'a Object, Option<&'a Story>, &'a Odp),
+    /// A paragraph or run with the character properties its style chain
+    /// resolves to (record 0316).
     Paragraph(
         &'a litchi_odp::scene::Paragraph,
-        &'a litchi_odp::scene::AutomaticStyles,
+        litchi_odp::scene::TextProperties,
     ),
     Run(
         &'a litchi_odp::scene::Run,
-        &'a litchi_odp::scene::AutomaticStyles,
+        litchi_odp::scene::TextProperties,
     ),
-    Cell(&'a litchi_odp::scene::Cell),
-    Notes(Option<String>),
+    Cell(&'a litchi_odp::scene::Cell, &'a Odp),
+    Notes(Option<String>, Option<&'a Story>, &'a Odp),
     Comment(&'a litchi_odp::annotation::Info),
     Master(&'a litchi_odp::master::Summary),
     Layout(&'a litchi_odp::layout::Layout),
@@ -516,34 +520,49 @@ impl<'a> Props<'a> {
                 },
                 None => PropValues::None,
             },
-            Item::Object(..) => node.object().map_or(PropValues::None, PropValues::Object),
+            Item::Object(..) => node.object().map_or(PropValues::None, |object| {
+                let story = node.own_story().and_then(|story| scene.story(&story));
+                PropValues::Object(object, story, node.file)
+            }),
             Item::Paragraph(story, index) => scene
                 .story(story)
                 .and_then(|story| story.paragraphs().get(*index))
                 .map_or(Ok::<_, crate::Error>(PropValues::None), |paragraph| {
-                    Ok(PropValues::Paragraph(
-                        paragraph,
-                        node.file.automatic_styles()?,
-                    ))
+                    let resolved = node
+                        .file
+                        .automatic_styles()?
+                        .resolve_paragraph(node.file.common_styles()?, paragraph);
+                    Ok(PropValues::Paragraph(paragraph, resolved))
                 })?,
             Item::Run(story, paragraph, index) => scene
                 .story(story)
                 .and_then(|story| story.paragraphs().get(*paragraph))
-                .and_then(|paragraph| paragraph.runs().get(*index))
-                .map_or(Ok::<_, crate::Error>(PropValues::None), |run| {
-                    Ok(PropValues::Run(run, node.file.automatic_styles()?))
-                })?,
+                .and_then(|paragraph| Some((paragraph, paragraph.runs().get(*index)?)))
+                .map_or(
+                    Ok::<_, crate::Error>(PropValues::None),
+                    |(paragraph, run)| {
+                        // A run inherits what its own style leaves unset from
+                        // its paragraph (record 0316).
+                        let styles = node.file.automatic_styles()?;
+                        let common = node.file.common_styles()?;
+                        let mut resolved = styles.resolve_run(common, run);
+                        resolved.inherit(&styles.resolve_paragraph(common, paragraph));
+                        Ok(PropValues::Run(run, resolved))
+                    },
+                )?,
             Item::Cell(object, row, cell) => scene
                 .object(object)
                 .and_then(Object::table)
                 .and_then(|table| table.rows().get(*row))
                 .and_then(|row| row.cells().get(*cell))
-                .map_or(PropValues::None, PropValues::Cell),
+                .map_or(PropValues::None, |cell| PropValues::Cell(cell, node.file)),
             Item::Notes(page) => PropValues::Notes(
                 scene
                     .page(*page)
                     .and_then(|page| page.notes())
                     .and_then(litchi_odp::scene::Notes::text),
+                notes_story(scene, *page).and_then(|story| scene.story(&story)),
+                node.file,
             ),
             Item::Comment(index) => node
                 .file
@@ -592,25 +611,29 @@ impl<'a> Props<'a> {
                 "master" => text(page.master_page()),
                 _ => None,
             },
-            PropValues::Object(object) => object_value(object, key),
-            PropValues::Paragraph(paragraph, styles) => match key {
+            PropValues::Object(object, story, file) => match object_value(object, key) {
+                Some(value) => Some(value),
+                None if CHARACTER_KEYS.contains(&key) => shared_character(file, (*story)?, key),
+                None => None,
+            },
+            PropValues::Paragraph(paragraph, properties) => match key {
                 "style" => text(paragraph.style_name()),
                 "level" => Some(Value::Int(i64::from(paragraph.level()))),
-                key => character(styles.paragraph_text_properties(paragraph)?, key),
+                key => character(properties, key).map(Value::into_owned),
             },
-            PropValues::Run(run, styles) => match key {
+            PropValues::Run(run, properties) => match key {
                 "style" => text(run.style_name()),
                 "link" => text(run.href()),
-                key => character(styles.run_text_properties(run)?, key),
+                key => character(properties, key).map(Value::into_owned),
             },
-            PropValues::Cell(cell) => match key {
+            PropValues::Cell(cell, file) => match key {
                 "colSpan" => Some(Value::Int(i64::from(cell.column_span()))),
                 "rowSpan" => Some(Value::Int(i64::from(cell.row_span()))),
-                _ => None,
+                key => shared_character(file, cell.story(), key),
             },
-            PropValues::Notes(notes) => match key {
+            PropValues::Notes(notes, story, file) => match key {
                 "text" => owned(notes.clone()),
-                _ => None,
+                key => shared_character(file, (*story)?, key),
             },
             PropValues::Comment(info) => match key {
                 "text" => Some(Value::Text(Cow::Owned(annotation_text(info)))),
@@ -699,8 +722,41 @@ impl fmt::Debug for Props<'_> {
     }
 }
 
-/// A character property (record 0308) a paragraph or span's automatic
-/// style sets locally.
+/// The character property every run of `story` shares (record 0316): each
+/// run's style chain over its paragraph's; a paragraph without runs counts
+/// by its own. `None` when the runs differ or none sets it.
+fn shared_character(file: &Odp, story: &Story, key: &str) -> Option<Value<'static>> {
+    let styles = file.automatic_styles().ok()?;
+    let common = file.common_styles().ok()?;
+    let mut shared: Option<Value<'static>> = None;
+    let mut seen = false;
+    for paragraph in story.paragraphs() {
+        let base = styles.resolve_paragraph(common, paragraph);
+        let mut each = |properties: &litchi_odp::scene::TextProperties| -> bool {
+            let value = character(properties, key).map(Value::into_owned);
+            let agrees = !seen || value == shared;
+            seen = true;
+            shared = value;
+            agrees
+        };
+        if paragraph.runs().is_empty() {
+            if !each(&base) {
+                return None;
+            }
+            continue;
+        }
+        for run in paragraph.runs() {
+            let mut resolved = styles.resolve_run(common, run);
+            resolved.inherit(&base);
+            if !each(&resolved) {
+                return None;
+            }
+        }
+    }
+    shared
+}
+
+/// A character property (record 0308) a node's style chain resolves to.
 fn character<'a>(
     properties: &'a litchi_odp::scene::TextProperties,
     key: &str,

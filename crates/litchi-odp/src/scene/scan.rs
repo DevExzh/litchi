@@ -11,7 +11,7 @@ use quick_xml::reader::NsReader;
 use super::styles::StylesInsertion;
 use super::{
     Cell, FrameContent, Notes, Object, ObjectKind, Page, Paragraph, Prefixes, Row, Run, RunKind,
-    Scene, Story, Table, Wrapper,
+    Scene, Story, Table, WrappedField, Wrapper,
 };
 
 pub(super) const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -208,6 +208,48 @@ struct RunBuilder {
     style_name: Option<String>,
     href: Option<String>,
     text: Projection,
+    /// The direct children of the run element (controls included), its
+    /// first one, and whether character data sits directly in it: a span
+    /// that holds one field, or a link that holds one span, is recorded as
+    /// such (record 0316).
+    children: u8,
+    child: Option<Child>,
+    direct_text: bool,
+}
+
+/// The first direct child element of a run.
+struct Child {
+    /// A field-like inline element (not a span, link or control).
+    field: bool,
+    span: bool,
+    start: usize,
+    tag_end: usize,
+    content_end: Option<usize>,
+    end: Option<usize>,
+    style_name: Option<String>,
+}
+
+impl RunBuilder {
+    fn new(kind: RunKind, start: usize, content_start: usize, content_end: usize) -> Self {
+        Self {
+            kind,
+            start,
+            content_start,
+            content_end,
+            style_name: None,
+            href: None,
+            text: Projection::default(),
+            children: 0,
+            child: None,
+            direct_text: false,
+        }
+    }
+
+    /// The sole child element, when it is the run's whole content.
+    fn sole_child(&self) -> Option<&Child> {
+        let child = self.child.as_ref()?;
+        (self.children == 1 && !self.direct_text && child.end.is_some()).then_some(child)
+    }
 }
 
 struct TableBuilder {
@@ -284,6 +326,45 @@ pub(super) fn scan(xml: &str) -> Result<Scene> {
         styles_range: scanner.styles_range,
         styles_insertion: scanner.styles_insertion,
     })
+}
+
+/// The prefixes a document root binds to the ODF namespaces markup is
+/// authored in (the first binding of each).
+pub(super) fn root_prefixes(element: &BytesStart<'_>) -> Result<Prefixes> {
+    let mut prefixes = Prefixes::default();
+    for attribute in element.attributes() {
+        let attribute =
+            attribute.map_err(|error| invalid(format!("invalid ODP attribute: {error}")))?;
+        let key = attribute.key.as_ref();
+        let Some(prefix) = key.strip_prefix(b"xmlns:") else {
+            continue;
+        };
+        let value = attribute.value.as_ref();
+        let prefix = std::str::from_utf8(prefix)
+            .map_err(|error| invalid(format!("invalid ODP namespace prefix: {error}")))?
+            .to_owned();
+        let slot = if value == DRAW_NS {
+            &mut prefixes.draw
+        } else if value == TEXT_NS {
+            &mut prefixes.text
+        } else if value == SVG_NS {
+            &mut prefixes.svg
+        } else if value == PRESENTATION_NS {
+            &mut prefixes.presentation
+        } else if value == STYLE_NS {
+            &mut prefixes.style
+        } else if value == FO_NS {
+            &mut prefixes.fo
+        } else if value == OFFICE_NS {
+            &mut prefixes.office
+        } else {
+            continue;
+        };
+        if slot.is_none() {
+            *slot = Some(prefix);
+        }
+    }
+    Ok(prefixes)
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -398,6 +479,9 @@ impl Scanner<'_> {
                 return self.open_inline(ns, local, element, start, end, empty);
             },
             Some(Frame::Run | Frame::InRun) => {
+                if parent == Some(Frame::Run) {
+                    self.note_run_child(ns, local, element, start, end)?;
+                }
                 if self.is_control(ns, local) {
                     self.push_control(element, start, end, false)?;
                     return Ok(Frame::InRun);
@@ -501,38 +585,7 @@ impl Scanner<'_> {
     }
 
     fn read_prefixes(&mut self, element: &BytesStart<'_>) -> Result<()> {
-        for attribute in element.attributes() {
-            let attribute =
-                attribute.map_err(|error| invalid(format!("invalid ODP attribute: {error}")))?;
-            let key = attribute.key.as_ref();
-            let Some(prefix) = key.strip_prefix(b"xmlns:") else {
-                continue;
-            };
-            let value = attribute.value.as_ref();
-            let prefix = std::str::from_utf8(prefix)
-                .map_err(|error| invalid(format!("invalid ODP namespace prefix: {error}")))?
-                .to_owned();
-            let slot = if value == DRAW_NS {
-                &mut self.prefixes.draw
-            } else if value == TEXT_NS {
-                &mut self.prefixes.text
-            } else if value == SVG_NS {
-                &mut self.prefixes.svg
-            } else if value == PRESENTATION_NS {
-                &mut self.prefixes.presentation
-            } else if value == STYLE_NS {
-                &mut self.prefixes.style
-            } else if value == FO_NS {
-                &mut self.prefixes.fo
-            } else if value == OFFICE_NS {
-                &mut self.prefixes.office
-            } else {
-                continue;
-            };
-            if slot.is_none() {
-                *slot = Some(prefix);
-            }
-        }
+        self.prefixes = root_prefixes(element)?;
         Ok(())
     }
 
@@ -842,6 +895,44 @@ impl Scanner<'_> {
         Ok(())
     }
 
+    /// Count a direct child element of the open run, remembering the first.
+    fn note_run_child(
+        &mut self,
+        ns: Option<&[u8]>,
+        local: &[u8],
+        element: &BytesStart<'_>,
+        start: usize,
+        end: usize,
+    ) -> Result<()> {
+        let span = ns == Some(TEXT_NS) && local == b"span";
+        let link = ns == Some(TEXT_NS) && local == b"a";
+        let field = !(span || link || self.is_control(ns, local) || is_opaque(ns, local));
+        let style_name = if span {
+            self.attribute(element, TEXT_NS, b"style-name")?
+        } else {
+            None
+        };
+        if let Some(run) = self
+            .paragraph
+            .as_mut()
+            .and_then(|paragraph| paragraph.run.as_mut())
+        {
+            if run.children == 0 {
+                run.child = Some(Child {
+                    field,
+                    span,
+                    start,
+                    tag_end: end,
+                    content_end: None,
+                    end: None,
+                    style_name,
+                });
+            }
+            run.children = run.children.saturating_add(1);
+        }
+        Ok(())
+    }
+
     /// Record inline content of the open paragraph that is not text: a
     /// frame, a note, an annotation, a field or a hyperlink (record 0304).
     fn note_object(&mut self, element: &BytesStart<'_>, start: usize) {
@@ -890,15 +981,9 @@ impl Scanner<'_> {
         };
         paragraph.text.push_explicit(character, count);
         if direct {
-            let plain = paragraph.plain.get_or_insert_with(|| RunBuilder {
-                kind: RunKind::Text,
-                start,
-                content_start: start,
-                content_end: end,
-                style_name: None,
-                href: None,
-                text: Projection::default(),
-            });
+            let plain = paragraph
+                .plain
+                .get_or_insert_with(|| RunBuilder::new(RunKind::Text, start, start, end));
             plain.content_end = end;
             plain.text.push_explicit(character, count);
         } else if let Some(run) = &mut paragraph.run {
@@ -943,15 +1028,10 @@ impl Scanner<'_> {
             (RunKind::Field, None, None)
         };
         if let Some(paragraph) = &mut self.paragraph {
-            paragraph.run = Some(RunBuilder {
-                kind,
-                start,
-                content_start: end,
-                content_end: end,
-                style_name,
-                href,
-                text: Projection::default(),
-            });
+            let mut run = RunBuilder::new(kind, start, end, end);
+            run.style_name = style_name;
+            run.href = href;
+            paragraph.run = Some(run);
         }
         let _ = empty;
         Ok(Frame::Run)
@@ -965,9 +1045,12 @@ impl Scanner<'_> {
                 kind: RunKind::Text,
                 range: plain.start..plain.content_end,
                 content: plain.content_start..plain.content_end,
+                start_tag: plain.start..plain.start,
                 style_name: None,
                 href: None,
                 text: plain.text.finish(),
+                field: None,
+                inner_span: None,
             });
         }
     }
@@ -1053,24 +1136,19 @@ impl Scanner<'_> {
             Some(Frame::Paragraph) => {
                 if let Some(paragraph) = &mut self.paragraph {
                     paragraph.text.push_text(text);
-                    let plain = paragraph.plain.get_or_insert_with(|| RunBuilder {
-                        kind: RunKind::Text,
-                        start,
-                        content_start: start,
-                        content_end: end,
-                        style_name: None,
-                        href: None,
-                        text: Projection::default(),
-                    });
+                    let plain = paragraph
+                        .plain
+                        .get_or_insert_with(|| RunBuilder::new(RunKind::Text, start, start, end));
                     plain.content_end = end;
                     plain.text.push_text(text);
                 }
             },
-            Some(Frame::Run | Frame::InRun) => {
+            Some(frame @ (Frame::Run | Frame::InRun)) => {
                 if let Some(paragraph) = &mut self.paragraph {
                     paragraph.text.push_text(text);
                     if let Some(run) = &mut paragraph.run {
                         run.text.push_text(text);
+                        run.direct_text |= frame == Frame::Run;
                     }
                 }
             },
@@ -1199,15 +1277,57 @@ impl Scanner<'_> {
                     && let Some(mut run) = paragraph.run.take()
                 {
                     run.content_end = content_end;
+                    let sole = run.sole_child().map(|child| {
+                        let child_end = child.end.unwrap_or(child.tag_end);
+                        (
+                            child.field,
+                            child.span,
+                            child.start..child.tag_end,
+                            child.tag_end..child.content_end.unwrap_or(child_end),
+                            child.start..child_end,
+                            child.style_name.clone(),
+                        )
+                    });
                     let text = run.text.finish();
-                    if run.kind != RunKind::Field || !text.is_empty() {
+                    let mut kind = run.kind;
+                    let mut field = None;
+                    let mut inner_span = None;
+                    match sole {
+                        // A span holding one field is that field, formatted
+                        // (record 0316).
+                        Some((true, _, tag, content, range, _))
+                            if kind == RunKind::Span && !text.is_empty() =>
+                        {
+                            kind = RunKind::Field;
+                            field = Some(WrappedField {
+                                range,
+                                start_tag: tag,
+                                content,
+                            });
+                        },
+                        // A link holding one span carries that span's
+                        // formatting.
+                        Some((_, true, tag, _, _, style)) if kind == RunKind::Link => {
+                            inner_span = Some((tag, style));
+                        },
+                        _ => {},
+                    }
+                    let tag_end = if run.content_start > run.start {
+                        run.content_start
+                    } else {
+                        end
+                    };
+                    if kind != RunKind::Field || !text.is_empty() {
                         paragraph.runs.push(Run {
-                            kind: run.kind,
+                            kind,
                             range: run.start..end,
                             content: run.content_start..run.content_end.max(run.content_start),
+                            start_tag: run.start..tag_end,
                             style_name: run.style_name,
                             href: run.href,
                             text,
+                            field,
+                            inner_span,
                         });
                     }
                 }
@@ -1222,7 +1342,21 @@ impl Scanner<'_> {
                     }
                 }
             },
-            Frame::Link | Frame::RowGroup | Frame::InRun | Frame::Opaque => {},
+            Frame::InRun | Frame::Opaque => {
+                // The first direct child of a run closes.
+                if self.parent() == Some(Frame::Run)
+                    && let Some(child) = self
+                        .paragraph
+                        .as_mut()
+                        .and_then(|paragraph| paragraph.run.as_mut())
+                        .and_then(|run| run.child.as_mut())
+                    && child.end.is_none()
+                {
+                    child.content_end = Some(content_end);
+                    child.end = Some(end);
+                }
+            },
+            Frame::Link | Frame::RowGroup => {},
         }
         Ok(())
     }

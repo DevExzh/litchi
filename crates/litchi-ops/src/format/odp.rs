@@ -51,6 +51,9 @@ struct OdpState {
     /// The automatic styles of `content.xml`, indexed on first use (record
     /// 0308).
     styles: OnceLock<litchi_odp::scene::AutomaticStyles>,
+    /// The common styles of `styles.xml` (or the flat document), indexed
+    /// on first use (record 0316).
+    common_styles: OnceLock<litchi_odp::scene::CommonStyles>,
     /// Master pages, layouts and annotations, each parsed on first use.
     masters: OnceLock<Vec<litchi_odp::master::Summary>>,
     layouts: OnceLock<Vec<litchi_odp::layout::Layout>>,
@@ -155,6 +158,7 @@ impl Odp {
             odf_options,
             scene: OnceLock::new(),
             styles: OnceLock::new(),
+            common_styles: OnceLock::new(),
             masters: OnceLock::new(),
             layouts: OnceLock::new(),
             annotations: OnceLock::new(),
@@ -190,6 +194,7 @@ impl Odp {
                 odf_options: shared.odf_options,
                 scene: OnceLock::new(),
                 styles: OnceLock::new(),
+                common_styles: OnceLock::new(),
                 masters: OnceLock::new(),
                 layouts: OnceLock::new(),
                 annotations: OnceLock::new(),
@@ -354,6 +359,19 @@ impl Odp {
             .automatic_styles(self.content_xml()?)
             .map_err(core_error)?;
         Ok(self.0.styles.get_or_init(|| styles))
+    }
+
+    /// The common styles of the snapshot, indexed on first use (record
+    /// 0316): what automatic styles inherit through their parents.
+    pub(crate) fn common_styles(&self) -> Result<&litchi_odp::scene::CommonStyles> {
+        if let Some(styles) = self.0.common_styles.get() {
+            return Ok(styles);
+        }
+        let styles = match self.styles_xml()? {
+            Some(xml) => litchi_odp::scene::CommonStyles::parse(xml).map_err(core_error)?,
+            None => litchi_odp::scene::CommonStyles::default(),
+        };
+        Ok(self.0.common_styles.get_or_init(|| styles))
     }
 
     /// The master pages, listed by identity on first use.

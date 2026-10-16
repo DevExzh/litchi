@@ -75,6 +75,26 @@ impl TextProperties {
             .or(self.font_name.as_deref())
     }
 
+    /// Fill each property this style leaves unset from `parent`, the style
+    /// it inherits from. The font is one property: a `style:font-name` or a
+    /// `fo:font-family` here hides both of the parent's.
+    pub fn inherit(&mut self, parent: &Self) {
+        let fill = |field: &mut Option<String>, value: &Option<String>| {
+            if field.is_none() {
+                field.clone_from(value);
+            }
+        };
+        fill(&mut self.font_weight, &parent.font_weight);
+        fill(&mut self.font_style, &parent.font_style);
+        fill(&mut self.underline, &parent.underline);
+        fill(&mut self.font_size, &parent.font_size);
+        fill(&mut self.color, &parent.color);
+        if self.font_name.is_none() && self.font_family.is_none() {
+            self.font_name.clone_from(&parent.font_name);
+            self.font_family.clone_from(&parent.font_family);
+        }
+    }
+
     /// Whether every property `edit` sets already has that value here.
     pub(crate) fn satisfies(&self, edit: &TextPropertyEdit) -> bool {
         edit.bold.is_none_or(|bold| self.bold() == Some(bold))
@@ -199,9 +219,154 @@ impl AutomaticStyles {
         Some(self.get("text", run.style_name()?)?.text_properties())
     }
 
+    /// The character properties the style `family`/`name` resolves to
+    /// (record 0316): its own, then those of its parents through
+    /// `style:parent-style-name` (an automatic style's parent is looked up
+    /// here, then in `common`), then the family's default style
+    /// (`style:default-style`). A missing parent ends the chain, and a
+    /// cycle is cut after 32 styles.
+    #[must_use]
+    pub fn resolve(
+        &self,
+        common: &CommonStyles,
+        family: &str,
+        name: Option<&str>,
+    ) -> TextProperties {
+        let mut resolved = TextProperties::default();
+        let mut next = name.map(str::to_owned);
+        let mut automatic = true;
+        for _ in 0..32 {
+            let Some(current) = next.take() else {
+                break;
+            };
+            let style = if automatic {
+                self.get(family, &current)
+                    .or_else(|| common.styles.get(family, &current))
+            } else {
+                common.styles.get(family, &current)
+            };
+            let Some(style) = style else {
+                break;
+            };
+            // Automatic styles name common styles as parents.
+            automatic = automatic && self.get(family, &current).is_some_and(|own| own == style);
+            resolved.inherit(&style.text);
+            next.clone_from(&style.parent);
+        }
+        if let Some(default) = common.styles.get(family, "") {
+            resolved.inherit(&default.text);
+        }
+        resolved
+    }
+
+    /// The character properties a paragraph's style resolves to
+    /// ([`Self::resolve`], `paragraph` family).
+    #[must_use]
+    pub fn resolve_paragraph(
+        &self,
+        common: &CommonStyles,
+        paragraph: &super::Paragraph,
+    ) -> TextProperties {
+        self.resolve(common, "paragraph", paragraph.style_name())
+    }
+
+    /// The character properties a run's own style resolves to: a span's, a
+    /// formatted field's, or a link's text span over its link style; a
+    /// plain-text run and a bare field have none.
+    #[must_use]
+    pub fn resolve_run(&self, common: &CommonStyles, run: &super::Run) -> TextProperties {
+        match run.kind() {
+            super::RunKind::Span | super::RunKind::Field if run.style_name().is_some() => {
+                self.resolve(common, "text", run.style_name())
+            },
+            super::RunKind::Link => {
+                let mut resolved = match run.link_text_style_name() {
+                    Some(name) => self.resolve(common, "text", Some(name)),
+                    None => TextProperties::default(),
+                };
+                if run.style_name().is_some() {
+                    resolved.inherit(&self.resolve(common, "text", run.style_name()));
+                }
+                resolved
+            },
+            _ => TextProperties::default(),
+        }
+    }
+
     /// Whether a style of any family has `name`.
     pub(crate) fn has_name(&self, name: &str) -> bool {
         self.styles.iter().any(|style| style.name == name)
+    }
+}
+
+/// The common styles of a presentation: the `style:style` and
+/// `style:default-style` children of `office:styles`, in `styles.xml` or a
+/// flat document. Automatic styles name them as parents, and
+/// [`AutomaticStyles::resolve`] reads formatting through them (record
+/// 0316). A family's default style is indexed under the empty name.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CommonStyles {
+    styles: AutomaticStyles,
+}
+
+impl CommonStyles {
+    /// Index the common styles of `xml`, a `styles.xml` part or a flat
+    /// `office:document`. A document without `office:styles` has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::InvalidFormat`] for malformed XML.
+    pub fn parse(xml: &str) -> Result<Self> {
+        use quick_xml::events::Event;
+        use quick_xml::name::ResolveResult;
+
+        const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+        let invalid = |message: String| Error::InvalidFormat(message);
+        // Offsets are into `xml`; the reader starts after a byte-order mark.
+        let (base, body) = match xml.strip_prefix('\u{feff}') {
+            Some(rest) => ('\u{feff}'.len_utf8(), rest),
+            None => (0, xml),
+        };
+        let mut reader = quick_xml::NsReader::from_str(body);
+        let mut prefixes = super::Prefixes::default();
+        let mut depth = 0_usize;
+        let mut range: Option<Range<usize>> = None;
+        loop {
+            let start =
+                usize::try_from(reader.buffer_position()).map_or(usize::MAX, |at| base + at);
+            let (resolved, event) = reader
+                .read_resolved_event()
+                .map_err(|error| invalid(format!("invalid ODP styles XML: {error}")))?;
+            let office = matches!(resolved, ResolveResult::Bound(namespace) if namespace.as_ref() == OFFICE_NS);
+            let end = usize::try_from(reader.buffer_position()).map_or(usize::MAX, |at| base + at);
+            match event {
+                Event::Start(element) => {
+                    if depth == 0 {
+                        prefixes = super::scan::root_prefixes(&element)?;
+                    } else if depth == 1 && office && element.local_name().as_ref() == b"styles" {
+                        range = Some(end..end);
+                    }
+                    depth += 1;
+                },
+                Event::End(element) => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 1
+                        && office
+                        && element.local_name().as_ref() == b"styles"
+                        && let Some(open) = &mut range
+                    {
+                        open.end = start;
+                        break;
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        let range = range.filter(|range| range.end >= range.start);
+        Ok(Self {
+            styles: parse(xml, range, &prefixes)?,
+        })
     }
 }
 
@@ -226,6 +391,7 @@ pub(crate) fn parse(
         .get(range.clone())
         .ok_or_else(|| invalid("ODP automatic styles are outside the content".to_string()))?;
     let qualified = |prefix: &str, local: &str| format!("{prefix}:{local}");
+    let default_style = qualified(style, "default-style");
     let names = [
         qualified(style, "style"),
         qualified(style, "text-properties"),
@@ -274,7 +440,7 @@ pub(crate) fn parse(
                 let empty = end > start && xml.as_bytes().get(end - 2) == Some(&b'/');
                 let name = element.name();
                 let name = name.as_ref();
-                if depth == 0 && name == names[0].as_bytes() {
+                if depth == 0 && (name == names[0].as_bytes() || name == default_style.as_bytes()) {
                     let mut started = AutomaticStyle {
                         range: start..end,
                         start_tag: start..end,

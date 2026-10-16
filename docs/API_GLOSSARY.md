@@ -2504,3 +2504,25 @@ POI's `AnchorType` and ECMA-376 `ST_EditAs`; wire values are unchanged.
 
 The `xls-minimal` profile bans the old spellings. See
 [0316](unified-ops/0316-xls-odp-structural-follow-ups.md).
+
+## ODP character formatting through styles, links and fields (record 0316)
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_odp::scene::CommonStyles::parse` | Indexes `office:styles` of `styles.xml` or a flat document, a family's `style:default-style` under the empty name | ✅ 0316 |
+| `litchi_odp::scene::AutomaticStyles::{resolve, resolve_paragraph, resolve_run}` | Character properties through `style:parent-style-name` (automatic, then common styles) and the family's default style; a link's text span over its link style | ✅ 0316 |
+| `litchi_odp::scene::TextProperties::inherit` | Fills unset properties from a parent; the font is one property | ✅ 0316 |
+| `litchi_odp::scene::Run::link_text_style_name` | The style of the one `text:span` a link's content is | ✅ 0316 |
+| `RunKind::Field` for a `text:span` holding one field with text | The span's style formats the field; `Change::SetFieldText` rewrites the field inside it | ✅ 0316 |
+| `Change::SetTextProperties` on link and field runs | A link keeps its link style and its content span carries the formatting; a bare field is wrapped in a span | ✅ 0316 |
+
+Unified ODP `shape`, `placeholder`, `tc` and `notes` nodes read and set
+`bold`, `italic`, `underline`, `size`, `color` and `font` as the value every
+run of their text shares; paragraph and run reads resolve their style chain
+through common styles, a run over its paragraph.
+
+## XLS worksheet repairs (record 0316)
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_xls::WorksheetDefect::{ZoomLevel, SharedFormulaFlag}`, `Defect::Worksheet` | Excel-compatible repairs under every `Leniency`: a WINDOW2 zoom outside `10..=400` reads as the default; a stale `fShrFmla` on a formula with its own tokens is ignored | ✅ 0316 |
