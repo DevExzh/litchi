@@ -2,7 +2,7 @@
 """Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0310 (`docs/unified-ops/02[4-9]*.md`, `03[01]*.md`)
+operations records 0249-0312 (`docs/unified-ops/02[4-9]*.md`, `03[01]*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -39,9 +39,9 @@ Conventions:
 * Before/after-build records (0250, 0263, 0268, 0289, 0290, 0293) compare
   builds, not unified with leaf: comparison "after/before", budget 1.05.
 
-Records 0285-0310 (record 0294 extended the tool to 0302; record 0306
+Records 0285-0312 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
-0305, 0309 and 0310 parsers) are collected
+0305, 0309, 0310, 0311 and 0312 parsers) are collected
 only when their record file is on this tree; the Markdown lists every
 record of that range, absent ones as "not on this tree", so the tool can
 be rerun unchanged after later merges.
@@ -982,7 +982,7 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 310)
+FOLLOW_RANGE = (285, 312)
 
 
 def record_file(record: str):
@@ -1297,7 +1297,11 @@ def numbers_docs(record, docs, paths):
     """numbers_unified_bench scenarios (records 0297, 0301, 0302)."""
     out = []
     for name, items in group_cases(docs, lambda s: s["name"]).items():
-        op, label, budget = NUMBERS_SCEN[name]
+        if name in NUMBERS_SCEN:
+            op, label, budget = NUMBERS_SCEN[name]
+        else:
+            # Record 0309's element writes, against its bar.
+            (op, label), budget = NUMBERS_0309[name], ELEMENT_0309
         fixture = Path(items[0]["fixture"]).name
         out.append(row(record, "numbers", op, label, fixture,
                        us(med(i["leaf_median_ns"] for i in items)),
@@ -1459,7 +1463,11 @@ def p0306():
 DOCX_LARGE = (("set", "auto", "text set, default (source-backed) owner"),
               ("set", "eager", "text set, eager owner"),
               ("add", "auto", "paragraph add, default (source-backed) owner"),
-              ("add", "eager", "paragraph add, eager owner"))
+              ("add", "eager", "paragraph add, eager owner"),
+              # Record 0311: legs on a handle already committed from the
+              # default owner.
+              ("set", "committed", "text set, committed handle"),
+              ("add", "committed", "paragraph add, committed handle"))
 
 
 def docx_large(record, paths):
@@ -1477,6 +1485,8 @@ def docx_large(record, paths):
     for op, owner, label in DOCX_LARGE:
         leaf, unified = f"leaf_{op}", f"{owner}_{op}"
         items = [r for r in runs if leaf in r and unified in r]
+        if not items:
+            continue
         out.append(row(record, "docx", op, label, "1,000 paragraphs",
                        med(r[leaf] for r in items), med(r[unified] for r in items),
                        [r[unified] / r[leaf] for r in items], SINGLE,
@@ -1626,6 +1636,44 @@ def text_set_against(record, paths, before_paths, scenarios):
     return out
 
 
+OFFICE_GAPS_0311 = {
+    "doc_text_set": ("doc", "set", "paragraph text set (against the body-text snapshot leaf)"),
+    "doc_package_text_set": ("doc", "set", "paragraph text set (against the Package::edit leaf)"),
+}
+
+
+@needs("0311")
+def p0311():
+    """Record 0311: after legs of docx_large_bench (with its committed-handle
+    legs) and of the office_gaps_bench DOC scenarios."""
+    base = RES / "0311"
+    out = docx_large("0311", trials(base.glob("docx-large-after-*.txt")))
+    paths = trials(base.glob("doc-after-*.jsonl"))
+    for scen, items in group_cases([load_jsonl(p) for p in paths], lambda r: r["scenario"]).items():
+        fmt, op, label = OFFICE_GAPS_0311[scen]
+        out.append(row("0311", fmt, op, label, "",
+                       med(i["native_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items),
+                       [i["ratio"] for i in items], SINGLE, f"office_gaps:{scen}",
+                       src(paths), comparison="unified/native"))
+    return out
+
+
+@needs("0312")
+def p0312():
+    """Record 0312: its keynote_bench, pages_bench and numbers_unified_bench
+    runs (the 0305/0309 scenarios after the lazy iWork tables)."""
+    base = RES / "0312"
+    out = iwork_summary("0312", trials(base.glob("keynote-*.jsonl")),
+                        lambda f, s: "multi-slide.key", {**KEYNOTE_SCEN, **IWORK_0309})
+    out += iwork_summary("0312", trials(base.glob("pages-*.jsonl")),
+                         lambda f, s: "10,000-paragraph document" if s.startswith("batch_")
+                         else "basic.pages", IWORK_0309)
+    numbers = trials(base.glob("numbers-*.json"))
+    out += numbers_docs("0312", [load_json(p)["scenarios"] for p in numbers], numbers)
+    return out
+
+
 @needs("0310")
 def p0310():
     """Record 0310: `merged/` re-measures every harness of an open miss on
@@ -1662,7 +1710,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
-           p0306, p0309, p0310]
+           p0306, p0309, p0310, p0311, p0312]
 
 
 # ---------------------------------------------------------------- merge
@@ -1845,7 +1893,7 @@ def to_md(rows, conflicts, agreements, cur):
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
       "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
       "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306; "
-      "record 0310 those of 0305, 0309 and 0310.")
+      "record 0310 those of 0305, 0309, 0310, 0311 and 0312.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "

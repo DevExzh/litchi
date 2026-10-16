@@ -2,7 +2,8 @@
 
 - Status: implemented on `uo2/miss-sweep`, cut from `feat/unified-ops-api`
   at `0f3d8158cb`; trunk `8f5569d0d8` (records 0305, 0308, 0309) merged at
-  `b53ed53006`.
+  `b53ed53006`, then trunk `1100472b75` (records 0311, 0312) at
+  `6dd73bb204`.
 - Date: 2026-10-16
 - Input: the 102 open misses of `tools/unified_bench_matrix.py`
   (`results/0289/bench-matrix.{tsv,md}` at `0f3d8158cb`), each citing a
@@ -27,19 +28,19 @@
 |---|---:|
 | matrix at `0f3d8158cb` | **102** |
 | fixed by this record: XLS positional axis writes (G3, §3.3) | −3 |
-| fixed by record 0305, merged during this work: DOCX single paragraph `set` (now 1.049–1.050), Keynote open + `get` (1.033–1.038), Numbers open + `get` (1.047–1.058, inside the +20 µs arm) | −3 |
+| fixed by records merged during this work: DOCX single paragraph `set` (0305; 1.049–1.050 in `merged/`), Keynote open + `get` and Numbers open + `get` (0305, then 0312: 1.034–1.042 and 1.047) | −3 |
 | no longer reproduce on trunk: DOCX table-cell `align` and `text` (1.08), RTF dense-run add of 10,000 groups (1.01), record 0304's ODT text-set reading (1.000–1.004 against 0304's own before runs) | −4 |
-| rows the new 0305 and 0309 parsers add: DOCX 1,000-paragraph set and add (0305 §4.5), Keynote and Pages table-cell writes (0309 §6) | +4 |
+| rows the new 0305, 0309, 0311 and 0312 parsers add: DOCX 1,000-paragraph set and add (0305 §4.5, fixed by 0311: 0.54 and 0.40–0.47), Keynote and Pages table-cell writes (0309 §6, fixed by 0312: 1.014–1.019), the DOC body-text comparison (0311 §4.2, 1.12–1.27) | +1 |
 | 0305's new RTF route G (fan-out with `&Query`), three single-target families | +3 |
 | RTF single sets at the bar: `add run (paragraphs, middle)` 1.103 and `run_text (separate_paragraphs)` 1.100, which read 1.05–1.09 and 1.09–1.12 in this record's earlier runs | +2 |
-| **matrix after this record** (merged tree) | **101** |
+| **matrix after this record** (merged tree) | **98** |
 
 G1 (XLSB) and G2 (XLSX header rows) are fixed in what they cost — 1.05–5.1×
 less time, one source check per match as the owner's rule requires — but
 stay open misses: what remains is the G4/G5 residual against a borrowed or
 typed leaf leg. Every open miss cites a 0310 measurement and its root-cause
 group (§2), or the measurement and explanation of the record that owns it
-(0305 §4.5, 0309 §6). The two before/after-build rows 0310 cannot rebuild
+(0311 §4.2 for its DOC comparison). The two before/after-build rows 0310 cannot rebuild
 (0263, 0290) carry 0310's note.
 
 ## 2. The open misses by root cause
@@ -58,13 +59,14 @@ tree (§4.3).
 | **G7** DOCX queries | 3 | `format/docx` `Children::next` checks the source per yielded child inside fenced steps (491 version reads over 11 queries with no match); the 176-byte DOCX node | follow-up for the OOXML owner |
 | **G8** XLS `get` and scans | 16 | Per-call text-path resolution (3.57 K instructions per eager `get` against 1.18 K native: vocabulary 0.75 K, child steps 0.73 K, validation and cell parsing 0.34 K) and, on the positional owner, the per-match and `View::text` checks | inherent at this design; follow-up: cache the parsed sheet step |
 | **G9** RTF single-target writes | 14 | Fixed costs one target cannot amortize: 90.6 K instructions per edit-closure set against the native 80.5 K, the excess in property coercion (≈0.9 K per length string), planning, the source index and the transaction | open; one case no longer reproduces; follow-up: a typed-props route |
-| **G10** DOCX single-op sets | 3 | 0302 §4.1 (the leaf's own commit, L1 misses) | the two table-cell sets meet on trunk (1.06–1.08); 0305 fixed the paragraph set (1.049–1.050 merged); 0305's 1,000-paragraph set and add (1.46–1.58) are its §4.5 |
-| **G11** iWork opens | 4 | Eager trees (record 0305) and Keynote's bytes copy (`Iwork::detect_bytes` copies the owned `Vec`, 500 KB) | 0305 fixed Keynote open + get; Numbers open + get meets the +20 µs arm; Keynote bytes open still misses (follow-up for the iWork owner) |
+| **G10** DOCX single-op sets | 3 | 0302 §4.1 (the leaf's own commit, L1 misses) | the two table-cell sets meet on trunk (1.06–1.08); 0305 fixed the paragraph set (1.049–1.050 merged); 0305's 1,000-paragraph set and add (its §4.5) were fixed by 0311 |
+| **G11** iWork opens | 4 | Eager trees (record 0305) and Keynote's bytes copy (`Iwork::detect_bytes` copies the owned `Vec`, 500 KB) | 0305 and 0312 fixed both open + get rows; Keynote bytes open still misses (follow-up for the iWork owner) |
 | **G12** after/before readings | 3 | Wall-clock readings of before/after builds with no added work: 0304 ODT text set (callgrind +0.22 %), 0290 ODP metadata (+7 ns, the requested string), 0263 XLS get (+30 ns on a 10 ns timer step) | the 0304 reading no longer reproduces (1.000–1.004 against 0304's before runs); the other two cannot be rebuilt and carry 0310's note |
 
-Counts by group, merged tree (101): G1 4, G2 2, G3 0, G4 25, G5 16,
-G6 9, G7 3, G8 16, G9 18, G10 2 (0305's large-document set and add), G11 4
-(Keynote bytes open ×2, Keynote and Pages table cells, 0309), G12 2.
+Counts by group after this record (98): G1 4, G2 2, G3 0, G4 25, G5 16,
+G6 9, G7 3, G8 16, G9 18 (0305's route G added three), G10 0, G11 2
+(Keynote bytes open), G12 2, and 0311's DOC body-text comparison (its
+§4.2).
 
 ## 3. Fixes
 
@@ -159,7 +161,11 @@ reading is layout or host noise, as 0287 §5 found for similar readings.
 ### 4.3 The merged tree (`merged/`)
 
 Two runs of every harness on the merged tree, the rows the matrix parses
-(ratio ranges over the runs):
+(ratio ranges over the runs). They were taken at `b53ed53006`, before
+records 0311 and 0312 merged. Those two change no query or XLS/RTF route:
+0311 changes DOCX and DOC publication (`litchi-opc` overlay audits; the
+DOCX rows here already meet) and 0312 the iWork tables, whose own runs
+supersede the 0310 iWork rows in the matrix.
 
 | group | routes | merged |
 |---|---|---:|
@@ -181,10 +187,13 @@ Two runs of every harness on the merged tree, the rows the matrix parses
 - New parsers: **0305** (its keynote, numbers, docx, rtf, pages and
   `docx_large_bench` after legs; `RTF_ROUTES` gains its route G, the fan-out
   passing `&Query`), **0309** (its element writes, against its stated 5 %
-  or 20 µs bar) and **0310** (`merged/`). Record 0308 has no paired
-  measurement and is listed in the notes. The record range runs to 0310.
+  or 20 µs bar), **0310** (`merged/`), **0311** (`docx_large_bench` with
+  its committed-handle legs, the `office_gaps_bench` DOC scenarios) and
+  **0312** (its Keynote, Pages and Numbers runs). Record 0308 has no paired
+  measurement and is listed in the notes. The record range runs to 0312.
 - New curated annotations attach §2's group and measured cause to every
-  open 0310 row, and 0305 §4.5 and 0309 §6's explanations to their misses;
+  open 0310 row, and 0305 §4.5, 0309 §6 and 0311 §4.2's explanations to
+  their records' misses;
   the 0290 and 0263 before/after rows gain 0310's note.
 - `python3 tools/unified_bench_matrix.py --check` exits 0, and no miss lacks
   an explanation.
@@ -253,26 +262,28 @@ By owner. Nothing here is claimed fixed.
 
 ## 8. Gates
 
-On the merged tree (`b53ed53006` + this record), build environment per the
+On the final merged tree (`6dd73bb204` + this record's documents and the
+`fmt` fix below), build environment per the
 rules (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`, one cargo command at a
 time in the memory-capped scopes, test executables pruned between chunks).
 Every exit status was checked (`gates.sh`, its summary in the scratch
-directory).
+directory). The same list also passed on `b53ed53006`, before the second
+merge.
 
 | Command | Exit |
 |---|---:|
-| `cargo fmt --all --check` | 0 |
+| `cargo fmt --all --check` (after `404f635d27`: trunk `1100472b75`'s `tests/iwork_unified.rs` from record 0312 was not formatted) | 0 |
 | `cargo clippy -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features [--features F] --all-targets -- -D warnings`, F = none, xlsx, xlsb, xls, rtf | 0 each |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ops` | 0 |
-| `cargo test -p litchi-ops --all-features` in chunks: `--lib` (920), `--doc` (210), the 137 test targets in five groups (1,249) — includes the query-corpus differential, corpus fidelity, checklist goldens, `path_allocations` | 0 each |
+| `cargo test -p litchi-ops --all-features` in chunks: `--lib` (922), `--doc` (210), the 138 test targets in five groups (1,253) — includes the query-corpus differential, corpus fidelity, checklist goldens, `path_allocations` | 0 each |
 | `cargo test -p litchi-ops --all-features --test capabilities --test registry` (not re-blessed) | 0 |
 | the same with `--no-default-features --features` every litchi-ops feature but `encryption` (not re-blessed) | 0 |
 | `cargo test -p litchi --all-features` (230) | 0 |
 | `cargo test -p litchi-cli --all-features --test officecli_corpus` (not re-blessed) | 0 |
 | `python3 tools/check_crate_boundaries.py` | 0 |
 | `python3 tools/non_iwork_gate.py verify` | 0 |
-| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target/glossary` (40 profiles, 2,306 bans, 227 families) | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target/glossary` (40 profiles, 2,306 bans, 228 families) | 0 |
 | `crates/pyo3-litchi/tests/run_tests.sh` (279 tests) | 0 |
 | `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
 | `python3 tools/unified_bench_matrix.py --check` | 0 |

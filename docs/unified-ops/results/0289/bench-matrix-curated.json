@@ -16,7 +16,7 @@
   "[0306] Parsers added for 0298 (keynote_bench summary), 0301 (numbers structure bench) and 0302 (after legs of its docx, odt, pages, numbers and rtf harnesses; the base legs re-measure states earlier records carry). 0303–0305 are listed as 'not on this tree' until their records merge; rerun the tool after those merges.",
   "[0306] Parsers added for 0303 (pptx_gaps_bench: unified/native in the after build, after/before on the plain paths the base accepts), 0304 (text_set_bench: each after run against the median of the before runs, and ODT unified/leaf) and 0306 (iwork_directory_bench). 0305 is listed as 'not on this tree' until it merges.",
   "[0310] Record 0310 re-measured every open miss's harness on trunk 0f3d8158cb (results/0310/trunk/) and the routes it changes in B A A B order (results/0310/abba/, after legs parsed). Its §2 groups the open misses by root cause (G1–G12); every open miss cites that grouping. Rows it cannot re-measure (before/after builds of 0263 and 0290) carry its note in their explanation.",
-  "[0310] Parsers added for 0305 (after legs of its keynote, numbers, docx, rtf — with its route G, the fan-out passing &Query — pages and docx_large harnesses) and 0309 (its element-write scenarios, against its stated 5 % or 20 µs bar). Records with no paired measurement: 0308 ('performance_claim: none; §7 shows the touched paths')."
+  "[0310] Parsers added for 0305 (after legs of its keynote, numbers, docx, rtf — with its route G, the fan-out passing &Query — pages and docx_large harnesses) and 0309 (its element-write scenarios, against its stated 5 % or 20 µs bar). Records with no paired measurement: 0308 ('performance_claim: none; §7 shows the touched paths'). Record 0310 also added the 0311 (docx_large_bench with its committed-handle legs, the office_gaps_bench DOC scenarios) and 0312 (its keynote, pages and numbers runs) parsers after merging them."
  ],
  "rows": [
   {
@@ -2417,6 +2417,11 @@
    "record": "0310",
    "series": "iwork:keynote:table_cell",
    "explanation": "Record 0310 §2 G11: re-measured on the merged tree 2.0×, as record 0309 §6 found (1.99): resolving …/tr[1]/tc[1] builds the slide's part, which decodes the slide table (select_table_after_inventory) at about the cost of the leaf write. Follow-up (0309): a lazy table part for Keynote slide tables, or reuse of the decoded table between the tree and the write."
+  },
+  {
+   "record": "0311",
+   "series": "office_gaps:doc_text_set",
+   "explanation": "Record 0311 §4.2: 'Unified against the Package::edit leaf it wraps: 1.03–1.04×, inside the single-op budget. The body-text leaf's commit publishes only the next body snapshot. The package commit also parses the published file into the Document the returned package reads … This parse is the commit's validation of the output, so skipping it would weaken the commit. The wall-time gap is larger than the instruction gap because of L1i misses: 12.4 K against 10.8 K per call, from the second parser's code.'"
   }
  ]
 }
