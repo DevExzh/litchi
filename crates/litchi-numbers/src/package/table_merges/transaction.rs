@@ -8,7 +8,6 @@
 
 use std::{fmt, sync::Arc};
 
-use litchi_core::id::generate_guid_bytes;
 use litchi_iwa_archive::package::{EntryEdit, SharedBytes};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::{Archive, Limits, RawMessage, SnappyStream};
@@ -518,12 +517,12 @@ fn rewrite(
         archive_limits.max_archive_bytes(),
         budget,
     )?;
-    let written =
-        merge_wire::rewrite_table_merges(source_payload, after, generate_guid_bytes(), limits)
-            .map_err(|error| {
-                super::charge_attempted(budget, &error);
-                super::map_merge_error(error)
-            })?;
+    let written = merge_wire::rewrite_table_merges_derived(source_payload, after, limits).map_err(
+        |error| {
+            super::charge_attempted(budget, &error);
+            super::map_merge_error(error)
+        },
+    )?;
     budget.charge_wire_report(
         written.report.input_bytes(),
         written.report.fields(),

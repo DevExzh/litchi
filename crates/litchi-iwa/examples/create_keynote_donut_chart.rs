@@ -65,9 +65,9 @@ fn single_output_argument(usage: &'static str) -> Result<String, Box<dyn std::er
 }
 
 fn donut_data() -> litchi_iwa::Result<ChartData> {
-    ChartData::new(
+    Ok(ChartData::new(
         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
         vec!["Revenue".to_owned()],
         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
-    )
+    )?)
 }
