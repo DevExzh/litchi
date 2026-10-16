@@ -332,6 +332,13 @@ impl Namespaces {
         name
     }
 
+    /// How many prefixed bindings are in scope. An element whose content has
+    /// as many as its parent's content declared none of its own, so the two
+    /// share one set of bindings.
+    pub(super) fn bindings(&self) -> usize {
+        self.bindings.len()
+    }
+
     /// Ends the scope of the bindings declared by the element at `depth`.
     #[inline]
     pub(super) fn close(&mut self, depth: usize) {
