@@ -72,9 +72,10 @@ impl<'f> Nav<'f> {
             _ => return Ok(Lookup::NotApplicable),
         };
         Ok(match handle {
-            Some(handle) => {
-                Self::found(Node::new_sheet(file, Sheet::new(handle.position(), handle)))
-            },
+            Some(handle) => Self::found(Node::new_sheet(
+                file,
+                Sheet::new(file, handle.position(), handle),
+            )),
             None => Lookup::Missing,
         })
     }

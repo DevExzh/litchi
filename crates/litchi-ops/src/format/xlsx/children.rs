@@ -400,7 +400,10 @@ impl<'f> Children<'f> {
                         let Some(handle) = SheetHandle::at(file, position)? else {
                             continue;
                         };
-                        return Ok(Some(Node::new_sheet(file, Sheet::new(position, handle))));
+                        return Ok(Some(Node::new_sheet(
+                            file,
+                            Sheet::new(file, position, handle),
+                        )));
                     }
                     if *names && *name < defined_names(file).len() {
                         let index = *name;

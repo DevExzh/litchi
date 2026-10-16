@@ -10,7 +10,7 @@ use litchi_core::selector::{CellRange, CellRef};
 use super::Xls;
 use super::children::Children;
 use super::node::{CellSource, Item, Node, Sheet, display_value, raw_value};
-use super::owner::SheetHandle;
+use super::owner::{Grid, SheetHandle};
 use super::spec::{Kind, SPEC};
 use crate::error::{Code, Error, Result};
 use crate::node::spec::{FormatSpec, GapSpec};
@@ -33,7 +33,10 @@ impl<'f> Nav<'f> {
     }
 
     /// Resolve direct structural coordinates without decoding their payload.
-    /// The native edit inventory supplies cell facts for a coalesced run.
+    /// The native edit inventory supplies cell facts for a coalesced run; a
+    /// row or column named by its number carries no grid (record 0310: the
+    /// layout writer reads only its sheet and index, and building the grid
+    /// read every cell of the worksheet per call on a positional owner).
     pub(super) const fn coordinates(file: &'f Xls) -> Self {
         Self {
             file,
@@ -140,6 +143,29 @@ impl<'f> Nav<'f> {
                     CellSource::Direct(sheet.handle.cell(at)?)
                 },
             )));
+        }
+        if self.coordinates_only {
+            match (kind, select) {
+                (Kind::Row, Select::Number(number)) => {
+                    let index = index(number)?;
+                    return Ok(Self::found(Node::new_row(
+                        self.file,
+                        position,
+                        Grid::coordinates_only(),
+                        index,
+                    )));
+                },
+                (Kind::Column, Select::Number(number)) => {
+                    let index = index(number)?;
+                    return Ok(Self::found(Node::new_column(
+                        self.file,
+                        position,
+                        Grid::coordinates_only(),
+                        index,
+                    )));
+                },
+                _ => {},
+            }
         }
         let grid = sheet.grid()?.clone();
         Ok(match (kind, select) {
@@ -422,7 +448,7 @@ fn column_rect(index: u32) -> (u32, u32, u32, u32) {
     (0, index, u32::MAX, index)
 }
 
-fn joined_text(grid: &super::owner::Grid, rect: (u32, u32, u32, u32)) -> String {
+fn joined_text(grid: &Grid, rect: (u32, u32, u32, u32)) -> String {
     let mut out = String::new();
     for (index, (_, cell)) in grid.cells_in(rect).enumerate() {
         if index > 0 {

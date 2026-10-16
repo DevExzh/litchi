@@ -651,3 +651,103 @@ fn clones_share_one_state() {
         .join()
         .unwrap();
 }
+
+// --- Fence scopes (record 0310) ------------------------------------------
+
+/// A source that counts its version observations and can be changed.
+struct Versioned {
+    bytes: Vec<u8>,
+    revision: std::sync::atomic::AtomicU64,
+    versions: AtomicUsize,
+}
+
+impl ReadAt for Versioned {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset).unwrap_or(usize::MAX);
+        if output.is_empty() || offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let count = output.len().min(self.bytes.len() - offset);
+        output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.versions.fetch_add(1, Ordering::SeqCst);
+        Ok(SourceVersion::new(
+            0x584c_5342_4f50_5301,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
+}
+
+/// Observations of `selector`'s second full run over a generated `Data`
+/// sheet of `rows` numbers (1, 2, ...), and its match count.
+fn observed_query(rows: u32, selector: &str) -> (usize, usize) {
+    let mut sheet = xlsb::writer::MutableWorksheet::new("Data");
+    for row in 0..rows {
+        sheet.set_cell(row, 0, f64::from(row + 1));
+    }
+    let mut builder = xlsb::Builder::new();
+    builder.add_worksheet(sheet);
+    let source = Arc::new(Versioned {
+        bytes: builder.build().unwrap().to_bytes().unwrap(),
+        revision: std::sync::atomic::AtomicU64::new(0),
+        versions: AtomicUsize::new(0),
+    });
+    let workbook = xlsb::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let owner = XlsbOwner::Source(SourceWorkbook::new(workbook).unwrap());
+    let file = crate::File::Xlsb(Xlsb::with_owner(
+        owner,
+        Metadata::default(),
+        MetadataRepairs::default(),
+        &OpenOptions::new(),
+    ));
+    let matches = file.query(selector).unwrap().count();
+    let before = source.versions.load(Ordering::SeqCst);
+    assert_eq!(file.query(selector).unwrap().count(), matches);
+    (matches, source.versions.load(Ordering::SeqCst) - before)
+}
+
+/// Record 0310: inside a query step the node reads the step makes (a cell's
+/// value for `cell[value>N]`, its text) share the step's closing check, as
+/// the XLSX adapter's do. Every match is still checked (owner decision
+/// 2026-10-14): ten more cells cost ten more observations when each
+/// matches, and none when none does. A change between two pulls still
+/// fails the next pull.
+#[test]
+fn query_steps_share_one_check_with_their_node_reads() {
+    for (selector, per_cell) in [("cell", 1), ("cell[value>0]", 1), ("cell[value>1000]", 0)] {
+        let (small_matches, small) = observed_query(10, selector);
+        let (large_matches, large) = observed_query(20, selector);
+        assert_eq!(large_matches - small_matches, 10 * per_cell, "{selector}");
+        assert_eq!(
+            large - small,
+            10 * per_cell,
+            "{selector}: {small} -> {large}"
+        );
+    }
+
+    let source = Arc::new(Versioned {
+        bytes: fixture("xlsb/Simple.xlsb"),
+        revision: std::sync::atomic::AtomicU64::new(0),
+        versions: AtomicUsize::new(0),
+    });
+    let workbook = xlsb::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let owner = XlsbOwner::Source(SourceWorkbook::new(workbook).unwrap());
+    let file = crate::File::Xlsb(Xlsb::with_owner(
+        owner,
+        Metadata::default(),
+        MetadataRepairs::default(),
+        &OpenOptions::new(),
+    ));
+    let mut matches = file.query("sheet, cell").unwrap();
+    assert!(matches.next().unwrap().is_ok());
+    source.revision.store(1, Ordering::SeqCst);
+    assert_eq!(matches.next().unwrap().unwrap_err().code(), Code::IoError);
+    assert!(matches.next().is_none());
+}

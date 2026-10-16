@@ -1,0 +1,63 @@
+== rtf-1.json 10:20:20 load 4.35
+== xls-1.json 10:20:22 load 4.35
+== ods-1.json 10:20:23 load 4.35
+== odt-1.txt 10:20:38 load 5.09
+== docx-fanout-1.json 10:20:39 load 5.09
+== docx-elem-1.json 10:20:39 load 5.09
+== xls-p0-1.json 10:20:43 load 5.32
+== checklist-1.jsonl 10:21:17 load 6.27
+== rtf-2.json 10:21:17 load 6.27
+== xls-2.json 10:21:18 load 6.27
+== ods-2.json 10:21:20 load 6.41
+== odt-2.txt 10:21:35 load 6.83
+== docx-fanout-2.json 10:21:36 load 6.83
+== docx-elem-2.json 10:21:36 load 6.83
+== xls-p0-2.json 10:21:39 load 6.83
+== checklist-2.jsonl 10:22:13 load 7.46
+done
+== 1 xlsx_1000_bytes 10:33:08 load 4.39
+== 1 xlsx_1000_file 10:33:26 load 4.54
+== 1 xlsx_50000_bytes 10:33:50 load 4.46
+== 1 xlsx_50000_file 10:34:31 load 5.69
+== 1 xlsb_1000_bytes 10:35:16 load 5.12
+== 1 xlsb_1000_file 10:35:20 load 5.12
+== 1 pptx_small_bytes 10:35:33 load 5.27
+== 1 pptx_small_file 10:35:35 load 5.17
+== 1 pptx_large_bytes 10:35:38 load 5.17
+== 1 pptx_large_file 10:35:42 load 5.15
+== 1 docx_drawing_file 10:35:46 load 5.06
+== 1 docx_saut_bytes 10:35:49 load 5.06
+== 1 docx_saut_file 10:35:50 load 4.97
+== 1 all xlsx_1000_bytes 10:35:52 load 4.97
+== 1 all pptx_large_bytes 10:36:10 load 4.78
+done 1
+== 2 xlsx_1000_bytes 10:36:14 load 4.78
+== 2 xlsx_1000_file 10:36:32 load 4.56
+== 2 xlsx_50000_bytes 10:36:56 load 4.52
+== 2 xlsx_50000_file 10:37:36 load 4.75
+== 2 xlsb_1000_bytes 10:38:22 load 5.68
+== 2 xlsb_1000_file 10:38:25 load 6.02
+== 2 pptx_small_bytes 10:38:39 load 6.56
+== 2 pptx_small_file 10:38:41 load 6.75
+== 2 pptx_large_bytes 10:38:44 load 6.75
+== 2 pptx_large_file 10:38:47 load 6.93
+== 2 docx_drawing_file 10:38:52 load 7.10
+== 2 docx_saut_bytes 10:38:55 load 7.33
+== 2 docx_saut_file 10:38:56 load 7.33
+== 2 all xlsx_1000_bytes 10:38:58 load 7.33
+== 2 all pptx_large_bytes 10:39:16 load 6.89
+done 2
+== unified-rtf-add-1 10:48:51 load 6.08
+== unified-rtf-layout-1 10:48:52 load 6.08
+== unified-rtf-run-add-1 10:48:55 load 5.91
+== unified-rtf-batch-set-1 10:49:14 load 5.42
+== unified-rtf-add-2 10:50:14 load 5.80
+== unified-rtf-layout-2 10:50:14 load 5.80
+== unified-rtf-run-add-2 10:50:17 load 5.57
+== unified-rtf-batch-set-2 10:50:36 load 5.03
+== iwork-directory-1.jsonl 12:50:05 load 5.13
+== keynote-1.jsonl 12:50:19 load 5.30
+== numbers-1.json 12:51:21 load 3.83
+== iwork-directory-2.jsonl 12:51:21 load 3.83
+== keynote-2.jsonl 12:51:35 load 3.64
+== numbers-2.json 12:52:37 load 3.84

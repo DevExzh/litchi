@@ -27,6 +27,9 @@
 //!
 //! `LITCHI_XLS_BENCH_SAMPLES` (default nine) and `LITCHI_XLS_BENCH_REPEATS`
 //! (operations per sample, default chosen per case) tune the run.
+//! `LITCHI_XLS_BENCH_ONLY` (a scenario name), `LITCHI_XLS_BENCH_OWNER`
+//! (`eager` or `positional`) and `LITCHI_XLS_BENCH_CELLS` (record 0310) keep
+//! only the matching cases, for profiling one of them.
 
 #[cfg(all(feature = "xls", any(unix, windows)))]
 mod enabled {
@@ -80,14 +83,26 @@ mod enabled {
 
     pub(super) fn run() {
         let samples = env("LITCHI_XLS_BENCH_SAMPLES").unwrap_or(DEFAULT_SAMPLES);
+        let only = std::env::var("LITCHI_XLS_BENCH_ONLY").ok();
+        let only_owner = std::env::var("LITCHI_XLS_BENCH_OWNER").ok();
+        let only_cells = env("LITCHI_XLS_BENCH_CELLS");
         let mut cases = Vec::new();
         for &cells in CASES {
+            if only_cells.is_some_and(|only| only != cells) {
+                continue;
+            }
             let bytes = workbook(cells);
             for owner in ["eager", "positional"] {
+                if only_owner.as_deref().is_some_and(|only| only != owner) {
+                    continue;
+                }
                 let (native, unified, _guard) = open(&bytes, owner == "positional");
                 let repeats =
                     env("LITCHI_XLS_BENCH_REPEATS").unwrap_or(if cells > 1_000 { 20 } else { 200 });
                 for &scenario in SCENARIOS {
+                    if only.as_deref().is_some_and(|only| only != scenario) {
+                        continue;
+                    }
                     let identical = native_leg(&native, scenario)
                         .to_bytes()
                         .expect("native bytes")

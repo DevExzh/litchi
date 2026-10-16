@@ -5,6 +5,9 @@
 //! clock.  The unified side deliberately uses one direct path set per target;
 //! its commit diagnostics prove whether compatible calls shared one native
 //! commit.
+//!
+//! `RTF_BATCH_SET_COUNT` (record 0310) keeps only the cases of one target
+//! count.
 
 #[cfg(feature = "rtf")]
 use litchi_core::Position;
@@ -33,10 +36,18 @@ use std::time::Instant;
 #[cfg(feature = "rtf")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     const COUNTS: [usize; 5] = [1, 10, 100, 1_000, 10_000];
+    // Record 0310: `RTF_BATCH_SET_COUNT` keeps one target count, for
+    // profiling the fixed cost of the single-target cases.
+    let only_count = std::env::var("RTF_BATCH_SET_COUNT")
+        .ok()
+        .and_then(|count| count.parse::<usize>().ok());
     let mut cases = Vec::new();
     for family in Family::ALL {
         for &shape in family.shapes() {
             for count in COUNTS {
+                if only_count.is_some_and(|only| only != count) {
+                    continue;
+                }
                 let case = Prepared::new(family, shape, count)?;
                 cases.push(run_case(&case)?);
                 assert_eq!(case.native.to_bytes()?, case.bytes);

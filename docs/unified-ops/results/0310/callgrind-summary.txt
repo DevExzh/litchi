@@ -1,0 +1,62 @@
+Record 0310 — callgrind counts (valgrind 3.26, `perf` is blocked on this host).
+Binaries: base = trunk 0f3d8158cb, final = this record's code (binaries.sha256);
+`unified-query profile <route> <calls>` toggles on its `profiled` loop, the
+litchi-ops examples on the named leg function. Counts are per process unless
+stated; "version reads" are calls of the source's `ReadAt::version`
+(an fstat on a file source).
+
+== Source observations in full queries (base binary, 1 warm-up + 5 profiled queries)
+xlsx_1000_file_all_cell             FileSource::version 18,112   ≈ 1.0 per match (3,003 matches)
+xlsb_1000_file_all_cell             FileSource::version 36,220   ≈ 2.0 per match
+xlsb_1000_file_all_cell_value_gt    FileSource::version 78,256   ≈ 4.3 per candidate cell (3,003 cells, 500 matches)
+  callers of SourceBackedWorkbook::source_version: XlsbOwner::finish 36,036, the walker's
+  per-match check 3,006, Xlsb::catalog 12; each source_version read the version twice
+  (preflight_package + postflight_package).
+xlsx_50000_file_all_row_header_gt   FileSource::version 350,068 for ONE query over 50,000 rows (7 per row)
+  callers: SourceBackedPackage::source_version 250,021 (SourceWorksheet::grid 100,000,
+  ::resident_store 99,999, the per-match check 50,002), SourceBackedPackage::part 100,014
+  (SourceWorksheet::store); Sheet::grid re-entered the leaf's grid() twice per probed row.
+docx_saut_file_all_run_bold (0 matches, 11 queries)  FileSource::version 491;
+  litchi_docx Package::check_source 418, of which Children::next 396.
+
+Unit tests on the final code (counting ReadAt sources, second of two identical queries):
+  XLSB  10 → 20 rows: cell +10, cell[value>0] +10, cell[value>1000] +0 observations
+        (base code: cell +20)
+  XLSX  header-row query, 10 → 20 matching rows: +10 observations (base code: +40)
+
+== Instructions, final against base (unified-query profile, 5 queries)
+pptx_large_file_all_shape   118,618,018 → 115,967,322 (−2.2 %)   PPTX code unchanged
+pptx_large_bytes_all_shape  112,167,048 → 109,516,519 (−2.4 %)
+xlsx_1000_bytes_all_cell     10,079,371 →  10,079,371 (equal)
+Per match: XLSX bytes ≈ 671, PPTX bytes ≈ 1,068 instructions.
+
+== XLS positional row_height, 100 cells (xls_p0_write_bench, 101 calls per leg, --cache-sim=yes)
+unified 298,617,008 Ir   native 283,810,748 Ir   (+5.2 %)
+  path::resolve::get 13,772,424 → Nav::child → SheetHandle::grid 13,151,394
+  (10,100 VisitCells::accept, Cell::from_record, CellValue clones, 404 memsets of ≈32 KB):
+  ≈130 K instructions per call to resolve /Data/row[1]. Syscalls per run equal
+  (FileSource::version 4,078 and read_at 802 calls in both legs).
+
+== XLS eager get + View::text, 1,000 cells (xls_read_bench, 6,000 calls per leg)
+unified 21,418,368 Ir (3.57 K per call)   native 7,064,802 Ir (1.18 K per call)
+  File::get 14.9 M: path resolution 11.35 M (Vocabulary::rule 2.46 M, ::alias 2.04 M,
+  Nav::child 4.40 M of which SheetHandle::cell 1.96 M, path validation 1.06 M,
+  CellRange::parse 0.98 M, Label::cell 0.70 M); View::text 5.35 M (display_value 4.65 M,
+  the same float formatting as the native leg's display).
+
+== RTF edit-closure single sets (unified-rtf-batch-set, RTF_BATCH_SET_COUNT=1)
+unified (toggle edit_with_limits) 11,957,734 Ir / 132 calls = 90.6 K per call
+native  (toggle native_once)      11,113,266 Ir / 138 calls = 80.5 K per call
+  Run::commit (leaf commit) 10,706,236 = 81.1 K per call
+  Edit::set_with_policy 1,139,779 = 8.6 K per call: coalesce_parsed 971,625
+    (Run::plan 759,032: make_plan 731,312 — SourceRef::get 226,386, paragraph_properties
+    160,314 / 44, run_format_patch 134,552 / 88, paragraph_twips 98,956 / 110 ≈ 0.9 K per
+    length value; Run::new 73,832), into_target 54,736, number::scan 32,648
+  A plain-integer fast path in value::number::parse_f64: 11,957,734 → 11,928,716 Ir
+  (−220 per call, −0.24 %); not kept.
+
+== Keynote bytes open (iwork_directory_bench --rounds 1 --iterations 2, whole run)
+Iwork::detect_bytes 828,660,167 Ir inclusive over the run; memcpy 127,946,143. The unified
+leg copies its owned Vec into Arc<[u8]> (format/iwork.rs, detect_bytes) before detection;
+the leaf leg's Arc is built outside the timed region. Not attributed further (format/iwork
+belongs to record 0305's owner).
