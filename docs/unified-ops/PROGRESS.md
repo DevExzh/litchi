@@ -722,6 +722,19 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - `Leaf::{Pptx, Xlsx}` boxed (combined-feature clippy clean).
   - Open: ODT plain-paragraph sets are 3.4–4.7% slower in wall time with +0.22% instructions (unexplained, under the 5% trigger), and the F1/F3–F6 notes in the record.
 
+- Merged `docx-mc` (0307):
+  - DOCX documents with run-level `mc:AlternateContent` are admitted (new `admit_held` proof); block positions are proven, so set/remove/add/move work;
+  - each wrapper is one opaque object to find, merge and text sets; a text set over a text box is refused with a typed error;
+  - compactor whitespace-reference bug fixed; DOCX fidelity refusals 1 → 0.
+  - Finding: unified DOCX text set and add on a 1,000-paragraph document are 2.5× and 2.1× the leaf, handed to 0305.
+  - Merge fix: the boundary test scaffold now matches 0298's `pub(crate) mod` (failing on trunk since 0298; the gate now runs the boundary and non-iWork unit tests).
+- Merged `iwork-facade` (0306) — **plan step 28 done**:
+  - `litchi::iwork::Document` is deleted and every caller (facade, Python, CLI, examples, fuzz, docs) uses `File`; the glossary bans the old names;
+  - Keynote and Numbers package directories open and save back as directories through the shared `litchi_iwa_archive::bundle`;
+  - `OpenOptions::{pages,keynote,numbers}_options` reach the leaves;
+  - bench matrix parsers through 0307 (1,522 rows, 102 open misses).
+  - Open: Keynote bytes open 5.3% over a no-copy leaf; loose `Index/` bundles save in the `Index.zip` layout.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
