@@ -10,9 +10,9 @@
 //!
 //! Office and OpenDocument files open through `litchi::open_bytes`, which
 //! detects the format from the content: documents and presentations convert to
-//! Markdown, and workbooks yield their plain text. `litchi::open` does not open
-//! Apple iWork files yet, so Pages, Keynote and Numbers files are read through
-//! `litchi::iwork::Document` and yield their plain text.
+//! Markdown, and workbooks yield their plain text. Apple iWork files open the
+//! same way (record 0306): Pages and Keynote convert to Markdown, and Numbers
+//! yields its plain text.
 //!
 //! # Features
 //!
@@ -153,9 +153,6 @@ enum Work {
     Markdown,
     /// Open with `litchi::open_bytes`, then extract the plain text.
     Text,
-    /// Read the Apple iWork package with `litchi::iwork::Document`, which
-    /// reads Pages, Keynote and Numbers files, then collect its plain text.
-    IworkText,
 }
 
 impl Work {
@@ -163,7 +160,7 @@ impl Work {
     fn unit(self) -> &'static str {
         match self {
             Work::Markdown => "md chars",
-            Work::Text | Work::IworkText => "text chars",
+            Work::Text => "text chars",
         }
     }
 }
@@ -220,17 +217,6 @@ fn run_once(kind: &str, data: &[u8], work: Work) -> Result<usize, String> {
         Work::Text => open()?
             .text()
             .map_err(|e| format!("Text extraction: {}", with_causes(&e)))?,
-        Work::IworkText => {
-            let document = litchi::iwork::Document::from_bytes(data)
-                .map_err(|e| format!("{kind} open: {}", with_causes(&e)))?;
-            let snapshot = document.snapshot();
-            let mut text = String::new();
-            for item in snapshot.iter_text() {
-                text.push_str(item.value());
-                text.push('\n');
-            }
-            text
-        },
     };
     // Keep the output in scope briefly to ensure it's not optimized away
     Ok(std::hint::black_box(&output).len())
@@ -281,17 +267,10 @@ fn determine_file_type(filename: &str) -> Option<&'static str> {
     }
 }
 
-/// What profiling a file produces: Markdown for documents and presentations,
-/// plain text for workbooks, and plain text for Apple iWork files, which
-/// `litchi::open` does not open yet.
+/// What profiling a file produces: Markdown for documents and presentations
+/// (Pages and Keynote included), plain text for workbooks (Numbers included).
 fn work_for(file_type: &str, filename: &str) -> Work {
-    let lowercase = filename.to_lowercase();
-    if [".pages", ".key", ".numbers"]
-        .iter()
-        .any(|extension| lowercase.ends_with(extension))
-    {
-        Work::IworkText
-    } else if file_type == "spreadsheet" {
+    if filename.to_lowercase().ends_with(".numbers") || file_type == "spreadsheet" {
         Work::Text
     } else {
         Work::Markdown

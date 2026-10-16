@@ -426,6 +426,19 @@ fn exit_statuses_follow_the_code_families() {
 }
 
 /// Copies a fixture or creates a blank file of `name`'s type in `dir`.
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).expect("mkdir");
+    for entry in std::fs::read_dir(from).expect("read dir") {
+        let entry = entry.expect("entry");
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("type").is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).expect("copy");
+        }
+    }
+}
+
 fn scratch(dir: &Path, name: &str, source: Option<&str>) -> PathBuf {
     let path = dir.join(name);
     match source {
@@ -1005,6 +1018,26 @@ fn iwork_writes_save_in_place() {
     assert_eq!(text_of(&numbers, "/sheet[1]/table[1]/B2"), "CLI cell");
     let query = expect(0, ["query", arg(&numbers), "cell", "--json"]).json();
     assert!(query.to_string().contains("CLI cell"), "{query}");
+
+    // Record 0306: a Keynote package directory edits in place and stays a
+    // directory.
+    let bundle = dir.path().join("bundle.key");
+    copy_tree(&fixture("iwork/directory/keynote/basic.key"), &bundle);
+    expect(
+        0,
+        [
+            "set",
+            arg(&bundle),
+            "/slide[1]/placeholder[title]",
+            "--prop",
+            "text=Bundle title",
+        ],
+    );
+    assert!(bundle.join("Index.zip").is_file());
+    assert_eq!(
+        text_of(&bundle, "/slide[1]/placeholder[title]"),
+        "Bundle title"
+    );
 
     // Record 0297: a created workbook takes renames, values and merges.
     let blank = scratch(dir.path(), "blank.numbers", None);

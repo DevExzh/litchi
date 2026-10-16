@@ -20,7 +20,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// Numbers document, which `litchi::File` opens without a family view.
 enum Source {
     File(litchi::File),
-    Numbers(litchi::numbers::semantic::Workbook),
+    Numbers(litchi::File),
 }
 
 /// Excel workbook interface
@@ -55,18 +55,13 @@ pub struct Workbook {
 impl Workbook {
     fn read(path: &std::path::Path) -> Result<Source, Failure> {
         match litchi::open(path) {
-            // `litchi::File` opens iWork packages (record 0296), but its
-            // family views do not cover them; this reader keeps the
-            // semantic document's projection.
-            Ok(file) if file.format() == Some(CoreFormat::Numbers) => {
-                iwork::open_numbers(path).map(Source::Numbers)
-            },
+            // `litchi::File` opens Numbers packages and package directories
+            // (records 0296 and 0306), but its family views do not cover
+            // them; this reader projects the package the file retains.
+            Ok(file) if file.format() == Some(CoreFormat::Numbers) => Ok(Source::Numbers(file)),
             Ok(file) => match file.workbook() {
                 Ok(_) => Ok(Source::File(file)),
                 Err(error) => Err(Failure::open(&error, Opener::Workbook)),
-            },
-            Err(error) if iwork::is_refused(&error, CoreFormat::Numbers) => {
-                iwork::open_numbers(path).map(Source::Numbers)
             },
             Err(error) => Err(Failure::open(&error, Opener::Workbook)),
         }
@@ -78,7 +73,7 @@ impl Workbook {
                 .workbook()
                 .and_then(|workbook| workbook.worksheet_count())
                 .map_err(|error| Failure::read(&error)),
-            Source::Numbers(document) => Ok(document.sheets().len()),
+            Source::Numbers(file) => Ok(iwork::numbers(file)?.sheets().len()),
         }
     }
 }
@@ -127,7 +122,7 @@ impl Workbook {
                 .workbook()
                 .and_then(|workbook| workbook.worksheet_names())
                 .map_err(|error| Failure::read(&error)),
-            Source::Numbers(document) => Ok(document
+            Source::Numbers(file) => Ok(iwork::numbers(file)?
                 .sheets()
                 .iter()
                 .map(|sheet| sheet.name().to_owned())
@@ -146,7 +141,7 @@ impl Workbook {
     fn text(&self, py: Python<'_>) -> PyResult<String> {
         py.detach(|| match &self.source {
             Source::File(file) => file.text().map_err(|error| Failure::read(&error)),
-            Source::Numbers(document) => document.plain_text().map_err(iwork::numbers_failure),
+            Source::Numbers(file) => file.text().map_err(|error| Failure::read(&error)),
         })
         .map_err(PyErr::from)
     }

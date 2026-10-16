@@ -136,7 +136,7 @@ and redaction vocabulary remain pending.
 |---|---|---|---|
 | Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ keynote (0298) `SourceLimits` (input, entries, entry/aggregate/component bytes, archive objects/messages/message bytes/header fields) · ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); ✅ ODF `litchi_odf_common::SourceLimits` (`SourcePackageLimits` deleted, 0268); ✅ pages `SourceLimits` (input bytes, members, entry/aggregate/component bytes; `DocumentSourceLimits` and the `Limits` re-export deleted, 0299); ✅ Numbers `litchi_numbers::SourceLimits` (`DocumentSourceLimits`, `PackageLimits` deleted; adds the format-specific `header_fields` dimension; default = hard ceilings, 0297) |
 | Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ keynote (0298), `DocumentSemanticLimits` merged into `SemanticLimits`; ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228); ✅ XLSB nested `data_model`, `calculation_chain`, `volatile_dependencies` and `xml_maps` `ReadLimits` and their `Limits` aliases renamed `SemanticLimits` (0261) · ✅ ODT/ODS/ODP `SemanticLimits` (content/styles bytes, units; 0268) · ✅ pages builder form, `SemanticLimitsError` deleted (0299) · ✅ Numbers one `SemanticLimits` for the package and the `Workbook` projection (`DocumentLimits`, `PackageSemanticLimits` deleted, 0297) · 🔴 remaining dimensions and W1 |
-| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ keynote (0298) `OpenOptions { source_limits, semantic_limits }` on `Package`, `Presentation` and `MergeReader`; ✅ DOCX ingress envelope (0038–0040); ✅ XLSB (0261, `OpenPolicy` refusals for owner-specific policies); ✅ pages `OpenOptions` (`DocumentReadOptions` deleted, 0299); ✅ Numbers `litchi_numbers::OpenOptions` on `Package`, `Workbook` and `MergeReader` ingress (`ReadOptions`, `DocumentReadOptions` deleted, 0297); owning lazy-policy support and W1–W4 pending |
+| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade; deleted with `litchi::iwork`, 0306) | ✅ keynote (0298) `OpenOptions { source_limits, semantic_limits }` on `Package`, `Presentation` and `MergeReader`; ✅ DOCX ingress envelope (0038–0040); ✅ XLSB (0261, `OpenPolicy` refusals for owner-specific policies); ✅ pages `OpenOptions` (`DocumentReadOptions` deleted, 0299); ✅ Numbers `litchi_numbers::OpenOptions` on `Package`, `Workbook` and `MergeReader` ingress (`ReadOptions`, `DocumentReadOptions` deleted, 0297); owning lazy-policy support and W1–W4 pending |
 | Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ keynote (0298) `SourceLimits::builder()`/`SemanticLimits::builder()`; ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · ✅ pages `SourceLimits::builder()`/`SemanticLimits::builder()` (0299) · ✅ Numbers `SourceLimits::builder()`, `SemanticLimits::builder()` (0297) |
 | Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ keynote (0298) `Error::InvalidLimit { kind: LimitKind, value, maximum }`; ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); pages `PackageError::InvalidLimit` (0299); ✅ Numbers `limits::Error::InvalidLimit { kind: LimitKind, .. }` (`SemanticLimitsError`, `DocumentSourceLimitsError`, `DocumentLimitsError` deleted, 0297); other owners pending |
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
@@ -352,7 +352,10 @@ The checker does not remove a caller's lockfile.
 
 `tools/api_glossary.json` has version 1 and an explicit `profiles` array. Each
 profile contains `id`, `package`, `default_features`, `features`,
-`banned_names`, and `families`. Feature combinations are separate profiles;
+`banned_names`, and `families`, and optionally `delegated_globs`: the crates
+whose glob re-exports (`pub use litchi_pages::*` in the facade) the profile
+leaves to those crates' own profiles (record 0306); any other glob without
+local module data is refused. Feature combinations are separate profiles;
 results are checked immediately after each build, before the next profile
 can overwrite its rustdoc JSON. Register every feature surface affected by a
 migration in the same commit as the code and glossary status update.
@@ -2426,3 +2429,12 @@ canonical `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` set and
   zero-based `destination`, as `sheet::order` does.
 
 Both profiles now register 30 families.
+
+## iWork facade retirement and iWork open options (record 0306)
+
+| Canonical name | Banned | Status |
+| --- | --- | --- |
+| `litchi::open`/`open_with` → `File::{Pages, Keynote, Numbers}` for packages **and** package directories | `litchi::iwork` (module), `litchi::iwork::{Document, Snapshot, Summary, Table, Slide, Section, SectionKind, TextRole, Text, Value, CellView, Options, SourceLimits, SnapshotLimits, Error, ErrorKind, Stage, Resource, Format}` | ✅ 0306: deleted; `facade-iwork` profile bans `litchi::iwork` |
+| `litchi_ops::OpenOptions::{pages_options, keynote_options, numbers_options}` taking the leaf `OpenOptions` | — | ✅ 0306 |
+| `Package::save_directory(path)` on `litchi_keynote` and `litchi_numbers` (as on `litchi_pages`), `SaveError::{Bundling, Bundle}` | — | ✅ 0306 |
+| `litchi_iwa_archive::bundle::{capture, save, converted_limits, is_directory, CaptureLimits, CaptureLimitKind, CaptureError, INDEX_ZIP}` | — | ✅ 0306 (shared by the three leaves) |

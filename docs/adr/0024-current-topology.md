@@ -4961,3 +4961,24 @@ The policy gains four canonical edges and keeps 12 development-only edges
 and 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15,
 16, 17]`, with one migration host; `tools/check_crate_boundaries.py`
 reports 67 workspace packages and 282 internal dependency declarations.
+
+## 2026-10-16 amendment: iWork facade reader retired (record 0306)
+
+Unified-ops record [0306](../unified-ops/0306-iwork-facade-retirement.md)
+deletes the facade's read-only `litchi::iwork` module (plan step 28): every
+iWork package and package directory opens through `litchi::open` as a
+`File` variant. Two edges change:
+
+- `litchi -> litchi-iwa-structured` is removed: only `litchi::iwork` used it.
+  `litchi-iwa-structured` keeps its own edges and has no workspace dependent
+  now.
+- `litchi-ops -> litchi-iwa-archive` is added (the internal `iwork-adapter`
+  umbrella): the unified error classification matches the archive's typed
+  limit and I/O errors inside the leaves' read errors. The edge points
+  downward and adds no runtime package.
+
+The facade's `iwork` feature is now only the aggregate of `pages`, `keynote`
+and `numbers`; it no longer turns on the leaves' `internal-iwork-source`
+features (the `pages`, `keynote` and `numbers` features of `litchi-ops` do).
+`tools/check_crate_boundaries.py` still reports 67 workspace packages and 282
+internal dependency declarations, with the same 11 migration debts.

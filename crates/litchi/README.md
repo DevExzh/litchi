@@ -36,14 +36,13 @@ fn main() -> litchi::Result<()> {
 
 - `litchi::open` / `litchi::open_bytes` — detect the format from the content
   in one pass and return a `File`, one variant per format (`.doc`, `.docx`,
-  `.rtf`, `.odt`, `.ppt`, `.pptx`, `.odp`, `.xls`, `.xlsx`, `.xlsb`, `.ods`),
+  `.rtf`, `.odt`, `.ppt`, `.pptx`, `.odp`, `.xls`, `.xlsx`, `.xlsb`, `.ods`,
+  and Apple `.pages`, `.key` and `.numbers` packages and package directories),
   plus `File::Locked` for an encrypted input and `File::Signed` for a signed
   one. `open_with` / `open_bytes_with` take `OpenOptions` for limits and
   policy.
 - `File::document`, `File::presentation`, `File::workbook` — the family views;
   each refuses a file of another family and names the format it found.
-- `litchi::iwork::Document` — Pages, Keynote and Numbers (the `iwork`
-  feature), which `litchi::open` recognizes and refuses with a suggestion.
 - `detect_file_format` / `detect_file_format_from_bytes` — format sniffing
   without parsing.
 
