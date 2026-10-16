@@ -171,6 +171,8 @@ struct PendingOverlay {
     replacement: Arc<Vec<u8>>,
     source_xml: Option<SourceXmlPart>,
     replacement_spans: Option<Arc<[ReplacementSpan]>>,
+    /// The source audit's proof for `replacement`, when its producer holds one.
+    proof: Option<xml_minifier::audit::VerifiedSource>,
 }
 
 /// A bounded source-backed OPC publication plan.
@@ -210,6 +212,9 @@ struct TopologyReplacement {
     replacement: Arc<Vec<u8>>,
     source_xml: Option<SourceXmlPart>,
     replacement_spans: Option<Arc<[ReplacementSpan]>>,
+    /// The source audit's proof for `replacement`
+    /// ([`SourceTopologyPlan::try_replace_part_verified`]).
+    proof: Option<xml_minifier::audit::VerifiedSource>,
 }
 
 #[derive(Debug)]
@@ -2105,6 +2110,26 @@ impl SourceTopologyPlan {
         self.try_replace_part_with_payload_and_spans(partname, || replacement, spans)
     }
 
+    /// Replace the payload of one existing Part with bytes the source XML
+    /// audit has already passed, retaining the proof's allocation.
+    ///
+    /// Publication accepts the proof in place of auditing the replacement
+    /// again when it covers exactly these bytes under the default limits; the
+    /// replaced Part's original bytes are still audited. Without such a proof
+    /// this is [`Self::try_replace_part_shared`].
+    pub(crate) fn try_replace_part_verified(
+        &mut self,
+        partname: PackURI,
+        proof: xml_minifier::audit::VerifiedSource,
+    ) -> Result<()> {
+        let replacement = Arc::clone(proof.bytes());
+        self.try_replace_part_with_payload(partname, || replacement)?;
+        if let Some(entry) = self.replacements.last_mut() {
+            entry.proof = Some(proof);
+        }
+        Ok(())
+    }
+
     /// Replace one existing XML Part with a source-authorized payload.
     ///
     /// The source payload may be an exact copy or a checked splice assembled
@@ -2140,6 +2165,7 @@ impl SourceTopologyPlan {
             replacement,
             source_xml: Some(source_xml),
             replacement_spans: None,
+            proof: None,
         });
         Ok(())
     }
@@ -2172,6 +2198,7 @@ impl SourceTopologyPlan {
             replacement: replacement(),
             source_xml: None,
             replacement_spans,
+            proof: None,
         });
         Ok(())
     }
@@ -5837,6 +5864,11 @@ struct PartCache {
     write_permits: Mutex<Option<WritePermits>>,
     input_reservation_failures: Option<Arc<DiagnosticCounter>>,
     output_reservation_failures: Option<Arc<DiagnosticCounter>>,
+    /// Physical Parts whose source bytes passed the source XML audit under
+    /// the default limits, with the source revision they were read from (see
+    /// [`SourceBackedPackage::audit_physical_replacement_xml`]). At most one
+    /// entry per catalog Part.
+    audited_source_xml: Mutex<Vec<(usize, SourceVersion)>>,
     #[cfg(test)]
     publication_hook: Mutex<Option<Arc<TestPublicationHook>>>,
     #[cfg(test)]
@@ -5921,6 +5953,7 @@ impl PartCache {
             write_permits: Mutex::new(None),
             input_reservation_failures: None,
             output_reservation_failures: None,
+            audited_source_xml: Mutex::new(Vec::new()),
             #[cfg(test)]
             publication_hook: Mutex::new(None),
             #[cfg(test)]
@@ -5955,6 +5988,7 @@ impl PartCache {
             write_permits: Mutex::new(None),
             input_reservation_failures: Some(input_reservation_failures),
             output_reservation_failures: Some(output_reservation_failures),
+            audited_source_xml: Mutex::new(Vec::new()),
             #[cfg(test)]
             publication_hook: Mutex::new(None),
             #[cfg(test)]
@@ -9076,6 +9110,7 @@ impl SourceBackedPackage {
                 replacement: Arc::clone(&replacement.replacement),
                 source_xml: replacement.source_xml.clone(),
                 replacement_spans: replacement.replacement_spans.clone(),
+                proof: replacement.proof.clone(),
             });
         }
         let mut pending_replacement_indices = HashMap::new();
@@ -10725,11 +10760,12 @@ impl SourceBackedPackage {
                     part.partname.as_str(),
                     part.content_type.as_str(),
                 ) {
-                    audit_source_part_replacement_xml(
-                        part.partname.as_str(),
+                    self.audit_physical_replacement_xml(
+                        replacement.target,
                         original.as_bytes(),
                         &replacement.replacement,
                         replacement.replacement_spans.as_deref(),
+                        replacement.proof.as_ref(),
                     )?;
                 }
                 changed.push(ChangedOverlay {
@@ -11726,6 +11762,7 @@ impl SourceBackedPackage {
                     replacement: Arc::new(replacement),
                     source_xml: None,
                     replacement_spans: None,
+                    proof: None,
                 });
                 continue;
             }
@@ -11760,6 +11797,7 @@ impl SourceBackedPackage {
                 replacement: Arc::new(replacement),
                 source_xml: None,
                 replacement_spans: None,
+                proof: None,
             });
             relationship_overlays.push((
                 target,
@@ -12039,6 +12077,7 @@ impl SourceBackedPackage {
                 replacement: into_shared(replacement),
                 source_xml: None,
                 replacement_spans: None,
+                proof: None,
             });
         }
         let mut omitted_members = Vec::new();
@@ -15103,6 +15142,105 @@ fn audit_source_part_replacement_xml(
     })
 }
 
+impl SourceBackedPackage {
+    /// Audit replacing physical Part `target`'s source bytes `original` with
+    /// `replacement`, with the verdict and error of
+    /// [`audit_source_part_replacement_xml`], and return the proof of the
+    /// replacement when the audit established one.
+    ///
+    /// That verdict is the source audit of `original` and then of
+    /// `replacement` under the default limits. Two of its inputs can be
+    /// proven instead of scanned again:
+    ///
+    /// * `replacement`, by a [`xml_minifier::audit::VerifiedSource`] that
+    ///   covers its exact allocation under the default limits. Only the audit
+    ///   itself mints one (the transaction commit that verified the bytes, or
+    ///   an earlier call of this method), so a caller without one, or with one
+    ///   for any other bytes or limits, gets the complete audit.
+    /// * `original`, once it has passed here for this Part and source
+    ///   revision of an unmanaged package; then the replacement alone is
+    ///   audited (completely, as no window can be proven without the original
+    ///   scan). The physical bytes of one revision
+    ///   do not change, and a failure is never remembered, so an original
+    ///   that fails is audited, and reported, every time.
+    ///
+    /// Bounded multi-window hints keep their windowed audit and return no
+    /// proof.
+    fn audit_physical_replacement_xml(
+        &self,
+        target: usize,
+        original: &[u8],
+        replacement: &Arc<Vec<u8>>,
+        spans: Option<&[ReplacementSpan]>,
+        proof: Option<&xml_minifier::audit::VerifiedSource>,
+    ) -> Result<Option<xml_minifier::audit::VerifiedSource>> {
+        let limits = xml_minifier::audit::Limits::default();
+        let part = self.catalog.parts[target].partname.as_str();
+        let publication_error = |source| OpcError::XmlPublication {
+            part: part.to_string(),
+            source,
+        };
+        let version = self.source.version();
+        let proof = proof.filter(|proof| proof.covers(replacement.as_slice(), limits));
+        if let Some(proof) = proof {
+            if !self.original_source_xml_audited(target, version) {
+                let _report = xml_minifier::audit::verify_source(original, limits)
+                    .map_err(publication_error)?;
+                self.remember_source_xml_audit(target, version);
+            }
+            return Ok(Some(proof.clone()));
+        }
+        if self.original_source_xml_audited(target, version) {
+            // The pair's verdict on `original` is known to pass, so it is the
+            // replacement's own audit, error included.
+            let proof =
+                xml_minifier::audit::VerifiedSource::verify(Arc::clone(replacement), limits)
+                    .map_err(publication_error)?;
+            return Ok(Some(proof));
+        }
+        if let Some(spans) = spans
+            && spans.len() > 1
+            && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS
+        {
+            audit_source_part_replacement_xml(part, original, replacement, Some(spans))?;
+            self.remember_source_xml_audit(target, version);
+            return Ok(None);
+        }
+        let (proof, _how) = xml_minifier::audit::VerifiedSource::verify_replacement(
+            original,
+            Arc::clone(replacement),
+            limits,
+        )
+        .map_err(|error| publication_error(error.into_error()))?;
+        self.remember_source_xml_audit(target, version);
+        Ok(Some(proof))
+    }
+
+    fn original_source_xml_audited(&self, target: usize, version: SourceVersion) -> bool {
+        self.cache
+            .audited_source_xml
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .contains(&(target, version))
+    }
+
+    /// Remember a passed original. Managed packages retain no memory they do
+    /// not reserve, so they keep auditing it.
+    fn remember_source_xml_audit(&self, target: usize, version: SourceVersion) {
+        if self.cache.is_managed() {
+            return;
+        }
+        let mut audited = self
+            .cache
+            .audited_source_xml
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !audited.contains(&(target, version)) && audited.try_reserve(1).is_ok() {
+            audited.push((target, version));
+        }
+    }
+}
+
 fn validate_source_part_replacement_xml(
     part: &str,
     original: &[u8],
@@ -17269,6 +17407,69 @@ mod tests {
             Err(OpcError::XmlPublication { .. })
         ));
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn physical_replacement_audit_remembers_only_passing_originals() {
+        // Record 0311: the remembered original verdict and the plan's proof.
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        let package =
+            SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", false))
+                .unwrap();
+        let target = package.part_index(&partname).unwrap();
+        let original = package.read_part(target).unwrap();
+        let version = package.source.version();
+        // The original passes here and the replacement fails: nothing is
+        // remembered, so the next pair is audited completely again.
+        assert!(
+            package
+                .audit_physical_replacement_xml(
+                    target,
+                    original.as_bytes(),
+                    &Arc::new(b"<a>".to_vec()),
+                    None,
+                    None,
+                )
+                .is_err()
+        );
+        assert!(!package.original_source_xml_audited(target, version));
+        let replacement = Arc::new(b"<after/>".to_vec());
+        let proof = package
+            .audit_physical_replacement_xml(target, original.as_bytes(), &replacement, None, None)
+            .unwrap()
+            .expect("a complete pair audit proves its replacement");
+        assert!(proof.covers(&replacement, xml_minifier::audit::Limits::default()));
+        assert!(package.original_source_xml_audited(target, version));
+        assert!(package.clone().original_source_xml_audited(target, version));
+        // A remembered original still audits an unproven replacement.
+        assert!(matches!(
+            package.audit_physical_replacement_xml(
+                target,
+                original.as_bytes(),
+                &Arc::new(b"<a>".to_vec()),
+                None,
+                None,
+            ),
+            Err(OpcError::XmlPublication { .. })
+        ));
+        // The plan entry keeps the proof and publishes its allocation.
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_part_verified(partname.clone(), proof.clone())
+            .unwrap();
+        assert!(plan.replacements[0].proof.is_some());
+        assert!(Arc::ptr_eq(
+            &plan.replacements[0].replacement,
+            proof.bytes()
+        ));
+        let mut output = Vec::new();
+        package.write_topology_to_stream(&mut output, plan).unwrap();
+        assert_eq!(
+            soapberry_zip::office::ArchiveReader::new(&output)
+                .unwrap()
+                .read(partname.membername())
+                .unwrap(),
+            b"<after/>"
+        );
     }
 
     #[test]

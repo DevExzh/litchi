@@ -15,9 +15,11 @@
 //! refused: the object's own capability deletes or moves it.
 //!
 //! Tables are read from the leaf's body-table catalog and cell reader
-//! (`/body/tbl[N]/tr[R]/tc[C]`) and removed through its deletion
-//! transaction; cell writes are a typed gap. Section names, header and
-//! footer text, footnote text and the document properties
+//! (`/body/tbl[N]/tr[R]/tc[C]`), built the first time a read reaches a
+//! table (record 0312); their cells write through `table::values` and the
+//! tables are removed through the deletion transaction. Sections are added
+//! and removed through `section::lifecycle` (record 0312). Section names,
+//! header and footer text, footnote text and the document properties
 //! (`set("/metadata", ..)`) write through their leaf families.
 
 use std::collections::BTreeMap;
@@ -164,27 +166,7 @@ static GAPS: [GapSpec; 2] = [
     },
 ];
 
-static OPERATION_GAPS: [GapSpec; 6] = [
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "section",
-            context: "a new section",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 11",
-        reason: "the Pages leaf has no section lifecycle transaction (a section break plus a new native section object)",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "section",
-            context: "a section",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 11",
-        reason: "the Pages leaf has no section lifecycle transaction",
-    },
+static OPERATION_GAPS: [GapSpec; 4] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -350,8 +332,8 @@ impl Flavor for Pages {
 /// The elements `set` writes, `add` creates and `remove` deletes.
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["p", "section", "tc", "header", "footer", "footnote"],
-    addable: &["p", "footnote"],
-    removable: &["p", "tbl", "footnote"],
+    addable: &["p", "footnote", "section"],
+    removable: &["p", "tbl", "footnote", "section"],
     movable: &["p"],
     gaps: &OPERATION_GAPS,
 };
@@ -382,6 +364,7 @@ pub(crate) enum Patch {
     Metadata(litchi_pages::metadata::Patch),
     TextStyle(litchi_pages::section::text_style::Patch),
     TableValues(litchi_pages::table::values::Patch),
+    SectionLifecycle(litchi_pages::section::lifecycle::Patch),
     TableDeletion(
         #[allow(
             dead_code,
@@ -403,6 +386,7 @@ impl Patch {
             Self::Metadata(patch) => patch.is_noop(),
             Self::TextStyle(patch) => patch.is_noop(),
             Self::TableValues(patch) => patch.is_noop(),
+            Self::SectionLifecycle(patch) => patch.is_noop(),
             Self::TableDeletion(_) => false,
         }
     }
@@ -467,18 +451,18 @@ fn template_of(ordinal: u32) -> Template {
 /// Build the tree of `package` without the section headers and footers:
 /// reading them decodes every page template, so they join the tree the
 /// first time a read reaches a section's children ([`build_full`]).
-pub(crate) fn build(package: &Package) -> super::Tree {
+pub(crate) fn build(package: &Package) -> (super::Tree, Box<[super::Part]>) {
     build_with(package, false)
 }
 
 /// Build the complete tree of `package`, headers and footers included.
 /// Every item of [`build`]'s tree keeps its index: the regions are pushed
 /// last.
-pub(crate) fn build_full(package: &Package) -> super::Tree {
+pub(crate) fn build_full(package: &Package) -> (super::Tree, Box<[super::Part]>) {
     build_with(package, true)
 }
 
-fn build_with(package: &Package, regions: bool) -> super::Tree {
+fn build_with(package: &Package, regions: bool) -> (super::Tree, Box<[super::Part]>) {
     let mut tree = TreeBuilder::new(SPEC.elements, Pages::SINGLETONS);
     let body = tree.push(ROOT, Kind::Body).done();
     let mut paragraphs = 0_usize;
@@ -501,7 +485,8 @@ fn build_with(package: &Package, regions: bool) -> super::Tree {
         paragraphs += lines;
         section_items.push((index, section.name().map(str::to_owned), value, lines));
     }
-    let tables = build_tables(package, &mut tree, body);
+    let parts = build_tables(package, &mut tree, body);
+    let tables = parts.len();
     let mut section_indices = Vec::with_capacity(section_items.len());
     for (index, name, value, lines) in section_items {
         let section = tree
@@ -561,63 +546,81 @@ fn build_with(package: &Package, regions: bool) -> super::Tree {
                 .done();
         }
     }
-    tree.build()
+    (tree.build(), parts.into_boxed_slice())
 }
 
-/// The body tables, their rows and cells; returns the table count.
-fn build_tables(package: &Package, tree: &mut TreeBuilder<Kind>, body: u32) -> usize {
+/// The body tables: a stand-in per table holding its name (record 0312);
+/// returns the parts holding their contents, one per table, which
+/// [`build_table`] builds the first time a read reaches a table's
+/// properties or children.
+fn build_tables(package: &Package, tree: &mut TreeBuilder<Kind>, body: u32) -> Vec<super::Part> {
     let Ok(catalog) = package.body_tables() else {
-        return 0;
+        return Vec::new();
     };
+    let mut parts = Vec::with_capacity(catalog.len());
     for (index, snapshot) in catalog.iter().enumerate() {
-        let Ok(read) = package.body_table_cells(BodyTableSelector::index(index)) else {
-            tree.push(body, Kind::Table)
-                .prop("name", text(Some(snapshot.name())))
-                .label(Some(snapshot.name()))
-                .leaf([index, 0, 0, 0])
-                .done();
-            continue;
-        };
-        let rows = usize::try_from(read.row_count()).unwrap_or(usize::MAX);
-        let columns = usize::try_from(read.column_count()).unwrap_or(usize::MAX);
-        let mut values: BTreeMap<(usize, usize), (String, &'static str)> = BTreeMap::new();
-        for cell in read.iter_cells() {
-            let position = cell.position();
-            values.insert(
-                (position.row() as usize, position.column() as usize),
-                (cell.value().to_string(), value_type(cell.value())),
-            );
-        }
-        let table = tree
+        let part = u32::try_from(parts.len() + 1).unwrap_or(u32::MAX);
+        let stand_in = tree
             .push(body, Kind::Table)
             .prop("name", text(Some(snapshot.name())))
-            .prop("rows", count(rows))
-            .prop("columns", count(columns))
             .label(Some(snapshot.name()))
             .leaf([index, 0, 0, 0])
+            .part(part)
             .done();
-        for row in 0..rows {
-            let item = tree
-                .push(table, Kind::Row)
-                .prop("cellCount", count(columns))
-                .leaf([index, row, 0, 0])
+        parts.push(super::Part::Contents(super::part::Contents::new(
+            index, stand_in,
+        )));
+    }
+    parts
+}
+
+/// Build the contents of the body table whose stand-in is `stand_in` and
+/// whose catalog position is `index`: its size, rows and cells. A table
+/// the leaf's cell reader refuses keeps its name without rows.
+pub(crate) fn build_table(
+    package: &Package,
+    stand_in: &super::tree::Item,
+    index: usize,
+) -> super::Tree {
+    let mut tree = TreeBuilder::from_stand_in(SPEC.elements, Pages::SINGLETONS, stand_in);
+    let Ok(read) = package.body_table_cells(BodyTableSelector::index(index)) else {
+        return tree.build();
+    };
+    let rows = usize::try_from(read.row_count()).unwrap_or(usize::MAX);
+    let columns = usize::try_from(read.column_count()).unwrap_or(usize::MAX);
+    let mut values: BTreeMap<(usize, usize), (String, &'static str)> = BTreeMap::new();
+    for cell in read.iter_cells() {
+        let position = cell.position();
+        values.insert(
+            (position.row() as usize, position.column() as usize),
+            (cell.value().to_string(), value_type(cell.value())),
+        );
+    }
+    tree.root()
+        .prop("rows", count(rows))
+        .prop("columns", count(columns))
+        .done();
+    for row in 0..rows {
+        let item = tree
+            .push(ROOT, Kind::Row)
+            .prop("cellCount", count(columns))
+            .leaf([index, row, 0, 0])
+            .done();
+        for column in 0..columns {
+            let (value, kind) = values
+                .get(&(row, column))
+                .map_or((String::new(), "empty"), |(value, kind)| {
+                    (value.clone(), *kind)
+                });
+            tree.push(item, Kind::Cell)
+                .prop("text", text(Some(&value)))
+                .prop("type", text(Some(kind)))
+                .text(value)
+                .leaf([index, row, column, 0])
                 .done();
-            for column in 0..columns {
-                let (value, kind) = values
-                    .get(&(row, column))
-                    .map_or((String::new(), "empty"), |(value, kind)| {
-                        (value.clone(), *kind)
-                    });
-                tree.push(item, Kind::Cell)
-                    .prop("text", text(Some(&value)))
-                    .prop("type", text(Some(kind)))
-                    .text(value)
-                    .leaf([index, row, column, 0])
-                    .done();
-            }
         }
     }
-    catalog.len()
+    tree.build()
 }
 
 /// The unified type name of a cell value.
@@ -692,6 +695,106 @@ fn paragraph_text(value: &PropValue<'_>) -> Result<String> {
     Ok(value)
 }
 
+/// The leaf value of a body-table cell's `text` or `value`.
+fn table_value(key: &str, value: &PropValue<'_>) -> Result<litchi_pages::table::values::Value> {
+    use super::write::CellScalar;
+    use litchi_pages::table::values::Value;
+    Ok(match super::write::cell_scalar(key, value)? {
+        CellScalar::Text(text) => Value::Text(text),
+        CellScalar::Number(number) => Value::Number(number),
+        CellScalar::Boolean(flag) => Value::Boolean(flag),
+        CellScalar::Empty => Value::Empty,
+    })
+}
+
+/// Commit the values of one body table's cells: one leaf table-values
+/// transaction.
+fn commit_cells(
+    chain: &mut Chain<Package>,
+    table: usize,
+    values: Vec<(u32, u32, litchi_pages::table::values::Value)>,
+) -> Result<()> {
+    let error = |error| failure(LeafError::PagesTableValues(error));
+    let mut edit = chain
+        .package
+        .edit_body_table_values(BodyTableSelector::index(table))
+        .map_err(error)?;
+    for (row, column, value) in values {
+        edit.set(row, column, value).map_err(error)?;
+    }
+    let commit = edit.commit().map_err(error)?;
+    let (package, patch) = commit.into_parts();
+    push(chain, package, Patch::TableValues(patch));
+    Ok(())
+}
+
+/// A one-value set of a body-table cell named by the direct path
+/// `/body/tbl[N]/tr[R]/tc[C]` (`table` for `tbl`; each of the last three
+/// steps with one positional index, `body` with none), committed without
+/// reading the table (record 0312): the body lists the table's stand-in,
+/// and the leaf transaction checks the cell against the table. `None`
+/// sends any other target, and any failure, to the general route, which
+/// reports it.
+fn direct_cell(
+    file: &Iwork,
+    package: &Package,
+    target: &TargetArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Option<Commit> {
+    let mut entries = props.iter();
+    let (Some((key, value)), None) = (entries.next(), entries.next()) else {
+        return None;
+    };
+    let key = key.as_str();
+    if key != "text" && key != "value" {
+        return None;
+    }
+    let path = target.path()?.path();
+    let [body, table, row, column] = path.steps() else {
+        return None;
+    };
+    if !path.is_absolute()
+        || body.name() != "body"
+        || !body.predicates().is_empty()
+        || !matches!(table.name(), "tbl" | "table")
+        || row.name() != "tr"
+        || column.name() != "tc"
+    {
+        return None;
+    }
+    let [table, row, column] = [table, row, column].map(|step| step.index().map(Position::get));
+    let (table, row, column) = (table?, row?, column?);
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets()).ok()?;
+    bound(LimitKind::Operations, 1, limits.max_operations()).ok()?;
+    file.checked_tree().ok()?;
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Body);
+    let body_at = file
+        .kids(super::At::ROOT)
+        .iter()
+        .find(|&child| file.kind_at(child) == ordinal)?;
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Table);
+    let table_at = file
+        .kids(body_at)
+        .iter()
+        .filter(|&child| file.kind_at(child) == ordinal)
+        .nth(table)?;
+    let index = file.stand_in(table_at).leaf()[0] as usize;
+    let value = table_value(key, value).ok()?;
+    let mut chain = Chain::new(package.clone());
+    let values = vec![(u32::try_from(row).ok()?, u32::try_from(column).ok()?, value)];
+    commit_cells(&mut chain, index, values).ok()?;
+    finish(
+        file,
+        chain.changed,
+        Owner::Pages(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )
+    .ok()
+}
+
 /// Set properties on every target.
 pub(crate) fn set(
     file: &Iwork,
@@ -702,6 +805,9 @@ pub(crate) fn set(
 ) -> Result<Commit> {
     if is_metadata(target) {
         return set_metadata(file, package, props, limits);
+    }
+    if let Some(commit) = direct_cell(file, package, target, props, limits) {
+        return Ok(commit);
     }
     let nodes = resolve::<Pages>(file, target, limits.max_expanded_targets())?;
     let mut chain = Chain::new(package.clone());
@@ -793,17 +899,7 @@ pub(crate) fn set(
                     push(&mut chain, commit.into_package(), Patch::Footnote(patch));
                 },
                 ("cell", "text" | "value") => {
-                    use super::write::CellScalar;
-                    let value = match super::write::cell_scalar(key, value)? {
-                        CellScalar::Text(text) => litchi_pages::table::values::Value::Text(text),
-                        CellScalar::Number(number) => {
-                            litchi_pages::table::values::Value::Number(number)
-                        },
-                        CellScalar::Boolean(flag) => {
-                            litchi_pages::table::values::Value::Boolean(flag)
-                        },
-                        CellScalar::Empty => litchi_pages::table::values::Value::Empty,
-                    };
+                    let value = table_value(key, value)?;
                     cells.entry(leaf[0]).or_default().push((
                         u32::try_from(leaf[1]).unwrap_or(u32::MAX),
                         u32::try_from(leaf[2]).unwrap_or(u32::MAX),
@@ -820,17 +916,7 @@ pub(crate) fn set(
     }
     pending.flush(&mut chain)?;
     for (table, values) in cells {
-        let error = |error| failure(LeafError::PagesTableValues(error));
-        let mut edit = chain
-            .package
-            .edit_body_table_values(BodyTableSelector::index(table))
-            .map_err(error)?;
-        for (row, column, value) in values {
-            edit.set(row, column, value).map_err(error)?;
-        }
-        let commit = edit.commit().map_err(error)?;
-        let (package, patch) = commit.into_parts();
-        push(&mut chain, package, Patch::TableValues(patch));
+        commit_cells(&mut chain, table, values)?;
     }
     finish(
         file,
@@ -1045,13 +1131,13 @@ pub(crate) fn add(
     if kind == "footnote" {
         return add_footnote(file, package, &parent_node, node, limits);
     }
+    if kind == "section" {
+        return add_section(file, package, &parent_node, node, limits);
+    }
     if !matches!(kind.as_str(), "p" | "paragraph") {
         return Err(refusal(
             Code::UnsupportedCapability,
             match kind.as_str() {
-                "section" => {
-                    "adding a Pages section needs a leaf section lifecycle transaction (IWORK_API_REQUESTS.md request 11)"
-                },
                 "tbl" | "table" => {
                     "adding a Pages body table needs a leaf table-creation transaction (record 0299 follow-up)"
                 },
@@ -1113,6 +1199,85 @@ pub(crate) fn add(
         _ => return Err(element_refusal("add", &parent_node)),
     };
     add_at(file, package, section, line, &value, limits)
+}
+
+/// Add a section (record 0312): a section break and a new section copying
+/// the page masters, headers and footers of the section it follows. The
+/// placement names where it goes among the sections (the end by default);
+/// the first section always begins the body, so a new one cannot precede
+/// it. `name` is the only property: the new section starts empty.
+fn add_section(
+    file: &Iwork,
+    package: &Package,
+    parent: &Node<'_>,
+    node: &NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    use crate::Placement;
+    if parent.item().type_name() != "document" {
+        return Err(element_refusal("add", parent));
+    }
+    let mut name = None;
+    for (key, prop) in node.props().iter() {
+        if key.as_str() == "name" {
+            name = super::write::text(prop, "name")?;
+        } else {
+            return Err(super::write::unwritable("section", key.as_str()));
+        }
+    }
+    let count = package.sections().len();
+    let section_at = |path: &PathArg<'_>| -> Result<usize> {
+        let anchor = super::write::node_at::<Pages>(file, path)?;
+        if anchor.item().type_name() != "section" {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "a section is placed before or after another section",
+            ));
+        }
+        Ok(anchor.item().leaf()[SECTION] as usize)
+    };
+    // The new section's final position among the sections.
+    let index = match node.placement() {
+        None | Some(Placement::End | Placement::Into(_, None)) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position) | Placement::Into(_, Some(position))) => position.get(),
+        Some(Placement::Before(path)) => section_at(path)?,
+        Some(Placement::After(path)) => section_at(path)? + 1,
+    };
+    if index == 0 {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "the first section begins the body; a new section follows another one",
+        ));
+    }
+    if index > count {
+        return Err(refusal(
+            Code::OutOfRange,
+            "the insertion position is outside the document's sections",
+        ));
+    }
+    let error = |error| failure(LeafError::PagesSectionLifecycle(error));
+    let commit = package
+        .edit_section_lifecycle()
+        .add(index - 1, name.as_deref())
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let (next, patch) = commit.into_parts();
+    let mut chain = Chain::new(package.clone());
+    push(&mut chain, next, Patch::SectionLifecycle(patch));
+    let commit = finish(
+        file,
+        chain.changed,
+        Owner::Pages(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )?;
+    let path = Path::parse(&format!("/section[{}]", index + 1))
+        .map_err(|_error| refusal(Code::InternalError, "the new section's path"))?
+        .into_owned();
+    Ok((commit, path))
 }
 
 /// Insert a paragraph at `(section, line)` and name its new path.
@@ -1242,6 +1407,7 @@ pub(crate) fn remove(
     let nodes = resolve::<Pages>(file, target, limits.max_expanded_targets())?;
     let mut tables = Vec::new();
     let mut footnotes = Vec::new();
+    let mut sections = Vec::new();
     let mut lines: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for node in &nodes {
         let leaf = node.item().leaf().map(|value| value as usize);
@@ -1249,6 +1415,7 @@ pub(crate) fn remove(
             "paragraph" => lines.entry(leaf[SECTION]).or_default().push(leaf[LINE]),
             "table" => tables.push(leaf[0]),
             "footnote" => footnotes.push(leaf[0]),
+            "section" => sections.push(leaf[SECTION]),
             _ => return Err(element_refusal("remove", node)),
         }
     }
@@ -1326,6 +1493,22 @@ pub(crate) fn remove(
         let commit = edit.commit().map_err(error)?;
         let (next, patch) = commit.into_parts();
         push(&mut chain, next, Patch::Paragraphs(patch));
+    }
+    // Sections last, from the last (record 0312): each removal keeps its
+    // text in the preceding section and the earlier sections' positions.
+    sections.sort_unstable();
+    sections.dedup();
+    for section in sections.iter().rev() {
+        let error = |error| failure(LeafError::PagesSectionLifecycle(error));
+        let commit = chain
+            .package
+            .edit_section_lifecycle()
+            .remove(*section)
+            .map_err(error)?
+            .commit()
+            .map_err(error)?;
+        let (next, patch) = commit.into_parts();
+        push(&mut chain, next, Patch::SectionLifecycle(patch));
     }
     finish(
         file,

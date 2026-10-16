@@ -746,6 +746,22 @@ pub(super) struct NativeBodySnapshot {
     pub(super) utf16_len: usize,
 }
 
+impl NativeBodySnapshot {
+    /// The native identifier of section `position` (record 0312).
+    pub(super) fn section_identifier(&self, position: usize) -> Option<u64> {
+        self.references
+            .get(position)
+            .map(|reference| reference.identifier.get())
+    }
+
+    /// The UTF-16 boundary where section `position` starts.
+    pub(super) fn section_boundary(&self, position: usize) -> Option<usize> {
+        self.references
+            .get(position)
+            .and_then(|reference| usize::try_from(reference.character_index).ok())
+    }
+}
+
 const ROOT_COMPONENT_NAME: &str = "Index/Document.iwa";
 const ROOT_OBJECT_IDENTIFIER: u64 = 1;
 const ROOT_MESSAGE_TYPE: u32 = 10_000;

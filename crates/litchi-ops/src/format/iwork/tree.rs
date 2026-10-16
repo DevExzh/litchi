@@ -263,6 +263,44 @@ impl<K: ElementKind> TreeBuilder<K> {
         }
     }
 
+    /// The contents of a table whose holding tree lists `stand_in`: the
+    /// anchor (index [`ROOT`]) is a copy of the stand-in, whose properties
+    /// the table's reader completes, and the rows and cells pushed under it
+    /// take their paths and ordinals from it (record 0312).
+    #[cfg(any(feature = "keynote", feature = "pages"))]
+    pub(crate) fn from_stand_in(
+        elements: &'static [ElementSpec<K>],
+        singletons: &'static [K],
+        stand_in: &Item,
+    ) -> Self {
+        let item = Item {
+            kind: stand_in.kind,
+            type_name: stand_in.type_name,
+            props: stand_in.props,
+            values: stand_in.values.clone(),
+            text: stand_in.text.clone(),
+            label: stand_in.label.clone(),
+            children: Vec::new(),
+            path: stand_in.path.clone(),
+            leaf: stand_in.leaf,
+            ordinal: stand_in.ordinal,
+            part: 0,
+        };
+        Self {
+            items: vec![item],
+            elements,
+            singletons,
+            ordinals: std::collections::HashMap::new(),
+            deferred: None,
+        }
+    }
+
+    /// How many items the tree holds so far.
+    #[cfg(feature = "keynote")]
+    pub(crate) fn len(&self) -> usize {
+        self.items.len()
+    }
+
     /// The root item, for its properties.
     pub(crate) fn root(&mut self) -> Draft<'_, K> {
         self.draft_at(ROOT)
@@ -298,7 +336,7 @@ impl<K: ElementKind> TreeBuilder<K> {
     }
 
     /// An item already built, for more properties.
-    #[cfg(any(feature = "pages", feature = "keynote"))]
+    #[cfg(feature = "pages")]
     pub(crate) fn draft(&mut self, index: u32) -> Draft<'_, K> {
         self.draft_at(index)
     }
@@ -397,7 +435,7 @@ impl<K> Draft<'_, K> {
     }
 
     /// Hold the item's children in lazily built part `part`.
-    #[cfg(any(feature = "keynote", feature = "numbers"))]
+    #[cfg(any(feature = "keynote", feature = "numbers", feature = "pages"))]
     pub(crate) fn part(mut self, part: u32) -> Self {
         self.item().part = part;
         self

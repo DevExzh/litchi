@@ -105,15 +105,7 @@ pub(crate) const PLACEHOLDER_PROPS: &[PropSpec] = &[
     writable("height", EXTENT),
     writable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
-    {
-        let mut spec = PropSpec::new("hidden", ValueType::Bool);
-        spec.access = crate::node::spec::Access {
-            get: false,
-            set: true,
-            add: false,
-        };
-        spec
-    },
+    writable("hidden", ValueType::Bool),
 ];
 
 const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
@@ -218,9 +210,9 @@ static OPERATION_GAPS: [GapSpec; 9] = [
     operation_gap(
         "set",
         "run",
-        "placeholder and notes runs",
-        "record 0309 follow-ups",
-        "character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles",
+        "speaker-notes runs",
+        "record 0312 follow-ups",
+        "character properties are written on runs of text boxes, shapes and title and body placeholders (record 0312); speaker notes list no runs and keep their styles",
     ),
     operation_gap(
         "add",
@@ -815,15 +807,22 @@ impl Slides {
 /// reading them decodes every drawable's character-style table, so they
 /// join the part the first time a read reaches a paragraph's children.
 /// Every item of the part without runs keeps its index.
+///
+/// A table is a stand-in holding its frame (record 0312): reading a table
+/// decodes it, so its name, size, rows and cells are built the first time
+/// a read reaches them ([`build_table`]). Returns the tree and, for each
+/// stand-in in order, the table's selector (its position among the
+/// slide's tables in z-order) and the stand-in's index.
 pub(crate) fn build_slide(
     package: &Package,
     index: usize,
     path: &[crate::node::PathStep<'static>],
     with_runs: bool,
-) -> super::Tree {
+) -> (super::Tree, Vec<(usize, u32)>) {
     let mut tree = TreeBuilder::under(SPEC.elements, Keynote::SINGLETONS, Kind::Slide, path);
+    let mut selectors = Vec::new();
     let Some(slide) = package.slides().ok().and_then(|slides| slides.get(index)) else {
-        return tree.build();
+        return (tree.build(), selectors);
     };
     let item = ROOT;
     let mut deferred = Vec::new();
@@ -846,10 +845,22 @@ pub(crate) fn build_slide(
             .iter()
             .position(|drawable| drawable.kind() == kind);
         let drawable = position.and_then(|position| drawables.get(position));
+        // A hidden placeholder keeps its text on its slide (record 0312).
+        let hidden = package
+            .slide_placeholder_visibility(selector, role)
+            .ok()
+            .flatten()
+            .map(|state| {
+                Value::Bool(matches!(
+                    state,
+                    litchi_keynote::slide::placeholder::State::Hidden
+                ))
+            });
         let placeholder = frame(
             tree.push(item, Kind::Placeholder)
                 .prop("type", text(Some(name)))
-                .prop("text", text(Some(&value))),
+                .prop("text", text(Some(&value)))
+                .prop("hidden", hidden),
             drawable,
         )
         .label(Some(name))
@@ -898,28 +909,37 @@ pub(crate) fn build_slide(
             },
             _ => draft,
         };
-        let drawable_item = frame(draft, Some(drawable)).done();
-        match kind {
-            Kind::Shape => {
-                let value = drawable.text().unwrap_or_default();
-                let lines =
-                    paragraphs(&mut tree, drawable_item, value, [index, DRAWABLE, position]);
-                if drawable.text().is_some() {
-                    deferred.push(Deferred {
-                        paragraphs: lines,
-                        slide: index,
-                        drawable: position,
-                    });
-                }
-            },
-            Kind::Table => {
+        let draft = match kind {
+            // The stand-in's part names its contents among the slide's
+            // tables; a slide with more tables than a part addresses keeps
+            // the later ones' frames without rows.
+            Kind::Table if selectors.len() < super::part::SLIDE_TABLES => {
                 let ordinal = tables
                     .iter()
                     .position(|(_, table)| *table == position)
                     .unwrap_or(0);
-                table(&mut tree, package, drawable_item, index, ordinal, position);
+                selectors.push((ordinal, 0));
+                draft.part(u32::try_from(selectors.len()).unwrap_or(u32::MAX))
             },
-            _ => {},
+            _ => draft,
+        };
+        let drawable_item = frame(draft, Some(drawable)).done();
+        if kind == Kind::Table
+            && let Some(last) = selectors.last_mut()
+            && last.1 == 0
+        {
+            last.1 = drawable_item;
+        }
+        if kind == Kind::Shape {
+            let value = drawable.text().unwrap_or_default();
+            let lines = paragraphs(&mut tree, drawable_item, value, [index, DRAWABLE, position]);
+            if drawable.text().is_some() {
+                deferred.push(Deferred {
+                    paragraphs: lines,
+                    slide: index,
+                    drawable: position,
+                });
+            }
         }
     }
     if with_runs {
@@ -934,36 +954,42 @@ pub(crate) fn build_slide(
             runs(&mut tree, text, &read);
         }
     }
-    tree.build()
+    (tree.build(), selectors)
 }
 
-/// Read one table's name, size and cells. A table the leaf's cell reader
-/// refuses keeps its frame without rows.
-fn table(
-    tree: &mut TreeBuilder<Kind>,
+/// Build the contents of the slide table whose stand-in is `stand_in` and
+/// whose selector among its slide's tables is `ordinal`: its name, size,
+/// rows and cells (record 0312). A table the leaf's cell reader refuses,
+/// or one with more cells than a slide's part addresses, keeps its frame
+/// without rows.
+pub(crate) fn build_table(
     package: &Package,
-    item: u32,
-    slide: usize,
+    stand_in: &super::tree::Item,
     ordinal: usize,
-    drawable: usize,
-) {
+) -> super::Tree {
+    let mut tree = TreeBuilder::from_stand_in(SPEC.elements, Keynote::SINGLETONS, stand_in);
+    let [slide, _, _, drawable] = stand_in.leaf().map(|value| value as usize);
     let Ok(read) =
         package.slide_table_cells(SlideSelector::index(slide), TableSelector::index(ordinal))
     else {
-        return;
+        return tree.build();
     };
     let table = read.table();
     let dimensions = table.dimensions();
     let (rows, columns) = (dimensions.rows(), dimensions.columns());
-    tree.draft(item)
+    tree.root()
         .prop("name", text(Some(table.name())))
         .prop("rows", count(rows as usize))
         .prop("cols", count(columns as usize))
         .label(Some(table.name()))
         .done();
+    let items = (rows as usize).saturating_mul(1 + columns as usize);
+    if items >= super::part::TABLE_ITEMS {
+        return tree.build();
+    }
     for row in 0..rows {
         let row_item = tree
-            .push(item, Kind::Row)
+            .push(ROOT, Kind::Row)
             .leaf([slide, DRAWABLE, row as usize, drawable])
             .done();
         for column in 0..columns {
@@ -979,6 +1005,8 @@ fn table(
                 .done();
         }
     }
+    debug_assert!(tree.len() <= super::part::TABLE_ITEMS);
+    tree.build()
 }
 
 /// The type token of a table cell value.

@@ -31,7 +31,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `3f9933fcc82cdb5c6974246e4eff44efd2985093eaa5302abc7b1a3c6a387faa` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `a8e6bfdedfcc65539479cb710e28b8818dbdda31ab68fb831106ca0576c823d6` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `2fdded1c92e64c56696c48a388dd03c27c4f6297468640ffa1133bd113bc8529` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `a709d8d0d7f5b8d90b14ba3162013f4afc0a0c914a238ba6cec825295bcd4d37` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
@@ -43,7 +43,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `adbc9fc35ffae00c3089b29ffbe50bf327f8a0f7ec11080651ed8ddda00f87ba` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d7ed0734b44bf5cec561cea44b5e7629e2c19e96ce1834aecacf776daf95b990` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `f6be53b953eb7ca538731f5d32fedf58dc3804812313739f38392172139284ab` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `51c51512e3c89b13c59f053cfb96cdd907747af2510db1945450c8e8fbb800dd` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -7876,7 +7876,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `run` | `placeholder and notes runs` | character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles | record 0309 follow-ups |
+| `set` | `run` | `speaker-notes runs` | character properties are written on runs of text boxes, shapes and title and body placeholders (record 0312); speaker notes list no runs and keep their styles | record 0312 follow-ups |
 | `add` | `run` | `a new character run` | a run is a styled span of a paragraph; add a paragraph or set its text | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
 | `set` | `tc` | `cells in a formula graph` | slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale | record 0309 follow-ups |
 | `add` | `table` | `a new slide table` | the Keynote leaf has no slide-table creation transaction | record 0298 follow-up: Keynote slide-table creation |
@@ -10870,8 +10870,6 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata() | record 0299 Pages metadata node |
-| `add` | `section` | `a new section` | the Pages leaf has no section lifecycle transaction (a section break plus a new native section object) | IWORK_API_REQUESTS.md request 11 |
-| `remove` | `section` | `a section` | the Pages leaf has no section lifecycle transaction | IWORK_API_REQUESTS.md request 11 |
 | `set` | `tc` | `cells in a formula graph` | body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale | record 0309 follow-ups |
 | `add` | `tbl` | `a new body table` | the Pages leaf deletes body tables but has no table-creation transaction | record 0299 follow-up: Pages body-table creation |
 | `remove` | `p` | `a paragraph that anchors a chart, image or footnote` | a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here | record 0301 follow-up: delete those anchored objects with their paragraph |

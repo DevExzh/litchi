@@ -1101,8 +1101,9 @@ impl<'a> Edit<'a> {
     /// # Errors
     ///
     /// Returns typed selector errors, [`Error::InvalidSpan`],
-    /// [`Error::Unsupported`] for drawables other than text boxes and shapes
-    /// and [`Unsupported::TextStyling`] for a style that sets nothing; a
+    /// [`Error::Unsupported`] for drawables other than text boxes, shapes and
+    /// title and body placeholders, and [`Unsupported::TextStyling`] for a
+    /// style that sets nothing; a
     /// storage shared with other objects is refused by [`Self::commit`].
     ///
     /// ```no_run
@@ -1134,8 +1135,14 @@ impl<'a> Edit<'a> {
         style: Style,
     ) -> Result<&mut Self, Error> {
         let (selected, item) = self.drawable(slide.into(), drawable.into())?;
-        let (Kind::TextBox | Kind::Shape, Some(storage), Some(current)) =
-            (item.kind, item.storage, item.text.as_deref())
+        // Title and body placeholders style their slide's own storage, as
+        // text boxes do (record 0312); their text writes go through
+        // `slide::text`, never through this edit.
+        let (
+            Kind::TextBox | Kind::Shape | Kind::TitlePlaceholder | Kind::BodyPlaceholder,
+            Some(storage),
+            Some(current),
+        ) = (item.kind, item.storage, item.text.as_deref())
         else {
             return Err(Error::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },

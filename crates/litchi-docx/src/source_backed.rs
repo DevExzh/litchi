@@ -2188,11 +2188,7 @@ impl Package {
                         source_version,
                         partname,
                     )?;
-                    *self
-                        .main_snapshot
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                        Some(snapshot.clone());
+                    self.remember_main_snapshot(&snapshot);
                     Ok(snapshot)
                 })();
                 snapshot?
@@ -2208,8 +2204,17 @@ impl Package {
         result
     }
 
+    /// Keep `snapshot` as the unmanaged transaction snapshot memo.
+    fn remember_main_snapshot(&self, snapshot: &Snapshot) {
+        *self
+            .main_snapshot
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(snapshot.clone());
+    }
+
     /// The memoized unmanaged snapshot, when it was built from this source
-    /// revision's main part and its bytes equal `raw`.
+    /// revision's main part, or from an effective revision over it, and its
+    /// bytes equal `raw`.
     fn memoized_main_snapshot(
         &self,
         raw: &[u8],

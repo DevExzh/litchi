@@ -158,6 +158,12 @@ impl Package {
                 topology
                     .apply_source_xml(&source_xml, target_xml)
                     .map_err(Error::from)?
+            } else if let Some(proof) = target.publication_proof() {
+                // The commit audited exactly these bytes; the overlay accepts
+                // its proof instead of auditing them again (record 0311).
+                topology
+                    .apply_verified_xml_bytes(&name, current.xml_bytes(), proof.clone())
+                    .map_err(Error::from)?
             } else {
                 let bytes = target.shared_xml()?;
                 topology
@@ -218,6 +224,13 @@ impl Package {
             } else {
                 let data = main.data().map_err(Error::from)?;
                 self.admit_main_document(data.as_bytes(), version, operation)?;
+                // A committed handle edited again scans its effective revision
+                // once, as the physical route does (record 0311).
+                if let Some(snapshot) =
+                    self.memoized_main_snapshot(data.as_bytes(), &lineage, version, &name)
+                {
+                    return Ok((name, snapshot));
+                }
                 let mut bytes = Vec::new();
                 bytes
                     .try_reserve_exact(data.as_bytes().len())
@@ -228,12 +241,14 @@ impl Package {
                         })
                     })?;
                 bytes.extend_from_slice(data.as_bytes());
-                Snapshot::from_shared_xml_with_source_identity(
+                let snapshot = Snapshot::from_shared_xml_with_source_identity(
                     Arc::new(bytes),
                     lineage,
                     version,
                     &name,
-                )?
+                )?;
+                self.remember_main_snapshot(&snapshot);
+                snapshot
             };
             Ok((name, snapshot))
         })();

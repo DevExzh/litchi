@@ -2,7 +2,8 @@
 //! of a 1,000-paragraph document (record 0307's fixture shape), the leaf
 //! `Edit::replace_paragraph_text` / `insert_paragraph` + commit against the
 //! unified `set` / `add` on a default (`SourceMode::Auto`, source-backed)
-//! owner and on an eager owner. Each leg: two warm-ups, nine samples of
+//! owner and on an eager owner, and (record 0311, `committed_*`) on a handle
+//! already committed from the default owner. Each leg: two warm-ups, nine samples of
 //! `DOCX_LARGE_LOOPS` calls (default 20), the median in µs per call.
 //! `DOCX_LARGE_ONLY=<leg>` runs one leg; `DOCX_LARGE_PROFILE=1` loops it
 //! once for a profiler.
@@ -71,6 +72,11 @@ mod bench {
         )
         .unwrap();
         let path = "/body/p[501]";
+        // A handle already committed from the default owner (record 0311):
+        // its next edit reads the effective revision, not the physical one.
+        let committed = auto
+            .set("/body/p[2]", props! {"text" => "Committed earlier"})
+            .unwrap();
         let mut legs: Vec<(&str, Box<dyn FnMut()>)> = vec![
             (
                 "leaf_set",
@@ -91,6 +97,16 @@ mod bench {
                 "eager_set",
                 Box::new(|| {
                     black_box(eager.set(path, props! {"text" => "Replaced text"}).unwrap());
+                }),
+            ),
+            (
+                "committed_set",
+                Box::new(|| {
+                    black_box(
+                        committed
+                            .set(path, props! {"text" => "Replaced text"})
+                            .unwrap(),
+                    );
                 }),
             ),
             (
@@ -120,6 +136,21 @@ mod bench {
                 Box::new(|| {
                     black_box(
                         eager
+                            .add(
+                                "/body",
+                                NewNode::new("paragraph")
+                                    .prop("text", "Inserted")
+                                    .at(Placement::Position(Position::new(500))),
+                            )
+                            .unwrap(),
+                    );
+                }),
+            ),
+            (
+                "committed_add",
+                Box::new(|| {
+                    black_box(
+                        committed
                             .add(
                                 "/body",
                                 NewNode::new("paragraph")

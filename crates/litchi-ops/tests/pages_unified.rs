@@ -518,3 +518,49 @@ fn body_table_cells_take_values() {
         Some("empty")
     );
 }
+
+#[test]
+fn sections_are_added_and_removed() {
+    // Record 0312 (request 11): a section break and a copy of the page
+    // masters, headers and footers of the section it follows.
+    let file = read("pages/basic.pages");
+    let litchi_ops::Added {
+        file: added, path, ..
+    } = file
+        .add("/", NewNode::new("section").prop("name", "Appendix"))
+        .expect("add section");
+    assert_eq!(path.to_string(), "/section[2]");
+    let reopened = reopen(&added);
+    assert_eq!(prop(&reopened, "/", "sectionCount").as_deref(), Some("2"));
+    assert_eq!(
+        prop(&reopened, "/section[2]", "name").as_deref(),
+        Some("Appendix")
+    );
+    assert_eq!(text(&reopened, "/section[2]").as_deref(), Some(""));
+    assert_eq!(text(&reopened, "/section[1]"), text(&file, "/section[1]"));
+    assert_eq!(
+        reopened
+            .query("section[2] > footer")
+            .expect("query")
+            .count(),
+        file.query("section[1] > footer").expect("query").count()
+    );
+    // The first section cannot be removed, nor preceded.
+    let error = reopened.remove("/section[1]").expect_err("first section");
+    assert_eq!(error.code(), Code::InvalidArgument);
+    let error = file
+        .add("/", NewNode::new("section").at(Placement::Start))
+        .expect_err("before the first section");
+    assert_eq!(error.code(), Code::InvalidArgument);
+    // Text written into the new section joins the first one on removal.
+    let written = reopened
+        .set("/section[2]", props! { "text" => "Tail" })
+        .expect("set");
+    let removed = written.remove("/section[2]").expect("remove section");
+    let removed = reopen(&removed);
+    assert_eq!(prop(&removed, "/", "sectionCount").as_deref(), Some("1"));
+    assert_eq!(
+        text(&removed, "/section[1]"),
+        text(&file, "/section[1]").map(|text| format!("{text}Tail"))
+    );
+}

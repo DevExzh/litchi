@@ -439,3 +439,41 @@ pre-existing refusals on several corpus files; Pages section add/remove
 placeholder and notes run styles, table creation, movie and audio
 creation, duplicating slides with other-component content, image data
 removal and stale thumbnail records; a readable placeholder `hidden`.
+
+## 2026-10-16 lazy tables and the next element gaps (record 0312)
+
+- **11 (Pages): done.** `section::lifecycle`
+  (`Package::{edit_section_lifecycle, apply_section_lifecycle}`;
+  `Edit::{add(after, Option<&str>), remove(section)}`, one operation per
+  edit). Add inserts a U+0004 break at the end of a section and a
+  section-table entry for an independent copy of that section's private
+  graph (page templates, headers and footers, the guide map and its first
+  guide storage), as the native editor does; remove drops a non-initial
+  boundary and its private graph, and the removed section's text joins the
+  preceding one. On `basic.pages` and `body-sections-unicode.pages` the
+  rewritten `Index/Document.iwa` is identical to the retired host editor's
+  (`append_pages_section`, `remove_pages_section`); only the registry
+  differs (fresh UUIDs; the host also lowers the identifier watermark).
+  Typed refusals: `InitialSection`, `EmptySection` (a break must follow
+  content), `UnsupportedContent` (a header or footer owning records of its
+  own, data references), `UnsupportedDependency`. 31 of 31 corpus
+  documents add and remove a section. Unified `add` of `section` under `/`
+  and `remove` of `/section[N]`.
+- **10 (Keynote placeholders): done.** `slide::drawable::Edit::set_text_style`
+  accepts title and body placeholders (78 corpus placeholders styled and
+  inverted exactly). **Open:** speaker-notes runs (the tree lists no runs
+  under notes; the notes storage needs a run reader and a style writer).
+- **Keynote placeholder `hidden`: readable** through
+  `Package::slide_placeholder_visibility` (no leaf change).
+- **19 (Numbers comments): open, diagnosed.** Probing
+  `set_table_cell_comment` on every corpus workbook (record 0312 §5): 31
+  files fail because the creation census is package-wide and refuses a
+  workbook holding more than one comment list (native Numbers gives every
+  table its own) — selecting the target table's list moves that refusal to
+  the next check, which requires the comment list, the table model and the
+  tile in one component (native files keep tiles in their own
+  components, so creation needs cross-component registry references); 6
+  more fail the strict header-metadata census of other lists
+  (`validate_comment_message_metadata`). Not changed in this record.
+- **Still open:** Keynote and Pages table creation; Numbers topology on
+  tables with formulas (the formula-coordinate shift is not ported).
