@@ -946,3 +946,73 @@ fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
     }
     Ok(())
 }
+
+/// Title and body placeholders take character styles on their slide's own
+/// storage (record 0312); the text stays, the runs read back, the inverse
+/// restores the bytes.
+#[test]
+fn corpus_placeholders_take_character_styles() -> TestResult {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(keynote_dir())?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<_, _>>()?;
+    paths.retain(|path| path.extension().is_some_and(|extension| extension == "key"));
+    paths.sort();
+    let mut styled = 0_usize;
+    let mut refused = Vec::new();
+    for path in paths {
+        let Ok(package) = Package::open(&path) else {
+            continue;
+        };
+        let Ok(slides) = package.slides() else {
+            continue;
+        };
+        for slide_index in 0..slides.len() {
+            let slide = SlideSelector::index(slide_index);
+            let Ok(drawables) = package.slide_drawable_list(slide) else {
+                continue;
+            };
+            for (index, drawable) in drawables.iter().enumerate() {
+                if !matches!(
+                    drawable.kind(),
+                    Kind::TitlePlaceholder | Kind::BodyPlaceholder
+                ) {
+                    continue;
+                }
+                let Some(text) = drawable.text().filter(|text| text.chars().count() >= 2) else {
+                    continue;
+                };
+                let source = bytes(&package)?;
+                let selector = DrawableSelector::index(index);
+                let mut edit = package.edit_slide_drawables();
+                edit.set_text_style(
+                    slide,
+                    selector,
+                    TextSpan::new(0, 2),
+                    Style::new().with_bold(true).with_color([1, 2, 3]),
+                )?;
+                match edit.commit() {
+                    Ok(commit) => {
+                        let package = commit.package();
+                        let runs = package.slide_drawable_text_runs(slide, selector)?;
+                        assert_eq!(runs[0].style().bold, Some(true), "{}", path.display());
+                        assert_eq!(runs[0].style().color, Some([1, 2, 3]));
+                        assert_eq!(
+                            list(package, slide_index)?[index].text(),
+                            Some(text),
+                            "{}",
+                            path.display()
+                        );
+                        let restored = package.apply_slide_drawables(&commit.patch().inverse())?;
+                        assert_eq!(bytes(restored.package())?, source, "{}", path.display());
+                        styled += 1;
+                    },
+                    Err(error @ Error::Unsupported { .. }) => refused.push((path.clone(), error)),
+                    Err(error) => panic!("{}: {error:?}", path.display()),
+                }
+            }
+        }
+    }
+    eprintln!("styled {styled}; refused {refused:?}");
+    assert!(styled >= 10, "only {styled} styled");
+    Ok(())
+}
