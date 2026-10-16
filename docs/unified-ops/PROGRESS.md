@@ -609,6 +609,12 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - the coordinator watches `MemAvailable` (alert below 16 GB) and free disk.
 - Resumed: `iwork-found` (0296), `checklist-fixes` (0290), `perf-path` (0291), `producer-structure` (0293). Held: `odf-verbs` (0292), `acceptance2` (0294), `m4-ext` (0295).
 
+## Incident (2026-10-16): coordinator session lost to an OOM kill
+The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were running.
+- Cause, now confirmed: the user journal shows a kernel OOM kill in the session's tmux scope (memory peak 106.8 GB). That scope has `OOMPolicy=stop`, so systemd stopped the whole scope, coordinator included. The policy cannot be changed at runtime.
+- Mitigation: a coordinator-side cargo shim (`.coord/bin/cargo`) runs every cargo command in its own `systemd-run --user --scope` with `OOMPolicy=continue` and `MemoryMax=26G`. An OOM now kills only that command. Every agent env, the gate and the rebless scripts put the shim first on `PATH`, and the agent rules require the same scoping for valgrind and perf.
+- Resumed all four agents.
+
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
   - `File::metadata()` reports `dc:language` for every ODF format (six Markdown golden rows updated);
