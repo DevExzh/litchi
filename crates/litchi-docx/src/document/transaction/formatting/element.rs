@@ -1245,10 +1245,17 @@ impl Edit {
             Some(index) => {
                 let (start, end, _) = &layout.children[index];
                 let paragraph = &before[*start..*end];
-                // A paragraph the text rewrite refuses holds content that a
-                // plain replacement would drop (record 0304).
-                let owner = scan_text_owner(paragraph, b"p").map_err(refusal)?;
-                rewrite_text_owner(paragraph, &owner, &text)?
+                match scan_text_owner(paragraph, b"p") {
+                    Ok(owner) => rewrite_text_owner(paragraph, &owner, &text)?,
+                    // A paragraph with no text slot (an empty one) loses
+                    // nothing to a plain replacement; any other paragraph the
+                    // text rewrite refuses holds content it would drop
+                    // (record 0304).
+                    Err(_) if is_plain_text_block(paragraph) => {
+                        self.plain_paragraph(&layout, &text)?
+                    },
+                    Err(reason) => return Err(refusal(reason)),
+                }
             },
             None => self.plain_paragraph(&layout, &text)?,
         };

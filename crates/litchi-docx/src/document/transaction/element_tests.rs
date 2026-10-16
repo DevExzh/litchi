@@ -253,6 +253,7 @@ fn cell_text_replacement_refuses_content_it_would_drop() {
         r#"<w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r></w:hyperlink></w:p>"#,
         r#"<w:p><w:bookmarkStart w:id="1" w:name="b"/><w:r><w:t>one</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>"#,
         r#"<w:p><w:fldSimple w:instr="PAGE"><w:r><w:t>1</w:t></w:r></w:fldSimple></w:p>"#,
+        r#"<w:p><w:r><w:pict/></w:r></w:p>"#,
     ] {
         let base = snapshot(&format!(
             "<w:tbl><w:tr><w:tc>{content}</w:tc></w:tr></w:tbl>"
@@ -271,6 +272,11 @@ fn cell_text_replacement_refuses_content_it_would_drop() {
     let base = snapshot(
         r#"<w:tbl><w:tr><w:tc><w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>two</w:t><w:tab/><w:br/></w:r></w:p></w:tc></w:tr></w:tbl>"#,
     );
+    let mut edit = base.edit();
+    edit.replace_cell_text_at(&cell(0, 0, 0), "new").unwrap();
+    commit_and_check(&base, edit);
+    // An empty first paragraph has nothing to lose.
+    let base = snapshot(r#"<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>"#);
     let mut edit = base.edit();
     edit.replace_cell_text_at(&cell(0, 0, 0), "new").unwrap();
     commit_and_check(&base, edit);
