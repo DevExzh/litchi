@@ -74,12 +74,15 @@ fn create_returns_a_deterministic_minimal_workbook() {
         prop(&reopen(&merged), "/sheet[1]/table[1]", "mergeCount").as_deref(),
         Some("1")
     );
-    // Gap: the built blank has no formula-owner dependency record for its
-    // table, so the leaf refuses formula authoring (FormulaCache).
-    let error = reopened
+    // The blank's table owner carries the native table extents, so the
+    // created workbook authors formulas (record 0309).
+    let formula = reopened
         .set("/sheet[1]/table[1]/B2", props! { "formula" => "A2*3" })
-        .expect_err("formulas need a formula owner");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+        .expect("a formula into the fresh workbook");
+    assert_eq!(
+        prop(&reopen(&formula), "/sheet[1]/table[1]/B2", "type").as_deref(),
+        Some("formula")
+    );
 }
 
 #[test]

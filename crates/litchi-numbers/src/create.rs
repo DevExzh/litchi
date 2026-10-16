@@ -34,7 +34,12 @@
 //! Numbers writer (`litchi_iwa::numbers::NumbersDocumentBuilder::new()`,
 //! file format 14.4.1, stored members), with its identity rewritten to
 //! [`Identity::BLANK`] by this module and its build-history producer
-//! string set to `Litchi`. It is 6 KiB and holds no preview images.
+//! string set to `Litchi`. Record 0309 then gave its table's formula owner
+//! the native table extents (the spanning dependencies' total and body
+//! ranges, as a table added by `table::lifecycle` carries them), so formulas
+//! can be authored on a created workbook; the change was published through
+//! the structural working set and the asset regenerated from it. It is
+//! 6 KiB and holds no preview images.
 
 use std::fmt;
 use std::io::Cursor;

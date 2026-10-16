@@ -3604,9 +3604,15 @@ impl Preflight {
         )?;
         let field_upper = checked_mul(checked_add(source_bytes, output_upper)?, 4)?;
         ensure_limit("field preauthorization", field_upper, limits.max_fields)?;
-        let reference_upper = checked_mul(
-            checked_add(graph.owners.len(), checked_add(cell_tiles, range_tiles)?)?,
-            4,
+        // Each owner may gain one dependency tile (an owner without tiles,
+        // such as a created workbook's table owner, gets its first one), so
+        // the bound allows one more reference per owner (record 0309).
+        let reference_upper = checked_add(
+            checked_mul(
+                checked_add(graph.owners.len(), checked_add(cell_tiles, range_tiles)?)?,
+                4,
+            )?,
+            graph.owners.len(),
         )?;
         ensure_limit(
             "reference preauthorization",

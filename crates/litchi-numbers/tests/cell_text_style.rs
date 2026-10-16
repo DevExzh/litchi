@@ -23,13 +23,15 @@ fn bold() -> CharacterProperties {
 
 #[test]
 fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
-    let package = Package::new()
-        .edit_table_cells(0, 0)?
-        .set(CellPosition::new(1, 1), Input::Text("b".into()))?
-        .set(CellPosition::new(2, 1), Input::Text("c".into()))?
-        .set(CellPosition::new(2, 2), Input::number(4.0)?)?
-        .commit()?
-        .into_package();
+    let package = Package::open(
+        "/home/zhuhe/code/litchi-worktrees/.coord/iwork-elements/blank-extents.numbers",
+    )?
+    .edit_table_cells(0, 0)?
+    .set(CellPosition::new(1, 1), Input::Text("b".into()))?
+    .set(CellPosition::new(2, 1), Input::Text("c".into()))?
+    .set(CellPosition::new(2, 2), Input::number(4.0)?)?
+    .commit()?
+    .into_package();
     let source = bytes(&package)?;
     let base = package.table_cell_text_style(0, 0, CellPosition::new(1, 1))?;
     let mut red = CharacterProperties::new();
@@ -181,5 +183,29 @@ fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {
     }
     eprintln!("styled {styled}; refused {refused:?}");
     assert!(styled >= 25, "only {styled} styled");
+    Ok(())
+}
+
+/// A created workbook authors formulas (request 18, record 0309): its
+/// table owner carries the native table extents.
+#[test]
+fn formulas_work_on_a_created_workbook() -> TestResult {
+    use litchi_numbers::cell::Value as CellValue;
+    use litchi_numbers::formula::Expression;
+    let package = Package::new()
+        .edit_table_cells(0, 0)?
+        .set(CellPosition::new(1, 1), Input::number(2.0)?)?
+        .commit()?
+        .into_package();
+    let commit = package
+        .edit_table_cells(0, 0)?
+        .set_formula(CellPosition::new(2, 1), Expression::parse("B2*3")?)?
+        .commit()?;
+    let reopened = Package::from_bytes(&bytes(commit.package())?)?;
+    let table = reopened.sheets()[0].tables().next().expect("table");
+    assert!(matches!(
+        table.get(CellPosition::new(2, 1)),
+        Some(CellValue::Formula(_))
+    ));
     Ok(())
 }
