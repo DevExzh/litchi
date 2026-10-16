@@ -29,6 +29,10 @@ enum Footprint {
     Run(StoryRef, usize, usize),
     Attribute(ObjectRef, Attribute),
     PageName(usize),
+    /// Character formatting of a paragraph or run of the story (record
+    /// 0308): it reads the story's runs, so it never shares a run with a
+    /// text write of the same story.
+    Format(StoryRef),
 }
 
 impl Footprint {
@@ -48,6 +52,7 @@ impl Footprint {
                 object, attribute, ..
             } => Self::Attribute(object.clone(), *attribute),
             Change::SetPageName { page, .. } => Self::PageName(*page),
+            Change::SetTextProperties { story, .. } => Self::Format(story.clone()),
             _ => return None,
         })
     }
@@ -69,6 +74,8 @@ struct StoryWrites {
 struct Index {
     stories: HashMap<StoryRef, StoryWrites>,
     pages: HashSet<usize>,
+    /// Stories with pending character formatting.
+    formats: HashSet<StoryRef>,
     /// The position in `Run::changes` of each text footprint.
     text: HashMap<Footprint, usize>,
 }
@@ -77,6 +84,12 @@ impl Index {
     /// Whether `footprint` must see the result of a pending write: it
     /// overlaps one at another granularity, or renames a page twice.
     fn overlaps(&self, footprint: &Footprint) -> bool {
+        if let Footprint::Story(story) | Footprint::Paragraph(story, _) | Footprint::Run(story, ..) =
+            footprint
+            && self.formats.contains(story)
+        {
+            return true;
+        }
         match footprint {
             Footprint::Story(story) => self
                 .stories
@@ -92,6 +105,9 @@ impl Index {
                 .is_some_and(|writes| writes.whole || writes.paragraphs.contains(paragraph)),
             Footprint::Attribute(..) => false,
             Footprint::PageName(page) => self.pages.contains(page),
+            Footprint::Format(story) => self.stories.get(story).is_some_and(|writes| {
+                writes.whole || !writes.paragraphs.is_empty() || !writes.runs.is_empty()
+            }),
         }
     }
 
@@ -117,6 +133,9 @@ impl Index {
             Footprint::Attribute(..) => {},
             Footprint::PageName(page) => {
                 self.pages.insert(*page);
+            },
+            Footprint::Format(story) => {
+                self.formats.insert(story.clone());
             },
         }
     }

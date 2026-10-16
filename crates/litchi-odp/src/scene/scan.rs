@@ -8,6 +8,7 @@ use quick_xml::events::{BytesRef, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
+use super::styles::StylesInsertion;
 use super::{
     Cell, FrameContent, Notes, Object, ObjectKind, Page, Paragraph, Prefixes, Row, Run, RunKind,
     Scene, Story, Table, Wrapper,
@@ -18,6 +19,8 @@ pub(super) const TEXT_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1
 pub(super) const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 pub(super) const PRESENTATION_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+pub(super) const STYLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+pub(super) const FO_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const TABLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const DR3D_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0";
 const XLINK_NS: &[u8] = b"http://www.w3.org/1999/xlink";
@@ -75,6 +78,8 @@ enum Frame {
     Title,
     /// An object's `svg:desc`.
     Description,
+    /// `office:automatic-styles`.
+    AutomaticStyles,
 }
 
 /// The slide parser's paragraph text rules.
@@ -237,6 +242,9 @@ struct Scanner<'x> {
     prefixes: Prefixes,
     root_seen: bool,
     body_end: Option<usize>,
+    /// The content of `office:automatic-styles`, indexed on demand.
+    styles_range: Option<Range<usize>>,
+    styles_insertion: StylesInsertion,
 }
 
 pub(super) fn scan(xml: &str) -> Result<Scene> {
@@ -264,6 +272,8 @@ pub(super) fn scan(xml: &str) -> Result<Scene> {
         prefixes: Prefixes::default(),
         root_seen: false,
         body_end: None,
+        styles_range: None,
+        styles_insertion: StylesInsertion::None,
     };
     scanner.run()?;
     Ok(Scene {
@@ -271,6 +281,8 @@ pub(super) fn scan(xml: &str) -> Result<Scene> {
         prefixes: scanner.prefixes,
         body_end: scanner.body_end,
         len: xml.len(),
+        styles_range: scanner.styles_range,
+        styles_insertion: scanner.styles_insertion,
     })
 }
 
@@ -402,6 +414,12 @@ impl Scanner<'_> {
             Some(Frame::Title | Frame::Description) => return Ok(Frame::Opaque),
             _ => {},
         }
+        // `office:automatic-styles` and its children sit at depth 1 and 2.
+        if self.frames.len() <= 2
+            && let Some(frame) = self.open_style_element(ns, local, start, end, empty)
+        {
+            return Ok(frame);
+        }
         if ns == Some(OFFICE_NS) && local == b"presentation" {
             return Ok(Frame::Body);
         }
@@ -452,6 +470,36 @@ impl Scanner<'_> {
         Ok(Frame::Other)
     }
 
+    /// Note where `office:automatic-styles` holds its styles (indexed on
+    /// demand, `Scene::automatic_styles`) and where `office:body` starts.
+    fn open_style_element(
+        &mut self,
+        ns: Option<&[u8]>,
+        local: &[u8],
+        start: usize,
+        end: usize,
+        empty: bool,
+    ) -> Option<Frame> {
+        if self.frames.len() == 1 && ns == Some(OFFICE_NS) {
+            if local == b"automatic-styles" {
+                if empty {
+                    self.styles_insertion = StylesInsertion::Expand(start..end);
+                } else {
+                    // `Before` and the range end are set at the end tag.
+                    self.styles_insertion = StylesInsertion::None;
+                    self.styles_range = Some(end..end);
+                }
+                return Some(Frame::AutomaticStyles);
+            }
+            if local == b"body" && self.styles_insertion == StylesInsertion::None {
+                self.styles_insertion = StylesInsertion::Create(start);
+            }
+            return None;
+        }
+        // The styles' own subtree is not part of the scene.
+        (self.parent() == Some(Frame::AutomaticStyles)).then_some(Frame::Opaque)
+    }
+
     fn read_prefixes(&mut self, element: &BytesStart<'_>) -> Result<()> {
         for attribute in element.attributes() {
             let attribute =
@@ -472,6 +520,12 @@ impl Scanner<'_> {
                 &mut self.prefixes.svg
             } else if value == PRESENTATION_NS {
                 &mut self.prefixes.presentation
+            } else if value == STYLE_NS {
+                &mut self.prefixes.style
+            } else if value == FO_NS {
+                &mut self.prefixes.fo
+            } else if value == OFFICE_NS {
+                &mut self.prefixes.office
             } else {
                 continue;
             };
@@ -1039,6 +1093,14 @@ impl Scanner<'_> {
     ) -> Result<()> {
         match frame {
             Frame::Other => {},
+            Frame::AutomaticStyles => {
+                if !empty {
+                    self.styles_insertion = StylesInsertion::Before(content_end);
+                    if let Some(range) = &mut self.styles_range {
+                        range.end = content_end;
+                    }
+                }
+            },
             Frame::Forms => {
                 if let Some(page) = &mut self.page
                     && page.objects.is_empty()

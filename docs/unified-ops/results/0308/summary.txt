@@ -1,0 +1,56 @@
+Record 0308 measurements (release, taskset -c 9, shared 32-core host, load 6-8).
+
+Binaries (not committed; SHA-256):
+  before  90674871bcf9a4b9a7a66f853b5245c4d15116213798b6b7aeffad1d933c0795  trunk 6c8d517eff + examples/office_gaps_bench.rs
+  after   98a381ef36df70838471dcf8bbee39b2f1d09c6dcfe9c4fcb630e04c1cce7581  first version (scan-time ODP style index)            -> r1-*
+  after2  2e59538403ae3d93f1cb72eb501e422706be9d31428869321ef81e29c6d2a0c7  lazy ODP styles, XLS shift reads trimmed              -> r2-*
+  after3  baefa67e24e22a25bc1518d4dc195029ed54ac7f7fc7f73ac52e900cb8c7636d  scan check limited to depth <= 2 (odp_scene only)     -> odp-*
+  new     c34b5bc094d8e4a1f311117cdbde5c8d6bc1e9962a0bce9039c8ce6ec0419575  examples/office_gaps_new_bench.rs, first version      -> r1-new*
+  new2    c783794a328354de831cdceb49da743d02995279d7a12c2b6c180f9333a10ac9  examples/office_gaps_new_bench.rs                      -> r2-new*
+Build: cargo build --release -p litchi-ops --features xls,rtf,odp,doc --example office_gaps_bench --example office_gaps_new_bench
+Order: r1 B A A B; r2 B A A B B A; odp B A A B B A A B. 15 rounds after 3 warm-ups per scenario.
+
+Callgrind, odp_scene only (OFFICE_GAPS_SCENARIO=odp_scene, whole process):
+  before 3,615,153,769 Ir; after3 3,610,098,898 Ir (-0.14%).
+
+xls_complete_open_20k {'after2': [5636.7, 5642.8, 6144.3], 'before': [5894.0, 5791.2, 5672.9]} after/before 0.974
+xls_complete_open_formula_eval {'after2': [1795.0, 1815.4, 1811.5], 'before': [1865.8, 1843.3, 1854.5]} after/before 0.977
+xls_row_insert_10k native {'after2': [9952.2, 10023.4, 10518.7], 'before': [9930.0, 9954.3, 10525.5]} after/before 1.007
+xls_row_insert_10k unified {'after2': [9947.4, 10037.2, 10524.5], 'before': [9930.6, 9949.2, 10712.5]} after/before 1.009
+   unified/native {'after2': [1.0, 1.001, 1.001], 'before': [1.0, 0.999, 1.018]}
+rtf_move_plain_1k native {'after2': [429.2, 431.4, 436.7], 'before': [429.0, 434.7, 435.1]} after/before 0.992
+rtf_move_plain_1k unified {'after2': [428.2, 430.6, 435.0], 'before': [435.1, 434.6, 435.7]} after/before 0.99
+   unified/native {'after2': [0.998, 0.998, 0.996], 'before': [1.014, 1.0, 1.001]}
+rtf_move_producer_1k native {'after2': [596.5, 600.8, 606.6], 'before': [601.8, 604.6, 611.0]} after/before 0.994
+rtf_move_producer_1k unified {'after2': [599.6, 600.7, 599.5], 'before': [607.0, 604.8, 605.9]} after/before 0.99
+   unified/native {'after2': [1.005, 1.0, 0.988], 'before': [1.009, 1.0, 0.992]}
+odp_scene_parse_200 {'after2': [504.2, 504.1, 510.7], 'before': [487.9, 495.4, 487.3]} after/before 1.034
+doc_text_set native {'after2': [57.5, 57.4, 58.1], 'before': [58.5, 57.6, 59.2]} after/before 0.983
+doc_text_set unified {'after2': [90.0, 89.9, 90.4], 'before': [90.3, 91.0, 92.0]} after/before 0.989
+   unified/native {'after2': [1.566, 1.567, 1.556], 'before': [1.545, 1.58, 1.555]}
+new1.jsonl odp_run_format_200 1814.5 1824.3 1.005
+new1.jsonl rtf_producer_insert_1k 868.8 856.2 0.985
+new1.jsonl rtf_producer_replay_1k 729.9 729.5 0.999
+new1.jsonl xls_row_insert_unindexed 95.8 97.2 1.015
+new2.jsonl odp_run_format_200 1821.5 1821.3 1.0
+new2.jsonl rtf_producer_insert_1k 854.6 847.9 0.992
+new2.jsonl rtf_producer_replay_1k 740.1 736.6 0.995
+new2.jsonl xls_row_insert_unindexed 95.2 96.3 1.012
+
+odp_scene_parse_200 {'after3': [501.7, 494.4, 495.1, 494.7], 'before': [464.2, 463.9, 459.3, 479.9]} after/before 1.066
+
+xls_complete_open_20k {'after': [5433.2, 5471.5], 'before': [5730.8, 5590.1]} after/before 0.963
+xls_complete_open_formula_eval {'after': [1774.5, 1768.1], 'before': [1819.8, 1809.1]} after/before 0.976
+xls_row_insert_10k native {'after': [10508.2, 10285.5], 'before': [9928.1, 9862.5]} after/before 1.051
+xls_row_insert_10k unified {'after': [10494.2, 10313.7], 'before': [9938.8, 9851.6]} after/before 1.051
+   unified/native {'after': [0.999, 1.003], 'before': [1.001, 0.999]}
+rtf_move_plain_1k native {'after': [429.2, 428.4], 'before': [428.2, 431.7]} after/before 0.997
+rtf_move_plain_1k unified {'after': [427.2, 428.8], 'before': [428.9, 432.4]} after/before 0.994
+   unified/native {'after': [0.995, 1.001], 'before': [1.002, 1.002]}
+rtf_move_producer_1k native {'after': [600.2, 598.3], 'before': [601.3, 603.6]} after/before 0.995
+rtf_move_producer_1k unified {'after': [595.2, 598.7], 'before': [600.0, 597.9]} after/before 0.997
+   unified/native {'after': [0.992, 1.001], 'before': [0.998, 0.99]}
+odp_scene_parse_200 {'after': [681.4, 674.8], 'before': [486.3, 494.4]} after/before 1.383
+doc_text_set native {'after': [58.3, 58.6], 'before': [57.8, 58.1]} after/before 1.01
+doc_text_set unified {'after': [90.8, 91.4], 'before': [90.0, 90.0]} after/before 1.012
+   unified/native {'after': [1.557, 1.559], 'before': [1.558, 1.551]}

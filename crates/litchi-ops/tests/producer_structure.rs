@@ -4,7 +4,8 @@
 //! made. Each case below failed before record 0293 and pins one producer
 //! construct the leaves now handle; the inverse edit must restore the input
 //! bytes. The corpus-wide picture is in `corpus_fidelity.rs` (structure
-//! columns) and the ignored `structure_census.rs`.
+//! columns) and the ignored `structure_census.rs`. Record 0308 adds the
+//! XLS and RTF producer constructs pinned below.
 
 #![cfg(all(
     feature = "xls",
@@ -77,7 +78,67 @@ mod xls {
             .map(drop)
             .expect_err("conditional formats are not shifted");
         assert_eq!(error.code().as_str(), "unsupported_capability");
-        assert!(error.message().contains("0x01B0"), "{}", error.message());
+        assert!(
+            error.message().contains("conditional format"),
+            "{}",
+            error.message()
+        );
+    }
+
+    /// Record 0308: producer constructs the shifts now handle.
+    #[test]
+    fn worksheets_without_index_or_dbcell_regenerate_their_row_table() {
+        round_trips("ole/xls/WithExtendedStyles.xls");
+        // DIMENSIONS wider than the cells are kept, shifted.
+        round_trips("libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls");
+    }
+
+    #[test]
+    fn an_embedded_chart_has_its_own_dimensions() {
+        round_trips("ole/xls/SimpleChart.xls");
+    }
+
+    #[test]
+    fn split_drawings_and_picture_objects_shift() {
+        round_trips("ole/xls/SimpleWithImages.xls");
+    }
+
+    #[test]
+    fn shared_formulas_move_with_their_cells() {
+        round_trips("poi/test-data/spreadsheet/44010-TwoCharts.xls");
+    }
+
+    #[test]
+    fn reference_free_validations_move_with_their_ranges() {
+        round_trips("libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls");
+    }
+
+    #[test]
+    fn a_shifted_shared_formula_reads_back() {
+        // Insert a row at the top of a sheet with shared formulas: every
+        // formula cell keeps its rendered formula one row lower.
+        let (file, _) = input("poi/test-data/spreadsheet/44010-TwoCharts.xls");
+        let added = file
+            .add("/sheet[1]", NewNode::new("row").at(Placement::Start))
+            .unwrap();
+        let before = file.query("/sheet[1]/cell").unwrap().count();
+        let after = added.file.query("/sheet[1]/cell").unwrap().count();
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn locked_drawing_anchors_are_refused() {
+        // A comment box anchored "don't move or size with cells".
+        let (file, _) = input("ole/xls/SimpleWithComments.xls");
+        let error = file
+            .add("/sheet[1]", NewNode::new("row").at(Placement::Start))
+            .map(drop)
+            .expect_err("a position-locked anchor needs row sizes");
+        assert!(
+            error.message().contains("position-locked"),
+            "{}",
+            error.message()
+        );
     }
 }
 
@@ -128,6 +189,53 @@ mod pptx {
 
 mod rtf {
     use super::*;
+
+    fn text(file: &File, path: &str) -> Option<String> {
+        file.get(path)
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .map(|text| text.into_owned())
+    }
+
+    /// Record 0308: a paragraph added to producer RTF is a scoped group, so
+    /// removing it again restores the source bytes.
+    #[test]
+    fn producer_paragraphs_are_added_and_removed_exactly() {
+        let (file, bytes) = input("rtf/testUnicode.rtf");
+        let added = file
+            .add(
+                "/body",
+                NewNode::new("paragraph")
+                    .prop("text", "Litchi ✓")
+                    .at(Placement::Start),
+            )
+            .unwrap();
+        let reopened = litchi_ops::open_bytes(added.file.to_bytes().unwrap()).unwrap();
+        assert_eq!(text(&reopened, "/body/p[1]").as_deref(), Some("Litchi ✓"));
+        assert_eq!(text(&reopened, "/body/p[2]"), text(&file, "/body/p[1]"));
+        let removed = added.file.remove(&added.path).unwrap();
+        assert_eq!(removed.to_bytes().unwrap(), bytes);
+    }
+
+    /// Record 0308: a paragraph that inherits the root-level state its
+    /// neighbour set, and a formatting group holding several paragraphs,
+    /// move value-exactly.
+    #[test]
+    fn inherited_state_and_split_groups_move_value_exactly() {
+        for relative in ["rtf/testUnicode.rtf", "rtf/cjklist12.rtf"] {
+            let (file, _) = input(relative);
+            let first = text(&file, "/body/p[1]");
+            let second = text(&file, "/body/p[2]");
+            let moved = file
+                .move_to("/body/p[1]", Placement::after("/body/p[2]").unwrap())
+                .unwrap_or_else(|error| panic!("{relative}: {error}"));
+            let reopened = litchi_ops::open_bytes(moved.to_bytes().unwrap()).unwrap();
+            assert_eq!(text(&reopened, "/body/p[1]"), second, "{relative}");
+            assert_eq!(text(&reopened, "/body/p[2]"), first, "{relative}");
+        }
+    }
 
     #[test]
     fn producer_paragraphs_move_and_swap_back_exactly() {

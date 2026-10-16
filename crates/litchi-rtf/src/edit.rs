@@ -5040,12 +5040,13 @@ impl Edit {
     /// closure or candidate validation/readback fails.
     pub fn commit(self) -> Result<Commit, Error> {
         // The plain-body paths keep their behaviour and cost; a paragraph
-        // removal, move or swap they refuse falls back to exact source
-        // splicing of producer paragraphs (record 0293), whose typed refusal
-        // names the producer construct.
+        // insertion, removal, move or swap they refuse falls back to exact
+        // source splicing of producer paragraphs (records 0293, 0308), whose
+        // typed refusal names the producer construct.
         match self.operations.as_slice() {
             [
                 operation @ (Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
                 | Operation::SwapParagraph { .. }),
             ] => {

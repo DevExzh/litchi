@@ -28,10 +28,10 @@ pub(crate) fn decode_flags_preserving(
     flags: u16,
     tokens: &[u8],
 ) -> Result<(Metadata, Option<FlagDefect>)> {
-    if flags & !VALID_FLAGS != 0 {
-        return Err(invalid("Formula flags contain reserved bits"));
-    }
-    let metadata = Metadata::from_wire(flags, 0);
+    // `[MS-XLS]` 2.4.127: reserved1, reserved2 and reserved3 "MUST be
+    // zero, and MUST be ignored". Producers set them (record 0308); a reader
+    // ignores them, and the record bytes stay as the producer wrote them.
+    let metadata = Metadata::from_wire(flags & VALID_FLAGS, 0);
     let defect = (metadata.shared_formula() && !is_ptg_exp(tokens))
         .then_some(FlagDefect::SharedWithoutPtgExp);
     Ok((metadata, defect))

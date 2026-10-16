@@ -1,0 +1,7 @@
+{"median_us":5590.1209499999995,"min_us":5570.96135,"repeats":20,"rounds":15,"scenario":"xls_complete_open_20k"}
+{"median_us":1809.0553499999999,"min_us":1799.7808499999999,"repeats":20,"rounds":15,"scenario":"xls_complete_open_formula_eval"}
+{"native_median_us":9862.4672,"native_min_us":9825.7028,"order":"ABBA","ratio":0.9988992409526088,"repeats":5,"rounds":15,"scenario":"xls_row_insert_10k","unified_median_us":9851.611,"unified_min_us":9815.2248}
+{"native_median_us":431.69519999999994,"native_min_us":431.20029999999997,"order":"ABBA","ratio":1.0015381222677484,"repeats":10,"rounds":15,"scenario":"rtf_move_plain_1k","unified_median_us":432.35920000000004,"unified_min_us":431.30219999999997}
+{"native_median_us":603.6411999999999,"native_min_us":602.3661,"order":"ABBA","ratio":0.9904544288892144,"repeats":10,"rounds":15,"scenario":"rtf_move_producer_1k","unified_median_us":597.8791,"unified_min_us":596.5591000000001}
+{"median_us":494.39304999999996,"min_us":493.10704999999996,"repeats":20,"rounds":15,"scenario":"odp_scene_parse_200"}
+{"native_median_us":58.0533,"native_min_us":57.497299999999996,"order":"ABBA","ratio":1.5506525899475136,"repeats":10,"rounds":15,"scenario":"doc_text_set","unified_median_us":90.0205,"unified_min_us":89.1335}

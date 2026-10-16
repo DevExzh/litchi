@@ -37,8 +37,10 @@ fn parses_all_formula_flags_and_application_cache() {
 }
 
 #[test]
-fn rejects_reserved_flags_empty_tokens_and_trailing_payload() {
-    assert!(decode_flags(0x0002, &[0x16]).is_err());
+fn ignores_reserved_flags_and_rejects_empty_tokens_and_trailing_payload() {
+    // Reserved bits "MUST be ignored" ([MS-XLS] 2.4.127; record 0308).
+    let ignored = decode_flags(0xFFD2, &[0x16]).unwrap();
+    assert_eq!(ignored, decode_flags(0, &[0x16]).unwrap());
     assert!(parse_record(&payload(0, 0, &[])).is_err());
 
     let mut data = payload(0, 0, &[0x16]);
