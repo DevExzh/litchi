@@ -37,6 +37,8 @@ pub mod table_merges;
 
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;
+/// Payload-level cell writes shared by the Pages and Keynote table owners.
+pub mod table_write;
 
 use std::collections::BTreeMap;
 
@@ -249,6 +251,48 @@ pub enum CellDataFormatKind {
     Text,
     PopUpMenu,
 }
+
+/// The table data list a BNC cell key indexes (record 0309).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ListKind {
+    /// `string_table`.
+    String,
+    /// `rich_text_table`.
+    RichText,
+    /// `style_table` (cell styles and text styles).
+    Style,
+    /// `conditional_style_table`.
+    ConditionalStyle,
+    /// `formula_table`.
+    Formula,
+    /// `formula_error_table`.
+    FormulaError,
+    /// `control_cell_spec_table`.
+    ControlCellSpec,
+    /// `comment_storage_table`.
+    Comment,
+    /// `format_table` (every format identifier).
+    Format,
+}
+
+/// Every key-bearing BNC field and the list it indexes.
+const LIST_KEY_FLAGS: [(u32, ListKind); 15] = [
+    (STRING_FLAG, ListKind::String),
+    (RICH_TEXT_FLAG, ListKind::RichText),
+    (STYLE_FLAG, ListKind::Style),
+    (TEXT_STYLE_FLAG, ListKind::Style),
+    (CONDITIONAL_STYLE_FLAG, ListKind::ConditionalStyle),
+    (FORMULA_FLAG, ListKind::Formula),
+    (CONTROL_CELL_SPEC_FLAG, ListKind::ControlCellSpec),
+    (FORMULA_ERROR_FLAG, ListKind::FormulaError),
+    (COMMENT_FLAG, ListKind::Comment),
+    (CELL_FORMAT_IDENTIFIER_FLAG, ListKind::Format),
+    (CURRENCY_FORMAT_IDENTIFIER_FLAG, ListKind::Format),
+    (DATE_TIME_FORMAT_IDENTIFIER_FLAG, ListKind::Format),
+    (DURATION_FORMAT_IDENTIFIER_FLAG, ListKind::Format),
+    (TEXT_FORMAT_IDENTIFIER_FLAG, ListKind::Format),
+    (CHECKBOX_FORMAT_IDENTIFIER_FLAG, ListKind::Format),
+];
 
 #[derive(Debug, Clone)]
 pub struct BncCell {
@@ -710,6 +754,14 @@ impl BncCell {
     #[must_use]
     pub fn formula_error_identifier(&self) -> Option<u32> {
         self.u32_field(FORMULA_ERROR_FLAG)
+    }
+
+    /// Every table data-list key this cell holds a reference to, in flag
+    /// order, with the list it indexes (a removed cell releases each one).
+    pub fn list_keys(&self) -> impl Iterator<Item = (ListKind, u32)> + '_ {
+        LIST_KEY_FLAGS
+            .iter()
+            .filter_map(|(flag, kind)| Some((*kind, self.u32_field(*flag)?)))
     }
 
     #[must_use]

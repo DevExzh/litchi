@@ -105,6 +105,15 @@ pub(crate) const PLACEHOLDER_PROPS: &[PropSpec] = &[
     writable("height", EXTENT),
     writable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
+    {
+        let mut spec = PropSpec::new("hidden", ValueType::Bool);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: true,
+            add: false,
+        };
+        spec
+    },
 ];
 
 const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
@@ -112,12 +121,12 @@ const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
 const PARAGRAPH_PROPS: &[PropSpec] = &[addable("text", ValueType::Text)];
 
 const RUN_PROPS: &[PropSpec] = &[
-    PropSpec::new("bold", ValueType::Bool),
-    PropSpec::new("italic", ValueType::Bool),
-    PropSpec::new("underline", ValueType::Bool),
-    PropSpec::new("size", FONT_SIZE),
-    PropSpec::new("color", COLOR),
-    PropSpec::new("font.latin", ValueType::Text),
+    writable("bold", ValueType::Bool),
+    writable("italic", ValueType::Bool),
+    writable("underline", ValueType::Bool),
+    writable("size", FONT_SIZE),
+    writable("color", COLOR),
+    writable("font.latin", ValueType::Text),
 ];
 
 const SHAPE_PROPS: &[PropSpec] = &[
@@ -170,8 +179,17 @@ const TABLE_PROPS: &[PropSpec] = &[
 const ROW_PROPS: &[PropSpec] = &[];
 
 const CELL_PROPS: &[PropSpec] = &[
-    PropSpec::new("text", ValueType::Text),
+    writable("text", ValueType::Text),
     PropSpec::new("type", ValueType::Text),
+    {
+        let mut spec = PropSpec::new("value", ValueType::Scalar);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: true,
+            add: false,
+        };
+        spec
+    },
 ];
 
 static GAPS: [GapSpec; 0] = [];
@@ -196,13 +214,13 @@ const fn operation_gap(
     }
 }
 
-static OPERATION_GAPS: [GapSpec; 10] = [
+static OPERATION_GAPS: [GapSpec; 9] = [
     operation_gap(
         "set",
         "run",
-        "character formatting",
-        "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
-        "the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling)",
+        "placeholder and notes runs",
+        "record 0309 follow-ups",
+        "character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles",
     ),
     operation_gap(
         "add",
@@ -214,9 +232,9 @@ static OPERATION_GAPS: [GapSpec; 10] = [
     operation_gap(
         "set",
         "tc",
-        "table cell values",
-        "record 0298 follow-up: wire the Keynote slide-table cell transactions",
-        "the unified layer reads slide-table cells; their leaf write families are not wired yet",
+        "cells in a formula graph",
+        "record 0309 follow-ups",
+        "slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale",
     ),
     operation_gap(
         "add",
@@ -233,18 +251,11 @@ static OPERATION_GAPS: [GapSpec; 10] = [
         "the leaf's drawable removal refuses tables, charts and groups",
     ),
     operation_gap(
-        "remove",
-        "video",
-        "a movie or audio clip",
-        "record 0298 follow-up: wire slide::media lifecycle removal",
-        "movies and audio are removed through the leaf's media lifecycle family, not wired yet",
-    ),
-    operation_gap(
         "add",
         "video",
         "a new movie or audio clip",
-        "record 0298 follow-up: wire slide::movie and slide::audio creation",
-        "the leaf's movie and audio creation families are not wired yet",
+        "record 0309 follow-up: wire slide::movie and slide::audio creation",
+        "the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet",
     ),
     operation_gap(
         "set",
@@ -256,16 +267,16 @@ static OPERATION_GAPS: [GapSpec; 10] = [
     operation_gap(
         "remove",
         "placeholder",
-        "a title or body placeholder",
-        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-        "placeholders are hidden, not removed; set the text to empty instead",
+        "slide-number and object placeholders",
+        "record 0309 follow-ups",
+        "`remove` hides a title or body placeholder on its slide (and `hidden` = false shows it again); slide-number and object placeholders have no unified element",
     ),
     operation_gap(
         "add",
         "placeholder",
         "a new placeholder",
-        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-        "a slide's placeholders come from its layout; add a slide from a layout instead",
+        "record 0309 follow-ups",
+        "a slide's placeholders come from its layout; show a hidden one with `hidden` = false, or add a slide from a layout",
     ),
 ];
 
@@ -471,6 +482,8 @@ pub(crate) enum Patch {
     ),
     Drawables(litchi_keynote::slide::drawable::Patch),
     Creation(litchi_keynote::slide::creation::Patch),
+    Media(litchi_keynote::slide::media::lifecycle::Patch),
+    Placeholder(litchi_keynote::slide::placeholder::Patch),
 }
 
 impl Patch {
@@ -484,6 +497,8 @@ impl Patch {
             Self::Deletion(_) => false,
             Self::Drawables(patch) => patch.is_noop(),
             Self::Creation(patch) => patch.is_noop(),
+            Self::Media(patch) => patch.is_noop(),
+            Self::Placeholder(patch) => patch.is_noop(),
         }
     }
 }
@@ -495,11 +510,22 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "placeholder",
         "notes",
         "paragraph",
+        "run",
         "shape",
         "picture",
+        "tc",
     ],
     addable: &["slide", "paragraph", "shape", "picture"],
-    removable: &["slide", "paragraph", "shape", "picture", "connector"],
+    removable: &[
+        "slide",
+        "paragraph",
+        "shape",
+        "picture",
+        "connector",
+        "video",
+        "audio",
+        "placeholder",
+    ],
     movable: &[
         "slide",
         "paragraph",

@@ -955,13 +955,18 @@ pub(crate) static NUMBERS: Vocabulary = Vocabulary {
     root: "workbook",
     aliases: &[
         ("cell", "cell"),
+        ("col", "col"),
+        ("column", "col"),
         ("mergecell", "mergeCell"),
+        ("row", "row"),
         ("sheet", "sheet"),
         ("table", "table"),
     ],
     elements: &[
         ElementRule::new("cell"),
+        ElementRule::new("col"),
         ElementRule::new("mergeCell"),
+        ElementRule::new("row"),
         ElementRule::new("sheet").named(Named::First {
             child: "table",
             case: Caseless,
@@ -975,7 +980,7 @@ pub(crate) static NUMBERS: Vocabulary = Vocabulary {
             case: Caseless,
         }),
     ],
-    roots: "/<sheet name>, /sheet[N], /sheet[N]/table[N] (cells as /Sheet 1/Table 1/A1; merged ranges as /sheet[N]/table[N]/mergeCell[N])",
+    roots: "/<sheet name>, /sheet[N], /sheet[N]/table[N] (cells as /Sheet 1/Table 1/A1; merged ranges as /sheet[N]/table[N]/mergeCell[N]; rows and columns as /sheet[N]/table[N]/row[N] and col[N])",
     index: AliasIndex::EMPTY,
 }
 .indexed();

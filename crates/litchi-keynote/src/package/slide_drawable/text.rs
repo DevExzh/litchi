@@ -229,6 +229,39 @@ fn character_style(
     })
 }
 
+/// The longest parent chain a run's style is resolved through.
+const MAX_STYLE_DEPTH: usize = 16;
+
+/// The properties a character style and its parent chain set.
+fn effective_style(
+    source: &impl Objects,
+    identifier: u64,
+    wire: WireLimits,
+) -> Result<Style, StructureError> {
+    let mut style = Style::new();
+    let mut current = Some(identifier);
+    for _ in 0..MAX_STYLE_DEPTH {
+        let Some(identifier) = current else { break };
+        let own = character_style(source, identifier, wire)?;
+        style.bold = style.bold.or(own.bold);
+        style.italic = style.italic.or(own.italic);
+        style.underline = style.underline.or(own.underline);
+        style.font_size = style.font_size.or(own.font_size);
+        if style.font_name.is_none() {
+            style.font_name = own.font_name;
+        }
+        style.color = style.color.or(own.color);
+        current = source
+            .get(identifier)
+            .and_then(|object| unique_message(object, CHARACTER_STYLE).ok())
+            .map(|(_, payload)| litchi_iwa_text_wire::character_style_parent(payload))
+            .transpose()
+            .map_err(|_error| StructureError::Malformed)?
+            .flatten();
+    }
+    Ok(style)
+}
+
 /// The runs of storage `storage` whose text is `text`.
 pub(super) fn runs(
     source: &impl Objects,
@@ -283,7 +316,7 @@ pub(super) fn runs(
             continue;
         }
         let style = match style {
-            Some(identifier) => character_style(source, *identifier, wire)?,
+            Some(identifier) => effective_style(source, *identifier, wire)?,
             None => Style::new(),
         };
         output.push(TextRun {

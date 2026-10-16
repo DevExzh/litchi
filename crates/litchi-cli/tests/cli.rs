@@ -1091,6 +1091,55 @@ fn iwork_writes_save_in_place() {
     let sheets = expect(0, ["query", file, "sheet", "--json"]).json();
     assert!(!sheets.to_string().contains("Extra"), "{sheets}");
 
+    // Record 0309: rows and columns are inserted and removed; cell text
+    // takes character properties; Pages table cells take values.
+    let table = "/sheet[1]/table[1]";
+    let rows = |file: &Path| {
+        expect(0, ["get", arg(file), table, "--json"]).json()["format"]["rowCount"].clone()
+    };
+    let before = rows(&blank);
+    // A table with merged cells refuses, typed; unmerge first.
+    let refused = expect(5, ["add", file, table, "--type", "row"]);
+    assert!(
+        refused.stderr.contains("merged cells"),
+        "{}",
+        refused.stderr
+    );
+    expect(0, ["remove", file, "/sheet[1]/table[1]/mergeCell[1]"]);
+    expect(0, ["add", file, table, "--type", "row", "--index", "0"]);
+    assert_ne!(rows(&blank), before);
+    assert_eq!(text_of(&blank, "/sheet[1]/table[1]/A2"), "2");
+    expect(0, ["remove", file, "/sheet[1]/table[1]/row[1]"]);
+    assert_eq!(rows(&blank), before);
+    expect(0, ["add", file, table, "--type", "col"]);
+    expect(
+        0,
+        [
+            "set",
+            file,
+            "/sheet[1]/table[1]/A1",
+            "--prop",
+            "font.bold=true",
+        ],
+    );
+    assert_eq!(text_of(&blank, "/sheet[1]/table[1]/A1"), "2");
+    let pages = scratch(
+        dir.path(),
+        "t.pages",
+        Some("iwork/pages/body-table-catalog-native.pages"),
+    );
+    expect(
+        0,
+        [
+            "set",
+            arg(&pages),
+            "/body/tbl[1]/tr[1]/tc[1]",
+            "--prop",
+            "text=CLI cell",
+        ],
+    );
+    assert_eq!(text_of(&pages, "/body/tbl[1]/tr[1]/tc[1]"), "CLI cell");
+
     // Pages creates its minimal document (record 0299).
     let blank = dir.path().join("blank.pages");
     expect(0, ["create", arg(&blank)]);
@@ -1182,11 +1231,32 @@ fn keynote_structure_from_the_command_line() {
         ],
     );
     assert_eq!(text_of(&deck, "/slide[1]/notes"), "Notes from the CLI");
-    let run = expect(5, ["remove", file, "/slide[1]/placeholder[title]"]);
-    assert!(
-        run.stderr.contains("unsupported_capability"),
-        "{}",
-        run.stderr
+    // Record 0309: a run of a text box takes character properties; a
+    // removed title placeholder is hidden and `hidden=false` shows it.
+    expect(
+        0,
+        [
+            "set",
+            file,
+            "/slide[1]/shape[2]/p[1]/run[1]",
+            "--prop",
+            "bold=true",
+            "--prop",
+            "size=24pt",
+        ],
+    );
+    let run = expect(0, ["get", file, "/slide[1]/shape[2]/p[1]/run[1]", "--json"]).json();
+    assert_eq!(run["format"]["bold"], json!(true), "{run}");
+    expect(0, ["remove", file, "/slide[1]/placeholder[title]"]);
+    expect(
+        0,
+        [
+            "set",
+            file,
+            "/slide[1]/placeholder[title]",
+            "--prop",
+            "hidden=false",
+        ],
     );
 
     let blank = dir.path().join("blank.key");

@@ -17,7 +17,14 @@
 
 #![forbid(unsafe_code)]
 
+mod char_style;
 mod rewrite;
+
+pub use char_style::{
+    CharStyleError, CharStyleRun, CharacterProperties, char_style_runs, character_style_parent,
+    character_style_properties, character_style_variation, restyle_span, styles_in_span,
+    stylesheet_with_style,
+};
 
 pub use rewrite::{
     PreparedStorageRewrite, RemovedObjectReference, RewriteBehavior, RewriteError, RewriteLimits,

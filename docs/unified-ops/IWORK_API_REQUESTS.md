@@ -59,8 +59,8 @@ Each request is described by intent. The signatures are suggestions; the owners 
 5. **Table lifecycle:** add and remove a table.
 6. **Row and column insert/delete as package transactions.** The `RowDeletion` and `ColumnDeletion`
    types exist (`crates/litchi-numbers/src/table/topology.rs:69`), but no public package edit entry was
-   found (*unverified*).
-7. **Cell text-style edits:** bold, italic, font, colour.
+   found (*unverified*). *Landed in 0309* for tables without formulas or merges (`table::topology`).
+7. **Cell text-style edits:** bold, italic, font, colour. *Landed in 0309* (`cell::text_style`).
 
 **Keynote**
 
@@ -97,14 +97,14 @@ Each request is described by intent. The signatures are suggestions; the owners 
    `drawable::Edit::set_text_style(slide, drawable, TextSpan, Style)` is a
    typed `Error::Unsupported { reason: Unsupported::TextStyling }` until a
    native character-style override fixture exists to port the host's layout
-   from.
+   from. *Landed in 0309* for text boxes and shapes (see below).
 
 **Pages**
 
 11. **Section add and remove.**
 12. **Paragraph-level addressing:** set, insert, remove and move a paragraph by index. The current
     surface is span-based over a flat section or body text.
-13. **Text formatting** on body text spans.
+13. **Text formatting** on body text spans. *Landed in 0309* (`section::text_style`).
 14. **Document metadata set** (title, author).
 
 ## 2026-10-08 glossary coordination request (record 0016)
@@ -379,3 +379,63 @@ Record 0301 adds structural leaf transactions and wires them into
   storage is not native (the synthetic compatibility fixture: text reads,
   `query` is `invalid_input`); a merge-reader tolerance request for the
   Numbers owner.
+
+## 2026-10-16 iWork element gaps (record 0309)
+
+Record 0309 adds the element-level leaf families the unified layer was
+missing and wires them into `File`. Every edit keeps untouched bytes exact
+and returns an exact-source patch with `inverse()`; what is not ported is a
+typed refusal.
+
+- **6 (Numbers): done, with typed gaps.** `table::topology`
+  (`Package::{edit_table_topology, apply_table_topology}`;
+  `Edit::{insert_row, insert_column, remove_row, remove_column}` with
+  header/body/footer-relative `RowInsertion`/`ColumnInsertion`/`RowDeletion`/
+  `ColumnDeletion`). It splices the tiles (pre-BNC offsets too), the row and
+  column info buffers, header counts, the layout cache, stroke layers and
+  the table-data lists (removed cells release their keys). Refused, typed
+  (`Error::Unsupported(..)`): tables holding formulas or read by a formula
+  or chart elsewhere (no formula-coordinate shift is ported), merged cells,
+  filters, categories, pivots, column edits under sort rules, removing a
+  hidden, bordered or commented axis, and non-native storage layouts. Corpus:
+  28 tables insert and remove a row and a column round trip; unified
+  `add`/`remove` of `row[N]`/`col[N]` under a table.
+- **7 (Numbers): done.** `cell::text_style`
+  (`Package::{edit_table_cell_text_style, apply_table_cell_text_style,
+  table_cell_text_style}`): bold, italic, underline, strikethrough, size,
+  font and colour as a paragraph-style variation of the cell's style; an
+  empty cell is refused (`EmptyCell`). 33 corpus cells styled. Unified
+  `font.*` on `cell` (set-only).
+- **10 (Keynote): done for text boxes and shapes.**
+  `slide::drawable::Edit::set_text_style` writes character-style variations
+  into the storage's stylesheet (registry UUIDs and external references
+  kept). Unified `run` properties `bold`, `italic`, `underline`, `size`,
+  `color` and `font.latin`. **Open:** placeholder and notes runs (their
+  text keeps the layout's styles; typed refusal).
+- **13 (Pages): done at paragraph level.** `section::text_style`
+  (`Package::{edit_section_text_style, apply_section_text_style,
+  section_text_runs}`). Unified `font.*` on `p` (set-only). **Open:** run
+  elements in the Pages tree; a whole-section text `set` after styling is
+  refused (`DependentContent`) because it would drop the style references.
+- **18 (Numbers): done.** The blank workbook asset now carries its table
+  owner's extents and the formula-metadata preflight counts the owners, so
+  formulas work on a created workbook.
+- **Table cell writes (Pages, Keynote): done.** `table::values` for Pages
+  (`Package::{edit_body_table_values, apply_body_table_values}`; 13 corpus
+  tables written, the 4 holding formulas refused) and
+  `slide::drawable::Edit::set_table_cell` for Keynote
+  (`Unsupported::{TableFormulas, TableStorage}`), on the shared
+  `litchi_numbers_wire::table_write` writer. Unified `tc` `text`/`value`.
+- **Keynote media removal and placeholder visibility: wired.**
+  `remove` of a `video`/`audio` goes through `slide::media::lifecycle`;
+  `remove` of a title or body placeholder hides it and `hidden` = false
+  shows it again (`slide::placeholder` visibility).
+
+**Still open after 0309:** Numbers formula-coordinate shifting for
+topology (tables with formulas), merges and filters under topology; Numbers
+comments (19) and cross-table formulas; the Numbers cell writer's
+pre-existing refusals on several corpus files; Pages section add/remove
+(11), run elements, Markdown body tables and table creation; Keynote
+placeholder and notes run styles, table creation, movie and audio
+creation, duplicating slides with other-component content, image data
+removal and stale thumbnail records; a readable placeholder `hidden`.

@@ -241,8 +241,128 @@ pub(crate) fn text(value: &PropValue<'_>, key: &'static str) -> Result<Option<St
         .map_err(|error| error.with_property(key))
 }
 
+/// The character properties of a `font.*` write (record 0309).
+#[cfg(feature = "numbers")]
+pub(crate) use litchi_numbers::cell::text_style::CharacterProperties as FontProperties;
+#[cfg(all(feature = "pages", not(feature = "numbers")))]
+pub(crate) use litchi_pages::section::text_style::CharacterProperties as FontProperties;
+
+/// Fold one `font.*` key into `properties`; `false` for other keys.
+#[cfg(any(feature = "pages", feature = "numbers"))]
+pub(crate) fn font_property(
+    properties: &mut FontProperties,
+    key: &str,
+    value: &PropValue<'_>,
+    color_type: ValueType,
+) -> Result<bool> {
+    let cleared = |key: &str| {
+        refusal(Code::InvalidValue, "a font property cannot be cleared")
+            .with_property(key.to_owned())
+    };
+    let lower = key.to_ascii_lowercase();
+    match lower.as_str() {
+        "font.bold" => properties.bold = Some(boolean(value, "font.bold")?),
+        "font.italic" => properties.italic = Some(boolean(value, "font.italic")?),
+        "font.underline" => {
+            properties.underline = Some(boolean(value, "font.underline")?);
+        },
+        "font.strike" | "font.strikethrough" => {
+            properties.strikethrough = Some(boolean(value, "font.strike")?);
+        },
+        "font.name" => {
+            properties.font_name = Some(text(value, "font.name")?.ok_or_else(|| cleared(key))?);
+        },
+        "font.size" => {
+            let points = value
+                .with_coerced(
+                    ValueType::Length(crate::value::LengthSpec::FONT_SIZE),
+                    |scalar| {
+                        Ok(scalar.and_then(|scalar| match scalar {
+                            Scalar::Length(length) => Some(length.points()),
+                            Scalar::Number(value) => Some(value),
+                            #[allow(clippy::cast_precision_loss, reason = "point sizes are small")]
+                            Scalar::Int(value) => Some(value as f64),
+                            _ => None,
+                        }))
+                    },
+                )
+                .map_err(|error| error.with_property("font.size"))?
+                .ok_or_else(|| cleared(key))?;
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "iWork stores font sizes as 32-bit floats"
+            )]
+            let points = points as f32;
+            if !points.is_finite() || points <= 0.0 {
+                return Err(refusal(Code::InvalidValue, "a font size must be positive")
+                    .with_property("font.size".to_owned()));
+            }
+            properties.size = Some(points);
+        },
+        "font.color" => {
+            let color = value
+                .with_coerced(color_type, |scalar| {
+                    Ok(scalar.and_then(|scalar| match scalar {
+                        Scalar::Color(color) if color.transforms().is_empty() => {
+                            match color.base() {
+                                crate::value::Base::Rgb(rgba) => {
+                                    Some([rgba.red(), rgba.green(), rgba.blue()])
+                                },
+                                _ => None,
+                            }
+                        },
+                        _ => None,
+                    }))
+                })
+                .map_err(|error| error.with_property("font.color"))?
+                .ok_or_else(|| {
+                    refusal(Code::InvalidValue, "a font color must be an RGB color")
+                        .with_property("font.color".to_owned())
+                })?;
+            properties.color = Some(color);
+        },
+        _ => return Ok(false),
+    }
+    Ok(true)
+}
+
+/// A table-cell value of a `text` or `value` key: text, a finite number,
+/// a boolean, or `None` (clear) for `null` (record 0309).
+#[cfg(any(feature = "keynote", feature = "pages"))]
+pub(crate) enum CellScalar {
+    Text(String),
+    Number(f64),
+    Boolean(bool),
+    Empty,
+}
+
+#[cfg(any(feature = "keynote", feature = "pages"))]
+pub(crate) fn cell_scalar(key: &str, value: &PropValue<'_>) -> Result<CellScalar> {
+    if key.eq_ignore_ascii_case("text") {
+        return Ok(text(value, "text")?.map_or(CellScalar::Empty, CellScalar::Text));
+    }
+    value
+        .with_coerced(ValueType::Scalar, |scalar| {
+            Ok(match scalar {
+                None => CellScalar::Empty,
+                Some(Scalar::Text(text)) => CellScalar::Text(text.to_owned()),
+                Some(Scalar::Bool(flag)) => CellScalar::Boolean(flag),
+                #[allow(clippy::cast_precision_loss, reason = "table cells store doubles")]
+                Some(Scalar::Int(number)) => CellScalar::Number(number as f64),
+                Some(Scalar::Number(number)) if number.is_finite() => CellScalar::Number(number),
+                Some(other) => {
+                    return Err(refusal(
+                        Code::InvalidValue,
+                        format!("a table cell cannot hold `{other}`"),
+                    ));
+                },
+            })
+        })
+        .map_err(|error| error.with_property("value"))
+}
+
 /// The value of `key` coerced to a boolean; `null` is refused.
-#[cfg(feature = "keynote")]
+#[cfg(any(feature = "keynote", feature = "numbers", feature = "pages"))]
 pub(crate) fn boolean(value: &PropValue<'_>, key: &'static str) -> Result<bool> {
     value
         .with_coerced(ValueType::Bool, |scalar| {

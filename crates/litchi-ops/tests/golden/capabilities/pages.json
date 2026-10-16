@@ -252,6 +252,48 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -419,7 +461,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -433,7 +475,7 @@
         "text": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "type": {
@@ -441,6 +483,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -621,8 +669,8 @@
       "subject": "element",
       "element": "r",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 13 (Pages text runs and formatting)",
-      "reason": "the Pages leaf reads and writes body text as plain section text; character runs and their styles have no transaction yet"
+      "followUp": "record 0309 follow-up: Pages run elements",
+      "reason": "Pages body text has no run elements in the tree yet; character properties are written on a whole paragraph (`font.*` on `p`) through the leaf's section::text_style family, and Package::section_text_runs reads the runs"
     },
     {
       "subject": "operation",
@@ -655,10 +703,10 @@
       "subject": "operation",
       "verb": "set",
       "element": "tc",
-      "context": "a body-table cell",
+      "context": "cells in a formula graph",
       "code": "unsupported_capability",
-      "followUp": "record 0299 follow-up: Pages body-table cell writes",
-      "reason": "the Pages leaf reads body-table cells but has no cell-write transaction (the Numbers cell writer is not shared with Pages)"
+      "followUp": "record 0309 follow-ups",
+      "reason": "body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale"
     },
     {
       "subject": "operation",

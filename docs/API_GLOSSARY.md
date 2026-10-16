@@ -2431,7 +2431,7 @@ ADR 0034 W1 for `litchi-keynote`, part 4 (slide drawables):
 | `Package::edit_slide_drawables() -> drawable::Edit<'_>` | Several operations per edit, one workspace, one commit; selectors resolve against the base snapshot | ✅ 0298 |
 | `Edit::{set_geometry, remove, move_to}(slide, drawable, …)` | `move_to` takes the back-to-front z-order `Position`; owned order (and so selectors) unchanged | ✅ 0298 |
 | `Edit::{add_text_box(slide, Geometry, &str), add_shape(slide, Preset, Geometry, &str), add_image(slide, &[u8], &str, Geometry)}` | `drawable::Preset::{Rectangle, RoundedRectangle { radius }, Ellipse}`; `ImageFormat::{Png, Jpeg, Gif}` sniffed; `Commit::created() -> &[Created { slide(), drawable() }]` | ✅ 0298 |
-| `Edit::set_text_style(slide, drawable, TextSpan, Style)` | Validates, then typed `Error::Unsupported { reason: Unsupported::TextStyling }`; `Package::slide_drawable_text_runs` reads `TextRun { span, text, style }` | 🔴 write refused (0298) |
+| `Edit::set_text_style(slide, drawable, TextSpan, Style)` | Each run in the span gets a `TSWP.CharacterStyleArchive` variation of its style in the storage's stylesheet; `Unsupported::TextStyling` only for a style that sets nothing; `Package::slide_drawable_text_runs` reads `TextRun { span, text, style }` with the parent chain resolved | ✅ 0309 (refused in 0298) |
 | `Package::apply_slide_drawables(&Patch)` | Exact source check, reopen; `Patch::{is_noop, inverse, operations}` | ✅ 0298 |
 
 ## Numbers structure (record 0301)
@@ -2450,6 +2450,27 @@ canonical `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` set and
   zero-based `destination`, as `sheet::order` does.
 
 Both profiles now register 30 families.
+
+## Numbers rows and columns (record 0309)
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_numbers::table::topology::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Unsupported}` | Registered family (31st) in `numbers-minimal` / `numbers-full`; the section-relative `RowInsertion`, `ColumnInsertion`, `RowDeletion`, `ColumnDeletion` values stay in the same module | ✅ 0309 |
+| `Package::edit_table_topology(sheet, table) -> topology::Edit<'_>` | `Edit::{insert_row, insert_column, remove_row, remove_column}`; several operations per edit, applied in order, one commit | ✅ 0309 |
+| `Package::apply_table_topology(&Patch)` | Exact source check; `Patch::{is_noop, inverse}` | ✅ 0309 |
+| `topology::Error::Unsupported { reason: Unsupported }` | `Formulas`, `ReferencedByOtherOwners`, `Merges`, `Filters`, `Categories`, `Pivot`, `SortRules`, `HiddenAxis`, `Borders`, `Comments`, `StorageLayout` | ✅ 0309 |
+| `litchi_numbers_wire::{ListKind, BncCell::list_keys}` | The table data lists a BNC cell's keys index | ✅ 0309 |
+
+## iWork character styling (record 0309)
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_iwa_text_wire::{CharacterProperties, CharStyleRun, CharStyleError, char_style_runs, styles_in_span, restyle_span, character_style_variation, character_style_properties, character_style_parent, stylesheet_with_style}` | Shared TSWP `table_char_style` runs and the character-style variation records a span restyle writes | ✅ 0309 |
+| `litchi_numbers::cell::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, CharacterProperties}` | Registered family (32nd) in `numbers-minimal` / `numbers-full`; `Package::{edit_table_cell_text_style, apply_table_cell_text_style, table_cell_text_style}`; `Edit::set(CellPosition, CharacterProperties)` on stored cells | ✅ 0309 |
+| `litchi_numbers_wire::table_write::{tile_cell, tile_set_cell, header_adjust, list_intern, list_release, cell_bytes, cell_formula_state, table_formula_state, CellInput, FormulaState, TileCellWrite, WriteError}` | Shared TST cell writer for Pages and Keynote tables | ✅ 0309 |
+| `litchi_pages::table::values::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Value}` | Registered family in `pages`; `Package::{edit_body_table_values, apply_body_table_values}`; `Edit::set(row, column, Value)` | ✅ 0309 |
+| `litchi_keynote::slide::drawable::{Edit::set_table_cell, TableCellValue, Unsupported::{TableFormulas, TableStorage}}` | Slide-table cell values in the slide-drawable commit | ✅ 0309 |
+| `litchi_pages::section::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Run, CharacterProperties}` | Registered family in `pages`; `Package::{edit_section_text_style, apply_section_text_style, section_text_runs}`; `Edit::set(TextSpan, CharacterProperties)` (UTF-16, several per edit) | ✅ 0309 |
 
 ## iWork facade retirement and iWork open options (record 0306)
 

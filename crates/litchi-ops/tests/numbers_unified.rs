@@ -74,12 +74,15 @@ fn create_returns_a_deterministic_minimal_workbook() {
         prop(&reopen(&merged), "/sheet[1]/table[1]", "mergeCount").as_deref(),
         Some("1")
     );
-    // Gap: the built blank has no formula-owner dependency record for its
-    // table, so the leaf refuses formula authoring (FormulaCache).
-    let error = reopened
+    // The blank's table owner carries the native table extents, so the
+    // created workbook authors formulas (record 0309).
+    let formula = reopened
         .set("/sheet[1]/table[1]/B2", props! { "formula" => "A2*3" })
-        .expect_err("formulas need a formula owner");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+        .expect("a formula into the fresh workbook");
+    assert_eq!(
+        prop(&reopen(&formula), "/sheet[1]/table[1]/B2", "type").as_deref(),
+        Some("formula")
+    );
 }
 
 #[test]
@@ -407,13 +410,9 @@ fn sheets_and_tables_are_added_and_removed() {
         .expect("remove sheet with its table");
     let reopened = reopen(&gone);
     assert_eq!(prop(&reopened, "/", "sheetCount").as_deref(), Some("1"));
-    // The last sheet stays; rows and columns are still a typed gap.
+    // The last sheet stays.
     let error = reopened.remove("/sheet[1]").expect_err("last sheet");
     assert_eq!(error.code(), Code::InvalidArgument);
-    let error = reopened
-        .add("/sheet[1]/table[1]", NewNode::new("row"))
-        .expect_err("rows");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
     let error = file
         .add("/", NewNode::new("sheet").prop("name", "Sheet 1"))
         .expect_err("duplicate");
@@ -553,4 +552,172 @@ fn structural_round_trips_over_the_corpus() {
         files >= 30 && merged * 2 >= files,
         "{merged} of {files} merged"
     );
+}
+
+#[test]
+fn rows_and_columns_are_inserted_and_removed() {
+    let file = create(FileFormat::Numbers).expect("create");
+    let filled = file
+        .edit(|tx| {
+            tx.set("/sheet[1]/table[1]/B2", props! { "value" => "b2" })?;
+            tx.set("/sheet[1]/table[1]/B3", props! { "value" => 3 })?;
+            tx.set("/sheet[1]/table[1]/D3", props! { "value" => "d3" })?;
+            Ok(())
+        })
+        .expect("values")
+        .file;
+    let rows = prop(&filled, "/sheet[1]/table[1]", "rowCount").expect("rows");
+    let rows: usize = rows.parse().expect("count");
+    // A row before row 3 (zero-based position 2), then filled.
+    let added = filled
+        .add(
+            "/sheet[1]/table[1]",
+            NewNode::new("row").at(Placement::Position(litchi_core::Position::new(2))),
+        )
+        .expect("insert a row");
+    assert_eq!(added.path.to_string(), "/sheet[1]/table[1]/row[3]");
+    let reopened = reopen(&added.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]", "rowCount"),
+        Some((rows + 1).to_string())
+    );
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/B4", "value").as_deref(),
+        Some("3")
+    );
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/B2", "value").as_deref(),
+        Some("b2")
+    );
+    let written = reopened
+        .set("/sheet[1]/table[1]/A3", props! { "value" => "new" })
+        .expect("the new row takes a value");
+    assert_eq!(
+        prop(&reopen(&written), "/sheet[1]/table[1]/A3", "value").as_deref(),
+        Some("new")
+    );
+    // The inverse restores the bytes.
+    let edited = filled
+        .edit(|tx| {
+            tx.add("/sheet[1]/table[1]", NewNode::new("row"))
+                .map(|_| ())
+        })
+        .expect("append a row");
+    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), filled.to_bytes().unwrap());
+    // Removing row 3 drops its cells and moves the rest up.
+    let removed = filled
+        .remove("/sheet[1]/table[1]/row[3]")
+        .expect("remove a row");
+    let reopened = reopen(&removed);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]", "rowCount"),
+        Some((rows - 1).to_string())
+    );
+    assert!(
+        reopened.get("/sheet[1]/table[1]/D3").is_err()
+            || prop(&reopened, "/sheet[1]/table[1]/D3", "value").is_none()
+    );
+    // A column appended, one placed first, and one removed.
+    let appended = filled
+        .add("/sheet[1]/table[1]", NewNode::new("col"))
+        .expect("append a column");
+    let columns = prop(&filled, "/sheet[1]/table[1]", "columnCount").expect("columns");
+    let columns: usize = columns.parse().expect("count");
+    assert_eq!(
+        appended.path.to_string(),
+        format!("/sheet[1]/table[1]/col[{}]", columns + 1)
+    );
+    let first = filled
+        .add(
+            "/sheet[1]/table[1]",
+            NewNode::new("column").at(Placement::Start),
+        )
+        .expect("a header column");
+    let reopened = reopen(&first.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/C2", "value").as_deref(),
+        Some("b2")
+    );
+    let dropped = filled
+        .remove("/sheet[1]/table[1]/col[2]")
+        .expect("remove a column");
+    let reopened = reopen(&dropped);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/C3", "value").as_deref(),
+        Some("d3")
+    );
+    // Typed refusals.
+    let error = filled
+        .remove(&format!("/sheet[1]/table[1]/row[{}]", rows + 5))
+        .expect_err("no such row");
+    assert_eq!(error.code(), Code::PathNotFound);
+    let error = filled
+        .add("/sheet[1]", NewNode::new("row"))
+        .expect_err("rows go under a table");
+    assert_eq!(error.code(), Code::InvalidArgument);
+    let error = read("formula-arena-native.numbers")
+        .add("/sheet[1]/table[1]", NewNode::new("row"))
+        .expect_err("formulas");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+}
+
+#[test]
+fn cell_fonts_are_written() {
+    let file = create(FileFormat::Numbers)
+        .expect("create")
+        .set("/sheet[1]/table[1]/B2", props! { "value" => "styled" })
+        .expect("value");
+    let styled = file
+        .set(
+            "/sheet[1]/table[1]/B2",
+            props! {
+                "font.bold" => true,
+                "font.italic" => true,
+                "font.size" => "16pt",
+                "font.color" => "FF0000",
+                "font.name" => "Helvetica",
+            },
+        )
+        .expect("font");
+    let package = leaf(&styled);
+    let style = package
+        .table_cell_text_style(0, 0, litchi_numbers::CellPosition::new(1, 1))
+        .expect("style");
+    assert_eq!(style.bold, Some(true));
+    assert_eq!(style.italic, Some(true));
+    assert_eq!(style.size, Some(16.0));
+    assert_eq!(style.color, Some([255, 0, 0]));
+    assert_eq!(style.font_name.as_deref(), Some("Helvetica"));
+    assert_eq!(
+        prop(&reopen(&styled), "/sheet[1]/table[1]/B2", "value").as_deref(),
+        Some("styled")
+    );
+    let batch = file
+        .batch(
+            vec![
+                batch_set(
+                    "/sheet[1]/table[1]/B2".to_owned(),
+                    Props::new().with("font.bold", true),
+                ),
+                batch_set(
+                    "/sheet[1]/table[1]/C3".to_owned(),
+                    Props::new().with("value", 3_i64),
+                ),
+            ],
+            BatchMode::Atomic,
+        )
+        .expect("batch");
+    let package = leaf(&batch.file);
+    assert_eq!(
+        package
+            .table_cell_text_style(0, 0, litchi_numbers::CellPosition::new(1, 1))
+            .expect("style")
+            .bold,
+        Some(true)
+    );
+    let error = file
+        .set("/sheet[1]/table[1]/D4", props! { "font.bold" => true })
+        .expect_err("empty cell");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
 }

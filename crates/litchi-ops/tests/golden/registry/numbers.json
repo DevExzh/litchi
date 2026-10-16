@@ -105,6 +105,14 @@
         {
           "element": "mergeCell",
           "pathSegment": "mergeCell"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "col",
+          "pathSegment": "col"
         }
       ],
       "properties": {
@@ -193,14 +201,53 @@
           "add": false,
           "set": true,
           "get": false
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "propertyGaps": {
-        "font.bold": {
-          "code": "unsupported_capability",
-          "followUp": "IWORK_API_REQUESTS.md request 7",
-          "reason": "the Numbers leaf has no cell text-style transaction; `numberFormat` covers decimal and percentage display formats only"
-        },
         "comment": {
           "code": "unsupported_capability",
           "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
@@ -213,7 +260,14 @@
           "text",
           "type",
           "value"
-        ]
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
       }
     },
     {
@@ -247,16 +301,63 @@
           "type"
         ]
       }
+    },
+    {
+      "format": "numbers",
+      "element": "row",
+      "parent": "table",
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/row[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ],
+        "headerColumns": true
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "col",
+      "parent": "table",
+      "elementAliases": [
+        "column"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/col[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
     }
   ],
   "gaps": [
-    {
-      "subject": "element",
-      "element": "row",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 6",
-      "reason": "rows and columns are table coordinates here; the leaf has no package transaction that inserts or deletes them (the migration host's editor does, outside the supported crates)"
-    },
     {
       "subject": "operation",
       "verb": "set",
@@ -274,6 +375,24 @@
       "code": "unsupported_capability",
       "followUp": "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
       "reason": "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "row",
+      "context": "tables with formulas or merges",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-ups (IWORK_API_REQUESTS.md request 6)",
+      "reason": "rows and columns are inserted and removed when no formula coordinate moves: a table holding formulas, one a formula or chart elsewhere reads, merged cells, filters, categories, pivots and (for columns) sort rules are refused, as are removing a hidden, bordered or commented row or column"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "row",
+      "context": "height and visibility",
+      "code": "unsupported_capability",
+      "followUp": "record 0309 follow-ups",
+      "reason": "rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction"
     },
     {
       "subject": "view",

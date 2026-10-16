@@ -82,6 +82,8 @@ SEEDS = {
         ("add", "/body", "paragraph", {"text": "Two"}),
     ],
     "ods": [("set", "/Sheet1/A1:B2", {"merge": "true"})],
+    # Record 0309: character properties are written on runs of text boxes.
+    "keynote": [("add", "/slide[1]", "shape", {"text": "Box\nSecond"})],
 }
 
 #: ``Spec.extension`` of crud_matrix.rs where it differs from the format name.
