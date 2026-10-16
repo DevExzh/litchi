@@ -650,16 +650,15 @@ fn rewrite_merges(
         max_regions,
         max_overlap_checks: budget.remaining_work().map_err(super::map_core_error)?,
     };
-    let write = table_merges::rewrite_table_merges(
-        &original,
-        desired,
-        litchi_core::id::generate_guid_bytes(),
-        limits,
-    )
-    .map_err(|error| {
-        super::charge_attempted(budget, &error);
-        super::map_merge_error(error)
-    })?;
+    // A new merge owner's UUID derives from the table model's own UUID, so
+    // identical rewrites of identical sources are byte-identical (ADR 0034
+    // §9; record 0300).
+    let write = table_merges::rewrite_table_merges_derived(&original, desired, limits).map_err(
+        |error| {
+            super::charge_attempted(budget, &error);
+            super::map_merge_error(error)
+        },
+    )?;
     budget
         .input(write.report.input_bytes())
         .map_err(super::map_core_error)?;
