@@ -454,24 +454,7 @@ enum Neighbour {
 
 /// Whether `haystack` holds `needle`.
 fn mentions(haystack: &[u8], needle: &[u8]) -> bool {
-    let Some((&first, rest)) = needle.split_first() else {
-        return true;
-    };
-    let mut offset = 0;
-    while let Some(found) = haystack
-        .get(offset..)
-        .and_then(|tail| tail.iter().position(|byte| *byte == first))
-    {
-        let at = offset + found + 1;
-        if haystack
-            .get(at..)
-            .is_some_and(|tail| tail.starts_with(rest))
-        {
-            return true;
-        }
-        offset = at;
-    }
-    false
+    memchr::memmem::find(haystack, needle).is_some()
 }
 
 /// Re-sort every section's entries into `order`, keeping each slide in its
