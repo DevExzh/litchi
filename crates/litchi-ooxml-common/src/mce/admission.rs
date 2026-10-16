@@ -36,6 +36,13 @@
 //! a verdict about the document; it only says that the proof does not hold,
 //! so a caller that needs the processor's own answer can still run it.
 //!
+//! [`admit_held`] proves a weaker agreement for one more shape: a part whose
+//! `mc:AlternateContent` wrappers all lie inside a [`Holder`] element (a
+//! WordprocessingML run, for a main document). Each such wrapper is opaque:
+//! processing replaces it, in place inside the holder, with the content of
+//! the branch it selects, and the proof does not examine that content.
+//! Everything outside the wrappers agrees as [`admit`] proves it.
+//!
 //! # Agreement with the processor
 //!
 //! The proof admits a part only when processing it would succeed. It repeats
@@ -146,6 +153,28 @@ impl Refusal {
             Self::Unproven => "markup-compatibility processing is not proven to succeed unchanged",
         }
     }
+}
+
+/// An element whose subtree may hold opaque `mc:AlternateContent`
+/// wrappers, for [`admit_held`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Holder<'h> {
+    /// The namespaces the element may be in.
+    pub namespaces: &'h [&'h str],
+    /// The element's local name.
+    pub local: &'h str,
+}
+
+/// What [`admit_held`] proved about a part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Held {
+    /// The verdict on everything outside the held wrappers, with the same
+    /// meaning as [`admit`]'s.
+    pub outside: Admission,
+    /// How many `mc:AlternateContent` wrappers lie inside holders, counting
+    /// only the outermost ones. When it is zero the verdict is [`admit`]'s
+    /// own.
+    pub wrappers: usize,
 }
 
 /// Whether `xml` mentions the markup-compatibility namespace: its literal
@@ -302,7 +331,60 @@ pub fn admit_with<E>(
     {
         return Ok(Err(Refusal::Unproven));
     }
-    Prover::new(xml, capabilities, limits).run(observe)
+    Prover::new(xml, capabilities, limits, None)
+        .run(observe)
+        .map(|verdict| verdict.map(|held| held.outside))
+}
+
+/// Prove how processing with `capabilities` and `limits` would treat `xml`
+/// outside the `mc:AlternateContent` wrappers that lie inside a `holder`
+/// element.
+///
+/// A wrapper with a holder ancestor, outside any subtree processing drops,
+/// is opaque: the declarations on its own start tag are read, and nothing in
+/// it is examined beyond well-formedness, the depth bound and the reference
+/// check [`admit`] makes on visible text. Every other markup-compatibility
+/// element is refused as [`admit`] refuses it, and so is everything else
+/// [`admit`] refuses.
+///
+/// An admitted part agrees with its projection, as [`Admission`] states, on
+/// everything outside the wrappers. Processing replaces each wrapper, in
+/// place inside its holder, with the content of the branch it selects (or
+/// with nothing), so every element outside the holders keeps its parent and
+/// its order. The proof does **not** establish that processing succeeds
+/// inside a wrapper (a `Requires` naming an unbound prefix, for example, is
+/// a processing error): when [`Held::wrappers`] is not zero, a caller runs
+/// the processor, or has run it, before it relies on the verdict.
+///
+/// # Errors
+///
+/// Returns the [`Refusal`] that keeps the proof from holding.
+pub fn admit_held(
+    xml: &[u8],
+    capabilities: &Capabilities,
+    limits: &Limits,
+    holder: Holder<'_>,
+) -> Result<Held, Refusal> {
+    if xml.len() > limits.max_input_bytes || xml.len() > limits.max_output_bytes {
+        return Err(Refusal::Unproven);
+    }
+    if !mentions_namespace(xml) {
+        return Ok(Held {
+            outside: Admission::Unbound,
+            wrappers: 0,
+        });
+    }
+    if !capabilities.extensions.is_empty()
+        || xml.len().saturating_mul(MAX_OUTPUT_GROWTH) > limits.max_output_bytes
+    {
+        return Err(Refusal::Unproven);
+    }
+    match Prover::new(xml, capabilities, limits, Some(holder))
+        .run(|_| Ok::<(), core::convert::Infallible>(()))
+    {
+        Ok(verdict) => verdict,
+        Err(never) => match never {},
+    }
 }
 
 /// The most output bytes processing can write for one input byte of an
@@ -318,6 +400,8 @@ struct Frame {
     declares: bool,
     /// Whether processing drops this element (and so its whole subtree).
     dropped: bool,
+    /// Whether the element is a holder or lies inside one.
+    held: bool,
 }
 
 /// What the proof asks about the namespace one name resolves to.
@@ -414,10 +498,21 @@ struct Prover<'a> {
     root_seen: bool,
     /// The declarations of the start tag being examined.
     local: Vec<(String, String)>,
+    /// The element whose subtree may hold opaque wrappers.
+    holder: Option<Holder<'a>>,
+    /// The depth of the opaque wrapper being skipped.
+    opaque: Option<usize>,
+    /// The opaque wrappers seen.
+    wrappers: usize,
 }
 
 impl<'a> Prover<'a> {
-    fn new(xml: &'a [u8], capabilities: &'a Capabilities, limits: &'a Limits) -> Self {
+    fn new(
+        xml: &'a [u8],
+        capabilities: &'a Capabilities,
+        limits: &'a Limits,
+        holder: Option<Holder<'a>>,
+    ) -> Self {
         let scope = Scope::new(capabilities);
         let none = Class {
             id: NO_NAMESPACE,
@@ -439,13 +534,16 @@ impl<'a> Prover<'a> {
             drops: false,
             root_seen: false,
             local: Vec::new(),
+            holder,
+            opaque: None,
+            wrappers: 0,
         }
     }
 
     fn run<E>(
         mut self,
         mut observe: impl FnMut(usize) -> Result<(), E>,
-    ) -> Result<Result<Admission, Refusal>, E> {
+    ) -> Result<Result<Held, Refusal>, E> {
         let mut reader = Reader::from_reader(self.xml);
         reader.config_mut().trim_text(false);
         loop {
@@ -489,7 +587,10 @@ impl<'a> Prover<'a> {
                 Ok(Event::DocType(_) | Event::PI(_)) | Err(_) => Err(Refusal::Unproven),
                 Ok(Event::Eof) => {
                     return Ok(if self.frames.is_empty() {
-                        Ok(self.verdict())
+                        Ok(Held {
+                            outside: self.verdict(),
+                            wrappers: self.wrappers,
+                        })
                     } else {
                         Err(Refusal::Unproven)
                     });
@@ -514,6 +615,9 @@ impl<'a> Prover<'a> {
 
     fn end(&mut self) -> Result<(), Refusal> {
         let frame = self.frames.pop().ok_or(Refusal::Unproven)?;
+        if self.opaque.is_some_and(|depth| self.frames.len() < depth) {
+            self.opaque = None;
+        }
         if frame.declares {
             self.scope.truncate(self.frames.len() + 1);
             self.cache.clear();
@@ -529,6 +633,19 @@ impl<'a> Prover<'a> {
     ) -> Result<(), Refusal> {
         if self.frames.len() >= self.limits.max_depth {
             return Err(Refusal::Unproven);
+        }
+        if self.opaque.is_some() {
+            // Inside an opaque wrapper: only nesting is tracked.
+            if !empty {
+                self.frames.try_reserve(1).map_err(|_| Refusal::Unproven)?;
+                self.frames.push(Frame {
+                    bindings: 0,
+                    declares: false,
+                    dropped: false,
+                    held: true,
+                });
+            }
+            return Ok(());
         }
         let depth = self.frames.len() + 1;
         let root = depth == 1;
@@ -556,11 +673,16 @@ impl<'a> Prover<'a> {
             false
         };
 
-        let (prefix, _) = split_name(element.name().into_inner())?;
+        let (prefix, local) = split_name(element.name().into_inner())?;
         let class = self.resolve(prefix, true)?;
+        let parent_held = parent.is_some_and(|frame| frame.held);
         if class.mce {
+            if parent_held && !parent_dropped && local == b"AlternateContent" {
+                return self.open_wrapper(depth, bindings, declares, empty);
+            }
             return Err(Refusal::Element);
         }
+        let held = parent_held || self.is_holder(prefix, local);
         let dropped = if parent_dropped {
             if class.understood {
                 return Err(Refusal::HiddenContent);
@@ -588,8 +710,50 @@ impl<'a> Prover<'a> {
                 bindings,
                 declares,
                 dropped,
+                held,
             });
         }
+        Ok(())
+    }
+
+    /// Whether an element (not in the markup-compatibility namespace) is the
+    /// holder.
+    fn is_holder(&self, prefix: &[u8], local: &[u8]) -> bool {
+        let Some(holder) = self.holder else {
+            return false;
+        };
+        holder.local.as_bytes() == local
+            && str::from_utf8(prefix)
+                .ok()
+                .and_then(|prefix| self.scope.resolve(prefix))
+                .is_some_and(|uri| holder.namespaces.contains(&uri.text))
+    }
+
+    /// Enter an opaque `mc:AlternateContent` inside a holder, whose own
+    /// declarations are already in scope.
+    fn open_wrapper(
+        &mut self,
+        depth: usize,
+        bindings: usize,
+        declares: bool,
+        empty: bool,
+    ) -> Result<(), Refusal> {
+        self.wrappers = self.wrappers.checked_add(1).ok_or(Refusal::Unproven)?;
+        if empty {
+            if declares {
+                self.scope.truncate(depth);
+                self.cache.clear();
+            }
+            return Ok(());
+        }
+        self.frames.try_reserve(1).map_err(|_| Refusal::Unproven)?;
+        self.frames.push(Frame {
+            bindings,
+            declares,
+            dropped: false,
+            held: true,
+        });
+        self.opaque = Some(depth);
         Ok(())
     }
 

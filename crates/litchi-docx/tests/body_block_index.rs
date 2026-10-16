@@ -67,9 +67,104 @@ fn indexed_text(block: &IndexedBlock) -> String {
     block_text(&block.to_block().unwrap())
 }
 
+/// The byte ranges of the direct `w:p` children of the body, by local name.
+fn raw_body_paragraphs(xml: &[u8]) -> Vec<std::ops::Range<usize>> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut ranges = Vec::new();
+    let mut depth = 0usize;
+    let mut open = None;
+    loop {
+        let start = usize::try_from(reader.buffer_position()).unwrap();
+        let event = reader.read_event().unwrap();
+        let end = usize::try_from(reader.buffer_position()).unwrap();
+        match event {
+            Event::Start(element) => {
+                depth += 1;
+                if depth == 3 && element.local_name().as_ref() == b"p" {
+                    open = Some(start);
+                }
+            },
+            Event::Empty(element) if depth == 2 && element.local_name().as_ref() == b"p" => {
+                ranges.push(start..end);
+            },
+            Event::End(_) => {
+                if depth == 3
+                    && let Some(start) = open.take()
+                {
+                    ranges.push(start..end);
+                }
+                depth -= 1;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    ranges
+}
+
+/// The text of a paragraph outside its inline objects: `w:t`, tabs and
+/// breaks, skipping every drawing, picture, embedded object and
+/// `mc:AlternateContent` wrapper. Names are compared by local name alone.
+fn text_outside_objects(xml: &[u8]) -> String {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut text = String::new();
+    let mut skipping = 0usize;
+    let mut in_text = false;
+    loop {
+        match reader.read_event().unwrap() {
+            Event::Start(element) => {
+                let local = element.local_name();
+                if skipping > 0
+                    || matches!(
+                        local.as_ref(),
+                        b"AlternateContent" | b"drawing" | b"pict" | b"object"
+                    )
+                {
+                    skipping += 1;
+                } else {
+                    in_text = local.as_ref() == b"t";
+                }
+            },
+            Event::Empty(element) if skipping == 0 => match element.local_name().as_ref() {
+                b"tab" => text.push('\t'),
+                b"br" | b"cr" => text.push('\n'),
+                _ => {},
+            },
+            Event::End(_) => {
+                if skipping > 0 {
+                    skipping -= 1;
+                } else {
+                    in_text = false;
+                }
+            },
+            Event::Text(value) if skipping == 0 && in_text => {
+                text.push_str(&value.decode().unwrap());
+            },
+            Event::GeneralRef(reference) if skipping == 0 && in_text => {
+                let name = reference.decode().unwrap();
+                text.push_str(match name.as_ref() {
+                    "lt" => "<",
+                    "gt" => ">",
+                    "amp" => "&",
+                    "quot" => "\"",
+                    "apos" => "'",
+                    _ => "?",
+                });
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    text
+}
+
 struct Totals {
     files: usize,
     admitted: usize,
+    /// Paragraphs whose runs hold `mc:AlternateContent` (record 0307).
+    alternate: usize,
     blocks: usize,
     wrapped: usize,
     equations: usize,
@@ -81,6 +176,7 @@ fn check_transaction_positions(
     path: &Path,
     blocks: &Blocks,
     snapshot: &litchi_docx::document::Snapshot,
+    alternate: &mut usize,
 ) {
     assert!(blocks.raw_positions_proven(), "{}", path.display());
     let mut paragraphs = 0;
@@ -94,13 +190,33 @@ fn check_transaction_positions(
         if let Some(paragraph) = block.paragraph() {
             assert_eq!(position.get(), paragraphs, "{}", path.display());
             paragraphs += 1;
-            assert_eq!(
-                snapshot.paragraph(position).unwrap().text().unwrap(),
-                paragraph.text().unwrap(),
-                "{} paragraph {}",
-                path.display(),
-                position.get()
-            );
+            let raw = snapshot.paragraph(position).unwrap();
+            let raw_xml = &snapshot.xml_bytes()
+                [raw_body_paragraphs(snapshot.xml_bytes())[position.get()].clone()];
+            if raw_xml
+                .windows(b"AlternateContent".len())
+                .any(|window| window == b"AlternateContent")
+            {
+                // Record 0307: the raw paragraph holds every branch of its
+                // run-level alternate content and the visible one only the
+                // selected branch, so they agree outside those objects.
+                *alternate += 1;
+                assert_eq!(
+                    text_outside_objects(raw_xml),
+                    text_outside_objects(block.xml_bytes()),
+                    "{} paragraph {}",
+                    path.display(),
+                    position.get()
+                );
+            } else {
+                assert_eq!(
+                    raw.text().unwrap(),
+                    paragraph.text().unwrap(),
+                    "{} paragraph {}",
+                    path.display(),
+                    position.get()
+                );
+            }
         } else if block.kind() == BlockKind::Table {
             assert_eq!(position.get(), tables);
             tables += 1;
@@ -156,6 +272,7 @@ fn body_index_agrees_with_both_owners_the_block_view_and_the_transaction() {
     let mut totals = Totals {
         files: 0,
         admitted: 0,
+        alternate: 0,
         blocks: 0,
         wrapped: 0,
         equations: 0,
@@ -240,9 +357,14 @@ fn body_index_agrees_with_both_owners_the_block_view_and_the_transaction() {
         // Positions agree with the transaction wherever it admits the part.
         if let Ok(snapshot) = eager.document_snapshot() {
             totals.admitted += 1;
-            check_transaction_positions(&path, &eager_blocks, &snapshot);
+            check_transaction_positions(&path, &eager_blocks, &snapshot, &mut totals.alternate);
             let source_snapshot = source.document_snapshot().unwrap();
-            check_transaction_positions(&path, &source_blocks, &source_snapshot);
+            check_transaction_positions(
+                &path,
+                &source_blocks,
+                &source_snapshot,
+                &mut totals.alternate,
+            );
         }
         check_identifiers(&eager_blocks, &mut totals);
 
@@ -264,9 +386,10 @@ fn body_index_agrees_with_both_owners_the_block_view_and_the_transaction() {
         );
     }
     println!(
-        "files={} admitted={} blocks={} wrapped={} equations={} controls={} para_ids={}",
+        "files={} admitted={} alternate={} blocks={} wrapped={} equations={} controls={} para_ids={}",
         totals.files,
         totals.admitted,
+        totals.alternate,
         totals.blocks,
         totals.wrapped,
         totals.equations,
@@ -275,6 +398,10 @@ fn body_index_agrees_with_both_owners_the_block_view_and_the_transaction() {
     );
     assert!(totals.files >= 50, "the corpus is present");
     assert!(totals.admitted >= 50);
+    assert!(
+        totals.alternate > 0,
+        "a run-level alternate-content fixture is admitted"
+    );
     assert!(totals.identifiers > 0);
 }
 

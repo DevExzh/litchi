@@ -1144,8 +1144,12 @@ impl Package {
     /// `mc:Ignorable` on `w:document` whose dropped markup holds no element
     /// or attribute of an understood namespace (and, below it, only
     /// `Ignorable` directives listing understood namespaces). Names are
-    /// decided on their decoded values. A document whose projection selects,
-    /// unwraps or hides content (`AlternateContent`, `ProcessContent`,
+    /// decided on their decoded values. A document whose only selections are
+    /// `mc:AlternateContent` wrappers inside runs (a drawing or text box with
+    /// a fallback) is admitted once its projection succeeds; each wrapper is
+    /// one opaque inline object to the snapshot's edits (record 0307). A
+    /// document whose projection otherwise selects, unwraps or hides content
+    /// (`AlternateContent` outside a run, `ProcessContent`,
     /// `MustUnderstand`, ignorable markup holding content, or an `Ignorable`
     /// below `w:document` listing a namespace that is not understood) is
     /// refused, and a projection error is returned as is. Under an

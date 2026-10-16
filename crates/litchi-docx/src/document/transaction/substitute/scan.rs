@@ -7,6 +7,12 @@
 //! `end` marker (record 0285). Text inside a field instruction (the result of
 //! a field nested in the instruction) is fixed content, never text; text of a
 //! field result is ordinary text.
+//!
+//! An `mc:AlternateContent` wrapper (a drawing or text box with a fallback,
+//! record 0307) is one opaque object: a run holding it reads it as one
+//! [`OBJECT`], and nothing inside it, neither branch's text nor the
+//! paragraphs of its text boxes, is listed. The branches differ, and the
+//! visible projection shows only one, so neither is text to an edit.
 
 use std::ops::Range;
 
@@ -171,6 +177,8 @@ struct OpenParagraph {
     runs: Vec<RunSlot>,
     fields: Vec<Field>,
     objects: usize,
+    /// Text offsets of the objects that stand for `mc:AlternateContent`.
+    alternate: Vec<usize>,
     group: usize,
     complex: Vec<OpenComplex>,
     simple: Vec<OpenSimple>,
@@ -279,6 +287,8 @@ pub(super) fn scan(xml: &[u8], start: Start) -> Result<Scanned> {
         done: Vec::new(),
     };
     let origin = ReaderOrigin::of(fragment);
+    // The depth of the open `mc:AlternateContent` whose content is skipped.
+    let mut opaque = None::<usize>;
     loop {
         let event_start = origin
             .offset(reader.buffer_position())
@@ -298,6 +308,24 @@ pub(super) fn scan(xml: &[u8], start: Start) -> Result<Scanned> {
             .and_then(|offset| offset.checked_add(base))
             .ok_or_else(|| xml_error("story offset overflow"))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
+        if let Some(wrapper) = opaque {
+            match event {
+                Event::Start(_) => {
+                    scanner.depth += 1;
+                    if scanner.depth > MAX_DOCUMENT_DEPTH {
+                        return Err(xml_error("story XML is too deep"));
+                    }
+                    continue;
+                },
+                Event::End(_) if scanner.depth > wrapper => {
+                    scanner.depth -= 1;
+                    continue;
+                },
+                Event::End(_) => opaque = None,
+                Event::Eof => {},
+                _ => continue,
+            }
+        }
         let word = is_wordprocessing_namespace(&namespace);
         match event {
             Event::Start(element) => {
@@ -305,8 +333,16 @@ pub(super) fn scan(xml: &[u8], start: Start) -> Result<Scanned> {
                 if scanner.depth > MAX_DOCUMENT_DEPTH {
                     return Err(xml_error("story XML is too deep"));
                 }
+                let alternate =
+                    !word && is_alternate_content(&namespace, element.local_name().as_ref());
+                if alternate {
+                    opaque = Some(scanner.depth);
+                }
                 let declares = declares_namespaces(&xml[event_start..event_end]);
                 let frame = scanner.open(&reader, &element, word, event_start, event_end, false)?;
+                if alternate {
+                    scanner.mark_alternate();
+                }
                 let frame = Frame { declares, ..frame };
                 if declares {
                     let captured = scanner.capture.capture(reader.resolver())?;
@@ -318,6 +354,9 @@ pub(super) fn scan(xml: &[u8], start: Start) -> Result<Scanned> {
             Event::Empty(element) => {
                 scanner.depth += 1;
                 let frame = scanner.open(&reader, &element, word, event_start, event_end, true)?;
+                if !word && is_alternate_content(&namespace, element.local_name().as_ref()) {
+                    scanner.mark_alternate();
+                }
                 scanner.stack.push((event_start, frame));
                 scanner.close(element.local_name().as_ref(), word, event_start, event_end)?;
             },
@@ -335,6 +374,16 @@ pub(super) fn scan(xml: &[u8], start: Start) -> Result<Scanned> {
         paragraphs: scanner.done,
         bindings: scanner.bindings,
     })
+}
+
+/// Whether an element is an `mc:AlternateContent` wrapper.
+fn is_alternate_content(namespace: &ResolveResult<'_>, local: &[u8]) -> bool {
+    local == b"AlternateContent"
+        && matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(uri))
+                if *uri == litchi_ooxml_common::mce::NAMESPACE.as_bytes()
+        )
 }
 
 /// Whether a start tag declares a namespace.
@@ -458,6 +507,7 @@ impl Scanner<'_> {
                     runs: Vec::new(),
                     fields: Vec::new(),
                     objects: 0,
+                    alternate: Vec::new(),
                     group: 0,
                     complex: Vec::new(),
                     simple: Vec::new(),
@@ -568,6 +618,21 @@ impl Scanner<'_> {
             },
         }
         Ok(frame)
+    }
+
+    /// Record the object an `mc:AlternateContent` just opened as a direct
+    /// run child pushed: the paragraph's last character.
+    fn mark_alternate(&mut self) {
+        let depth = self.depth;
+        if self.runs.last().is_none_or(|run| run.depth + 1 != depth) {
+            return;
+        }
+        if let Some(paragraph) = self.paragraphs.last_mut()
+            && paragraph.text.ends_with(OBJECT)
+        {
+            let offset = paragraph.text.len() - OBJECT.len_utf8();
+            paragraph.alternate.push(offset);
+        }
     }
 
     /// Whether the next element is paragraph content outside any run.
@@ -907,6 +972,7 @@ impl Scanner<'_> {
             bindings: paragraph.bindings,
             entry: paragraph.entry,
             item: paragraph.item,
+            alternate: paragraph.alternate,
         });
     }
 

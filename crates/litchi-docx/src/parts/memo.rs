@@ -242,14 +242,18 @@ pub(crate) struct MemoDiagnostics {
 /// projection neither selected an `mc:AlternateContent` branch nor unwrapped
 /// `mc:ProcessContent` content: the projection then only drops attributes and
 /// whole ignorable subtrees, and WordprocessingML elements, which a profile
-/// never ignores, keep their parents and their order. A part the record 0011
-/// admission accepts has neither construct, so every admitted part is
+/// never ignores, keep their parents and their order. They also agree when
+/// every selection is an `mc:AlternateContent` inside a run (record 0307):
+/// the selected branch replaces its wrapper inside that run, so every block
+/// and every run keeps its parent and its order. A part the document
+/// transaction admits has only these shapes, so every admitted part is
 /// `Preserved`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RawPositions {
     /// Raw and visible positions are proven equal.
     Preserved,
-    /// The projection selected or unwrapped content; positions may differ.
+    /// The projection selected or unwrapped content outside runs; positions
+    /// may differ.
     Unproven,
 }
 
@@ -280,8 +284,10 @@ impl VisiblePayload {
             &super::document_part::visible_document_capabilities(),
             &litchi_ooxml_common::mce::Limits::default(),
         )?;
-        let preserved =
-            output.report.alternate_content_count == 0 && output.report.unwrapped_elements == 0;
+        let preserved = (output.report.alternate_content_count == 0
+            && output.report.unwrapped_elements == 0)
+            || (output.report.alternate_content_count > 0
+                && super::document_part::holds_run_alternate_content(raw));
         Ok(match output.xml {
             std::borrow::Cow::Borrowed(_) => Self {
                 projected: None,
@@ -531,5 +537,25 @@ mod tests {
         let payload = VisiblePayload::project(&selected).unwrap();
         assert_eq!(payload.positions(), RawPositions::Unproven);
         assert!(payload.same_projection(&VisiblePayload::project(&selected).unwrap(), &selected));
+
+        // Record 0307: selections inside runs keep every block and run where
+        // it is; one outside a run does not.
+        let in_run = allocation(
+            format!(
+                r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:x="urn:unknown"><w:body><w:p><w:r><mc:AlternateContent><mc:Choice Requires="x"><w:t>C</w:t></mc:Choice><mc:Fallback><w:t>F</w:t></mc:Fallback></mc:AlternateContent></w:r></w:p><w:p/></w:body></w:document>"#
+            )
+            .as_bytes(),
+        );
+        let payload = VisiblePayload::project(&in_run).unwrap();
+        assert!(payload.projected().is_some());
+        assert!(payload.positions().is_preserved());
+        let in_paragraph = allocation(
+            format!(
+                r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:x="urn:unknown"><w:body><w:p><mc:AlternateContent><mc:Choice Requires="x"><w:r/></mc:Choice></mc:AlternateContent></w:p></w:body></w:document>"#
+            )
+            .as_bytes(),
+        );
+        let payload = VisiblePayload::project(&in_paragraph).unwrap();
+        assert_eq!(payload.positions(), RawPositions::Unproven);
     }
 }

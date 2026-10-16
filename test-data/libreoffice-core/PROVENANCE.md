@@ -36,6 +36,10 @@ registry fragments also carry their own MPL-2.0 / Apache-2.0 headers.
 | `sd/qa/unit/data/odp/tdf53970_linked.odp` | `a1a150f610354851fdf39de51187fd0d4e5e1c0da7590c9fb09e57969befaa77` | `crates/litchi-ops/tests/crud_matrix.rs`, ODP media (record 0289; copied 2026-10-14) |
 | `sw/qa/extras/layout/data/tdf124423.odt` | `8369bba63d74890de8b4e638a0fede60b3282bb1f967a3068b2ba9cbadf53f38` | `crates/litchi-ops/tests/crud_matrix.rs`, ODT text box (record 0289; copied 2026-10-14) |
 | `sw/qa/extras/rtfexport/data/n192129.rtf` | `db775680d2697af2038682d37f37c731027cabebf75abce2a5cd9af50cc576f3` | `crates/litchi-ops/tests/crud_matrix.rs`, RTF picture (record 0289; copied 2026-10-14) |
+| `sw/qa/extras/ooxmlexport/data/tdf90153.docx` | `ab2183e077e00d260ffc85a86859e86e2a583e9384f801681efe431bb756e807` | `crates/litchi-ops/tests/docx_markup_compatibility.rs`, run-level `mc:AlternateContent` shape without text (record 0307; copied 2026-10-16) |
+| `sw/qa/extras/layout/data/inline-textbox-position.docx` | `ffef711a9531d47da480d48bb107d0d8aebebbc1112c645061bdbaf6317ff839` | same, two text boxes in one paragraph |
+| `sw/qa/writerfilter/dmapper/data/redlined-shape-sdt.docx` | `1f93998fb483bb99e27370e1ef91d081d0011cbc3c295be1c6b85626b5e32547` | same, a group shape in a tracked insertion |
+| `sw/qa/extras/ooxmlexport/data/tdf103389.docx` | `1e966f982f6664f17d63d508d7299a577c98427a3d3943e550e1c359dc6e4048` | same, two drawing canvases |
 
 ## Filter registry fragments
 

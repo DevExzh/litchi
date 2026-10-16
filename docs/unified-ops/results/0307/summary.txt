@@ -1,0 +1,15 @@
+Record 0307: crates/litchi-ops/examples/docx_mc_bench.rs, release, taskset -c 9.
+before = e7fe30fb24 (base) sha256 d8ca160d51fe7ada971368616cdafe0ece32306cce08ea446ebccd82633931fe
+after  = 9c0f50308f        sha256 9579372950a9ced01bbb59c95cea39803b7c31698c9e5cc29d6d74622cb1cda8
+12 runs in ABBA order (B A A B x3); each run's value is a median of 9 samples of 20 calls; µs per call.
+Medians across the six runs of each binary:
+
+scenario       leg        before    after   delta
+text_set       leaf        768.5    765.9   -0.3%
+text_set       unified    1918.6   1897.7   -1.1%
+add_paragraph  leaf       1120.1   1114.6   -0.5%
+add_paragraph  unified    2365.3   2337.4   -1.2%
+run_bold       unified    1538.9   1524.2   -1.0%
+find           unified    5297.2   5290.3   -0.1%
+mc_text_set    unified   refused    293.3
+mc_add         unified   refused    251.4

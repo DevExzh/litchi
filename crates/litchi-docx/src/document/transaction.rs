@@ -172,6 +172,12 @@ pub enum Refusal {
     /// The body block an insertion or move is anchored to does not exist;
     /// the error's position is the block's own position.
     BlockNotFound,
+    /// The content holds `mc:AlternateContent` (a text box or drawing with a
+    /// fallback) with text of its own. The wrapper is one opaque object to
+    /// an edit, and readers show one branch's text as part of the content's,
+    /// so replacing the content's text would either keep that text or drop
+    /// the object (record 0307).
+    AlternateContentText,
 }
 
 impl std::fmt::Display for Refusal {
@@ -211,6 +217,9 @@ impl std::fmt::Display for Refusal {
             },
             Self::FieldInterior => "insertion point lies inside a complex field",
             Self::BlockNotFound => "anchor block was not found",
+            Self::AlternateContentText => {
+                "content holds markup-compatibility alternate content (a text box) with its own text"
+            },
         })
     }
 }
@@ -10203,6 +10212,9 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
     let mut text = String::new();
     let mut depth = 0usize;
     let mut saw_root = false;
+    // The depth of the open `mc:AlternateContent`: an opaque object whose
+    // own text refuses the edit (record 0307).
+    let mut opaque = None::<usize>;
 
     loop {
         let event_start = origin
@@ -10220,9 +10232,36 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
             .offset(reader.buffer_position())
             .ok_or(Refusal::ComplexContent)?;
 
+        if let Some(wrapper) = opaque {
+            match &event {
+                Event::Start(element) | Event::Empty(element) => {
+                    if alternate_content_text(&namespace, element.name(), &fragment_prefix) {
+                        return Err(Refusal::AlternateContentText);
+                    }
+                    if matches!(event, Event::Start(_)) {
+                        depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                    }
+                    continue;
+                },
+                Event::End(_) => {
+                    if depth == wrapper {
+                        opaque = None;
+                    }
+                    depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                    continue;
+                },
+                Event::Eof => {},
+                _ => continue,
+            }
+        }
+
         match event {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_some() && is_alternate_content_name(&namespace, element.name()) {
+                    opaque = Some(depth);
+                    continue;
+                }
                 if root_depth.is_none() {
                     fragment_prefix = FragmentPrefix::from_name(element.name());
                     if saw_root
@@ -10408,6 +10447,40 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
         return Err(Refusal::ComplexRun);
     }
     Ok(TextOwner { slots, text })
+}
+
+/// Whether an element is an `mc:AlternateContent` wrapper. A transaction
+/// fragment is parsed without the declarations it inherits, so an unbound
+/// prefix counts; a prefix bound to another namespace does not.
+fn is_alternate_content_name(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+) -> bool {
+    name.local_name().as_ref() == b"AlternateContent"
+        && match namespace {
+            ResolveResult::Bound(Namespace(uri)) => *uri == MARKUP_COMPATIBILITY_NAMESPACE,
+            ResolveResult::Unknown(_) | ResolveResult::Unbound => true,
+        }
+}
+
+/// Whether an element inside alternate content carries text a reader shows
+/// (or might show) as part of its owner's.
+fn alternate_content_text(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    matches!(
+        name.local_name().as_ref(),
+        b"t" | b"delText"
+            | b"tab"
+            | b"ptab"
+            | b"br"
+            | b"cr"
+            | b"noBreakHyphen"
+            | b"softHyphen"
+            | b"sym"
+    ) && is_fragment_word_element(namespace, fragment_prefix)
 }
 
 fn is_owner_text_element(
@@ -15972,5 +16045,47 @@ mod tests {
             })
         ));
         assert_eq!(refused.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn text_sets_treat_run_alternate_content_as_one_opaque_object() {
+        // Record 0307: a wrapper without text survives a paragraph text set;
+        // one whose branches hold text refuses it, typed, with the edit
+        // untouched.
+        let document = |run: &str| {
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:x=\"urn:x\"><w:body>\
+                 <w:p><w:r><w:t>before</w:t></w:r><w:r>{run}</w:r></w:p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes()
+        };
+        let shape = r#"<mc:AlternateContent><mc:Choice Requires="x"><w:drawing><x:pos>1905</x:pos></w:drawing></mc:Choice><mc:Fallback><w:pict/></mc:Fallback></mc:AlternateContent>"#;
+        let base = Snapshot::from_xml(document(shape)).unwrap();
+        let mut edit = base.edit();
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let published = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(published.contains(shape), "{published}");
+        assert!(published.contains("<w:t>after</w:t>"), "{published}");
+
+        for text in [
+            r#"<w:t>BOX</w:t>"#,
+            r#"<w:txbxContent><w:p><w:r><w:tab/></w:r></w:p></w:txbxContent>"#,
+        ] {
+            let boxed = format!(
+                r#"<mc:AlternateContent><mc:Choice Requires="x"><w:drawing>{text}</w:drawing></mc:Choice><mc:Fallback/></mc:AlternateContent>"#
+            );
+            let base = Snapshot::from_xml(document(&boxed)).unwrap();
+            let mut edit = base.edit();
+            assert!(matches!(
+                edit.replace_paragraph_text(Position::new(0), "after"),
+                Err(Error::Refused {
+                    position: 0,
+                    reason: Refusal::AlternateContentText,
+                })
+            ));
+            assert_eq!(edit.projected().xml_bytes(), base.xml_bytes());
+        }
     }
 }
