@@ -677,6 +677,11 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - the iWork leaf public-API checker exits 0 (Numbers `Position`/`Range` aliases deleted and banned; shared table modules allowed with reasons).
 - Usage-limit pause (weekly limit hit 2026-10-15, reset 2026-10-18): `iwork-keynote` (0298), `iwork-structure` (0301) and `perf-residual` (0302) stopped mid-task and were resumed afterwards.
 
+- Disk (2026-10-16):
+  - free disk fell to 4–16 GB repeatedly with three agents rebuilding;
+  - with the owner's approval, the main checkout's build directory (`/home/zhuhe/code/litchi/target`, about 965 GB of rebuildable output) was deleted, so free disk is about 1 TB;
+  - memory (no swap) still caps concurrency at about four agents.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
