@@ -95,6 +95,7 @@ pub(crate) mod table_sort;
 )]
 mod table_sort_compat;
 pub(crate) mod table_title;
+pub(crate) mod table_topology;
 
 use std::collections::HashSet;
 use std::fmt;

@@ -1,8 +1,16 @@
-//! Section-relative table topology edits.
+//! Section-relative table row and column insertion and removal (record
+//! 0309): the atomic, exact-source [`Edit`](crate::table::topology::Edit) started by
+//! [`crate::Package::edit_table_topology`], and the section-relative
+//! coordinates it takes.
 //!
-//! These values describe semantic table coordinates only. The concrete IWA
-//! adapter resolves them against native header/body/footer counts and performs
-//! the graph, formula, merge, UID, and wire updates transactionally.
+//! The coordinate values describe semantic table positions only; the
+//! transaction resolves them against the table's native header, body and
+//! footer counts and rewrites storage, headers, UIDs, borders and counts in
+//! one publication.
+
+pub use crate::package::table_topology::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Unsupported,
+};
 
 /// A row insertion whose index is relative to a semantic table section.
 ///

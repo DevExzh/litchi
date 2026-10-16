@@ -2451,6 +2451,16 @@ canonical `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` set and
 
 Both profiles now register 30 families.
 
+## Numbers rows and columns (record 0309)
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_numbers::table::topology::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Unsupported}` | Registered family (31st) in `numbers-minimal` / `numbers-full`; the section-relative `RowInsertion`, `ColumnInsertion`, `RowDeletion`, `ColumnDeletion` values stay in the same module | ✅ 0309 |
+| `Package::edit_table_topology(sheet, table) -> topology::Edit<'_>` | `Edit::{insert_row, insert_column, remove_row, remove_column}`; several operations per edit, applied in order, one commit | ✅ 0309 |
+| `Package::apply_table_topology(&Patch)` | Exact source check; `Patch::{is_noop, inverse}` | ✅ 0309 |
+| `topology::Error::Unsupported { reason: Unsupported }` | `Formulas`, `ReferencedByOtherOwners`, `Merges`, `Filters`, `Categories`, `Pivot`, `SortRules`, `HiddenAxis`, `Borders`, `Comments`, `StorageLayout` | ✅ 0309 |
+| `litchi_numbers_wire::{ListKind, BncCell::list_keys}` | The table data lists a BNC cell's keys index | ✅ 0309 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |
