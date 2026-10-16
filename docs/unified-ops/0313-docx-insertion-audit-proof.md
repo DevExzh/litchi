@@ -3,8 +3,9 @@
 - Status: implemented on `uo2/docx-insert`, cut from `feat/unified-ops-api`
   at `12724da2d5`; trunk `1100472b75` (record 0312) merged (`9c79d04592`;
   the merge touches no file this record changes and no measured path).
-  Commits: `0c354bc8ef` (xml-minifier), `40dbab6d5d` (litchi-opc), then the
-  bench legs and this record.
+  Commits: `0c354bc8ef` (xml-minifier), `40dbab6d5d` (litchi-opc),
+  `fd964e4103` (bench legs), `2eacd2e922` (this record). Trunk `75e5da7150`
+  (rustfmt of a 0312 test, `PROGRESS.md`) was merged last (`6f23858452`).
 - Date: 2026-10-16
 - Input: record 0311 §4.1. A DOCX paragraph `add` on the default
   source-backed owner carried no audit proof, so the source overlay audited
@@ -264,7 +265,7 @@ repository).
 
 | Command | Exit |
 |---|---:|
-| `cargo fmt --all --check` | **1**: only `crates/litchi-ops/tests/iwork_unified.rs:160`, from trunk's record 0312 (`92693c1292`); every file this record changes is formatted. Left for the coordinator, outside this record's ownership |
+| `cargo fmt --all --check` | 0 after trunk `75e5da7150` was merged (`6f23858452`). On `9c79d04592` it failed only on `crates/litchi-ops/tests/iwork_unified.rs:160`, from record 0312, which trunk then reformatted |
 | `cargo clippy -p xml-minifier -p litchi-opc -p litchi-docx -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features [--features docx] --all-targets -- -D warnings` (none, docx; again after the `fresh_*` legs) | 0 each |
 | `cargo test -p xml-minifier --all-features` (180) | 0 |
