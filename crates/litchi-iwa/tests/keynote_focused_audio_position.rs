@@ -13,7 +13,9 @@ use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::media::{MovieKind, Point as FocusedPoint};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
-use litchi_keynote::{DrawableSelector, MediaPart, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{
+    DrawableSelector, MovieSelector, Package, SlideSelector, slide::media::data::MediaPart,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;

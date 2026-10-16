@@ -50,8 +50,9 @@ CREATABLE = (
     "oth", "odm", "odg", "odc", "odi", "odb", "odf",
     # Numbers builds a blank workbook (record 0297).
     "numbers",
-    # Pages builds its minimal document (record 0299).
-    "pages",
+    # Pages builds its minimal document (record 0299), Keynote its minimal
+    # presentation (record 0298).
+    "pages", "keynote",
 )
 #: The formats File holds read-only, and a fixture of each: none since ODT
 #: (0276), ODS (0277) and ODP (0278) gained writers.
@@ -149,12 +150,6 @@ class CreateTests(WriteAssertions):
         self.assertIn("docx", error.suggestion)
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
-    def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("keynote",):
-            with self.subTest(format=name):
-                error = raised(lambda: L.create(name))
-                self.assertIsInstance(error, L.UnsupportedError)
-
     def test_iwork_writes_round_trip(self):
         # Record 0296: the iWork leaves' focused writes through litchi_py.
         pages = L.open(fixture("iwork/pages/body-sections-unicode.pages"))
@@ -167,6 +162,34 @@ class CreateTests(WriteAssertions):
         keynote = L.open(fixture("iwork/keynote/basic.key"))
         edited = keynote.set("/slide[1]", {"hidden": True})
         self.assertTrue(L.open_bytes(edited.to_bytes()).get("/slide[1]", 0)["format"]["hidden"])
+
+    def test_keynote_structural_writes_round_trip(self):
+        # Record 0298: Keynote slides, paragraphs and drawables.
+        deck = L.open(fixture("iwork/keynote/multi-slide.key"))
+        copied, path = deck.add("/", "slide", {"from": "/slide[2]"}, index=0)
+        self.assertEqual(path, "/slide[1]")
+        reopened = L.open_bytes(copied.to_bytes())
+        self.assertEqual(reopened.get("/slide[1]/placeholder[title]", 0)["text"], "Agenda")
+        removed = L.open_bytes(copied.remove("/slide[1]").to_bytes())
+        self.assertEqual(removed.get("/slide[1]/placeholder[title]", 0)["text"], "Litchi multi-slide fixture")
+        self.assertEqual(len(removed.query("slide")), len(deck.query("slide")))
+        swapped = deck.swap("/slide[1]", "/slide[2]")
+        self.assertEqual(swapped.get("/slide[1]/placeholder[title]", 0)["text"], "Agenda")
+        moved = swapped.move("/slide[1]", index=1)
+        self.assertEqual(moved.get("/slide[2]/placeholder[title]", 0)["text"], "Agenda")
+        boxed, box = deck.add("/slide[1]", "textbox", {"text": "From Python", "x": "1in"})
+        self.assertEqual(box, "/slide[1]/shape[2]")
+        self.assertEqual(L.open_bytes(boxed.to_bytes()).get(box, 0)["text"], "From Python")
+        body = "/slide[2]/placeholder[body]"
+        added, paragraph = deck.add(body, "paragraph", {"text": "Fourth topic"})
+        self.assertEqual(paragraph, "/slide[2]/placeholder[2]/paragraph[4]")
+        edited = added.set(body + "/p[1]", {"text": "Changed"})
+        self.assertEqual(edited.get(body + "/p[1]", 0)["text"], "Changed")
+        error = raised(lambda: deck.remove("/slide[1]/placeholder[title]"))
+        self.assertIsInstance(error, L.UnsupportedError)
+        created = L.create("keynote")
+        grown, _ = created.add("/", "slide")
+        self.assertEqual(len(grown.query("slide")), len(created.query("slide")) + 1)
 
     def test_a_created_file_has_no_path(self):
         error = raised(lambda: L.create("docx").save())

@@ -11,7 +11,8 @@ use litchi_iwa_common::shape::geometry::Point;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, Package, SlideSelector, slide::audio::Options,
+    MovieKind, MovieSelector, Package, SlideSelector, slide::audio::Options,
+    slide::media::data::MediaPart,
 };
 use prost::Message;
 

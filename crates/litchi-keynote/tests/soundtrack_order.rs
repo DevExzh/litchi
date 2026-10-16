@@ -4,7 +4,9 @@ use litchi_iwa_archive::{Limits, package::Catalog, package::EntryEdit};
 use litchi_iwa_common::{encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{keynote_soundtrack_settings_codec as soundtrack_codec, kn, tsa, tsk, tsp};
-use litchi_keynote::{Package, Position, ReadOptions, SemanticLimits, soundtrack::order::Error};
+use litchi_keynote::{
+    OpenOptions, Package, Position, SemanticLimits, SourceLimits, soundtrack::order::Error,
+};
 use prost::Message;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -411,8 +413,15 @@ fn fixture_order_transaction_is_exact_and_reversible() -> TestResult {
 fn changed_order_rejects_a_tight_output_limit_atomically() -> TestResult {
     let source = fixture()?;
     let input_bytes = u64::try_from(source.len())?;
-    let limits = Limits::new(input_bytes, 128, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
-    let package = Package::from_bytes_with_limits(&source, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(input_bytes)?
+        .max_entries(128)?
+        .max_entry_bytes(1024 * 1024)?
+        .max_aggregate_bytes(1024 * 1024)?
+        .max_component_bytes(1024 * 1024)?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
     let mut edit = package.edit_soundtrack_order();
     edit.move_item(Position::new(0), Position::new(1))?;
     assert!(matches!(
@@ -593,16 +602,9 @@ fn malformed_root_reference_ownership_fails_before_staging() -> TestResult {
 #[test]
 fn soundtrack_order_reference_budget_is_aggregate() -> TestResult {
     let source = fixture()?;
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
     let package =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))?;
     let mut edit = package.edit_soundtrack_order();
     assert!(matches!(
         edit.move_item(Position::new(0), Position::new(0)),

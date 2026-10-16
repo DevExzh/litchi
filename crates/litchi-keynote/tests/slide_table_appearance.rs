@@ -25,10 +25,7 @@ use litchi_keynote::slide::table::appearance::transaction::{
 use litchi_keynote::slide::table::appearance::{
     Appearance, Banding, GridlineVisibility, Gridlines, RowSizing,
 };
-use litchi_keynote::{
-    MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    ReadOptions, SemanticLimits, SlideSelector, TableSelector,
-};
+use litchi_keynote::{OpenOptions, Package, SemanticLimits, SlideSelector, TableSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
@@ -1163,7 +1160,7 @@ fn no_op_is_exact_and_apply_conflict_is_source_bound() -> TestResult {
     let unrelated_package = Package::from_bytes(&unrelated)?;
     assert!(matches!(
         unrelated_package.apply_slide_table_appearance(changed.patch()),
-        Err(litchi_keynote::SlideTableAppearanceError::PatchConflict)
+        Err(Error::PatchConflict)
     ));
     Ok(())
 }
@@ -1673,20 +1670,15 @@ fn metadata_uuid_and_locator_collisions_fail_before_publication() -> TestResult 
 #[test]
 fn finite_semantic_limits_refuse_before_candidate_publication() -> TestResult {
     // Variation work is private to the prepared rewrite and has no public
-    // ReadOptions/SemanticLimits setter, so a deterministic max-minus-one
+    // OpenOptions/SemanticLimits setter, so a deterministic max-minus-one
     // variation case is not caller-accessible at this integration boundary.
     let source = synthetic_package(false, false)?;
     let mut saw_limit = false;
     for references in 1..=64 {
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            references,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
-        let options = ReadOptions::new(Limits::default(), semantic);
+        let semantic = SemanticLimits::builder()
+            .max_references(references)?
+            .build()?;
+        let options = OpenOptions::new().semantic_limits(semantic);
         let Ok(package) = Package::from_bytes_with_options(&source, options) else {
             continue;
         };
@@ -1694,10 +1686,7 @@ fn finite_semantic_limits_refuse_before_candidate_publication() -> TestResult {
         let result = package
             .edit_slide_table_appearance(0usize, 0usize)
             .and_then(|edit| edit.set(custom_appearance()).commit());
-        if matches!(
-            result,
-            Err(litchi_keynote::SlideTableAppearanceError::LimitExceeded { .. })
-        ) {
+        if matches!(result, Err(Error::LimitExceeded { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             saw_limit = true;
             break;

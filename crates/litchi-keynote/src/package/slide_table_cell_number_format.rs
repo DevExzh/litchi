@@ -32,7 +32,7 @@ use litchi_iwa_protos::{
     numbers_table_cell_storage_codec as storage_codec,
 };
 use litchi_numbers_wire::BncCell;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::slide_table_core as core;
 use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
@@ -48,7 +48,7 @@ const FORMAT_LIST_TYPE: i32 = 2;
 /// transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableCellNumberFormatLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -66,7 +66,7 @@ pub enum SlideTableCellNumberFormatLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideTableCellNumberFormatLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -92,7 +92,7 @@ impl fmt::Display for SlideTableCellNumberFormatLimitKind {
 /// operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableCellNumberFormatPath {
+pub enum Path {
     Package,
     Cell {
         slide: Position,
@@ -101,7 +101,7 @@ pub enum SlideTableCellNumberFormatPath {
     },
 }
 
-impl fmt::Display for SlideTableCellNumberFormatPath {
+impl fmt::Display for Path {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => formatter.write_str("package"),
@@ -122,9 +122,9 @@ impl fmt::Display for SlideTableCellNumberFormatPath {
 }
 
 /// Failure from a Keynote table-cell Number-format read or transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableCellNumberFormatError {
+pub enum Error {
     #[error("this Keynote source does not support physical table-cell Number-format edits")]
     UnsupportedSource,
     #[error("the requested Keynote table-cell Number-format graph is outside the supported scope")]
@@ -153,7 +153,7 @@ pub enum SlideTableCellNumberFormatError {
         "Keynote table-cell Number format {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
     LimitExceeded {
-        kind: SlideTableCellNumberFormatLimitKind,
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -169,16 +169,16 @@ pub enum SlideTableCellNumberFormatError {
 
 /// One mutable Number-format edit staged against an immutable package
 /// snapshot.
-pub struct SlideTableCellNumberFormatEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: CellSelection,
     after: Option<Number>,
 }
 
-impl fmt::Debug for SlideTableCellNumberFormatEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableCellNumberFormatEdit")
+            .debug_struct("Edit")
             .field("path", &self.selection.path)
             .field("before", &self.selection.before)
             .field("after", &self.after)
@@ -186,9 +186,9 @@ impl fmt::Debug for SlideTableCellNumberFormatEdit<'_> {
     }
 }
 
-impl SlideTableCellNumberFormatEdit<'_> {
+impl Edit<'_> {
     #[must_use]
-    pub const fn path(&self) -> SlideTableCellNumberFormatPath {
+    pub const fn path(&self) -> Path {
         self.selection.path
     }
 
@@ -229,27 +229,25 @@ impl SlideTableCellNumberFormatEdit<'_> {
         self.clear()
     }
 
-    pub fn commit(
-        self,
-    ) -> Result<SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source checked reversible Number-format patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTableCellNumberFormatPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
-    path: SlideTableCellNumberFormatPath,
+    path: Path,
     before: Option<Number>,
     after: Option<Number>,
     touched_components: usize,
 }
 
-impl fmt::Debug for SlideTableCellNumberFormatPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableCellNumberFormatPatch")
+            .debug_struct("Patch")
             .field("path", &self.path)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -257,9 +255,9 @@ impl fmt::Debug for SlideTableCellNumberFormatPatch {
     }
 }
 
-impl SlideTableCellNumberFormatPatch {
+impl Patch {
     #[must_use]
-    pub const fn path(&self) -> SlideTableCellNumberFormatPath {
+    pub const fn path(&self) -> Path {
         self.path
     }
 
@@ -302,13 +300,13 @@ impl SlideTableCellNumberFormatPatch {
 
 /// Compact diagnostics for one published Number-format transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTableCellNumberFormatDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTableCellNumberFormatDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -344,13 +342,13 @@ impl SlideTableCellNumberFormatDiagnostics {
 /// Fully verified result of one Number-format transaction.
 #[must_use = "a Keynote Number-format commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTableCellNumberFormatCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTableCellNumberFormatPatch,
-    diagnostics: SlideTableCellNumberFormatDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTableCellNumberFormatCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -362,19 +360,19 @@ impl SlideTableCellNumberFormatCommit {
     }
 
     #[must_use]
-    pub const fn patch(&self) -> &SlideTableCellNumberFormatPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTableCellNumberFormatDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
 
 #[derive(Clone, PartialEq, Eq)]
 struct CellSelection {
-    path: SlideTableCellNumberFormatPath,
+    path: Path,
     target: core::Target,
     position: CellPosition,
     tile: core::ObjectLocation,
@@ -402,13 +400,13 @@ impl Package {
     /// Read one existing slide-table cell's explicit Number format.
     ///
     /// `None` is the automatic/no-explicit-Number state. Other native format
-    /// families fail with [`SlideTableCellNumberFormatError::WrongFormatFamily`].
+    /// families fail with [`Error::WrongFormatFamily`].
     pub fn slide_table_cell_number_format<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
         position: CellPosition,
-    ) -> Result<Option<Number>, SlideTableCellNumberFormatError> {
+    ) -> Result<Option<Number>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         Ok(select_cell(self, slide.into(), table.into(), position, &mut budget)?.before)
     }
@@ -420,11 +418,11 @@ impl Package {
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
         position: CellPosition,
-    ) -> Result<SlideTableCellNumberFormatEdit<'_>, SlideTableCellNumberFormatError> {
+    ) -> Result<Edit<'_>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         let selection = select_cell(self, slide.into(), table.into(), position, &mut budget)?;
         let after = selection.before;
-        Ok(SlideTableCellNumberFormatEdit {
+        Ok(Edit {
             source: self,
             selection: CellSelection {
                 budget,
@@ -435,25 +433,22 @@ impl Package {
     }
 
     /// Apply an exact-source checked reversible Number-format patch.
-    pub fn apply_slide_table_cell_number_format(
-        &self,
-        patch: &SlideTableCellNumberFormatPatch,
-    ) -> Result<SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatError> {
+    pub fn apply_slide_table_cell_number_format(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         if !patch.artifacts.authorizes_source(&catalog.shared_source()) {
-            return Err(SlideTableCellNumberFormatError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         let current = select_path(self, patch.path, &mut budget)?;
         if current.before != patch.before {
-            return Err(SlideTableCellNumberFormatError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideTableCellNumberFormatCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideTableCellNumberFormatDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         reopen_patch(self, patch, budget)
@@ -462,16 +457,16 @@ impl Package {
 
 fn select_path(
     package: &Package,
-    path: SlideTableCellNumberFormatPath,
+    path: Path,
     budget: &mut core::Budget,
-) -> Result<CellSelection, SlideTableCellNumberFormatError> {
-    let SlideTableCellNumberFormatPath::Cell {
+) -> Result<CellSelection, Error> {
+    let Path::Cell {
         slide,
         table,
         position,
     } = path
     else {
-        return Err(SlideTableCellNumberFormatError::PatchConflict);
+        return Err(Error::PatchConflict);
     };
     select_cell(
         package,
@@ -488,10 +483,10 @@ fn select_cell(
     table: TableSelector,
     position: CellPosition,
     budget: &mut core::Budget,
-) -> Result<CellSelection, SlideTableCellNumberFormatError> {
+) -> Result<CellSelection, Error> {
     let target = core::select_table(package, slide, table, budget).map_err(map_core_error)?;
     if position.row() >= target.rows || position.column() >= target.columns {
-        return Err(SlideTableCellNumberFormatError::CellPositionNotFound { position });
+        return Err(Error::CellPositionNotFound { position });
     }
 
     let model_payload = core::model_payload(package, &target).map_err(map_core_error)?;
@@ -506,22 +501,22 @@ fn select_cell(
     if model.model().number_of_rows() != target.rows
         || model.model().number_of_columns() != target.columns
     {
-        return Err(SlideTableCellNumberFormatError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let store = model.data_store();
     let (tile_storage, tile_references) = decode_tile_references(store.tiles(), package, budget)?;
     let tile_size = tile_storage
         .tile_size()
         .filter(|size| *size != 0)
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let tile_id = position.row() / tile_size;
     let mut tile_matches = tile_references.iter().filter(|(id, _)| *id == tile_id);
     let tile_identifier = tile_matches
         .next()
         .map(|(_, identifier)| *identifier)
-        .ok_or(SlideTableCellNumberFormatError::CellPositionNotFound { position })?;
+        .ok_or(Error::CellPositionNotFound { position })?;
     if tile_matches.next().is_some() || tile_identifier == target.model.identifier {
-        return Err(SlideTableCellNumberFormatError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let tile = core::locate_object(package, tile_identifier).map_err(map_core_error)?;
     let tile_object = core::object_at(package, &tile).map_err(map_core_error)?;
@@ -530,8 +525,7 @@ fn select_cell(
     let cell_source = tile_cell(tile_payload, position.row(), position.column())
         .map_err(|error| map_cell_wire_error(error, position))?;
     charge_bnc_parse(budget, cell_source.len()).map_err(map_core_error)?;
-    let cell =
-        BncCell::parse(cell_source).map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource)?;
     let old_format_key = classify_cell(&cell)?;
 
     // Number BNC identifiers in current Keynote files resolve through the
@@ -542,10 +536,10 @@ fn select_cell(
         .or_else(|| Some(store.format_table_pre_bnc()))
         .map(|reference| reference.identifier())
         .filter(|identifier| *identifier != 0)
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let format = core::locate_object(package, format_identifier).map_err(map_core_error)?;
     if format.identifier == target.model.identifier || format.identifier == tile_identifier {
-        return Err(SlideTableCellNumberFormatError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     let format_object = core::object_at(package, &format).map_err(map_core_error)?;
     let (format_message_index, format_payload) = core::unique_message_any(
@@ -565,13 +559,13 @@ fn select_cell(
                 .entries
                 .iter()
                 .find(|entry| entry.key == key)
-                .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             if entry.ref_count == 0 {
-                return Err(SlideTableCellNumberFormatError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let format_type = format_type(&entry.payload, package, budget)?;
             if format_type != number_codec::NATIVE_NUMBER_FORMAT_TYPE {
-                return Err(SlideTableCellNumberFormatError::WrongFormatFamily);
+                return Err(Error::WrongFormatFamily);
             }
             let number = decode_number(&entry.payload, package, budget)?;
             if cell.explicit_format_flags() == 0 {
@@ -583,7 +577,7 @@ fn select_cell(
         None => None,
     };
     Ok(CellSelection {
-        path: SlideTableCellNumberFormatPath::Cell {
+        path: Path::Cell {
             slide: target.slide_position,
             table: target.table_position,
             position,
@@ -637,8 +631,7 @@ fn decode_tile_references(
     source: &[u8],
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<(storage_codec::TileStorageSnapshot, Vec<(u32, u64)>), SlideTableCellNumberFormatError>
-{
+) -> Result<(storage_codec::TileStorageSnapshot, Vec<(u32, u64)>), Error> {
     budget.allocations(1).map_err(map_core_error)?;
     let options = storage_options(package, budget).map_err(map_core_error)?;
     let mut collector = TileReferenceCollector::default();
@@ -650,7 +643,7 @@ fn decode_tile_references(
         .references
         .len()
         .checked_mul(size_of::<(u32, u64)>() + 4 * size_of::<usize>())
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .allocations(
             collector
@@ -669,7 +662,7 @@ fn decode_tile_references(
             .iter()
             .any(|(_, identifier)| *identifier == 0)
     {
-        return Err(SlideTableCellNumberFormatError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok((snapshot, collector.references))
 }
@@ -754,7 +747,7 @@ fn decode_format_facts(
     source: &[u8],
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<FormatFacts, SlideTableCellNumberFormatError> {
+) -> Result<FormatFacts, Error> {
     let options = storage_options(package, budget).map_err(map_core_error)?;
     let mut collector = FormatCollector::default();
     let (snapshot, report) =
@@ -762,7 +755,7 @@ fn decode_format_facts(
             .map_err(map_storage_error)?;
     charge_storage_report(budget, report).map_err(map_core_error)?;
     if snapshot.list_type() != FORMAT_LIST_TYPE || collector.segments != 0 {
-        return Err(SlideTableCellNumberFormatError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     if snapshot.next_list_id() == 0
         || collector
@@ -770,7 +763,7 @@ fn decode_format_facts(
             .iter()
             .any(|entry| entry.key >= snapshot.next_list_id())
     {
-        return Err(SlideTableCellNumberFormatError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget
         .retained(
@@ -797,10 +790,10 @@ fn decode_format_facts(
     })
 }
 
-fn classify_cell(cell: &BncCell) -> Result<Option<u32>, SlideTableCellNumberFormatError> {
+fn classify_cell(cell: &BncCell) -> Result<Option<u32>, Error> {
     if cell.control_cell_spec_identifier().is_some() || cell.secondary_format_identifier().is_some()
     {
-        return Err(SlideTableCellNumberFormatError::WrongFormatFamily);
+        return Err(Error::WrongFormatFamily);
     }
     match cell.cell_format_kind() {
         Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND) => {
@@ -808,32 +801,25 @@ fn classify_cell(cell: &BncCell) -> Result<Option<u32>, SlideTableCellNumberForm
                 || (cell.explicit_format_flags() != 0
                     && cell.explicit_format_flags() != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT)
             {
-                return Err(SlideTableCellNumberFormatError::WrongFormatFamily);
+                return Err(Error::WrongFormatFamily);
             }
-            let key = cell
-                .format_identifier()
-                .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+            let key = cell.format_identifier().ok_or(Error::InvalidSource)?;
             if key == 0 {
-                return Err(SlideTableCellNumberFormatError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             Ok(Some(key))
         },
-        Some(_) => Err(SlideTableCellNumberFormatError::WrongFormatFamily),
+        Some(_) => Err(Error::WrongFormatFamily),
         None if cell.format_identifier().is_some() || cell.explicit_format_flags() != 0 => {
-            Err(SlideTableCellNumberFormatError::WrongFormatFamily)
+            Err(Error::WrongFormatFamily)
         },
         None => Ok(None),
     }
 }
 
-fn format_type(
-    source: &[u8],
-    package: &Package,
-    budget: &mut core::Budget,
-) -> Result<u32, SlideTableCellNumberFormatError> {
+fn format_type(source: &[u8], package: &Package, budget: &mut core::Budget) -> Result<u32, Error> {
     let limits = budget.residual(package).map_err(map_core_error)?;
-    let view = WireView::parse_with_limits(source, limits)
-        .map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut selected = None;
     for field in view.fields() {
         budget.fields(1).map_err(map_core_error)?;
@@ -842,24 +828,23 @@ fn format_type(
             continue;
         }
         if selected.is_some() || field.wire_type() != 0 {
-            return Err(SlideTableCellNumberFormatError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let (value, consumed) = decode_varint_from_bytes(field.payload())
-            .map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+        let (value, consumed) =
+            decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
         if consumed != field.payload().len() {
-            return Err(SlideTableCellNumberFormatError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        selected =
-            Some(u32::try_from(value).map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?);
+        selected = Some(u32::try_from(value).map_err(|_| Error::InvalidSource)?);
     }
-    selected.ok_or(SlideTableCellNumberFormatError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn number_options(
     source: &[u8],
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<number_codec::DecodeOptions, SlideTableCellNumberFormatError> {
+) -> Result<number_codec::DecodeOptions, Error> {
     let limits = budget.residual(package).map_err(map_core_error)?;
     let output = source
         .len()
@@ -873,7 +858,7 @@ fn decode_number(
     source: &[u8],
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Number, SlideTableCellNumberFormatError> {
+) -> Result<Number, Error> {
     let options = number_options(source, package, budget)?;
     let (snapshot, report) = number_codec::decode_number_format_with_report(source, options)
         .map_err(map_number_codec_error)?;
@@ -883,10 +868,9 @@ fn decode_number(
     } else {
         DecimalPlaces::Fixed(
             FixedDecimalPlaces::new(
-                u8::try_from(snapshot.decimal_places())
-                    .map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?,
+                u8::try_from(snapshot.decimal_places()).map_err(|_| Error::InvalidSource)?,
             )
-            .map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?,
+            .map_err(|_| Error::InvalidSource)?,
         )
     };
     let negative = match snapshot.negative_style() {
@@ -894,7 +878,7 @@ fn decode_number(
         1 => NegativeStyle::Red,
         2 => NegativeStyle::Parentheses,
         3 => NegativeStyle::RedParentheses,
-        _ => return Err(SlideTableCellNumberFormatError::InvalidSource),
+        _ => return Err(Error::InvalidSource),
     };
     let separator = if snapshot.show_thousands_separator() {
         ThousandsSeparator::Shown
@@ -1049,7 +1033,7 @@ fn validate_format_refcounts(
     facts: &FormatFacts,
     _tile_size: u32,
     budget: &mut core::Budget,
-) -> Result<(), SlideTableCellNumberFormatError> {
+) -> Result<(), Error> {
     let mut census = BncReferenceCensus::default();
     for (_, identifier) in tile_references {
         let location = core::locate_object(package, *identifier).map_err(map_core_error)?;
@@ -1061,23 +1045,23 @@ fn validate_format_refcounts(
             .map_err(map_storage_error)?;
         charge_storage_report(budget, report).map_err(map_core_error)?;
         if census.invalid {
-            return Err(SlideTableCellNumberFormatError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for entry in &facts.entries {
         let observed = census.formats.get(&entry.key).copied().unwrap_or(0);
         if observed != usize::try_from(entry.ref_count).unwrap_or(usize::MAX) {
-            return Err(SlideTableCellNumberFormatError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if census.formats.keys().any(|key| !facts.keys.contains(key)) {
-        return Err(SlideTableCellNumberFormatError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let retained = census
         .formats
         .len()
         .checked_mul(size_of::<(u32, usize)>() + 4 * size_of::<usize>())
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .allocations(census.formats.len())
         .and_then(|_| budget.retained(retained))
@@ -1174,7 +1158,7 @@ fn prepare_number_append(
     source: &[u8],
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Vec<u8>, SlideTableCellNumberFormatError> {
+) -> Result<Vec<u8>, Error> {
     let options = number_options(source, package, budget)?;
     let prepared = number_codec::prepare_number_format_write(number_write(value), options)
         .map_err(map_number_codec_error)?;
@@ -1189,7 +1173,7 @@ fn prepare_number_append(
         || output.report().allocations() != requirements.allocations()
         || output.report().retained_bytes() != requirements.retained_bytes()
     {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     Ok(output.into_bytes())
 }
@@ -1199,7 +1183,7 @@ fn find_matching_format(
     desired: Number,
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Option<u32>, SlideTableCellNumberFormatError> {
+) -> Result<Option<u32>, Error> {
     for entry in &facts.entries {
         if format_type(&entry.payload, package, budget)? != number_codec::NATIVE_NUMBER_FORMAT_TYPE
         {
@@ -1219,10 +1203,10 @@ fn validate_current_entry(
     before: Option<Number>,
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<(), SlideTableCellNumberFormatError> {
+) -> Result<(), Error> {
     let Some(key) = old_key else {
         if before.is_some() {
-            return Err(SlideTableCellNumberFormatError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         return Ok(());
     };
@@ -1230,19 +1214,19 @@ fn validate_current_entry(
         .entries
         .iter()
         .find(|entry| entry.key == key)
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.ref_count == 0
         || format_type(&entry.payload, package, budget)? != number_codec::NATIVE_NUMBER_FORMAT_TYPE
     {
-        return Err(SlideTableCellNumberFormatError::WrongFormatFamily);
+        return Err(Error::WrongFormatFamily);
     }
     let current = decode_number(&entry.payload, package, budget)?;
     if cell.explicit_format_flags() == litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
         if before != Some(current) {
-            return Err(SlideTableCellNumberFormatError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
     } else if before.is_some() {
-        return Err(SlideTableCellNumberFormatError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     Ok(())
 }
@@ -1255,7 +1239,7 @@ fn mutate_format_list(
     desired_payload: Option<&[u8]>,
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<(Option<Vec<u8>>, Option<u32>), SlideTableCellNumberFormatError> {
+) -> Result<(Option<Vec<u8>>, Option<u32>), Error> {
     if old_key == desired_key {
         return Ok((None, desired_key));
     }
@@ -1265,7 +1249,7 @@ fn mutate_format_list(
             .entries
             .iter()
             .find(|entry| entry.key == old_key)
-            .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let mutation = if entry.ref_count > 1 {
             storage_codec::TableDataListEntryMutation::RefCount(
                 storage_codec::TableDataListEntryRefCountEdit::new(
@@ -1288,7 +1272,7 @@ fn mutate_format_list(
     let current_source = output.as_deref().unwrap_or(source);
     let Some(desired_key) = desired_key else {
         if desired_payload.is_some() {
-            return Err(SlideTableCellNumberFormatError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         return Ok((output, None));
     };
@@ -1297,7 +1281,7 @@ fn mutate_format_list(
         let replacement = entry
             .ref_count
             .checked_add(1)
-            .ok_or(SlideTableCellNumberFormatError::UnsupportedDependency)?;
+            .ok_or(Error::UnsupportedDependency)?;
         storage_codec::TableDataListEntryMutation::RefCount(
             storage_codec::TableDataListEntryRefCountEdit::new(
                 desired_key,
@@ -1306,13 +1290,13 @@ fn mutate_format_list(
             ),
         )
     } else {
-        let payload = desired_payload.ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        let payload = desired_payload.ok_or(Error::InvalidSource)?;
         if desired_key != facts.next_list_id {
-            return Err(SlideTableCellNumberFormatError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         let replacement = desired_key
             .checked_add(1)
-            .ok_or(SlideTableCellNumberFormatError::UnsupportedDependency)?;
+            .ok_or(Error::UnsupportedDependency)?;
         storage_codec::TableDataListEntryMutation::Append(
             storage_codec::TableDataListEntryAppend::format(desired_key, 1, payload)
                 .advance_next_list_id(desired_key, replacement),
@@ -1327,7 +1311,7 @@ fn apply_list_mutation(
     mutation: storage_codec::TableDataListEntryMutation<'_>,
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Vec<u8>, SlideTableCellNumberFormatError> {
+) -> Result<Vec<u8>, Error> {
     let options = storage_options(package, budget).map_err(map_core_error)?;
     let prepared = storage_codec::prepare_table_data_list_entry_rewrite(source, mutation, options)
         .map_err(map_storage_error)?;
@@ -1370,7 +1354,7 @@ fn apply_list_mutation(
         || report.allocations() != requirements.allocations()
         || report.retained_bytes() != requirements.retained_bytes()
     {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     Ok(output)
 }
@@ -1379,63 +1363,63 @@ fn commit_edit(
     source: &Package,
     selection: &CellSelection,
     after: Option<Number>,
-) -> Result<SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatError> {
+) -> Result<Commit, Error> {
     let mut budget = selection.budget;
     if selection.before == after {
         let bytes = shared_source_artifact(source, &mut budget)?;
-        return Ok(SlideTableCellNumberFormatCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideTableCellNumberFormatPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 path: selection.path,
                 before: selection.before,
                 after,
                 touched_components: 0,
             },
-            diagnostics: SlideTableCellNumberFormatDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if selection.target.locked {
-        return Err(SlideTableCellNumberFormatError::Locked);
+        return Err(Error::Locked);
     }
     let (candidate, touched_components) =
         rewrite(source, selection.path, selection.before, after, &mut budget)?;
     let mut reopen_budget = budget;
     let reopened = select_path(&candidate, selection.path, &mut reopen_budget)?;
     if !same_target(&reopened, selection) || reopened.before != after {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     verify_package_locality(source, &candidate, selection, &reopened, &mut reopen_budget)?;
     let source_bytes = shared_source_artifact(source, &mut reopen_budget)?;
     let target_bytes = shared_source_artifact(&candidate, &mut reopen_budget)?;
-    Ok(SlideTableCellNumberFormatCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTableCellNumberFormatPatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(source_bytes, target_bytes),
             path: selection.path,
             before: selection.before,
             after,
             touched_components,
         },
-        diagnostics: SlideTableCellNumberFormatDiagnostics::published(touched_components),
+        diagnostics: Diagnostics::published(touched_components),
     })
 }
 
 fn reopen_patch(
     source: &Package,
-    patch: &SlideTableCellNumberFormatPatch,
+    patch: &Patch,
     mut budget: core::Budget,
-) -> Result<SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatError> {
+) -> Result<Commit, Error> {
     let source_selection = select_path(source, patch.path, &mut budget)?;
     if source_selection.before != patch.before {
-        return Err(SlideTableCellNumberFormatError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let candidate = parse_candidate(patch.artifacts.target(), source, &mut budget)?;
     let candidate_selection = select_path(&candidate, patch.path, &mut budget)?;
     if !same_target(&candidate_selection, &source_selection)
         || candidate_selection.before != patch.after
     {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     verify_package_locality(
         source,
@@ -1444,26 +1428,26 @@ fn reopen_patch(
         &candidate_selection,
         &mut budget,
     )?;
-    Ok(SlideTableCellNumberFormatCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideTableCellNumberFormatDiagnostics::published(patch.touched_components),
+        diagnostics: Diagnostics::published(patch.touched_components),
     })
 }
 
 fn rewrite(
     source: &Package,
-    path: SlideTableCellNumberFormatPath,
+    path: Path,
     before: Option<Number>,
     after: Option<Number>,
     budget: &mut core::Budget,
-) -> Result<(Package, usize), SlideTableCellNumberFormatError> {
+) -> Result<(Package, usize), Error> {
     let selection = select_path(source, path, budget)?;
     if selection.before != before {
-        return Err(SlideTableCellNumberFormatError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     if selection.target.locked {
-        return Err(SlideTableCellNumberFormatError::Locked);
+        return Err(Error::Locked);
     }
     let tile_object = core::object_at(source, &selection.tile).map_err(map_core_error)?;
     let (_, tile_payload) =
@@ -1475,10 +1459,9 @@ fn rewrite(
     )
     .map_err(|error| map_cell_wire_error(error, selection.position))?;
     charge_bnc_parse(budget, cell_source.len()).map_err(map_core_error)?;
-    let cell =
-        BncCell::parse(cell_source).map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource)?;
     if classify_cell(&cell)? != selection.old_format_key {
-        return Err(SlideTableCellNumberFormatError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
 
     let format_object = core::object_at(source, &selection.format).map_err(map_core_error)?;
@@ -1511,7 +1494,7 @@ fn rewrite(
         facts
             .next_list_id
             .checked_add(1)
-            .ok_or(SlideTableCellNumberFormatError::UnsupportedDependency)?;
+            .ok_or(Error::UnsupportedDependency)?;
     }
     let desired_payload = match (after, desired_key == Some(facts.next_list_id)) {
         (Some(value), true) => Some(prepare_number_append(
@@ -1532,17 +1515,16 @@ fn rewrite(
         budget,
     )?;
     if after.is_some() && selected_key.is_none() {
-        return Err(SlideTableCellNumberFormatError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
-    let mut replacement_cell =
-        BncCell::parse(cell_source).map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+    let mut replacement_cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource)?;
     replacement_cell
         .set_number_or_percentage_format_identifier_preserving_value(selected_key)
-        .map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let replacement_cell = replacement_cell.encode();
     if replacement_cell == cell_source && format_replacement.is_none() {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     charge_tile_patch(budget, tile_payload.len(), replacement_cell.len())
         .map_err(map_core_error)?;
@@ -1559,7 +1541,7 @@ fn rewrite(
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let mut component_names = vec![
         selection.tile.component.as_ref(),
         selection.format.component.as_ref(),
@@ -1569,7 +1551,7 @@ fn rewrite(
     let mut archives = Vec::new();
     archives
         .try_reserve_exact(component_names.len())
-        .map_err(|_| SlideTableCellNumberFormatError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_names.len(),
         })?;
     for component_name in &component_names {
@@ -1604,11 +1586,11 @@ fn rewrite(
     }
 
     let mut compressed = Vec::new();
-    compressed.try_reserve_exact(archives.len()).map_err(|_| {
-        SlideTableCellNumberFormatError::Allocation {
+    compressed
+        .try_reserve_exact(archives.len())
+        .map_err(|_| Error::Allocation {
             amount: archives.len(),
-        }
-    })?;
+        })?;
     for (name, archive) in &archives {
         let encoded_bound = archive
             .encoded_len_with_limits(archive_limits)
@@ -1631,11 +1613,11 @@ fn rewrite(
             .to_bytes_with_limits(archive_limits)
             .map_err(map_core_native_error)?;
         if bytes.len() != encoded_bound {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
         let bytes = SnappyStream::compress(&bytes).map_err(map_core_native_error)?;
         if bytes.len() > compressed_bound {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
         compressed.push((name.as_str(), bytes));
     }
@@ -1664,19 +1646,17 @@ fn rewrite(
     Ok((candidate, component_names.len()))
 }
 
-fn physical_catalog(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideTableCellNumberFormatError> {
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideTableCellNumberFormatError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
     }
 }
 
 fn shared_source_artifact(
     package: &Package,
     budget: &mut core::Budget,
-) -> Result<Arc<[u8]>, SlideTableCellNumberFormatError> {
+) -> Result<Arc<[u8]>, Error> {
     let source = physical_catalog(package)?;
     budget
         .artifact(source.package().source_bytes().len(), 0)
@@ -1688,7 +1668,7 @@ fn parse_candidate(
     source: Arc<[u8]>,
     original: &Package,
     budget: &mut core::Budget,
-) -> Result<Package, SlideTableCellNumberFormatError> {
+) -> Result<Package, Error> {
     budget
         .preflight_candidate(original, source.len())
         .map_err(map_core_error)?;
@@ -1710,85 +1690,74 @@ fn same_target(left: &CellSelection, right: &CellSelection) -> bool {
         && left.format_message_index == right.format_message_index
 }
 
-fn map_cell_wire_error(
-    error: CellWireError,
-    position: CellPosition,
-) -> SlideTableCellNumberFormatError {
+fn map_cell_wire_error(error: CellWireError, position: CellPosition) -> Error {
     match error {
-        CellWireError::Missing => {
-            SlideTableCellNumberFormatError::CellPositionNotFound { position }
-        },
-        CellWireError::Unsupported => SlideTableCellNumberFormatError::UnsupportedDependency,
-        CellWireError::Invalid => SlideTableCellNumberFormatError::InvalidSource,
+        CellWireError::Missing => Error::CellPositionNotFound { position },
+        CellWireError::Unsupported => Error::UnsupportedDependency,
+        CellWireError::Invalid => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: core::Error) -> SlideTableCellNumberFormatError {
+fn map_core_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => SlideTableCellNumberFormatError::UnsupportedSource,
-        core::Error::UnsupportedDependency => {
-            SlideTableCellNumberFormatError::UnsupportedDependency
-        },
-        core::Error::UnsupportedTopology => SlideTableCellNumberFormatError::UnsupportedTopology,
-        core::Error::AmbiguousSelector => SlideTableCellNumberFormatError::AmbiguousSelector,
-        core::Error::EmptySlideName => SlideTableCellNumberFormatError::EmptySlideName,
-        core::Error::SlideNameNotFound => SlideTableCellNumberFormatError::SlideNameNotFound,
-        core::Error::SlidePositionNotFound(position) => {
-            SlideTableCellNumberFormatError::SlidePositionNotFound { position }
-        },
-        core::Error::TablePositionNotFound(position) => {
-            SlideTableCellNumberFormatError::TablePositionNotFound { position }
-        },
+        core::Error::UnsupportedSource => Error::UnsupportedSource,
+        core::Error::UnsupportedDependency => Error::UnsupportedDependency,
+        core::Error::UnsupportedTopology => Error::UnsupportedTopology,
+        core::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        core::Error::EmptySlideName => Error::EmptySlideName,
+        core::Error::SlideNameNotFound => Error::SlideNameNotFound,
+        core::Error::SlidePositionNotFound(position) => Error::SlidePositionNotFound { position },
+        core::Error::TablePositionNotFound(position) => Error::TablePositionNotFound { position },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableCellNumberFormatError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_limit_kind(kind),
             observed,
             maximum,
         },
-        core::Error::Allocation(amount) => SlideTableCellNumberFormatError::Allocation { amount },
+        core::Error::Allocation(amount) => Error::Allocation { amount },
         core::Error::InvalidSource
         | core::Error::Read
         | core::Error::Wire
         | core::Error::Codec
         | core::Error::Archive
-        | core::Error::Verification => SlideTableCellNumberFormatError::InvalidSource,
+        | core::Error::Verification => Error::InvalidSource,
     }
 }
 
-const fn map_limit_kind(kind: core::LimitKind) -> SlideTableCellNumberFormatLimitKind {
+const fn map_limit_kind(kind: core::LimitKind) -> LimitKind {
     match kind {
-        core::LimitKind::InputBytes => SlideTableCellNumberFormatLimitKind::InputBytes,
-        core::LimitKind::OutputBytes => SlideTableCellNumberFormatLimitKind::OutputBytes,
-        core::LimitKind::Entries => SlideTableCellNumberFormatLimitKind::Entries,
-        core::LimitKind::EntryBytes => SlideTableCellNumberFormatLimitKind::EntryBytes,
-        core::LimitKind::TotalBytes => SlideTableCellNumberFormatLimitKind::TotalBytes,
-        core::LimitKind::PayloadObjects => SlideTableCellNumberFormatLimitKind::PayloadObjects,
-        core::LimitKind::PayloadMessages => SlideTableCellNumberFormatLimitKind::PayloadMessages,
-        core::LimitKind::References => SlideTableCellNumberFormatLimitKind::References,
-        core::LimitKind::WireFields => SlideTableCellNumberFormatLimitKind::WireFields,
-        core::LimitKind::WireNesting => SlideTableCellNumberFormatLimitKind::WireNesting,
-        core::LimitKind::WireWork => SlideTableCellNumberFormatLimitKind::WireWork,
-        core::LimitKind::Allocations => SlideTableCellNumberFormatLimitKind::Allocations,
-        core::LimitKind::Retained => SlideTableCellNumberFormatLimitKind::Retained,
-        core::LimitKind::Scratch => SlideTableCellNumberFormatLimitKind::Scratch,
-        core::LimitKind::Components => SlideTableCellNumberFormatLimitKind::Components,
+        core::LimitKind::InputBytes => LimitKind::InputBytes,
+        core::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        core::LimitKind::Entries => LimitKind::Entries,
+        core::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        core::LimitKind::TotalBytes => LimitKind::TotalBytes,
+        core::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        core::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        core::LimitKind::References => LimitKind::References,
+        core::LimitKind::WireFields => LimitKind::WireFields,
+        core::LimitKind::WireNesting => LimitKind::WireNesting,
+        core::LimitKind::WireWork => LimitKind::WireWork,
+        core::LimitKind::Allocations => LimitKind::Allocations,
+        core::LimitKind::Retained => LimitKind::Retained,
+        core::LimitKind::Scratch => LimitKind::Scratch,
+        core::LimitKind::Components => LimitKind::Components,
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideTableCellNumberFormatError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableCellNumberFormatError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                SemanticLimitKind::References => SlideTableCellNumberFormatLimitKind::References,
-                _ => SlideTableCellNumberFormatLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1798,224 +1767,172 @@ fn map_read_error(error: ReadError) -> SlideTableCellNumberFormatError {
             observed,
             maximum,
             ..
-        } => SlideTableCellNumberFormatError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                PayloadLimitKind::Bytes => SlideTableCellNumberFormatLimitKind::InputBytes,
-                PayloadLimitKind::Fields => SlideTableCellNumberFormatLimitKind::WireFields,
-                PayloadLimitKind::Nesting => SlideTableCellNumberFormatLimitKind::WireNesting,
-                PayloadLimitKind::Work => SlideTableCellNumberFormatLimitKind::WireWork,
+                PayloadLimitKind::Bytes => LimitKind::InputBytes,
+                PayloadLimitKind::Fields => LimitKind::WireFields,
+                PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => {
-            SlideTableCellNumberFormatError::Allocation { amount }
-        },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(error) => map_archive_error(error),
-        _ => SlideTableCellNumberFormatError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_storage_error(error: storage_codec::DecodeError) -> SlideTableCellNumberFormatError {
+fn map_storage_error(error: storage_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return SlideTableCellNumberFormatError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        storage_codec::DecodeLimit::Bytes { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::InputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        storage_codec::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::References { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::References,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        storage_codec::DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::References,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Text { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        storage_codec::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Fields { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        storage_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Work { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        storage_codec::DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Nesting { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
         storage_codec::DecodeLimit::Allocation { requested } => {
-            SlideTableCellNumberFormatError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        storage_codec::DecodeLimit::Retained { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::Retained,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        storage_codec::DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::Retained,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        _ => SlideTableCellNumberFormatError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_number_codec_error(error: number_codec::DecodeError) -> SlideTableCellNumberFormatError {
+fn map_number_codec_error(error: number_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return SlideTableCellNumberFormatError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        number_codec::DecodeLimit::InputBytes { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::InputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        number_codec::DecodeLimit::InputBytes { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::OutputBytes { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::OutputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        number_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::Fields { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        number_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
         number_codec::DecodeLimit::Work { observed, maximum }
         | number_codec::DecodeLimit::Items { observed, maximum }
-        | number_codec::DecodeLimit::Text { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        | number_codec::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::Nesting { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        number_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        number_codec::DecodeLimit::References { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::References,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        number_codec::DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::References,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
         number_codec::DecodeLimit::Allocation { requested } => {
-            SlideTableCellNumberFormatError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        number_codec::DecodeLimit::Retained { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::Retained,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        number_codec::DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::Retained,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::Scratch { observed, maximum } => {
-            SlideTableCellNumberFormatError::LimitExceeded {
-                kind: SlideTableCellNumberFormatLimitKind::Scratch,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        number_codec::DecodeLimit::Scratch { observed, maximum } => Error::LimitExceeded {
+            kind: LimitKind::Scratch,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        _ => SlideTableCellNumberFormatError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTableCellNumberFormatError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableCellNumberFormatError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    SlideTableCellNumberFormatLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    SlideTableCellNumberFormatLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => {
-                    SlideTableCellNumberFormatLimitKind::Entries
-                },
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
-                    SlideTableCellNumberFormatLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    SlideTableCellNumberFormatLimitKind::TotalBytes
-                },
-                _ => SlideTableCellNumberFormatLimitKind::WireWork,
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTableCellNumberFormatError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_native_error(error),
-        _ => SlideTableCellNumberFormatError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_native_error(error: litchi_iwa_core::Error) -> SlideTableCellNumberFormatError {
+fn map_core_native_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableCellNumberFormatError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => {
-                    SlideTableCellNumberFormatLimitKind::PayloadObjects
-                },
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableCellNumberFormatLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    SlideTableCellNumberFormatLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    SlideTableCellNumberFormatLimitKind::EntryBytes
-                },
-                _ => SlideTableCellNumberFormatLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTableCellNumberFormatError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTableCellNumberFormatError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -2369,20 +2286,18 @@ fn replace_archive_message(
     message_index: usize,
     payload: Vec<u8>,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), SlideTableCellNumberFormatError> {
+) -> Result<(), Error> {
     let archive = archives
         .iter_mut()
         .find(|(name, _)| name == component_name)
         .map(|(_, archive)| archive)
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
-    let object = archive
-        .object_mut(identifier)
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    let object = archive.object_mut(identifier).ok_or(Error::InvalidSource)?;
     let message_type = object
         .messages
         .get(message_index)
         .map(|message| message.type_)
-        .ok_or(SlideTableCellNumberFormatError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
         .replace_message_preserving_header_with_limits(
             message_index,
@@ -2402,7 +2317,7 @@ fn verify_package_locality(
     selection: &CellSelection,
     candidate_selection: &CellSelection,
     budget: &mut core::Budget,
-) -> Result<(), SlideTableCellNumberFormatError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     let source_entries = source_catalog.package();
@@ -2417,13 +2332,13 @@ fn verify_package_locality(
     let mut source_by_name = HashMap::new();
     source_by_name
         .try_reserve(source_entries.len())
-        .map_err(|_| SlideTableCellNumberFormatError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: source_entries.len(),
         })?;
     let mut candidate_by_name = HashMap::new();
     candidate_by_name
         .try_reserve(candidate_entries.len())
-        .map_err(|_| SlideTableCellNumberFormatError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: candidate_entries.len(),
         })?;
     for entry in source_entries.iter() {
@@ -2431,7 +2346,7 @@ fn verify_package_locality(
             .work(entry.name().len().saturating_add(entry.data().len()))
             .map_err(map_core_error)?;
         if source_by_name.insert(entry.name(), entry).is_some() {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
     }
     for entry in candidate_entries.iter() {
@@ -2439,7 +2354,7 @@ fn verify_package_locality(
             .work(entry.name().len().saturating_add(entry.data().len()))
             .map_err(map_core_error)?;
         if candidate_by_name.insert(entry.name(), entry).is_some() {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
     }
     if source_by_name.len() != candidate_by_name.len()
@@ -2447,7 +2362,7 @@ fn verify_package_locality(
             .keys()
             .any(|name| !source_by_name.contains_key(name))
     {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
 
     let mut changed_components = HashSet::new();
@@ -2457,7 +2372,7 @@ fn verify_package_locality(
         let candidate_entry = candidate_by_name
             .get(name)
             .copied()
-            .ok_or(SlideTableCellNumberFormatError::Verification)?;
+            .ok_or(Error::Verification)?;
         if !changed_components.contains(name)
             && (source_entry.data() != candidate_entry.data()
                 || source_entry.metadata() != candidate_entry.metadata()
@@ -2468,7 +2383,7 @@ fn verify_package_locality(
                     candidate_entry.raw_record().central_directory_record(),
                 ))
         {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
     }
 
@@ -2477,7 +2392,7 @@ fn verify_package_locality(
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| SlideTableCellNumberFormatError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     for component_name in changed_components {
         let source_component = core::component(source, component_name).map_err(map_core_error)?;
         let candidate_component =
@@ -2485,16 +2400,16 @@ fn verify_package_locality(
         let source_archive = source_component.archive();
         let candidate_archive = candidate_component.archive();
         if source_archive.objects.len() != candidate_archive.objects.len() {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
         for source_object in &source_archive.objects {
             let identifier = source_object
                 .archive_info
                 .identifier
-                .ok_or(SlideTableCellNumberFormatError::Verification)?;
+                .ok_or(Error::Verification)?;
             let candidate_object = candidate_archive
                 .object(identifier)
-                .ok_or(SlideTableCellNumberFormatError::Verification)?;
+                .ok_or(Error::Verification)?;
             let selected_message = if identifier == selection.tile.identifier {
                 Some((selection.tile_message_index, TILE_MESSAGE_TYPE))
             } else if identifier == selection.format.identifier {
@@ -2519,7 +2434,7 @@ fn verify_package_locality(
                     .get(index)
                     .is_none_or(|message| message.type_ != TABLE_DATA_LIST_NATIVE_MESSAGE_TYPE)
                 {
-                    return Err(SlideTableCellNumberFormatError::Verification);
+                    return Err(Error::Verification);
                 }
             }
             verify_object_delta(
@@ -2541,11 +2456,8 @@ fn verify_object_delta(
     selected_message: Option<(usize, u32)>,
     limits: litchi_iwa_core::Limits,
     budget: &mut core::Budget,
-) -> Result<(), SlideTableCellNumberFormatError> {
-    let identifier = source
-        .archive_info
-        .identifier
-        .ok_or(SlideTableCellNumberFormatError::Verification)?;
+) -> Result<(), Error> {
+    let identifier = source.archive_info.identifier.ok_or(Error::Verification)?;
     if candidate.archive_info.identifier != Some(identifier)
         || source.messages.len() != source.archive_info.message_infos.len()
         || candidate.messages.len() != candidate.archive_info.message_infos.len()
@@ -2553,7 +2465,7 @@ fn verify_object_delta(
         || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
         || source.archive_info.should_merge != candidate.archive_info.should_merge
     {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     let mut expected = source.clone();
     let mut changed = false;
@@ -2564,12 +2476,12 @@ fn verify_object_delta(
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(SlideTableCellNumberFormatError::Verification)?;
+            .ok_or(Error::Verification)?;
         let candidate_info = candidate
             .archive_info
             .message_infos
             .get(index)
-            .ok_or(SlideTableCellNumberFormatError::Verification)?;
+            .ok_or(Error::Verification)?;
         if source_info.type_ != source_message.type_
             || candidate_info.type_ != candidate_message.type_
             || source_info.type_ != candidate_info.type_
@@ -2585,16 +2497,16 @@ fn verify_object_delta(
             || u32::try_from(source_message.data.len()).ok() != Some(source_info.length)
             || u32::try_from(candidate_message.data.len()).ok() != Some(candidate_info.length)
         {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
         if source_message.data == candidate_message.data {
             continue;
         }
         let Some((allowed_index, allowed_type)) = selected_message else {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         };
         if index != allowed_index || source_message.type_ != allowed_type {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
         expected
             .replace_message_preserving_header_with_limits(index, candidate_message.clone(), limits)
@@ -2603,17 +2515,17 @@ fn verify_object_delta(
     }
     if !changed {
         if !source.same_content_ignoring_offsets(candidate) {
-            return Err(SlideTableCellNumberFormatError::Verification);
+            return Err(Error::Verification);
         }
         return Ok(());
     }
     let ((header_length, data_length), expected) =
         physical_object_framing(expected, limits, budget)?;
     if candidate.header_length != header_length || candidate.data_length != data_length {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     if !expected.same_content_ignoring_offsets(candidate) {
-        return Err(SlideTableCellNumberFormatError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -2622,19 +2534,19 @@ fn physical_object_framing(
     object: ArchiveObject,
     limits: litchi_iwa_core::Limits,
     budget: &mut core::Budget,
-) -> Result<((u64, u64), ArchiveObject), SlideTableCellNumberFormatError> {
+) -> Result<((u64, u64), ArchiveObject), Error> {
     let payload_length = object
         .messages
         .iter()
         .try_fold(0usize, |total, message| {
             total.checked_add(message.data.len())
         })
-        .ok_or(SlideTableCellNumberFormatError::Verification)?;
+        .ok_or(Error::Verification)?;
     let mut archive = Archive::new();
     archive
         .objects
         .try_reserve_exact(1)
-        .map_err(|_| SlideTableCellNumberFormatError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     archive.objects.push(object);
     budget
         .allocations(1)
@@ -2646,16 +2558,11 @@ fn physical_object_framing(
         .map_err(map_core_native_error)?;
     let header_length = encoded_length
         .checked_sub(payload_length)
-        .ok_or(SlideTableCellNumberFormatError::Verification)?;
-    let object = archive
-        .objects
-        .pop()
-        .ok_or(SlideTableCellNumberFormatError::Verification)?;
+        .ok_or(Error::Verification)?;
+    let object = archive.objects.pop().ok_or(Error::Verification)?;
     let mut object = object;
-    object.header_length =
-        u64::try_from(header_length).map_err(|_| SlideTableCellNumberFormatError::Verification)?;
-    object.data_length =
-        u64::try_from(payload_length).map_err(|_| SlideTableCellNumberFormatError::Verification)?;
+    object.header_length = u64::try_from(header_length).map_err(|_| Error::Verification)?;
+    object.data_length = u64::try_from(payload_length).map_err(|_| Error::Verification)?;
     Ok(((object.header_length, object.data_length), object))
 }
 
@@ -2670,8 +2577,8 @@ fn same_central_directory_record(left: &[u8], right: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        CellPosition, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, Package,
-        SlideTableCellNumberFormatError, ThousandsSeparator,
+        CellPosition, DecimalPlaces, Error, FixedDecimalPlaces, NegativeStyle, Number, Package,
+        ThousandsSeparator,
     };
     use crate::slide::table::TableSelector;
     use crate::{Position, SlideSelector};
@@ -2779,6 +2686,6 @@ mod tests {
         let conflict = source
             .apply_slide_table_cell_number_format(&inverse)
             .expect_err("inverse must reject the original source");
-        assert_eq!(conflict, SlideTableCellNumberFormatError::PatchConflict);
+        assert_eq!(conflict, Error::PatchConflict);
     }
 }

@@ -30,7 +30,9 @@ use super::{
     MOVIE_MESSAGE_TYPE, PACKAGE_METADATA_MESSAGE_TYPE, Package, SLIDE_MESSAGE_TYPE,
     SLIDE_NODE_MESSAGE_TYPE, STANDIN_CAPTION_MESSAGE_TYPE, STYLESHEET_MESSAGE_TYPE,
 };
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];

@@ -5,8 +5,10 @@ use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::Wire
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp, tswp};
 use litchi_keynote::{
-    Package, Position, SlideNotesCommit, SlideNotesDiagnostics, SlideNotesError,
-    SlideNotesLimitKind, SlideNotesPatch, SlideSelector, TextPosition, TextSpan,
+    OpenOptions, Package, Position, SlideSelector, SourceLimits, TextPosition, TextSpan,
+    slide::notes::Commit as SlideNotesCommit, slide::notes::Diagnostics as SlideNotesDiagnostics,
+    slide::notes::Error as SlideNotesError, slide::notes::LimitKind as SlideNotesLimitKind,
+    slide::notes::Patch as SlideNotesPatch,
 };
 use prost::Message as _;
 
@@ -1149,8 +1151,15 @@ fn dependent_note_content_is_refused_without_blocking_unrelated_text() -> TestRe
 fn changed_notes_respect_the_retained_output_limit() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let input_bytes = u64::try_from(bytes.len())?;
-    let limits = Limits::new(input_bytes, 16, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(input_bytes)?
+        .max_entries(16)?
+        .max_entry_bytes(1024 * 1024)?
+        .max_aggregate_bytes(1024 * 1024)?
+        .max_component_bytes(1024 * 1024)?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))?;
     let mut edit = package.edit_slide_notes("Agenda")?;
     edit.insert(TextPosition::ZERO, &"expanded".repeat(1_024))?;
     assert!(matches!(

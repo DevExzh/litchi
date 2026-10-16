@@ -22,7 +22,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// or a Keynote document, which `litchi::File` opens without a family view.
 enum Source {
     File(litchi::File),
-    Keynote(litchi::keynote::semantic::Document),
+    Keynote(litchi::keynote::semantic::Presentation),
 }
 
 /// Unified PowerPoint presentation interface

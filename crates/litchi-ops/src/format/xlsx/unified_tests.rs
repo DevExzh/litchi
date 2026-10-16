@@ -7,7 +7,7 @@ use std::io::{Cursor, Write as _};
 use std::path::PathBuf;
 
 use super::{Nav, Xlsx};
-use crate::error::{Code, Result};
+use crate::error::Result;
 use crate::node::{Node, ViewOptions};
 use crate::options::{OpenOptions, SourceMode};
 use crate::path::{IntoPath, resolve};
@@ -344,9 +344,11 @@ fn plans_compile_for_xlsx_and_run_on_any_workbook() {
             ]
         );
     }
-    // Pages body tables have cells since record 0299; Keynote has none.
-    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Keynote).unwrap_err();
-    assert_eq!(other.code(), Code::UnsupportedCapability);
+    // Pages body tables (record 0299) and Keynote slide tables (record 0298)
+    // have cells: the plan compiles for them too.
+    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Keynote)
+        .expect("Keynote slide-table cells");
+    assert_eq!(other.format(), litchi_core::FileFormat::Keynote);
 }
 
 #[test]

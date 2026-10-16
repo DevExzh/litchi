@@ -225,6 +225,10 @@ fn drawable_states(package: &Package) -> TestResult<Vec<DrawableState>> {
     Ok(states)
 }
 
+#[allow(
+    clippy::type_complexity,
+    reason = "the signature tuple mirrors the compared public projections"
+)]
 fn document_signature(
     package: &Package,
 ) -> TestResult<

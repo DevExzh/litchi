@@ -205,11 +205,7 @@ fn stylesheet_registration(package: &Package, target_identifier: u64) -> (u64, u
                     .message_infos
                     .get(message_index)
                     .expect("stylesheet message metadata");
-                if info
-                    .object_references
-                    .iter()
-                    .any(|identifier| *identifier == target_identifier)
-                {
+                if info.object_references.contains(&target_identifier) {
                     assert!(
                         selected
                             .replace((object_identifier, message_index))
@@ -346,11 +342,11 @@ fn assert_public_rejects(source: &[u8]) {
     let package = Package::from_bytes(source).expect("mutated fixture package");
     assert!(matches!(
         package.slide_chart_title(SlideSelector::index(0), ChartSelector::index(0)),
-        Err(ChartTitleError::InvalidSource)
+        Err(Error::InvalidSource)
     ));
     assert!(matches!(
         package.edit_slide_chart_title(SlideSelector::index(0), ChartSelector::index(0)),
-        Err(ChartTitleError::InvalidSource)
+        Err(Error::InvalidSource)
     ));
 }
 
@@ -590,11 +586,7 @@ fn exact_bytes(package: &Package) -> Vec<u8> {
     bytes
 }
 
-fn forge_patch(
-    source_bytes: &[u8],
-    patch: &ChartTitlePatch,
-    target_bytes: Vec<u8>,
-) -> ChartTitlePatch {
+fn forge_patch(source_bytes: &[u8], patch: &Patch, target_bytes: Vec<u8>) -> Patch {
     let mut forged = patch.clone();
     forged.artifacts = ExactArtifacts::new(
         Arc::<[u8]>::from(source_bytes.to_vec()),
@@ -677,7 +669,7 @@ fn chart_title_candidate_verification_rejects_unrelated_drift_and_stale_preview(
         let forged = forge_patch(&source_bytes, &patch, candidate_bytes);
         assert!(matches!(
             source.apply_slide_chart_title(&forged),
-            Err(ChartTitleError::Verification)
+            Err(Error::Verification)
         ));
     }
 }
@@ -772,7 +764,7 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
             .set("changed")
             .expect("title")
             .commit(),
-        Err(ChartTitleError::InvalidSource)
+        Err(Error::InvalidSource)
     ));
     let changed = package
         .edit_slide_chart_title(0usize, 0usize)
@@ -784,7 +776,7 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
     let forged = forge_patch(&opaque, changed.patch(), exact_bytes(changed.package()));
     assert!(matches!(
         opaque_package.apply_slide_chart_title(&forged),
-        Err(ChartTitleError::InvalidSource)
+        Err(Error::InvalidSource)
     ));
     assert_eq!(exact_bytes(&opaque_package), opaque);
 }

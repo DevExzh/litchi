@@ -31,7 +31,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `3f9933fcc82cdb5c6974246e4eff44efd2985093eaa5302abc7b1a3c6a387faa` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `01497f55fe71995f16ec5ffd0c7b8516c91fa4c524b92a7affe10b10c774fcf4` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ef314e1e8b8607d17dc63ddee4e32ed7eb67e056f4d34f6d52ebe5f3750a4a7b` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `1096eea95f8aaf22bbd6e1a512f3beb39a19b62efc3cf3d1eb53d319a57d3712` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
@@ -89,7 +89,7 @@ Elements:
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
-| keynote | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| keynote | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 5 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
@@ -7852,6 +7852,18 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | slide | litchi-only |  |
 |  | placeholder | litchi-only |  |
 |  | notes | litchi-only |  |
+|  | paragraph | litchi-only |  |
+|  | run | litchi-only |  |
+|  | shape | litchi-only |  |
+|  | picture | litchi-only |  |
+|  | connector | litchi-only |  |
+|  | video | litchi-only |  |
+|  | audio | litchi-only |  |
+|  | table | litchi-only |  |
+|  | tr | litchi-only |  |
+|  | tc | litchi-only |  |
+|  | chart | litchi-only |  |
+|  | group | litchi-only |  |
 
 ### Properties
 
@@ -7864,9 +7876,16 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `notes` | `speaker notes text` | speaker notes are read-only here; the leaf's slide-notes transaction is not wired yet | 0298 Keynote notes writes |
-| `add` | `slide` | `a new slide` | the Keynote leaf has no slide creation transaction | IWORK_API_REQUESTS.md request 8 |
-| `create` | `presentation` | `a presentation from scratch` | the Keynote leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |
+| `set` | `run` | `character formatting` | the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling) | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
+| `add` | `run` | `a new character run` | a run is a styled span of a paragraph; add a paragraph or set its text | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
+| `set` | `tc` | `table cell values` | the unified layer reads slide-table cells; their leaf write families are not wired yet | record 0298 follow-up: wire the Keynote slide-table cell transactions |
+| `add` | `table` | `a new slide table` | the Keynote leaf has no slide-table creation transaction | record 0298 follow-up: Keynote slide-table creation |
+| `remove` | `table` | `a slide table, chart or group` | the leaf's drawable removal refuses tables, charts and groups | record 0298 follow-up: structural removal of tables, charts and groups |
+| `remove` | `video` | `a movie or audio clip` | movies and audio are removed through the leaf's media lifecycle family, not wired yet | record 0298 follow-up: wire slide::media lifecycle removal |
+| `add` | `video` | `a new movie or audio clip` | the leaf's movie and audio creation families are not wired yet | record 0298 follow-up: wire slide::movie and slide::audio creation |
+| `set` | `video` | `the frame of a movie, audio clip, line, table, chart or group` | the leaf's drawable geometry refuses tables, charts, groups, lines and movies | record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others |
+| `remove` | `placeholder` | `a title or body placeholder` | placeholders are hidden, not removed; set the text to empty instead | record 0298 follow-up: Keynote placeholder visibility through the unified layer |
+| `add` | `placeholder` | `a new placeholder` | a slide's placeholders come from its layout; add a slide from a layout instead | record 0298 follow-up: Keynote placeholder visibility through the unified layer |
 
 ## numbers
 

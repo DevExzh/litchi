@@ -23,11 +23,14 @@ use super::slide_audio_creation::{
     physical_catalog, plan_movie_metadata, prepare_movie_builds, read_movie_content_and_poster,
     resolve_context, verify_movie_graph,
 };
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 use crate::slide::movie::Options;
 use crate::slide::movie::creation::{
-    SlideMovieCreationCommit, SlideMovieCreationDiagnostics, SlideMovieCreationError,
-    SlideMovieCreationLimitKind, SlideMovieCreationPatch,
+    Commit as SlideMovieCreationCommit, Diagnostics as SlideMovieCreationDiagnostics,
+    Error as SlideMovieCreationError, LimitKind as SlideMovieCreationLimitKind,
+    Patch as SlideMovieCreationPatch,
 };
 use crate::{MovieKind, SlideSelector};
 

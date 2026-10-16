@@ -8,7 +8,7 @@ use std::fmt;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Options;
 use crate::Package;
@@ -16,7 +16,7 @@ use crate::Package;
 /// Finite resources consumed by one audio-creation transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideAudioCreationLimitKind {
+pub enum LimitKind {
     /// Source package bytes.
     InputBytes,
     /// Candidate package bytes.
@@ -45,7 +45,7 @@ pub enum SlideAudioCreationLimitKind {
     Allocations,
 }
 
-impl fmt::Display for SlideAudioCreationLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "source package bytes",
@@ -66,9 +66,9 @@ impl fmt::Display for SlideAudioCreationLimitKind {
 }
 
 /// Content-redacted failures from fresh slide-audio creation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideAudioCreationError {
+pub enum Error {
     /// The package has no exact physical source suitable for this transaction.
     #[error("this Keynote source does not support slide audio creation")]
     UnsupportedSource,
@@ -96,7 +96,7 @@ pub enum SlideAudioCreationError {
     /// A configured finite resource ceiling was exceeded.
     #[error("slide audio creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     LimitExceeded {
-        kind: SlideAudioCreationLimitKind,
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -114,7 +114,7 @@ pub enum SlideAudioCreationError {
 /// Exact source and target artifacts for creating one slide-owned audio clip.
 #[must_use]
 #[derive(Clone)]
-pub struct SlideAudioCreationPatch {
+pub struct Patch {
     pub(crate) artifacts: ExactArtifacts,
     pub(crate) slide_position: Position,
     pub(crate) movie_position: Position,
@@ -133,10 +133,10 @@ pub struct SlideAudioCreationPatch {
     pub(crate) restored_previews: usize,
 }
 
-impl fmt::Debug for SlideAudioCreationPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideAudioCreationPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("movie_position", &self.movie_position)
             .field("source_media_count", &self.source_media_count)
@@ -154,7 +154,7 @@ impl fmt::Debug for SlideAudioCreationPatch {
     }
 }
 
-impl SlideAudioCreationPatch {
+impl Patch {
     /// Return the diagnostic fingerprint of the exact source artifact.
     #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
@@ -265,7 +265,7 @@ impl SlideAudioCreationPatch {
 
 /// Resource and topology evidence for a verified creation or its inverse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideAudioCreationDiagnostics {
+pub struct Diagnostics {
     pub(crate) changed: bool,
     pub(crate) source_media_count: usize,
     pub(crate) target_media_count: usize,
@@ -278,8 +278,8 @@ pub struct SlideAudioCreationDiagnostics {
     pub(crate) restored_previews: usize,
 }
 
-impl SlideAudioCreationDiagnostics {
-    pub(crate) fn for_patch(patch: &SlideAudioCreationPatch) -> Self {
+impl Diagnostics {
+    pub(crate) fn for_patch(patch: &Patch) -> Self {
         Self {
             changed: !patch.is_noop(),
             source_media_count: patch.source_media_count,
@@ -358,13 +358,13 @@ impl SlideAudioCreationDiagnostics {
 /// A reopened package and its exact-source reversible creation patch.
 #[must_use]
 #[derive(Debug)]
-pub struct SlideAudioCreationCommit {
+pub struct Commit {
     pub(crate) package: Package,
-    pub(crate) patch: SlideAudioCreationPatch,
-    pub(crate) diagnostics: SlideAudioCreationDiagnostics,
+    pub(crate) patch: Patch,
+    pub(crate) diagnostics: Diagnostics,
 }
 
-impl SlideAudioCreationCommit {
+impl Commit {
     /// Borrow the verified package.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -378,13 +378,13 @@ impl SlideAudioCreationCommit {
     }
 
     /// Borrow the exact-source patch.
-    pub const fn patch(&self) -> &SlideAudioCreationPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow the creation diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideAudioCreationDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }

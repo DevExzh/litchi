@@ -112,7 +112,7 @@ impl Docx {
             }
             assignments
         } else {
-            Vec::new()
+            super::Few::new()
         };
         let nodes = self.resolve_targets(target)?;
         let mut reach = reach(&nodes)?;

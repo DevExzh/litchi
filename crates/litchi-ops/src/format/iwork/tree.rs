@@ -177,8 +177,17 @@ impl<K: ElementKind> TreeBuilder<K> {
         }
     }
 
+    /// The text of an item already built.
+    #[cfg(feature = "keynote")]
+    pub(crate) fn item_text(&self, index: u32) -> &str {
+        self.items[index as usize]
+            .text
+            .as_deref()
+            .unwrap_or_default()
+    }
+
     /// An item already built, for more properties.
-    #[cfg(feature = "pages")]
+    #[cfg(any(feature = "pages", feature = "keynote"))]
     pub(crate) fn draft(&mut self, index: u32) -> Draft<'_, K> {
         Draft {
             builder: self,

@@ -259,7 +259,7 @@ pub enum Error {
     PagesTableMerges(#[from] litchi_pages::table::merge::transaction::Error),
 
     #[error(transparent)]
-    KeynoteSlideTableMerges(#[from] litchi_keynote::SlideTableMergesError),
+    KeynoteSlideTableMerges(#[from] litchi_keynote::slide::table::merge::transaction::Error),
 
     #[error(transparent)]
     TextHyperlink(#[from] litchi_iwa_text::hyperlink::Error),

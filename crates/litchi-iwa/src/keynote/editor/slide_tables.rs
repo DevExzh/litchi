@@ -190,6 +190,30 @@ fn focused_table_index(
     })
 }
 
+/// Describe a validated physical iWork archive profile as the focused Keynote
+/// ingress envelope.
+///
+/// The focused owner accepts the archive dimensions it names
+/// ([`litchi_keynote::SourceLimits`]); every other neutral IWA dimension keeps
+/// its default.
+pub(super) fn focused_keynote_options(
+    limits: litchi_iwa_archive::Limits,
+) -> std::result::Result<litchi_keynote::OpenOptions, litchi_keynote::Error> {
+    let archive = limits.archive_limits();
+    let source = litchi_keynote::SourceLimits::builder()
+        .max_input_bytes(limits.max_input_bytes())?
+        .max_entries(limits.max_entries())?
+        .max_entry_bytes(limits.max_entry_bytes())?
+        .max_aggregate_bytes(limits.max_total_bytes())?
+        .max_component_bytes(limits.max_iwa_stream_bytes())?
+        .max_component_objects(archive.max_objects())?
+        .max_component_messages(archive.max_messages())?
+        .max_message_bytes(archive.max_message_bytes())?
+        .max_header_fields(archive.max_header_fields())?
+        .build()?;
+    Ok(litchi_keynote::OpenOptions::new().source_limits(source))
+}
+
 fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
     let package_limits = editor.package().limits();
     let archive_limits = litchi_iwa_archive::Limits::new(
@@ -202,8 +226,8 @@ fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Packa
     .map_err(|error| Error::InvalidFormat(format!("focused Keynote limits: {error}")))?
     .with_archive_limits(package_limits.effective_archive_limits()?)
     .map_err(|error| Error::InvalidFormat(format!("focused Keynote archive limits: {error}")))?;
-    let options =
-        litchi_keynote::ReadOptions::new(archive_limits, litchi_keynote::SemanticLimits::default());
+    let options = focused_keynote_options(archive_limits)
+        .map_err(|error| Error::InvalidFormat(format!("focused Keynote limits: {error}")))?;
     if let Some(source) = editor.package().exact_source_owner() {
         return litchi_keynote::Package::__from_shared_source_with_options(source, options)
             .map_err(|error| {
@@ -212,7 +236,7 @@ fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Packa
     }
 
     let bytes = editor.package().to_bytes()?;
-    litchi_keynote::Package::from_bytes_with_limits(&bytes, archive_limits).map_err(|error| {
+    litchi_keynote::Package::from_bytes_with_options(&bytes, options).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
     })
 }
@@ -240,37 +264,37 @@ pub(super) fn compatibility_slide_table_merge_regions(
         // Keep the source-built migration behavior for legacy table-model
         // roles. Ownership was already proved through the selected slide and
         // table, so the bounded compatibility reader may inspect that model.
-        Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) => {
+        Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) => {
             crate::numbers::editor::table_cell_merges_in_package(editor.package(), model_object_id)
         },
         Err(error) => Err(map_focused_keynote_merges_error(error)),
     }
 }
 
-fn map_focused_keynote_cells_error(error: litchi_keynote::SlideTableCellsError) -> Error {
+fn map_focused_keynote_cells_error(error: litchi_keynote::slide::table::cells::Error) -> Error {
     match error {
-        litchi_keynote::SlideTableCellsError::LimitExceeded {
+        litchi_keynote::slide::table::cells::Error::LimitExceeded {
             kind,
             observed,
             maximum,
         } => map_focused_keynote_cells_limit(kind, observed, maximum),
-        litchi_keynote::SlideTableCellsError::Allocation { amount } => {
+        litchi_keynote::slide::table::cells::Error::Allocation { amount } => {
             Error::IwaCommon(litchi_iwa_common::Error::Allocation {
                 resource: "Keynote slide-table cell read",
                 amount,
             })
         },
-        error @ litchi_keynote::SlideTableCellsError::AmbiguousSelector
-        | error @ litchi_keynote::SlideTableCellsError::EmptySlideName
-        | error @ litchi_keynote::SlideTableCellsError::SlideNameNotFound
-        | error @ litchi_keynote::SlideTableCellsError::SlidePositionNotFound { .. }
-        | error @ litchi_keynote::SlideTableCellsError::TablePositionNotFound { .. } => {
+        error @ litchi_keynote::slide::table::cells::Error::AmbiguousSelector
+        | error @ litchi_keynote::slide::table::cells::Error::EmptySlideName
+        | error @ litchi_keynote::slide::table::cells::Error::SlideNameNotFound
+        | error @ litchi_keynote::slide::table::cells::Error::SlidePositionNotFound { .. }
+        | error @ litchi_keynote::slide::table::cells::Error::TablePositionNotFound { .. } => {
             Error::ParseError(error.to_string())
         },
-        error @ (litchi_keynote::SlideTableCellsError::UnsupportedSource
-        | litchi_keynote::SlideTableCellsError::UnsupportedDependency
-        | litchi_keynote::SlideTableCellsError::UnsupportedTopology
-        | litchi_keynote::SlideTableCellsError::InvalidSource) => {
+        error @ (litchi_keynote::slide::table::cells::Error::UnsupportedSource
+        | litchi_keynote::slide::table::cells::Error::UnsupportedDependency
+        | litchi_keynote::slide::table::cells::Error::UnsupportedTopology
+        | litchi_keynote::slide::table::cells::Error::InvalidSource) => {
             Error::InvalidFormat(format!("focused Keynote table cells: {error}"))
         },
         error => Error::InvalidFormat(format!("focused Keynote table cells: {error}")),
@@ -278,7 +302,7 @@ fn map_focused_keynote_cells_error(error: litchi_keynote::SlideTableCellsError) 
 }
 
 fn map_focused_keynote_cells_limit(
-    kind: litchi_keynote::SlideTableCellsLimitKind,
+    kind: litchi_keynote::slide::table::cells::LimitKind,
     observed: u64,
     maximum: u64,
 ) -> Error {
@@ -299,30 +323,36 @@ fn map_focused_keynote_cells_limit(
     })
 }
 
-fn map_focused_keynote_merges_error(error: litchi_keynote::SlideTableMergesError) -> Error {
+fn map_focused_keynote_merges_error(
+    error: litchi_keynote::slide::table::merge::transaction::Error,
+) -> Error {
     match error {
-        litchi_keynote::SlideTableMergesError::LimitExceeded {
+        litchi_keynote::slide::table::merge::transaction::Error::LimitExceeded {
             kind,
             observed,
             maximum,
         } => map_focused_keynote_merges_limit(kind, observed, maximum),
-        litchi_keynote::SlideTableMergesError::Allocation { amount } => {
+        litchi_keynote::slide::table::merge::transaction::Error::Allocation { amount } => {
             Error::IwaCommon(litchi_iwa_common::Error::Allocation {
                 resource: "Keynote slide-table merge read",
                 amount,
             })
         },
-        error @ litchi_keynote::SlideTableMergesError::AmbiguousSelector
-        | error @ litchi_keynote::SlideTableMergesError::EmptySlideName
-        | error @ litchi_keynote::SlideTableMergesError::SlideNameNotFound
-        | error @ litchi_keynote::SlideTableMergesError::SlidePositionNotFound { .. }
-        | error @ litchi_keynote::SlideTableMergesError::TablePositionNotFound { .. } => {
-            Error::ParseError(error.to_string())
-        },
-        error @ (litchi_keynote::SlideTableMergesError::UnsupportedSource
-        | litchi_keynote::SlideTableMergesError::UnsupportedDependency
-        | litchi_keynote::SlideTableMergesError::UnsupportedTopology
-        | litchi_keynote::SlideTableMergesError::InvalidSource) => {
+        error @ litchi_keynote::slide::table::merge::transaction::Error::AmbiguousSelector
+        | error @ litchi_keynote::slide::table::merge::transaction::Error::EmptySlideName
+        | error @ litchi_keynote::slide::table::merge::transaction::Error::SlideNameNotFound
+        | error
+        @ litchi_keynote::slide::table::merge::transaction::Error::SlidePositionNotFound {
+            ..
+        }
+        | error
+        @ litchi_keynote::slide::table::merge::transaction::Error::TablePositionNotFound {
+            ..
+        } => Error::ParseError(error.to_string()),
+        error @ (litchi_keynote::slide::table::merge::transaction::Error::UnsupportedSource
+        | litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency
+        | litchi_keynote::slide::table::merge::transaction::Error::UnsupportedTopology
+        | litchi_keynote::slide::table::merge::transaction::Error::InvalidSource) => {
             Error::InvalidFormat(format!("focused Keynote table merges: {error}"))
         },
         error => Error::InvalidFormat(format!("focused Keynote table merges: {error}")),
@@ -330,7 +360,7 @@ fn map_focused_keynote_merges_error(error: litchi_keynote::SlideTableMergesError
 }
 
 fn map_focused_keynote_merges_limit(
-    kind: litchi_keynote::SlideTableMergesLimitKind,
+    kind: litchi_keynote::slide::table::merge::transaction::LimitKind,
     observed: u64,
     maximum: u64,
 ) -> Error {
@@ -361,7 +391,7 @@ trait IntoKeynoteWireLimitKind {
     fn into_keynote_wire_limit_kind(self) -> Option<litchi_iwa_common::LimitKind>;
 }
 
-impl IntoKeynoteWireLimitKind for litchi_keynote::SlideTableCellsLimitKind {
+impl IntoKeynoteWireLimitKind for litchi_keynote::slide::table::cells::LimitKind {
     fn into_keynote_wire_limit_kind(self) -> Option<litchi_iwa_common::LimitKind> {
         match self {
             Self::InputBytes => Some(litchi_iwa_common::LimitKind::InputBytes),
@@ -385,7 +415,7 @@ impl IntoKeynoteWireLimitKind for litchi_keynote::SlideTableCellsLimitKind {
     }
 }
 
-impl IntoKeynoteWireLimitKind for litchi_keynote::SlideTableMergesLimitKind {
+impl IntoKeynoteWireLimitKind for litchi_keynote::slide::table::merge::transaction::LimitKind {
     fn into_keynote_wire_limit_kind(self) -> Option<litchi_iwa_common::LimitKind> {
         match self {
             Self::InputBytes => Some(litchi_iwa_common::LimitKind::InputBytes),

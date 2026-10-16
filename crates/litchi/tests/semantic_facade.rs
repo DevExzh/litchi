@@ -46,27 +46,24 @@ fn pages_semantic_namespace_is_concrete_and_archive_free() {
 #[test]
 fn keynote_semantic_namespace_is_concrete_and_archive_free() {
     use litchi::keynote::semantic::{
-        Build, Document, DocumentIoKind, DocumentReadError, DocumentReadLimitKind,
-        DocumentReadOptions, DocumentSemanticLimitKind, DocumentSemanticLimits,
-        DocumentSemanticLimitsError, DocumentSourceLimitKind, DocumentSourceLimits,
-        DocumentSourceLimitsError, DocumentStats, Error, Mode, Position, Result, Seconds, Settings,
-        Show, Size, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult, TextPosition,
-        TextSpan, Transition,
+        Build, Error, LimitKind, Mode, OpenOptions, Position, Presentation, Result, Seconds,
+        SemanticLimitKind, SemanticLimits, Settings, Show, Size, Slide, SlideSelector,
+        SlideSelectorError, SlideSelectorResult, SourceLimitKind, SourceLimits, TextPosition,
+        TextSpan, Transition, presentation,
     };
 
-    assert_send_sync_static::<Document>();
-    assert_send_sync_static::<DocumentReadOptions>();
+    assert_send_sync_static::<Presentation>();
+    assert_send_sync_static::<OpenOptions>();
     assert_send_sync_static::<Build>();
-    assert_send_sync_static::<DocumentIoKind>();
-    assert_send_sync_static::<DocumentReadError>();
-    assert_send_sync_static::<DocumentReadLimitKind>();
-    assert_send_sync_static::<DocumentSemanticLimitKind>();
-    assert_send_sync_static::<DocumentSemanticLimits>();
-    assert_send_sync_static::<DocumentSemanticLimitsError>();
-    assert_send_sync_static::<DocumentSourceLimitKind>();
-    assert_send_sync_static::<DocumentSourceLimits>();
-    assert_send_sync_static::<DocumentSourceLimitsError>();
-    assert_send_sync_static::<DocumentStats>();
+    assert_send_sync_static::<presentation::IoKind>();
+    assert_send_sync_static::<presentation::Error>();
+    assert_send_sync_static::<presentation::LimitKind>();
+    assert_send_sync_static::<presentation::Stats>();
+    assert_send_sync_static::<LimitKind>();
+    assert_send_sync_static::<SemanticLimitKind>();
+    assert_send_sync_static::<SemanticLimits>();
+    assert_send_sync_static::<SourceLimitKind>();
+    assert_send_sync_static::<SourceLimits>();
     assert_send_sync_static::<Error>();
     assert_send_sync_static::<Mode>();
     assert_send_sync_static::<Position>();
@@ -83,12 +80,11 @@ fn keynote_semantic_namespace_is_concrete_and_archive_free() {
     assert_send_sync_static::<TextSpan>();
     assert_send_sync_static::<Transition>();
 
-    let options = DocumentReadOptions::new(
-        DocumentSourceLimits::default(),
-        DocumentSemanticLimits::default(),
-    );
-    assert_eq!(options.source(), DocumentSourceLimits::default());
-    assert_eq!(options.semantic(), DocumentSemanticLimits::default());
+    let options = OpenOptions::new()
+        .source_limits(SourceLimits::default())
+        .semantic_limits(SemanticLimits::default());
+    assert_eq!(options.source_limits_value(), SourceLimits::default());
+    assert_eq!(options.semantic_limits_value(), SemanticLimits::default());
 
     let selector = SlideSelector::position(Position::new(2));
     assert_eq!(selector.as_position(), Some(Position::new(2)));

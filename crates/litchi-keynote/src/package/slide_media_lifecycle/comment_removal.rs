@@ -21,7 +21,7 @@ use litchi_iwa_core::{ArchiveObject, Limits as ArchiveLimits, MessageInfo};
 
 use super::budget::LifecycleBudget;
 use super::comment_graph::CommentGraphPlan;
-use super::{Package, SlideMediaLifecycleError};
+use super::{Error, Package};
 
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
@@ -64,48 +64,48 @@ pub(super) fn plan_comment_removal(
     comment_graph: &CommentGraphPlan,
     archive_limits: ArchiveLimits,
     budget: &mut LifecycleBudget,
-) -> Result<CommentRemovalPlan, SlideMediaLifecycleError> {
+) -> Result<CommentRemovalPlan, Error> {
     if component_name.is_empty() || comment_graph.component_name.as_ref() != component_name {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_sorted_unique(selected_object_ids)?;
     validate_sorted_unique(&comment_graph.storage_ids)?;
     validate_sorted_unique(&comment_graph.author_ids)?;
     if comment_graph.storage_ids.is_empty() || comment_graph.root_storage_identifier == 0 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     for &identifier in selected_object_ids {
         let Some((actual_component, _)) = package.object_with_component(identifier) else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if actual_component != component_name {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for &identifier in &comment_graph.storage_ids {
         if selected_object_ids.binary_search(&identifier).is_err() {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let Some((actual_component, _)) = package.object_with_component(identifier) else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if actual_component != component_name {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for &identifier in &comment_graph.author_ids {
         if identifier == 0 || selected_object_ids.binary_search(&identifier).is_ok() {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if package.object_with_component(identifier).is_none() {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     validate_author_dependencies(package, comment_graph, budget)?;
     let wire_limits = package
         .semantic_wire_limits()
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
 
     let mut retained_comment_storage_ids = Vec::new();
     reserve_vec(
@@ -126,12 +126,9 @@ pub(super) fn plan_comment_removal(
         budget.charge_entries(component.archive().objects.len())?;
         let source_component = component.name() == component_name;
         for object in &component.archive().objects {
-            let identifier = object
-                .archive_info
-                .identifier
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             if object.archive_info.message_infos.len() != object.messages.len() {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             validate_known_payload_relationships(
                 package,
@@ -152,16 +149,16 @@ pub(super) fn plan_comment_removal(
             for info in &object.archive_info.message_infos {
                 field_count = field_count
                     .checked_add(info.field_infos.len())
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 metadata_items = metadata_items
                     .checked_add(info.object_references.len())
                     .and_then(|count| count.checked_add(info.data_references.len()))
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for field in &info.field_infos {
                     metadata_items = metadata_items
                         .checked_add(field.object_references.len())
                         .and_then(|count| count.checked_add(field.data_references.len()))
-                        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
             }
             budget.charge_wire_fields(
@@ -170,7 +167,7 @@ pub(super) fn plan_comment_removal(
                     .message_infos
                     .len()
                     .checked_add(field_count)
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )?;
             budget.charge_wire_work(metadata_items.saturating_add(field_count).max(1))?;
 
@@ -274,7 +271,7 @@ fn validate_author_dependencies(
     package: &Package,
     comment_graph: &CommentGraphPlan,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_wire_work(comment_graph.author_dependencies.len().max(1))?;
     for dependency in &comment_graph.author_dependencies {
         if comment_graph
@@ -286,17 +283,17 @@ fn validate_author_dependencies(
                 .binary_search(&dependency.author_identifier)
                 .is_err()
         {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let Some((actual_component, _)) =
             package.object_with_component(dependency.author_identifier)
         else {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if actual_component != dependency.component_name.as_ref()
             || dependency.component_name.as_ref().is_empty()
         {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -314,7 +311,7 @@ fn validate_known_payload_relationships(
     comment_storage_ids: &[u64],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     for (message, info) in object
         .messages
         .iter()
@@ -323,7 +320,7 @@ fn validate_known_payload_relationships(
         match message.type_ {
             MOVIE_MESSAGE_TYPE => {
                 if info.type_ != MOVIE_MESSAGE_TYPE {
-                    return Err(SlideMediaLifecycleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 validate_movie_payload_relationship(
                     package,
@@ -338,10 +335,7 @@ fn validate_known_payload_relationships(
             COMMENT_STORAGE_MESSAGE_TYPE => validate_comment_storage_relationship(
                 package,
                 component_name,
-                object
-                    .archive_info
-                    .identifier
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?,
+                object.archive_info.identifier.ok_or(Error::InvalidSource)?,
                 info,
                 message.data.as_slice(),
                 limits,
@@ -361,7 +355,7 @@ fn validate_movie_payload_relationship(
     comment_storage_ids: &[u64],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let direct_comment = super::graph::direct_drawable_comment(payload, limits, budget)?;
     if let Some(identifier) = direct_comment {
         validate_comment_storage_target(package, component_name, identifier)?;
@@ -371,14 +365,14 @@ fn validate_movie_payload_relationship(
             .filter(|reference| **reference == identifier)
             .count();
         if count != 1 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for &reference in &info.object_references {
         if comment_storage_ids.binary_search(&reference).is_ok()
             && direct_comment != Some(reference)
         {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     validate_field_reference_subset(info, budget)
@@ -392,7 +386,7 @@ fn validate_comment_storage_relationship(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let facts = super::comment_graph::validate_comment_storage_payload_relationship(
         storage_identifier,
         info,
@@ -413,22 +407,19 @@ fn validate_comment_storage_target(
     package: &Package,
     component_name: &str,
     identifier: u64,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let Some((actual_component, object)) = package.object_with_component(identifier) else {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     if actual_component != component_name {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_single_message_type(object, identifier, COMMENT_STORAGE_MESSAGE_TYPE)
 }
 
-fn validate_annotation_author_target(
-    package: &Package,
-    identifier: u64,
-) -> Result<(), SlideMediaLifecycleError> {
+fn validate_annotation_author_target(package: &Package, identifier: u64) -> Result<(), Error> {
     let Some((_, object)) = package.object_with_component(identifier) else {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     validate_single_message_type(object, identifier, 212)
 }
@@ -437,27 +428,24 @@ fn validate_single_message_type(
     object: &ArchiveObject,
     identifier: u64,
     expected_type: u32,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     if object.archive_info.identifier != Some(identifier)
         || object.messages.len() != 1
         || object.archive_info.message_infos.len() != 1
     {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let message = object
-        .messages
-        .first()
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+    let message = object.messages.first().ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .first()
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != expected_type
         || info.type_ != expected_type
         || usize::try_from(info.length).ok() != Some(message.data.len())
     {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -465,17 +453,17 @@ fn validate_single_message_type(
 fn validate_field_reference_subset(
     info: &MessageInfo,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let field_reference_count = info.field_infos.iter().try_fold(0usize, |count, field| {
         count
             .checked_add(field.object_references.len())
-            .ok_or(SlideMediaLifecycleError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     })?;
     let mut aggregate = Vec::new();
     reserve_vec(&mut aggregate, info.object_references.len(), budget)?;
     for &reference in &info.object_references {
         if reference == 0 {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         push_vec(&mut aggregate, reference, budget)?;
     }
@@ -484,7 +472,7 @@ fn validate_field_reference_subset(
     for field in &info.field_infos {
         for &reference in &field.object_references {
             if reference == 0 {
-                return Err(SlideMediaLifecycleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             push_vec(&mut fields, reference, budget)?;
         }
@@ -494,7 +482,7 @@ fn validate_field_reference_subset(
         .saturating_add(fields.len())
         .max(1)
         .checked_mul(usize::BITS as usize)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_wire_work(sort_work)?;
     aggregate.sort_unstable();
     fields.sort_unstable();
@@ -505,7 +493,7 @@ fn validate_field_reference_subset(
             aggregate_index += 1;
         }
         if aggregate_index == aggregate.len() || aggregate[aggregate_index] != reference {
-            return Err(SlideMediaLifecycleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         aggregate_index += 1;
     }
@@ -525,9 +513,9 @@ fn visit_reference(
     selected_comment_author_edges: &mut Vec<(u64, u64)>,
     used_author_ids: &mut Vec<u64>,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     if reference == 0 {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let is_comment = comment_storage_ids.binary_search(&reference).is_ok();
     let is_author = author_ids.binary_search(&reference).is_ok();
@@ -560,12 +548,12 @@ fn close_retained_comment_storage_ids(
     retained_comment_storage_ids: &mut Vec<u64>,
     comment_edges: &mut Vec<(u64, u64)>,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     let sort_work = comment_edges
         .len()
         .max(1)
         .checked_mul(usize::BITS as usize)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_wire_work(sort_work)?;
     comment_edges.sort_unstable();
     comment_edges.dedup();
@@ -612,9 +600,9 @@ fn lower_bound_source(edges: &[(u64, u64)], source: u64) -> usize {
     low
 }
 
-fn validate_sorted_unique(values: &[u64]) -> Result<(), SlideMediaLifecycleError> {
+fn validate_sorted_unique(values: &[u64]) -> Result<(), Error> {
     if values.contains(&0) || values.windows(2).any(|window| window[0] >= window[1]) {
-        return Err(SlideMediaLifecycleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -623,24 +611,20 @@ fn reserve_vec<T>(
     output: &mut Vec<T>,
     additional: usize,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     if additional == 0 {
         return Ok(());
     }
     let amount = additional
         .checked_mul(size_of::<T>())
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_allocations(amount)?;
     output
         .try_reserve_exact(additional)
-        .map_err(|_| SlideMediaLifecycleError::Allocation { amount })
+        .map_err(|_| Error::Allocation { amount })
 }
 
-fn push_vec<T>(
-    output: &mut Vec<T>,
-    value: T,
-    budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+fn push_vec<T>(output: &mut Vec<T>, value: T, budget: &mut LifecycleBudget) -> Result<(), Error> {
     if output.len() == output.capacity() {
         reserve_vec(output, output.capacity().max(1), budget)?;
     }
@@ -652,7 +636,7 @@ fn push_pair(
     output: &mut Vec<(u64, u64)>,
     value: (u64, u64),
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     push_vec(output, value, budget)
 }
 
@@ -660,7 +644,7 @@ fn insert_sorted_unique(
     output: &mut Vec<u64>,
     value: u64,
     budget: &mut LifecycleBudget,
-) -> Result<bool, SlideMediaLifecycleError> {
+) -> Result<bool, Error> {
     match output.binary_search(&value) {
         Ok(_) => Ok(false),
         Err(index) => {

@@ -510,14 +510,13 @@ pub mod keynote {
     /// profiles, selector errors, and immutable value errors are available
     /// here as well, so no package-layer type is needed to configure a read.
     pub mod semantic {
+        pub use litchi_keynote::presentation;
         pub use litchi_keynote::show::{Mode, Settings, Show, Size};
         pub use litchi_keynote::{
-            Build, Document, DocumentIoKind, DocumentReadError, DocumentReadLimitKind,
-            DocumentReadOptions, DocumentSemanticLimitKind, DocumentSemanticLimits,
-            DocumentSemanticLimitsError, DocumentSourceLimitKind, DocumentSourceLimits,
-            DocumentSourceLimitsError, DocumentStats, Error, Position, Result, Seconds, Slide,
-            SlideSelector, SlideSelectorError, SlideSelectorResult, TextPosition, TextSpan,
-            Transition,
+            Build, Error, LimitKind, OpenOptions, Position, Presentation, Result, Seconds,
+            SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder, Slide, SlideSelector,
+            SlideSelectorError, SlideSelectorResult, SourceLimitKind, SourceLimits,
+            SourceLimitsBuilder, TextPosition, TextSpan, Transition,
         };
 
         /// Result returned by the archive-free Keynote source readers.
@@ -526,20 +525,20 @@ pub mod keynote {
         /// semantic-operation result. The source reader keeps Keynote's
         /// typed I/O, limit, malformed-input, allocation, and wrong-format
         /// errors available to callers.
-        pub type ReadResult<T> = std::result::Result<T, DocumentReadError>;
+        pub type ReadResult<T> = std::result::Result<T, presentation::Error>;
 
-        /// Read one immutable Keynote snapshot from a complete package or
-        /// app-authored package directory.
-        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Document> {
-            Document::open(path)
+        /// Read one immutable Keynote presentation from a complete package
+        /// or app-authored package directory.
+        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Presentation> {
+            Presentation::open(path)
         }
 
-        /// Read one immutable Keynote snapshot from package bytes.
+        /// Read one immutable Keynote presentation from package bytes.
         ///
         /// Format detection and semantic projection stay owned by the
         /// Keynote reader; no native identifiers enter this facade.
-        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {
-            Document::from_bytes(bytes)
+        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Presentation> {
+            Presentation::from_bytes(bytes)
         }
     }
 }

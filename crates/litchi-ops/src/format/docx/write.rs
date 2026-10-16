@@ -15,6 +15,7 @@ use super::Docx;
 use super::DocxEditor;
 use super::Nav;
 use super::element;
+use super::few::Few;
 use super::node::{Node, WriteSelection};
 use super::setters::Setter;
 use super::spec::{CELL_REGISTRY, HYPERLINK_REGISTRY, Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
@@ -134,7 +135,7 @@ impl Docx {
     /// error.  A failed operation never publishes a partial edit.
     pub(crate) fn set<'p, 'v>(
         &self,
-        target: TargetArg<'p>,
+        target: &TargetArg<'p>,
         props: impl IntoProps<'v>,
     ) -> Result<Commit> {
         // The final source fence belongs outside the whole operation.  This
@@ -147,7 +148,7 @@ impl Docx {
 
     pub(crate) fn set_command<'p, 'v>(
         &self,
-        target: TargetArg<'p>,
+        target: &TargetArg<'p>,
         props: impl IntoProps<'v>,
     ) -> Result<Commit> {
         self.owner().finish(self.set_inner(target, props, true))
@@ -155,7 +156,7 @@ impl Docx {
 
     fn set_inner<'p, 'v>(
         &self,
-        target: TargetArg<'p>,
+        target: &TargetArg<'p>,
         props: impl IntoProps<'v>,
         command_text: bool,
     ) -> Result<Commit> {
@@ -163,7 +164,7 @@ impl Docx {
         // this makes an empty property list honor the same security policy as
         // a non-empty write.
         let editor = self.edit()?;
-        let nodes = self.resolve_targets(&target)?;
+        let nodes = self.resolve_targets(target)?;
         let props = Props::from_props(props)?;
         let editor = match self.try_set_chart(editor, &nodes, &props)? {
             Ok(commit) => return Ok(commit),
@@ -191,8 +192,8 @@ impl Docx {
         if props.is_empty() {
             return WorkEdit::from(editor)?.commit(self);
         }
-        let assignments = admit_assignments(targets[0].kind, &props)?;
-        let (request, assignments) = list_request(assignments)?;
+        let mut assignments = admit_assignments(targets[0].kind, &props)?;
+        let request = list_request(&mut assignments)?;
         self.owner().check_source()?;
         // A hyperlink target change stages a relationship, which only the
         // owning package publishes.
@@ -272,10 +273,10 @@ impl Docx {
         }
     }
 
-    pub(super) fn resolve_targets<'f>(&'f self, target: &TargetArg<'_>) -> Result<Vec<Node<'f>>> {
+    pub(super) fn resolve_targets<'f>(&'f self, target: &TargetArg<'_>) -> Result<Few<Node<'f>>> {
         let nav = Nav::new(self);
         let nodes = if let Some(path) = target.path() {
-            vec![crate::path::resolve::get(&nav, path)?]
+            Few::One([crate::path::resolve::get(&nav, path)?])
         } else if let Some(query) = target.query() {
             let walk = crate::query::run(nav, query)?;
             // Query diagnostics are harmless for reads because an unknown
@@ -288,7 +289,7 @@ impl Docx {
                 )
                 .with_format(FileFormat::Docx));
             }
-            walk.collect::<Result<Vec<_>>>()?
+            walk.collect::<Result<Few<_>>>()?
         } else {
             return Err(
                 Error::new(Code::InvalidArgument, "the mutation target is empty")
@@ -887,8 +888,8 @@ impl WorkEdit {
     }
 }
 
-fn admit_targets(nodes: &[Node<'_>]) -> Result<Vec<Target>> {
-    let mut targets = Vec::with_capacity(nodes.len());
+fn admit_targets(nodes: &[Node<'_>]) -> Result<Few<Target>> {
+    let mut targets = Few::with_capacity(nodes.len());
     // Every node comes from one resolve_targets call on one immutable owner.
     // Cache only within this admission; later operations may have a new body.
     let mut body = None;
@@ -935,7 +936,7 @@ fn admit_targets(nodes: &[Node<'_>]) -> Result<Vec<Target>> {
     Ok(targets)
 }
 
-fn admit_assignments<'a>(kind: TargetKind, props: &'a Props<'_>) -> Result<Vec<Assignment<'a>>> {
+fn admit_assignments<'a>(kind: TargetKind, props: &'a Props<'_>) -> Result<Few<Assignment<'a>>> {
     match kind {
         TargetKind::Paragraph => admit_table(&PARAGRAPH_REGISTRY, kind, props),
         TargetKind::Run => admit_table(&RUN_REGISTRY, kind, props),
@@ -948,8 +949,8 @@ fn admit_table<'a, const N: usize, const A: usize>(
     table: &Table<Setter, N, A>,
     kind: TargetKind,
     props: &'a Props<'_>,
-) -> Result<Vec<Assignment<'a>>> {
-    let mut assignments = Vec::with_capacity(props.len());
+) -> Result<Few<Assignment<'a>>> {
+    let mut assignments = Few::with_capacity(props.len());
     for (key, value) in props.iter() {
         let (_, entry) = table
             .resolve(key.as_str())
@@ -989,10 +990,9 @@ fn admit_table<'a, const N: usize, const A: usize>(
 }
 
 /// Split the `listStyle` and `start` assignments (record 0251e) from the
-/// others.
-fn list_request(
-    assignments: Vec<Assignment<'_>>,
-) -> Result<(Option<super::lists::Request>, Vec<Assignment<'_>>)> {
+/// others, which stay in `assignments`. The list is changed only when it
+/// holds one of them (a moved list is a copy of its inline element).
+fn list_request(assignments: &mut Few<Assignment<'_>>) -> Result<Option<super::lists::Request>> {
     let is_list = |assignment: &Assignment<'_>| {
         matches!(
             assignment.entry.access,
@@ -1000,11 +1000,11 @@ fn list_request(
         )
     };
     if !assignments.iter().any(is_list) {
-        return Ok((None, assignments));
+        return Ok(None);
     }
     let mut request = None::<super::lists::Request>;
-    let mut rest = Vec::with_capacity(assignments.len());
-    for assignment in assignments {
+    let mut rest = Few::with_capacity(assignments.len());
+    for assignment in std::mem::take(assignments) {
         match assignment.entry.access {
             crate::registry::Access::Set(Setter::ParagraphListStyle) => {
                 let style = assignment
@@ -1048,7 +1048,8 @@ fn list_request(
             _ => rest.push(assignment),
         }
     }
-    Ok((request, rest))
+    *assignments = rest;
+    Ok(request)
 }
 
 fn text_value(value: Option<crate::value::Scalar<'_>>) -> Result<String> {

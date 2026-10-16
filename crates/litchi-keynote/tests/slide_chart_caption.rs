@@ -10,8 +10,8 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tswp};
 use litchi_keynote::{
-    ChartCaptionError, ChartCaptionLimitKind, ChartSelector, Package, Position, ReadOptions,
-    SemanticLimits, SlideSelector,
+    ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits,
+    chart::caption::Error as ChartCaptionError, chart::caption::LimitKind as ChartCaptionLimitKind,
 };
 use prost::Message as _;
 
@@ -720,37 +720,28 @@ fn package_metrics(package: &[u8]) -> TestResult<PackageMetrics> {
     Ok(metrics)
 }
 
-fn target_read_options(target: &[u8]) -> TestResult<ReadOptions> {
+fn target_read_options(target: &[u8]) -> TestResult<OpenOptions> {
     let metrics = package_metrics(target)?;
-    let defaults = Limits::default();
     let max_input_bytes = u64::try_from(target.len())?;
-    let archive_limits = Limits::new(
-        max_input_bytes,
-        defaults.max_entries(),
-        metrics.max_entry_bytes,
-        metrics.total_bytes_limit(),
-        metrics.max_iwa_stream_bytes,
-    )?;
-    let iwa_limits = litchi_iwa_core::Limits::default()
-        .with_archive_bytes(metrics.max_iwa_stream_bytes)?
-        .with_objects(metrics.max_archive_objects)?
-        .with_messages(metrics.max_archive_messages)?
-        .with_message_bytes(metrics.max_message_bytes)?;
-    let archive_limits = archive_limits.with_archive_limits(iwa_limits)?;
-    let defaults = SemanticLimits::default();
-    let semantic_limits = SemanticLimits::new(
-        metrics.total_objects,
-        defaults.max_slides(),
-        defaults.max_references(),
-        defaults.max_text_storages(),
-        defaults.max_text_fragments(),
-        defaults.max_text_bytes(),
-    )?;
-    Ok(ReadOptions::new(archive_limits, semantic_limits))
+    let source_limits = SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)?
+        .max_entry_bytes(metrics.max_entry_bytes)?
+        .max_aggregate_bytes(metrics.total_bytes_limit())?
+        .max_component_bytes(metrics.max_iwa_stream_bytes)?
+        .max_component_objects(metrics.max_archive_objects)?
+        .max_component_messages(metrics.max_archive_messages)?
+        .max_message_bytes(metrics.max_message_bytes)?
+        .build()?;
+    let semantic_limits = SemanticLimits::builder()
+        .max_objects(metrics.total_objects)?
+        .build()?;
+    Ok(OpenOptions::new()
+        .source_limits(source_limits)
+        .semantic_limits(semantic_limits))
 }
 
 fn replace_archive_limit(
-    options: ReadOptions,
+    options: OpenOptions,
     max_input_bytes: u64,
     max_entry_bytes: u64,
     max_total_bytes: u64,
@@ -758,29 +749,24 @@ fn replace_archive_limit(
     max_archive_objects: usize,
     max_archive_messages: usize,
     max_message_bytes: usize,
-) -> TestResult<ReadOptions> {
-    let defaults = options.archive();
-    let archive_limits = Limits::new(
-        max_input_bytes,
-        defaults.max_entries(),
-        max_entry_bytes,
-        max_total_bytes,
-        max_iwa_stream_bytes,
-    )?;
-    let iwa_limits = litchi_iwa_core::Limits::default()
-        .with_archive_bytes(max_iwa_stream_bytes)?
-        .with_objects(max_archive_objects)?
-        .with_messages(max_archive_messages)?
-        .with_message_bytes(max_message_bytes)?;
-    Ok(ReadOptions::new(
-        archive_limits.with_archive_limits(iwa_limits)?,
-        options.semantic(),
-    ))
+) -> TestResult<OpenOptions> {
+    let defaults = options.source_limits_value();
+    let source_limits = SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(max_entry_bytes)?
+        .max_aggregate_bytes(max_total_bytes)?
+        .max_component_bytes(max_iwa_stream_bytes)?
+        .max_component_objects(max_archive_objects)?
+        .max_component_messages(max_archive_messages)?
+        .max_message_bytes(max_message_bytes)?
+        .build()?;
+    Ok(options.source_limits(source_limits))
 }
 
 fn run_caption_create_with_options(
     source: &[u8],
-    options: ReadOptions,
+    options: OpenOptions,
 ) -> TestResult<Result<Vec<u8>, ChartCaptionError>> {
     let package = Package::from_bytes_with_options(source, options)?;
     let result = package
@@ -798,8 +784,8 @@ fn run_caption_create_with_options(
 
 fn run_caption_apply_with_options(
     source: &[u8],
-    patch: &litchi_keynote::ChartCaptionPatch,
-    options: ReadOptions,
+    patch: &litchi_keynote::chart::caption::Patch,
+    options: OpenOptions,
 ) -> TestResult<Result<Vec<u8>, ChartCaptionError>> {
     let package = Package::from_bytes_with_options(source, options)?;
     let result = package.apply_slide_chart_caption(patch);
@@ -2841,32 +2827,30 @@ fn public_package_limits_bound_caption_creation_and_patch_apply_atomically() -> 
         "message-byte max-minus-one",
     )?;
 
-    let under_semantic_objects = ReadOptions::new(
-        exact.archive(),
-        SemanticLimits::new(
-            target_metrics.total_objects.saturating_sub(1),
-            exact.semantic().max_slides(),
-            exact.semantic().max_references(),
-            exact.semantic().max_text_storages(),
-            exact.semantic().max_text_fragments(),
-            exact.semantic().max_text_bytes(),
-        )?,
+    let under_semantic_objects = exact.semantic_limits(
+        SemanticLimits::builder()
+            .max_objects(target_metrics.total_objects.saturating_sub(1))?
+            .max_slides(exact.semantic_limits_value().max_slides())?
+            .max_references(exact.semantic_limits_value().max_references())?
+            .max_text_storages(exact.semantic_limits_value().max_text_storages())?
+            .max_text_fragments(exact.semantic_limits_value().max_text_fragments())?
+            .max_text_bytes(exact.semantic_limits_value().max_text_bytes())?
+            .build()?,
     );
     assert_caption_limit(
         run_caption_create_with_options(&source, under_semantic_objects)?,
         "semantic-object max-minus-one",
     )?;
 
-    let under_references = ReadOptions::new(
-        exact.archive(),
-        SemanticLimits::new(
-            exact.semantic().max_objects(),
-            exact.semantic().max_slides(),
-            4,
-            exact.semantic().max_text_storages(),
-            exact.semantic().max_text_fragments(),
-            exact.semantic().max_text_bytes(),
-        )?,
+    let under_references = exact.semantic_limits(
+        SemanticLimits::builder()
+            .max_objects(exact.semantic_limits_value().max_objects())?
+            .max_slides(exact.semantic_limits_value().max_slides())?
+            .max_references(4)?
+            .max_text_storages(exact.semantic_limits_value().max_text_storages())?
+            .max_text_fragments(exact.semantic_limits_value().max_text_fragments())?
+            .max_text_bytes(exact.semantic_limits_value().max_text_bytes())?
+            .build()?,
     );
     assert_caption_limit(
         run_caption_create_with_options(&source, under_references)?,

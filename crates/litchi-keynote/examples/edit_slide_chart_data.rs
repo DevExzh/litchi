@@ -14,7 +14,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_keynote::{ChartData, ChartSelector, Package, SlideChartDataError, SlideSelector};
+use litchi_keynote::{ChartData, ChartSelector, Package, SlideSelector, chart::data};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: edit_slide_chart_data <input.key> <output.key> \
@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if source_conflict_checked
         && !matches!(
             commit.package().apply_slide_chart_data(commit.patch()),
-            Err(SlideChartDataError::PatchConflict)
+            Err(data::Error::PatchConflict)
         )
     {
         return Err(invalid_input(

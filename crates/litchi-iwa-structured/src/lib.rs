@@ -10,8 +10,8 @@
 use std::fmt;
 use std::sync::Arc;
 
+use litchi_keynote::Presentation as KeynotePresentation;
 use litchi_keynote::build::AnimationType;
-use litchi_keynote::document::Document as KeynoteDocument;
 use litchi_keynote::slide::Slide;
 use litchi_keynote::transition::Effect;
 use litchi_numbers::Table;
@@ -351,7 +351,7 @@ struct Snapshot {
 #[derive(Debug)]
 enum Slides {
     Owned(Vec<Slide>),
-    Keynote(KeynoteDocument),
+    Keynote(KeynotePresentation),
 }
 
 impl Slides {
@@ -457,18 +457,19 @@ impl StructuredData {
         })
     }
 
-    /// Build a structured snapshot that shares a Keynote semantic document.
+    /// Build a structured snapshot that shares a Keynote semantic
+    /// [`KeynotePresentation`] projection.
     ///
     /// No slide, text storage, build, transition, or string is cloned. The
-    /// supplied document remains the sole semantic owner behind this aggregate
-    /// view.
+    /// supplied presentation remains the sole semantic owner behind this
+    /// aggregate view.
     ///
     /// # Errors
     ///
     /// Returns a typed error when slide positions or default aggregate bounds
     /// are invalid.
-    pub fn from_keynote_document(document: KeynoteDocument) -> Result<Self> {
-        Self::from_keynote_document_with_limits(document, Limits::default())
+    pub fn from_keynote_presentation(presentation: KeynotePresentation) -> Result<Self> {
+        Self::from_keynote_presentation_with_limits(presentation, Limits::default())
     }
 
     /// Build a sharing-aware Keynote snapshot under explicit aggregate limits.
@@ -477,8 +478,8 @@ impl StructuredData {
     ///
     /// Returns a typed error when slide positions or selected aggregate bounds
     /// are invalid.
-    pub fn from_keynote_document_with_limits(
-        document: KeynoteDocument,
+    pub fn from_keynote_presentation_with_limits(
+        document: KeynotePresentation,
         limits: Limits,
     ) -> Result<Self> {
         validate_parts(&[], document.slides(), &[], document.show().title(), limits)?;
@@ -1025,7 +1026,7 @@ mod tests {
         const BUILD_IDENTIFIER: &str = "vendor:future-build";
         const TRANSITION_IDENTIFIER: &str = "vendor:future-transition";
 
-        fn document() -> KeynoteDocument {
+        fn document() -> KeynotePresentation {
             let animation =
                 AnimationType::from_identifier(BUILD_IDENTIFIER).unwrap_or_else(|error| {
                     panic!("unknown build identifier should be valid: {error}")
@@ -1046,21 +1047,21 @@ mod tests {
             let mut show = litchi_keynote::show::Show::builder();
             show.set_title(Some(SHOW_TITLE.to_owned()));
             show.push_slide(slide.build());
-            KeynoteDocument::from_show(show.build())
+            KeynotePresentation::from_show(show.build())
         }
 
         let retained_bytes =
             SHOW_TITLE.len() + BUILD_IDENTIFIER.len() + TRANSITION_IDENTIFIER.len();
         let exact = Limits::try_new(1, 1, 1, retained_bytes)
             .unwrap_or_else(|error| panic!("exact retained-text limit should be valid: {error}"));
-        StructuredData::from_keynote_document_with_limits(document(), exact)
+        StructuredData::from_keynote_presentation_with_limits(document(), exact)
             .unwrap_or_else(|error| panic!("exact retained-text limit should pass: {error}"));
 
         let one_under = Limits::try_new(1, 1, 1, retained_bytes - 1).unwrap_or_else(|error| {
             panic!("one-under retained-text limit should be valid: {error}")
         });
         assert!(matches!(
-            StructuredData::from_keynote_document_with_limits(document(), one_under),
+            StructuredData::from_keynote_presentation_with_limits(document(), one_under),
             Err(Error::TextTooLarge {
                 observed,
                 maximum,
@@ -1417,10 +1418,10 @@ mod tests {
         slide.set_title(Some("Shared slide".to_owned()));
         let mut show = litchi_keynote::show::Show::builder();
         show.push_slide(slide.build());
-        let keynote = KeynoteDocument::from_show(show.build());
+        let keynote = KeynotePresentation::from_show(show.build());
         let slide_ptr = keynote.slides().as_ptr();
 
-        let keynote_data = StructuredData::from_keynote_document(keynote)
+        let keynote_data = StructuredData::from_keynote_presentation(keynote)
             .unwrap_or_else(|error| panic!("Keynote document should be valid: {error}"));
         assert_eq!(keynote_data.slides().as_ptr(), slide_ptr);
         assert_eq!(keynote_data.all_text(), ["Shared slide"]);

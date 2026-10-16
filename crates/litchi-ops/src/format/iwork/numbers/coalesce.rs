@@ -8,7 +8,8 @@
 //! a query, any other key or verb closes the run, so every operation still
 //! observes the result of the ones before it.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, HashSet};
+use std::hash::{BuildHasherDefault, Hasher};
 
 use litchi_core::selector::{CellRef, Path, Step};
 
@@ -170,7 +171,8 @@ impl Iwork {
 pub(crate) struct Run {
     base: Iwork,
     cells: BTreeMap<(usize, usize), Vec<Change>>,
-    planned: BTreeSet<Address>,
+    /// The cells planned so far, by [`cell_key`].
+    planned: HashSet<(usize, usize, u64), BuildHasherDefault<CellHasher>>,
     tables: Tables,
     first: Option<usize>,
     operations: usize,
@@ -184,7 +186,7 @@ impl Run {
         Ok(Self {
             base: base.clone(),
             cells: BTreeMap::new(),
-            planned: BTreeSet::new(),
+            planned: HashSet::default(),
             tables: Tables::new(),
             first: None,
             operations: 0,
@@ -204,7 +206,7 @@ impl Run {
 
     /// Whether `plan` must start a new run: its cell was planned already.
     pub(crate) fn requires_barrier(&self, plan: &Plan) -> bool {
-        self.planned.contains(&plan.address)
+        self.planned.contains(&cell_key(plan.address))
     }
 
     /// The wire index of the run's first operation.
@@ -226,7 +228,7 @@ impl Run {
         }
         self.operations = operations;
         self.first.get_or_insert(index);
-        self.planned.insert(plan.address);
+        self.planned.insert(cell_key(plan.address));
         self.cells
             .entry((plan.address.sheet, plan.address.table))
             .or_default()
@@ -257,5 +259,53 @@ impl Run {
             &self.limits,
         )?;
         Ok((self.base, commit))
+    }
+}
+
+/// A planned cell's set key: sheet, table, and row and column in one word.
+const fn cell_key(address: Address) -> (usize, usize, u64) {
+    (
+        address.sheet,
+        address.table,
+        ((address.row as u64) << 32) | address.column as u64,
+    )
+}
+
+/// A multiply-rotate hasher for the integer keys of [`cell_key`] (record
+/// 0302): the default SipHash cost about a third of a coalesced cell's
+/// planning. The keys are coordinates inside the run's tables, so no
+/// collision resistance against chosen keys is needed beyond what an
+/// operation limit already bounds.
+#[derive(Default)]
+pub(crate) struct CellHasher(u64);
+
+impl CellHasher {
+    const SEED: u64 = 0x51_7c_c1_b7_27_22_0a_95;
+
+    #[inline]
+    fn add(&mut self, word: u64) {
+        self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(Self::SEED);
+    }
+}
+
+impl Hasher for CellHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.add(u64::from(byte));
+        }
+    }
+
+    fn write_u64(&mut self, word: u64) {
+        self.add(word);
+    }
+
+    fn write_usize(&mut self, word: usize) {
+        self.add(word as u64);
+    }
+
+    fn finish(&self) -> u64 {
+        // The product's high bits depend on every input bit; the table
+        // indexes buckets by the low ones.
+        self.0.rotate_left(26)
     }
 }

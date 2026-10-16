@@ -133,10 +133,8 @@ fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
-pub(super) fn map_chart_title_error(
-    error: super::slide_chart_title::ChartTitleError,
-) -> AxisSupportError {
-    use super::slide_chart_title::{ChartTitleError, ChartTitleLimitKind};
+pub(super) fn map_chart_title_error(error: super::slide_chart_title::Error) -> AxisSupportError {
+    use super::slide_chart_title::{Error as ChartTitleError, LimitKind as ChartTitleLimitKind};
     match error {
         ChartTitleError::UnsupportedSource => {
             AxisSupportError::Selector(AxisSupportSelectorError::UnsupportedSource)

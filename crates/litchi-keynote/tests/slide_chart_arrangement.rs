@@ -13,9 +13,13 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_protos::{kn, tsch, tsd, tsp};
 use litchi_keynote::{
-    ChartArrangement, ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartSelector,
-    Package, Position, ReadOptions, SemanticLimits, SlideSelector,
+    ChartArrangement, ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector,
+    SourceLimits, chart::arrangement::Commit as ChartArrangementCommit,
+    chart::arrangement::Diagnostics as ChartArrangementDiagnostics,
+    chart::arrangement::Edit as ChartArrangementEdit,
+    chart::arrangement::Error as ChartArrangementError,
+    chart::arrangement::LimitKind as ChartArrangementLimitKind,
+    chart::arrangement::Patch as ChartArrangementPatch,
 };
 
 use prost::Message as _;
@@ -561,16 +565,12 @@ fn arrangement_batch_malformed_second_chart_fails_atomically_and_redacted() -> T
 #[test]
 fn arrangement_batch_semantic_reference_limit_refuses_without_mutation() -> TestResult<()> {
     let source = base_source()?;
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        1,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
+    let semantic = SemanticLimits::builder()
+        .max_slides(1)?
+        .max_references(1)?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))?;
     let before = exact_bytes(&package)?;
     let error = package
         .slide_chart_arrangements(0usize)
@@ -1009,9 +1009,16 @@ fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_ato
         )))
         .collect();
     let source = litchi_iwa_archive::package::to_bytes(entries.iter().copied(), Limits::default())?;
-    let semantic = SemanticLimits::new(1, 1, 1, 1, 1, 1)?;
+    let semantic = SemanticLimits::builder()
+        .max_objects(1)?
+        .max_slides(1)?
+        .max_references(1)?
+        .max_text_storages(1)?
+        .max_text_fragments(1)?
+        .max_text_bytes(1)?
+        .build()?;
     let limited =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic));
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic));
     let ingress_error = limited.expect_err("semantic object limit must reject the chart graph");
     error_is_redacted(&ingress_error);
     assert!(format!("{ingress_error:?}").len() < 512);
@@ -1022,17 +1029,15 @@ fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_ato
     let candidate = exact_bytes(unrestricted.package())?;
     assert!(candidate.len() > source.len());
     let defaults = Limits::default();
-    let limits = Limits::new(
-        u64::try_from(candidate.len() - 1)?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let bounded = Package::from_bytes_with_options(
-        &source,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(candidate.len() - 1)?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let bounded =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
     let before = exact_bytes(&bounded)?;
     let error = bounded
         .edit_slide_chart_arrangement(0usize, 0usize)

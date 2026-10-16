@@ -1201,8 +1201,6 @@ fn binary_search_work(length: usize) -> Result<usize, Error> {
         .ok_or(Error::InvalidSource)
 }
 
-fn map_lifecycle_error(
-    error: crate::package::slide_media_lifecycle::SlideMediaLifecycleError,
-) -> Error {
+fn map_lifecycle_error(error: crate::package::slide_media_lifecycle::Error) -> Error {
     error.into()
 }

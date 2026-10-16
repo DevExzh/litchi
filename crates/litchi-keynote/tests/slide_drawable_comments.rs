@@ -19,8 +19,9 @@ use litchi_iwa_common::{
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
-    DrawableSelector, MovieInfo, Package, ReadOptions, ReplySelector, SemanticLimits,
-    SlideDrawableCommentError, SlideDrawableCommentLimitKind, SlideSelector,
+    DrawableSelector, MovieInfo, OpenOptions, Package, ReplySelector, SemanticLimits,
+    SlideSelector, SourceLimits, slide::comment::transaction::Error as SlideDrawableCommentError,
+    slide::comment::transaction::LimitKind as SlideDrawableCommentLimitKind,
 };
 use prost::Message as _;
 
@@ -347,22 +348,27 @@ fn permanent_native_fixture_is_pinned() {
 #[test]
 fn entry_limit_is_typed_and_source_stays_unchanged() -> TestResult {
     let source = source_bytes()?;
-    let limits = Limits::new(
-        8 * 1024 * 1024,
-        256,
-        2 * 1024 * 1024,
-        8 * 1024 * 1024,
-        2 * 1024 * 1024,
+    let limits = SourceLimits::builder()
+        .max_input_bytes(8 * 1024 * 1024)?
+        .max_entries(256)?
+        .max_entry_bytes(2 * 1024 * 1024)?
+        .max_aggregate_bytes(8 * 1024 * 1024)?
+        .max_component_bytes(2 * 1024 * 1024)?
+        .build()?;
+    let semantic = SemanticLimits::builder()
+        .max_objects(16 * 1024)?
+        .max_slides(512)?
+        .max_references(32 * 1024)?
+        .max_text_storages(8 * 1024)?
+        .max_text_fragments(32 * 1024)?
+        .max_text_bytes(2 * 1024 * 1024)?
+        .build()?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        OpenOptions::new()
+            .source_limits(limits)
+            .semantic_limits(semantic),
     )?;
-    let semantic = SemanticLimits::new(
-        16 * 1024,
-        512,
-        32 * 1024,
-        8 * 1024,
-        32 * 1024,
-        2 * 1024 * 1024,
-    )?;
-    let package = Package::from_bytes_with_options(&source, ReadOptions::new(limits, semantic))?;
     let slide = SlideSelector::index(0);
     let inventory = package.slide_drawables(slide)?;
     let target = inventory
@@ -385,7 +391,12 @@ fn entry_limit_is_typed_and_source_stays_unchanged() -> TestResult {
     );
     assert_eq!(exact_bytes(&package)?, source);
 
-    let package = Package::from_bytes_with_options(&source, ReadOptions::new(limits, semantic))?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        OpenOptions::new()
+            .source_limits(limits)
+            .semantic_limits(semantic),
+    )?;
     let mutation = package.edit_slide_drawable_comment(slide, target);
     assert!(
         matches!(

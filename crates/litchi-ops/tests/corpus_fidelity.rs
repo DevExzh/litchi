@@ -13,9 +13,10 @@
 //! Whether the reverted bytes also equal the input is reported, not
 //! required: a revert is a second edit, and the leaves may normalize what
 //! they rewrite. A structural round trip follows on XLS, PPTX and RTF
-//! (record 0293) and Pages (record 0299): a row inserted and removed, a
-//! slide or paragraph moved and moved back, or a Pages paragraph added and
-//! removed, must read back with the same node texts.
+//! (record 0293), Pages (record 0299) and Keynote (record 0298): a row
+//! inserted and removed, a slide or paragraph moved and moved back, a Pages
+//! paragraph added and removed, or a Keynote slide duplicated and a slide
+//! added and both removed, must read back with the same node texts.
 //!
 //! An empty edit the leaf editor refuses (typed) is reported with its
 //! cause, and the file then goes through `open` → `save_as`, which must be
@@ -386,6 +387,31 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 .map(|added| added.file)
             },
             |file| file.remove("/body/p[1]"),
+        ),
+        // Record 0298: the first Keynote slide duplicated after itself and a
+        // slide added from the theme's default layout at the end, then both
+        // removed, through the leaf slide-creation and deletion families.
+        Some(FileFormat::Keynote) => (
+            "slide duplicate+add+remove",
+            &["/slide[1]/placeholder[1]", "/slide[1]/shape[1]"],
+            |file| {
+                let copied = file
+                    .add(
+                        "/",
+                        NewNode::new("slide")
+                            .prop("from", "/slide[1]")
+                            .at(Placement::after("/slide[1]")?),
+                    )?
+                    .file;
+                copied
+                    .add("/", NewNode::new("slide"))
+                    .map(|added| added.file)
+            },
+            |file| {
+                let last = file.query("slide")?.count();
+                file.remove(format!("/slide[{last}]").as_str())?
+                    .remove("/slide[2]")
+            },
         ),
         _ => return ("-", String::new()),
     };

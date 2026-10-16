@@ -19,7 +19,9 @@ use litchi_iwa_protos::keynote_media_lifecycle_codec as lifecycle_codec;
 use litchi_iwa_protos::keynote_media_lifecycle_codec::node_cache;
 
 use super::{CreationBudget, CreationContext, CreationIds};
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 
 const BUILD_MESSAGE_TYPE: u32 = 8;
 const BUILD_CHUNK_MESSAGE_TYPE: u32 = 153;

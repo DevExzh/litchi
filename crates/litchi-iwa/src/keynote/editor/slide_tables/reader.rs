@@ -16,7 +16,10 @@ use litchi_iwa_protos::{
     keynote_document_codec, keynote_show_codec,
     table_info_codec::{self, WireResourceLimit},
 };
-use litchi_keynote::{MergeReader, SlideSelector, SlideTableMergesError, TableSelector};
+use litchi_keynote::{
+    SlideSelector, TableSelector, slide::table::merge::transaction::Error as SlideTableMergesError,
+    slide::table::merge::transaction::MergeReader,
+};
 use litchi_numbers::table::merge::Region;
 
 use super::super::KeynoteEditor;
@@ -81,8 +84,8 @@ pub(super) fn regions_in_editor(
             "Keynote table model {model_object_id} is not owned by slide {slide_index}"
         )));
     };
-    let options =
-        litchi_keynote::ReadOptions::new(limits, litchi_keynote::SemanticLimits::default());
+    let options = super::focused_keynote_options(limits)
+        .map_err(|_error| Error::KeynoteSlideTableMerges(SlideTableMergesError::InvalidSource))?;
     let reader = MergeReader::__from_shared_catalog(components, options)
         .map_err(map_focused_merges_error)?;
     match reader.slide_table_merges(
@@ -93,7 +96,7 @@ pub(super) fn regions_in_editor(
         // Preserve the existing compatibility arm for legacy table-model
         // roles. All other post-admission failures remain typed focused
         // failures and must not widen into the archive-wide reader.
-        Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) => {
+        Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) => {
             crate::numbers::editor::table_cell_merges_in_package(editor.package(), model_object_id)
         },
         Err(error) => Err(map_focused_merges_error(error)),
@@ -381,22 +384,22 @@ fn map_common_wire_error(error: litchi_iwa_common::Error, context: &str) -> Erro
 
 fn map_common_wire_limit(
     kind: litchi_iwa_common::LimitKind,
-) -> Option<litchi_keynote::SlideTableMergesLimitKind> {
+) -> Option<litchi_keynote::slide::table::merge::transaction::LimitKind> {
     Some(match kind {
         litchi_iwa_common::LimitKind::InputBytes => {
-            litchi_keynote::SlideTableMergesLimitKind::InputBytes
+            litchi_keynote::slide::table::merge::transaction::LimitKind::InputBytes
         },
         litchi_iwa_common::LimitKind::Fields => {
-            litchi_keynote::SlideTableMergesLimitKind::WireFields
+            litchi_keynote::slide::table::merge::transaction::LimitKind::WireFields
         },
         litchi_iwa_common::LimitKind::OutputBytes => {
-            litchi_keynote::SlideTableMergesLimitKind::OutputBytes
+            litchi_keynote::slide::table::merge::transaction::LimitKind::OutputBytes
         },
         litchi_iwa_common::LimitKind::Nesting => {
-            litchi_keynote::SlideTableMergesLimitKind::WireNesting
+            litchi_keynote::slide::table::merge::transaction::LimitKind::WireNesting
         },
         litchi_iwa_common::LimitKind::RewriteWork => {
-            litchi_keynote::SlideTableMergesLimitKind::WireWork
+            litchi_keynote::slide::table::merge::transaction::LimitKind::WireWork
         },
         litchi_iwa_common::LimitKind::TableRows
         | litchi_iwa_common::LimitKind::TableColumns
@@ -516,7 +519,7 @@ impl SelectorBudget {
             &mut self.objects,
             amount,
             self.max_objects,
-            litchi_keynote::SlideTableMergesLimitKind::PayloadObjects,
+            litchi_keynote::slide::table::merge::transaction::LimitKind::PayloadObjects,
         )
     }
 
@@ -525,7 +528,7 @@ impl SelectorBudget {
             &mut self.components,
             amount,
             self.max_components,
-            litchi_keynote::SlideTableMergesLimitKind::Components,
+            litchi_keynote::slide::table::merge::transaction::LimitKind::Components,
         )
     }
 
@@ -534,7 +537,7 @@ impl SelectorBudget {
             &mut self.items,
             amount,
             self.max_items,
-            litchi_keynote::SlideTableMergesLimitKind::PayloadItems,
+            litchi_keynote::slide::table::merge::transaction::LimitKind::PayloadItems,
         )
     }
 
@@ -543,7 +546,7 @@ impl SelectorBudget {
             &mut self.references,
             amount,
             self.max_references,
-            litchi_keynote::SlideTableMergesLimitKind::References,
+            litchi_keynote::slide::table::merge::transaction::LimitKind::References,
         )
     }
 
@@ -552,7 +555,7 @@ impl SelectorBudget {
             &mut self.work,
             amount,
             self.max_work,
-            litchi_keynote::SlideTableMergesLimitKind::WireWork,
+            litchi_keynote::slide::table::merge::transaction::LimitKind::WireWork,
         )
     }
 
@@ -560,7 +563,7 @@ impl SelectorBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: litchi_keynote::SlideTableMergesLimitKind,
+        kind: litchi_keynote::slide::table::merge::transaction::LimitKind,
     ) -> Result<()> {
         let observed = current.saturating_add(amount);
         if observed > maximum {
@@ -648,8 +651,10 @@ fn map_catalog_error(error: ArchiveError) -> Error {
     })
 }
 
-fn map_archive_limit(kind: ArchiveLimitKind) -> litchi_keynote::SlideTableMergesLimitKind {
-    use litchi_keynote::SlideTableMergesLimitKind;
+fn map_archive_limit(
+    kind: ArchiveLimitKind,
+) -> litchi_keynote::slide::table::merge::transaction::LimitKind {
+    use litchi_keynote::slide::table::merge::transaction::LimitKind as SlideTableMergesLimitKind;
     match kind {
         ArchiveLimitKind::InputBytes => SlideTableMergesLimitKind::InputBytes,
         ArchiveLimitKind::OutputBytes => SlideTableMergesLimitKind::OutputBytes,
@@ -726,7 +731,9 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
 
 fn map_projection_error(error: litchi_keynote::ReadError) -> Error {
     Error::KeynoteSlideTableMerges(match error {
-        litchi_keynote::ReadError::NotKeynote => SlideTableMergesError::UnsupportedSource,
+        litchi_keynote::ReadError::UnexpectedFormat { .. } => {
+            SlideTableMergesError::UnsupportedSource
+        },
         litchi_keynote::ReadError::Archive(ArchiveError::Limit {
             kind,
             observed,
@@ -744,18 +751,18 @@ fn map_projection_error(error: litchi_keynote::ReadError) -> Error {
         } => SlideTableMergesError::LimitExceeded {
             kind: match kind {
                 litchi_keynote::PayloadLimitKind::Bytes => {
-                    litchi_keynote::SlideTableMergesLimitKind::InputBytes
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::InputBytes
                 },
                 litchi_keynote::PayloadLimitKind::Fields => {
-                    litchi_keynote::SlideTableMergesLimitKind::WireFields
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::WireFields
                 },
                 litchi_keynote::PayloadLimitKind::Nesting => {
-                    litchi_keynote::SlideTableMergesLimitKind::WireNesting
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::WireNesting
                 },
                 litchi_keynote::PayloadLimitKind::Work => {
-                    litchi_keynote::SlideTableMergesLimitKind::WireWork
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::WireWork
                 },
-                _ => litchi_keynote::SlideTableMergesLimitKind::WireWork,
+                _ => litchi_keynote::slide::table::merge::transaction::LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -768,24 +775,24 @@ fn map_projection_error(error: litchi_keynote::ReadError) -> Error {
         } => SlideTableMergesError::LimitExceeded {
             kind: match kind {
                 litchi_keynote::SemanticLimitKind::Objects => {
-                    litchi_keynote::SlideTableMergesLimitKind::PayloadObjects
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::PayloadObjects
                 },
                 litchi_keynote::SemanticLimitKind::Slides => {
-                    litchi_keynote::SlideTableMergesLimitKind::Components
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::Components
                 },
                 litchi_keynote::SemanticLimitKind::References => {
-                    litchi_keynote::SlideTableMergesLimitKind::References
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::References
                 },
                 litchi_keynote::SemanticLimitKind::TextStorages => {
-                    litchi_keynote::SlideTableMergesLimitKind::PayloadMessages
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::PayloadMessages
                 },
                 litchi_keynote::SemanticLimitKind::TextFragments => {
-                    litchi_keynote::SlideTableMergesLimitKind::PayloadItems
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::PayloadItems
                 },
                 litchi_keynote::SemanticLimitKind::TextBytes => {
-                    litchi_keynote::SlideTableMergesLimitKind::Retained
+                    litchi_keynote::slide::table::merge::transaction::LimitKind::Retained
                 },
-                _ => litchi_keynote::SlideTableMergesLimitKind::WireWork,
+                _ => litchi_keynote::slide::table::merge::transaction::LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -808,14 +815,14 @@ fn map_wire_error(
     }
     if let Some((observed, maximum)) = fields {
         return SlideTableMergesError::LimitExceeded {
-            kind: litchi_keynote::SlideTableMergesLimitKind::WireFields,
+            kind: litchi_keynote::slide::table::merge::transaction::LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = work {
         return SlideTableMergesError::LimitExceeded {
-            kind: litchi_keynote::SlideTableMergesLimitKind::WireWork,
+            kind: litchi_keynote::slide::table::merge::transaction::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
@@ -823,12 +830,12 @@ fn map_wire_error(
     if let Some(resource) = resource {
         let (kind, observed, maximum) = match resource {
             WireResourceValues::Bytes { observed, maximum } => (
-                litchi_keynote::SlideTableMergesLimitKind::InputBytes,
+                litchi_keynote::slide::table::merge::transaction::LimitKind::InputBytes,
                 observed,
                 maximum,
             ),
             WireResourceValues::Nesting { observed, maximum } => (
-                litchi_keynote::SlideTableMergesLimitKind::WireNesting,
+                litchi_keynote::slide::table::merge::transaction::LimitKind::WireNesting,
                 observed,
                 maximum,
             ),

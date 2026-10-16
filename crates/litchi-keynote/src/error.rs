@@ -78,6 +78,16 @@ pub enum Error {
     /// A build path exceeded the bounded semantic collection budget.
     #[error("Keynote build path exceeds the semantic collection budget")]
     BuildTooLarge,
+    /// A caller-selected ingress limit was zero or exceeded its hard ceiling.
+    #[error("Keynote {kind} limit must be between 1 and {maximum}, got {value}")]
+    InvalidLimit {
+        /// The rejected dimension.
+        kind: crate::limits::LimitKind,
+        /// The requested value.
+        value: u64,
+        /// The hard ceiling of the dimension.
+        maximum: u64,
+    },
 }
 
 /// Result type for semantic Keynote operations.

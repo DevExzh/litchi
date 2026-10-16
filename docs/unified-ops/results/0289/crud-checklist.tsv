@@ -4887,58 +4887,214 @@ pages	footnote	edit	supported		ok tx.set
 pages	footnote	batch	supported		ok set item
 pages	footnote	create	supported		ok format
 pages	footnote	save	supported		ok format
-keynote	presentation	get	supported		ok 1 instances, first `iwork/keynote/basic.key` /
-keynote	presentation	find	supported		ok 1 instances, first `iwork/keynote/basic.key` /
+keynote	presentation	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /
+keynote	presentation	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /
 keynote	presentation	query	n/a	query not offered for this element	-
-keynote	presentation	view	supported		ok 1 instances, first `iwork/keynote/basic.key` /
+keynote	presentation	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /
 keynote	presentation	set	n/a	set not offered for this element	-
-keynote	presentation	add	gap	IWORK_API_REQUESTS.md	-
+keynote	presentation	add	n/a	add not offered for this element	-
 keynote	presentation	remove	n/a	remove not offered for this element	-
 keynote	presentation	move	format-verb		unreached
-keynote	presentation	swap	gap	IWORK_API_REQUESTS.md	unreached
+keynote	presentation	swap	format-verb		unreached
 keynote	presentation	edit	n/a	edit not offered for this element	-
 keynote	presentation	batch	n/a	batch not offered for this element	-
-keynote	presentation	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+keynote	presentation	create	supported		ok format
 keynote	presentation	save	supported		ok format
-keynote	slide	get	supported		ok 1 instances, first `iwork/keynote/basic.key` /slide[1]
-keynote	slide	find	supported		ok 1 instances, first `iwork/keynote/basic.key` /slide[1]
-keynote	slide	query	supported		ok matches in iwork/keynote/basic.key
-keynote	slide	view	supported		ok 1 instances, first `iwork/keynote/basic.key` /slide[1]
-keynote	slide	set	supported		ok `iwork/keynote/basic.key` /slide[1] hidden=true
-keynote	slide	add	gap	IWORK_API_REQUESTS.md	-
-keynote	slide	remove	supported		FAILED invalid_argument: the final Keynote slide cannot be deleted
-keynote	slide	move	format-verb		unreached
-keynote	slide	swap	gap	IWORK_API_REQUESTS.md	unreached
+keynote	slide	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]
+keynote	slide	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]
+keynote	slide	query	supported		ok matches in create()
+keynote	slide	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]
+keynote	slide	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1] hidden=true
+keynote	slide	add	supported		ok /slide[6] on `iwork/keynote/multi-slide.key` under / [from]
+keynote	slide	remove	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]
+keynote	slide	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1] /slide[2]
+keynote	slide	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1] /slide[2]
 keynote	slide	edit	supported		ok tx.set
 keynote	slide	batch	supported		ok set item
-keynote	slide	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+keynote	slide	create	supported		ok format
 keynote	slide	save	supported		ok format
-keynote	placeholder	get	supported		ok 4 instances, first `iwork/keynote/basic.key` /slide[1]/placeholder[1]
-keynote	placeholder	find	supported		ok 4 instances, first `iwork/keynote/basic.key` /slide[1]/placeholder[1]
-keynote	placeholder	query	supported		ok matches in iwork/keynote/basic.key
-keynote	placeholder	view	supported		ok 4 instances, first `iwork/keynote/basic.key` /slide[1]/placeholder[1]
-keynote	placeholder	set	supported		ok `iwork/keynote/basic.key` /slide[1]/placeholder[1] text=Litchi
-keynote	placeholder	add	gap	IWORK_API_REQUESTS.md	-
+keynote	placeholder	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]
+keynote	placeholder	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]
+keynote	placeholder	query	supported		ok matches in create()
+keynote	placeholder	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]
+keynote	placeholder	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] text=Litchi
+keynote	placeholder	add	n/a	add not offered for this element	-
 keynote	placeholder	remove	n/a	remove not offered for this element	-
-keynote	placeholder	move	format-verb		refused unsupported_capability
-keynote	placeholder	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+keynote	placeholder	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] /slide[1]/placeholder[2]
+keynote	placeholder	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] /slide[1]/placeholder[2]
 keynote	placeholder	edit	supported		ok tx.set
 keynote	placeholder	batch	supported		ok set item
-keynote	placeholder	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+keynote	placeholder	create	supported		ok format
 keynote	placeholder	save	supported		ok format
-keynote	notes	get	supported		unreached
-keynote	notes	find	supported		unreached
-keynote	notes	query	supported		unreached
-keynote	notes	view	supported		unreached
-keynote	notes	set	n/a	set not offered for this element	unreached
-keynote	notes	add	gap	IWORK_API_REQUESTS.md	-
-keynote	notes	remove	n/a	remove not offered for this element	unreached
+keynote	notes	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/notes
+keynote	notes	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/notes
+keynote	notes	query	supported		ok matches in iwork/keynote/multi-slide.key
+keynote	notes	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/notes
+keynote	notes	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes text=Litchi
+keynote	notes	add	n/a	add not offered for this element	-
+keynote	notes	remove	n/a	remove not offered for this element	-
 keynote	notes	move	format-verb		unreached
-keynote	notes	swap	gap	IWORK_API_REQUESTS.md	unreached
-keynote	notes	edit	n/a	edit not offered for this element	-
-keynote	notes	batch	n/a	batch not offered for this element	-
-keynote	notes	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+keynote	notes	swap	format-verb		unreached
+keynote	notes	edit	supported		ok tx.set
+keynote	notes	batch	supported		ok set item
+keynote	notes	create	supported		ok format
 keynote	notes	save	supported		ok format
+keynote	paragraph	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]
+keynote	paragraph	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]
+keynote	paragraph	query	supported		ok matches in create()
+keynote	paragraph	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]
+keynote	paragraph	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1]/paragraph[1] text=Litchi
+keynote	paragraph	add	supported		ok /slide[1]/placeholder[1]/paragraph[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1]/placeholder[1] []
+keynote	paragraph	remove	supported		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1]
+keynote	paragraph	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1] /slide[1]/placeholder[1]/paragraph[2]
+keynote	paragraph	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1] /slide[1]/placeholder[1]/paragraph[2]
+keynote	paragraph	edit	supported		ok tx.set
+keynote	paragraph	batch	supported		ok set item
+keynote	paragraph	create	supported		ok format
+keynote	paragraph	save	supported		ok format
+keynote	run	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
+keynote	run	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
+keynote	run	query	supported		ok matches in create()
+keynote	run	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
+keynote	run	set	n/a	set not offered for this element	-
+keynote	run	add	n/a	add not offered for this element	-
+keynote	run	remove	n/a	remove not offered for this element	-
+keynote	run	move	format-verb		unreached
+keynote	run	swap	format-verb		unreached
+keynote	run	edit	n/a	edit not offered for this element	-
+keynote	run	batch	n/a	batch not offered for this element	-
+keynote	run	create	supported		ok format
+keynote	run	save	supported		ok format
+keynote	shape	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
+keynote	shape	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
+keynote	shape	query	supported		ok matches in iwork/keynote/multi-slide.key
+keynote	shape	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
+keynote	shape	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1] text=Litchi
+keynote	shape	add	supported		ok /slide[1]/shape[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1] []
+keynote	shape	remove	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1]
+keynote	shape	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add shape` /slide[1]/shape[1] /slide[1]/shape[2]
+keynote	shape	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add shape` /slide[1]/shape[1] /slide[1]/shape[2]
+keynote	shape	edit	supported		ok tx.set
+keynote	shape	batch	supported		ok set item
+keynote	shape	create	supported		ok format
+keynote	shape	save	supported		ok format
+keynote	picture	get	supported		ok 3 instances, first `iwork/keynote/image-adjustments-native.key` /slide[1]/picture[1]
+keynote	picture	find	supported		ok 3 instances, first `iwork/keynote/image-adjustments-native.key` /slide[1]/picture[1]
+keynote	picture	query	supported		ok matches in iwork/keynote/image-adjustments-native.key
+keynote	picture	view	supported		ok 3 instances, first `iwork/keynote/image-adjustments-native.key` /slide[1]/picture[1]
+keynote	picture	set	supported		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1] x=12pt
+keynote	picture	add	supported		ok /slide[1]/picture[1] on `iwork/keynote/multi-slide.key` under /slide[1] [src]
+keynote	picture	remove	supported		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1]
+keynote	picture	move	format-verb		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1] /slide[1]/picture[2]
+keynote	picture	swap	format-verb		ok `iwork/keynote/multi-slide.key + add picture` /slide[1]/picture[1] /slide[1]/picture[2]
+keynote	picture	edit	supported		ok tx.set
+keynote	picture	batch	supported		ok set item
+keynote	picture	create	supported		ok format
+keynote	picture	save	supported		ok format
+keynote	connector	get	supported		unreached
+keynote	connector	find	supported		unreached
+keynote	connector	query	supported		unreached
+keynote	connector	view	supported		unreached
+keynote	connector	set	n/a	set not offered for this element	unreached
+keynote	connector	add	n/a	add not offered for this element	-
+keynote	connector	remove	supported		unreached
+keynote	connector	move	format-verb		unreached
+keynote	connector	swap	format-verb		unreached
+keynote	connector	edit	n/a	edit not offered for this element	-
+keynote	connector	batch	n/a	batch not offered for this element	-
+keynote	connector	create	supported		ok format
+keynote	connector	save	supported		ok format
+keynote	video	get	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1]
+keynote	video	find	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1]
+keynote	video	query	supported		ok matches in iwork/keynote/media-lifecycle-audio-remove-native.key
+keynote	video	view	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1]
+keynote	video	set	n/a	set not offered for this element	-
+keynote	video	add	n/a	add not offered for this element	-
+keynote	video	remove	n/a	remove not offered for this element	-
+keynote	video	move	format-verb		ok `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1] /slide[1]/video[2]
+keynote	video	swap	format-verb		ok `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1] /slide[1]/video[2]
+keynote	video	edit	n/a	edit not offered for this element	-
+keynote	video	batch	n/a	batch not offered for this element	-
+keynote	video	create	supported		ok format
+keynote	video	save	supported		ok format
+keynote	audio	get	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1]
+keynote	audio	find	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1]
+keynote	audio	query	supported		ok matches in iwork/keynote/media-lifecycle-remove-native.key
+keynote	audio	view	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1]
+keynote	audio	set	n/a	set not offered for this element	-
+keynote	audio	add	n/a	add not offered for this element	-
+keynote	audio	remove	n/a	remove not offered for this element	-
+keynote	audio	move	format-verb		ok `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1] /slide[1]/audio[2]
+keynote	audio	swap	format-verb		ok `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1] /slide[1]/audio[2]
+keynote	audio	edit	n/a	edit not offered for this element	-
+keynote	audio	batch	n/a	batch not offered for this element	-
+keynote	audio	create	supported		ok format
+keynote	audio	save	supported		ok format
+keynote	table	get	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	find	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
+keynote	table	view	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	set	n/a	set not offered for this element	-
+keynote	table	add	n/a	add not offered for this element	-
+keynote	table	remove	n/a	remove not offered for this element	-
+keynote	table	move	format-verb		unreached
+keynote	table	swap	format-verb		unreached
+keynote	table	edit	n/a	edit not offered for this element	-
+keynote	table	batch	n/a	batch not offered for this element	-
+keynote	table	create	supported		ok format
+keynote	table	save	supported		ok format
+keynote	tr	get	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	find	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
+keynote	tr	view	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	set	n/a	set not offered for this element	-
+keynote	tr	add	n/a	add not offered for this element	-
+keynote	tr	remove	n/a	remove not offered for this element	-
+keynote	tr	move	format-verb		refused unsupported_capability
+keynote	tr	swap	format-verb		refused invalid_argument
+keynote	tr	edit	n/a	edit not offered for this element	-
+keynote	tr	batch	n/a	batch not offered for this element	-
+keynote	tr	create	supported		ok format
+keynote	tr	save	supported		ok format
+keynote	tc	get	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	find	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
+keynote	tc	view	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	set	n/a	set not offered for this element	-
+keynote	tc	add	n/a	add not offered for this element	-
+keynote	tc	remove	n/a	remove not offered for this element	-
+keynote	tc	move	format-verb		refused unsupported_capability
+keynote	tc	swap	format-verb		refused invalid_argument
+keynote	tc	edit	n/a	edit not offered for this element	-
+keynote	tc	batch	n/a	batch not offered for this element	-
+keynote	tc	create	supported		ok format
+keynote	tc	save	supported		ok format
+keynote	chart	get	supported		ok 1 instances, first `iwork/keynote/chart-grid-authored-native.key` /slide[1]/chart[1]
+keynote	chart	find	supported		ok 1 instances, first `iwork/keynote/chart-grid-authored-native.key` /slide[1]/chart[1]
+keynote	chart	query	supported		ok matches in iwork/keynote/chart-grid-authored-native.key
+keynote	chart	view	supported		ok 1 instances, first `iwork/keynote/chart-grid-authored-native.key` /slide[1]/chart[1]
+keynote	chart	set	n/a	set not offered for this element	-
+keynote	chart	add	n/a	add not offered for this element	-
+keynote	chart	remove	n/a	remove not offered for this element	-
+keynote	chart	move	format-verb		unreached
+keynote	chart	swap	format-verb		unreached
+keynote	chart	edit	n/a	edit not offered for this element	-
+keynote	chart	batch	n/a	batch not offered for this element	-
+keynote	chart	create	supported		ok format
+keynote	chart	save	supported		ok format
+keynote	group	get	supported		unreached
+keynote	group	find	supported		unreached
+keynote	group	query	supported		unreached
+keynote	group	view	supported		unreached
+keynote	group	set	n/a	set not offered for this element	unreached
+keynote	group	add	n/a	add not offered for this element	-
+keynote	group	remove	n/a	remove not offered for this element	unreached
+keynote	group	move	format-verb		unreached
+keynote	group	swap	format-verb		unreached
+keynote	group	edit	n/a	edit not offered for this element	-
+keynote	group	batch	n/a	batch not offered for this element	-
+keynote	group	create	supported		ok format
+keynote	group	save	supported		ok format
 numbers	workbook	get	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
 numbers	workbook	find	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
 numbers	workbook	query	n/a	query not offered for this element	-

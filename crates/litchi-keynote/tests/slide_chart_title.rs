@@ -4,7 +4,9 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp};
-use litchi_keynote::{ChartSelector, ChartTitleError, Package, Position, SlideSelector};
+use litchi_keynote::{
+    ChartSelector, Package, Position, SlideSelector, chart::title::Error as ChartTitleError,
+};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";

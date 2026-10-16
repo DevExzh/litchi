@@ -149,7 +149,7 @@ fn focused_table_appearance_package(
     })?;
     let focused = litchi_keynote::Package::__from_shared_source_with_options(
         source,
-        litchi_keynote::ReadOptions::default(),
+        litchi_keynote::OpenOptions::default(),
     )
     .map_err(|error| {
         Error::InvalidFormat(format!(

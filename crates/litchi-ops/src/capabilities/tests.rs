@@ -6,8 +6,8 @@
 use litchi_core::FileFormat;
 
 use super::{
-    CREATE_PENDING, Capabilities, EDITS, IWORK_CREATE, IWORK_STRUCTURE, SAVE_PENDING, State,
-    Support, Verb, path_segment, positional, refused,
+    CREATE_PENDING, Capabilities, EDITS, IWORK_STRUCTURE, SAVE_PENDING, State, Support, Verb,
+    path_segment, positional, refused,
 };
 use crate::Code;
 use crate::view::Mode;
@@ -262,8 +262,12 @@ fn every_format_has_one_answer_for_its_reads() {
                     Verb::Add => !writes.addable.is_empty(),
                     Verb::Remove => !writes.removable.is_empty(),
                     Verb::Move => !writes.movable.is_empty(),
-                    // Pages exchanges paragraphs (record 0299).
-                    Verb::Swap => format == FileFormat::Pages && !writes.movable.is_empty(),
+                    // Pages exchanges paragraphs (record 0299); Keynote
+                    // slides, paragraphs and drawables (record 0298).
+                    Verb::Swap => {
+                        matches!(format, FileFormat::Pages | FileFormat::Keynote)
+                            && !writes.movable.is_empty()
+                    },
                     _ => false,
                 });
             #[cfg(not(feature = "iwork-adapter"))]
@@ -358,12 +362,10 @@ fn every_format_has_one_answer_for_its_reads() {
                 format,
                 FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
             ) && crate::read::Adapter::of(format).is_some();
-            // Pages creates its minimal document (record 0299).
-            let pages_create = format == FileFormat::Pages && iwork;
-            let expected = if integrated || (iwork && verb == Verb::Save) || pages_create {
+            // Pages (record 0299), Numbers (record 0297) and Keynote (record
+            // 0298) create their minimal documents.
+            let expected = if integrated || iwork {
                 Support::Supported
-            } else if iwork {
-                IWORK_CREATE.support()
             } else if get.is_supported() {
                 match verb {
                     Verb::Save => SAVE_PENDING.support(),
