@@ -1,5 +1,11 @@
 /// Exact-source transactions for the fill stored directly on one section.
 pub mod background;
+/// Adding and removing sections (record 0312).
+pub mod lifecycle {
+    pub use crate::package::section_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+    };
+}
 /// Exact-source transactions for one section's name.
 pub mod name {
     pub use crate::package::section_name::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

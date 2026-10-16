@@ -42,6 +42,10 @@ name = "edit_section_background"
 path = "examples/edit_section_background.rs"
 
 [[example]]
+name = "edit_section_lifecycle"
+path = "examples/edit_section_lifecycle.rs"
+
+[[example]]
 name = "edit_section_name"
 path = "examples/edit_section_name.rs"
 

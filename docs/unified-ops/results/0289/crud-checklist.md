@@ -33,7 +33,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | oth | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
 | odm | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
-| pages | 11 | 88 | 88 | 0 | 0 | 0 | 33 | 2 | 14 |
+| pages | 11 | 90 | 90 | 0 | 0 | 0 | 31 | 2 | 14 |
 | keynote | 16 | 131 | 122 | 0 | 9 | 0 | 45 | 14 | 4 |
 | numbers | 7 | 61 | 61 | 0 | 0 | 7 | 16 | 2 | 3 |
 
@@ -548,7 +548,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## pages
 
-- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-name-focused.pages`, `create() + add paragraph`, `create() + add paragraph + add footnote`
+- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-name-focused.pages`, `create() + add paragraph`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`
 - document views on `iwork/pages/body-sections-unicode.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -556,7 +556,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | document | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | body | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| section | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| section | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
 | row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |

@@ -33,6 +33,7 @@ mod movie_playback;
 pub(crate) mod page_layout;
 mod save;
 pub(crate) mod section_background;
+pub(crate) mod section_lifecycle;
 pub(crate) mod section_name;
 pub(crate) mod section_pagination;
 pub(crate) mod section_paragraphs;
@@ -41,6 +42,7 @@ pub(crate) mod section_text;
 pub(crate) mod section_text_style;
 mod section_transaction;
 pub(crate) mod sidecars;
+mod structure;
 pub(crate) mod table_cells;
 pub(crate) mod table_lock;
 #[cfg(feature = "internal-iwork-source")]
