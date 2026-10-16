@@ -425,3 +425,209 @@ fn field_text_keeps_the_field_element() {
         );
     }
 }
+
+/// The sample with style and fo bindings and two automatic styles: the
+/// title paragraph's `P1` (no text properties) and the span's `T1` (bold).
+fn styled() -> String {
+    sample()
+        .replacen(
+            r#"xmlns:table="#,
+            concat!(
+                r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+                r#"xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" "#,
+                r#"xmlns:table="#
+            ),
+            1,
+        )
+        .replacen(
+            "<office:body>",
+            concat!(
+                r#"<office:automatic-styles>"#,
+                r#"<style:style style:name="P1" style:family="paragraph"><style:paragraph-properties fo:text-align="center"/></style:style>"#,
+                r##"<style:style style:name="T1" style:family="text"><style:text-properties fo:font-weight="bold" fo:color="#112233"/></style:style>"##,
+                r#"</office:automatic-styles><office:body>"#
+            ),
+            1,
+        )
+}
+
+fn edit(build: impl FnOnce(&mut TextPropertyEdit)) -> TextPropertyEdit {
+    let mut properties = TextPropertyEdit::new();
+    build(&mut properties);
+    properties
+}
+
+#[test]
+fn automatic_styles_are_indexed() {
+    let xml = styled();
+    let scene = Scene::parse(&xml).unwrap();
+    assert_eq!(scene.automatic_styles().len(), 2);
+    let span = &scene.pages()[0].objects()[0].story().unwrap().paragraphs()[0].runs()[1];
+    let properties = scene.run_text_properties(span).unwrap();
+    assert_eq!(properties.bold(), Some(true));
+    assert_eq!(properties.color(), Some("#112233"));
+    assert_eq!(properties.italic(), None);
+    let paragraph = &scene.pages()[0].objects()[0].story().unwrap().paragraphs()[0];
+    assert_eq!(
+        scene.paragraph_text_properties(paragraph),
+        Some(&TextProperties::default())
+    );
+    assert!(scene.automatic_style("text", "P1").is_none());
+}
+
+#[test]
+fn span_formatting_derives_a_new_style() {
+    let xml = styled();
+    let changed = apply(
+        &xml,
+        &[Change::SetTextProperties {
+            story: title(0),
+            paragraph: 0,
+            run: Some(1),
+            properties: edit(|properties| {
+                properties.italic = Some(true);
+                properties.size = Some("24pt".into());
+            }),
+        }],
+    );
+    let scene = Scene::parse(&changed).unwrap();
+    let span = &scene.pages()[0].objects()[0].story().unwrap().paragraphs()[0].runs()[1];
+    assert_ne!(span.style_name(), Some("T1"));
+    let properties = scene.run_text_properties(span).unwrap();
+    // Kept from T1, and added.
+    assert_eq!(properties.bold(), Some(true));
+    assert_eq!(properties.color(), Some("#112233"));
+    assert_eq!(properties.italic(), Some(true));
+    assert_eq!(properties.size(), Some("24pt"));
+    // T1 itself is unchanged.
+    assert_eq!(
+        scene
+            .automatic_style("text", "T1")
+            .unwrap()
+            .text_properties()
+            .italic(),
+        None
+    );
+    assert_eq!(scene.pages()[0].objects()[0].text(), "Hello big world");
+}
+
+#[test]
+fn plain_text_runs_are_wrapped_and_paragraphs_restyled() {
+    let xml = styled();
+    let changed = apply(
+        &xml,
+        &[
+            Change::SetTextProperties {
+                story: title(0),
+                paragraph: 0,
+                run: Some(0),
+                properties: edit(|properties| properties.underline = Some(true)),
+            },
+            Change::SetRunText {
+                story: title(0),
+                paragraph: 0,
+                run: 0,
+                text: "Hi".into(),
+            },
+            Change::SetTextProperties {
+                story: title(0),
+                paragraph: 0,
+                run: None,
+                properties: edit(|properties| properties.font = Some("Liberation Sans".into())),
+            },
+            Change::SetTextProperties {
+                story: title(1),
+                paragraph: 0,
+                run: None,
+                properties: edit(|properties| properties.bold = Some(true)),
+            },
+        ],
+    );
+    let scene = Scene::parse(&changed).unwrap();
+    let title_story = scene.pages()[0].objects()[0].story().unwrap();
+    let paragraph = &title_story.paragraphs()[0];
+    let first = &paragraph.runs()[0];
+    assert_eq!(first.text(), "Hi");
+    assert_eq!(first.kind(), RunKind::Span);
+    assert_eq!(
+        scene.run_text_properties(first).unwrap().underline(),
+        Some(true)
+    );
+    let restyled = scene.paragraph_text_properties(paragraph).unwrap();
+    assert_eq!(restyled.font(), Some("Liberation Sans"));
+    // The derived paragraph style keeps P1's paragraph properties.
+    let derived = scene
+        .automatic_style("paragraph", paragraph.style_name().unwrap())
+        .unwrap();
+    assert!(changed[derived.range()].contains(r#"fo:text-align="center""#));
+    // A paragraph with no style gets one with no parent.
+    let body = &scene.pages()[0].objects()[1].story().unwrap().paragraphs()[0];
+    let style = scene
+        .automatic_style("paragraph", body.style_name().unwrap())
+        .unwrap();
+    assert_eq!(style.parent(), None);
+    assert_eq!(style.text_properties().bold(), Some(true));
+}
+
+#[test]
+fn formatting_no_ops_and_refusals() {
+    let xml = styled();
+    let scene = Scene::parse(&xml).unwrap();
+    // T1 is already bold: an exact no-op.
+    let plan_bold = plan(
+        &xml,
+        &scene,
+        &[Change::SetTextProperties {
+            story: title(0),
+            paragraph: 0,
+            run: Some(1),
+            properties: edit(|properties| properties.bold = Some(true)),
+        }],
+    )
+    .unwrap();
+    assert!(plan_bold.is_empty());
+    let invalid = plan(
+        &xml,
+        &scene,
+        &[Change::SetTextProperties {
+            story: title(0),
+            paragraph: 0,
+            run: None,
+            properties: edit(|properties| properties.color = Some("red".into())),
+        }],
+    );
+    assert!(matches!(invalid, Err(litchi_core::Error::InvalidFormat(_))));
+    // Content without automatic styles gains the element before the body.
+    let bare = sample().replacen(
+        r#"xmlns:table="#,
+        concat!(
+            r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+            r#"xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" "#,
+            r#"xmlns:table="#
+        ),
+        1,
+    );
+    let changed = apply(
+        &bare,
+        &[Change::SetTextProperties {
+            story: title(0),
+            paragraph: 0,
+            run: Some(1),
+            properties: edit(|properties| properties.bold = Some(true)),
+        }],
+    );
+    assert!(changed.contains("<office:automatic-styles><style:style style:name=\"T1\""));
+    // Without the style namespace bound on the root, the edit is refused.
+    let unbound = Scene::parse(&sample()).unwrap();
+    let refused = plan(
+        &sample(),
+        &unbound,
+        &[Change::SetTextProperties {
+            story: title(0),
+            paragraph: 0,
+            run: Some(1),
+            properties: edit(|properties| properties.bold = Some(true)),
+        }],
+    );
+    assert!(matches!(refused, Err(litchi_core::Error::Unsupported(_))));
+}

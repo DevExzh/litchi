@@ -41,6 +41,7 @@
 mod change;
 mod markup;
 mod scan;
+mod styles;
 #[cfg(test)]
 mod tests;
 
@@ -50,6 +51,7 @@ use litchi_core::Result;
 
 use change::Fragment;
 pub use change::{Attribute, Change, NewPage, NewTextBox, ObjectRef, Scope, StoryRef};
+pub use styles::{AutomaticStyle, TextProperties, TextPropertyEdit};
 
 /// Apply `changes` to the `content.xml` of `source` as checked splices.
 ///
@@ -98,6 +100,12 @@ pub struct Scene {
     /// before the end tag of `office:presentation`.
     pub(crate) body_end: Option<usize>,
     pub(crate) len: usize,
+    /// The automatic styles of the content, in document order.
+    pub(crate) styles: Vec<AutomaticStyle>,
+    /// Positions into `styles`, sorted by family and name.
+    pub(crate) style_order: Vec<usize>,
+    /// Where new automatic styles go.
+    pub(crate) styles_insertion: styles::StylesInsertion,
 }
 
 /// The prefixes the document root binds to the ODF namespaces markup is
@@ -108,6 +116,9 @@ pub(crate) struct Prefixes {
     pub(crate) text: Option<String>,
     pub(crate) svg: Option<String>,
     pub(crate) presentation: Option<String>,
+    pub(crate) style: Option<String>,
+    pub(crate) fo: Option<String>,
+    pub(crate) office: Option<String>,
 }
 
 impl Scene {
@@ -146,6 +157,45 @@ impl Scene {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
+    }
+
+    /// The automatic styles of `office:automatic-styles`, in document
+    /// order.
+    #[must_use]
+    pub fn automatic_styles(&self) -> &[AutomaticStyle] {
+        &self.styles
+    }
+
+    /// The automatic style of `family` (`text`, `paragraph`, ...) named
+    /// `name`.
+    #[must_use]
+    pub fn automatic_style(&self, family: &str, name: &str) -> Option<&AutomaticStyle> {
+        let found = self
+            .style_order
+            .binary_search_by(|&index| {
+                let style = &self.styles[index];
+                (style.family.as_str(), style.name.as_str()).cmp(&(family, name))
+            })
+            .ok()?;
+        self.styles.get(self.style_order[found])
+    }
+
+    /// The character properties a paragraph's automatic style sets locally
+    /// (empty when its style is a common style or absent).
+    #[must_use]
+    pub fn paragraph_text_properties(&self, paragraph: &Paragraph) -> Option<&TextProperties> {
+        let name = paragraph.style_name()?;
+        Some(self.automatic_style("paragraph", name)?.text_properties())
+    }
+
+    /// The character properties a span's automatic style sets locally.
+    #[must_use]
+    pub fn run_text_properties(&self, run: &Run) -> Option<&TextProperties> {
+        if run.kind() != RunKind::Span {
+            return None;
+        }
+        let name = run.style_name()?;
+        Some(self.automatic_style("text", name)?.text_properties())
     }
 
     /// Resolve an object reference against this scene.

@@ -6,6 +6,7 @@ use std::ops::Range;
 use litchi_core::{Error, Result};
 
 use super::markup::{Encoded, StartTag, encode, escape_attribute, open_tag, template};
+use super::styles::{StylesInsertion, TextPropertyEdit};
 use super::{Object, ObjectKind, Page, Paragraph, RunKind, Scene, Story};
 
 /// Which object list of a page an [`ObjectRef`] indexes.
@@ -166,6 +167,21 @@ pub enum Change {
         run: usize,
         /// The new text.
         text: String,
+    },
+    /// Set character formatting on a paragraph (`run: None`, through its
+    /// paragraph style) or on one run (a `text:span`, or plain text, which
+    /// a new span wraps). A new automatic style derived from the node's own
+    /// carries the properties; no existing style changes (record 0308).
+    /// Link and field runs are refused.
+    SetTextProperties {
+        /// The story.
+        story: StoryRef,
+        /// Zero-based paragraph position.
+        paragraph: usize,
+        /// Zero-based run position, or `None` for the paragraph.
+        run: Option<usize>,
+        /// The properties to set.
+        properties: TextPropertyEdit,
     },
     /// Insert a paragraph at a final position, styled like its neighbour.
     InsertParagraph {
@@ -338,6 +354,28 @@ struct Planner<'a> {
     tags: BTreeMap<usize, (Range<usize>, Vec<(String, Option<String>)>)>,
     /// New page names chosen in this plan.
     names: Vec<String>,
+    /// Character formatting staged per formatted node.
+    formats: Vec<Format>,
+}
+
+/// How a formatted node points at its new automatic style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pointer {
+    /// Rewrite `text:style-name` on this start tag.
+    StartTag,
+    /// Wrap this plain-text range in a new `text:span`.
+    Wrap,
+}
+
+/// The character formatting one node receives in a plan.
+struct Format {
+    /// The start tag (or the wrapped range) of the node.
+    range: Range<usize>,
+    pointer: Pointer,
+    family: &'static str,
+    /// The node's current style.
+    base: Option<String>,
+    properties: TextPropertyEdit,
 }
 
 /// Plan `changes` against `scene`, the index of `xml`.
@@ -351,10 +389,12 @@ pub(crate) fn plan(xml: &str, scene: &Scene, changes: &[Change]) -> Result<Plan>
         edits: Vec::new(),
         tags: BTreeMap::new(),
         names: Vec::new(),
+        formats: Vec::new(),
     };
     for change in changes {
         planner.change(change)?;
     }
+    planner.finish_formats()?;
     let mut edits = planner.edits;
     for (_, (range, attributes)) in planner.tags {
         let raw = &xml[range.clone()];
@@ -447,6 +487,12 @@ impl<'a> Planner<'a> {
                 run,
                 text,
             } => self.set_field_text(story, *paragraph, *run, text),
+            Change::SetTextProperties {
+                story,
+                paragraph,
+                run,
+                properties,
+            } => self.set_text_properties(story, *paragraph, *run, properties),
             Change::InsertParagraph { story, index, text } => {
                 self.insert_paragraph(story, *index, text)
             },
@@ -754,6 +800,235 @@ impl<'a> Planner<'a> {
         };
         self.push(at..at, Fragment::Markup(markup));
         Ok(())
+    }
+
+    fn set_text_properties(
+        &mut self,
+        story: &StoryRef,
+        index: usize,
+        run: Option<usize>,
+        properties: &TextPropertyEdit,
+    ) -> Result<()> {
+        properties.validate()?;
+        let paragraph = self.paragraph(story, index)?;
+        let (range, pointer, family, base) = match run {
+            None => (
+                paragraph.start_tag.clone(),
+                Pointer::StartTag,
+                "paragraph",
+                paragraph.style_name.clone(),
+            ),
+            Some(run) => {
+                let selected = paragraph.runs.get(run).ok_or_else(|| missing("run"))?;
+                match selected.kind {
+                    RunKind::Span => {
+                        let tag_end = if selected.content.start > selected.range.start {
+                            selected.content.start
+                        } else {
+                            selected.range.end
+                        };
+                        (
+                            selected.range.start..tag_end,
+                            Pointer::StartTag,
+                            "text",
+                            selected.style_name.clone(),
+                        )
+                    },
+                    RunKind::Text => (selected.range.clone(), Pointer::Wrap, "text", None),
+                    RunKind::Link => {
+                        return Err(unsupported(
+                            "character formatting of an ODP hyperlink run is not supported; format the paragraph",
+                        ));
+                    },
+                    RunKind::Field => {
+                        return Err(unsupported(
+                            "character formatting of an ODP field run is not supported; format the paragraph",
+                        ));
+                    },
+                }
+            },
+        };
+        if properties.is_empty() {
+            return Ok(());
+        }
+        if let Some(format) = self.formats.iter_mut().find(|format| format.range == range) {
+            format.properties.merge(properties);
+            return Ok(());
+        }
+        self.formats.push(Format {
+            range,
+            pointer,
+            family,
+            base,
+            properties: properties.clone(),
+        });
+        Ok(())
+    }
+
+    /// Derive one automatic style per formatted node, point the node at
+    /// it, and insert the new styles into `office:automatic-styles`.
+    fn finish_formats(&mut self) -> Result<()> {
+        let formats = std::mem::take(&mut self.formats);
+        let mut definitions = String::new();
+        let mut taken: Vec<String> = Vec::new();
+        for format in formats {
+            let deleted = format.pointer == Pointer::Wrap
+                && self.edits.iter().any(|(range, fragment)| {
+                    *range == format.range && *fragment == Fragment::Delete
+                });
+            if deleted {
+                continue;
+            }
+            let base = format
+                .base
+                .as_deref()
+                .and_then(|name| self.scene.automatic_style(format.family, name));
+            if base.is_some_and(|style| style.text.satisfies(&format.properties)) {
+                continue;
+            }
+            let style = self.prefix(self.scene.prefixes.style.as_ref(), "style")?;
+            let fo = self.prefix(self.scene.prefixes.fo.as_ref(), "XSL-FO")?;
+            let text = self.text_prefix()?;
+            let name = self.fresh_style_name(format.family, &taken);
+            let changes = format.properties.attributes(style, fo);
+            let definition = match base {
+                Some(base) => self.derive_style(base, &name, &changes, style)?,
+                None => {
+                    let mut out = format!(
+                        "<{style}:style {style}:name=\"{}\" {style}:family=\"{}\"",
+                        escape_attribute(&name),
+                        format.family
+                    );
+                    if let Some(parent) = &format.base {
+                        out.push_str(&format!(
+                            " {style}:parent-style-name=\"{}\"",
+                            escape_attribute(parent)
+                        ));
+                    }
+                    out.push('>');
+                    out.push_str(&text_properties_tag(style, &changes));
+                    out.push_str(&format!("</{style}:style>"));
+                    out
+                },
+            };
+            definitions.push_str(&definition);
+            match format.pointer {
+                Pointer::StartTag => {
+                    self.tag(
+                        &format.range,
+                        format!("{text}:style-name"),
+                        Some(name.clone()),
+                    );
+                },
+                Pointer::Wrap => {
+                    // A text set of the same run in this plan is folded
+                    // into the wrapper; a deleted run needs none.
+                    let staged = self
+                        .edits
+                        .iter()
+                        .position(|(range, _)| *range == format.range);
+                    let inner = match staged {
+                        Some(position) => {
+                            let (_, fragment) = self.edits.remove(position);
+                            fragment.bytes(self.xml).to_owned()
+                        },
+                        None => self.xml[format.range.clone()].to_owned(),
+                    };
+                    let markup = format!(
+                        "<{text}:span {text}:style-name=\"{}\">{inner}</{text}:span>",
+                        escape_attribute(&name)
+                    );
+                    self.push(format.range, Fragment::Markup(markup));
+                },
+            }
+            taken.push(name);
+        }
+        if definitions.is_empty() {
+            return Ok(());
+        }
+        match &self.scene.styles_insertion {
+            StylesInsertion::Before(at) => {
+                self.push(*at..*at, Fragment::Markup(definitions));
+            },
+            StylesInsertion::Expand(range) => {
+                self.expand(range.clone(), &definitions)?;
+            },
+            StylesInsertion::Create(at) => {
+                let office = self.prefix(self.scene.prefixes.office.as_ref(), "office")?;
+                self.push(
+                    *at..*at,
+                    Fragment::Markup(format!(
+                        "<{office}:automatic-styles>{definitions}</{office}:automatic-styles>"
+                    )),
+                );
+            },
+            StylesInsertion::None => {
+                return Err(unsupported(
+                    "this ODP content has no place for automatic styles",
+                ));
+            },
+        }
+        Ok(())
+    }
+
+    /// A copy of the automatic style `base` named `name`, with `changes`
+    /// applied to its `style:text-properties` (added when absent).
+    fn derive_style(
+        &self,
+        base: &super::AutomaticStyle,
+        name: &str,
+        changes: &[(String, Option<String>)],
+        style: &str,
+    ) -> Result<String> {
+        let rename = [(format!("{style}:name"), Some(name.to_owned()))];
+        let raw_start = &self.xml[base.start_tag.clone()];
+        let start = StartTag::parse(raw_start)?;
+        if base.empty {
+            let mut out = start.write(&rename, false, false);
+            out.push_str(&text_properties_tag(style, changes));
+            out.push_str("</");
+            out.push_str(start.name);
+            out.push('>');
+            return Ok(out);
+        }
+        let mut out = start.write(&rename, false, false);
+        let body = base.start_tag.end;
+        match &base.text_tag {
+            Some(tag) => {
+                let raw = &self.xml[tag.clone()];
+                let rewritten = StartTag::parse(raw)?.write(changes, raw.ends_with("/>"), false);
+                out.push_str(&self.xml[body..tag.start]);
+                out.push_str(&rewritten);
+                out.push_str(&self.xml[tag.end..base.range.end]);
+            },
+            None => {
+                let at = base.text_insertion.clamp(body, base.range.end);
+                out.push_str(&self.xml[body..at]);
+                out.push_str(&text_properties_tag(style, changes));
+                out.push_str(&self.xml[at..base.range.end]);
+            },
+        }
+        Ok(out)
+    }
+
+    /// An automatic style name unused in the content and in this plan:
+    /// `T<n>` for text styles, `P<n>` for paragraph styles.
+    fn fresh_style_name(&self, family: &str, taken: &[String]) -> String {
+        let letter = if family == "paragraph" { 'P' } else { 'T' };
+        let mut number = self.scene.styles.len() + taken.len() + 1;
+        loop {
+            let candidate = format!("{letter}{number}");
+            let used = taken.contains(&candidate)
+                || self
+                    .scene
+                    .styles
+                    .iter()
+                    .any(|style| style.name == candidate);
+            if !used {
+                return candidate;
+            }
+            number += 1;
+        }
     }
 
     /// Replace a self-closing element with its open form holding `content`.
@@ -1112,6 +1387,22 @@ impl<'a> Planner<'a> {
 }
 
 /// The qualified name of a paragraph's start tag.
+/// A new `style:text-properties` element carrying `changes`.
+fn text_properties_tag(style: &str, changes: &[(String, Option<String>)]) -> String {
+    let mut out = format!("<{style}:text-properties");
+    for (key, value) in changes {
+        if let Some(value) = value {
+            out.push(' ');
+            out.push_str(key);
+            out.push_str("=\"");
+            out.push_str(&escape_attribute(value));
+            out.push('"');
+        }
+    }
+    out.push_str("/>");
+    out
+}
+
 fn paragraph_qname(raw: &str) -> Result<String> {
     Ok(StartTag::parse(raw)?.name.to_owned())
 }
