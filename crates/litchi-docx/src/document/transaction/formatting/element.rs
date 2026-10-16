@@ -457,6 +457,57 @@ fn not_found() -> Error {
     }
 }
 
+/// Whether `xml` is a paragraph whose removal loses only text: its
+/// properties and runs of text, tabs and breaks (record 0304).
+fn is_plain_text_block(xml: &[u8]) -> bool {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    // Depth inside a `w:pPr` or `w:rPr` subtree, whose content is formatting.
+    let mut properties = 0usize;
+    let mut depth = 0usize;
+    loop {
+        let (local, empty) = match reader.read_event() {
+            Ok(Event::Start(element)) => (element.local_name().as_ref().to_vec(), false),
+            Ok(Event::Empty(element)) => (element.local_name().as_ref().to_vec(), true),
+            Ok(Event::End(_)) => {
+                depth = depth.saturating_sub(1);
+                if properties > depth {
+                    properties = 0;
+                }
+                continue;
+            },
+            Ok(Event::Eof) => return true,
+            Ok(_) => continue,
+            Err(_) => return false,
+        };
+        if properties == 0 {
+            let allowed = match depth {
+                0 => local == b"p",
+                1 => matches!(local.as_slice(), b"pPr" | b"r" | b"proofErr"),
+                _ => matches!(
+                    local.as_slice(),
+                    b"rPr"
+                        | b"t"
+                        | b"tab"
+                        | b"br"
+                        | b"cr"
+                        | b"noBreakHyphen"
+                        | b"softHyphen"
+                        | b"lastRenderedPageBreak"
+                ),
+            };
+            if !allowed {
+                return false;
+            }
+            if !empty && matches!(local.as_slice(), b"pPr" | b"rPr") {
+                properties = depth + 1;
+            }
+        }
+        if !empty {
+            depth += 1;
+        }
+    }
+}
+
 fn refusal(reason: Refusal) -> Error {
     Error::Refused {
         position: 0,
@@ -1147,7 +1198,11 @@ impl Edit {
     /// The cell's properties (`w:tcPr`) and its first paragraph's
     /// properties are kept. Every other block of the cell is removed, so the
     /// edit is refused when one of them holds an open range, a story
-    /// reference or a section break.
+    /// reference or a section break, and (record 0304) when one of them is
+    /// not a paragraph of plain runs: a table, a content control, a
+    /// drawing, a field, a bookmark or anything else that is not text would
+    /// be lost. The first paragraph is rewritten with the rules of
+    /// [`Self::replace_paragraph_text`], so its refusals apply too.
     ///
     /// # Errors
     ///
@@ -1182,15 +1237,18 @@ impl Edit {
             paragraph_dependencies(&before[*start..*end], &inherited)
                 .refuse(Removal::Delete)
                 .map_err(refusal)?;
+            if !is_plain_text_block(&before[*start..*end]) {
+                return Err(refusal(Refusal::ComplexContent));
+            }
         }
         let paragraph = match first_paragraph {
             Some(index) => {
                 let (start, end, _) = &layout.children[index];
                 let paragraph = &before[*start..*end];
-                match scan_text_owner(paragraph, b"p") {
-                    Ok(owner) => rewrite_text_owner(paragraph, &owner, &text)?,
-                    Err(_) => self.plain_paragraph(&layout, &text)?,
-                }
+                // A paragraph the text rewrite refuses holds content that a
+                // plain replacement would drop (record 0304).
+                let owner = scan_text_owner(paragraph, b"p").map_err(refusal)?;
+                rewrite_text_owner(paragraph, &owner, &text)?
             },
             None => self.plain_paragraph(&layout, &text)?,
         };
