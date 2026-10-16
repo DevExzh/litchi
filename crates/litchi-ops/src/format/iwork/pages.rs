@@ -467,18 +467,18 @@ fn template_of(ordinal: u32) -> Template {
 /// Build the tree of `package` without the section headers and footers:
 /// reading them decodes every page template, so they join the tree the
 /// first time a read reaches a section's children ([`build_full`]).
-pub(crate) fn build(package: &Package) -> super::Tree {
+pub(crate) fn build(package: &Package) -> (super::Tree, Box<[super::Part]>) {
     build_with(package, false)
 }
 
 /// Build the complete tree of `package`, headers and footers included.
 /// Every item of [`build`]'s tree keeps its index: the regions are pushed
 /// last.
-pub(crate) fn build_full(package: &Package) -> super::Tree {
+pub(crate) fn build_full(package: &Package) -> (super::Tree, Box<[super::Part]>) {
     build_with(package, true)
 }
 
-fn build_with(package: &Package, regions: bool) -> super::Tree {
+fn build_with(package: &Package, regions: bool) -> (super::Tree, Box<[super::Part]>) {
     let mut tree = TreeBuilder::new(SPEC.elements, Pages::SINGLETONS);
     let body = tree.push(ROOT, Kind::Body).done();
     let mut paragraphs = 0_usize;
@@ -501,7 +501,8 @@ fn build_with(package: &Package, regions: bool) -> super::Tree {
         paragraphs += lines;
         section_items.push((index, section.name().map(str::to_owned), value, lines));
     }
-    let tables = build_tables(package, &mut tree, body);
+    let parts = build_tables(package, &mut tree, body);
+    let tables = parts.len();
     let mut section_indices = Vec::with_capacity(section_items.len());
     for (index, name, value, lines) in section_items {
         let section = tree
@@ -561,63 +562,81 @@ fn build_with(package: &Package, regions: bool) -> super::Tree {
                 .done();
         }
     }
-    tree.build()
+    (tree.build(), parts.into_boxed_slice())
 }
 
-/// The body tables, their rows and cells; returns the table count.
-fn build_tables(package: &Package, tree: &mut TreeBuilder<Kind>, body: u32) -> usize {
+/// The body tables: a stand-in per table holding its name (record 0312);
+/// returns the parts holding their contents, one per table, which
+/// [`build_table`] builds the first time a read reaches a table's
+/// properties or children.
+fn build_tables(package: &Package, tree: &mut TreeBuilder<Kind>, body: u32) -> Vec<super::Part> {
     let Ok(catalog) = package.body_tables() else {
-        return 0;
+        return Vec::new();
     };
+    let mut parts = Vec::with_capacity(catalog.len());
     for (index, snapshot) in catalog.iter().enumerate() {
-        let Ok(read) = package.body_table_cells(BodyTableSelector::index(index)) else {
-            tree.push(body, Kind::Table)
-                .prop("name", text(Some(snapshot.name())))
-                .label(Some(snapshot.name()))
-                .leaf([index, 0, 0, 0])
-                .done();
-            continue;
-        };
-        let rows = usize::try_from(read.row_count()).unwrap_or(usize::MAX);
-        let columns = usize::try_from(read.column_count()).unwrap_or(usize::MAX);
-        let mut values: BTreeMap<(usize, usize), (String, &'static str)> = BTreeMap::new();
-        for cell in read.iter_cells() {
-            let position = cell.position();
-            values.insert(
-                (position.row() as usize, position.column() as usize),
-                (cell.value().to_string(), value_type(cell.value())),
-            );
-        }
-        let table = tree
+        let part = u32::try_from(parts.len() + 1).unwrap_or(u32::MAX);
+        let stand_in = tree
             .push(body, Kind::Table)
             .prop("name", text(Some(snapshot.name())))
-            .prop("rows", count(rows))
-            .prop("columns", count(columns))
             .label(Some(snapshot.name()))
             .leaf([index, 0, 0, 0])
+            .part(part)
             .done();
-        for row in 0..rows {
-            let item = tree
-                .push(table, Kind::Row)
-                .prop("cellCount", count(columns))
-                .leaf([index, row, 0, 0])
+        parts.push(super::Part::Contents(super::part::Contents::new(
+            index, stand_in,
+        )));
+    }
+    parts
+}
+
+/// Build the contents of the body table whose stand-in is `stand_in` and
+/// whose catalog position is `index`: its size, rows and cells. A table
+/// the leaf's cell reader refuses keeps its name without rows.
+pub(crate) fn build_table(
+    package: &Package,
+    stand_in: &super::tree::Item,
+    index: usize,
+) -> super::Tree {
+    let mut tree = TreeBuilder::from_stand_in(SPEC.elements, Pages::SINGLETONS, stand_in);
+    let Ok(read) = package.body_table_cells(BodyTableSelector::index(index)) else {
+        return tree.build();
+    };
+    let rows = usize::try_from(read.row_count()).unwrap_or(usize::MAX);
+    let columns = usize::try_from(read.column_count()).unwrap_or(usize::MAX);
+    let mut values: BTreeMap<(usize, usize), (String, &'static str)> = BTreeMap::new();
+    for cell in read.iter_cells() {
+        let position = cell.position();
+        values.insert(
+            (position.row() as usize, position.column() as usize),
+            (cell.value().to_string(), value_type(cell.value())),
+        );
+    }
+    tree.root()
+        .prop("rows", count(rows))
+        .prop("columns", count(columns))
+        .done();
+    for row in 0..rows {
+        let item = tree
+            .push(ROOT, Kind::Row)
+            .prop("cellCount", count(columns))
+            .leaf([index, row, 0, 0])
+            .done();
+        for column in 0..columns {
+            let (value, kind) = values
+                .get(&(row, column))
+                .map_or((String::new(), "empty"), |(value, kind)| {
+                    (value.clone(), *kind)
+                });
+            tree.push(item, Kind::Cell)
+                .prop("text", text(Some(&value)))
+                .prop("type", text(Some(kind)))
+                .text(value)
+                .leaf([index, row, column, 0])
                 .done();
-            for column in 0..columns {
-                let (value, kind) = values
-                    .get(&(row, column))
-                    .map_or((String::new(), "empty"), |(value, kind)| {
-                        (value.clone(), *kind)
-                    });
-                tree.push(item, Kind::Cell)
-                    .prop("text", text(Some(&value)))
-                    .prop("type", text(Some(kind)))
-                    .text(value)
-                    .leaf([index, row, column, 0])
-                    .done();
-            }
         }
     }
-    catalog.len()
+    tree.build()
 }
 
 /// The unified type name of a cell value.
@@ -692,6 +711,106 @@ fn paragraph_text(value: &PropValue<'_>) -> Result<String> {
     Ok(value)
 }
 
+/// The leaf value of a body-table cell's `text` or `value`.
+fn table_value(key: &str, value: &PropValue<'_>) -> Result<litchi_pages::table::values::Value> {
+    use super::write::CellScalar;
+    use litchi_pages::table::values::Value;
+    Ok(match super::write::cell_scalar(key, value)? {
+        CellScalar::Text(text) => Value::Text(text),
+        CellScalar::Number(number) => Value::Number(number),
+        CellScalar::Boolean(flag) => Value::Boolean(flag),
+        CellScalar::Empty => Value::Empty,
+    })
+}
+
+/// Commit the values of one body table's cells: one leaf table-values
+/// transaction.
+fn commit_cells(
+    chain: &mut Chain<Package>,
+    table: usize,
+    values: Vec<(u32, u32, litchi_pages::table::values::Value)>,
+) -> Result<()> {
+    let error = |error| failure(LeafError::PagesTableValues(error));
+    let mut edit = chain
+        .package
+        .edit_body_table_values(BodyTableSelector::index(table))
+        .map_err(error)?;
+    for (row, column, value) in values {
+        edit.set(row, column, value).map_err(error)?;
+    }
+    let commit = edit.commit().map_err(error)?;
+    let (package, patch) = commit.into_parts();
+    push(chain, package, Patch::TableValues(patch));
+    Ok(())
+}
+
+/// A one-value set of a body-table cell named by the direct path
+/// `/body/tbl[N]/tr[R]/tc[C]` (`table` for `tbl`; each of the last three
+/// steps with one positional index, `body` with none), committed without
+/// reading the table (record 0312): the body lists the table's stand-in,
+/// and the leaf transaction checks the cell against the table. `None`
+/// sends any other target, and any failure, to the general route, which
+/// reports it.
+fn direct_cell(
+    file: &Iwork,
+    package: &Package,
+    target: &TargetArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Option<Commit> {
+    let mut entries = props.iter();
+    let (Some((key, value)), None) = (entries.next(), entries.next()) else {
+        return None;
+    };
+    let key = key.as_str();
+    if key != "text" && key != "value" {
+        return None;
+    }
+    let path = target.path()?.path();
+    let [body, table, row, column] = path.steps() else {
+        return None;
+    };
+    if !path.is_absolute()
+        || body.name() != "body"
+        || !body.predicates().is_empty()
+        || !matches!(table.name(), "tbl" | "table")
+        || row.name() != "tr"
+        || column.name() != "tc"
+    {
+        return None;
+    }
+    let [table, row, column] = [table, row, column].map(|step| step.index().map(Position::get));
+    let (table, row, column) = (table?, row?, column?);
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets()).ok()?;
+    bound(LimitKind::Operations, 1, limits.max_operations()).ok()?;
+    file.checked_tree().ok()?;
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Body);
+    let body_at = file
+        .kids(super::At::ROOT)
+        .iter()
+        .find(|&child| file.kind_at(child) == ordinal)?;
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Table);
+    let table_at = file
+        .kids(body_at)
+        .iter()
+        .filter(|&child| file.kind_at(child) == ordinal)
+        .nth(table)?;
+    let index = file.stand_in(table_at).leaf()[0] as usize;
+    let value = table_value(key, value).ok()?;
+    let mut chain = Chain::new(package.clone());
+    let values = vec![(u32::try_from(row).ok()?, u32::try_from(column).ok()?, value)];
+    commit_cells(&mut chain, index, values).ok()?;
+    finish(
+        file,
+        chain.changed,
+        Owner::Pages(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )
+    .ok()
+}
+
 /// Set properties on every target.
 pub(crate) fn set(
     file: &Iwork,
@@ -702,6 +821,9 @@ pub(crate) fn set(
 ) -> Result<Commit> {
     if is_metadata(target) {
         return set_metadata(file, package, props, limits);
+    }
+    if let Some(commit) = direct_cell(file, package, target, props, limits) {
+        return Ok(commit);
     }
     let nodes = resolve::<Pages>(file, target, limits.max_expanded_targets())?;
     let mut chain = Chain::new(package.clone());
@@ -793,17 +915,7 @@ pub(crate) fn set(
                     push(&mut chain, commit.into_package(), Patch::Footnote(patch));
                 },
                 ("cell", "text" | "value") => {
-                    use super::write::CellScalar;
-                    let value = match super::write::cell_scalar(key, value)? {
-                        CellScalar::Text(text) => litchi_pages::table::values::Value::Text(text),
-                        CellScalar::Number(number) => {
-                            litchi_pages::table::values::Value::Number(number)
-                        },
-                        CellScalar::Boolean(flag) => {
-                            litchi_pages::table::values::Value::Boolean(flag)
-                        },
-                        CellScalar::Empty => litchi_pages::table::values::Value::Empty,
-                    };
+                    let value = table_value(key, value)?;
                     cells.entry(leaf[0]).or_default().push((
                         u32::try_from(leaf[1]).unwrap_or(u32::MAX),
                         u32::try_from(leaf[2]).unwrap_or(u32::MAX),
@@ -820,17 +932,7 @@ pub(crate) fn set(
     }
     pending.flush(&mut chain)?;
     for (table, values) in cells {
-        let error = |error| failure(LeafError::PagesTableValues(error));
-        let mut edit = chain
-            .package
-            .edit_body_table_values(BodyTableSelector::index(table))
-            .map_err(error)?;
-        for (row, column, value) in values {
-            edit.set(row, column, value).map_err(error)?;
-        }
-        let commit = edit.commit().map_err(error)?;
-        let (package, patch) = commit.into_parts();
-        push(&mut chain, package, Patch::TableValues(patch));
+        commit_cells(&mut chain, table, values)?;
     }
     finish(
         file,
