@@ -2426,15 +2426,18 @@ fn rebuild_sheet(
     // An empty sheet whose producer still wrote a DBCELL (and an INDEX
     // pointing at it) keeps that row table while it stays empty (record
     // 0316).
-    let top_holds_cells = top.iter().any(|(_, record)| {
-        is_cell_record(record.kind)
-            || matches!(
-                record.kind,
-                STRING | TABLE | ARRAY | SHARED_FORMULA | 0x0091
-            )
-    });
+    // Only a sheet without ROW records asks.
+    let top_holds_cells = || {
+        top.iter().any(|(_, record)| {
+            is_cell_record(record.kind)
+                || matches!(
+                    record.kind,
+                    STRING | TABLE | ARRAY | SHARED_FORMULA | 0x0091
+                )
+        })
+    };
     let lone_dbcells = match (first_row, last_dbcell) {
-        (None, Some(last)) if !unindexed && !top_holds_cells => records[..=last]
+        (None, Some(last)) if !unindexed && !top_holds_cells() => records[..=last]
             .iter()
             .position(|record| record.kind == DBCELL)
             .filter(|first| {
@@ -2456,7 +2459,7 @@ fn rebuild_sheet(
             (&records[0..0], records[first].start, records[last].end)
         },
         (None, None) if unindexed => {
-            if top_holds_cells {
+            if top_holds_cells() {
                 return Err(Error::UnsafeEdit(
                     "empty worksheet row-table metadata is inconsistent".into(),
                 ));
@@ -2481,7 +2484,7 @@ fn rebuild_sheet(
                 || dimensions <= index
                 || def_col <= index
                 || def_col >= dimensions
-                || top_holds_cells
+                || top_holds_cells()
             {
                 return Err(Error::UnsafeEdit(
                     "empty worksheet row-table metadata is inconsistent".into(),
@@ -2604,16 +2607,17 @@ fn rebuild_sheet(
                 .copy_from_slice(source_ibxf);
         }
     }
-    let empty_after = !new_rows_hold_rows(&new_rows)?;
-    let (new_index, new_rows) =
-        if lone_dbcells.is_some() && empty_after && between.len() == source_between.len() {
-            (
-                worksheet[records[index].start..records[index].end].to_vec(),
-                worksheet[row_table_start..row_table_end].to_vec(),
-            )
-        } else {
-            (new_index, new_rows)
-        };
+    let (new_index, new_rows) = if lone_dbcells.is_some()
+        && between.len() == source_between.len()
+        && !new_rows_hold_rows(&new_rows)?
+    {
+        (
+            worksheet[records[index].start..records[index].end].to_vec(),
+            worksheet[row_table_start..row_table_end].to_vec(),
+        )
+    } else {
+        (new_index, new_rows)
+    };
 
     let computed = dimensions_from_row_table(&new_rows)?;
     // Producers write DIMENSIONS wider than the cells span (rows with only a
@@ -2876,6 +2880,7 @@ fn patch_coordinate_dependencies(
         let Some(shift) = axis_shift(operation) else {
             continue;
         };
+        let mut rules = false;
         for record in &records {
             let payload_start = record
                 .start
@@ -2893,6 +2898,7 @@ fn patch_coordinate_dependencies(
                 // `shift_columns`).
                 ARRAY => rules::patch_array_formula(payload, shift)?,
                 TABLE => rules::patch_table_inputs(payload, shift)?,
+                kind if rules::RULE_RECORDS.contains(&kind) => rules = true,
                 MERGED_CELLS => patch_merged_cells(payload, shift)?,
                 HLINK => patch_hyperlink(payload, shift)?,
                 HLINK_TOOLTIP => patch_hyperlink_tooltip(payload, shift)?,
@@ -2903,7 +2909,9 @@ fn patch_coordinate_dependencies(
                 _ => {},
             }
         }
-        rules::patch_rule_records(worksheet, &records, shift)?;
+        if rules {
+            rules::patch_rule_records(worksheet, &records, shift)?;
+        }
         let sizes = match source {
             Some((source, source_records)) if !drawing_ranges(&records).is_empty() => {
                 Some(sizes::SizeCheck::predict(source, source_records, shift)?)
@@ -4885,6 +4893,7 @@ fn certify_coordinate_shift(
         let sizes = sizes::SizeCheck::predict(worksheet, records, shift)?;
         shifted_drawing_stream(worksheet, &drawings, shift, Some(&sizes))?;
     }
+    let mut has_rules = false;
     for record in records {
         let payload_start = record
             .start
@@ -4898,6 +4907,7 @@ fn certify_coordinate_shift(
             SHARED_FORMULA => certify_mutation(payload, shift, patch_shared_formula)?,
             ARRAY => certify_mutation(payload, shift, rules::patch_array)?,
             TABLE => certify_mutation(payload, shift, rules::patch_table)?,
+            kind if rules::RULE_RECORDS.contains(&kind) => has_rules = true,
             SELECTION => certify_mutation(payload, shift, patch_selection_shift)?,
             MERGED_CELLS => certify_mutation(payload, shift, patch_merged_cells)?,
             HLINK => certify_mutation(payload, shift, patch_hyperlink)?,
@@ -4912,10 +4922,7 @@ fn certify_coordinate_shift(
             _ => {},
         }
     }
-    if records
-        .iter()
-        .any(|record| rules::RULE_RECORDS.contains(&record.kind))
-    {
+    if has_rules {
         // Conditional-format rules are read against the ranges of the
         // records before them, so the rules are certified together.
         let mut candidate = Vec::new();

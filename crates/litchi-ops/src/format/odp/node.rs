@@ -473,6 +473,9 @@ impl fmt::Debug for Node<'_> {
 pub(crate) struct Props<'a> {
     kind: Kind,
     values: PropValues<'a>,
+    /// The character properties a story's runs share, resolved once on the
+    /// first such read (record 0316), in `CHARACTER_KEYS` order.
+    shared: std::cell::OnceCell<[Option<Value<'static>>; 6]>,
 }
 
 enum PropValues<'a> {
@@ -584,6 +587,7 @@ impl<'a> Props<'a> {
         Ok(Self {
             kind: node.semantic_kind(),
             values,
+            shared: std::cell::OnceCell::new(),
         })
     }
 
@@ -613,7 +617,7 @@ impl<'a> Props<'a> {
             },
             PropValues::Object(object, story, file) => match object_value(object, key) {
                 Some(value) => Some(value),
-                None if CHARACTER_KEYS.contains(&key) => shared_character(file, (*story)?, key),
+                None if CHARACTER_KEYS.contains(&key) => self.shared(file, (*story)?, key),
                 None => None,
             },
             PropValues::Paragraph(paragraph, properties) => match key {
@@ -629,11 +633,11 @@ impl<'a> Props<'a> {
             PropValues::Cell(cell, file) => match key {
                 "colSpan" => Some(Value::Int(i64::from(cell.column_span()))),
                 "rowSpan" => Some(Value::Int(i64::from(cell.row_span()))),
-                key => shared_character(file, cell.story(), key),
+                key => self.shared(file, cell.story(), key),
             },
             PropValues::Notes(notes, story, file) => match key {
                 "text" => owned(notes.clone()),
-                key => shared_character(file, (*story)?, key),
+                key => self.shared(file, (*story)?, key),
             },
             PropValues::Comment(info) => match key {
                 "text" => Some(Value::Text(Cow::Owned(annotation_text(info)))),
@@ -722,35 +726,52 @@ impl fmt::Debug for Props<'_> {
     }
 }
 
-/// The character property every run of `story` shares (record 0316): each
-/// run's style chain over its paragraph's; a paragraph without runs counts
-/// by its own. `None` when the runs differ or none sets it.
-fn shared_character(file: &Odp, story: &Story, key: &str) -> Option<Value<'static>> {
-    let styles = file.automatic_styles().ok()?;
-    let common = file.common_styles().ok()?;
-    let mut shared: Option<Value<'static>> = None;
+impl Props<'_> {
+    /// The character property `key` every run of `story` shares.
+    fn shared(&self, file: &Odp, story: &Story, key: &str) -> Option<Value<'static>> {
+        let index = CHARACTER_KEYS
+            .iter()
+            .position(|candidate| *candidate == key)?;
+        self.shared.get_or_init(|| shared_characters(file, story))[index].clone()
+    }
+}
+
+/// The character properties every run of `story` shares (record 0316), in
+/// `CHARACTER_KEYS` order: each run's style chain over its paragraph's; a
+/// paragraph without runs counts by its own. A property is `None` when the
+/// runs differ or none sets it.
+fn shared_characters(file: &Odp, story: &Story) -> [Option<Value<'static>>; 6] {
+    let (Ok(styles), Ok(common)) = (file.automatic_styles(), file.common_styles()) else {
+        return Default::default();
+    };
+    let mut shared: [Option<Value<'static>>; 6] = Default::default();
+    let mut agreed = [true; 6];
     let mut seen = false;
+    let mut each = |properties: &litchi_odp::scene::TextProperties| {
+        for (index, key) in CHARACTER_KEYS.iter().enumerate() {
+            if !agreed[index] {
+                continue;
+            }
+            let value = character(properties, key).map(Value::into_owned);
+            if seen && value != shared[index] {
+                agreed[index] = false;
+                shared[index] = None;
+            } else {
+                shared[index] = value;
+            }
+        }
+        seen = true;
+    };
     for paragraph in story.paragraphs() {
         let base = styles.resolve_paragraph(common, paragraph);
-        let mut each = |properties: &litchi_odp::scene::TextProperties| -> bool {
-            let value = character(properties, key).map(Value::into_owned);
-            let agrees = !seen || value == shared;
-            seen = true;
-            shared = value;
-            agrees
-        };
         if paragraph.runs().is_empty() {
-            if !each(&base) {
-                return None;
-            }
+            each(&base);
             continue;
         }
         for run in paragraph.runs() {
             let mut resolved = styles.resolve_run(common, run);
             resolved.inherit(&base);
-            if !each(&resolved) {
-                return None;
-            }
+            each(&resolved);
         }
     }
     shared

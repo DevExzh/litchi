@@ -11,20 +11,24 @@
 //! it.
 
 use std::ops::Range;
+use std::sync::Arc;
 
 use litchi_core::{Error, Result};
 
 /// Character properties an automatic style sets locally
 /// (`style:text-properties`), as written.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+///
+/// Values are shared (`Arc<str>`), so resolving a style chain
+/// ([`AutomaticStyles::resolve`]) copies no text (record 0316).
 pub struct TextProperties {
-    pub(crate) font_weight: Option<String>,
-    pub(crate) font_style: Option<String>,
-    pub(crate) underline: Option<String>,
-    pub(crate) font_size: Option<String>,
-    pub(crate) color: Option<String>,
-    pub(crate) font_name: Option<String>,
-    pub(crate) font_family: Option<String>,
+    pub(crate) font_weight: Option<Arc<str>>,
+    pub(crate) font_style: Option<Arc<str>>,
+    pub(crate) underline: Option<Arc<str>>,
+    pub(crate) font_size: Option<Arc<str>>,
+    pub(crate) color: Option<Arc<str>>,
+    pub(crate) font_name: Option<Arc<str>>,
+    pub(crate) font_family: Option<Arc<str>>,
 }
 
 impl TextProperties {
@@ -79,7 +83,7 @@ impl TextProperties {
     /// it inherits from. The font is one property: a `style:font-name` or a
     /// `fo:font-family` here hides both of the parent's.
     pub fn inherit(&mut self, parent: &Self) {
-        let fill = |field: &mut Option<String>, value: &Option<String>| {
+        let fill = |field: &mut Option<Arc<str>>, value: &Option<Arc<str>>| {
             if field.is_none() {
                 field.clone_from(value);
             }
@@ -233,25 +237,25 @@ impl AutomaticStyles {
         name: Option<&str>,
     ) -> TextProperties {
         let mut resolved = TextProperties::default();
-        let mut next = name.map(str::to_owned);
+        let mut next = name;
         let mut automatic = true;
         for _ in 0..32 {
             let Some(current) = next.take() else {
                 break;
             };
-            let style = if automatic {
-                self.get(family, &current)
-                    .or_else(|| common.styles.get(family, &current))
+            // Automatic styles name common styles as parents; a common
+            // style's parents are common.
+            let own = if automatic {
+                self.get(family, current)
             } else {
-                common.styles.get(family, &current)
+                None
             };
-            let Some(style) = style else {
+            automatic = own.is_some();
+            let Some(style) = own.or_else(|| common.styles.get(family, current)) else {
                 break;
             };
-            // Automatic styles name common styles as parents.
-            automatic = automatic && self.get(family, &current).is_some_and(|own| own == style);
             resolved.inherit(&style.text);
-            next.clone_from(&style.parent);
+            next = style.parent.as_deref();
         }
         if let Some(default) = common.styles.get(family, "") {
             resolved.inherit(&default.text);
@@ -483,7 +487,7 @@ pub(crate) fn parse(
                                     11 => &mut text.font_family,
                                     _ => continue,
                                 };
-                                *field = Some(value);
+                                *field = Some(value.into());
                             }
                         }
                     } else if name.starts_with(style_prefix.as_bytes())

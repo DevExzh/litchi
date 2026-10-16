@@ -487,7 +487,7 @@ pub(super) fn patch_rule_3d_references(
     let (_, _, three_d) =
         crate::formula::shared_formula_reference_spans(tokens).ok_or_else(|| {
             Error::UnsafeEdit(
-                "row/column movement cannot read a workbook formula's references".into(),
+                "row/column movement cannot read the references of a shared, array, conditional-format or validation formula".into(),
             )
         })?;
     for reference in three_d {

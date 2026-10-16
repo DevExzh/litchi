@@ -430,12 +430,14 @@ impl<R: Read + Seek> Reader<R> {
                 tolerance,
             )?;
             view_collector.feed_record(record.kind().get(), record.payload())?;
-            for defect in view_collector.take_zoom_defects() {
-                tolerance.record(
-                    WorksheetDefect::ZoomLevel,
-                    u32::try_from(record_position).unwrap_or(u32::MAX),
-                    u32::from(defect.raw),
-                );
+            if record.kind().get() == 0x023E {
+                for defect in view_collector.take_zoom_defects() {
+                    tolerance.record(
+                        WorksheetDefect::ZoomLevel,
+                        u32::try_from(record_position).unwrap_or(u32::MAX),
+                        u32::from(defect.raw),
+                    );
+                }
             }
             page_setup_collector.feed_record(record.kind().get(), record.payload())?;
             protection_collector.feed_record(record.kind().get(), record.payload())?;
