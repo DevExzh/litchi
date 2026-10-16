@@ -3,7 +3,8 @@
 - Status: implemented on `uo2/perf-lazy`, cut from `feat/unified-ops-api`
   at `f24868dfb5`, trunk `e7fe30fb24` merged (`109639b9e7`; the merge
   changed no source on the measured routes), then trunk `6c8d517eff`
-  (`191da4bf26`).
+  (`191da4bf26`), then trunk `bcdcadadf0` (record 0307, `604fcdf18b`) and
+  `9940d9bfe0` (`7adf1cce79`).
 - Date: 2026-10-16
 - Inputs: the open misses against `docs/UNIFIED_OPS_GOAL.md`'s PERFORMANCE
   BAR from records 0298 (Keynote open + first `get`), 0297/0302 (Numbers
@@ -309,23 +310,24 @@ edit — part of the same follow-up.
 Build environment per the rules (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`,
 one cargo command at a time, test executables pruned between chunks). Every
 exit status was checked. The whole list ran on `109639b9e7` + this record
-and again, after the trunk merge and §2.4, on `5cda11f624`; the exits below
-are the final tree's.
+and again after each trunk merge and §2.4; the exits and counts below are
+the final merged tree's (`7adf1cce79`), run after the 07:46 session loss
+under the memory-capped cargo scopes.
 
 | Command | Exit |
 |---|---:|
 | `cargo fmt --all --check` | 0 |
 | `cargo clippy -p litchi-docx -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
-| `cargo clippy -p litchi-ops --no-default-features [--features F] --all-targets -- -D warnings`, F = none, docx (and pages, keynote, numbers, rtf on `109639b9e7`; those paths are unchanged since) | 0 each |
-| `cargo test -p litchi-docx --all-features` (2,396) | 0 |
-| `cargo test -p litchi-ops --all-features` in chunks: `--lib` (918), `--doc` (207), the test targets in five groups (1,214) | 0 each |
+| `cargo clippy -p litchi-ops --no-default-features [--features F] --all-targets -- -D warnings`, F = none, docx, pages, keynote, numbers, rtf | 0 each |
+| `cargo test -p litchi-docx --all-features` (2,399) | 0 |
+| `cargo test -p litchi-ops --all-features` in chunks: `--lib` (918), `--doc` (210), the test targets in five groups (1,226) | 0 each |
 | `cargo test -p litchi-ops --no-default-features --features` every litchi-ops feature but `encryption` `--test capabilities --test registry` (not re-blessed) | 0 |
-| `cargo test -p litchi --all-features` (260) | 0 |
+| `cargo test -p litchi --all-features` (230; trunk removed the iWork facade tests) | 0 |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ops -p litchi-docx` | 0 |
 | `python3 tools/check_crate_boundaries.py` | 0 |
 | `python3 tools/non_iwork_gate.py verify` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target/glossary` (39 profiles, 2,305 bans, 221 families) | 0 |
-| `crates/pyo3-litchi/tests/run_tests.sh` (279 tests) | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` (278 tests) | 0 |
 | `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
 | `cargo test -p litchi-cli --all-features --test officecli_corpus` (not re-blessed) | 0 |
 
