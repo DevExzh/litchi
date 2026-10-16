@@ -217,9 +217,9 @@ libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	odp	exact		value-exact	/slide[
 libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp	odp	exact		value-exact	/slide[1] name: 13158 -> 13170 bytes, first difference at 5025	-	
 libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp	odp	exact		value-exact	/slide[1] name: 11416 -> 11428 bytes, first difference at 5907	-	
 libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	pptx	exact		none		none	
-libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	refused	slide move+back: unsupported_capability: unsupported PresentationML slide-order edit (positional semantic owner): presentation root exten...
-libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	pptx	exact		value-exact	/slide[7]/shape[1] font: 138108 -> 138094 bytes, first difference at 74356	refused	slide move+back: unsupported_capability: unsupported PresentationML slide-order edit (positional semantic owner): presentation root exten...
-libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		refused	/slide[1]/shape[5] font: unsupported_capability: unsafe PPTX edit during slide_snapshot: source-backed transition edits refuse markup-com...	none	
+libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	byte-exact	slide move+back
+libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	pptx	exact		value-exact	/slide[7]/shape[1] font: 138108 -> 138094 bytes, first difference at 74356	byte-exact	slide move+back
+libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		refused	/slide[1]/shape[5] font: unsupported_capability: unsafe PPTX edit during set_text_properties: source-backed slide edits do not support ma...	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx	pptx	exact		refused	/slidemaster[1]/shape[1] font: unsupported_capability: master and layout text writes are not integrated	none	

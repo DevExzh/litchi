@@ -3338,7 +3338,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M2 PPTX positional-owner slide ordering",
-        reason: "source-backed PPTX slide ordering still refuses sections, outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions",
+        reason: "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -3348,7 +3348,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M2 PPTX positional-owner slide ordering",
-        reason: "source-backed PPTX slide ordering still refuses sections, outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions",
+        reason: "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -3358,7 +3358,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M2 PPTX dependency-aware slide removal",
-        reason: "native PPTX slide removal currently admits only a dependency-free slide with exactly one layout relationship; notes, comments, images, media, and external or internal relationship closure remain pending",
+        reason: "native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused",
     },
     GapSpec {
         subject: Subject::Operation {
