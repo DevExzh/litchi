@@ -104,6 +104,11 @@ struct State {
     /// first time a read reaches them. Every item of `tree` keeps its index
     /// here, so nodes taken from either tree stay valid.
     full: OnceLock<Built>,
+    /// The global index of each Pages section's first paragraph, then the
+    /// paragraph count: what a coalesced `/body/p[N]` set needs, without
+    /// building the tree (record 0302).
+    #[cfg(feature = "pages")]
+    paragraph_starts: OnceLock<Box<[usize]>>,
     origin: Option<Arc<Path>>,
 }
 
@@ -246,8 +251,16 @@ impl Iwork {
             owner,
             tree: OnceLock::new(),
             full: OnceLock::new(),
+            #[cfg(feature = "pages")]
+            paragraph_starts: OnceLock::new(),
             origin,
         }))
+    }
+
+    /// The Pages paragraph starts, computed by `build` on the first call.
+    #[cfg(feature = "pages")]
+    pub(crate) fn paragraph_starts(&self, build: impl FnOnce() -> Box<[usize]>) -> &[usize] {
+        self.0.paragraph_starts.get_or_init(build)
     }
 
     /// The same file, saving to `origin`. Called on a handle the open route
