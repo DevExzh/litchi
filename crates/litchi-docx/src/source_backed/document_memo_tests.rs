@@ -249,3 +249,59 @@ fn unmanaged_edits_share_one_transaction_snapshot() {
     assert_eq!(memoized, expected);
     drop(first);
 }
+
+/// A handle committed from a source-backed owner edits its effective
+/// revision through the same memo (record 0311): the revision is scanned
+/// once for the edit and its commit, never served for other bytes, and the
+/// chain publishes what a chain of fresh scans publishes.
+#[test]
+fn committed_handles_share_one_effective_transaction_snapshot() {
+    let bytes = docx(word_document(
+        "",
+        "<w:p><w:r><w:t>alpha</w:t></w:r></w:p><w:p><w:r><w:t>beta</w:t></w:r></w:p>",
+    ));
+    let chain = |forget: bool| {
+        let package = Package::from_read_at(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        let mut edit = package.edit().unwrap();
+        edit.replace_paragraph_text(Position::new(0), "first")
+            .unwrap();
+        let committed = edit.commit().unwrap().into_package();
+        assert!(committed.effective.is_some());
+        assert!(committed.main_snapshot.lock().unwrap().is_none());
+        let mut edit = committed.edit().unwrap();
+        let held = committed
+            .main_snapshot
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("the effective edit memoizes its snapshot");
+        assert_eq!(held.xml_bytes(), edit.source().xml_bytes());
+        let topology = committed.effective.as_ref().unwrap();
+        let effective = topology.main_document_part().unwrap().data().unwrap();
+        assert_eq!(held.xml_bytes(), effective.as_bytes());
+        let lineage = topology.physical_source_lineage();
+        let version = topology.physical_source_version().unwrap();
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        let physical = package.physical_package().unwrap();
+        let original = physical.main_document_part().unwrap().data().unwrap();
+        assert!(
+            committed
+                .memoized_main_snapshot(original.as_bytes(), &lineage, version, &partname)
+                .is_none(),
+            "the physical revision's bytes are not the effective revision's"
+        );
+        if forget {
+            *committed.main_snapshot.lock().unwrap() = None;
+        }
+        edit.replace_paragraph_text(Position::new(1), "second")
+            .unwrap();
+        let mut published = Vec::new();
+        edit.commit()
+            .unwrap()
+            .into_package()
+            .write_to(&mut published)
+            .unwrap();
+        published
+    };
+    assert_eq!(chain(false), chain(true));
+}

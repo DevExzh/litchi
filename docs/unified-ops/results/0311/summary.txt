@@ -1,0 +1,50 @@
+Record 0311 measurements. Host: shared 32-core EPYC, load 5-6, taskset -c 30.
+Binaries: binaries.sha256. Builds: `profiling` (release + debug info), stripped for timing.
+
+1. DOCX 1,000 paragraphs (docx_large_bench, µs per call, median of 9 samples of 20), measure.sh B A A B
+   leg            base-1   base-2   after-1  after-2
+   leaf_set        769.9    769.2    766.8    756.3
+   auto_set       1205.9   1208.0    415.9    410.3
+   eager_set       771.6    769.4    761.6    820.9
+   committed_set  1907.3   1906.4    418.5    416.6
+   leaf_add       1116.7   1120.4   1106.1   1105.3
+   auto_add       1646.1   1640.6    446.5    516.7
+   eager_add       422.9    420.1    424.0    423.9
+   committed_add  1581.2   1583.7    459.8    531.2
+   Cache simulation per call: docx-cachesim.txt.
+
+2. DOC (office_gaps_bench, paired ABBA in process; native = leaf leg)
+   scenario              run      leaf µs  unified µs  ratio
+   doc_text_set          base-1    57.8     98.0       1.694
+   doc_text_set          base-2    58.1    100.6       1.732
+   doc_text_set          after-1   57.8     73.4       1.269
+   doc_text_set          after-2   55.0     61.4       1.118
+   doc_package_text_set  base-1    92.8     95.7       1.031
+   doc_package_text_set  base-2    98.6    101.0       1.025
+   doc_package_text_set  after-1   72.7     74.8       1.029
+   doc_package_text_set  after-2   74.3     77.2       1.040
+   Callgrind, doc_text_set whole scenario (180 calls per leg), per call:
+     base  unified 1.759 M Ir (I1mr 17.3 K), body-text leaf 1.126 M
+     after unified 1.199 M Ir (I1mr 12.4 K), body-text leaf 1.126 M (I1mr 10.8 K)
+
+3. ODP Scene::parse, 200 slides / 400 styles, isolated (crates/litchi-odp/examples/scene_parse_bench.rs)
+   before = crates/litchi-odp/src at 6c8d517eff (pre-0308), now = this branch; µs per parse, median of 15x20
+   order B A A B x3:  before 443.9 445.0 447.6 442.0 446.6 442.8 | now 443.8 438.2 440.0 441.1 438.5 440.7
+   B N' N N' B x2 (N' = open_style_element #[inline(never)], rejected):
+     before 451.6 452.1 452.1 449.8 | noinline 450.7 449.1 448.3 448.7 | now 442.4 443.9
+   64-byte function alignment (-C llvm-args=-align-all-functions=6 -align-all-nofallthru-blocks=5), B A A B x2:
+     before 443.9 443.0 440.4 441.7 | now 443.6 443.6 444.0 446.2
+   Callgrind per parse ((60-20 loops)/40), cache sim I1/D1 32K 8-way:
+     before Ir 9,669,445 I1mr 40,613 D1mr 7,637 D1mw 6,502
+     now    Ir 9,627,992 I1mr 47,982 D1mr 7,605 D1mw 6,506
+     noinline Ir 9,642,513 I1mr 45,816
+   The same parse inside office_gaps_bench (scene code identical in both binaries):
+     base 527.1(outlier) 484.3 482.4 484.8 | after 487.8 488.1 488.0 484.3
+
+4. ODT plain paragraph set, leaf Edit::set_text + commit, isolated (crates/litchi-odt/examples/plain_set_bench.rs)
+   before = this branch with record 0304's litchi-odt commits (59e515dc72, c8b3585325) reversed
+   B A A B x3: before 432.9 436.7 433.7 427.7 430.8 428.6 | now 424.7 421.4 422.6 420.2 424.2 419.0
+   aligned build, B A A B x2: before 420.6 418.2 420.3 418.4 | now 417.7 417.6 416.7 416.2
+   Callgrind per call ((30-10 loops)/20):
+     before Ir 12,423,052 I1mr 35,901 D1mr 46,878 D1mw 70,697
+     now    Ir 12,402,514 I1mr 36,200 D1mr 47,010 D1mw 71,560
