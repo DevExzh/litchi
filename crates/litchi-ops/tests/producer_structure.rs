@@ -4,7 +4,8 @@
 //! made. Each case below failed before record 0293 and pins one producer
 //! construct the leaves now handle; the inverse edit must restore the input
 //! bytes. The corpus-wide picture is in `corpus_fidelity.rs` (structure
-//! columns) and the ignored `structure_census.rs`.
+//! columns) and the ignored `structure_census.rs`. Record 0308 adds the
+//! XLS and RTF producer constructs pinned below.
 
 #![cfg(all(
     feature = "xls",
@@ -188,6 +189,53 @@ mod pptx {
 
 mod rtf {
     use super::*;
+
+    fn text(file: &File, path: &str) -> Option<String> {
+        file.get(path)
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .map(|text| text.into_owned())
+    }
+
+    /// Record 0308: a paragraph added to producer RTF is a scoped group, so
+    /// removing it again restores the source bytes.
+    #[test]
+    fn producer_paragraphs_are_added_and_removed_exactly() {
+        let (file, bytes) = input("rtf/testUnicode.rtf");
+        let added = file
+            .add(
+                "/body",
+                NewNode::new("paragraph")
+                    .prop("text", "Litchi ✓")
+                    .at(Placement::Start),
+            )
+            .unwrap();
+        let reopened = litchi_ops::open_bytes(added.file.to_bytes().unwrap()).unwrap();
+        assert_eq!(text(&reopened, "/body/p[1]").as_deref(), Some("Litchi ✓"));
+        assert_eq!(text(&reopened, "/body/p[2]"), text(&file, "/body/p[1]"));
+        let removed = added.file.remove(&added.path).unwrap();
+        assert_eq!(removed.to_bytes().unwrap(), bytes);
+    }
+
+    /// Record 0308: a paragraph that inherits the root-level state its
+    /// neighbour set, and a formatting group holding several paragraphs,
+    /// move value-exactly.
+    #[test]
+    fn inherited_state_and_split_groups_move_value_exactly() {
+        for relative in ["rtf/testUnicode.rtf", "rtf/cjklist12.rtf"] {
+            let (file, _) = input(relative);
+            let first = text(&file, "/body/p[1]");
+            let second = text(&file, "/body/p[2]");
+            let moved = file
+                .move_to("/body/p[1]", Placement::after("/body/p[2]").unwrap())
+                .unwrap_or_else(|error| panic!("{relative}: {error}"));
+            let reopened = litchi_ops::open_bytes(moved.to_bytes().unwrap()).unwrap();
+            assert_eq!(text(&reopened, "/body/p[1]"), second, "{relative}");
+            assert_eq!(text(&reopened, "/body/p[2]"), first, "{relative}");
+        }
+    }
 
     #[test]
     fn producer_paragraphs_move_and_swap_back_exactly() {
