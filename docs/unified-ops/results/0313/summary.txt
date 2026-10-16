@@ -1,0 +1,21 @@
+record 0313 docx_large_bench, us per call (median of 9 x 20), processes B A A B on CPU 30
+leg              base-1   after-1   after-2    base-2
+leaf_set           762.1     757.7     761.0     760.8
+auto_set           410.3     411.4     412.1     410.8
+eager_set          764.3     761.8     793.5     760.9
+committed_set      417.8     415.9     417.6     416.6
+leaf_add          1108.0    1111.7    1103.9    1108.3
+auto_add           442.2      74.3      73.4     441.3
+eager_add          426.5     420.0     422.8     429.0
+committed_add      453.6     272.4     268.8     453.8
+fresh_auto_add    1809.9    1454.5    1481.5    1851.4
+fresh_eager_add   1523.2    1543.7    1463.9    1565.2
+
+ratios                           base-1  after-1  after-2  base-2
+auto_add/eager_add                1.037   0.177   0.174   1.029
+auto_add/leaf_add                 0.399   0.067   0.066   0.398
+committed_add/eager_add           1.064   0.649   0.636   1.058
+fresh_auto_add/fresh_eager_add    1.188   0.942   1.012   1.183
+auto_set/leaf_set                 0.538   0.543   0.542   0.540
+auto_set/eager_set                0.537   0.540   0.519   0.540
+committed_set/leaf_set            0.548   0.549   0.549   0.548
