@@ -2466,6 +2466,7 @@ Both profiles now register 30 families.
 | Canonical name | Notes | Status |
 | --- | --- | --- |
 | `litchi_iwa_text_wire::{CharacterProperties, CharStyleRun, CharStyleError, char_style_runs, styles_in_span, restyle_span, character_style_variation, character_style_properties, character_style_parent, stylesheet_with_style}` | Shared TSWP `table_char_style` runs and the character-style variation records a span restyle writes | ✅ 0309 |
+| `litchi_numbers::cell::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, CharacterProperties}` | Registered family (32nd) in `numbers-minimal` / `numbers-full`; `Package::{edit_table_cell_text_style, apply_table_cell_text_style, table_cell_text_style}`; `Edit::set(CellPosition, CharacterProperties)` on stored cells | ✅ 0309 |
 | `litchi_pages::section::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Run, CharacterProperties}` | Registered family in `pages`; `Package::{edit_section_text_style, apply_section_text_style, section_text_runs}`; `Edit::set(TextSpan, CharacterProperties)` (UTF-16, several per edit) | ✅ 0309 |
 
 ## iWork facade retirement and iWork open options (record 0306)

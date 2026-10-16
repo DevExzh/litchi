@@ -9,15 +9,15 @@ use super::super::structure::{Fault, FaultResult, map_wire, references, reserve}
 
 /// One field of a parsed message.
 #[derive(Clone, Copy)]
-pub(super) struct Field<'a> {
-    pub(super) number: u32,
-    pub(super) wire_type: u8,
-    pub(super) raw: &'a [u8],
-    pub(super) payload: &'a [u8],
+pub(in crate::package) struct Field<'a> {
+    pub(in crate::package) number: u32,
+    pub(in crate::package) wire_type: u8,
+    pub(in crate::package) raw: &'a [u8],
+    pub(in crate::package) payload: &'a [u8],
 }
 
 /// The fields of `data`, in order.
-pub(super) fn fields(data: &[u8]) -> FaultResult<Vec<Field<'_>>> {
+pub(in crate::package) fn fields(data: &[u8]) -> FaultResult<Vec<Field<'_>>> {
     let view = parse_wire_view(data).map_err(|error| map_wire(&error))?;
     let mut output = Vec::new();
     reserve(&mut output, view.len())?;
@@ -33,7 +33,7 @@ pub(super) fn fields(data: &[u8]) -> FaultResult<Vec<Field<'_>>> {
 }
 
 /// Decode one canonical varint payload.
-pub(super) fn varint(payload: &[u8]) -> FaultResult<u64> {
+pub(in crate::package) fn varint(payload: &[u8]) -> FaultResult<u64> {
     let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(payload)
         .map_err(|_error| Fault::Invalid)?;
     if length != payload.len() {
@@ -43,20 +43,24 @@ pub(super) fn varint(payload: &[u8]) -> FaultResult<u64> {
 }
 
 /// Append a canonical varint.
-pub(super) fn push_varint(output: &mut Vec<u8>, value: u64) -> FaultResult<()> {
+pub(in crate::package) fn push_varint(output: &mut Vec<u8>, value: u64) -> FaultResult<()> {
     reserve(output, 10)?;
     litchi_iwa_common::varint::encode_varint_into(output, value);
     Ok(())
 }
 
 /// Append a varint field.
-pub(super) fn push_varint_field(output: &mut Vec<u8>, number: u32, value: u64) -> FaultResult<()> {
+pub(in crate::package) fn push_varint_field(
+    output: &mut Vec<u8>,
+    number: u32,
+    value: u64,
+) -> FaultResult<()> {
     push_varint(output, u64::from(number) << 3)?;
     push_varint(output, value)
 }
 
 /// Append a length-delimited field.
-pub(super) fn push_bytes_field(
+pub(in crate::package) fn push_bytes_field(
     output: &mut Vec<u8>,
     number: u32,
     payload: &[u8],
@@ -72,7 +76,7 @@ pub(super) fn push_bytes_field(
 }
 
 /// The payload of the unique length-delimited field `number`, if present.
-pub(super) fn single_bytes(data: &[u8], number: u32) -> FaultResult<Option<&[u8]>> {
+pub(in crate::package) fn single_bytes(data: &[u8], number: u32) -> FaultResult<Option<&[u8]>> {
     let mut found = None;
     for field in fields(data)? {
         if field.number != number {
@@ -86,7 +90,7 @@ pub(super) fn single_bytes(data: &[u8], number: u32) -> FaultResult<Option<&[u8]
 }
 
 /// The value of the unique varint field `number`, if present.
-pub(super) fn single_varint(data: &[u8], number: u32) -> FaultResult<Option<u64>> {
+pub(in crate::package) fn single_varint(data: &[u8], number: u32) -> FaultResult<Option<u64>> {
     let mut found = None;
     for field in fields(data)? {
         if field.number != number {
@@ -100,14 +104,14 @@ pub(super) fn single_varint(data: &[u8], number: u32) -> FaultResult<Option<u64>
 }
 
 /// The identifier of the unique `TSP.Reference` field `number`, if present.
-pub(super) fn single_reference(data: &[u8], number: u32) -> FaultResult<Option<u64>> {
+pub(in crate::package) fn single_reference(data: &[u8], number: u32) -> FaultResult<Option<u64>> {
     single_bytes(data, number)?
         .map(references::reference_identifier)
         .transpose()
 }
 
 /// The payloads of every length-delimited field `number`.
-pub(super) fn repeated_bytes(data: &[u8], number: u32) -> FaultResult<Vec<&[u8]>> {
+pub(in crate::package) fn repeated_bytes(data: &[u8], number: u32) -> FaultResult<Vec<&[u8]>> {
     let mut output = Vec::new();
     for field in fields(data)? {
         if field.number != number {
@@ -124,7 +128,7 @@ pub(super) fn repeated_bytes(data: &[u8], number: u32) -> FaultResult<Vec<&[u8]>
 
 /// The values of every unpacked varint field `number`; a packed occurrence
 /// is decoded too.
-pub(super) fn repeated_varints(data: &[u8], number: u32) -> FaultResult<Vec<u64>> {
+pub(in crate::package) fn repeated_varints(data: &[u8], number: u32) -> FaultResult<Vec<u64>> {
     let mut output = Vec::new();
     for field in fields(data)? {
         if field.number != number {
@@ -153,7 +157,7 @@ pub(super) fn repeated_varints(data: &[u8], number: u32) -> FaultResult<Vec<u64>
 
 /// Rebuild `data`, replacing each field for which `map` returns `Some`
 /// (an empty replacement drops the field) and copying the rest.
-pub(super) fn rebuild(
+pub(in crate::package) fn rebuild(
     data: &[u8],
     mut map: impl FnMut(Field<'_>) -> FaultResult<Option<Vec<u8>>>,
 ) -> FaultResult<Vec<u8>> {
@@ -174,14 +178,14 @@ pub(super) fn rebuild(
 }
 
 /// Encode a complete varint field.
-pub(super) fn varint_field(number: u32, value: u64) -> FaultResult<Vec<u8>> {
+pub(in crate::package) fn varint_field(number: u32, value: u64) -> FaultResult<Vec<u8>> {
     let mut output = Vec::new();
     push_varint_field(&mut output, number, value)?;
     Ok(output)
 }
 
 /// Encode a complete length-delimited field.
-pub(super) fn bytes_field(number: u32, payload: &[u8]) -> FaultResult<Vec<u8>> {
+pub(in crate::package) fn bytes_field(number: u32, payload: &[u8]) -> FaultResult<Vec<u8>> {
     let mut output = Vec::new();
     push_bytes_field(&mut output, number, payload)?;
     Ok(output)

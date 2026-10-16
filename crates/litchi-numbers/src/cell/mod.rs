@@ -10,6 +10,14 @@ pub mod comment;
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
+/// Character properties of cells' text (record 0309), started by
+/// [`crate::Package::edit_table_cell_text_style`].
+pub mod text_style {
+    pub use crate::package::table_cell_text_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+    };
+    pub use litchi_iwa_text_wire::CharacterProperties;
+}
 /// Unified archive-free interactive cell controls.
 ///
 /// The value types are defined by the focused data-format modules and are

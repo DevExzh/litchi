@@ -204,7 +204,7 @@ fn slots(storage: &[u8], offsets: &[u8], unit: usize) -> FaultResult<Vec<Option<
 }
 
 /// The stored BNC cells of one tile row, as `(column, bytes)`.
-pub(super) fn bnc_cells(row: &[u8]) -> FaultResult<Vec<(u32, &[u8])>> {
+pub(in crate::package) fn bnc_cells(row: &[u8]) -> FaultResult<Vec<(u32, &[u8])>> {
     let (Some(storage), Some(offsets)) = (single_bytes(row, 6)?, single_bytes(row, 7)?) else {
         return Ok(Vec::new());
     };
@@ -224,6 +224,63 @@ pub(super) fn bnc_cells(row: &[u8]) -> FaultResult<Vec<(u32, &[u8])>> {
         }
     }
     Ok(output)
+}
+
+/// Rewrite one tile row so its BNC cell in `column` holds `cell`; every
+/// other cell keeps its bytes (later cells move with the new length).
+///
+/// Returns `None` when the row stores no BNC cell in `column`.
+pub(in crate::package) fn replace_cell(
+    row: &[u8],
+    column: u32,
+    cell: &[u8],
+) -> FaultResult<Option<Vec<u8>>> {
+    let (Some(storage), Some(offsets)) = (single_bytes(row, 6)?, single_bytes(row, 7)?) else {
+        return Ok(None);
+    };
+    let unit = if single_varint(row, 8)?.unwrap_or(0) != 0 {
+        4
+    } else {
+        1
+    };
+    let column = usize::try_from(column).map_err(|_error| Fault::Invalid)?;
+    let cells = slots(storage, offsets, unit)?;
+    if cells.get(column).copied().flatten().is_none() {
+        return Ok(None);
+    }
+    let mut new_storage = Vec::new();
+    reserve(&mut new_storage, storage.len() + cell.len())?;
+    let mut new_offsets = Vec::new();
+    reserve(&mut new_offsets, offsets.len())?;
+    for (index, slot) in cells.into_iter().enumerate() {
+        let Some((start, end)) = slot else {
+            new_offsets.extend_from_slice(&MISSING);
+            continue;
+        };
+        while new_storage.len() % unit != 0 {
+            new_storage.push(0);
+        }
+        let offset =
+            u16::try_from(new_storage.len() / unit).map_err(|_error| Fault::Unsupported)?;
+        if offset.to_le_bytes() == MISSING {
+            return Err(Fault::Unsupported);
+        }
+        new_offsets.extend_from_slice(&offset.to_le_bytes());
+        if index == column {
+            new_storage.extend_from_slice(cell);
+        } else {
+            new_storage.extend_from_slice(storage.get(start..end).ok_or(Fault::Invalid)?);
+        }
+    }
+    while new_storage.len() % unit != 0 {
+        new_storage.push(0);
+    }
+    let rebuilt = rebuild(row, |field| match field.number {
+        6 => bytes_field(6, &new_storage).map(Some),
+        7 => bytes_field(7, &new_offsets).map(Some),
+        _ => Ok(None),
+    })?;
+    Ok(Some(rebuilt))
 }
 
 /// Re-encode `storage`/`offsets` without the cell in `column`, keeping the

@@ -37,9 +37,9 @@
 )]
 
 mod calc;
-mod lists;
-mod storage;
-mod wire;
+pub(super) mod lists;
+pub(super) mod storage;
+pub(super) mod wire;
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -62,13 +62,13 @@ use crate::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowIn
 structure::structural_family!("table-topology");
 
 /// `TST.Tile`.
-const TILE_MESSAGE_TYPE: u32 = 6_002;
+pub(super) const TILE_MESSAGE_TYPE: u32 = 6_002;
 /// `TST.HeaderStorageBucket`.
 const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 /// `TST.TableDataList`.
-const LIST_MESSAGE_TYPE: u32 = 6_005;
+pub(super) const LIST_MESSAGE_TYPE: u32 = 6_005;
 /// `TST.TableDataListSegment`.
-const LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
+pub(super) const LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
 /// `TST.FilterSetArchive`.
 const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
 /// `TST.ColumnRowUIDMapArchive`.
@@ -235,12 +235,12 @@ enum Operation {
 
 /// A table's size and section counts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Geometry {
-    rows: u32,
-    columns: u32,
-    header_rows: u32,
-    header_columns: u32,
-    footer_rows: u32,
+pub(super) struct Geometry {
+    pub(super) rows: u32,
+    pub(super) columns: u32,
+    pub(super) header_rows: u32,
+    pub(super) header_columns: u32,
+    pub(super) footer_rows: u32,
 }
 
 impl Geometry {
@@ -492,12 +492,12 @@ impl Edit<'_> {
 }
 
 /// The table drawable and model of one table.
-struct Target {
-    info: u64,
-    model: u64,
+pub(super) struct Target {
+    pub(super) info: u64,
+    pub(super) model: u64,
 }
 
-fn locate(working: &Working<'_>, sheet: usize, table: usize) -> Result<Target, Error> {
+pub(super) fn locate(working: &Working<'_>, sheet: usize, table: usize) -> Result<Target, Error> {
     let document = working.object(1)?;
     let document_index = structure::document_message(document)?;
     let sheets = references::identifiers(
@@ -523,7 +523,7 @@ fn locate(working: &Working<'_>, sheet: usize, table: usize) -> Result<Target, E
 }
 
 /// The unique message of `identifier` with one of `types`.
-fn message<'w>(
+pub(super) fn message<'w>(
     working: &'w Working<'_>,
     identifier: u64,
     types: &[u32],
@@ -533,7 +533,7 @@ fn message<'w>(
     Ok((index, &object.messages[index].data))
 }
 
-fn geometry(model: &[u8]) -> Result<Geometry, Error> {
+pub(super) fn geometry(model: &[u8]) -> Result<Geometry, Error> {
     let count = |number| -> Result<u32, Error> {
         u32::try_from(single_varint(model, number)?.unwrap_or(0))
             .map_err(|_error| Error::InvalidSource)
@@ -677,7 +677,7 @@ fn check_hidden(model: &[u8], uuid: (u64, u64), row_axis: bool) -> Result<(), Er
 
 /// The storage tiles of a data store: `(key, tile object)`, and the rows
 /// per tile.
-fn tiles(store: &[u8]) -> Result<(Vec<(u32, u64)>, u64), Error> {
+pub(super) fn tiles(store: &[u8]) -> Result<(Vec<(u32, u64)>, u64), Error> {
     let storage = single_bytes(store, 3)?.ok_or(Error::InvalidSource)?;
     let size = single_varint(storage, 2)?.unwrap_or(DEFAULT_TILE_SIZE);
     if size == 0 {
@@ -1207,7 +1207,7 @@ fn verify(
     Ok(())
 }
 
-fn table_position(
+pub(super) fn table_position(
     source: &Package,
     sheet: usize,
     selector: TableSelector<'_>,

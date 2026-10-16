@@ -21,7 +21,7 @@ const REFERENCE_FIELDS: [u32; 3] = [4, 9, 10];
 ///
 /// Returns the rewritten payload (`None` when the list holds none of the
 /// keys) and the object references the dropped entries held.
-pub(super) fn release(
+pub(in crate::package) fn release(
     list: &[u8],
     remaining: &mut BTreeMap<u32, u32>,
 ) -> FaultResult<(Option<Vec<u8>>, Vec<u64>)> {
