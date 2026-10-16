@@ -2,7 +2,8 @@
 
 - Status: implemented on `uo2/perf-opc`, cut from `feat/unified-ops-api`
   at `1178eb235c`; trunk `a41adc99cf` (record 0309) merged (`4171af6671`;
-  the merge touches no file this record changes).
+  the merge touches no file this record changes), then `8f5569d0d8`
+  (`PROGRESS.md` only, `359704aab0`).
 - Date: 2026-10-16
 - Inputs: record 0305 §4.5 (DOCX 1,000-paragraph set 1.56×, add 1.46× on
   the default source-backed owner), record 0308 §7 (DOC unified/leaf 1.56;
