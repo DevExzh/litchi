@@ -78,6 +78,12 @@ pub enum LeafError {
     /// A Keynote slide-drawable transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteDrawables(litchi_keynote::slide::drawable::Error),
+    /// A Keynote movie or audio removal failed (record 0309).
+    #[cfg(feature = "keynote")]
+    KeynoteMedia(litchi_keynote::slide::media::lifecycle::Error),
+    /// A Keynote placeholder visibility change failed (record 0309).
+    #[cfg(feature = "keynote")]
+    KeynotePlaceholder(litchi_keynote::slide::placeholder::Error),
     /// A Keynote slide-creation transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteCreation(litchi_keynote::slide::creation::Error),
@@ -153,6 +159,10 @@ impl fmt::Display for LeafError {
             #[cfg(feature = "keynote")]
             Self::KeynoteDrawables(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
+            Self::KeynoteMedia(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
+            Self::KeynotePlaceholder(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::KeynoteSave(error) => error.fmt(formatter),
@@ -218,6 +228,10 @@ impl std::error::Error for LeafError {
             Self::KeynoteNotes(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteDrawables(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteMedia(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynotePlaceholder(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => Some(error),
             #[cfg(feature = "keynote")]
@@ -293,6 +307,10 @@ impl LeafError {
             Self::KeynoteNotes(error) => keynote_notes_code(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteDrawables(error) => keynote_drawables_code(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteMedia(error) => keynote_media_code(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynotePlaceholder(error) => keynote_placeholder_code(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => keynote_creation_code(error),
             #[cfg(feature = "numbers")]
@@ -425,6 +443,36 @@ fn pages_text_style_code(error: &litchi_pages::section::text_style::Error) -> Co
         E::UnsupportedDependency | E::UnsupportedSource => Code::UnsupportedCapability,
         E::LimitExceeded { .. } => Code::LimitExceeded,
         E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "keynote")]
+fn keynote_placeholder_code(error: &litchi_keynote::slide::placeholder::Error) -> Code {
+    use litchi_keynote::slide::placeholder::Error as E;
+    match error {
+        E::SlideNameNotFound | E::SlidePositionNotFound { .. } | E::PlaceholderNotFound { .. } => {
+            Code::PathNotFound
+        },
+        E::UnsupportedSource => Code::UnsupportedCapability,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::AmbiguousSelector => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "keynote")]
+fn keynote_media_code(error: &litchi_keynote::slide::media::lifecycle::Error) -> Code {
+    use litchi_keynote::slide::media::lifecycle::Error as E;
+    match error {
+        E::SlideNameNotFound
+        | E::SlidePositionNotFound { .. }
+        | E::MoviePositionNotFound { .. } => Code::PathNotFound,
+        E::UnsupportedSource | E::UnsupportedComment | E::AudioPoster | E::KindMismatch { .. } => {
+            Code::UnsupportedCapability
+        },
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict | E::Read => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }

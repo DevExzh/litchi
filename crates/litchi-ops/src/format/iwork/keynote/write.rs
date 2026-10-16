@@ -139,6 +139,8 @@ pub(super) struct Pending {
     styles: BTreeMap<(usize, usize, usize, usize), (Style, usize)>,
     /// Table cells: (slide, drawable, row, column) → (value, item).
     cells: BTreeMap<(usize, usize, u32, u32), (TableCellValue, usize)>,
+    /// Placeholder visibility: (slide, TITLE or BODY) → (hidden, item).
+    visibility: BTreeMap<(usize, usize), (bool, usize)>,
 }
 
 /// What publishing a pending set made.
@@ -341,6 +343,7 @@ impl Pending {
             && self.hidden.is_empty()
             && self.styles.is_empty()
             && self.cells.is_empty()
+            && self.visibility.is_empty()
     }
 
     /// The new drawables staged on `slide` so far.
@@ -568,6 +571,14 @@ impl Pending {
             },
             ("run", _) => return Err(run_refusal(key)),
             ("tc", "text" | "value") => self.stage_cell(file, node, key, value, index)?,
+            ("placeholder", "hidden") => {
+                let [_, slot, _, _] = node.item().leaf().map(|value| value as usize);
+                if slot != TITLE && slot != BODY {
+                    return Err(key_refusal(node, key));
+                }
+                let hidden = super::super::write::boolean(value, "hidden")?;
+                self.visibility.insert((slide, slot), (hidden, index));
+            },
             (
                 "slide" | "placeholder" | "notes" | "paragraph" | "shape" | "picture" | "connector"
                 | "video" | "audio" | "table" | "tc" | "chart" | "group",
@@ -741,6 +752,22 @@ impl Pending {
                 },
                 _ => {},
             }
+        }
+        for ((slide, slot), (hidden, index)) in std::mem::take(&mut self.visibility) {
+            let error = |error| (failure(LeafError::KeynotePlaceholder(error)), Some(index));
+            let kind = if slot == TITLE {
+                litchi_keynote::slide::placeholder::Kind::Title
+            } else {
+                litchi_keynote::slide::placeholder::Kind::Body
+            };
+            let edit = chain
+                .package
+                .edit_slide_placeholder_visibility(SlideSelector::index(slide), kind)
+                .map_err(error)?;
+            let edit = if hidden { edit.hide() } else { edit.show() };
+            let commit = edit.commit().map_err(error)?;
+            let patch = commit.patch().clone();
+            push(chain, commit.into_package(), Patch::Placeholder(patch));
         }
         for (slide, (hidden, index)) in std::mem::take(&mut self.hidden) {
             let error = |error| (failure(LeafError::KeynoteEdit(error)), Some(index));
@@ -1219,7 +1246,6 @@ fn removal_gap(node: &Node<'_>) -> Error {
         format!("removing a Keynote `{kind}` is not supported yet"),
     )
     .with_suggestion(match kind {
-        "video" | "audio" => "follow-up: wire slide::media lifecycle removal (record 0298)",
         "table" | "chart" | "group" => {
             "the leaf's drawable removal refuses tables, charts and groups (record 0298 follow-up)"
         },
@@ -1241,17 +1267,27 @@ pub(crate) fn remove(
     let mut slides = Vec::new();
     let mut lines: BTreeMap<Text, Vec<usize>> = BTreeMap::new();
     let mut pending = Pending::default();
+    let mut media: Vec<(usize, usize)> = Vec::new();
     for node in &nodes {
         let [slide, _, line, drawable] = node.item().leaf().map(|value| value as usize);
         match node.item().type_name() {
             "slide" => slides.push(slide),
+            "video" | "audio" => media.push((slide, drawable)),
             "paragraph" => {
                 let text = Text::of(node)
                     .ok_or_else(|| refusal(Code::InternalError, "the text is missing"))?;
                 lines.entry(text).or_default().push(line);
             },
             "shape" | "picture" | "connector" => pending.stage_removal(slide, drawable, 0),
-            "placeholder" | "notes" | "video" | "audio" | "table" | "chart" | "group" => {
+            "placeholder" => {
+                // A layout placeholder is hidden on its slide, not deleted.
+                let [_, slot, _, _] = node.item().leaf().map(|value| value as usize);
+                if slot != TITLE && slot != BODY {
+                    return Err(removal_gap(node));
+                }
+                pending.visibility.insert((slide, slot), (true, 0));
+            },
+            "notes" | "table" | "chart" | "group" => {
                 return Err(removal_gap(node));
             },
             _ => return Err(element_refusal("remove", node)),
@@ -1280,6 +1316,37 @@ pub(crate) fn remove(
     let mut chain = Chain::new(package.clone());
     if !pending.is_empty() {
         pending.flush(&mut chain).map_err(|(error, _)| error)?;
+    }
+    // Movies and audio, each slide's from its last, so the earlier source
+    // positions hold (record 0309).
+    media.sort_unstable();
+    media.dedup();
+    media.retain(|(slide, _)| !slides.contains(slide));
+    for (slide, drawable) in media.iter().rev() {
+        let list = chain
+            .package
+            .slide_drawable_list(SlideSelector::index(*slide))
+            .map_err(|error| failure(LeafError::KeynoteDrawables(error)))?;
+        let ordinal = list
+            .iter()
+            .take(*drawable)
+            .filter(|item| {
+                matches!(
+                    item.kind(),
+                    litchi_keynote::slide::drawable::Kind::Movie
+                        | litchi_keynote::slide::drawable::Kind::Audio
+                )
+            })
+            .count();
+        let commit = chain
+            .package
+            .remove_slide_media(
+                SlideSelector::index(*slide),
+                litchi_keynote::MovieSelector::index(ordinal),
+            )
+            .map_err(|error| failure(LeafError::KeynoteMedia(error)))?;
+        let patch = commit.patch().clone();
+        push(&mut chain, commit.into_package(), Patch::Media(patch));
     }
     slides.sort_unstable();
     slides.dedup();

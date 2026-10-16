@@ -105,6 +105,15 @@ pub(crate) const PLACEHOLDER_PROPS: &[PropSpec] = &[
     writable("height", EXTENT),
     writable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
+    {
+        let mut spec = PropSpec::new("hidden", ValueType::Bool);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: true,
+            add: false,
+        };
+        spec
+    },
 ];
 
 const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
@@ -205,7 +214,7 @@ const fn operation_gap(
     }
 }
 
-static OPERATION_GAPS: [GapSpec; 10] = [
+static OPERATION_GAPS: [GapSpec; 9] = [
     operation_gap(
         "set",
         "run",
@@ -242,18 +251,11 @@ static OPERATION_GAPS: [GapSpec; 10] = [
         "the leaf's drawable removal refuses tables, charts and groups",
     ),
     operation_gap(
-        "remove",
-        "video",
-        "a movie or audio clip",
-        "record 0298 follow-up: wire slide::media lifecycle removal",
-        "movies and audio are removed through the leaf's media lifecycle family, not wired yet",
-    ),
-    operation_gap(
         "add",
         "video",
         "a new movie or audio clip",
-        "record 0298 follow-up: wire slide::movie and slide::audio creation",
-        "the leaf's movie and audio creation families are not wired yet",
+        "record 0309 follow-up: wire slide::movie and slide::audio creation",
+        "the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet",
     ),
     operation_gap(
         "set",
@@ -265,16 +267,16 @@ static OPERATION_GAPS: [GapSpec; 10] = [
     operation_gap(
         "remove",
         "placeholder",
-        "a title or body placeholder",
-        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-        "placeholders are hidden, not removed; set the text to empty instead",
+        "slide-number and object placeholders",
+        "record 0309 follow-ups",
+        "`remove` hides a title or body placeholder on its slide (and `hidden` = false shows it again); slide-number and object placeholders have no unified element",
     ),
     operation_gap(
         "add",
         "placeholder",
         "a new placeholder",
-        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-        "a slide's placeholders come from its layout; add a slide from a layout instead",
+        "record 0309 follow-ups",
+        "a slide's placeholders come from its layout; show a hidden one with `hidden` = false, or add a slide from a layout",
     ),
 ];
 
@@ -480,6 +482,8 @@ pub(crate) enum Patch {
     ),
     Drawables(litchi_keynote::slide::drawable::Patch),
     Creation(litchi_keynote::slide::creation::Patch),
+    Media(litchi_keynote::slide::media::lifecycle::Patch),
+    Placeholder(litchi_keynote::slide::placeholder::Patch),
 }
 
 impl Patch {
@@ -493,6 +497,8 @@ impl Patch {
             Self::Deletion(_) => false,
             Self::Drawables(patch) => patch.is_noop(),
             Self::Creation(patch) => patch.is_noop(),
+            Self::Media(patch) => patch.is_noop(),
+            Self::Placeholder(patch) => patch.is_noop(),
         }
     }
 }
@@ -510,7 +516,16 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "tc",
     ],
     addable: &["slide", "paragraph", "shape", "picture"],
-    removable: &["slide", "paragraph", "shape", "picture", "connector"],
+    removable: &[
+        "slide",
+        "paragraph",
+        "shape",
+        "picture",
+        "connector",
+        "video",
+        "audio",
+        "placeholder",
+    ],
     movable: &[
         "slide",
         "paragraph",
