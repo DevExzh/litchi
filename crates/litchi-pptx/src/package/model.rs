@@ -534,7 +534,7 @@ impl Package {
         Ok(snapshot)
     }
 
-    /// Atomically publish a source-bound dependency-free whole-slide removal.
+    /// Atomically publish a source-bound whole-slide removal.
     ///
     /// Planning captures a complete-package fingerprint and an exact durable
     /// patch over only the presentation owner and selected slide. Publication

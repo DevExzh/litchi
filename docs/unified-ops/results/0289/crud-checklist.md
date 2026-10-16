@@ -17,7 +17,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 |---|---|---|---|---|---|---|---|---|---|
 | docx | 41 | 127 | 127 | 0 | 0 | 325 | 49 | 8 | 10 |
 | xlsx | 26 | 92 | 92 | 0 | 0 | 195 | 29 | 2 | 14 |
-| pptx | 37 | 189 | 188 | 1 | 0 | 156 | 86 | 2 | 32 |
+| pptx | 37 | 189 | 189 | 0 | 0 | 156 | 86 | 2 | 32 |
 | xlsb | 26 | 58 | 58 | 0 | 0 | 234 | 30 | 2 | 6 |
 | doc | 13 | 86 | 86 | 0 | 0 | 0 | 57 | 2 | 6 |
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
@@ -139,7 +139,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | group | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | connector | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
 | smartart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| ole | ok | ok | ok | ok | n/a | n/a | FAIL | no pair | no pair | n/a | n/a | ok | ok |
+| ole | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | run | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | linebreak | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |

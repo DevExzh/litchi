@@ -31,6 +31,7 @@ litchi-drawingml = { workspace = true }
 litchi-fonts = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
+memchr = { workspace = true }
 quick-xml = { workspace = true }
 rand = { workspace = true }
 sha2 = { workspace = true, features = ["zeroize"] }
@@ -39,7 +40,6 @@ unicode-normalization = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-memchr = { workspace = true }
 soapberry-zip = { workspace = true }
 tempfile = { workspace = true }
 

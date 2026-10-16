@@ -29,7 +29,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `d261a29c010985932815530391ff3b57dff5ebb7c490acc95fa955b1ccf57f7e` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `17866e45cf525f14b60e55cfb5590014a980b5493350319f324adce9d5fabcf6` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `3f9933fcc82cdb5c6974246e4eff44efd2985093eaa5302abc7b1a3c6a387faa` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ef314e1e8b8607d17dc63ddee4e32ed7eb67e056f4d34f6d52ebe5f3750a4a7b` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `598fe1e05cf36c559b8a3744c20a8c08d5a58583ca2b9cd8a46df80e3ceb83e0` |
@@ -7029,9 +7029,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `create` | `presentation` | `unrepresentable-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | M2 PPTX creation options |
 | `add` | `shape` | `non-append-placement` | PPTX shape creation currently supports append placement only | M2 PPTX non-append shape placement |
 | `add` | `shape` | `non-slide-parent` | text-box creation requires a top-level slide parent; group, master and layout insertion remain pending | M2 PPTX group/master/layout shape creation |
-| `move` | `slide` | `positional-owner` | source-backed PPTX slide ordering still refuses sections, outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering |
-| `swap` | `slide` | `positional-owner` | source-backed PPTX slide ordering still refuses sections, outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering |
-| `remove` | `slide` | `dependency-topology` | native PPTX slide removal currently admits only a dependency-free slide with exactly one layout relationship; notes, comments, images, media, and external or internal relationship closure remain pending | M2 PPTX dependency-aware slide removal |
+| `move` | `slide` | `positional-owner` | source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering |
+| `swap` | `slide` | `positional-owner` | source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering |
+| `remove` | `slide` | `dependency-topology` | native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused | M2 PPTX dependency-aware slide removal |
 | `remove` | `slide` | `final-slide` | native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation | M2 PPTX final-slide removal policy |
 | `remove` | `slide` | `canonical-target` | source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling | M2 PPTX equivalent relationship-target spellings |
 | `remove` | `shape` | `dependency-topology` | shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure | M2 PPTX dependency-aware shape removal |

@@ -533,9 +533,19 @@ fn final_slide_shared_owner_dependency_unknown_macro_and_signed_sources_refuse_a
         &with_hidden_incoming_relationship(&fixture()),
         SlideRemovalRefusal::UnknownSemanticSurface,
     );
-    assert_refusal(
-        &with_slide_dependency(&fixture()),
-        SlideRemovalRefusal::UnsupportedRelationship,
+    // A Part only the removed slide targets leaves with it (record 0303).
+    let dependent = with_slide_dependency(&fixture());
+    let mut output = Vec::new();
+    open(&dependent)
+        .plan_slide_removal(Position::new(1))
+        .unwrap()
+        .write_to(&mut output)
+        .unwrap();
+    let removed = OpcPackage::from_bytes(&output).unwrap();
+    assert!(
+        removed
+            .get_part(&PackURI::new("/ppt/media/dependency.bin").unwrap())
+            .is_err()
     );
     assert_refusal(
         &with_unknown_presentation_metadata(&fixture()),

@@ -105,15 +105,13 @@ mod pptx {
     }
 
     #[test]
-    fn slides_owning_notes_stay_typed_refusals() {
+    fn slides_owning_notes_are_removed_with_them() {
+        // Record 0303: the notes slide only this slide owns leaves with it.
         let (file, _) = input("ooxml/pptx/sample.pptx");
-        let error = file.remove("/slide[2]").map(drop).unwrap_err();
-        assert_eq!(error.code().as_str(), "unsupported_capability");
-        assert!(
-            error.message().contains("notesSlide"),
-            "{}",
-            error.message()
-        );
+        let removed = file.remove("/slide[2]").unwrap();
+        let reopened = litchi_ops::open_bytes(removed.to_bytes().unwrap()).unwrap();
+        assert!(reopened.get("/slide[1]").is_ok());
+        assert!(reopened.get("/slide[2]").is_err());
     }
 
     #[test]

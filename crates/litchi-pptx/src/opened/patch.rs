@@ -547,8 +547,12 @@ impl Patch {
             .any(|delta| &delta.name == name && delta.before.is_some() && delta.after.is_none())
     }
 
+    /// The direction and slide of an exact slide removal or its inverse:
+    /// the presentation Part changes, one slide Part leaves or returns, and
+    /// every other changed resource is a non-slide Part that leaves or
+    /// returns with it (the Parts the slide owns, record 0303).
     pub(crate) fn exact_slide_removal_change(&self) -> Option<(SinglePartChange, &PackURI)> {
-        if self.root.is_some() || self.deltas.len() != 2 {
+        if self.root.is_some() || self.deltas.len() < 2 {
             return None;
         }
         let presentation = self
@@ -567,23 +571,33 @@ impl Patch {
         {
             return None;
         }
-        let slide = self
+        let mut slides = self.deltas.iter().filter(|delta| {
+            delta.name != self.presentation_name
+                && [delta.before.as_ref(), delta.after.as_ref()]
+                    .into_iter()
+                    .flatten()
+                    .any(|image| {
+                        image.content_type == litchi_opc::constants::content_type::PML_SLIDE
+                    })
+        });
+        let slide = slides.next()?;
+        if slides.next().is_some() {
+            return None;
+        }
+        let direction = match (&slide.before, &slide.after) {
+            (Some(_), None) => SinglePartChange::Remove,
+            (None, Some(_)) => SinglePartChange::Add,
+            _ => return None,
+        };
+        let dependents_follow = self
             .deltas
             .iter()
-            .find(|delta| delta.name != self.presentation_name)?;
-        match (&slide.before, &slide.after) {
-            (Some(before), None)
-                if before.content_type == litchi_opc::constants::content_type::PML_SLIDE =>
-            {
-                Some((SinglePartChange::Remove, &slide.name))
-            },
-            (None, Some(after))
-                if after.content_type == litchi_opc::constants::content_type::PML_SLIDE =>
-            {
-                Some((SinglePartChange::Add, &slide.name))
-            },
-            _ => None,
-        }
+            .filter(|delta| delta.name != self.presentation_name && delta.name != slide.name)
+            .all(|delta| match direction {
+                SinglePartChange::Remove => delta.before.is_some() && delta.after.is_none(),
+                SinglePartChange::Add => delta.before.is_none() && delta.after.is_some(),
+            });
+        dependents_follow.then_some((direction, &slide.name))
     }
 
     pub(crate) fn has_same_changes(&self, other: &Self) -> bool {
