@@ -1,7 +1,7 @@
 # 0304 — No silent content loss on text sets
 
 - Status: implemented on `uo2/text-loss`, cut from `feat/unified-ops-api`
-  at `94f8047602`; trunk merged up to `8cf481f5fd` (record 0298).
+  at `94f8047602`; trunk merged up to `e7fe30fb24` (records 0294, 0298, 0301).
 - Date: 2026-10-16
 - Input: record [0294](0294-acceptance-follow-ups.md) §2.4 (on
   `uo2/acceptance2`): a paragraph `text` set on ODT, OTH and ODM silently
@@ -192,10 +192,14 @@ record's source changes reversed. Evidence and binary hashes:
 - `results/0289/crud-checklist.{md,tsv}`: unchanged (an intermediate
   version refused empty first cell paragraphs and changed the DOCX cell
   evidence; fixed in `59c6bf4b15`).
-- `tests/golden/query_corpus/digests.json`: the 35 ODM digests change
-  because the ODM corpus gains `frames.odm` (§7); record 0294's branch
-  re-blesses the same rows with its full fixture set, so a merge of both
-  should take that branch's file.
+- `tests/golden/query_corpus/digests.json`: the 35 ODM digests changed
+  because the ODM corpus gained `frames.odm` (§7, `d5cce163f6`); after the
+  merge of trunk (record 0294 landed with the same fixtures) the file is
+  trunk's and passes unchanged.
+- After that merge the fidelity report was re-blessed again on trunk's
+  version (`1caf73cec5`): the same ODT changes, and the `frames.oth`/
+  `frames.odm` reverts are byte-exact instead of value-exact, which closes
+  record 0294 §2.4.
 - Capability and registry goldens (both feature sets), the OfficeCLI corpus
   golden and the capability delta table: unchanged.
 - Python: `test_write_api.py` replaced the `*` of `datetime.ppt`'s date
@@ -205,9 +209,10 @@ record's source changes reversed. Evidence and binary hashes:
 
 ## 7. Fixtures
 
-`test-data/unified-ops/0294/frames.oth` and `frames.odm` are copied
+`test-data/unified-ops/0294/frames.oth` and `frames.odm` were copied
 byte-identical from `uo2/acceptance2` (record 0294's generator), with that
-record's `PROVENANCE.md`, so the merge of both branches is clean. Other
+record's `PROVENANCE.md`; the trunk merge of record 0294 brought the same
+blobs, so the merge was clean. Other
 tests use tracked fixtures (`odf/corpus`, `odfdo`, `ooxml`, `ole`, `rtf`,
 `poi`, `libreoffice-core`, `iwork`) or rewrite one member of one in the
 test.
