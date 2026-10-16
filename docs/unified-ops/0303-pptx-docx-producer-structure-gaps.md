@@ -1,7 +1,7 @@
 # 0303 — PPTX/DOCX structural gaps on files from other producers
 
 - Status: implemented on `uo2/pptx-gaps`, cut from `feat/unified-ops-api`
-  at `771a38c752`, trunk merged at `8cf481f5fd`. Follows record
+  at `771a38c752`, trunk merged at `e7fe30fb24`. Follows record
   [0293](0293-producer-structure.md) §4 gaps 1, 2 and 5, and record
   [0290](0290-checklist-failures-and-metadata-language.md) §3 (F3).
 - Date: 2026-10-16
@@ -212,9 +212,10 @@ Follow-up: "0303 DOCX run-level markup-compatibility admission".
   1 → 0. With trunk's record 0298 (F8), `KNOWN_FAILURES` is now empty.
   Items 1 and 2 do not show here: the checklist's remove/move cells run on
   documents Litchi made.
-- **Fidelity** (`results/0289/fidelity.{md,tsv}`, re-blessed): PPTX
-  structure byte-exact 8 → 10 (both sectioned LibreOffice decks), refused
-  3 → 1 (`bug62513`). `tdf103477`'s text probe is still refused, now by
+- **Fidelity** (`results/0289/fidelity.{md,tsv}`, re-blessed after the
+  trunk merge, whose record 0294 adds one PPTX fixture): PPTX structure
+  byte-exact 9 → 11 (both sectioned LibreOffice decks), refused 3 → 1
+  (`bug62513`). `tdf103477`'s text probe is still refused, now by
   the Enclosed edit guard at `set_text_properties` instead of at the
   snapshot. No other row changed; every no-op save stays byte-identical.
 - **Capabilities**: the `remove slide dependency-topology` gap describes
@@ -294,12 +295,12 @@ time.
 | `cargo clippy -p litchi-opc -p litchi-pptx -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features [--features pptx\|docx] --all-targets -- -D warnings` | 0 each |
 | `cargo test -p litchi-opc -p litchi-pptx --all-features --no-fail-fast` | 0 |
-| `cargo test -p litchi-ops --all-features` (`--lib`, `--doc`, then the 133 integration tests in chunks of 25) | 0 (one chunk first failed in `pptx_slide_remove`, which pinned the notes refusal; updated, then 0) |
+| `cargo test -p litchi-ops --all-features` (`--lib`, `--doc`, then the 133 integration tests in chunks of 25; rerun after the second trunk merge) | 0 (one chunk first failed in `pptx_slide_remove`, which pinned the notes refusal; updated, then 0) |
 | `cargo test -p litchi --all-features --no-fail-fast` | 0 |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-opc -p litchi-pptx -p litchi-ops` | 0 |
 | `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify`; `python3 tools/test_no_3rdparty_references.py`; `python3 tools/unified_bench_matrix.py --check` | 0 each |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 0 |
-| `crates/pyo3-litchi/tests/run_tests.sh` | 0 (275 tests) |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 (279 tests after the second trunk merge) |
 | `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 (lock gains `memchr` under `litchi-pptx`) |
 | `LITCHI_BLESS=1 cargo test -p litchi-ops --test capabilities --test registry`, `--all-features` and every feature but `encryption` | reviewed (§6) |
 | `python3 tools/officecli_capability_delta.py --officecli <OfficeCLI>` | 0, reason text only |
