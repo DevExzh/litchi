@@ -17,7 +17,7 @@ fn anchor() -> SheetAnchor {
     SheetAnchor::new(
         AnchorPoint::new(2, 4, -3, 7).unwrap(),
         AnchorPoint::new(9, 18, 1001, -11).unwrap(),
-        AnchorBehavior::MoveAndSize,
+        AnchorBehavior::Absolute,
     )
     .unwrap()
 }

@@ -8,8 +8,9 @@ use std::{error::Error, fs, path::PathBuf};
 use litchi_doc::builder::Builder;
 use litchi_doc::writer::{FloatingPosition, Kind, Shape};
 use litchi_ppt::writer::{FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table};
+use litchi_xls::AnchorBehavior;
 use litchi_xls::writer as xls_writer;
-use litchi_xls::writer::shape::{Anchor, Behavior, Rect};
+use litchi_xls::writer::shape::{Anchor, Rect};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let output = std::env::var_os("LITCHI_OFFICE_SMOKE_DIR")
@@ -167,6 +168,6 @@ fn xls_anchor(
         first_col,
         last_row,
         last_col,
-        Behavior::MoveAndSize,
+        AnchorBehavior::Absolute,
     )
 }

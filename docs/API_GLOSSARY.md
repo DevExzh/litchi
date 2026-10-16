@@ -2486,3 +2486,21 @@ Both profiles now register 30 families.
 | `litchi_ops::OpenOptions::{pages_options, keynote_options, numbers_options}` taking the leaf `OpenOptions` | — | ✅ 0306 |
 | `Package::save_directory(path)` on `litchi_keynote` and `litchi_numbers` (as on `litchi_pages`), `SaveError::{Bundling, Bundle}` | — | ✅ 0306 |
 | `litchi_iwa_archive::bundle::{capture, save, converted_limits, is_directory, CaptureLimits, CaptureLimitKind, CaptureError, INDEX_ZIP}` | — | ✅ 0306 (shared by the three leaves) |
+
+## XLS anchor behaviour (record 0316)
+
+`[MS-XLS]` 2.5.193 sets `fMove`/`fSize` when a shape is *kept intact* as its
+cells move or resize. The read enum named the three states the other way
+round (`Fixed` for 0, `MoveAndSize` for 3), and the writer carried a second
+enum with the same inversion. One enum now serves both, named after Apache
+POI's `AnchorType` and ECMA-376 `ST_EditAs`; wire values are unchanged.
+
+| Canonical name | Banned | Status |
+| --- | --- | --- |
+| `litchi_xls::AnchorBehavior::MoveAndResize` (wire 0, `twoCell`) | `AnchorBehavior::Fixed` | ✅ 0316 |
+| `litchi_xls::AnchorBehavior::MoveWithoutResize` (wire 2, `oneCell`) | `AnchorBehavior::Size` | ✅ 0316 |
+| `litchi_xls::AnchorBehavior::Absolute` (wire 3, `absolute`) | `AnchorBehavior::MoveAndSize` | ✅ 0316 |
+| `litchi_xls::writer::shape::Anchor::{new, cells, behavior}` take and return `AnchorBehavior` | `litchi_xls::writer::shape::Behavior` | ✅ 0316 |
+
+The `xls-minimal` profile bans the old spellings. See
+[0316](unified-ops/0316-xls-odp-structural-follow-ups.md).
