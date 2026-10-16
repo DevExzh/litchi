@@ -9,6 +9,9 @@
 //!   conversion, plus the unified layer's directory classification;
 //! - `file_open`: open the single-file fixture from its path (leaf
 //!   `Package::open(file)` vs `litchi_ops::open(file)`);
+//! - `bytes_open`: open in-memory bytes (leaf
+//!   `Package::from_shared_bytes_with_options` with the defaults vs
+//!   `litchi_ops::open_bytes`), the reference for the next scenario;
 //! - `bytes_open_options`: open in-memory bytes with the format's leaf
 //!   options set to their defaults (leaf `Package::from_shared_bytes_with_options`
 //!   vs `litchi_ops::open_bytes_with` carrying `{pages,keynote,numbers}_options`),
@@ -143,7 +146,7 @@ fn main() {
         let bundle = test_data().join(bundle);
         let bytes = std::fs::read(&single).unwrap();
         let options = unified_options(kind);
-        for scenario in ["dir_open", "file_open", "bytes_open_options"] {
+        for scenario in ["dir_open", "file_open", "bytes_open", "bytes_open_options"] {
             let mut ratios = Vec::with_capacity(rounds);
             let mut leaf_medians = Vec::new();
             let mut unified_medians = Vec::new();
@@ -173,10 +176,17 @@ fn main() {
                                 black_box(litchi_ops::open(&single).unwrap());
                             },
                         ),
-                        ("bytes_open_options", "leaf") => leg(
+                        ("bytes_open", "leaf") | ("bytes_open_options", "leaf") => leg(
                             iterations,
                             || Arc::<[u8]>::from(bytes.as_slice()),
                             |shared| leaf_bytes_open(kind, shared),
+                        ),
+                        ("bytes_open", _) => leg(
+                            iterations,
+                            || bytes.clone(),
+                            |owned| {
+                                black_box(litchi_ops::open_bytes(owned).unwrap());
+                            },
                         ),
                         _ => leg(
                             iterations,

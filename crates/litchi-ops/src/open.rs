@@ -192,6 +192,12 @@ pub fn open_with_tail<T: ZipTail>(
 fn open_directory(path: &Path, options: &OpenOptions, error: Error) -> Result<File> {
     #[cfg(feature = "iwork-adapter")]
     if path.is_dir()
+        && let Some(handle) = crate::format::iwork::Iwork::capture_directory(path, options)?
+    {
+        return Ok(handle.into_file());
+    }
+    #[cfg(feature = "iwork-adapter")]
+    if path.is_dir()
         && let Some(format) = crate::format::iwork::classify_directory(path)
     {
         return match format {

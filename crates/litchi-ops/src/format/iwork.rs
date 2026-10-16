@@ -619,6 +619,39 @@ impl Iwork {
         .with_suggestion("open an existing package and edit it"))
     }
 
+    /// Open an app-authored package directory on the single-pass route:
+    /// capture and convert the bundle once (`litchi_iwa_archive::bundle`,
+    /// under the hard physical ceilings detection also uses), then classify
+    /// and open the converted bytes like any in-memory package, so the
+    /// container is indexed once and the leaf adopts it. `Ok(None)` when the
+    /// route does not apply: a caller's leaf source limits are set (the leaf
+    /// then captures under them, [`Self::open_directory`]), a legacy
+    /// application marker is present, the capture fails, or detection
+    /// declines; the caller then classifies the
+    /// directory and lets the leaf report the precise error.
+    pub(crate) fn capture_directory(path: &Path, options: &OpenOptions) -> Result<Option<Self>> {
+        // A pre-2013 application marker can contradict the index: the
+        // classifier arbitrates those bundles.
+        if leaf_source_limits_set(options)
+            || ["index.xml", "index.apxl", "index.numbers"]
+                .iter()
+                .any(|marker| std::fs::symlink_metadata(path.join(marker)).is_ok())
+        {
+            return Ok(None);
+        }
+        let limits = litchi_iwa_archive::Limits::default();
+        let Ok(bytes) = litchi_iwa_archive::bundle::capture(path, limits.into(), limits) else {
+            return Ok(None);
+        };
+        if let Some(limit) = options.max_input_bytes {
+            crate::open::check_input_len(u64::try_from(bytes.len()).unwrap_or(u64::MAX), limit)?;
+        }
+        Ok(match Self::detect_bytes(bytes, options)? {
+            Detected::Opened(handle) => Some(handle.with_origin(Some(Arc::from(path)))),
+            Detected::Disabled(_) | Detected::Declined(_) => None,
+        })
+    }
+
     /// Open an app-authored package directory of `format`: the leaf
     /// captures the bundle once, under the caller's leaf options, and
     /// converts it to its single-file form (records 0299 and 0306). The
@@ -795,6 +828,35 @@ impl<W: std::io::Write> std::io::Write for Counter<'_, W> {
     fn flush(&mut self) -> std::io::Result<()> {
         self.inner.flush()
     }
+}
+
+/// Whether a caller selected leaf source limits other than the defaults for
+/// any iWork format: the routes that prepare under the hard ceilings then
+/// hand over to the leaf.
+fn leaf_source_limits_set(options: &OpenOptions) -> bool {
+    let _ = options;
+    #[cfg(feature = "pages")]
+    if options
+        .pages_options
+        .is_some_and(|leaf| leaf.source_limits_value() != litchi_pages::SourceLimits::default())
+    {
+        return true;
+    }
+    #[cfg(feature = "keynote")]
+    if options
+        .keynote_options
+        .is_some_and(|leaf| leaf.source_limits_value() != litchi_keynote::SourceLimits::default())
+    {
+        return true;
+    }
+    #[cfg(feature = "numbers")]
+    if options
+        .numbers_options
+        .is_some_and(|leaf| leaf.source_limits_value() != litchi_numbers::SourceLimits::default())
+    {
+        return true;
+    }
+    false
 }
 
 /// The unified format of an iWork detection result.
