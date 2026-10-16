@@ -334,6 +334,14 @@ impl<'a> Scene<'a> {
         matches!(self.xml, Cow::Owned(_))
     }
 
+    /// The owner XML the shape spans are defined against: the source bytes,
+    /// or the MCE-processed replacement when [`Self::is_rewritten`].
+    #[inline]
+    #[must_use]
+    pub(crate) fn owner_xml(&self) -> &[u8] {
+        &self.xml
+    }
+
     /// Number of shapes in depth-first pre-order, including grouped children.
     #[inline]
     #[must_use]

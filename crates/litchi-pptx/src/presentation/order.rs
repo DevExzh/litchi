@@ -507,6 +507,17 @@ fn capture(editor: &SourceBackedPresentationEditor) -> Result<SourceBackedSlideO
 fn validate_for_rewrite(snapshot: &SourceBackedSlideOrderSnapshot) -> Result<()> {
     snapshot.check_execution()?;
     reject_root_features(snapshot.xml.as_bytes(), snapshot.context.as_ref())?;
+    // This standalone editor rebuilds each candidate from the source, so it
+    // cannot carry the section placement of a sequence of moves; the
+    // primary source editor maintains sections (record 0303).
+    if crate::opened::sections::present(snapshot.xml.as_bytes())
+        && crate::opened::sections::scan(snapshot.xml.as_bytes())?.is_some()
+    {
+        return Err(refusal(
+            SlideOrderRefusal::Sections,
+            "presentation section metadata owns slide positions",
+        ));
+    }
     let binding_refs = binding_refs(&snapshot.bindings)?;
     crate::opened::validate_slide_bindings(
         snapshot.xml.as_bytes(),
@@ -1168,8 +1179,11 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
     let mut nodes = 0usize;
     let mut roots = 0usize;
     // Whether the root's `p:extLst` is open: its `p:ext` children must name
-    // non-positional extensions.
+    // non-positional extensions or the section list (record 0303), whose
+    // membership slide order and removal maintain.
     let mut extension_list = false;
+    let mut section_extension = false;
+    let mut sections = false;
     loop {
         let event = reader
             .read_event()
@@ -1185,21 +1199,30 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
                     b"uri",
                     reader.decoder(),
                 )?;
+                let section = uri.as_deref() == Some(crate::opened::SECTION_EXTENSION_URI);
                 if !is_presentation_namespace(&namespace)
                     || element.name().local_name().as_ref() != b"ext"
-                    || !uri
-                        .as_deref()
-                        .is_some_and(|uri| crate::opened::NON_POSITIONAL_EXTENSIONS.contains(&uri))
+                    || !(section
+                        || uri.as_deref().is_some_and(|uri| {
+                            crate::opened::NON_POSITIONAL_EXTENSIONS.contains(&uri)
+                        }))
                 {
                     return Err(refusal(
                         SlideOrderRefusal::PositionalOwner,
                         "presentation root extension may own slide positions",
                     ));
                 }
+                if section {
+                    sections = true;
+                    section_extension = matches!(event, Event::Start(_));
+                }
             }
         }
         if matches!(event, Event::End(_)) && depth == 2 {
             extension_list = false;
+        }
+        if matches!(event, Event::End(_)) && depth == 3 {
+            section_extension = false;
         }
         match event {
             Event::Start(element) => {
@@ -1227,7 +1250,9 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
                 } else if depth == 1 {
                     reject_root_child(&namespace, element.name().local_name().as_ref())?;
                 }
-                reject_positional_element(element.name().local_name().as_ref())?;
+                if !section_extension {
+                    reject_positional_element(element.name().local_name().as_ref())?;
+                }
                 depth += 1;
             },
             Event::Empty(element) => {
@@ -1249,7 +1274,9 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
                 } else if depth == 1 {
                     reject_root_child(&namespace, element.name().local_name().as_ref())?;
                 }
-                reject_positional_element(element.name().local_name().as_ref())?;
+                if !section_extension {
+                    reject_positional_element(element.name().local_name().as_ref())?;
+                }
             },
             Event::End(_) => {
                 depth = depth.checked_sub(1).ok_or_else(|| {
@@ -1288,6 +1315,10 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
         return Err(Error::Invalid(
             "source-backed presentation XML must contain one closed root".into(),
         ));
+    }
+    if sections {
+        // The section list must read exactly; an unreadable one is refused.
+        crate::opened::sections::scan(xml)?;
     }
     Ok(())
 }
@@ -1558,7 +1589,15 @@ pub(super) fn canonical_source_order_xml(
             .then(left.slide_id.cmp(&right.slide_id))
             .then(left.relationship_id.cmp(&right.relationship_id))
     });
-    reorder_stable_bindings(xml, order, &sorted, context)
+    let canonical = reorder_stable_bindings(xml, order, &sorted, context)?;
+    // Section membership follows the order (record 0303); the exact root
+    // preimages guard it, so the order-invariant digest leaves it out.
+    if crate::opened::sections::present(&canonical) {
+        if let Some((stripped, _)) = crate::opened::sections::strip(&canonical)? {
+            return Ok(stripped);
+        }
+    }
+    Ok(canonical)
 }
 
 fn allocation(source: std::collections::TryReserveError) -> Error {

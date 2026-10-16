@@ -7,6 +7,7 @@
 mod codec;
 mod model;
 mod order;
+pub(crate) mod owned_parts;
 mod package;
 pub(crate) mod source;
 mod source_cross_copy;

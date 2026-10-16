@@ -23,7 +23,7 @@ use super::super::{
     PartBinding, RelationshipBinding, SlideBinding, SourceBackedSlideSnapshot, SourcePayload,
 };
 use super::topology_digest;
-use super::topology_wire::{Change, Data, PartImage, State};
+use super::topology_wire::{Change, Data, Dependent, PartImage, State};
 use super::{Package, RootPayload, allocation, limit};
 use crate::presentation::order::{StableSlideKey, stable_slide_key};
 use crate::{Error, Result};
@@ -209,6 +209,11 @@ impl Revision {
             source_version,
             lineage: package.owner.package.source_lineage(),
             context,
+            // A prepared slide that encloses markup compatibility in shape
+            // children admits only whole-shape removal (record 0303); other
+            // slides keep the edit-time guards of each operation.
+            mce: crate::presentation::transition::admit_source(bytes, "slide_snapshot")
+                .unwrap_or(crate::presentation::transition::SlideMce::Plain),
         })
     }
 }
@@ -275,11 +280,35 @@ pub(super) fn remove(package: &Package, key: &StableSlideKey) -> Result<Package>
             after: None,
         },
     );
+    // The Parts the slide owns exclusively leave with it (record 0303).
+    let mut dependents = current_dependents(package);
+    for part_uri in owned_parts(package, std::slice::from_ref(&key.part_uri))?.parts() {
+        let (before, content_type) = match physical_dependent(package, part_uri, &mut retained)? {
+            Some((image, content_type)) => (Some(image), content_type),
+            None => {
+                let existing = dependents
+                    .iter()
+                    .find(|dependent| dependent.part_uri.is_equivalent_to(part_uri))
+                    .ok_or(Error::PatchConflict)?;
+                (None, existing.content_type.clone())
+            },
+        };
+        upsert_dependent(
+            &mut dependents,
+            Dependent {
+                part_uri: part_uri.clone(),
+                content_type,
+                before,
+                after: None,
+            },
+        );
+    }
     let revision = build_revision_with_retention(
         package,
         Arc::new(root),
         order.into(),
         changes.into(),
+        dependents.into(),
         None,
         retained,
     )?;
@@ -301,8 +330,15 @@ pub(super) fn insert(package: &Package, position: Position, layout_name: &str) -
     }
     let mut changes = current_changes(package, &mut retained)?;
     upsert_change(&mut changes, change);
-    let revision =
-        build_revision_with_retention(package, root, order, changes.into(), None, retained)?;
+    let revision = build_revision_with_retention(
+        package,
+        root,
+        order,
+        changes.into(),
+        current_dependents(package).into(),
+        None,
+        retained,
+    )?;
     package_from_revision(package, revision)
 }
 
@@ -318,6 +354,7 @@ pub(super) fn reorder(
         root,
         order,
         Arc::clone(&revision.data.changes),
+        Arc::clone(&revision.data.dependents),
         Some(&revision.data.after),
     )?;
     package_from_revision(package, revision)
@@ -381,6 +418,7 @@ pub(super) fn replace_snapshot(
         root,
         Arc::clone(&package.order),
         changes.into(),
+        Arc::clone(&revision.data.dependents),
         Some(&revision.data.after),
         seed,
     )?;
@@ -402,10 +440,12 @@ pub(super) fn patch_from_packages(source: &Package, target: &Package) -> Result<
     merge_retention(&mut retained, target_retained);
     validate_root_delta(source, &before, &after)?;
     let changes = diff_changes(source, target, &mut retained)?;
+    let dependents = diff_dependents(source, target, &mut retained)?;
     let data = Data {
         before,
         after,
         changes: changes.into(),
+        dependents: dependents.into(),
     };
     let prepared = target
         .topology
@@ -452,6 +492,7 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
         true,
         shape_removals,
     )?;
+    validate_dependents_against_effective(package, data, &mut retained)?;
     if data.before.topology_digest == data.after.topology_digest
         && data.before.root.as_slice() == data.after.root.as_slice()
         && data.before.order.as_ref() == data.after.order.as_ref()
@@ -459,6 +500,7 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
             == data.after.presentation_relationships.as_slice()
         && data.before.content_types.as_slice() == data.after.content_types.as_slice()
         && data.changes.is_empty()
+        && data.dependents.is_empty()
     {
         return Ok(package.clone());
     }
@@ -468,7 +510,8 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
     // source while retaining every earlier structural change, otherwise a
     // second removal or a restored Part would silently disappear on replay.
     let changes = rebase_changes_to_physical(package, &data.changes, &mut retained)?;
-    if target_is_physical(package, data, &changes, &mut retained)? {
+    let dependents = rebase_dependents_to_physical(package, &data.dependents, &mut retained)?;
+    if target_is_physical(package, data, &changes, &dependents, &mut retained)? {
         return package_as_physical(package);
     }
 
@@ -477,9 +520,11 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
         Arc::clone(&data.after.root),
         Arc::clone(&data.after.order),
         changes.into(),
+        dependents.into(),
         Some(&data.after),
         retained,
     )?;
+    validate_restored_dependents(&revision, data)?;
     package_from_revision(package, revision)
 }
 
@@ -529,6 +574,7 @@ fn build_revision(
     root: Arc<Vec<u8>>,
     order: Arc<[StableSlideKey]>,
     changes: Arc<[Change]>,
+    dependents: Arc<[Dependent]>,
     target_state: Option<&State>,
 ) -> Result<Revision> {
     build_revision_with_retention(
@@ -536,6 +582,7 @@ fn build_revision(
         root,
         order,
         changes,
+        dependents,
         target_state,
         Retention::default(),
     )
@@ -546,6 +593,7 @@ fn build_revision_with_retention(
     root: Arc<Vec<u8>>,
     order: Arc<[StableSlideKey]>,
     changes: Arc<[Change]>,
+    dependents: Arc<[Dependent]>,
     target_state: Option<&State>,
     mut retained: Retention,
 ) -> Result<Revision> {
@@ -559,7 +607,7 @@ fn build_revision_with_retention(
     // A fresh admission owns all shared recipe images in this revision. It
     // avoids retaining entire preceding revisions just to keep their image
     // reservations alive, so repeated edits do not pin a chain of candidates.
-    let amount = recipe_bytes(&root, &order, &changes, target_state)?;
+    let amount = recipe_bytes(&root, &order, &changes, &dependents, target_state)?;
     if let Some(reservation) = reserve_payload(package, amount)? {
         retained.reservations.push(Arc::new(reservation));
     }
@@ -568,6 +616,7 @@ fn build_revision_with_retention(
         &root,
         &order,
         &changes,
+        &dependents,
         target_state,
         &mut retained,
     )?;
@@ -629,6 +678,7 @@ fn build_revision_with_retention(
         before: physical,
         after,
         changes,
+        dependents,
     };
     Ok(Revision {
         prepared,
@@ -642,6 +692,7 @@ fn build_plan(
     root: &[u8],
     order: &[StableSlideKey],
     changes: &[Change],
+    dependents: &[Dependent],
     target_state: Option<&State>,
     retained: &mut Retention,
 ) -> Result<SourceTopologyPlan> {
@@ -733,7 +784,11 @@ fn build_plan(
                         retained.source_metadata.push(data);
                     }
                 } else {
-                    plan.try_add_part_shared(
+                    // A slide absent from the physical source is either
+                    // restored producer XML (a durable inverse after reopen)
+                    // or a slide this library authored; both are held to the
+                    // source XML policy, which authored compact XML passes.
+                    plan.try_add_restored_part_shared(
                         change.key.part_uri.clone(),
                         change.content_type.clone(),
                         Arc::clone(&image.xml),
@@ -786,6 +841,7 @@ fn build_plan(
         }
     }
 
+    stage_dependents(package, &mut plan, dependents, retained)?;
     if let Some(state) = target_state {
         restore_metadata(package, &mut plan, state, retained)?;
     }
@@ -800,6 +856,306 @@ fn build_plan(
         owner.package.execution_context().as_ref(),
     )?;
     Ok(plan)
+}
+
+/// Remove or restore the Parts that removed slides owned (record 0303).
+/// A dependent is never edited: a restored image must equal a physical Part
+/// that still exists, and a Part absent from the source is added with its
+/// exact payload, typed edges and relationship image.
+fn stage_dependents(
+    package: &Package,
+    plan: &mut SourceTopologyPlan,
+    dependents: &[Dependent],
+    retained: &mut Retention,
+) -> Result<()> {
+    let owner = &package.owner;
+    for dependent in dependents {
+        owner.package.check_execution()?;
+        let physical = match owner.package.part(&dependent.part_uri) {
+            Ok(view) => Some(view),
+            Err(litchi_opc::OpcError::PartNotFound(_)) => None,
+            Err(error) => return Err(Error::Opc(error)),
+        };
+        match (&dependent.after, physical) {
+            (None, Some(view)) => {
+                retained.source_parts.push(view.data()?);
+                plan.try_remove_part(dependent.part_uri.clone())?;
+            },
+            (None, None) => {},
+            (Some(image), Some(view)) => {
+                let data = view.data()?;
+                let relationships = owner.package.relationships_data_for_with_limit(
+                    view.partname(),
+                    owner.limits.max_relationship_xml_bytes(),
+                )?;
+                let same = view.content_type() == dependent.content_type
+                    && data.as_bytes() == image.xml.as_slice()
+                    && relationships.as_ref().map(PartData::as_bytes)
+                        == image.relationships.as_ref().map(|bytes| bytes.as_slice());
+                retained.source_parts.push(data);
+                if let Some(relationships) = relationships {
+                    retained.source_metadata.push(relationships);
+                }
+                if !same {
+                    return Err(Error::PatchConflict);
+                }
+            },
+            (Some(image), None) => {
+                plan.try_add_restored_part_shared(
+                    dependent.part_uri.clone(),
+                    dependent.content_type.clone(),
+                    Arc::clone(&image.xml),
+                )?;
+                if let Some(relationships) = &image.relationships {
+                    super::topology_admission::stage_dependent_edges(
+                        package,
+                        plan,
+                        &dependent.part_uri,
+                        relationships,
+                    )?;
+                    plan.try_restore_relationships_xml(
+                        dependent.part_uri.clone(),
+                        None,
+                        Some(Arc::clone(relationships)),
+                    )?;
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+/// The Parts the slides at `slides` own exclusively in the effective
+/// topology of `package`: the prepared candidate of a structural revision,
+/// or the physical source.
+fn owned_parts(
+    package: &Package,
+    slides: &[PackURI],
+) -> Result<crate::presentation::owned_parts::Owned> {
+    use crate::presentation::owned_parts::{Graph, Owned, may_own};
+    let maximum =
+        crate::presentation::source_removal::relationship_scan_limit(package.owner.limits)?;
+    if let Some(revision) = &package.topology {
+        let mut any = false;
+        for slide in slides {
+            any |= may_own(revision.prepared.part(slide)?.rels());
+        }
+        if !any {
+            return Ok(Owned::none());
+        }
+        return Graph::from_prepared(&revision.prepared, maximum)?.owned_by_all(slides);
+    }
+    let mut any = false;
+    for slide in slides {
+        any |= may_own(package.owner.package.part(slide)?.rels());
+    }
+    if !any {
+        return Ok(Owned::none());
+    }
+    Graph::from_source(&package.owner.package, maximum)?.owned_by_all(slides)
+}
+
+/// The physical image and content type of a dependent Part, or `None` when
+/// the source has no such Part.
+fn physical_dependent(
+    package: &Package,
+    part_uri: &PackURI,
+    retained: &mut Retention,
+) -> Result<Option<(PartImage, String)>> {
+    let view = match package.owner.package.part(part_uri) {
+        Ok(view) => view,
+        Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(None),
+        Err(error) => return Err(Error::Opc(error)),
+    };
+    let data = view.data()?;
+    let relationships = package.owner.package.relationships_data_for_with_limit(
+        part_uri,
+        package.owner.limits.max_relationship_xml_bytes(),
+    )?;
+    let relationships_arc = relationships
+        .as_ref()
+        .map(|data| copy_state_bytes(package, data.as_bytes(), retained))
+        .transpose()?;
+    let xml = copy_state_bytes(package, data.as_bytes(), retained)?;
+    retained.source_parts.push(data);
+    if let Some(data) = relationships {
+        retained.source_metadata.push(data);
+    }
+    Ok(Some((
+        PartImage {
+            xml,
+            relationships: relationships_arc,
+        },
+        view.content_type().to_owned(),
+    )))
+}
+
+/// The effective image of a dependent Part: its recipe image in a
+/// structural revision, else its physical image.
+fn effective_dependent(
+    package: &Package,
+    part_uri: &PackURI,
+    retained: &mut Retention,
+) -> Result<Option<PartImage>> {
+    if let Some(revision) = &package.topology {
+        if let Some(dependent) = revision
+            .data
+            .dependents
+            .iter()
+            .find(|dependent| dependent.part_uri.is_equivalent_to(part_uri))
+        {
+            return Ok(dependent.after.clone());
+        }
+    }
+    Ok(physical_dependent(package, part_uri, retained)?.map(|(image, _)| image))
+}
+
+fn current_dependents(package: &Package) -> Vec<Dependent> {
+    package
+        .topology
+        .as_ref()
+        .map(|revision| revision.data.dependents.to_vec())
+        .unwrap_or_default()
+}
+
+fn upsert_dependent(dependents: &mut Vec<Dependent>, dependent: Dependent) {
+    dependents.retain(|existing| !existing.part_uri.is_equivalent_to(&dependent.part_uri));
+    if dependent.before != dependent.after {
+        dependents.push(dependent);
+    }
+    sort_dependents(dependents);
+}
+
+fn sort_dependents(dependents: &mut [Dependent]) {
+    dependents.sort_unstable_by_key(|dependent| dependent.part_uri.as_str().to_ascii_lowercase());
+}
+
+fn diff_dependents(
+    source: &Package,
+    target: &Package,
+    retained: &mut Retention,
+) -> Result<Vec<Dependent>> {
+    let source_entries = current_dependents(source);
+    let target_entries = current_dependents(target);
+    let mut dependents = Vec::new();
+    let mut seen = HashSet::new();
+    for entry in source_entries.iter().chain(target_entries.iter()) {
+        if !seen.insert(entry.part_uri.as_str().to_ascii_lowercase()) {
+            continue;
+        }
+        let before = effective_dependent(source, &entry.part_uri, retained)?;
+        let after = effective_dependent(target, &entry.part_uri, retained)?;
+        if before == after {
+            continue;
+        }
+        dependents.push(Dependent {
+            part_uri: entry.part_uri.clone(),
+            content_type: entry.content_type.clone(),
+            before,
+            after,
+        });
+    }
+    sort_dependents(&mut dependents);
+    Ok(dependents)
+}
+
+fn rebase_dependents_to_physical(
+    package: &Package,
+    desired: &[Dependent],
+    retained: &mut Retention,
+) -> Result<Vec<Dependent>> {
+    let mut rebased = current_dependents(package);
+    for dependent in desired {
+        let before =
+            physical_dependent(package, &dependent.part_uri, retained)?.map(|(image, _)| image);
+        let mut recipe = dependent.clone();
+        recipe.before = before;
+        upsert_dependent(&mut rebased, recipe);
+    }
+    Ok(rebased)
+}
+
+/// A durable patch may remove exactly the Parts its removed slides own,
+/// proven on the current effective topology, and each must hold the image
+/// the patch was authored against.
+fn validate_dependents_against_effective(
+    package: &Package,
+    data: &Data,
+    retained: &mut Retention,
+) -> Result<()> {
+    for dependent in data.dependents.iter() {
+        if effective_dependent(package, &dependent.part_uri, retained)? != dependent.before {
+            return Err(Error::PatchConflict);
+        }
+    }
+    let removed: Vec<PackURI> = data
+        .changes
+        .iter()
+        .filter(|change| change.before.is_some() && change.after.is_none())
+        .map(|change| change.key.part_uri.clone())
+        .collect();
+    let expected: Vec<&PackURI> = data
+        .dependents
+        .iter()
+        .filter(|dependent| dependent.before.is_some())
+        .map(|dependent| &dependent.part_uri)
+        .collect();
+    if removed.is_empty() {
+        return if expected.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::PatchConflict)
+        };
+    }
+    let owned = owned_parts(package, &removed)?;
+    if !same_parts(owned.parts(), &expected) {
+        return Err(Error::PatchConflict);
+    }
+    Ok(())
+}
+
+/// The Parts a patch restores must be exactly the Parts its restored slides
+/// own in the prepared candidate.
+fn validate_restored_dependents(revision: &Revision, data: &Data) -> Result<()> {
+    let restored: Vec<PackURI> = data
+        .changes
+        .iter()
+        .filter(|change| change.before.is_none() && change.after.is_some())
+        .map(|change| change.key.part_uri.clone())
+        .collect();
+    let expected: Vec<&PackURI> = data
+        .dependents
+        .iter()
+        .filter(|dependent| dependent.after.is_some())
+        .map(|dependent| &dependent.part_uri)
+        .collect();
+    if expected.is_empty() {
+        return Ok(());
+    }
+    if restored.is_empty() {
+        return Err(Error::PatchConflict);
+    }
+    let maximum = revision
+        .prepared
+        .read_limits()
+        .max_parts()
+        .saturating_mul(16);
+    let owned =
+        crate::presentation::owned_parts::Graph::from_prepared(&revision.prepared, maximum)?
+            .owned_by_all(&restored)?;
+    if !same_parts(owned.parts(), &expected) {
+        return Err(Error::PatchConflict);
+    }
+    Ok(())
+}
+
+fn same_parts(owned: &[PackURI], expected: &[&PackURI]) -> bool {
+    owned.len() == expected.len()
+        && owned.iter().all(|part| {
+            expected
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(part))
+        })
 }
 
 fn restore_metadata(
@@ -997,7 +1353,9 @@ fn validate_changes_against_effective(
                     after.xml.as_slice(),
                     package.owner.limits,
                 )?;
-                crate::presentation::transition::validate_source(after.xml.as_slice(), "apply")?;
+                // A restored slide is an exact image; markup compatibility
+                // enclosed in its shapes is admitted (record 0303).
+                crate::presentation::transition::admit_source(after.xml.as_slice(), "apply")?;
             },
             (Some(_), None) => validate_removal_admission(
                 package,
@@ -1063,6 +1421,7 @@ fn target_is_physical(
     package: &Package,
     data: &Data,
     changes: &[Change],
+    dependents: &[Dependent],
     retained: &mut Retention,
 ) -> Result<bool> {
     let physical = physical_state(package, retained)?;
@@ -1078,6 +1437,13 @@ fn target_is_physical(
     for change in changes {
         let physical_image = physical_image(package, &change.key, retained)?.map(|value| value.0);
         if physical_image != change.after {
+            return Ok(false);
+        }
+    }
+    for dependent in dependents {
+        let physical =
+            physical_dependent(package, &dependent.part_uri, retained)?.map(|value| value.0);
+        if physical != dependent.after {
             return Ok(false);
         }
     }
@@ -1378,6 +1744,7 @@ fn recipe_bytes(
     root: &[u8],
     order: &[StableSlideKey],
     changes: &[Change],
+    dependents: &[Dependent],
     state: Option<&State>,
 ) -> Result<usize> {
     const MAXIMUM: usize = 128 * 1024 * 1024;
@@ -1407,6 +1774,20 @@ fn recipe_bytes(
         add(change.content_type.len())?;
         add(change.relationship_type.len())?;
         for image in [change.before.as_ref(), change.after.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            add(image.xml.len())?;
+            if let Some(rels) = &image.relationships {
+                add(rels.len())?;
+            }
+        }
+    }
+    for dependent in dependents {
+        add(256)?;
+        add(dependent.part_uri.as_str().len())?;
+        add(dependent.content_type.len())?;
+        for image in [dependent.before.as_ref(), dependent.after.as_ref()]
             .into_iter()
             .flatten()
         {

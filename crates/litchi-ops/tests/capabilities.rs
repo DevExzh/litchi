@@ -830,7 +830,7 @@ fn pptx_reports_selection_and_structural_writes() {
         assert_eq!(gap.follow_up(), "M2 PPTX positional-owner slide ordering");
         assert_eq!(
             gap.reason(),
-            "source-backed PPTX slide ordering still refuses sections, outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions"
+            "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions"
         );
     }
     assert!(
@@ -849,7 +849,7 @@ fn pptx_reports_selection_and_structural_writes() {
         (
             "dependency-topology",
             "M2 PPTX dependency-aware slide removal",
-            "native PPTX slide removal currently admits only a dependency-free slide with exactly one layout relationship; notes, comments, images, media, and external or internal relationship closure remain pending",
+            "native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused",
         ),
         (
             "final-slide",

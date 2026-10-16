@@ -20,8 +20,8 @@
 //! `docs/unified-ops/results/0289/crud-checklist.{md,tsv}`. Rewrite it with
 //! `LITCHI_BLESS=1` after showing that a change is intended. A
 //! claimed-supported cell that fails is a bug: [`KNOWN_FAILURES`] lists the
-//! ones records 0289 and 0290 left open, each with its cause, and the test
-//! fails on any other.
+//! ones still open, each with its cause (records 0290, 0298 and 0303 closed
+//! every one record 0289 found), and the test fails on any other.
 
 #![cfg(all(
     feature = "doc",
@@ -633,16 +633,9 @@ const SEEDS: &[(&str, &[Step])] = &[
 /// Claimed-supported cells that fail, with the cause record 0289 found:
 /// `(format, element, verb, cause)`. Each entry is a recorded bug. Record
 /// 0290 fixed F1, F2, F4, F6 and F7; record 0298 fixed F8 (Keynote slide
-/// removal, now exercised on the multi-slide deck).
-const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[(
-    "pptx",
-    "ole",
-    "remove",
-    "F3: every corpus OLE object sits in markup compatibility (the `mc:AlternateContent` \
-         inside the `p:graphicFrame`); the source-backed slide guard refuses any markup \
-         compatibility outside a direct transition at snapshot, apply and publication \
-         (record 0290 §3), and `add` cannot make one",
-)];
+/// removal, now exercised on the multi-slide deck); record 0303 fixed F3
+/// (PPTX OLE removal under markup compatibility).
+const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[];
 
 fn test_data() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data")
