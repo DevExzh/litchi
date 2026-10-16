@@ -658,6 +658,18 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - Bench matrix parsers through 0313; the `unified-query` lockfile gains `memchr`.
   - Coordinator note: a leftover agent wait loop (`pgrep -f` matching its own command line) was killed; the agent rules now forbid that pattern.
   - Open (to 0315): walker and owned-node residual (G4–G6, about 50 misses), DOCX `Children::next` freshness (G7), XLS sheet-step cache (G8), RTF typed props (G9); Keynote bytes-open copy (G11).
+- Merged `iwork-batch` (0314):
+  - A corpus property test (`iwork_batch_equivalence.rs`) compares `File::edit`, atomic `File::batch` and chained `File::set`. It found real violations in all three formats, now fixed (about 8,000 sequences pass):
+    - Pages, a leaf data-loss bug: several paragraph sets combined into one splice dropped the paragraph-style entries between them. The commit now combines only what it can prove equal (new `litchi-iwa-text-wire` `StorageBoundaries`).
+    - Keynote and Numbers runs publish first wherever combining would differ. A failed Numbers run names the first failing item.
+  - Batch misses remain: Pages `batch_10000` 1.47 and `batch_1000` 1.08; Keynote `batch_1000` 1.07 (meets the bar with paths parsed outside the clock); Numbers 1.31. Most of what remains is path-text parsing (about 0.96 K instructions per item), handed to 0315. The Pages leaf at 10,000 items is 3.5% slower, the cost of the correctness check.
+  - Open (to 0318): Numbers comments (request 19), the formula-coordinate shift, Keynote/Pages table creation.
+- Merged `opc-proofs` (0317):
+  - The DOCX default-owner set takes litchi-opc's remembered proof: 409 → 23 µs (0.031× the leaf).
+  - Successor proofs carry derived boundary indexes, and the overlay keeps each revision's proof, so chained edits on a committed handle are proved edit by edit: set 416 → 25 µs, add 268 → 82 µs.
+  - Depth-3 indexes for PresentationML parts; PPTX set+write and add+write are 5% faster.
+  - Debug builds re-check every splice and every derived index against a full audit; randomized chain tests run at depths 2 and 3.
+  - Open: default-owner DOCX add +4.8% instructions (+1.0–1.6% wall); PPTX committed handles not chained; the first DOCX commit scans the original twice.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
