@@ -16,7 +16,7 @@ use crate::{LimitKind, SourceLimitKind, SourceLimits};
 /// # Errors
 ///
 /// [`PackageError::InvalidFormat`] for a bundle the shared capture refuses
-/// (no `Index.zip`, a loose `Index/` directory, a symbolic link, a special
+/// (no `Index.zip` nor `Index/` folder, or both, a symbolic link, a special
 /// file, a non-UTF-8 name or nesting deeper than 16 levels);
 /// [`PackageError::Limit`] when a figure exceeds `limits`;
 /// [`PackageError::Io`] for a read failure; archive errors when `Index.zip`

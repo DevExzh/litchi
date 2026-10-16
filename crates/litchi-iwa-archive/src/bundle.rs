@@ -196,14 +196,20 @@ pub fn is_directory(path: &Path) -> bool {
 /// `archive` is the physical profile `Index.zip` is read under; the
 /// conversion's own output bound is derived from the captured length.
 ///
+/// A bundle normally holds `Index.zip`. A bundle whose components sit loose
+/// in an `Index/` folder instead (an older app layout) converts too: every
+/// file, the `Index/` components included, becomes a stored member in byte
+/// order of its relative name. Saving such a package with [`save`] writes
+/// the `Index.zip` layout.
+///
 /// # Errors
 ///
-/// [`CaptureError::Invalid`] for a bundle without `Index.zip`, with a loose
-/// `Index/` directory, a symbolic link, a special file, a non-UTF-8 name or
-/// nesting deeper than 16 levels; [`CaptureError::Limit`] when a figure
-/// exceeds `limits`; [`CaptureError::Io`] for a read failure;
+/// [`CaptureError::Invalid`] for a bundle with neither `Index.zip` nor an
+/// `Index/` folder, with both, with a symbolic link, a special file, a
+/// non-UTF-8 name or nesting deeper than 16 levels; [`CaptureError::Limit`]
+/// when a figure exceeds `limits`; [`CaptureError::Io`] for a read failure;
 /// [`CaptureError::Archive`] when `Index.zip` is malformed or the
-/// reassembly fails.
+/// conversion fails.
 pub fn capture(
     root: &Path,
     limits: CaptureLimits,
@@ -213,20 +219,37 @@ pub fn capture(
     let mut total = 0_u64;
     walk(root, "", 0, limits, &mut members, &mut total)?;
     members.sort_by(|left, right| left.name.as_bytes().cmp(right.name.as_bytes()));
-    let index = members
-        .iter()
-        .position(|member| member.name == INDEX_ZIP)
-        .ok_or(CaptureError::Invalid(
-            "an iWork package directory has no Index.zip",
-        ))?;
-    if members
-        .iter()
-        .any(|member| member.name.starts_with("Index/"))
-    {
-        return Err(CaptureError::Invalid(
-            "iWork package directories with a loose Index folder are not supported",
-        ));
-    }
+    let loose = is_directory(&root.join("Index"));
+    let index = members.iter().position(|member| member.name == INDEX_ZIP);
+    let index = match (index, loose) {
+        (Some(_), true) => {
+            return Err(CaptureError::Invalid(
+                "an iWork package directory holds both Index.zip and an Index folder",
+            ));
+        },
+        (None, false) => {
+            return Err(CaptureError::Invalid(
+                "an iWork package directory has no Index.zip",
+            ));
+        },
+        (None, true) => {
+            let output =
+                usize::try_from(total)
+                    .unwrap_or(usize::MAX)
+                    .saturating_add(members.iter().fold(64_usize, |bound, member| {
+                        bound
+                            .saturating_add(100)
+                            .saturating_add(member.name.len().saturating_mul(2))
+                    }));
+            let archive = converted_limits(archive, output)?;
+            let entries: Vec<(&str, &[u8])> = members
+                .iter()
+                .map(|member| (member.name.as_str(), member.data.as_slice()))
+                .collect();
+            return Ok(crate::package::to_bytes(entries, archive)?);
+        },
+        (Some(index), false) => index,
+    };
     let index = members.remove(index);
     let catalog = Catalog::from_bytes_with_limits(&index.data, archive)?;
     // The converted package is the captured bytes plus ZIP framing: a local
