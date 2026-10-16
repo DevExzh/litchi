@@ -82,7 +82,11 @@ pub(crate) fn find_replace(
             Scope::Ranges(ranges)
         };
         let body = file.body()?;
-        let (runs, ids) = surface_of(body, &scope)?;
+        // A paragraph without a candidate holds no match (every match lies
+        // in one paragraph, and `may_match` is exact when it says no), so
+        // only candidates are listed (record 0302).
+        let matcher = spec.matcher();
+        let (runs, ids) = surface_of(body, &scope, |text| matcher.may_match(text))?;
         let (changes, matches) = surface::find(&runs, spec, replacement, format, limits)?;
         Ok((commit(file, &ids, changes, limits)?, matches))
     })()
@@ -104,7 +108,9 @@ pub(crate) fn merge(
     let result = (|| {
         file.admit_edit()?;
         let body = file.body()?;
-        let (runs, ids) = surface_of(body, &Scope::Every)?;
+        // `surface::merge` looks for placeholders only in groups holding a
+        // `{`: a paragraph without one is not listed.
+        let (runs, ids) = surface_of(body, &Scope::Every, |text| text.contains('{'))?;
         let mut planner = Planner::new(record, options, limits);
         let changes = surface::merge(&runs, &mut planner, true, format, limits)?;
         let summary = planner.finish();
@@ -118,43 +124,40 @@ pub(crate) fn merge(
     result
 }
 
-/// The runs of every paragraph and heading in `scope`, and their ids.
-fn surface_of<'b>(body: Body<'b>, scope: &Scope) -> Result<(Vec<Run<'b>>, Vec<NodeId>)> {
+/// The runs of every paragraph and heading in `scope` whose text `wanted`
+/// accepts, and their ids. Every run's text is decoded once; a paragraph
+/// `wanted` rejects (its runs' text, joined) lists nothing, and its runs'
+/// scope and rewritability are not computed.
+fn surface_of<'b>(
+    body: Body<'b>,
+    scope: &Scope,
+    wanted: impl Fn(&str) -> bool,
+) -> Result<(Vec<Run<'b>>, Vec<NodeId>)> {
     let mut runs = Vec::new();
     let mut ids = Vec::new();
     let mut group = 0usize;
+    // The current paragraph's runs, with their groups, before the filter.
+    let mut pending: Vec<(LeafNode<'b>, std::borrow::Cow<'b, str>, usize)> = Vec::new();
+    let mut joined = String::new();
     for paragraph in body.nodes() {
         if !matches!(paragraph.kind(), LeafKind::Paragraph | LeafKind::Heading) {
             continue;
         }
         let range = paragraph.range();
-        let wanted = match scope {
+        let wanted_paragraph = match scope {
             Scope::Every => !in_comment(paragraph),
             // A paragraph is searched when a scope holds it, or lies in it
             // (a run scope).
             Scope::Ranges(ranges) => ranges.iter().any(|scope| overlaps(scope, &range)),
         };
-        if !wanted {
+        if !wanted_paragraph {
             continue;
         }
         group += 1;
+        pending.clear();
         let mut push = |run: LeafNode<'b>, group: usize| -> Result<()> {
-            let scoped = match scope {
-                Scope::Every => true,
-                Scope::Ranges(ranges) => {
-                    let own = run.range();
-                    ranges
-                        .iter()
-                        .any(|scope| scope.start <= own.start && own.end <= scope.end)
-                },
-            };
             let text = run.text().map_err(super::super::core_error)?;
-            runs.push(
-                Run::new(text, group)
-                    .scoped(scoped)
-                    .editable(rewritable(run)),
-            );
-            ids.push(run.id());
+            pending.push((run, text, group));
             Ok(())
         };
         for child in paragraph.children() {
@@ -174,6 +177,39 @@ fn surface_of<'b>(body: Body<'b>, scope: &Scope) -> Result<(Vec<Run<'b>>, Vec<No
                 LeafKind::Bookmark => {},
                 _ => group += 1,
             }
+        }
+        // A match or placeholder lies inside one group, so inside the
+        // paragraph's joined text.
+        let candidate = match pending.as_slice() {
+            [] => false,
+            [(_, text, _)] => wanted(text),
+            several => {
+                joined.clear();
+                for (_, text, _) in several {
+                    joined.push_str(text);
+                }
+                wanted(&joined)
+            },
+        };
+        if !candidate {
+            continue;
+        }
+        for (run, text, group) in pending.drain(..) {
+            let scoped = match scope {
+                Scope::Every => true,
+                Scope::Ranges(ranges) => {
+                    let own = run.range();
+                    ranges
+                        .iter()
+                        .any(|scope| scope.start <= own.start && own.end <= scope.end)
+                },
+            };
+            runs.push(
+                Run::new(text, group)
+                    .scoped(scoped)
+                    .editable(rewritable(run)),
+            );
+            ids.push(run.id());
         }
     }
     Ok((runs, ids))

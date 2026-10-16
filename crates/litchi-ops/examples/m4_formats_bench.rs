@@ -164,6 +164,9 @@ mod bench {
                 continue;
             }
             for matches in [1usize, paragraphs] {
+                if !wanted(&format!("odt_find_{matches}")) && !wanted("odt*") {
+                    continue;
+                }
                 let every = paragraphs / matches;
                 let bytes = odt(paragraphs, |index| {
                     if index % every == 0 {
