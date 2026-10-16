@@ -3073,6 +3073,12 @@ struct PreparedPart {
     replacement: Option<Arc<Vec<u8>>>,
     relationships: Option<Arc<Relationships>>,
     source_xml: Option<SourceXmlPart>,
+    /// The source XML audit's proof of `replacement`, with the boundaries
+    /// its audit recorded or derived, kept on unmanaged packages only so the
+    /// next edit of this effective revision is proved from it (record
+    /// 0317). At most [`RETAINED_EFFECTIVE_XML_PROOFS`] Parts of one
+    /// revision keep one.
+    xml_proof: Option<xml_minifier::audit::VerifiedSource>,
     _metadata_reservation: Option<Arc<Reservation>>,
 }
 
@@ -10740,8 +10746,20 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC XML source tokens",
                 source,
             })?;
+        // The proofs the audits below return, by pending replacement, kept
+        // for the effective Parts (record 0317).
+        let mut replacement_proofs: Vec<Option<xml_minifier::audit::VerifiedSource>> = Vec::new();
+        if !self.cache.is_managed() {
+            replacement_proofs
+                .try_reserve_exact(pending_replacements.len())
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC replacement proofs",
+                    source,
+                })?;
+            replacement_proofs.resize(pending_replacements.len(), None);
+        }
         if !signed_replacements_are_noop {
-            for replacement in &pending_replacements {
+            for (replacement_index, replacement) in pending_replacements.iter().enumerate() {
                 self.check_topology_progress()?;
                 let original = self.read_part(replacement.target)?;
                 // Compare bytes before any XML audit. A caller may intentionally
@@ -10761,13 +10779,22 @@ impl SourceBackedPackage {
                     part.partname.as_str(),
                     part.content_type.as_str(),
                 ) {
-                    self.audit_physical_replacement_xml(
+                    let proof = self.audit_physical_replacement_xml(
                         replacement.target,
                         &original,
                         &replacement.replacement,
                         replacement.replacement_spans.as_deref(),
                         replacement.proof.as_ref(),
+                        None,
                     )?;
+                    if let Some(slot) = replacement_proofs.get_mut(replacement_index) {
+                        *slot = proof.filter(|proof| {
+                            proof.covers(
+                                replacement.replacement.as_slice(),
+                                xml_minifier::audit::Limits::default(),
+                            )
+                        });
+                    }
                 }
                 changed.push(ChangedOverlay {
                     target: ChangedOverlayTarget::Part(replacement.target),
@@ -11027,10 +11054,17 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC effective Part catalog",
                 source,
             })?;
+        let mut retained_xml_proofs = 0;
         for (index, part) in self.catalog.parts.iter().enumerate() {
             if pending_removal_set.contains(&index) {
                 continue;
             }
+            let xml_proof = pending_replacement_indices
+                .get(&index)
+                .and_then(|replacement_index| replacement_proofs.get_mut(*replacement_index))
+                .and_then(Option::take)
+                .filter(|_| retained_xml_proofs < RETAINED_EFFECTIVE_XML_PROOFS);
+            retained_xml_proofs += usize::from(xml_proof.is_some());
             let replacement = pending_replacement_indices
                 .get(&index)
                 .map(|replacement_index| {
@@ -11048,6 +11082,7 @@ impl SourceBackedPackage {
                     .and_then(|replacement_index| {
                         pending_replacements[*replacement_index].source_xml.clone()
                     }),
+                xml_proof,
                 _metadata_reservation: None,
             }));
         }
@@ -11062,6 +11097,7 @@ impl SourceBackedPackage {
                 replacement: Some(addition.payload.effective_bytes_arc()),
                 relationships: Some(Arc::new(relationships)),
                 source_xml: None,
+                xml_proof: None,
                 _metadata_reservation: None,
             }));
         }
@@ -12148,10 +12184,16 @@ impl SourceBackedPackage {
                 target_part.partname.as_str(),
                 target_part.content_type.as_str(),
             ) {
-                validate_source_part_replacement_xml(
-                    target_part.partname.as_str(),
-                    original.as_bytes(),
+                // The pair audit's verdict and error, from the remembered
+                // original and its indexed proof when this unmanaged package
+                // has audited it before (records 0311, 0313 and 0317).
+                let _proof = self.audit_physical_replacement_xml(
+                    overlay.target,
+                    &original,
                     &overlay.replacement,
+                    None,
+                    None,
+                    None,
                 )?;
             }
             drop(original);
@@ -15178,6 +15220,19 @@ impl SourceBackedPackage {
     /// recorded boundaries, such as an inserted paragraph. The proof keeps
     /// the original's allocation alive; at most
     /// [`RETAINED_SOURCE_XML_PROOFS`] are kept per package.
+    ///
+    /// Record 0317 adds two things:
+    ///
+    /// * `predecessor`, the retained proof of the effective revision the
+    ///   replacement edits, is preferred over the original's proof once the
+    ///   original is remembered. Its successor's verdict is the
+    ///   replacement's own source audit whatever bytes it proves, so a
+    ///   predecessor can only make the audit cheaper, and a chain of edits on
+    ///   a committed revision is proved edit by edit from the boundaries each
+    ///   proof derives for its successor.
+    /// * PresentationML slide-like Parts are indexed one level deeper
+    ///   ([`source_xml_index_depth`]), so shape edits inside a slide's shape
+    ///   tree are proved by their own shape.
     fn audit_physical_replacement_xml(
         &self,
         target: usize,
@@ -15185,9 +15240,11 @@ impl SourceBackedPackage {
         replacement: &Arc<Vec<u8>>,
         spans: Option<&[ReplacementSpan]>,
         proof: Option<&xml_minifier::audit::VerifiedSource>,
+        predecessor: Option<&xml_minifier::audit::VerifiedSource>,
     ) -> Result<Option<xml_minifier::audit::VerifiedSource>> {
         let limits = xml_minifier::audit::Limits::default();
         let part = self.catalog.parts[target].partname.as_str();
+        let depth = source_xml_index_depth(self.catalog.parts[target].content_type.as_str());
         let publication_error = |source| OpcError::XmlPublication {
             part: part.to_string(),
             source,
@@ -15203,7 +15260,7 @@ impl SourceBackedPackage {
             if self.remembered_source_xml_audit(target, version).is_none() {
                 let base = match shared_original {
                     Some(bytes) => Some(
-                        xml_minifier::audit::VerifiedSource::verify_indexed(bytes, limits)
+                        xml_minifier::audit::VerifiedSource::verify_indexed(bytes, limits, depth)
                             .map_err(publication_error)?,
                     ),
                     None => {
@@ -15220,7 +15277,10 @@ impl SourceBackedPackage {
         if let Some(base) = self.remembered_source_xml_audit(target, version) {
             // The pair's verdict on `original` is known to pass, so it is the
             // replacement's own audit, error included.
-            let proof = match base {
+            let predecessor = predecessor.filter(|predecessor| {
+                predecessor.limits() == limits && predecessor.index_depth().is_some()
+            });
+            let proof = match predecessor.or(base.as_ref()) {
                 Some(base) => {
                     base.verify_successor(Arc::clone(replacement), limits)
                         .map_err(publication_error)?
@@ -15248,6 +15308,7 @@ impl SourceBackedPackage {
                         bytes,
                         Arc::clone(replacement),
                         limits,
+                        depth,
                     )
                     .map_err(|error| publication_error(error.into_error()))?;
                 (Some(base), proof)
@@ -15264,6 +15325,34 @@ impl SourceBackedPackage {
         };
         self.remember_source_xml_audit(target, version, base);
         Ok(Some(proof))
+    }
+
+    /// The indexed proof the source bytes of `partname` earned when this
+    /// package last audited a replacement of them, when it keeps one;
+    /// nothing is audited (record 0317).
+    ///
+    /// Only an unmanaged package remembers its originals, at most four of
+    /// them with their proofs, and only for its current source revision. The
+    /// proof covers exactly the bytes [`PartView::data`] returns for the
+    /// Part, so a caller may hand it to a source XML audit of an edit of
+    /// them, such as
+    /// [`xml_minifier::audit::VerifiedSource::verify_successor`], whose
+    /// verdict is the edit's own complete audit either way.
+    #[must_use]
+    pub fn xml_audit_proof(
+        &self,
+        partname: &PackURI,
+    ) -> Option<xml_minifier::audit::VerifiedSource> {
+        self.retained_xml_audit_proof(self.part_index(partname)?)
+    }
+
+    /// [`Self::xml_audit_proof`] by catalog index.
+    pub(crate) fn retained_xml_audit_proof(
+        &self,
+        target: usize,
+    ) -> Option<xml_minifier::audit::VerifiedSource> {
+        self.remembered_source_xml_audit(target, self.source.version())
+            .flatten()
     }
 
     /// `None` when the original of `target` at `version` has not passed here;
@@ -15333,6 +15422,39 @@ impl SourceBackedPackage {
 /// How many remembered originals keep their indexed proof (and so their
 /// allocation) per package.
 const RETAINED_SOURCE_XML_PROOFS: usize = 4;
+
+/// How many Parts of one effective revision keep their replacement's proof
+/// ([`PreparedPart::xml_proof`]). The proof shares the replacement's own
+/// allocation, so what it adds is its boundary index: at most 20 bytes per
+/// boundary, one boundary per 32 payload bytes plus 64, and its namespace
+/// snapshots within the auditor's 8 MiB snapshot budget.
+const RETAINED_EFFECTIVE_XML_PROOFS: usize = 4;
+
+/// The depth to which the source XML audit of a Part with `content_type`
+/// records content boundaries (record 0317).
+///
+/// PresentationML slides, layouts, masters and notes keep their shapes in
+/// `p:cSld/p:spTree`, three elements deep, so they are indexed one level
+/// deeper than the default, which covers WordprocessingML body blocks and
+/// SpreadsheetML rows.
+fn source_xml_index_depth(content_type: &str) -> xml_minifier::audit::IndexDepth {
+    const SLIDE_LIKE: [&str; 6] = [
+        "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml",
+    ];
+    if SLIDE_LIKE
+        .iter()
+        .any(|slide| slide.eq_ignore_ascii_case(content_type))
+    {
+        xml_minifier::audit::IndexDepth::GRANDCHILDREN
+    } else {
+        xml_minifier::audit::IndexDepth::CHILDREN
+    }
+}
 
 /// One physical Part's original that passed the source XML audit.
 #[derive(Debug)]
@@ -17542,7 +17664,7 @@ mod tests {
         let inserted = insert("<w:p><w:r><w:t>Inserted</w:t></w:r></w:p>");
         // The first pair audits the original once and keeps its boundaries.
         let proof = package
-            .audit_physical_replacement_xml(target, &original, &inserted, None, None)
+            .audit_physical_replacement_xml(target, &original, &inserted, None, None, None)
             .unwrap()
             .unwrap();
         assert!(proof.covers(&inserted, xml_minifier::audit::Limits::default()));
@@ -17560,8 +17682,14 @@ mod tests {
             insert("<x:p/>"),
             insert("<w:p><w:t>&bogus;</w:t></w:p>"),
         ] {
-            let actual =
-                package.audit_physical_replacement_xml(target, &original, &replacement, None, None);
+            let actual = package.audit_physical_replacement_xml(
+                target,
+                &original,
+                &replacement,
+                None,
+                None,
+                None,
+            );
             match xml_minifier::audit::verify_source(
                 &replacement,
                 xml_minifier::audit::Limits::default(),
@@ -17613,13 +17741,14 @@ mod tests {
                     &Arc::new(b"<a>".to_vec()),
                     None,
                     None,
+                    None,
                 )
                 .is_err()
         );
         assert!(!package.original_source_xml_audited(target, version));
         let replacement = Arc::new(b"<after/>".to_vec());
         let proof = package
-            .audit_physical_replacement_xml(target, &original, &replacement, None, None)
+            .audit_physical_replacement_xml(target, &original, &replacement, None, None, None)
             .unwrap()
             .expect("a complete pair audit proves its replacement");
         assert!(proof.covers(&replacement, xml_minifier::audit::Limits::default()));
@@ -17631,6 +17760,7 @@ mod tests {
                 target,
                 &original,
                 &Arc::new(b"<a>".to_vec()),
+                None,
                 None,
                 None,
             ),
