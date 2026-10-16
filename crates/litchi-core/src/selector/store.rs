@@ -10,25 +10,28 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 
 /// Zero or one element inline; two or more on the heap.
+///
+/// An enum rather than an `Option` beside a `Vec`: the single-element form
+/// carries no empty `Vec`, which keeps a path step 24 bytes smaller (record
+/// 0302), and a parsed path is moved by value several times per call.
 #[derive(Clone)]
-pub(super) struct OneOrMany<T> {
-    // Invariant: when `one` is `Some`, `many` is empty.
-    one: Option<T>,
-    many: Vec<T>,
+pub(super) enum OneOrMany<T> {
+    Zero,
+    One(T),
+    // Invariant: two or more elements.
+    Many(Vec<T>),
 }
 
 impl<T> OneOrMany<T> {
     pub(super) const fn new() -> Self {
-        Self {
-            one: None,
-            many: Vec::new(),
-        }
+        Self::Zero
     }
 
     pub(super) fn as_slice(&self) -> &[T] {
-        match &self.one {
-            Some(one) => std::slice::from_ref(one),
-            None => &self.many,
+        match self {
+            Self::Zero => &[],
+            Self::One(one) => std::slice::from_ref(one),
+            Self::Many(many) => many,
         }
     }
 
@@ -37,38 +40,38 @@ impl<T> OneOrMany<T> {
     }
 
     pub(super) fn is_empty(&self) -> bool {
-        self.one.is_none() && self.many.is_empty()
+        matches!(self, Self::Zero)
     }
 
     pub(super) fn push(&mut self, value: T) {
-        if !self.many.is_empty() {
-            self.many.push(value);
-        } else if let Some(first) = self.one.take() {
-            self.many.reserve_exact(4);
-            self.many.push(first);
-            self.many.push(value);
-        } else {
-            self.one = Some(value);
+        match self {
+            Self::Zero => *self = Self::One(value),
+            Self::Many(many) => many.push(value),
+            Self::One(_) => {
+                let Self::One(first) = std::mem::replace(self, Self::Zero) else {
+                    return;
+                };
+                let mut many = Vec::with_capacity(4);
+                many.push(first);
+                many.push(value);
+                *self = Self::Many(many);
+            },
         }
     }
 
     pub(super) fn into_vec(self) -> Vec<T> {
-        match self.one {
-            Some(one) => vec![one],
-            None => self.many,
+        match self {
+            Self::Zero => Vec::new(),
+            Self::One(one) => vec![one],
+            Self::Many(many) => many,
         }
     }
 
     pub(super) fn map<U>(self, mut map: impl FnMut(T) -> U) -> OneOrMany<U> {
-        match self.one {
-            Some(one) => OneOrMany {
-                one: Some(map(one)),
-                many: Vec::new(),
-            },
-            None => OneOrMany {
-                one: None,
-                many: self.many.into_iter().map(map).collect(),
-            },
+        match self {
+            Self::Zero => OneOrMany::Zero,
+            Self::One(one) => OneOrMany::One(map(one)),
+            Self::Many(many) => OneOrMany::Many(many.into_iter().map(map).collect()),
         }
     }
 }

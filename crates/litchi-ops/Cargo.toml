@@ -83,7 +83,7 @@ opc = ["dep:litchi-opc"]
 # facade. `formula` renders OMML and MTEF formulas as LaTeX in that output,
 # and `yaml` writes document properties as YAML front matter; each mirrors
 # the facade feature of the same name, which turns it on.
-markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr"]
+markdown = ["dep:base64", "dep:litchi-markdown"]
 formula = ["dep:litchi-formula", "litchi-doc?/formula"]
 yaml = ["dep:serde-saphyr"]
 
@@ -138,7 +138,7 @@ litchi-sign         = { workspace = true, optional = true }
 litchi-xls          = { workspace = true, optional = true }
 litchi-xlsb         = { workspace = true, optional = true }
 litchi-xlsx         = { workspace = true, optional = true }
-memchr              = { workspace = true, optional = true } # Markdown HTML escaping
+memchr              = { workspace = true } # Markdown HTML escaping; find/replace literal search
 serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
 
 [dev-dependencies]

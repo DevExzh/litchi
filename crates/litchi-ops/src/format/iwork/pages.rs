@@ -603,24 +603,33 @@ fn value_type(value: &litchi_pages::table::read::Value) -> &'static str {
 // ---------------------------------------------------------------------------
 
 /// Paragraph text sets waiting for one paragraph transaction per section:
-/// section → line → text.
+/// section → `(line, text)` in staging order. A batch stages in line order,
+/// so a list append is cheaper than a map insert per set (record 0302);
+/// [`Pending::flush`] orders each section's lines and keeps the last text
+/// of a repeated line, which is what a map keyed by line held.
 #[derive(Debug, Default)]
-struct Pending(BTreeMap<usize, BTreeMap<usize, String>>);
+struct Pending(BTreeMap<usize, Vec<(usize, String)>>);
 
 impl Pending {
     fn stage(&mut self, section: usize, line: usize, value: String) {
-        self.0.entry(section).or_default().insert(line, value);
+        self.0.entry(section).or_default().push((line, value));
     }
 
     /// Commit the staged sets: one leaf paragraph transaction per section.
     fn flush(&mut self, chain: &mut Chain<Package>) -> Result<()> {
         let error = |error| failure(LeafError::PagesParagraphs(error));
-        for (section, lines) in std::mem::take(&mut self.0) {
+        for (section, mut lines) in std::mem::take(&mut self.0) {
+            // Stable: the sets of one line stay in staging order.
+            lines.sort_by_key(|(line, _)| *line);
             let mut edit = chain
                 .package
                 .edit_section_paragraphs(section)
                 .map_err(error)?;
-            for (line, value) in &lines {
+            for (at, (line, value)) in lines.iter().enumerate() {
+                if lines.get(at + 1).is_some_and(|(next, _)| next == line) {
+                    // A later set of the same line replaces this one.
+                    continue;
+                }
                 edit.set(Position::new(*line), value).map_err(error)?;
             }
             let commit = edit.commit().map_err(error)?;
@@ -1362,6 +1371,17 @@ pub(crate) fn plan(
     if key.as_str() != "text" || is_metadata(target) {
         return Ok(None);
     }
+    if let Some(found) = direct_paragraph(file, path.path()) {
+        let Some((section, line)) = found else {
+            // Past the last paragraph: the ordinary path reports it.
+            return Ok(None);
+        };
+        return Ok(Some(Planned {
+            section,
+            line,
+            text: paragraph_text(value)?,
+        }));
+    }
     if file.checked_tree().is_err() {
         return Ok(None);
     }
@@ -1377,6 +1397,64 @@ pub(crate) fn plan(
         line: leaf[LINE],
         text: paragraph_text(value)?,
     }))
+}
+
+/// The `(section, line)` of the paragraph `/body/p[N]` names, from each
+/// section's paragraph count rather than the object tree (record 0302): a
+/// coalesced run of sets on a large document otherwise builds the whole
+/// tree, with a text copy and properties per paragraph, before its first
+/// set. `None` for any other spelling (it resolves through the tree);
+/// `Some(None)` when the document has fewer than N paragraphs.
+///
+/// The tree lists each section's lines (its text split at `\n`) in section
+/// order under the body, ahead of the tables, so the N-th paragraph child
+/// of the body is the N-th line overall; the test
+/// `direct_paragraphs_match_the_tree` compares the two.
+fn direct_paragraph(file: &Iwork, path: &Path<'_>) -> Option<Option<(usize, usize)>> {
+    let [body, paragraph] = path.steps() else {
+        return None;
+    };
+    if !path.is_absolute()
+        || body.name() != "body"
+        || !body.predicates().is_empty()
+        || paragraph.name() != "p"
+    {
+        return None;
+    }
+    let index = paragraph.index()?.get();
+    let package = file.pages()?;
+    let starts = file.paragraph_starts(|| paragraph_starts(package));
+    let (&total, sections) = starts.split_last()?;
+    if index >= total {
+        return Some(None);
+    }
+    // The last section whose first paragraph is at or before `index`.
+    let section = sections
+        .partition_point(|&start| start <= index)
+        .checked_sub(1)?;
+    Some(Some((section, index - sections[section])))
+}
+
+/// The global index of each section's first paragraph, then the total.
+fn paragraph_starts(package: &Package) -> Box<[usize]> {
+    let sections = package.sections().len();
+    let mut starts = Vec::with_capacity(sections + 1);
+    let mut total = 0_usize;
+    for index in 0..sections {
+        starts.push(total);
+        let lines = match package.section_text(index) {
+            Ok(text) => line_count(text),
+            Err(_) => line_count(&section_text(package, index)),
+        };
+        total = total.saturating_add(lines);
+    }
+    starts.push(total);
+    starts.into_boxed_slice()
+}
+
+/// The paragraphs of a section text: its `\n`-separated lines.
+fn line_count(text: &str) -> usize {
+    text.bytes().filter(|&byte| byte == b'\n').count() + 1
 }
 
 /// Consecutive paragraph text sets of one transaction, published as one
@@ -1449,5 +1527,60 @@ impl Run {
             &self.limits,
         )?;
         Ok((self.base, commit))
+    }
+}
+
+#[cfg(test)]
+mod direct_tests {
+    use super::{Pages, direct_paragraph};
+    use crate::File;
+    use crate::path::{IntoPath, Path};
+
+    /// Every Pages fixture: `/body/p[N]` found from the section counts names
+    /// the paragraph the tree resolves, for every N up to two past the end.
+    #[test]
+    fn direct_paragraphs_match_the_tree() {
+        let directory =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/pages");
+        let mut checked = 0;
+        let mut entries: Vec<_> = std::fs::read_dir(&directory)
+            .expect("fixtures")
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension().is_some_and(|ext| ext == "pages"))
+            .collect();
+        entries.sort();
+        for fixture in entries {
+            let Ok(bytes) = std::fs::read(&fixture) else {
+                continue;
+            };
+            let Ok(File::Pages(file)) = crate::open_bytes(bytes) else {
+                continue;
+            };
+            let mut index = 1;
+            loop {
+                let text = format!("/body/p[{index}]");
+                let path = Path::parse(&text).expect("path");
+                let direct = direct_paragraph(&file, &path).expect("a direct spelling");
+                let arg = text.as_str().into_path().expect("path");
+                let tree = crate::path::resolve::get(&super::super::Nav::<Pages>::new(&file), &arg)
+                    .ok()
+                    .filter(|node| node.item().type_name() == "paragraph")
+                    .map(|node| {
+                        let leaf = node.item().leaf();
+                        (leaf[0] as usize, leaf[1] as usize)
+                    });
+                assert_eq!(direct, tree, "{} {text}", fixture.display());
+                checked += 1;
+                if direct.is_none() {
+                    break;
+                }
+                index += 1;
+            }
+            for other in ["/body/paragraph[1]", "/body/p", "/body[1]/p[1]", "/p[1]"] {
+                let path = Path::parse(other).expect("path");
+                assert!(direct_paragraph(&file, &path).is_none(), "{other}");
+            }
+        }
+        assert!(checked > 20, "{checked}");
     }
 }

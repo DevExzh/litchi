@@ -1241,6 +1241,7 @@ dependencies = [
  "litchi-xls",
  "litchi-xlsb",
  "litchi-xlsx",
+ "memchr",
  "serde",
  "serde_json",
  "unicode-normalization",

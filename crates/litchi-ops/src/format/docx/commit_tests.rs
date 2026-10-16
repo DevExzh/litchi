@@ -90,7 +90,7 @@ fn every_write_verb_keeps_its_leaf_patch_and_diagnostics() {
             &original,
             original
                 .set(
-                    "/body/p[1]/r[1]".into_target().unwrap(),
+                    &"/body/p[1]/r[1]".into_target().unwrap(),
                     props! { "text" => "changed", "bold" => true },
                 )
                 .unwrap(),
@@ -165,11 +165,11 @@ fn exact_noops_still_have_real_patches_and_preserve_the_input_archive() {
         let original = open(eager);
         for commit in [
             original
-                .set("/body/p[1]".into_target().unwrap(), props! {})
+                .set(&"/body/p[1]".into_target().unwrap(), props! {})
                 .unwrap(),
             original
                 .set(
-                    "/body/p[1]/r[1]".into_target().unwrap(),
+                    &"/body/p[1]/r[1]".into_target().unwrap(),
                     props! { "text" => "FIRST_PRIVATE" },
                 )
                 .unwrap(),
@@ -201,7 +201,7 @@ fn ordered_commits_replay_and_reverse_against_their_own_intermediate_bases() {
             &original,
             original
                 .set(
-                    "/body/p[1]/r[1]".into_target().unwrap(),
+                    &"/body/p[1]/r[1]".into_target().unwrap(),
                     props! { "text" => "first step" },
                 )
                 .unwrap(),
@@ -264,7 +264,7 @@ fn failed_operation_does_not_damage_an_already_retained_commit() {
             &original,
             original
                 .set(
-                    "/body/p[1]/r[1]".into_target().unwrap(),
+                    &"/body/p[1]/r[1]".into_target().unwrap(),
                     props! { "text" => "accepted" },
                 )
                 .unwrap(),
@@ -273,7 +273,7 @@ fn failed_operation_does_not_damage_an_already_retained_commit() {
         assert!(
             first
                 .set(
-                    "/body/p[1]/r[1]".into_target().unwrap(),
+                    &"/body/p[1]/r[1]".into_target().unwrap(),
                     props! { "text" => "discard", "not.a.property" => true }
                 )
                 .is_err()
@@ -306,7 +306,7 @@ fn explicit_unsigning_is_outside_the_main_document_patch_scope() {
             panic!("unsigned DOCX")
         };
         let (file, patch, diagnostics) = handle
-            .set("/body/p[1]".into_target().unwrap(), props! {})
+            .set(&"/body/p[1]".into_target().unwrap(), props! {})
             .unwrap()
             .into_parts();
         // These are leaf main-document facts, not proof that signature parts
@@ -331,7 +331,7 @@ fn retained_source_commit_and_replay_still_fence_physical_source_changes() {
     };
     let (file, patch, _) = original
         .set(
-            "/body/p[1]/r[1]".into_target().unwrap(),
+            &"/body/p[1]/r[1]".into_target().unwrap(),
             props! { "text" => "changed" },
         )
         .unwrap()
@@ -353,11 +353,11 @@ fn empty_assignments_do_not_bypass_target_admission() {
     for eager in [false, true] {
         let original = open(eager);
         let error = original
-            .set("/body".into_target().unwrap(), props! {})
+            .set(&"/body".into_target().unwrap(), props! {})
             .unwrap_err();
         assert_eq!(error.code(), crate::Code::UnsupportedElement);
         let error = original
-            .set("/body/p, r".into_target().unwrap(), props! {})
+            .set(&"/body/p, r".into_target().unwrap(), props! {})
             .unwrap_err();
         assert_eq!(error.code(), crate::Code::UnsupportedCapability);
         assert_eq!(File::Docx(original).to_bytes().unwrap(), bytes());
@@ -371,7 +371,7 @@ fn paragraph_text_fanout_matches_scalar_bytes_and_retains_native_history() {
             let original = open(eager);
             let commit = original
                 .set(
-                    crate::query::Query::parse("/body/p")
+                    &crate::query::Query::parse("/body/p")
                         .unwrap()
                         .into_target()
                         .unwrap(),
@@ -382,14 +382,14 @@ fn paragraph_text_fanout_matches_scalar_bytes_and_retains_native_history() {
             assert_eq!(patch.operations().len(), 2);
             let first = original
                 .set(
-                    "/body/p[1]".into_target().unwrap(),
+                    &"/body/p[1]".into_target().unwrap(),
                     props! { "text" => value },
                 )
                 .unwrap()
                 .into_file();
             let scalar = first
                 .set(
-                    "/body/p[2]".into_target().unwrap(),
+                    &"/body/p[2]".into_target().unwrap(),
                     props! { "text" => value },
                 )
                 .unwrap()
@@ -400,7 +400,7 @@ fn paragraph_text_fanout_matches_scalar_bytes_and_retains_native_history() {
             );
             let (_, noop, diagnostics) = changed
                 .set(
-                    crate::query::Query::parse("/body/p")
+                    &crate::query::Query::parse("/body/p")
                         .unwrap()
                         .into_target()
                         .unwrap(),
@@ -422,7 +422,7 @@ fn paragraph_text_fanout_keeps_ordered_assignments_and_error_properties() {
         let before = xml(&original);
         let error = original
             .set(
-                crate::query::Query::parse("/body/p")
+                &crate::query::Query::parse("/body/p")
                     .unwrap()
                     .into_target()
                     .unwrap(),
@@ -433,7 +433,7 @@ fn paragraph_text_fanout_keeps_ordered_assignments_and_error_properties() {
         assert_eq!(xml(&original), before);
         let commit = original
             .set(
-                crate::query::Query::parse("/body/p")
+                &crate::query::Query::parse("/body/p")
                     .unwrap()
                     .into_target()
                     .unwrap(),

@@ -643,33 +643,41 @@ fn placement<'a>(item: &'a BatchItem<'_>, moving: bool) -> Result<Placement<'a>>
     Ok(Placement::End)
 }
 fn fields(item: &BatchItem<'_>, allowed: &[&str]) -> Result<()> {
-    for (name, present) in [
-        ("path", item.path.is_some()),
-        ("path2", item.path2.is_some()),
-        ("parent", item.parent.is_some()),
-        ("type", item.kind.is_some()),
-        ("from", item.from.is_some()),
-        ("to", item.to.is_some()),
-        ("index", item.index.is_some()),
-        ("after", item.after.is_some()),
-        ("before", item.before.is_some()),
-        ("mode", item.mode.is_some()),
-        ("depth", item.depth.is_some()),
-        ("part", item.part.is_some()),
-        ("xpath", item.xpath.is_some()),
-        ("action", item.action.is_some()),
-        ("xml", item.xml.is_some()),
-        ("props", item.props.is_some()),
-        ("selector", item.selector.is_some()),
-        ("text", item.text.is_some()),
-        ("dumpVersion", item.dump_version.is_some()),
-    ] {
-        if present && !allowed.contains(&name) {
-            return Err(Error::new(
-                Code::InvalidArgument,
-                format!("this batch command does not accept the {name} field"),
-            ));
-        }
+    // Each field is tested in wire order and named only when present: a
+    // batch item pays one test per field, not a table of every field's name
+    // (record 0302).
+    macro_rules! refuse_unless_allowed {
+        ($($name:literal => $present:expr),* $(,)?) => {
+            $(
+                if $present && !allowed.contains(&$name) {
+                    return Err(Error::new(
+                        Code::InvalidArgument,
+                        format!("this batch command does not accept the {} field", $name),
+                    ));
+                }
+            )*
+        };
+    }
+    refuse_unless_allowed! {
+        "path" => item.path.is_some(),
+        "path2" => item.path2.is_some(),
+        "parent" => item.parent.is_some(),
+        "type" => item.kind.is_some(),
+        "from" => item.from.is_some(),
+        "to" => item.to.is_some(),
+        "index" => item.index.is_some(),
+        "after" => item.after.is_some(),
+        "before" => item.before.is_some(),
+        "mode" => item.mode.is_some(),
+        "depth" => item.depth.is_some(),
+        "part" => item.part.is_some(),
+        "xpath" => item.xpath.is_some(),
+        "action" => item.action.is_some(),
+        "xml" => item.xml.is_some(),
+        "props" => item.props.is_some(),
+        "selector" => item.selector.is_some(),
+        "text" => item.text.is_some(),
+        "dumpVersion" => item.dump_version.is_some(),
     }
     Ok(())
 }

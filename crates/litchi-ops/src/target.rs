@@ -245,6 +245,14 @@ fn mixed_union_scope() -> Error {
 /// whether such a byte follows the latest top-level slash seen so far
 /// (record 0291; it used to find the last slash in a separate pass first).
 fn has_query_syntax(text: &str) -> bool {
+    // Only these bytes can make the answer `true` (brackets, slashes and
+    // the rest only change state); a plain path has none (record 0302).
+    if !text.bytes().any(|byte| {
+        matches!(byte, b'"' | b'\'' | b',' | b'>' | b'*' | b':' | b'(' | b')')
+            || byte.is_ascii_whitespace()
+    }) {
+        return false;
+    }
     let mut brackets = 0_usize;
     let mut parens = 0_usize;
     let mut quote: Option<u8> = None;

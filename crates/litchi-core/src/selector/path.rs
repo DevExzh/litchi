@@ -83,6 +83,10 @@ impl<'a> Path<'a> {
     /// `max_depth_exceeded` for step and nesting limits) and the byte offset
     /// of the failure.
     pub fn parse(input: &'a str) -> std::result::Result<Self, ParseError> {
+        let mut path = Path::root();
+        if parse_plain(input, &mut path) {
+            return Ok(path);
+        }
         let mut cursor = Cursor::new(input, Grammar::Path)?;
         parse_path(&mut cursor, true)
     }
@@ -321,6 +325,75 @@ impl fmt::Display for Step<'_> {
     }
 }
 
+/// Parses the common absolute form, `/` followed by plain segment names
+/// each with at most one positional index (`/body/p[3]`,
+/// `/sheet[1]/table[1]/B3`), in one pass over the bytes (record 0302).
+///
+/// Fills `path` (the root path on entry) and returns `true`; returns
+/// `false`, leaving `path` unspecified, for anything else, valid or not: a quoted name, any
+/// other predicate, whitespace inside brackets, an index of zero or one
+/// that overflows, a step or byte limit, or a malformed path. The general
+/// parser then builds the path or reports the error. For every input this
+/// accepts, the general parser builds an equal path (the test
+/// `plain_fast_path_matches_the_general_parser` compares them). The path is
+/// filled in place: a parsed path is several hundred bytes, and returning
+/// it through an `Option` copied it once more.
+fn parse_plain<'a>(input: &'a str, path: &mut Path<'a>) -> bool {
+    parse_plain_steps(input, path).is_some()
+}
+
+fn parse_plain_steps<'a>(input: &'a str, path: &mut Path<'a>) -> Option<()> {
+    let bytes = input.as_bytes();
+    if bytes.first() != Some(&b'/') || bytes.len() > limits::MAX_INPUT_BYTES {
+        return None;
+    }
+    let mut at = 1;
+    if at == bytes.len() {
+        return Some(());
+    }
+    loop {
+        let start = at;
+        if is_quote(bytes[at]) {
+            return None;
+        }
+        while let Some(&byte) = bytes.get(at) {
+            match byte {
+                b'/' | b'[' | b']' => break,
+                _ if byte.is_ascii_control() => return None,
+                _ => at += 1,
+            }
+        }
+        if at == start || path.steps.len() >= limits::MAX_STEPS {
+            return None;
+        }
+        // `at` is at an ASCII delimiter or the end: a char boundary.
+        let mut step = Step::new(&input[start..at]);
+        if bytes.get(at) == Some(&b'[') {
+            at += 1;
+            let digits = at;
+            let mut value: usize = 0;
+            while let Some(&byte) = bytes.get(at).filter(|byte| byte.is_ascii_digit()) {
+                value = value
+                    .checked_mul(10)?
+                    .checked_add(usize::from(byte - b'0'))?;
+                at += 1;
+            }
+            if at == digits || bytes.get(at) != Some(&b']') {
+                return None;
+            }
+            at += 1;
+            step.predicates
+                .push(Predicate::Index(super::Position::from_one_based(value)?));
+        }
+        path.steps.push(step);
+        match bytes.get(at) {
+            None => return Some(()),
+            Some(b'/') if at + 1 < bytes.len() => at += 1,
+            Some(_) => return None,
+        }
+    }
+}
+
 /// Parses a path over the cursor window, which must be consumed entirely.
 pub(super) fn parse_path<'a>(cursor: &mut Cursor<'a>, absolute: bool) -> Result<Path<'a>> {
     if cursor.at_end() {
@@ -385,5 +458,104 @@ fn step<'a>(cursor: &mut Cursor<'a>) -> Result<Step<'a>> {
 impl fmt::Debug for Step<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Step { .. }")
+    }
+}
+
+#[cfg(test)]
+mod plain_tests {
+    use super::*;
+
+    fn general(input: &str) -> std::result::Result<Path<'_>, ParseError> {
+        let mut cursor = Cursor::new(input, Grammar::Path)?;
+        parse_path(&mut cursor, true)
+    }
+
+    fn plain(input: &str) -> Option<Path<'_>> {
+        let mut path = Path::root();
+        parse_plain(input, &mut path).then_some(path)
+    }
+
+    fn check(input: &str) -> bool {
+        let Some(fast) = plain(input) else {
+            return false;
+        };
+        let slow = general(input).unwrap_or_else(|error| {
+            panic!("{input:?}: the fast path accepted what the parser refuses: {error}")
+        });
+        assert_eq!(fast, slow, "{input:?}");
+        assert_eq!(fast.to_string(), slow.to_string(), "{input:?}");
+        for (fast, slow) in fast.steps().iter().zip(slow.steps()) {
+            assert_eq!(fast.predicates(), slow.predicates(), "{input:?}");
+        }
+        true
+    }
+
+    #[test]
+    fn plain_fast_path_matches_the_general_parser() {
+        // Every string of up to five bytes over the bytes the grammars
+        // treat specially, plus name and digit bytes.
+        let alphabet = b"/aB[]10 \"'\t*";
+        let mut accepted = 0;
+        let mut input = Vec::new();
+        // Every string of length 1..=5, depth first.
+        fn visit(alphabet: &[u8], input: &mut Vec<u8>, depth: usize, accepted: &mut usize) {
+            if depth == 0 {
+                return;
+            }
+            for &byte in alphabet {
+                input.push(byte);
+                let text = std::str::from_utf8(input).expect("ascii");
+                if check(text) {
+                    *accepted += 1;
+                }
+                visit(alphabet, input, depth - 1, accepted);
+                input.pop();
+            }
+        }
+        visit(alphabet, &mut input, 5, &mut accepted);
+        assert!(accepted > 100, "{accepted}");
+        for input in [
+            "/",
+            "/body/p[1]",
+            "/body/p[3]/r[12]",
+            "/body/tbl[1]/tr[2]/tc[3]/p[1]/r[1]",
+            "/body/tbl[1]/tr[2]/tc[3]/p[1]/r[1]/x[2]/y",
+            "/sheet[1]/table[1]/B3",
+            "/Sheet1/A1:C5",
+            "/slide[2]/notes",
+            "/Größe/ü[007]",
+            "/a[18446744073709551615]",
+        ] {
+            assert!(check(input), "{input:?}");
+        }
+        for refused in [
+            "",
+            "body",
+            "//",
+            "/a/",
+            "/a[0]",
+            "/a[18446744073709551616]",
+            "/a[ 1]",
+            "/a[1][2]",
+            "/a[last()]",
+            "/a[@id=1]",
+            "/\"a/b\"/A1",
+            "/a]",
+            "/a\u{7}",
+        ] {
+            assert!(plain(refused).is_none(), "{refused:?}");
+            assert_eq!(
+                Path::parse(refused).map(|path| path.to_string()),
+                general(refused).map(|path| path.to_string()),
+                "{refused:?}"
+            );
+        }
+        let deep = "/a".repeat(limits::MAX_STEPS + 1);
+        assert!(plain(&deep).is_none());
+        assert!(Path::parse(&deep).is_err());
+        let limit = "/a".repeat(limits::MAX_STEPS);
+        assert!(check(&limit));
+        let long = format!("/{}", "a".repeat(limits::MAX_INPUT_BYTES));
+        assert!(plain(&long).is_none());
     }
 }
