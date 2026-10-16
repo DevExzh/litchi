@@ -131,7 +131,9 @@ impl FlatDrawingEdit {
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid selector, unsupported source span, or limit violation.
+    /// Returns [`Error::Unsupported`] for a shape whose text is not one
+    /// plain span (several paragraphs, spans, links or fields), and
+    /// [`Error::InvalidFormat`] for an invalid selector or a limit violation.
     pub fn set_shape_text(
         &mut self,
         page: usize,
@@ -149,8 +151,8 @@ impl FlatDrawingEdit {
             .and_then(|page_value| page_value.shapes().get(shape))
             .ok_or_else(|| invalid("flat ODG shape selector is out of bounds"))?;
         if selected.text_spans.len() != 1 {
-            return Err(invalid(
-                "flat ODG shape text is not one losslessly replaceable XML span",
+            return Err(Error::Unsupported(
+                "flat ODG shape text is not one losslessly replaceable XML span".to_string(),
             ));
         }
         if selected.text == replacement {

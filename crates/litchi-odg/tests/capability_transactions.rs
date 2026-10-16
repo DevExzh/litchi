@@ -387,3 +387,28 @@ fn drawing_with_resource(content: &str, resource: Option<&[u8]>) -> Package {
     }
     Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
 }
+
+/// A shape whose text is more than one plain span is an unsupported
+/// capability, not an invalid value (record 0308).
+#[test]
+fn shape_text_with_several_paragraphs_is_unsupported() {
+    let content = CONTENT.replace(
+        "<text:p>old</text:p>",
+        "<text:p>one</text:p><text:p>two</text:p>",
+    );
+    let mut writer = PackageWriter::new();
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.graphics")
+        .unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    writer
+        .add_file_with_media_type("Pictures/pixel.bin", b"before", "image/png")
+        .unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
+    let mut edit = source.edit();
+    let error = edit.set_shape_text(0, 0, "new").unwrap_err();
+    assert!(
+        matches!(error, litchi_core::Error::Unsupported(_)),
+        "{error:?}"
+    );
+}
