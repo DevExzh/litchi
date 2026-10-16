@@ -608,13 +608,23 @@ impl Package {
     /// Returns an error when the file cannot be read, is not a bounded valid
     /// iWork package, or does not contain a Keynote document root.
     ///
-    /// Path ingress accepts regular files only. It opens the final filesystem
-    /// object without following Unix symbolic links or Windows reparse points,
-    /// rejects Win32 device namespaces and non-disk handles, grows the source
-    /// buffer under the configured input ceiling, and checks descriptor
-    /// identity and mutation metadata before publishing package state.
-    /// Platforms without this descriptor-safe profile fail closed; portable
-    /// callers can use [`Self::from_bytes`] instead.
+    /// Path ingress accepts a regular file or an app-authored package
+    /// directory. A regular file is opened without following Unix symbolic
+    /// links or Windows reparse points; Win32 device namespaces and non-disk
+    /// handles are rejected, the source buffer grows under the configured
+    /// input ceiling, and descriptor identity and mutation metadata are
+    /// checked before package state is published. Platforms without this
+    /// descriptor-safe profile fail closed; portable callers can use
+    /// [`Self::from_bytes`] instead.
+    ///
+    /// A package directory (the bundle form Keynote writes when "Save as
+    /// package" is selected) is captured once and converted into its
+    /// single-file form ([`litchi_iwa_archive::bundle::capture`], record
+    /// 0306): the `Index.zip` members followed by every other file of the
+    /// bundle in byte order of its relative name. The result is an ordinary
+    /// exact-source package: it edits like a single-file package,
+    /// [`Self::save`] and [`Self::write_to`] publish the single-file form,
+    /// and [`Self::save_directory`] writes the bundle form back.
     pub fn open(path: impl AsRef<Path>) -> ReadResult<Self> {
         Self::open_with_options(path, OpenOptions::default())
     }
@@ -628,7 +638,21 @@ impl Package {
     /// limits are enforced lazily on first semantic access or [`Self::validate`].
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> ReadResult<Self> {
         let profile = Profile::from_options(options)?;
-        let source = read_source(path.as_ref(), profile.archive())?;
+        let path = path.as_ref();
+        if litchi_iwa_archive::bundle::is_directory(path) {
+            let archive = profile.archive();
+            let bytes = litchi_iwa_archive::bundle::capture(path, archive.into(), archive)
+                .map_err(litchi_iwa_archive::Error::from)?;
+            // The bundle's files were bounded while they were captured; the
+            // converted package adds only ZIP framing, so its own input bound
+            // is its length.
+            let archive = litchi_iwa_archive::bundle::converted_limits(archive, bytes.len())?;
+            return Self::from_source_with_options(
+                bytes.into(),
+                Profile::new(archive, profile.semantic()),
+            );
+        }
+        let source = read_source(path, profile.archive())?;
         Self::from_source_with_options(source, profile)
     }
 
@@ -917,6 +941,34 @@ impl Package {
     /// already committed through [`SaveError::was_committed`].
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
         save::save(self, path)
+    }
+
+    /// Save this package as an app-style package directory at `path`
+    /// (`IWORK_API_REQUESTS.md` request 16, record 0306): `Index.zip` holds
+    /// the `Index/` members with their records unchanged, and every other
+    /// member (metadata sidecars, previews, `Data/` media) is a plain file.
+    /// Opening the directory again gives back this package's exact bytes.
+    ///
+    /// The bundle is written into a sibling staging directory; an existing
+    /// destination directory is swapped out only after the new one is
+    /// complete and synchronized.
+    ///
+    /// # Errors
+    ///
+    /// [`SaveError::Publication`] when the destination exists and is not a
+    /// directory or the staging, synchronization or swap fails;
+    /// [`SaveError::Bundling`] when a staged file cannot be written;
+    /// [`SaveError::Bundle`] when the index archive cannot be assembled or a
+    /// member name cannot be a file.
+    pub fn save_directory(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
+        let source = self.state.source.package_source();
+        litchi_iwa_archive::bundle::save(
+            source.package(),
+            source.limits(),
+            path.as_ref(),
+            SaveError::Bundle,
+            SaveError::Bundling,
+        )
     }
 
     /// Return the ingress envelope this package was parsed under.
