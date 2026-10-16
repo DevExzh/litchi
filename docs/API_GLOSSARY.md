@@ -2472,6 +2472,12 @@ Both profiles now register 30 families.
 | `litchi_keynote::slide::drawable::{Edit::set_table_cell, TableCellValue, Unsupported::{TableFormulas, TableStorage}}` | Slide-table cell values in the slide-drawable commit | ✅ 0309 |
 | `litchi_pages::section::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Run, CharacterProperties}` | Registered family in `pages`; `Package::{edit_section_text_style, apply_section_text_style, section_text_runs}`; `Edit::set(TextSpan, CharacterProperties)` (UTF-16, several per edit) | ✅ 0309 |
 
+## iWork lazy tables and section lifecycle (record 0312)
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_pages::section::lifecycle::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | Registered family in `pages` (request 11); `Package::{edit_section_lifecycle, apply_section_lifecycle}`; `Edit::{add(after, Option<&str>), remove(section)}`, one operation per edit; `Error::{InitialSection, EmptySection, UnsupportedContent, UnsupportedDependency}` | ✅ 0312 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |
