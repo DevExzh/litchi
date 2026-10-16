@@ -66,6 +66,15 @@ pub(crate) fn staging_error(error: litchi_core::Error) -> Error {
     core_error(error).caused_by_argument(Code::InvalidValue)
 }
 
+/// A text set's staging error: the refusal of content a text set can
+/// neither keep nor replace (record 0304) stays `unsupported_capability`.
+fn text_error(error: litchi_core::Error) -> Error {
+    match error {
+        litchi_core::Error::Unsupported(_) => core_error(error),
+        other => staging_error(other),
+    }
+}
+
 pub(crate) fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
     if observed > maximum {
         return Err(TransactionError::Limit {
@@ -401,7 +410,7 @@ fn translate(kind: Kind, props: &Props<'_>, body: litchi_odt::body::Body<'_>) ->
 /// Stage `staged` on node `id`.
 fn stage(edit: &mut Edit, id: NodeId, staged: &Staged) -> Result<()> {
     if let Some(text) = &staged.text {
-        edit.set_text(id, text.clone()).map_err(staging_error)?;
+        edit.set_text(id, text.clone()).map_err(text_error)?;
     }
     for (attribute, value) in &staged.attributes {
         edit.set_attribute(id, *attribute, value.as_deref())

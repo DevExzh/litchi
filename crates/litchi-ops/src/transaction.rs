@@ -116,12 +116,10 @@ enum Leaf {
     Xls(Box<crate::format::xls::write::StepPatch>),
     #[cfg(feature = "ppt")]
     Ppt(Box<crate::format::ppt::write::StepPatch>),
+    // The two-endpoint variants are boxed whole, so `Leaf` stays one
+    // pointer wide in every feature combination (record 0304).
     #[cfg(feature = "pptx")]
-    Pptx {
-        source: crate::format::pptx::Editable,
-        target: crate::format::pptx::Editable,
-        _proof: Box<crate::format::pptx::write::Proof>,
-    },
+    Pptx(Box<PptxLeaf>),
     #[cfg(feature = "docx")]
     Docx(Box<litchi_docx::document::Patch>),
     #[cfg(feature = "rtf")]
@@ -137,13 +135,23 @@ enum Leaf {
     #[cfg(feature = "iwork-adapter")]
     Iwork(Box<crate::format::iwork::write::Patch>),
     #[cfg(feature = "xlsx")]
-    Xlsx {
-        source: litchi_xlsx::Package,
-        target: litchi_xlsx::Package,
-        // Retain the complete native proof even though process-local replay
-        // reuses a validated owner-bound endpoint.
-        _patch: Box<litchi_xlsx::workbook::Patch>,
-    },
+    Xlsx(Box<XlsxLeaf>),
+}
+// Every variant is one box: a discriminant and a pointer.
+const _: () = assert!(size_of::<Leaf>() <= 16);
+#[cfg(feature = "pptx")]
+struct PptxLeaf {
+    source: crate::format::pptx::Editable,
+    target: crate::format::pptx::Editable,
+    _proof: crate::format::pptx::write::Proof,
+}
+#[cfg(feature = "xlsx")]
+struct XlsxLeaf {
+    source: litchi_xlsx::Package,
+    target: litchi_xlsx::Package,
+    // Retain the complete native proof even though process-local replay
+    // reuses a validated owner-bound endpoint.
+    _patch: litchi_xlsx::workbook::Patch,
 }
 impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3269,11 +3277,11 @@ fn wrap_xlsx<T>(
         Step {
             before: File::Xlsx(before.clone()),
             after: File::Xlsx(after),
-            leaf: Leaf::Xlsx {
+            leaf: Leaf::Xlsx(Box::new(XlsxLeaf {
                 source,
                 target,
-                _patch: Box::new(patch),
-            },
+                _patch: patch,
+            })),
             leaf_operations,
             snapshot_bytes,
         },
@@ -3292,11 +3300,11 @@ fn wrap_pptx<T>(
         Step {
             before: File::Pptx(before.clone()),
             after: File::Pptx(commit.after),
-            leaf: Leaf::Pptx {
+            leaf: Leaf::Pptx(Box::new(PptxLeaf {
                 source: commit.source,
                 target: commit.target,
-                _proof: Box::new(commit.proof),
-            },
+                _proof: commit.proof,
+            })),
             leaf_operations: commit.operations,
             snapshot_bytes,
         },
@@ -3546,7 +3554,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
         #[cfg(feature = "ppt")]
         (Leaf::Ppt(first), Leaf::Ppt(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "pptx")]
-        (Leaf::Pptx { source, .. }, Leaf::Pptx { target, .. }) => Ok(!source.same_content(target)?),
+        (Leaf::Pptx(first), Leaf::Pptx(last)) => Ok(!first.source.same_content(&last.target)?),
         #[cfg(feature = "docx")]
         (Leaf::Docx(first), Leaf::Docx(last)) => {
             // A template merge can change only a header or other story
@@ -3564,7 +3572,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
                 }))
         },
         #[cfg(feature = "xlsx")]
-        (Leaf::Xlsx { source, .. }, Leaf::Xlsx { target, .. }) => Ok(!source.same_content(target)?),
+        (Leaf::Xlsx(first), Leaf::Xlsx(last)) => Ok(!first.source.same_content(&last.target)?),
         #[allow(unreachable_patterns)]
         _ => Err(Error::PatchConflict.into()),
     }
