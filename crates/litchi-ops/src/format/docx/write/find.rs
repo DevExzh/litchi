@@ -3,7 +3,8 @@
 //! The scope is the target's subtree. The document root searches the main
 //! story and, as OfficeCLI's root find does, every header, footer, footnote
 //! and endnote; the body searches the main story; a table, row, cell or
-//! content control searches its paragraphs (text boxes included); a
+//! content control searches its paragraphs (text boxes included, except
+//! those inside alternate content); a
 //! paragraph searches itself; a hyperlink or a run searches only its own
 //! text, as OfficeCLI's run scope does; the comments part and one comment
 //! search their paragraphs.
@@ -14,10 +15,14 @@
 //! shared matcher finds the matches of each group, and one leaf call per
 //! story replaces them. Format properties are applied by the leaf to the
 //! runs the replacement splits out, through the ordinary DOCX run setters.
+//!
+//! `mc:AlternateContent` wrappers in runs (drawings and text boxes with a
+//! fallback, record 0307) are opaque: their text, text boxes included, is
+//! not searched, and a match that would span one is refused.
 
 use litchi_core::FileFormat;
 use litchi_docx::document::ElementPath;
-use litchi_docx::document::substitute::{Replacement, Story, StoryKind};
+use litchi_docx::document::substitute::{OBJECT, Paragraph, Replacement, Story, StoryKind};
 
 use super::super::element;
 use super::super::merge::owning_editor;
@@ -229,6 +234,7 @@ fn plan(
             continue;
         }
         let text = paragraph.text();
+        refuse_alternate_spans(paragraph, matcher, scratch)?;
         if !matcher.may_match(text) {
             continue;
         }
@@ -278,6 +284,82 @@ fn plan(
         })?;
     }
     Ok(replacements)
+}
+
+/// Refuse a find with a match that would cross the object of an
+/// `mc:AlternateContent` wrapper (a drawing or text box with a fallback;
+/// record 0307).
+///
+/// The leaf lists a wrapper as one opaque object, which ends a text group as
+/// a picture does, so no match ever spans it and the wrapper is never split
+/// or dropped. Readers, though, show the wrapper's selected branch inline,
+/// and one without text not at all: a find that would match across the
+/// object if it were transparent is refused rather than reported as no
+/// match.
+fn refuse_alternate_spans(
+    paragraph: &Paragraph,
+    matcher: &Matcher<'_>,
+    scratch: &mut Scratch,
+) -> Result<()> {
+    let alternate = paragraph.alternate_content();
+    if alternate.is_empty() {
+        return Ok(());
+    }
+    let text = paragraph.text();
+    let mut pieces: Vec<Piece<'_>> = Vec::new();
+    // Indexes of the pieces joined to the previous one across a wrapper.
+    let mut joints: Vec<usize> = Vec::new();
+    let mut group = 0usize;
+    let mut previous: Option<(usize, usize)> = None;
+    for segment in paragraph.segments() {
+        let range = segment.range();
+        if let Some((original, end)) = previous
+            && segment.group() != original
+        {
+            let gap = text.get(end..range.start).unwrap_or_default();
+            let only_wrappers = !gap.is_empty()
+                && gap
+                    .char_indices()
+                    .all(|(at, character)| character == OBJECT && alternate.contains(&(end + at)));
+            if only_wrappers {
+                joints.push(pieces.len());
+            } else {
+                group += 1;
+            }
+        }
+        previous = Some((segment.group(), range.end));
+        pieces.push(Piece {
+            text: &text[range],
+            group,
+            scoped: segment.is_scoped(),
+        });
+    }
+    if joints.is_empty() {
+        return Ok(());
+    }
+    matches_with(
+        scratch,
+        &pieces,
+        matcher,
+        |members, starts, _, found, first| {
+            let spans = joints
+                .iter()
+                .filter(|joint| **joint > first && **joint < first + members.len())
+                .map(|joint| starts[joint - first])
+                .any(|at| found.iter().any(|range| range.start < at && at < range.end));
+            if spans {
+                return Err(Error::new(
+                Code::UnsupportedCapability,
+                "a match would span markup-compatibility alternate content (a drawing or text box with a fallback), which find does not edit",
+            )
+            .with_property(crate::find::FIND)
+            .with_suggestion(
+                "find text on one side of the object; its own text is not searched (record 0307)",
+            ));
+            }
+            Ok(())
+        },
+    )
 }
 
 /// What the target nodes search.

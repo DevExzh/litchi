@@ -529,10 +529,22 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::UnmanagedOnly,
         ),
         (
+            // Record 0307: run-level alternate content is an opaque inline
+            // object; the projection keeps every block where it is.
             "W1: AlternateContent in a run",
             document(
                 &mc,
-                r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14"><w:t>BOX</w:t></mc:Choice><mc:Fallback><w:t>BOX</w:t></mc:Fallback></mc:AlternateContent></w:r></w:p>"#,
+                &format!(
+                    r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14"><w:t>BOX</w:t></mc:Choice><mc:Fallback><w:t>BOX</w:t></mc:Fallback></mc:AlternateContent></w:r></w:p>{PARAGRAPHS}"#
+                ),
+            ),
+            Expect::UnmanagedOnly,
+        ),
+        (
+            "AlternateContent in a paragraph, outside its runs",
+            document(
+                &mc,
+                r#"<w:p><mc:AlternateContent><mc:Choice Requires="w14"><w:r><w:t>BOX</w:t></w:r></mc:Choice></mc:AlternateContent></w:p><w:p/>"#,
             ),
             Expect::Refused,
         ),
@@ -888,6 +900,34 @@ fn paragraph_transfer_requires_a_donor_whose_projection_drops_nothing() {
         ),
         "{error:?}"
     );
+
+    // Record 0307: a donor admitted for run-level alternate content selects
+    // a branch, which a receiver need not understand alike; even a paragraph
+    // without a wrapper is refused, as for the opaque donor above.
+    let alternate = eager(&package(
+        &document(
+            &format!(r#"xmlns:mc="{MCE}""#),
+            &format!(
+                r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14"><w:t>BOX</w:t></mc:Choice></mc:AlternateContent></w:r></w:p>{PARAGRAPHS}"#
+            ),
+        ),
+        None,
+    ));
+    alternate.edit().unwrap();
+    for paragraph in [0, 1] {
+        let error = receiver
+            .plan_paragraph_transfer_from(&alternate, Position::new(paragraph))
+            .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                TransactionError::Transfer(
+                    litchi_docx::document::TransferRefusal::MarkupCompatibilityScope
+                )
+            ),
+            "{error:?}"
+        );
+    }
 
     let lexical = eager(&package(
         &document(
