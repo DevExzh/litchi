@@ -343,6 +343,7 @@ fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+#[cfg(feature = "internal-iwork-source")]
 fn with_missing_parent(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_component(source, TABLES_MEMBER, |archive| {
         let table_info = archive
@@ -397,6 +398,7 @@ fn with_malformed_table_info(source: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+#[cfg(feature = "internal-iwork-source")]
 fn with_projection_unsupported_model(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_component(source, TABLES_MEMBER, |archive| {
         let model = archive
@@ -517,6 +519,7 @@ fn table_parent(source: &[u8], table_identifier: u64) -> TestResult<u64> {
     .ok_or_else(|| io::Error::other("table-info parent reference is missing").into())
 }
 
+#[cfg(feature = "internal-iwork-source")]
 fn optional_table_parent(source: &[u8], table_identifier: u64) -> TestResult<Option<u64>> {
     Ok(tst::TableInfoArchive::decode(
         object_message(
