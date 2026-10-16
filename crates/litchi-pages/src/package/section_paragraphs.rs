@@ -8,10 +8,14 @@
 //! ([`crate::section::text`]), which owns every native preservation and
 //! verification rule:
 //!
-//! - when the whole change is one contiguous splice that consumes no object
-//!   anchor (an inline table, chart, image or footnote mark), the commit is a
-//!   **single** section-text transaction, however many operations were
-//!   staged;
+//! - a commit publishes exactly what committing each operation on its own,
+//!   in order, publishes (record 0314);
+//! - consecutive text sets share **one** section-text transaction (one
+//!   splice from the text before them to the text after them) when that is
+//!   provably the same: the splice consumes no object anchor (an inline
+//!   table, chart, image or footnote mark), no attribute entry of the body
+//!   storage lies inside or between the paragraphs they touch, no set
+//!   empties the storage before a later one, and they do not cancel out;
 //! - otherwise each operation runs as its own minimal splice, in order, each
 //!   over the package the previous one published.
 //!
@@ -340,67 +344,294 @@ impl<'a> Edit<'a> {
         self.stage(Operation::Swap(left.get(), right.get()))
     }
 
-    /// Publish the staged operations: one section-text transaction when the
-    /// whole change is one anchor-free splice, else one per operation.
+    /// Publish the staged operations: exactly what committing each one on
+    /// its own, in order, publishes (record 0314), in as few section-text
+    /// transactions as that allows.
+    ///
+    /// Consecutive text sets share one transaction (one splice from the
+    /// text before them to the text after them) while that splice is
+    /// provably what their own splices publish one after another: no
+    /// attribute entry of the body storage lies inside the paragraphs they
+    /// touch or between them, the splice consumes no object anchor, no set
+    /// empties the storage before a later one, and the sets do not cancel
+    /// out. Any other run of sets, and every insertion, removal, relocation
+    /// and swap, publishes one transaction per operation.
     ///
     /// # Errors
     ///
     /// The first refusal, leaving the source package untouched.
     pub fn commit(self) -> Result<Commit, Error> {
-        let after = self.current.join("\n");
-        let Some((span, replacement)) = splice(self.before, &after) else {
-            return Ok(Commit {
-                package: self.source.clone(),
-                patch: Patch { steps: Vec::new() },
-                diagnostics: Diagnostics {
-                    changed: false,
-                    transactions: 0,
-                },
-            });
+        let mut publisher = Publisher {
+            position: self.position,
+            package: self.source.clone(),
+            steps: Vec::new(),
         };
-        if !touches_anchor(self.before, span, replacement) {
-            let mut edit = self.source.edit_section_text(self.position)?;
-            edit.replace(span, replacement)?;
-            let commit = edit.commit()?;
-            let changed = commit.diagnostics().changed();
-            let (package, patch) = (commit.package().clone(), commit.patch().clone());
-            return Ok(Commit {
-                package,
-                patch: Patch { steps: vec![patch] },
-                diagnostics: Diagnostics {
-                    changed,
-                    transactions: 1,
-                },
-            });
+        if let Some(single) = self.single_splice()? {
+            if let Some((span, replacement)) = single {
+                publisher.replace(span, &replacement)?;
+            }
+            return Ok(publisher.into_commit());
         }
-        let mut package = self.source.clone();
-        let mut steps = Vec::new();
+        let operations = &self.operations;
         let mut paragraphs = paragraphs(self.before);
-        for operation in &self.operations {
-            let before = paragraphs.join("\n");
-            operation.apply(&mut paragraphs)?;
-            let after = paragraphs.join("\n");
-            let Some((span, replacement)) = splice(&before, &after) else {
+        let mut group = Group::new(self.before.to_owned(), 0);
+        for (index, operation) in operations.iter().enumerate() {
+            let Operation::Set(line, _) = operation else {
+                group.publish(
+                    &mut publisher,
+                    &operations[group.start..index],
+                    &mut paragraphs,
+                )?;
+                publisher.each(std::slice::from_ref(operation), &mut paragraphs)?;
+                group = Group::new(paragraphs.join("\n"), index + 1);
                 continue;
             };
-            if touches_anchor(&before, span, replacement) {
-                return Err(Error::AnchoredParagraph);
+            if index > group.start && !group.admits(&publisher, &paragraphs, *line)? {
+                group.publish(
+                    &mut publisher,
+                    &operations[group.start..index],
+                    &mut paragraphs,
+                )?;
+                group = Group::new(paragraphs.join("\n"), index);
             }
-            let mut edit = package.edit_section_text(self.position)?;
-            edit.replace(span, replacement)?;
-            let commit = edit.commit()?;
-            steps.push(commit.patch().clone());
-            package = commit.into_package();
+            group.touch(*line);
+            let before = paragraphs.get(*line).cloned();
+            operation.apply(&mut paragraphs)?;
+            group.changed |= before.as_ref() != paragraphs.get(*line);
         }
-        let transactions = steps.len();
-        Ok(Commit {
-            package,
-            patch: Patch { steps },
+        group.publish(&mut publisher, &operations[group.start..], &mut paragraphs)?;
+        Ok(publisher.into_commit())
+    }
+
+    /// The text after every staged operation, when they are all text sets
+    /// that one splice from the text before them publishes exactly (the
+    /// conditions of [`Self::commit`] for the whole sequence, checked
+    /// without replaying it); `None` sends the commit to the per-group
+    /// path.
+    #[allow(
+        clippy::option_option,
+        reason = "`None` sends the commit to the per-group path; `Some(None)` publishes nothing"
+    )]
+    fn single_splice(&self) -> Result<Option<Option<(TextSpan, String)>>, Error> {
+        let mut touched: Option<(usize, usize)> = None;
+        for operation in &self.operations {
+            let Operation::Set(line, _) = operation else {
+                return Ok(None);
+            };
+            touched = Some(touched.map_or((*line, *line), |(first, last)| {
+                (first.min(*line), last.max(*line))
+            }));
+        }
+        let Some((first, last)) = touched else {
+            return Ok(Some(None));
+        };
+        // One set is its own transaction; an emptied single paragraph, a
+        // splice that touches an anchor, or a sequence that ends where it
+        // began takes the per-group path (which refuses or replays them).
+        let after = self.current.join("\n");
+        let Some((span, replacement)) = splice(self.before, &after) else {
+            return Ok((self.operations.len() == 1).then_some(None));
+        };
+        if touches_anchor(self.before, span, replacement) {
+            return Ok(None);
+        }
+        let single = Some(Some((span, replacement.to_owned())));
+        if self.operations.len() == 1 {
+            return Ok(single);
+        }
+        if self.current.len() == 1 && !self.before.is_empty() {
+            return Ok(None);
+        }
+        let mut unit = 0_usize;
+        let mut hull = None;
+        for (line, paragraph) in self.before.split(BREAK).enumerate() {
+            let units = if paragraph.is_ascii() {
+                paragraph.len()
+            } else {
+                paragraph.encode_utf16().count()
+            };
+            let end = unit.saturating_add(units);
+            if line == first {
+                hull = Some(unit..end);
+            }
+            if line == last {
+                hull = hull.map(|hull| hull.start..end);
+                break;
+            }
+            unit = end.saturating_add(1);
+        }
+        let Some(hull) = hull else {
+            return Ok(None);
+        };
+        let boundaries = super::section_text::section_boundaries(self.source, self.position)?;
+        Ok(boundaries.admits(hull).then_some(single).flatten())
+    }
+}
+
+/// The package a paragraph commit publishes onto, step by step.
+struct Publisher {
+    position: Position,
+    package: Package,
+    steps: Vec<section_text::Patch>,
+}
+
+impl Publisher {
+    fn into_commit(self) -> Commit {
+        let transactions = self.steps.len();
+        Commit {
+            package: self.package,
+            patch: Patch { steps: self.steps },
             diagnostics: Diagnostics {
                 changed: transactions != 0,
                 transactions,
             },
-        })
+        }
+    }
+
+    /// Publish one section-text splice from `before` to `after`, if they
+    /// differ. A splice that consumes or inserts an anchor is refused.
+    fn splice(&mut self, before: &str, after: &str) -> Result<(), Error> {
+        let Some((span, replacement)) = splice(before, after) else {
+            return Ok(());
+        };
+        if touches_anchor(before, span, replacement) {
+            return Err(Error::AnchoredParagraph);
+        }
+        self.replace(span, replacement)
+    }
+
+    /// Publish one checked section-text splice.
+    fn replace(&mut self, span: TextSpan, replacement: &str) -> Result<(), Error> {
+        let mut edit = self.package.edit_section_text(self.position)?;
+        edit.replace(span, replacement)?;
+        let commit = edit.commit()?;
+        self.steps.push(commit.patch().clone());
+        self.package = commit.into_package();
+        Ok(())
+    }
+
+    /// Publish `operations` one transaction each, over `paragraphs`.
+    fn each(
+        &mut self,
+        operations: &[Operation],
+        paragraphs: &mut Vec<String>,
+    ) -> Result<(), Error> {
+        for operation in operations {
+            let before = paragraphs.join("\n");
+            operation.apply(paragraphs)?;
+            self.splice(&before, &paragraphs.join("\n"))?;
+        }
+        Ok(())
+    }
+}
+
+/// Consecutive text sets that may publish as one splice.
+struct Group {
+    /// The section text before the group's first set.
+    base: String,
+    /// The group's first operation.
+    start: usize,
+    /// The first and last paragraph the group's sets touch.
+    touched: Option<(usize, usize)>,
+    /// Whether any set changed its paragraph.
+    changed: bool,
+    /// The UTF-16 offset of each paragraph of `base`, then its length plus
+    /// one, computed when a second set asks to join.
+    offsets: Option<Vec<usize>>,
+    /// The storage boundaries of the group's base package, read when a
+    /// second set asks to join.
+    boundaries: Option<super::section_text::SectionBoundaries>,
+}
+
+impl Group {
+    const fn new(base: String, start: usize) -> Self {
+        Self {
+            base,
+            start,
+            touched: None,
+            changed: false,
+            offsets: None,
+            boundaries: None,
+        }
+    }
+
+    fn touch(&mut self, line: usize) {
+        self.touched = Some(match self.touched {
+            Some((first, last)) => (first.min(line), last.max(line)),
+            None => (line, line),
+        });
+    }
+
+    /// Whether a set of paragraph `line` may join the group, whose sets so
+    /// far produced `paragraphs`.
+    fn admits(
+        &mut self,
+        publisher: &Publisher,
+        paragraphs: &[String],
+        line: usize,
+    ) -> Result<bool, Error> {
+        // An emptied storage loses its text field; a later splice adds it
+        // back last, which one splice would not.
+        if publisher.package.sections().len() == 1
+            && !self.base.is_empty()
+            && paragraphs.iter().all(String::is_empty)
+        {
+            return Ok(false);
+        }
+        let Some((first, last)) = self.touched else {
+            return Ok(true);
+        };
+        let (first, last) = (first.min(line), last.max(line));
+        let offsets = self.offsets.get_or_insert_with(|| {
+            let mut offsets = Vec::new();
+            let mut unit = 0_usize;
+            for paragraph in self.base.split(BREAK) {
+                offsets.push(unit);
+                unit = unit
+                    .saturating_add(paragraph.encode_utf16().count())
+                    .saturating_add(1);
+            }
+            offsets.push(unit);
+            offsets
+        });
+        // Paragraph `last` ends just before the break that follows it.
+        let (Some(&start), Some(&next)) = (offsets.get(first), offsets.get(last + 1)) else {
+            return Ok(false);
+        };
+        let hull = start..next.saturating_sub(1);
+        if self.boundaries.is_none() {
+            self.boundaries = Some(super::section_text::section_boundaries(
+                &publisher.package,
+                publisher.position,
+            )?);
+        }
+        Ok(self
+            .boundaries
+            .as_ref()
+            .is_some_and(|boundaries| boundaries.admits(hull)))
+    }
+
+    /// Publish the group's `sets`, which produced `paragraphs`: one splice
+    /// for one set, or for several that consume no anchor and do not cancel
+    /// out; otherwise each on its own, replayed from the group's base.
+    fn publish(
+        &self,
+        publisher: &mut Publisher,
+        sets: &[Operation],
+        paragraphs: &mut Vec<String>,
+    ) -> Result<(), Error> {
+        if sets.is_empty() {
+            return Ok(());
+        }
+        let after = paragraphs.join("\n");
+        let anchored = splice(&self.base, &after)
+            .is_some_and(|(span, replacement)| touches_anchor(&self.base, span, replacement));
+        let cancelled = after == self.base && self.changed;
+        if sets.len() == 1 || (!anchored && !cancelled) {
+            return publisher.splice(&self.base, &after);
+        }
+        *paragraphs = self::paragraphs(&self.base);
+        publisher.each(sets, paragraphs)
     }
 }
 
