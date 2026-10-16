@@ -1,0 +1,99 @@
+binaries (not committed), built at 35599e1978:
+  keynote_bench          f778c5ccabdf1e416ab672ae74a8e4db449e7f3746ca67c1147b3da78d4ecf34
+  pages_bench            44bb35f3e250eb53126f80c4c1251ba0fbc819166db7ab5c05e20acdaa0ec2c9
+  numbers_unified_bench  e57859e216f8395b68d2880a7580aaa885aa8aba69de2fbce1918d115ef6dc47
+
+== keynote-1
+open             leaf=   1625.4us unified=   1611.0us ratio=0.992
+open_get         leaf=   1621.3us unified=   1689.3us ratio=1.042
+set              leaf=   4966.7us unified=   5017.5us ratio=1.011
+notes            leaf=   2785.7us unified=   2875.3us ratio=1.033
+frame            leaf=   2971.7us unified=   3032.3us ratio=1.021
+batch_1000       leaf=   7956.3us unified=   8498.5us ratio=1.068
+duplicate        leaf=   3369.3us unified=   3465.8us ratio=1.029
+add_slide        leaf=  16322.1us unified=  16351.8us ratio=1.002
+add_textbox      leaf=   3081.9us unified=   3175.6us ratio=1.031
+remove_slide     leaf=   6106.5us unified=   6167.4us ratio=1.010
+run_style        leaf=   3784.3us unified=   3901.7us ratio=1.031
+placeholder_hide leaf=   3028.8us unified=   3109.0us ratio=1.026
+table_cell       leaf=   3086.3us unified=   3142.3us ratio=1.018
+media_remove     leaf=   7342.2us unified=   7436.3us ratio=1.013
+== keynote-2
+open             leaf=   1622.0us unified=   1604.8us ratio=0.990
+open_get         leaf=   1629.7us unified=   1684.6us ratio=1.034
+set              leaf=   4941.7us unified=   4995.2us ratio=1.011
+notes            leaf=   2794.3us unified=   2883.1us ratio=1.032
+frame            leaf=   2977.6us unified=   3024.1us ratio=1.015
+batch_1000       leaf=   7796.3us unified=   8318.7us ratio=1.067
+duplicate        leaf=   3370.6us unified=   3466.0us ratio=1.029
+add_slide        leaf=  16153.3us unified=  16187.1us ratio=1.002
+add_textbox      leaf=   3084.0us unified=   3182.5us ratio=1.032
+remove_slide     leaf=   6119.5us unified=   6188.3us ratio=1.011
+run_style        leaf=   3789.6us unified=   3895.8us ratio=1.029
+placeholder_hide leaf=   3020.3us unified=   3114.9us ratio=1.032
+table_cell       leaf=   3095.2us unified=   3138.5us ratio=1.014
+media_remove     leaf=   7377.3us unified=   7463.4us ratio=1.012
+== pages-1
+open             leaf=    921.0us unified=    906.1us ratio=0.986
+open_get         leaf=    922.5us unified=    936.9us ratio=1.015
+set              leaf=   2016.7us unified=   2034.7us ratio=1.010
+add              leaf=   2022.0us unified=   2062.7us ratio=1.020
+remove           leaf=   2012.7us unified=   2038.0us ratio=1.012
+move             leaf=   2012.1us unified=   2032.8us ratio=1.011
+paragraph_font   leaf=   3314.6us unified=   3336.6us ratio=1.008
+table_cell       leaf=   1615.7us unified=   1644.3us ratio=1.017
+batch_1          leaf=   2194.0us unified=   2228.0us ratio=1.014
+batch_10         leaf=   2190.6us unified=   2225.3us ratio=1.016
+batch_100        leaf=   2239.2us unified=   2293.4us ratio=1.025
+batch_1000       leaf=   2283.2us unified=   2474.2us ratio=1.083
+batch_10000      leaf=   2985.5us unified=   4613.5us ratio=1.549
+== pages-2
+open             leaf=    916.5us unified=    910.7us ratio=0.995
+open_get         leaf=    920.7us unified=    942.3us ratio=1.024
+set              leaf=   2013.1us unified=   2035.4us ratio=1.011
+add              leaf=   2015.0us unified=   2052.2us ratio=1.019
+remove           leaf=   2020.1us unified=   2051.7us ratio=1.016
+move             leaf=   2011.6us unified=   2034.7us ratio=1.012
+paragraph_font   leaf=   3300.1us unified=   3347.0us ratio=1.014
+table_cell       leaf=   1615.1us unified=   1646.2us ratio=1.019
+batch_1          leaf=   2266.2us unified=   2295.8us ratio=1.014
+batch_10         leaf=   2261.7us unified=   2297.1us ratio=1.016
+batch_100        leaf=   2269.5us unified=   2324.2us ratio=1.023
+batch_1000       leaf=   2344.9us unified=   2534.3us ratio=1.077
+batch_10000      leaf=   2983.0us unified=   4553.5us ratio=1.527
+== numbers-1
+open_get         leaf=     97.5us unified=    102.2us ratio=1.047
+set              leaf=    362.1us unified=    361.6us ratio=0.999
+batch_1000       leaf=    960.0us unified=   1278.2us ratio=1.332
+formula          leaf=   2781.7us unified=   2786.7us ratio=1.002
+rename_sheet     leaf=    196.7us unified=    196.3us ratio=0.998
+merge_add        leaf=    181.1us unified=    186.0us ratio=1.027
+sheet_move       leaf=   2215.7us unified=   2210.5us ratio=0.998
+sheet_add        leaf=    253.1us unified=    247.2us ratio=0.976
+sheet_remove     leaf=    223.7us unified=    224.9us ratio=1.005
+table_add        leaf=    417.4us unified=    417.3us ratio=1.000
+table_remove     leaf=    232.9us unified=    237.1us ratio=1.018
+table_move       leaf=    230.3us unified=    234.1us ratio=1.017
+row_insert       leaf=    525.1us unified=    528.5us ratio=1.006
+row_remove       leaf=   1029.8us unified=   1041.0us ratio=1.011
+col_insert       leaf=    491.8us unified=    491.6us ratio=1.000
+col_remove       leaf=   1187.6us unified=   1196.1us ratio=1.007
+cell_font        leaf=    323.6us unified=    324.1us ratio=1.002
+== numbers-2
+open_get         leaf=     97.1us unified=    100.9us ratio=1.039
+set              leaf=    360.3us unified=    359.7us ratio=0.998
+batch_1000       leaf=    970.8us unified=   1280.5us ratio=1.319
+formula          leaf=   2786.0us unified=   2785.4us ratio=1.000
+rename_sheet     leaf=    199.5us unified=    197.6us ratio=0.991
+merge_add        leaf=    182.1us unified=    186.6us ratio=1.025
+sheet_move       leaf=   2208.3us unified=   2211.3us ratio=1.001
+sheet_add        leaf=    247.8us unified=    255.7us ratio=1.032
+sheet_remove     leaf=    224.5us unified=    225.2us ratio=1.003
+table_add        leaf=    411.9us unified=    415.4us ratio=1.009
+table_remove     leaf=    237.1us unified=    234.4us ratio=0.989
+table_move       leaf=    234.1us unified=    230.4us ratio=0.984
+row_insert       leaf=    520.7us unified=    526.3us ratio=1.011
+row_remove       leaf=   1027.7us unified=   1031.9us ratio=1.004
+col_insert       leaf=    488.6us unified=    489.9us ratio=1.003
+col_remove       leaf=   1192.7us unified=   1199.1us ratio=1.005
+cell_font        leaf=    325.1us unified=    325.7us ratio=1.002
