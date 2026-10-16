@@ -22,6 +22,15 @@
 //!   `duplicate_slide` / `add_slide` from the default layout,
 //!   `edit_slide_drawables` with `add_text_box`, `edit_slide_deletion`;
 //!   unified: `File::add` / `File::remove`).
+//! - record 0309: `run_style` (bold and 24 pt on the first run of slide 1's
+//!   text box; leaf `edit_slide_drawables` + `set_text_style`),
+//!   `placeholder_hide` (slide 2's body placeholder; leaf
+//!   `edit_slide_placeholder_visibility` + `hide`; unified `File::remove`),
+//!   `table_cell` (the first cell of `table-discovery.key`; leaf
+//!   `set_table_cell`; unified `set` of `text`) and `media_remove` (the
+//!   first clip of `media-lifecycle-audio-remove-native.key`; leaf
+//!   `remove_slide_media`; unified `File::remove`). Their outputs are
+//!   compared byte for byte before timing.
 //!
 //! Inputs (opened packages and files) are prepared outside the timed
 //! region; the unified legs include building the object tree on their first
@@ -38,7 +47,9 @@
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-use litchi_keynote::slide::drawable::Geometry;
+use litchi_keynote::slide::drawable::{
+    Geometry, Kind as DrawableKind, Style, TableCellValue, TextSpan as DrawableSpan,
+};
 use litchi_keynote::slide::placeholder::Kind as Role;
 use litchi_keynote::{DrawableSelector, Package, Position, SlideSelector, TextPosition, TextSpan};
 use litchi_ops::{NewNode, props};
@@ -168,6 +179,128 @@ fn main() {
         .unwrap()[0]
         .geometry()
         .unwrap();
+
+    // Record 0309 inputs; each pair's outputs are compared once here.
+    const RUN: &str = "/slide[1]/shape[1]/p[1]/run[1]";
+    let run_length = file()
+        .get(RUN)
+        .unwrap()
+        .as_iwork()
+        .unwrap()
+        .text()
+        .unwrap()
+        .map_or(0, |text| text.chars().count());
+    let leaf_bytes = |package: &Package| {
+        let mut out = Vec::new();
+        package.write_to(&mut out).unwrap();
+        out
+    };
+    {
+        let source = package();
+        let mut edit = source.edit_slide_drawables();
+        edit.set_text_style(
+            SlideSelector::index(0),
+            DrawableSelector::index(0),
+            DrawableSpan::new(0, run_length),
+            Style::new().with_bold(true).with_font_size(24.0),
+        )
+        .unwrap();
+        let leaf = leaf_bytes(edit.commit().unwrap().package());
+        let unified = file()
+            .set(RUN, props! { "bold" => true, "size" => "24pt" })
+            .unwrap()
+            .to_bytes()
+            .unwrap();
+        assert!(leaf == unified, "run_style outputs differ");
+        let leaf = leaf_bytes(
+            package()
+                .edit_slide_placeholder_visibility(SlideSelector::index(1), Role::Body)
+                .unwrap()
+                .hide()
+                .commit()
+                .unwrap()
+                .package(),
+        );
+        assert!(
+            leaf == file().remove(body).unwrap().to_bytes().unwrap(),
+            "placeholder_hide outputs differ"
+        );
+    }
+    let table_bytes = std::fs::read(test_data().join("iwork/keynote/table-discovery.key")).unwrap();
+    let table_bytes = &table_bytes;
+    let table_package = || Package::from_bytes(table_bytes).unwrap();
+    let table_file = || litchi_ops::open_bytes(table_bytes.clone()).unwrap();
+    let cell = table_file()
+        .query("tc")
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path()
+        .to_string();
+    let cell = &*Box::leak(cell.into_boxed_str());
+    let slide_of = |path: &str| -> usize {
+        let start = path.find('[').unwrap() + 1;
+        let end = path.find(']').unwrap();
+        path[start..end].parse::<usize>().unwrap() - 1
+    };
+    let table_slide = slide_of(cell);
+    let table_drawable = table_package()
+        .slide_drawable_list(SlideSelector::index(table_slide))
+        .unwrap()
+        .iter()
+        .position(|drawable| drawable.kind() == DrawableKind::Table)
+        .unwrap();
+    {
+        let source = table_package();
+        let mut edit = source.edit_slide_drawables();
+        edit.set_table_cell(
+            SlideSelector::index(table_slide),
+            DrawableSelector::index(table_drawable),
+            0,
+            0,
+            TableCellValue::Text("Bench".into()),
+        )
+        .unwrap();
+        let leaf = leaf_bytes(edit.commit().unwrap().package());
+        let unified = table_file()
+            .set(cell, props! { "text" => "Bench" })
+            .unwrap()
+            .to_bytes()
+            .unwrap();
+        assert!(leaf == unified, "table_cell outputs differ");
+    }
+    let media_bytes =
+        std::fs::read(test_data().join("iwork/keynote/media-lifecycle-audio-remove-native.key"))
+            .unwrap();
+    let media_bytes = &media_bytes;
+    let media_package = || Package::from_bytes(media_bytes).unwrap();
+    let media_file = || litchi_ops::open_bytes(media_bytes.clone()).unwrap();
+    let video = media_file()
+        .query("video")
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path()
+        .to_string();
+    let video = &*Box::leak(video.into_boxed_str());
+    let media_slide = slide_of(video);
+    {
+        let leaf = leaf_bytes(
+            media_package()
+                .remove_slide_media(
+                    SlideSelector::index(media_slide),
+                    litchi_keynote::MovieSelector::index(0),
+                )
+                .unwrap()
+                .package(),
+        );
+        assert!(
+            leaf == media_file().remove(video).unwrap().to_bytes().unwrap(),
+            "media_remove outputs differ"
+        );
+    }
 
     let scenarios: Vec<Scenario<'_>> = vec![
         Scenario {
@@ -396,6 +529,88 @@ fn main() {
             unified: Box::new(move |n| {
                 leg(n, file, |file| {
                     black_box(file.remove("/slide[3]").unwrap());
+                })
+            }),
+        },
+        Scenario {
+            name: "run_style",
+            leaf: Box::new(move |n| {
+                leg(n, package, |package| {
+                    let mut edit = package.edit_slide_drawables();
+                    edit.set_text_style(
+                        SlideSelector::index(0),
+                        DrawableSelector::index(0),
+                        DrawableSpan::new(0, run_length),
+                        Style::new().with_bold(true).with_font_size(24.0),
+                    )
+                    .unwrap();
+                    drop(black_box(edit.commit().unwrap()));
+                })
+            }),
+            unified: Box::new(move |n| {
+                leg(n, file, |file| {
+                    black_box(
+                        file.set(RUN, props! { "bold" => true, "size" => "24pt" })
+                            .unwrap(),
+                    );
+                })
+            }),
+        },
+        Scenario {
+            name: "placeholder_hide",
+            leaf: Box::new(move |n| {
+                leg(n, package, |package| {
+                    let edit = package
+                        .edit_slide_placeholder_visibility(SlideSelector::index(1), Role::Body)
+                        .unwrap();
+                    drop(black_box(edit.hide().commit().unwrap()));
+                })
+            }),
+            unified: Box::new(move |n| {
+                leg(n, file, |file| {
+                    black_box(file.remove(body).unwrap());
+                })
+            }),
+        },
+        Scenario {
+            name: "table_cell",
+            leaf: Box::new(move |n| {
+                leg(n, table_package, |package| {
+                    let mut edit = package.edit_slide_drawables();
+                    edit.set_table_cell(
+                        SlideSelector::index(table_slide),
+                        DrawableSelector::index(table_drawable),
+                        0,
+                        0,
+                        TableCellValue::Text("Bench".into()),
+                    )
+                    .unwrap();
+                    drop(black_box(edit.commit().unwrap()));
+                })
+            }),
+            unified: Box::new(move |n| {
+                leg(n, table_file, |file| {
+                    black_box(file.set(cell, props! { "text" => "Bench" }).unwrap());
+                })
+            }),
+        },
+        Scenario {
+            name: "media_remove",
+            leaf: Box::new(move |n| {
+                leg(n, media_package, |package| {
+                    drop(black_box(
+                        package
+                            .remove_slide_media(
+                                SlideSelector::index(media_slide),
+                                litchi_keynote::MovieSelector::index(0),
+                            )
+                            .unwrap(),
+                    ));
+                })
+            }),
+            unified: Box::new(move |n| {
+                leg(n, media_file, |file| {
+                    black_box(file.remove(video).unwrap());
                 })
             }),
         },

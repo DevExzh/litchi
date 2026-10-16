@@ -21,6 +21,12 @@
 //!   `edit_table_lifecycle(..).add`; unified `add("/sheet[1]", table)`),
 //!   `table_remove` (the grid's table) and `table_move` (leaf
 //!   `edit_table_order`; unified in-sheet `move_to`), on the grid fixture.
+//! - record 0309: `row_insert` and `col_insert` (leaf `edit_table_topology`
+//!   + `insert_row`/`insert_column` before physical row 51 / column 6;
+//!   unified `add(table, row|col)` at that position), `row_remove` and
+//!   `col_remove` (the same row or column), and `cell_font` (leaf
+//!   `edit_table_cell_text_style` + bold on A3; unified `set` of
+//!   `font.bold`), on the grid fixture.
 //!
 //! Legs run in ABBA order per sample after a warm-up; outputs of every
 //! write scenario are compared byte for byte before timing (the merge by
@@ -42,10 +48,14 @@ mod enabled {
     use std::hint::black_box;
     use std::time::Instant;
 
+    use litchi_numbers::cell::text_style::CharacterProperties;
     use litchi_numbers::formula::Expression;
     use litchi_numbers::table::CellPosition;
     use litchi_numbers::table::cells::{Change, Input};
     use litchi_numbers::table::merge::Region;
+    use litchi_numbers::table::topology::{
+        ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
+    };
     use litchi_numbers::{Package, SheetSelector, TableSelector};
     use litchi_ops::{BatchItem, BatchMode, File, NewNode, Placement, Props, props};
     use serde::Serialize;
@@ -549,6 +559,147 @@ mod enabled {
             Some(same),
             || time(|| leaf_table_move(&tables)),
             || time(|| unified_table_move(&tables_file)),
+        ));
+
+        // Record 0309: rows and columns, and cell character properties.
+        let (sheet, table_selector) = table();
+        let settings = leaf
+            .table_header_settings(sheet, table_selector)
+            .expect("header settings");
+        let (header_rows, header_columns) =
+            (settings.header_row_count(), settings.header_column_count());
+        const ROW: usize = 50;
+        const COLUMN: usize = 5;
+        let leaf_row_insert = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .edit_table_topology(sheet, table)
+                .expect("edit")
+                .insert_row(RowInsertion::body(ROW - header_rows))
+                .expect("insert")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_row_insert = |file: &File| {
+            file.add(
+                "/sheet[1]/table[1]",
+                NewNode::new("row").at(Placement::Position(litchi_ops::path::Position::new(ROW))),
+            )
+            .expect("add row")
+            .into_file()
+        };
+        let same = leaf_bytes(&leaf_row_insert(&leaf))
+            == unified_row_insert(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "row_insert",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_row_insert(&leaf)),
+            || time(|| unified_row_insert(&file)),
+        ));
+        let leaf_row_remove = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .edit_table_topology(sheet, table)
+                .expect("edit")
+                .remove_row(RowDeletion::body(ROW - header_rows))
+                .expect("remove")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let row_path = format!("/sheet[1]/table[1]/row[{}]", ROW + 1);
+        let unified_row_remove = |file: &File| file.remove(row_path.as_str()).expect("remove row");
+        let same = leaf_bytes(&leaf_row_remove(&leaf))
+            == unified_row_remove(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "row_remove",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_row_remove(&leaf)),
+            || time(|| unified_row_remove(&file)),
+        ));
+        let leaf_col_insert = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .edit_table_topology(sheet, table)
+                .expect("edit")
+                .insert_column(ColumnInsertion::body(COLUMN - header_columns))
+                .expect("insert")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_col_insert = |file: &File| {
+            file.add(
+                "/sheet[1]/table[1]",
+                NewNode::new("col")
+                    .at(Placement::Position(litchi_ops::path::Position::new(COLUMN))),
+            )
+            .expect("add col")
+            .into_file()
+        };
+        let same = leaf_bytes(&leaf_col_insert(&leaf))
+            == unified_col_insert(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "col_insert",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_col_insert(&leaf)),
+            || time(|| unified_col_insert(&file)),
+        ));
+        let leaf_col_remove = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .edit_table_topology(sheet, table)
+                .expect("edit")
+                .remove_column(ColumnDeletion::body(COLUMN - header_columns))
+                .expect("remove")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let col_path = format!("/sheet[1]/table[1]/col[{}]", COLUMN + 1);
+        let unified_col_remove = |file: &File| file.remove(col_path.as_str()).expect("remove col");
+        let same = leaf_bytes(&leaf_col_remove(&leaf))
+            == unified_col_remove(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "col_remove",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_col_remove(&leaf)),
+            || time(|| unified_col_remove(&file)),
+        ));
+        let leaf_font = |package: &Package| {
+            let (sheet, table) = table();
+            let mut bold = CharacterProperties::new();
+            bold.bold = Some(true);
+            package
+                .edit_table_cell_text_style(sheet, table)
+                .expect("edit")
+                .set(CellPosition::new(2, 0), bold)
+                .expect("stage")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_font = |file: &File| {
+            file.set("/sheet[1]/table[1]/A3", props! { "font.bold" => true })
+                .expect("font")
+        };
+        let same = leaf_bytes(&leaf_font(&leaf)) == unified_font(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "cell_font",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_font(&leaf)),
+            || time(|| unified_font(&file)),
         ));
 
         let report = Report {
