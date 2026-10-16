@@ -1444,6 +1444,18 @@ impl RevisionEditor {
         &self.unmodeled_cp_tables
     }
 
+    /// The FIB index of the first modeled CP table (bookmark, smart tag,
+    /// comment range, field, note or proofing PLCF) with a position strictly
+    /// inside `start..end`. Replacing that text would collapse the range
+    /// boundary, so the text replacement refuses it instead.
+    #[must_use]
+    pub(crate) fn interior_range_boundary(&self, start: u32, end: u32) -> Option<usize> {
+        self.cp_tables
+            .iter()
+            .find(|table| table.cps.iter().any(|cp| *cp > start && *cp < end))
+            .map(|table| table.index)
+    }
+
     /// Whether all character runs in a non-empty range have byte-identical
     /// direct formatting. Length-changing replacement can preserve only this
     /// unambiguous dependency closure.

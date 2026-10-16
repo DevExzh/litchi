@@ -456,3 +456,43 @@ fn genuine_word97_noncanonical_picture_graphs_are_typed_refusals() {
         ));
     }
 }
+
+/// `FloatingPictures.doc` tags each style name as a smart tag
+/// (`PlcfBklFactoid`, FIB table 117) whose end lies inside paragraphs 5
+/// onwards. Replacing such a paragraph would collapse the tag's end, so the
+/// text replacement is a typed refusal (record 0308), not a corrupt file;
+/// paragraphs whose tags end at their own edge stay editable.
+#[test]
+fn a_smart_tag_end_inside_the_paragraph_is_a_typed_refusal() {
+    let bytes = std::fs::read(fixture("test-data/ole/doc/FloatingPictures.doc")).expect("fixture");
+    let source = Snapshot::open(bytes, Limits::default()).expect("fixture opens");
+    let paragraphs = source.paragraphs(Projection::All).expect("paragraphs");
+    let interior = paragraphs
+        .iter()
+        .find(|paragraph| paragraph.text() == "Normal + Courier New, 12pt")
+        .expect("fifth paragraph")
+        .position();
+    let mut edit = source.edit().expect("edit");
+    let error = edit
+        .replace_paragraph(interior, "replacement")
+        .expect_err("the smart tag end is inside the paragraph");
+    assert!(
+        matches!(
+            error,
+            Error::Refused(Refusal::RangeBoundary { fib_index: 117 })
+        ),
+        "{error:?}"
+    );
+    assert!(error.to_string().contains("smart tag"), "{error}");
+    // The same text is still an exact no-op.
+    edit.replace_paragraph(interior, "Normal + Courier New, 12pt")
+        .expect("no-op");
+    let edge = paragraphs
+        .iter()
+        .find(|paragraph| paragraph.text() == "Normal")
+        .expect("first paragraph")
+        .position();
+    edit.replace_paragraph(edge, "Plain")
+        .expect("a tag that ends at the paragraph's edge is kept");
+    edit.commit().expect("commit");
+}
