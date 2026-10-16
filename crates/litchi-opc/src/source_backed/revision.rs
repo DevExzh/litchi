@@ -212,7 +212,7 @@ impl PreparedTopology {
             let original = physical.data()?;
             let proof = self.package.audit_physical_replacement_xml(
                 physical.index,
-                original.as_bytes(),
+                &original,
                 &replacement,
                 None,
                 proof.as_ref(),
