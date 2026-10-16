@@ -88,6 +88,15 @@ pub struct OpenOptions {
     /// and ODP.
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     pub(crate) odf_options: Option<litchi_odf_common::OpenOptions>,
+    /// Pages ingress options (source and semantic limits).
+    #[cfg(feature = "pages")]
+    pub(crate) pages_options: Option<litchi_pages::OpenOptions>,
+    /// Keynote ingress options (source and semantic limits).
+    #[cfg(feature = "keynote")]
+    pub(crate) keynote_options: Option<litchi_keynote::OpenOptions>,
+    /// Numbers ingress options (source and semantic limits).
+    #[cfg(feature = "numbers")]
+    pub(crate) numbers_options: Option<litchi_numbers::OpenOptions>,
 }
 
 impl OpenOptions {
@@ -116,6 +125,12 @@ impl OpenOptions {
             rtf_options: None,
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
             odf_options: None,
+            #[cfg(feature = "pages")]
+            pages_options: None,
+            #[cfg(feature = "keynote")]
+            keynote_options: None,
+            #[cfg(feature = "numbers")]
+            numbers_options: None,
         }
     }
 
@@ -274,6 +289,58 @@ impl OpenOptions {
     #[must_use]
     pub const fn odf_options(mut self, options: litchi_odf_common::OpenOptions) -> Self {
         self.odf_options = Some(options);
+        self
+    }
+
+    /// Replace the Pages ingress options (source and semantic limits) used
+    /// for Pages packages and package directories (record 0306).
+    ///
+    /// Semantic limits apply on the single detection pass; source limits
+    /// other than the leaf defaults make the leaf parse the package again
+    /// under them, because detection prepares the container under the hard
+    /// ceilings.
+    ///
+    /// ```
+    /// let options = litchi_ops::OpenOptions::new()
+    ///     .pages_options(litchi_pages::OpenOptions::new());
+    /// # let _ = options;
+    /// ```
+    #[cfg(feature = "pages")]
+    #[must_use]
+    pub const fn pages_options(mut self, options: litchi_pages::OpenOptions) -> Self {
+        self.pages_options = Some(options);
+        self
+    }
+
+    /// Replace the Keynote ingress options (source and semantic limits) used
+    /// for Keynote packages and package directories (record 0306); as
+    /// [`Self::pages_options`].
+    ///
+    /// ```
+    /// let options = litchi_ops::OpenOptions::new()
+    ///     .keynote_options(litchi_keynote::OpenOptions::new());
+    /// # let _ = options;
+    /// ```
+    #[cfg(feature = "keynote")]
+    #[must_use]
+    pub const fn keynote_options(mut self, options: litchi_keynote::OpenOptions) -> Self {
+        self.keynote_options = Some(options);
+        self
+    }
+
+    /// Replace the Numbers ingress options (source and semantic limits) used
+    /// for Numbers packages and package directories (record 0306); as
+    /// [`Self::pages_options`].
+    ///
+    /// ```
+    /// let options = litchi_ops::OpenOptions::new()
+    ///     .numbers_options(litchi_numbers::OpenOptions::new());
+    /// # let _ = options;
+    /// ```
+    #[cfg(feature = "numbers")]
+    #[must_use]
+    pub const fn numbers_options(mut self, options: litchi_numbers::OpenOptions) -> Self {
+        self.numbers_options = Some(options);
         self
     }
 

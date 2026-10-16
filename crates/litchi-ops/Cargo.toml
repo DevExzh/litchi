@@ -61,7 +61,7 @@ odf-objects = ["dep:litchi-odf-common"]
 pages   = ["iwork-adapter", "dep:litchi-pages", "litchi-pages/internal-iwork-source"]
 keynote = ["iwork-adapter", "dep:base64", "dep:litchi-keynote", "litchi-keynote/internal-iwork-source"]
 numbers = ["iwork-adapter", "dep:litchi-numbers", "litchi-numbers/internal-iwork-source"]
-iwork-adapter = ["dep:litchi-iwa-detect"]
+iwork-adapter = ["dep:litchi-iwa-archive", "dep:litchi-iwa-detect"]
 
 encryption = [
     "dep:litchi-cfb",
@@ -112,6 +112,7 @@ litchi-docx         = { workspace = true, optional = true }
 litchi-drawingml    = { workspace = true, optional = true }
 litchi-eval         = { workspace = true, optional = true } # Formula evaluation (record 0266)
 litchi-formula      = { workspace = true, optional = true }
+litchi-iwa-archive  = { workspace = true, optional = true } # iWork physical error classification (record 0306)
 litchi-iwa-detect   = { workspace = true, optional = true } # iWork detection (record 0296)
 litchi-keynote      = { workspace = true, optional = true } # Keynote owner (record 0296)
 litchi-markdown     = { workspace = true, optional = true }
@@ -200,6 +201,11 @@ required-features = ["docx", "xlsx", "eval"]
 # Paired leaf-vs-unified iWork measurements (record 0296).
 [[example]]
 name              = "iwork_bench"
+required-features = ["pages", "keynote", "numbers"]
+
+# Paired leaf-vs-unified iWork directory and open-option routes (record 0306).
+[[example]]
+name              = "iwork_directory_bench"
 required-features = ["pages", "keynote", "numbers"]
 
 # Paired leaf-vs-unified Numbers measurements (record 0297).

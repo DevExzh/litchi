@@ -75,6 +75,9 @@ pub enum LeafError {
     /// A Keynote slide-creation transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteCreation(litchi_keynote::slide::creation::Error),
+    /// Saving a Keynote package directory failed (record 0306).
+    #[cfg(feature = "keynote")]
+    KeynoteSave(litchi_keynote::SaveError),
     /// The Numbers package could not be read.
     #[cfg(feature = "numbers")]
     Numbers(litchi_numbers::Error),
@@ -92,6 +95,9 @@ pub enum LeafError {
     /// display formats, formula text, or a fresh workbook build.
     #[cfg(feature = "numbers")]
     NumbersEdit(super::numbers::EditError),
+    /// Saving a Numbers package directory failed (record 0306).
+    #[cfg(feature = "numbers")]
+    NumbersSave(litchi_numbers::SaveError),
 }
 
 impl fmt::Display for LeafError {
@@ -138,6 +144,8 @@ impl fmt::Display for LeafError {
             Self::KeynoteDrawables(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteSave(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
             Self::Numbers(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
@@ -148,6 +156,8 @@ impl fmt::Display for LeafError {
             Self::NumbersWrite(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
             Self::NumbersEdit(error) => error.fmt(formatter),
+            #[cfg(feature = "numbers")]
+            Self::NumbersSave(error) => error.fmt(formatter),
         }
     }
 }
@@ -196,6 +206,8 @@ impl std::error::Error for LeafError {
             Self::KeynoteDrawables(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteSave(error) => Some(error),
             #[cfg(feature = "numbers")]
             Self::Numbers(error) => Some(error),
             #[cfg(feature = "numbers")]
@@ -206,6 +218,8 @@ impl std::error::Error for LeafError {
             Self::NumbersWrite(error) => Some(error),
             #[cfg(feature = "numbers")]
             Self::NumbersEdit(error) => error.source_error(),
+            #[cfg(feature = "numbers")]
+            Self::NumbersSave(error) => Some(error),
         }
     }
 }
@@ -280,7 +294,31 @@ impl LeafError {
             Self::NumbersWrite(_) => Code::IoError,
             #[cfg(feature = "numbers")]
             Self::NumbersEdit(error) => error.code(),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteSave(error) => match error {
+                litchi_keynote::SaveError::Bundle(_) => Code::InvalidInput,
+                _ => Code::IoError,
+            },
+            #[cfg(feature = "numbers")]
+            Self::NumbersSave(error) => match error {
+                litchi_numbers::SaveError::Bundle(_) => Code::InvalidInput,
+                _ => Code::IoError,
+            },
         }
+    }
+}
+
+/// The code of a physical iWork archive failure: a resource ceiling is
+/// `limit_exceeded` (record 0306: source limits and package-directory
+/// captures report through it), I/O is `io_error`, the rest is a malformed
+/// package.
+fn archive_code(error: &litchi_iwa_archive::Error) -> Code {
+    use litchi_iwa_archive::Error as E;
+    match error {
+        E::Limit { .. } => Code::LimitExceeded,
+        E::Io(_) => Code::IoError,
+        E::Allocation { .. } => Code::InternalError,
+        _ => Code::CorruptFile,
     }
 }
 
@@ -298,9 +336,16 @@ fn pages_code(error: &litchi_pages::PackageError) -> Code {
     match error {
         E::Io(_) => Code::IoError,
         E::Detection(error) => detection_code(error),
-        E::SectionNamesTooLarge { .. } | E::PayloadLimit { .. } | E::ObjectLimit { .. } => {
-            Code::LimitExceeded
-        },
+        E::Archive(error) => archive_code(error),
+        E::Limit { .. }
+        | E::Semantic(
+            litchi_pages::Error::TooManySections { .. }
+            | litchi_pages::Error::TextTooLarge { .. }
+            | litchi_pages::Error::TooManyBodyStorages { .. },
+        )
+        | E::SectionNamesTooLarge { .. }
+        | E::PayloadLimit { .. }
+        | E::ObjectLimit { .. } => Code::LimitExceeded,
         E::Allocation { .. } => Code::InternalError,
         _ => Code::CorruptFile,
     }
@@ -425,6 +470,7 @@ fn keynote_code(error: &litchi_keynote::ReadError) -> Code {
     match error {
         E::Io(_) => Code::IoError,
         E::Detection(error) => detection_code(error),
+        E::Archive(error) => archive_code(error),
         E::SemanticLimit { .. } | E::PayloadLimit { .. } => Code::LimitExceeded,
         E::Allocation { .. } => Code::InternalError,
         _ => Code::CorruptFile,
@@ -541,6 +587,7 @@ fn numbers_code(error: &litchi_numbers::Error) -> Code {
     match error {
         E::Io(_) => Code::IoError,
         E::Detection(error) => detection_code(error),
+        E::Archive(error) => archive_code(error),
         E::SemanticLimit { .. } | E::InputTooLarge { .. } => Code::LimitExceeded,
         _ => Code::CorruptFile,
     }

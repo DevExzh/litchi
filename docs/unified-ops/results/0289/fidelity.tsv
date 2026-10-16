@@ -1,8 +1,11 @@
 file	format	noop	detail	revert	revert_detail	structure	structure_detail
 Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14ISOStrict/Word/sectPr-Previous Section Properties-rsidSelect-004B4C75.docx	docx	exact		none		-	
 Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx	docx	exact		none		-	
+iwork/directory/keynote/basic.key	keynote	exact		-		-	
 iwork/directory/keynote/basic.key/Index.zip	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 123322 -> 123308 bytes, first difference at 14	value-exact	slide duplicate+add+remove: 123322 -> 126565 bytes, first difference at 89854
+iwork/directory/numbers/basic.numbers	numbers	exact		-		-	
 iwork/directory/numbers/basic.numbers/Index.zip	numbers	exact		value-exact	/sheet[1] name: 78105 -> 78111 bytes, first difference at 58425	value-exact	table add+remove: 78105 -> 78139 bytes, first difference at 58425
+iwork/directory/pages/basic.pages	pages	exact		-		-	
 iwork/directory/pages/basic.pages/Index.zip	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/keynote/basic.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 500058 -> 455848 bytes, first difference at 328815	value-exact	slide duplicate+add+remove: 500058 -> 459101 bytes, first difference at 418690
 iwork/keynote/chart-arrangement-retirement-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 510176 -> 459802 bytes, first difference at 331046	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...

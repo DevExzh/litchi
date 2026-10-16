@@ -47,8 +47,10 @@ const NEUTRAL_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 /// does not exist,
 /// [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat) with no
 /// [`detected`](Error::detected) format for an input that is not an Office
-/// file (an iWork package included), or with the detected format when its
-/// cargo feature is off, [`Code::LimitExceeded`](crate::Code::LimitExceeded)
+/// file, or with the detected format when its cargo feature is off (an
+/// Apple iWork package or package directory included; a package directory
+/// opens as its single-file form and `save()` writes it back as a
+/// directory, record 0306), [`Code::LimitExceeded`](crate::Code::LimitExceeded)
 /// when the input exceeds a read limit, and the format's typed error when its
 /// container cannot be read. In a build with an OOXML format, a file named
 /// as an OOXML package (`.docx`, `.xlsx`, `.pptx`, `.xlsb` and their macro
@@ -168,39 +170,56 @@ pub fn open_with_tail<T: ZipTail>(
     check_cancelled(options)?;
     let file = match path::open(path.as_ref(), options, tail) {
         Ok(file) => file,
-        Err(error) => open_directory(path.as_ref(), error)?,
+        Err(error) => open_directory(path.as_ref(), options, error)?,
     };
     check_cancelled(options)?;
     Ok(file)
 }
 
-/// Open the iWork package directory at `path` the file route refused: a
-/// Pages directory opens through its leaf (record 0299); the others are
-/// refused as before.
-fn open_directory(path: &Path, error: Error) -> Result<File> {
-    #[cfg(feature = "pages")]
-    if path.is_dir() && crate::format::iwork::classify_directory(path) == Some(FileFormat::Pages) {
-        return crate::format::iwork::Iwork::open_pages_directory(path)
-            .map(crate::format::iwork::Iwork::into_file);
-    }
-    Err(refuse_directory(path, error))
-}
-
-/// Finish a refusal of the input at `path`. The file route reads one
-/// positional source, so an iWork package directory (the app-authored
-/// bundle form) fails there; it is named here, on the error path only. A
-/// Keynote or Numbers directory is refused with
-/// [`Error::iwork_unsupported`] (Pages directories open, record 0299).
-fn refuse_directory(path: &Path, error: Error) -> Error {
+/// Open the iWork package directory at `path` the file route refused: the
+/// file route reads one positional source, so an app-authored package
+/// directory fails there and is classified here, on the error path only. A
+/// Pages, Keynote or Numbers directory opens through its leaf (records 0299
+/// and 0306); a directory of a format whose feature is off is
+/// `unsupported_format` naming the feature.
+#[cfg_attr(
+    not(feature = "iwork-adapter"),
+    allow(
+        clippy::unnecessary_wraps,
+        reason = "the directory route exists only with an iWork format"
+    )
+)]
+fn open_directory(path: &Path, options: &OpenOptions, error: Error) -> Result<File> {
     #[cfg(feature = "iwork-adapter")]
     if path.is_dir()
         && let Some(format) = crate::format::iwork::classify_directory(path)
     {
-        return Error::iwork_unsupported(format);
+        return match format {
+            #[cfg(feature = "pages")]
+            FileFormat::Pages => crate::format::iwork::Iwork::open_directory(path, format, options)
+                .map(crate::format::iwork::Iwork::into_file),
+            #[cfg(feature = "keynote")]
+            FileFormat::Keynote => {
+                crate::format::iwork::Iwork::open_directory(path, format, options)
+                    .map(crate::format::iwork::Iwork::into_file)
+            },
+            #[cfg(feature = "numbers")]
+            FileFormat::Numbers => {
+                crate::format::iwork::Iwork::open_directory(path, format, options)
+                    .map(crate::format::iwork::Iwork::into_file)
+            },
+            _ => Err(
+                Error::unsupported_format(Some(format)).with_suggestion(match format {
+                    FileFormat::Pages => "enable the `pages` cargo feature",
+                    FileFormat::Keynote => "enable the `keynote` cargo feature",
+                    _ => "enable the `numbers` cargo feature",
+                }),
+            ),
+        };
     }
     #[cfg(not(feature = "iwork-adapter"))]
-    let _ = path;
-    error
+    let _ = (path, options);
+    Err(error)
 }
 
 /// [`open_bytes_with`] with a lowest-precedence ZIP classifier; see
@@ -294,7 +313,7 @@ pub(crate) fn input_ceiling(options: &OpenOptions) -> u64 {
 }
 
 /// Refuse an input longer than `limit`.
-fn check_input_len(observed: u64, limit: u64) -> Result<()> {
+pub(crate) fn check_input_len(observed: u64, limit: u64) -> Result<()> {
     if observed > limit {
         return Err(
             litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
