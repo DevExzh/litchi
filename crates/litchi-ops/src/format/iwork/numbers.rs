@@ -19,8 +19,11 @@
 //! | `move` | `table` within its sheet | `edit_table_order` |
 //! | `add`/`remove` | `sheet` | `edit_sheet_lifecycle` (+ `edit_sheet_order` for a position) |
 //! | `add`/`remove` | `table` | `edit_table_lifecycle` (+ `edit_table_order` for a position) |
+//! | `add`/`remove` | `row`/`col` of a table | `edit_table_topology` (record 0309) |
 //!
-//! Row and column insertion and deletion stay a typed gap (request 6).
+//! Rows and columns are addressed by position, `/sheet[N]/table[M]/row[K]`
+//! and `col[K]`; the tree does not list them (a table's `rowCount` and
+//! `columnCount` give their extent).
 
 pub(crate) mod coalesce;
 
@@ -36,6 +39,7 @@ use litchi_numbers::cell::data_format::{
 use litchi_numbers::formula::Expression;
 use litchi_numbers::table::cells::{Change, Edit, Input};
 use litchi_numbers::table::merge::Region;
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use litchi_numbers::table::{CellPosition, CellRange};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
@@ -64,6 +68,8 @@ kinds! {
         Table => "table",
         Cell => "cell",
         MergeCell => "mergeCell",
+        Row => "row",
+        Column => "col",
     }
 }
 
@@ -124,13 +130,7 @@ pub(crate) const MERGE_PROPS: &[PropSpec] = &[{
 
 const FOLLOW_UP: &str = "record 0297 follow-ups (IWORK_API_REQUESTS.md)";
 
-static GAPS: [GapSpec; 4] = [
-    GapSpec {
-        subject: Subject::Element("row"),
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 6",
-        reason: "rows and columns are table coordinates here; the leaf has no package transaction that inserts or deletes them (the migration host's editor does, outside the supported crates)",
-    },
+static GAPS: [GapSpec; 3] = [
     GapSpec {
         subject: Subject::Property {
             element: "cell",
@@ -161,16 +161,38 @@ static GAPS: [GapSpec; 4] = [
     },
 ];
 
-static OPERATION_GAPS: [GapSpec; 1] = [GapSpec {
-    subject: Subject::Operation {
-        verb: "add",
-        element: "table",
-        context: "a workbook without a table",
+static OPERATION_GAPS: [GapSpec; 3] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "table",
+            context: "a workbook without a table",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
+        reason: "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet",
     },
-    code: Code::UnsupportedCapability,
-    follow_up: "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
-    reason: "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet",
-}];
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "row",
+            context: "tables with formulas or merges",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "record 0309 follow-ups (IWORK_API_REQUESTS.md request 6)",
+        reason: "rows and columns are inserted and removed when no formula coordinate moves: a table holding formulas, one a formula or chart elsewhere reads, merged cells, filters, categories, pivots and (for columns) sort rules are refused, as are removing a hidden, bordered or commented row or column",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "row",
+            context: "height and visibility",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "record 0309 follow-ups",
+        reason: "rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction",
+    },
+];
 
 /// The Numbers spec table.
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
@@ -199,7 +221,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "table",
             &["table"],
             &[Kind::Sheet],
-            &[Kind::Cell, Kind::MergeCell],
+            &[Kind::Cell, Kind::MergeCell, Kind::Row, Kind::Column],
             &["/sheet[N]/table[N]", "/<sheet name>/<table name>"],
             TABLE_PROPS,
         ),
@@ -221,6 +243,24 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/sheet[N]/table[N]/mergeCell[N]"],
             MERGE_PROPS,
         ),
+        element(
+            Kind::Row,
+            "row",
+            &["row"],
+            &[Kind::Table],
+            &[],
+            &["/sheet[N]/table[N]/row[N]"],
+            &[],
+        ),
+        element(
+            Kind::Column,
+            "col",
+            &["col", "column"],
+            &[Kind::Table],
+            &[],
+            &["/sheet[N]/table[N]/col[N]"],
+            &[],
+        ),
     ],
     gaps: &GAPS,
 };
@@ -240,8 +280,8 @@ impl Flavor for Numbers {
 /// The elements each write verb accepts.
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["cell", "sheet", "table"],
-    addable: &["mergeCell", "sheet", "table"],
-    removable: &["cell", "mergeCell", "sheet", "table"],
+    addable: &["col", "mergeCell", "row", "sheet", "table"],
+    removable: &["cell", "col", "mergeCell", "row", "sheet", "table"],
     movable: &["sheet", "table"],
     gaps: &OPERATION_GAPS,
 };
@@ -273,6 +313,8 @@ pub enum EditError {
     TableLifecycle(litchi_numbers::table::lifecycle::Error),
     /// A table move within its sheet.
     TableOrder(litchi_numbers::table::order::Error),
+    /// A row or column insertion or removal.
+    Topology(litchi_numbers::table::topology::Error),
 }
 
 impl fmt::Display for EditError {
@@ -289,6 +331,7 @@ impl fmt::Display for EditError {
             Self::SheetLifecycle(error) => error.fmt(formatter),
             Self::TableLifecycle(error) => error.fmt(formatter),
             Self::TableOrder(error) => error.fmt(formatter),
+            Self::Topology(error) => error.fmt(formatter),
         }
     }
 }
@@ -307,6 +350,7 @@ impl EditError {
             Self::SheetLifecycle(error) => error,
             Self::TableLifecycle(error) => error,
             Self::TableOrder(error) => error,
+            Self::Topology(error) => error,
         })
     }
 
@@ -421,6 +465,21 @@ impl EditError {
                     _ => Code::InternalError,
                 }
             },
+            Self::Topology(error) => {
+                use litchi_numbers::table::topology::Error as E;
+                match error {
+                    E::SheetNotFound | E::TableNotFound => Code::PathNotFound,
+                    E::PositionOutOfRange { .. } => Code::OutOfRange,
+                    E::SectionFull | E::LastAxis => Code::InvalidArgument,
+                    E::Unsupported { .. } | E::UnsupportedDependency | E::UnsupportedSource => {
+                        Code::UnsupportedCapability
+                    },
+                    E::CellClear { error } => cells_error(*error).code(),
+                    E::LimitExceeded { .. } => Code::LimitExceeded,
+                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+                    _ => Code::InternalError,
+                }
+            },
         }
     }
 }
@@ -445,6 +504,8 @@ pub(crate) enum Patch {
     TableLifecycle(litchi_numbers::table::lifecycle::Patch),
     /// A table move within its sheet.
     TableOrder(litchi_numbers::table::order::Patch),
+    /// Row and column insertions and removals.
+    Topology(litchi_numbers::table::topology::Patch),
 }
 
 impl Patch {
@@ -459,6 +520,7 @@ impl Patch {
             Self::SheetLifecycle(patch) => patch.is_noop(),
             Self::TableLifecycle(patch) => patch.is_noop(),
             Self::TableOrder(patch) => patch.is_noop(),
+            Self::Topology(patch) => patch.is_noop(),
         }
     }
 }
@@ -1042,6 +1104,9 @@ pub(crate) fn add(
     if kind.eq_ignore_ascii_case("table") {
         return add_table(file, package, parent, node, limits);
     }
+    if let Some(row_axis) = axis_kind(kind) {
+        return add_axis(file, package, parent, node, row_axis, limits);
+    }
     if !(kind.eq_ignore_ascii_case("mergeCell")
         || kind.eq_ignore_ascii_case("merge")
         || kind.eq_ignore_ascii_case("mergedRange"))
@@ -1343,16 +1408,240 @@ fn parse_region(range: &str) -> Result<Region> {
 }
 
 /// The typed refusal of an `add` the leaf cannot perform.
-fn add_gap(kind: &str) -> crate::Error {
-    let message = if ["row", "col", "column"]
-        .iter()
-        .any(|name| kind.eq_ignore_ascii_case(name))
-    {
-        "inserting Numbers rows or columns needs a leaf topology transaction (IWORK_API_REQUESTS.md request 6)"
+fn add_gap(_kind: &str) -> crate::Error {
+    refusal(
+        Code::UnsupportedCapability,
+        "a Numbers workbook adds sheets, tables, rows, columns (`row`, `col`) and merged ranges (`mergeCell`)",
+    )
+}
+
+// ------------------------------------------------------------ rows / columns
+
+/// `Some(true)` for a row element name, `Some(false)` for a column one.
+fn axis_kind(kind: &str) -> Option<bool> {
+    if kind.eq_ignore_ascii_case("row") {
+        Some(true)
+    } else if kind.eq_ignore_ascii_case("col") || kind.eq_ignore_ascii_case("column") {
+        Some(false)
     } else {
-        "a Numbers workbook adds sheets, tables and merged ranges (`mergeCell`)"
+        None
+    }
+}
+
+/// A table's size and section counts, for mapping a physical row or column
+/// to its section.
+#[derive(Debug, Clone, Copy)]
+struct Sections {
+    rows: usize,
+    columns: usize,
+    header_rows: usize,
+    header_columns: usize,
+    footer_rows: usize,
+}
+
+fn sections(package: &Package, sheet: usize, table: usize) -> Result<Sections> {
+    let error = |error| edit_error(EditError::Topology(error));
+    let leaf = package
+        .sheets()
+        .get(sheet)
+        .and_then(|sheet| sheet.tables().nth(table))
+        .ok_or_else(|| refusal(Code::PathNotFound, "the table is no longer in the workbook"))?;
+    let settings = package
+        .table_header_settings(SheetSelector::index(sheet), TableSelector::index(table))
+        .map_err(|_| error(litchi_numbers::table::topology::Error::InvalidSource))?;
+    Ok(Sections {
+        rows: leaf.row_count() as usize,
+        columns: leaf.column_count() as usize,
+        header_rows: settings.header_row_count(),
+        header_columns: settings.header_column_count(),
+        footer_rows: settings.footer_row_count(),
+    })
+}
+
+/// The section-relative insertion before physical row `at` (`at` may equal
+/// the row count): a row inside the header rows grows them, one past the
+/// body joins the footer rows, every other one joins the body.
+fn row_insertion(sections: Sections, at: usize) -> RowInsertion {
+    let body_end = sections.rows - sections.footer_rows;
+    if at < sections.header_rows {
+        RowInsertion::header(at)
+    } else if at <= body_end {
+        RowInsertion::body(at - sections.header_rows)
+    } else {
+        RowInsertion::footer(at - body_end)
+    }
+}
+
+fn row_deletion(sections: Sections, at: usize) -> RowDeletion {
+    let body_end = sections.rows - sections.footer_rows;
+    if at < sections.header_rows {
+        RowDeletion::header(at)
+    } else if at < body_end {
+        RowDeletion::body(at - sections.header_rows)
+    } else {
+        RowDeletion::footer(at - body_end)
+    }
+}
+
+fn column_insertion(sections: Sections, at: usize) -> ColumnInsertion {
+    if at < sections.header_columns {
+        ColumnInsertion::header(at)
+    } else {
+        ColumnInsertion::body(at - sections.header_columns)
+    }
+}
+
+fn column_deletion(sections: Sections, at: usize) -> ColumnDeletion {
+    if at < sections.header_columns {
+        ColumnDeletion::header(at)
+    } else {
+        ColumnDeletion::body(at - sections.header_columns)
+    }
+}
+
+/// The table and zero-based index a `row[K]`/`col[K]` path names, with the
+/// axis (`true` for rows).
+fn axis_target(file: &Iwork, path: &Path<'_>) -> Option<(usize, usize, bool, usize)> {
+    let (last, parent) = path.steps().split_last()?;
+    let row_axis = axis_kind(last.name())?;
+    let [Predicate::Index(position)] = last.predicates() else {
+        return None;
     };
-    refusal(Code::UnsupportedCapability, message)
+    let parent = Path::from_steps(parent.iter().cloned());
+    let parent = parent.into_path().ok()?;
+    let table = node_at::<Numbers>(file, &parent).ok()?;
+    if table.item().type_name() != "table" {
+        return None;
+    }
+    let [sheet, table_index, _, _] = table.item().leaf().map(|value| value as usize);
+    Some((sheet, table_index, row_axis, position.get()))
+}
+
+/// Insert a blank row or column into a table, appended to its body or
+/// placed (`Start`, `End`, `Position(N)`, before or after another row or
+/// column of the table).
+fn add_axis(
+    file: &Iwork,
+    package: &Package,
+    parent: &PathArg<'_>,
+    node: &NewNode<'_>,
+    row_axis: bool,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    let noun = if row_axis { "row" } else { "column" };
+    let table = node_at::<Numbers>(file, parent)?;
+    if table.item().type_name() != "table" {
+        return Err(refusal(
+            Code::InvalidArgument,
+            format!("a Numbers {noun} is added under a table (`/sheet[N]/table[N]`)"),
+        ));
+    }
+    if let Some((key, _)) = node.props().iter().next() {
+        return Err(super::write::unwritable(noun, key.as_str()));
+    }
+    let [sheet, table_index, _, _] = table.item().leaf().map(|value| value as usize);
+    let sections = sections(package, sheet, table_index)?;
+    let count = if row_axis {
+        sections.rows
+    } else {
+        sections.columns
+    };
+    let anchor = |path: &PathArg<'_>| -> Result<usize> {
+        match axis_target(file, path.path()) {
+            Some((anchor_sheet, anchor_table, anchor_row, index))
+                if (anchor_sheet, anchor_table, anchor_row) == (sheet, table_index, row_axis)
+                    && index < count =>
+            {
+                Ok(index)
+            },
+            _ => Err(refusal(
+                Code::InvalidArgument,
+                format!("a {noun} is placed before or after another {noun} of its table"),
+            )),
+        }
+    };
+    let at = match add_position(count, node.placement(), anchor)? {
+        Some(at) => at,
+        // Appended: the end of the body (before any footer rows).
+        None if row_axis => sections.rows - sections.footer_rows,
+        None => sections.columns,
+    };
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    let error = |error| edit_error(EditError::Topology(error));
+    let edit = package
+        .edit_table_topology(
+            SheetSelector::index(sheet),
+            TableSelector::index(table_index),
+        )
+        .map_err(error)?;
+    let edit = if row_axis {
+        edit.insert_row(row_insertion(sections, at))
+    } else {
+        edit.insert_column(column_insertion(sections, at))
+    }
+    .map_err(error)?;
+    let commit = edit.commit().map_err(error)?;
+    let mut chain = Chain::new(package.clone());
+    let (next, patch) = commit.into_parts();
+    push(&mut chain, next, Patch::Topology(patch));
+    let commit = finish(
+        file,
+        chain.changed,
+        Owner::Numbers(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )?;
+    let path = Path::from_steps([
+        Step::new("sheet").with(Predicate::Index(Position::new(sheet))),
+        Step::new("table").with(Predicate::Index(Position::new(table_index))),
+        Step::new(if row_axis { "row" } else { "col" }).with(Predicate::Index(Position::new(at))),
+    ]);
+    Ok((commit, path))
+}
+
+/// Remove one row or column of a table, with its cells.
+fn remove_axis(
+    file: &Iwork,
+    package: &Package,
+    (sheet, table, row_axis, at): (usize, usize, bool, usize),
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let sections = sections(package, sheet, table)?;
+    let count = if row_axis {
+        sections.rows
+    } else {
+        sections.columns
+    };
+    if at >= count {
+        return Err(refusal(
+            Code::PathNotFound,
+            "the table has no such row or column",
+        ));
+    }
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    let error = |error| edit_error(EditError::Topology(error));
+    let edit = package
+        .edit_table_topology(SheetSelector::index(sheet), TableSelector::index(table))
+        .map_err(error)?;
+    let edit = if row_axis {
+        edit.remove_row(row_deletion(sections, at))
+    } else {
+        edit.remove_column(column_deletion(sections, at))
+    }
+    .map_err(error)?;
+    let commit = edit.commit().map_err(error)?;
+    let mut chain = Chain::new(package.clone());
+    let (next, patch) = commit.into_parts();
+    push(&mut chain, next, Patch::Topology(patch));
+    finish(
+        file,
+        chain.changed,
+        Owner::Numbers(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )
 }
 
 /// Remove targets: a cell is cleared, a merged range unmerged.
@@ -1362,6 +1651,12 @@ pub(crate) fn remove(
     target: &TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
+    if let Some(axis) = target
+        .path()
+        .and_then(|path| axis_target(file, path.path()))
+    {
+        return remove_axis(file, package, axis, limits);
+    }
     let nodes = match targets(file, target, limits)? {
         Targets::EmptyCell(_) => {
             // An empty in-grid cell has nothing to remove.

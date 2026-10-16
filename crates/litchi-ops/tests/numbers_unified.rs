@@ -407,13 +407,9 @@ fn sheets_and_tables_are_added_and_removed() {
         .expect("remove sheet with its table");
     let reopened = reopen(&gone);
     assert_eq!(prop(&reopened, "/", "sheetCount").as_deref(), Some("1"));
-    // The last sheet stays; rows and columns are still a typed gap.
+    // The last sheet stays.
     let error = reopened.remove("/sheet[1]").expect_err("last sheet");
     assert_eq!(error.code(), Code::InvalidArgument);
-    let error = reopened
-        .add("/sheet[1]/table[1]", NewNode::new("row"))
-        .expect_err("rows");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
     let error = file
         .add("/", NewNode::new("sheet").prop("name", "Sheet 1"))
         .expect_err("duplicate");
@@ -553,4 +549,112 @@ fn structural_round_trips_over_the_corpus() {
         files >= 30 && merged * 2 >= files,
         "{merged} of {files} merged"
     );
+}
+
+#[test]
+fn rows_and_columns_are_inserted_and_removed() {
+    let file = create(FileFormat::Numbers).expect("create");
+    let filled = file
+        .edit(|tx| {
+            tx.set("/sheet[1]/table[1]/B2", props! { "value" => "b2" })?;
+            tx.set("/sheet[1]/table[1]/B3", props! { "value" => 3 })?;
+            tx.set("/sheet[1]/table[1]/D3", props! { "value" => "d3" })?;
+            Ok(())
+        })
+        .expect("values")
+        .file;
+    let rows = prop(&filled, "/sheet[1]/table[1]", "rowCount").expect("rows");
+    let rows: usize = rows.parse().expect("count");
+    // A row before row 3 (zero-based position 2), then filled.
+    let added = filled
+        .add(
+            "/sheet[1]/table[1]",
+            NewNode::new("row").at(Placement::Position(litchi_core::Position::new(2))),
+        )
+        .expect("insert a row");
+    assert_eq!(added.path.to_string(), "/sheet[1]/table[1]/row[3]");
+    let reopened = reopen(&added.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]", "rowCount"),
+        Some((rows + 1).to_string())
+    );
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/B4", "value").as_deref(),
+        Some("3")
+    );
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/B2", "value").as_deref(),
+        Some("b2")
+    );
+    let written = reopened
+        .set("/sheet[1]/table[1]/A3", props! { "value" => "new" })
+        .expect("the new row takes a value");
+    assert_eq!(
+        prop(&reopen(&written), "/sheet[1]/table[1]/A3", "value").as_deref(),
+        Some("new")
+    );
+    // The inverse restores the bytes.
+    let edited = filled
+        .edit(|tx| {
+            tx.add("/sheet[1]/table[1]", NewNode::new("row"))
+                .map(|_| ())
+        })
+        .expect("append a row");
+    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), filled.to_bytes().unwrap());
+    // Removing row 3 drops its cells and moves the rest up.
+    let removed = filled
+        .remove("/sheet[1]/table[1]/row[3]")
+        .expect("remove a row");
+    let reopened = reopen(&removed);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]", "rowCount"),
+        Some((rows - 1).to_string())
+    );
+    assert!(
+        reopened.get("/sheet[1]/table[1]/D3").is_err()
+            || prop(&reopened, "/sheet[1]/table[1]/D3", "value").is_none()
+    );
+    // A column appended, one placed first, and one removed.
+    let appended = filled
+        .add("/sheet[1]/table[1]", NewNode::new("col"))
+        .expect("append a column");
+    let columns = prop(&filled, "/sheet[1]/table[1]", "columnCount").expect("columns");
+    let columns: usize = columns.parse().expect("count");
+    assert_eq!(
+        appended.path.to_string(),
+        format!("/sheet[1]/table[1]/col[{}]", columns + 1)
+    );
+    let first = filled
+        .add(
+            "/sheet[1]/table[1]",
+            NewNode::new("column").at(Placement::Start),
+        )
+        .expect("a header column");
+    let reopened = reopen(&first.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/C2", "value").as_deref(),
+        Some("b2")
+    );
+    let dropped = filled
+        .remove("/sheet[1]/table[1]/col[2]")
+        .expect("remove a column");
+    let reopened = reopen(&dropped);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/C3", "value").as_deref(),
+        Some("d3")
+    );
+    // Typed refusals.
+    let error = filled
+        .remove(&format!("/sheet[1]/table[1]/row[{}]", rows + 5))
+        .expect_err("no such row");
+    assert_eq!(error.code(), Code::PathNotFound);
+    let error = filled
+        .add("/sheet[1]", NewNode::new("row"))
+        .expect_err("rows go under a table");
+    assert_eq!(error.code(), Code::InvalidArgument);
+    let error = read("formula-arena-native.numbers")
+        .add("/sheet[1]/table[1]", NewNode::new("row"))
+        .expect_err("formulas");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
 }
