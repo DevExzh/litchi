@@ -80,6 +80,7 @@ mod chart;
 mod children;
 pub(crate) mod create;
 mod element;
+mod few;
 mod lists;
 pub(crate) mod merge;
 mod nav;
@@ -117,7 +118,7 @@ pub(crate) struct DocxState {
     /// Core properties, read on first request. The eager owner parsed them
     /// at open; the source owner reads the selected part once and is then
     /// bound to the opened revision by [`DocxOwner::finish`].
-    metadata: OnceLock<Metadata>,
+    metadata: OnceLock<Box<Metadata>>,
     /// Successful explicit signature removal, shared by repeated publications.
     /// Failures are not cached, and source fences guard every use.
     unsigned: OnceLock<litchi_docx::Package>,
@@ -178,7 +179,7 @@ impl fmt::Debug for DocxEditor {
 )]
 pub(crate) enum DocxOwner {
     /// Deferred part payloads over the retained positional source.
-    Source(source_backed::Package),
+    Source(Box<source_backed::Package>),
     /// The owning package, validated by one text pass at open.
     Eager(Box<litchi_docx::Package>),
 }
@@ -252,7 +253,10 @@ impl Docx {
             let owned = package.to_owned_package_preserving_source()?;
             return Self::from_owned_package_with_origin(owned, options, origin);
         }
-        Ok(Self::with_owner(DocxOwner::Source(package), None, options).with_origin(origin))
+        Ok(
+            Self::with_owner(DocxOwner::Source(Box::new(package)), None, options)
+                .with_origin(origin),
+        )
     }
 
     /// Build the eager owner from the OPC package detection already parsed
@@ -357,7 +361,7 @@ impl Docx {
     /// Adopt a committed source-backed package without serializing and
     /// reopening it.
     pub(crate) fn adopt_source_package(&self, package: source_backed::Package) -> Self {
-        self.adopt_owner(DocxOwner::Source(package))
+        self.adopt_owner(DocxOwner::Source(Box::new(package)))
     }
 
     fn adopt_owner(&self, owner: DocxOwner) -> Self {
@@ -507,7 +511,7 @@ impl Docx {
 
     fn read_metadata(&self) -> Result<Metadata> {
         if let Some(metadata) = self.0.metadata.get() {
-            return self.0.owner.finish(Ok(metadata.clone()));
+            return self.0.owner.finish(Ok(Metadata::clone(metadata)));
         }
         let metadata = match &self.0.owner {
             DocxOwner::Eager(package) => package.metadata().cloned().unwrap_or_default(),
@@ -518,7 +522,7 @@ impl Docx {
         };
         // Concurrent first callers read the same pinned revision; the loser
         // of the race discards an equal value.
-        let _ = self.0.metadata.set(metadata.clone());
+        let _ = self.0.metadata.set(Box::new(metadata.clone()));
         Ok(metadata)
     }
 

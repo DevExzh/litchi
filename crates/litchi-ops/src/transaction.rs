@@ -543,9 +543,9 @@ impl Edit {
                 #[cfg(feature = "docx")]
                 File::Docx(handle) => {
                     let commit = if _command_text {
-                        handle.set_command(target, props)?
+                        handle.set_command(&target, props)?
                     } else {
-                        handle.set(target, props)?
+                        handle.set(&target, props)?
                     };
                     wrap(handle, commit, ())
                 },
