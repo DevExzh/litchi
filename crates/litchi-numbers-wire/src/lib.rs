@@ -37,6 +37,8 @@ pub mod table_merges;
 
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;
+/// Payload-level cell writes shared by the Pages and Keynote table owners.
+pub mod table_write;
 
 use std::collections::BTreeMap;
 
