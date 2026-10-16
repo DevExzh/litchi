@@ -432,10 +432,12 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             slide,
             DrawableSelector::index(0),
             TextSpan::new(0, 4),
-            Style::new().with_bold(true)
+            Style::new()
         ),
         Err(Error::Unsupported {
             reason: Unsupported::TextStyling
+        } | Error::Unsupported {
+            reason: Unsupported::Kind { .. }
         })
     ));
     assert!(matches!(
@@ -691,5 +693,69 @@ fn set_text_on_a_new_shape_and_on_every_corpus_text_box() -> TestResult {
             path.display()
         );
     }
+    Ok(())
+}
+
+/// Character styling (record 0309): a span of a text box gets a variation
+/// of its run style, reads back, survives a reopen and inverts exactly.
+#[test]
+fn text_spans_take_character_styles() -> TestResult {
+    let package = open("basic.key")?;
+    let source = bytes(&package)?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    edit.add_text_box(
+        slide,
+        Geometry::new(10.0, 10.0, 300.0, 60.0),
+        "Hello styled world",
+    )?;
+    let added = edit.commit()?.into_package();
+    let drawable = DrawableSelector::index(list(&added, 0)?.len() - 1);
+    let before_text = bytes(&added)?;
+
+    let mut edit = added.edit_slide_drawables();
+    edit.set_text_style(
+        slide,
+        drawable,
+        TextSpan::new(6, 12),
+        Style::new().with_bold(true).with_color([200, 10, 20]),
+    )?;
+    edit.set_text_style(
+        slide,
+        drawable,
+        TextSpan::new(9, 18),
+        Style::new().with_italic(true).with_font_size(30.0),
+    )?;
+    let commit = edit.commit()?;
+    let styled = commit.package();
+    let reopened = Package::from_bytes(&bytes(styled)?)?;
+    for package in [styled, &reopened] {
+        let runs = package.slide_drawable_text_runs(slide, drawable)?;
+        let texts: Vec<&str> = runs.iter().map(|run| run.text()).collect();
+        assert_eq!(texts, ["Hello ", "sty", "led", " world"]);
+        assert_eq!(*runs[0].style(), Style::new());
+        assert_eq!(runs[1].style().bold, Some(true));
+        assert_eq!(runs[1].style().color, Some([200, 10, 20]));
+        // The overlapping span is a variation of the bold one.
+        assert_eq!(runs[2].style().bold, Some(true));
+        assert_eq!(runs[2].style().italic, Some(true));
+        assert_eq!(runs[2].style().font_size, Some(30.0));
+        assert_eq!(runs[3].style().italic, Some(true));
+        assert_eq!(
+            list(package, 0)?.last().and_then(Drawable::text),
+            Some("Hello styled world")
+        );
+    }
+    let restored = styled.apply_slide_drawables(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, before_text);
+    let _ = source;
+
+    // Text edits keep the styled runs where their characters went.
+    let mut edit = styled.edit_slide_drawables();
+    edit.set_text(slide, drawable, "Hi styled world")?;
+    let retexted = edit.commit()?.into_package();
+    let runs = retexted.slide_drawable_text_runs(slide, drawable)?;
+    assert_eq!(runs[1].text(), "sty");
+    assert_eq!(runs[1].style().bold, Some(true));
     Ok(())
 }

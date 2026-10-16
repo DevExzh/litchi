@@ -485,6 +485,13 @@ enum Operation {
         storage: u64,
         text: Box<str>,
     },
+    TextStyle {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        span: TextSpan,
+        style: Style,
+    },
 }
 
 /// A drawable created by a commit: its slide and its new selector.
@@ -763,7 +770,9 @@ impl<'a> Edit<'a> {
             return Err(Error::ZPositionOutOfRange { position, count });
         }
         let untouched = !self.operations.iter().any(|operation| match operation {
-            Operation::Geometry { .. } | Operation::Text { .. } => false,
+            Operation::Geometry { .. } | Operation::Text { .. } | Operation::TextStyle { .. } => {
+                false
+            },
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::AddText { slide, .. }
@@ -1052,36 +1061,40 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
-    /// Stage character styling of one span of a drawable's text.
+    /// Stage character styling of one span (characters) of a text box's or
+    /// shape's text.
     ///
-    /// Not supported in this release: the span and drawable are validated,
-    /// then [`Error::Unsupported`] with [`Unsupported::TextStyling`] is
-    /// returned. Read the current runs with
-    /// [`Package::slide_drawable_text_runs`].
+    /// Each character-style run inside the span gets a new variation of its
+    /// style carrying the set properties (unset ones stay inherited); the
+    /// variations are registered in the storage's stylesheet. Several
+    /// styles and text changes may be staged; a style follows the text as
+    /// it stands when it is staged.
     ///
     /// # Errors
     ///
     /// Returns typed selector errors, [`Error::InvalidSpan`],
-    /// [`Error::Unsupported`] for drawables without text and
-    /// [`Unsupported::TextStyling`] otherwise.
+    /// [`Error::Unsupported`] for drawables other than text boxes and shapes
+    /// and [`Unsupported::TextStyling`] for a style that sets nothing; a
+    /// storage shared with other objects is refused by [`Self::commit`].
     ///
     /// ```no_run
-    /// use litchi_keynote::slide::drawable::{Error, Style, TextSpan, Unsupported};
+    /// use litchi_keynote::slide::drawable::{Style, TextSpan};
     /// use litchi_keynote::{DrawableSelector, Package, SlideSelector};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let package = Package::open("deck.key")?;
     /// let mut edit = package.edit_slide_drawables();
-    /// let result = edit.set_text_style(
+    /// edit.set_text_style(
     ///     SlideSelector::index(0),
     ///     DrawableSelector::index(0),
     ///     TextSpan::new(0, 4),
     ///     Style::new().with_bold(true),
-    /// );
-    /// assert!(matches!(
-    ///     result,
-    ///     Err(Error::Unsupported { reason: Unsupported::TextStyling })
-    /// ));
+    /// )?;
+    /// let commit = edit.commit()?;
+    /// let runs = commit
+    ///     .package()
+    ///     .slide_drawable_text_runs(SlideSelector::index(0), DrawableSelector::index(0))?;
+    /// assert_eq!(runs[0].style().bold, Some(true));
     /// # Ok(())
     /// # }
     /// ```
@@ -1092,19 +1105,41 @@ impl<'a> Edit<'a> {
         span: TextSpan,
         style: Style,
     ) -> Result<&mut Self, Error> {
-        let (_, item) = self.drawable(slide.into(), drawable.into())?;
-        let Some(text) = item.text.as_deref() else {
+        let (selected, item) = self.drawable(slide.into(), drawable.into())?;
+        let (Kind::TextBox | Kind::Shape, Some(storage), Some(current)) =
+            (item.kind, item.storage, item.text.as_deref())
+        else {
             return Err(Error::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
             });
         };
+        let staged_text = self
+            .operations
+            .iter()
+            .rev()
+            .find_map(|operation| match operation {
+                Operation::Text { drawable, text, .. } if *drawable == item.identifier => {
+                    Some(&**text)
+                },
+                _ => None,
+            });
+        let text = staged_text.unwrap_or(current);
         if span.start() >= span.end() || span.end() > text.chars().count() {
             return Err(Error::InvalidSpan);
         }
-        let _ = style;
-        Err(Error::Unsupported {
-            reason: Unsupported::TextStyling,
-        })
+        if style == Style::new() {
+            return Err(Error::Unsupported {
+                reason: Unsupported::TextStyling,
+            });
+        }
+        self.operations.push(Operation::TextStyle {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            span,
+            style,
+        });
+        Ok(self)
     }
 
     /// Apply every staged operation in one workspace, publish one candidate,
@@ -1630,6 +1665,23 @@ fn commit_operations(
                 stage::set_text(&mut workspace, *slide, *drawable, *storage, text, source)?;
                 let staged = read_inventory(&workspace, *slide, limits)?;
                 if staged.item(*drawable).and_then(|item| item.text.as_deref()) != Some(&**text) {
+                    return Err(Error::Verification);
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::TextStyle {
+                slide,
+                drawable,
+                storage,
+                span,
+                style,
+            } => {
+                let before = read_inventory(&workspace, *slide, limits)?
+                    .item(*drawable)
+                    .and_then(|item| item.text.clone());
+                stage::set_text_style(&mut workspace, *slide, *drawable, *storage, *span, style)?;
+                let staged = read_inventory(&workspace, *slide, limits)?;
+                if staged.item(*drawable).and_then(|item| item.text.clone()) != before {
                     return Err(Error::Verification);
                 }
                 touched.entry(*slide).or_default().insert(*drawable);
