@@ -464,16 +464,13 @@ impl Edit {
                 body_text::Refusal::Encrypted,
             )));
         }
-        let bytes = package.to_bytes().map_err(Error::Package)?;
-        let source = body_text::Snapshot::from_bytes_with_options(
-            bytes,
+        let source = package.body_source(
             body_text::OpenOptions::default()
                 .source_limits(package.source_limits())
                 .with_revision_limits(options.revision_limits)
                 .with_transaction_limits(options.transaction_limits)
                 .with_protection_policy(options.protection_policy),
-        )
-        .map_err(Error::from)?;
+        )?;
         let inner = source.edit().map_err(Error::from)?;
         Ok(Self { package, inner })
     }
@@ -659,6 +656,34 @@ impl Edit {
 }
 
 impl Package {
+    /// The body-text snapshot of this package's exact bytes under `options`.
+    ///
+    /// Opening one copies and parses the whole file, so the last one opened
+    /// is kept (record 0311): an immutable snapshot of the same bytes under
+    /// the same options is the value a fresh open returns, and every edit
+    /// starts from its own transaction over it. A memo hit still checks that
+    /// the retained source has its captured version, as the copy does.
+    fn body_source(&self, options: body_text::OpenOptions) -> Result<body_text::Snapshot> {
+        let memo = || {
+            self.body_source
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        };
+        let held = memo()
+            .as_ref()
+            .filter(|(held, _)| *held == options)
+            .map(|(_, snapshot)| snapshot.clone());
+        if let Some(snapshot) = held {
+            self.check_source_current().map_err(Error::Package)?;
+            return Ok(snapshot);
+        }
+        let bytes = self.to_bytes().map_err(Error::Package)?;
+        let snapshot = body_text::Snapshot::from_bytes_with_options(bytes, options.clone())
+            .map_err(Error::from)?;
+        *memo() = Some((options, snapshot.clone()));
+        Ok(snapshot)
+    }
+
     fn with_edit_profile(mut self, profile: EditProfile) -> Self {
         self.edit_profile = Some(profile);
         self
@@ -877,6 +902,49 @@ mod tests {
         let error = changed.apply(&patch).expect_err("stale patch");
         assert!(matches!(error, Error::Body(body_text::Error::Conflict)));
         assert_eq!(changed.to_bytes().unwrap(), before);
+    }
+
+    /// Record 0311: edits of one package share the body snapshot opened for
+    /// their options, never one opened under other options, and publish what
+    /// an edit from a fresh open publishes.
+    #[test]
+    fn edits_share_the_body_snapshot_opened_under_their_options() {
+        let source = package_with_paragraphs(3);
+        let commit = |package: &crate::Package, options: EditOptions| {
+            let mut edit = package.edit_with_options(options).expect("edit");
+            edit.replace_paragraph(Position::new(1), "after")
+                .expect("replacement");
+            edit.commit()
+                .expect("commit")
+                .into_package()
+                .to_bytes()
+                .unwrap()
+        };
+        let first = commit(&source, EditOptions::default());
+        let held = |package: &crate::Package| {
+            package
+                .body_source
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|(_, snapshot)| snapshot.bytes_shared())
+        };
+        let shared = held(&source).expect("the first edit keeps its snapshot");
+        assert_eq!(&*shared, source.to_bytes().unwrap().as_slice());
+        // A second edit, from a clone too, reuses that snapshot.
+        assert_eq!(commit(&source.clone(), EditOptions::default()), first);
+        assert!(std::sync::Arc::ptr_eq(&shared, &held(&source).unwrap()));
+        // Other options open their own snapshot.
+        let wide = EditOptions::default().with_transaction_limits(TransactionLimits::new(
+            300,
+            1024 * 1024,
+            4 * 1024 * 1024,
+        ));
+        assert_eq!(commit(&source, wide), first);
+        assert!(!std::sync::Arc::ptr_eq(&shared, &held(&source).unwrap()));
+        // A fresh open publishes the same bytes.
+        let fresh = crate::Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
+        assert_eq!(commit(&fresh, EditOptions::default()), first);
     }
 
     #[test]

@@ -17,7 +17,9 @@
 //!   automatic styles (the scan now indexes them);
 //! - `doc_text_set`: replace the text of one paragraph of a DOC file,
 //!   natively and through `File::set` (the edit now checks range
-//!   boundaries).
+//!   boundaries);
+//! - `doc_package_text_set` (record 0311): the same set against the leaf
+//!   `Package::edit` + `replace_paragraph` + `commit` it wraps.
 //!
 //! Every scenario prints one JSON line with the median and minimum of
 //! `ROUNDS` samples (after `WARMUP`), each sample the mean of `REPEATS`
@@ -271,6 +273,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             || {
                 black_box(unified_once());
+            },
+        );
+    }
+    if wanted("doc_package_text_set") {
+        // Record 0311: the same set against the leaf call it wraps,
+        // `Package::edit` + `replace_paragraph` + `commit`, whose commit also
+        // projects the published document (the `doc_text_set` leaf leg is the
+        // body-text snapshot API and publishes no readable package).
+        let bytes = fixture("ole/doc/NoHeadFoot.doc")?;
+        let package = litchi_doc::Package::from_bytes(&bytes)?;
+        let target = litchi_doc::body_text::Snapshot::open(
+            bytes.clone(),
+            litchi_doc::tracked_revision::Limits::default(),
+        )?
+        .paragraphs(litchi_doc::body_text::Projection::All)?
+        .into_iter()
+        .find(|paragraph| !paragraph.text().is_empty())
+        .expect("a paragraph with text")
+        .position();
+        let unified = litchi_ops::open_bytes(bytes.clone())?;
+        let path = format!("/body/p[{}]", target.get() + 1);
+        paired(
+            "doc_package_text_set",
+            10,
+            || {
+                let mut edit = package.edit().expect("edit");
+                edit.replace_paragraph(target, "Replaced paragraph text")
+                    .expect("replace");
+                black_box(edit.commit().expect("commit").into_package());
+            },
+            || {
+                black_box(
+                    unified
+                        .set(
+                            path.as_str(),
+                            props! { "text" => "Replaced paragraph text" },
+                        )
+                        .expect("set"),
+                );
             },
         );
     }

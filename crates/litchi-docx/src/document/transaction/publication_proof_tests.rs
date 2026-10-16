@@ -257,9 +257,10 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
 }
 
 #[test]
-fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
-    // The source-backed writer audits its own pair and never reads a proof,
-    // so a snapshot bound to a source identity must not pay for one.
+fn a_source_with_identity_is_proven_for_the_source_backed_writer() {
+    // Record 0311: the source-backed writer hands the proof to the OPC
+    // overlay, so a snapshot bound to a source identity is proven too, with
+    // the historical route's bytes.
     let package = generated_package(16);
     let plain = package.document_snapshot().unwrap();
     let mut archive = std::io::Cursor::new(Vec::new());
@@ -277,7 +278,7 @@ fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
         .unwrap();
     let projected = edit.projected().clone();
     let committed = commit_preserving_unmodified(&base, &projected).unwrap();
-    assert!(committed.publication_proof().is_none());
+    assert!(committed.publication_proof().is_some());
     assert_eq!(
         committed.xml_bytes(),
         historical_route(&base, &projected).unwrap().xml_bytes()

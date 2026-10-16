@@ -2402,6 +2402,187 @@ fn full_xml_replacement_rejects_invalid_documents_and_releases_managed_output() 
     ));
 }
 
+/// [`source_bytes`] with the main document member's bytes replaced verbatim,
+/// so the source may hold XML the writer would refuse.
+fn source_bytes_with_document(document: &[u8]) -> Vec<u8> {
+    let generated = source_bytes();
+    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(&generated).unwrap();
+    let mut writer = StreamingArchiveWriter::new();
+    for name in reader.member_names().unwrap() {
+        let bytes = if name == "word/document.xml" {
+            document.to_vec()
+        } else {
+            reader.read_member(&name).unwrap()
+        };
+        writer.write_stored(&name, &bytes).unwrap();
+    }
+    writer.finish_to_bytes().unwrap()
+}
+
+fn published(topology: &litchi_opc::PreparedTopology) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    topology.publish_to_stream(&mut bytes).unwrap();
+    bytes
+}
+
+fn audit_proof(
+    bytes: &[u8],
+    limits: xml_minifier::audit::Limits,
+) -> xml_minifier::audit::VerifiedSource {
+    xml_minifier::audit::VerifiedSource::verify(Arc::new(bytes.to_vec()), limits).unwrap()
+}
+
+#[test]
+fn verified_byte_replacements_publish_what_audited_replacements_publish() {
+    // Record 0311: the overlay accepts the audit's proof for the replacement
+    // in place of auditing it again; the result is byte-identical, on a
+    // fresh candidate and on a chained one.
+    let limits = xml_minifier::audit::Limits::default();
+    let base = open(Arc::new(VersionedSource::new(source_bytes())))
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    let original = base.main_document_part().unwrap().data().unwrap();
+    let first_xml = br#"<first xmlns:x="urn:&#120;"><x:child/></first>"#;
+    let audited = base
+        .apply_xml_bytes(
+            &pack(DOCUMENT),
+            original.as_bytes(),
+            Arc::new(first_xml.to_vec()),
+        )
+        .unwrap();
+    let proven = base
+        .apply_verified_xml_bytes(
+            &pack(DOCUMENT),
+            original.as_bytes(),
+            audit_proof(first_xml, limits),
+        )
+        .unwrap();
+    assert_eq!(published(&proven), published(&audited));
+    // The published Part is the proof's own allocation.
+    let proof = audit_proof(b"<second/>", limits);
+    let second = proven
+        .apply_verified_xml_bytes(&pack(DOCUMENT), first_xml, proof.clone())
+        .unwrap();
+    assert_eq!(
+        second
+            .main_document_part()
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes(),
+        proof.bytes().as_slice()
+    );
+    let unproven = audited
+        .apply_xml_bytes(&pack(DOCUMENT), first_xml, Arc::new(b"<second/>".to_vec()))
+        .unwrap();
+    assert_eq!(published(&second), published(&unproven));
+    // A stale precondition is refused before any proof is consulted.
+    assert!(
+        proven
+            .apply_verified_xml_bytes(&pack(DOCUMENT), original.as_bytes(), proof)
+            .is_err()
+    );
+    // A proof under other limits stands for nothing: the bytes are audited
+    // and published exactly as without it.
+    let narrow = limits.narrow(xml_minifier::audit::Resource::Depth, 64);
+    let other = base
+        .apply_verified_xml_bytes(
+            &pack(DOCUMENT),
+            original.as_bytes(),
+            audit_proof(first_xml, narrow),
+        )
+        .unwrap();
+    assert_eq!(published(&other), published(&audited));
+}
+
+#[test]
+fn a_proven_replacement_never_skips_the_original_audit() {
+    // The original Part fails the source audit; a proof for the replacement
+    // does not change that, every time (a failure is never remembered).
+    let invalid_original = b"<!DOCTYPE a><a/>";
+    let base = open(Arc::new(VersionedSource::new(source_bytes_with_document(
+        invalid_original,
+    ))))
+    .prepare_topology(SourceTopologyPlan::new())
+    .unwrap();
+    let limits = xml_minifier::audit::Limits::default();
+    let expected = base
+        .apply_xml_bytes(
+            &pack(DOCUMENT),
+            invalid_original,
+            Arc::new(b"<b/>".to_vec()),
+        )
+        .err()
+        .expect("refused")
+        .to_string();
+    for _ in 0..2 {
+        let error = base
+            .apply_verified_xml_bytes(
+                &pack(DOCUMENT),
+                invalid_original,
+                audit_proof(b"<b/>", limits),
+            )
+            .err()
+            .expect("refused");
+        assert!(matches!(error, OpcError::XmlPublication { .. }), "{error}");
+        assert_eq!(error.to_string(), expected);
+    }
+}
+
+#[test]
+fn a_remembered_original_still_audits_every_unproven_replacement() {
+    // Once the original has passed, an unproven replacement is audited on
+    // its own: an invalid one is refused with the error a fresh package
+    // reports for it.
+    let base = open(Arc::new(VersionedSource::new(source_bytes())))
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    let original = base.main_document_part().unwrap().data().unwrap();
+    let fresh = open(Arc::new(VersionedSource::new(source_bytes())))
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    base.apply_xml_bytes(
+        &pack(DOCUMENT),
+        original.as_bytes(),
+        Arc::new(b"<valid/>".to_vec()),
+    )
+    .unwrap();
+    for invalid in [b"<a>".as_slice(), b"<a/><b/>", b"<!DOCTYPE a><a/>"] {
+        let remembered = base
+            .apply_xml_bytes(
+                &pack(DOCUMENT),
+                original.as_bytes(),
+                Arc::new(invalid.to_vec()),
+            )
+            .err()
+            .expect("refused");
+        let first = fresh
+            .apply_xml_bytes(
+                &pack(DOCUMENT),
+                original.as_bytes(),
+                Arc::new(invalid.to_vec()),
+            )
+            .err()
+            .expect("refused");
+        assert_eq!(remembered.to_string(), first.to_string());
+    }
+    // A valid replacement after the remembered original publishes the bytes
+    // the fresh package publishes.
+    let replacement = Arc::new(br#"<r xmlns:x="urn:x"><x:c/></r>"#.to_vec());
+    assert_eq!(
+        published(
+            &base
+                .apply_xml_bytes(&pack(DOCUMENT), original.as_bytes(), replacement.clone())
+                .unwrap()
+        ),
+        published(
+            &fresh
+                .apply_xml_bytes(&pack(DOCUMENT), original.as_bytes(), replacement)
+                .unwrap()
+        )
+    );
+}
+
 #[test]
 fn full_document_byte_replacements_preserve_producer_namespaces_and_chain() {
     let physical = open(Arc::new(VersionedSource::new(source_bytes())));

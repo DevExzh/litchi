@@ -144,6 +144,39 @@ impl PreparedTopology {
         expected: &[u8],
         replacement: Arc<Vec<u8>>,
     ) -> Result<Self> {
+        self.apply_xml_payload(partname, expected, replacement, None)
+    }
+
+    /// [`Self::apply_xml_bytes`] for bytes the source XML audit has already
+    /// passed: `replacement` is the audit's own proof, and its allocation is
+    /// published.
+    ///
+    /// The proof stands in for auditing the replacement again only when it
+    /// covers its bytes under the default audit limits, the limits this
+    /// publication audits with; a proof under any other limits is ignored and
+    /// the bytes are audited in full. The physical Part's original bytes are
+    /// audited as by [`Self::apply_xml_bytes`] (once per unmanaged source
+    /// revision). Every refusal, and its order, is that method's.
+    ///
+    /// # Errors
+    /// As [`Self::apply_xml_bytes`].
+    pub fn apply_verified_xml_bytes(
+        &self,
+        partname: &PackURI,
+        expected: &[u8],
+        replacement: xml_minifier::audit::VerifiedSource,
+    ) -> Result<Self> {
+        let bytes = Arc::clone(replacement.bytes());
+        self.apply_xml_payload(partname, expected, bytes, Some(replacement))
+    }
+
+    fn apply_xml_payload(
+        &self,
+        partname: &PackURI,
+        expected: &[u8],
+        replacement: Arc<Vec<u8>>,
+        proof: Option<xml_minifier::audit::VerifiedSource>,
+    ) -> Result<Self> {
         self.check_source()?;
         let result = (|| {
             if self.is_managed() {
@@ -175,18 +208,26 @@ impl PreparedTopology {
                 replacement.len() as u64,
                 self.package.limits.max_part_bytes(),
             )?;
-            let original = self.package.part(partname)?.data()?;
-            validate_source_part_replacement_xml(
-                partname.as_str(),
+            let physical = self.package.part(partname)?;
+            let original = physical.data()?;
+            let proof = self.package.audit_physical_replacement_xml(
+                physical.index,
                 original.as_bytes(),
                 &replacement,
+                None,
+                proof.as_ref(),
             )?;
             if replacement.as_slice() == current.as_bytes() {
                 return Ok(self.clone());
             }
             if self.state.no_op {
+                // The audit's proof travels with the plan, so publication
+                // does not audit the same pair a second time.
                 let mut plan = SourceTopologyPlan::new();
-                plan.try_replace_part_shared(partname.clone(), replacement)?;
+                match proof {
+                    Some(proof) => plan.try_replace_part_verified(partname.clone(), proof)?,
+                    None => plan.try_replace_part_shared(partname.clone(), replacement)?,
+                }
                 self.package.clone().prepare_topology(plan)
             } else {
                 self.replace_effective_payload(part.index, replacement, None)

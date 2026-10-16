@@ -740,7 +740,19 @@ impl Package {
             source_limits,
             leniency,
             edit_profile: None,
+            body_source: Arc::default(),
         })
+    }
+
+    /// Refuse when the retained source no longer has its captured version,
+    /// with the error a read of it reports.
+    pub(super) fn check_source_current(&self) -> Result<()> {
+        let expected = self.shared.captured_source_version();
+        let observed = self.shared.source_arc().version()?;
+        if observed != expected {
+            return Err(Error::Ole(OleError::SourceChanged { expected, observed }));
+        }
+        Ok(())
     }
 
     fn read_source_into(&self, output: &mut [u8]) -> Result<()> {
