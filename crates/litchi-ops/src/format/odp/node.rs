@@ -475,7 +475,8 @@ pub(crate) struct Props<'a> {
     values: PropValues<'a>,
     /// The character properties a story's runs share, resolved once on the
     /// first such read (record 0316), in `CHARACTER_KEYS` order.
-    shared: std::cell::OnceCell<[Option<Value<'static>>; 6]>,
+    /// Boxed: most nodes never read it, and the projection stays small.
+    shared: std::cell::OnceCell<Box<[Option<Value<'static>>; 6]>>,
 }
 
 enum PropValues<'a> {
@@ -732,7 +733,9 @@ impl Props<'_> {
         let index = CHARACTER_KEYS
             .iter()
             .position(|candidate| *candidate == key)?;
-        self.shared.get_or_init(|| shared_characters(file, story))[index].clone()
+        self.shared
+            .get_or_init(|| Box::new(shared_characters(file, story)))[index]
+            .clone()
     }
 }
 

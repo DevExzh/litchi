@@ -855,7 +855,7 @@ poi/test-data/spreadsheet/47889.xlsx	xlsx	exact		value-exact	/sheet[1] name: 355
 poi/test-data/spreadsheet/48962.xlsx	xlsx	exact		value-exact	/sheet[1] name: 50260 -> 50265 bytes, first difference at 2199	-	
 poi/test-data/spreadsheet/48968.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/49609.xlsx	xlsx	exact		one-way	/sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...	-	
-poi/test-data/spreadsheet/50939.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot read a workbook formula's references
+poi/test-data/spreadsheet/50939.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot read the references of a shared, array, condition...
 poi/test-data/spreadsheet/53109.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/54016.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close dependency record 0x0090
 poi/test-data/spreadsheet/54071.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9150 -> 9158 bytes, first difference at 2315	-	
