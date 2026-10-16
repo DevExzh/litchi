@@ -2,7 +2,7 @@
 """Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0312 (`docs/unified-ops/02[4-9]*.md`, `03[01]*.md`)
+operations records 0249-0313 (`docs/unified-ops/02[4-9]*.md`, `03[01]*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -39,9 +39,9 @@ Conventions:
 * Before/after-build records (0250, 0263, 0268, 0289, 0290, 0293) compare
   builds, not unified with leaf: comparison "after/before", budget 1.05.
 
-Records 0285-0312 (record 0294 extended the tool to 0302; record 0306
+Records 0285-0313 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
-0305, 0309, 0310, 0311 and 0312 parsers) are collected
+0305, 0309, 0310, 0311, 0312 and 0313 parsers) are collected
 only when their record file is on this tree; the Markdown lists every
 record of that range, absent ones as "not on this tree", so the tool can
 be rerun unchanged after later merges.
@@ -982,7 +982,7 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 312)
+FOLLOW_RANGE = (285, 313)
 
 
 def record_file(record: str):
@@ -1674,6 +1674,13 @@ def p0312():
     return out
 
 
+@needs("0313")
+def p0313():
+    """Record 0313: after legs of docx_large_bench (DOCX insertions with
+    successor proofs)."""
+    return docx_large("0313", trials((RES / "0313").glob("docx-large-after-*.txt")))
+
+
 @needs("0310")
 def p0310():
     """Record 0310: `merged/` re-measures every harness of an open miss on
@@ -1710,7 +1717,8 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
-           p0306, p0309, p0310, p0311, p0312]
+           p0306, p0309, p0310, p0311, p0312,
+           p0313]
 
 
 # ---------------------------------------------------------------- merge
@@ -1893,7 +1901,7 @@ def to_md(rows, conflicts, agreements, cur):
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
       "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
       "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306; "
-      "record 0310 those of 0305, 0309, 0310, 0311 and 0312.")
+      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "

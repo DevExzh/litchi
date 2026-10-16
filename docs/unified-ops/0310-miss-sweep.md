@@ -3,7 +3,7 @@
 - Status: implemented on `uo2/miss-sweep`, cut from `feat/unified-ops-api`
   at `0f3d8158cb`; trunk `8f5569d0d8` (records 0305, 0308, 0309) merged at
   `b53ed53006`, then trunk `1100472b75` (records 0311, 0312) at
-  `6dd73bb204`.
+  `6dd73bb204`, then trunk `09a57ed610` (record 0313) at `fde3041d13`.
 - Date: 2026-10-16
 - Input: the 102 open misses of `tools/unified_bench_matrix.py`
   (`results/0289/bench-matrix.{tsv,md}` at `0f3d8158cb`), each citing a
@@ -189,8 +189,9 @@ supersede the 0310 iWork rows in the matrix.
   passing `&Query`), **0309** (its element writes, against its stated 5 %
   or 20 µs bar), **0310** (`merged/`), **0311** (`docx_large_bench` with
   its committed-handle legs, the `office_gaps_bench` DOC scenarios) and
-  **0312** (its Keynote, Pages and Numbers runs). Record 0308 has no paired
-  measurement and is listed in the notes. The record range runs to 0312.
+  **0312** (its Keynote, Pages and Numbers runs) and **0313**
+  (`docx_large_bench`; every row meets). Record 0308 has no paired
+  measurement and is listed in the notes. The record range runs to 0313.
 - New curated annotations attach §2's group and measured cause to every
   open 0310 row, and 0305 §4.5, 0309 §6 and 0311 §4.2's explanations to
   their records' misses;
@@ -268,7 +269,11 @@ rules (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`, one cargo command at a
 time in the memory-capped scopes, test executables pruned between chunks).
 Every exit status was checked (`gates.sh`, its summary in the scratch
 directory). The same list also passed on `b53ed53006`, before the second
-merge.
+merge. Record 0313, merged last, changes only `xml-minifier` and
+`litchi-opc`; after it `cargo fmt --all --check`, the all-features clippy
+of `litchi-ops`, `litchi` and `litchi-py`, `cargo test -p litchi-ops
+--all-features --lib` and the matrix `--check` were run again (§8, last
+rows).
 
 | Command | Exit |
 |---|---:|
@@ -287,6 +292,7 @@ merge.
 | `crates/pyo3-litchi/tests/run_tests.sh` (279 tests) | 0 |
 | `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
 | `python3 tools/unified_bench_matrix.py --check` | 0 |
+| after the 0313 merge (`fde3041d13`): `cargo fmt --all --check`; `cargo clippy -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings`; `cargo test -p litchi-ops --all-features --lib` (922); `python3 tools/unified_bench_matrix.py --check` | 0 each |
 
 No capability, registry or OfficeCLI-visible behaviour changed, so the
 delta table and the OfficeCLI corpus were not regenerated. No public name
