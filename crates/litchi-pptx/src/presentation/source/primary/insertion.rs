@@ -163,6 +163,15 @@ pub(super) fn plan(
         slide_id,
         &relationship_id,
     )?;
+    // The new slide joins the section of its neighbour, as the eager
+    // editor places it (record 0303).
+    let root = if crate::opened::sections::present(&root) {
+        let mut ids: Vec<u32> = package.order.iter().map(|key| key.slide_id).collect();
+        ids.insert(position, slide_id);
+        crate::opened::sections::place(&root, &ids, position)?.unwrap_or(root)
+    } else {
+        root
+    };
     if root.len() > package.owner.limits.max_part_bytes() as usize {
         return Err(limit(
             "source-backed primary presentation output bytes",

@@ -1914,9 +1914,13 @@ impl Transaction {
     pub fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
         let candidate = value.into();
         let encoded = encode_replacement(&candidate, self.resolved.kind)?;
-        if encoded.len() != self.resolved.payload.len() && !self.resolved.can_resize {
-            return Err(Error::Refused(Refusal::DependencyClosure));
-        }
+        check_replacement(
+            self.resolved.kind,
+            &self.resolved.payload,
+            &encoded,
+            self.resolved.can_resize,
+            &self.resolved.pins,
+        )?;
         self.replacement = Some(candidate);
         Ok(())
     }
@@ -1954,9 +1958,13 @@ impl Transaction {
         }
 
         let encoded = encode_replacement(&replacement, self.resolved.kind)?;
-        if encoded.len() != self.resolved.payload.len() && !self.resolved.can_resize {
-            return Err(Error::Refused(Refusal::DependencyClosure));
-        }
+        check_replacement(
+            self.resolved.kind,
+            &self.resolved.payload,
+            &encoded,
+            self.resolved.can_resize,
+            &self.resolved.pins,
+        )?;
         let target_slide = rewrite_slide(
             &self.resolved.slide_record,
             self.resolved.native_shape_id,
@@ -2313,6 +2321,8 @@ struct Resolved {
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
+    /// The text positions of the body's metacharacter fields (record 0304).
+    pins: Vec<usize>,
     /// The source parse of the target's slide, which the commit readback
     /// verifies the publication against incrementally (record 0264).
     source_view: Option<Arc<readback::SourceSlideView>>,
@@ -2382,6 +2392,7 @@ fn resolved_from_shared_location(
         payload: text.payload,
         text: text.text,
         can_resize: text.can_resize,
+        pins: text.pins,
         source_view: None,
     })
 }
@@ -2803,6 +2814,7 @@ pub(crate) fn replace_shape_texts_batch(
             payload: text.payload,
             text: text.text,
             can_resize: text.can_resize,
+            pins: text.pins,
             source_view: None,
         };
         let encoded_len = encoded_replacement_len(&target.replacement, resolved.kind)?;
@@ -2817,9 +2829,13 @@ pub(crate) fn replace_shape_texts_batch(
             )
             .into());
         }
-        if encoded.len() != resolved.payload.len() && !resolved.can_resize {
-            return Err(Error::Refused(Refusal::DependencyClosure));
-        }
+        check_replacement(
+            resolved.kind,
+            &resolved.payload,
+            &encoded,
+            resolved.can_resize,
+            &resolved.pins,
+        )?;
         if target.replacement != resolved.text {
             prepared.push(PreparedBatchText {
                 resolved,
@@ -3258,9 +3274,13 @@ pub(crate) fn replace_notes_text(
     let encoded_len = encoded_replacement_len(replacement, atom.kind)?;
     require_batch_text_budget(replacement.len(), encoded_len, max_output_bytes)?;
     let encoded = encode_replacement(replacement, atom.kind)?;
-    if encoded.len() != atom.payload.len() && !atom.can_resize {
-        return Err(Error::Refused(Refusal::DependencyClosure));
-    }
+    check_replacement(
+        atom.kind,
+        &atom.payload,
+        &encoded,
+        atom.can_resize,
+        &atom.pins,
+    )?;
     let staged = rewrite_slide_grouped(
         &original,
         &[ShapeTextRewrite {
@@ -3484,6 +3504,8 @@ struct TextAtom {
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
+    /// The text positions of the body's metacharacter fields (record 0304).
+    pins: Vec<usize>,
 }
 
 #[derive(Debug)]
@@ -3724,10 +3746,18 @@ fn inspect_text_records<'a>(
     let mut child_types = Vec::new();
     let mut style_record = None;
     let mut special_info_record = None;
+    let mut pins = Vec::new();
     for child_result in records {
         let child = child_result?;
         let child_type = record_type(child)?;
         child_types.push(child_type);
+        if is_metacharacter(child_type) {
+            let position = drawing_payload(child)?
+                .first_chunk::<4>()
+                .map(|bytes| u32::from_le_bytes(*bytes))
+                .ok_or_else(|| PackageError::Corrupted("metacharacter atom is truncated".into()))?;
+            pins.push(usize::try_from(position).unwrap_or(usize::MAX));
+        }
         if child_type == RecordType::StyleTextPropAtom as u16
             && style_record.replace(child).is_some()
         {
@@ -3755,9 +3785,11 @@ fn inspect_text_records<'a>(
             payload,
             text,
             can_resize: false,
+            pins: Vec::new(),
         });
     }
     let mut text_atom = atom.ok_or(Error::Refused(Refusal::NoTextAtom))?;
+    text_atom.pins = pins;
     text_atom.can_resize = resize_dependency_closure_is_modeled(
         &child_types,
         style_record,
@@ -3765,6 +3797,51 @@ fn inspect_text_records<'a>(
         text_units(text_atom.kind, text_atom.payload.len())?,
     )?;
     Ok(text_atom)
+}
+
+/// Refuse a replacement whose length change has unmodeled dependent ranges,
+/// or (record 0304) that writes another character at a metacharacter
+/// field's position: the field (`*` for a date, time, slide number,
+/// header or footer) would become plain text without a word.
+fn check_replacement(
+    kind: TextKind,
+    payload: &[u8],
+    encoded: &[u8],
+    can_resize: bool,
+    pins: &[usize],
+) -> Result<()> {
+    if encoded.len() != payload.len() && !can_resize {
+        return Err(Error::Refused(Refusal::DependencyClosure));
+    }
+    let width = match kind {
+        TextKind::Bytes => 1,
+        TextKind::Chars => 2,
+    };
+    for &pin in pins {
+        let unit = pin
+            .checked_mul(width)
+            .and_then(|start| Some(start..start.checked_add(width)?));
+        let same = unit.is_some_and(|unit| {
+            payload.get(unit.clone()).is_some() && payload.get(unit.clone()) == encoded.get(unit)
+        });
+        if !same {
+            return Err(Error::Refused(Refusal::DependencyClosure));
+        }
+    }
+    Ok(())
+}
+
+fn is_metacharacter(record: u16) -> bool {
+    [
+        RecordType::SlideNumberMCAtom,
+        RecordType::DateTimeMCAtom,
+        RecordType::GenericDateMCAtom,
+        RecordType::HeaderMCAtom,
+        RecordType::FooterMCAtom,
+        RecordType::RtfDateTimeMCAtom,
+    ]
+    .iter()
+    .any(|kind| *kind as u16 == record)
 }
 
 /// Whether a length-changing replacement keeps every dependent range of the

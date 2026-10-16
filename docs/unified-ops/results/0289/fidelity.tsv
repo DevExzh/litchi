@@ -221,9 +221,9 @@ libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	odp	exact		value-exact	/slide[
 libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp	odp	exact		value-exact	/slide[1] name: 13158 -> 13170 bytes, first difference at 5025	-	
 libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp	odp	exact		value-exact	/slide[1] name: 11416 -> 11428 bytes, first difference at 5907	-	
 libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	pptx	exact		none		none	
-libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	refused	slide move+back: unsupported_capability: unsupported PresentationML slide-order edit (positional semantic owner): presentation root exten...
-libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	pptx	exact		value-exact	/slide[7]/shape[1] font: 138108 -> 138094 bytes, first difference at 74356	refused	slide move+back: unsupported_capability: unsupported PresentationML slide-order edit (positional semantic owner): presentation root exten...
-libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		refused	/slide[1]/shape[5] font: unsupported_capability: unsafe PPTX edit during slide_snapshot: source-backed transition edits refuse markup-com...	none	
+libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	byte-exact	slide move+back
+libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	pptx	exact		value-exact	/slide[7]/shape[1] font: 138108 -> 138094 bytes, first difference at 74356	byte-exact	slide move+back
+libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		refused	/slide[1]/shape[5] font: unsupported_capability: unsafe PPTX edit during set_text_properties: source-backed slide edits do not support ma...	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx	pptx	exact		refused	/slidemaster[1]/shape[1] font: unsupported_capability: master and layout text writes are not integrated	none	
@@ -243,11 +243,11 @@ libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf	rtf	exact		none		refus
 libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt	odt	exact		value-exact	/body/p[1] text: 15388 -> 15263 bytes, first difference at 13238	-	
-libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt	odt	exact		value-exact	/body/p[1] text: 1996 -> 1826 bytes, first difference at 1761	-	
+libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:variable-set (an element with ...	-	
+libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt	odt	exact		value-exact	/body/p[1] text: 1996 -> 1946 bytes, first difference at 1830	-	
 libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt	odt	exact		value-exact	/metadata author: 4863 -> 4467 bytes, first difference at 4	-	
 libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt	odt	exact		byte-exact	/body/h[1] text	-	
-libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt	odt	exact		value-exact	/body/p[1] text: 1378 -> 1263 bytes, first difference at 1183	-	
+libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1378 -> 1409 bytes, first difference at 1176	-	
 libreoffice-core/sw/qa/extras/odfexport/data/CrossRefHeadingBookmark.fodt	odt	exact		byte-exact	/metadata author	-	
 libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt	odt	exact		value-exact	/metadata author: 25828 -> 24389 bytes, first difference at 7	-	
 libreoffice-core/sw/qa/extras/odfexport/data/footnote_spacing_hanging_para.rtf	rtf	exact		refused	/footnote[1] text: unsupported_capability: unsupported RTF edit source: canonical destination edits refuse unknown RTF destinations	none	
@@ -278,7 +278,7 @@ libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf89731.docx	docx	exact		byte-ex
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	docx	exact		byte-exact	/body/sdt[1]/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTOCFlag_u.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx	docx	exact		none		-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt	odt	exact		value-exact	/body/p[3] text: 9192 -> 8962 bytes, first difference at 5236	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
 libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	docx	exact		none		-	
 libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	docx	exact		none		-	
@@ -378,9 +378,9 @@ libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt	odt	exact		byte-exact	
 libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 13312 -> 14848 bytes, first difference at 516	-	
 libreoffice-core/sw/qa/uibase/shells/data/ole-save-preview-update.odt	odt	exact		value-exact	/metadata author: 16006 -> 14628 bytes, first difference at 7	-	
-libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt	odt	exact		value-exact	/body/p[1] text: 46651 -> 46449 bytes, first difference at 31588	-	
+libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:a (an element with text of its...	-	
 libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[2]/tc[2] text	none	
-libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt	odt	exact		value-exact	/body/p[1] text: 1340 -> 1234 bytes, first difference at 1170	-	
+libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt	odt	exact		byte-exact	/body/section[1] name	-	
 libreoffice-core/sw/qa/uitest/data/tdf145178.fodt	odt	exact		byte-exact	/body/section[1] name	-	
 libreoffice-core/sw/qa/writerfilter/dmapper/data/NoFirstPageHeadFooter.rtf	rtf	exact		value-exact	/header[1] text: 24644 -> 24642 bytes, first difference at 22545	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: a paragraph ends inside a group that continues with more content
@@ -399,15 +399,15 @@ libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt	odt	exact		byte-
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt	odt	exact		byte-exact	/metadata title	-	
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm	odm	exact		value-exact	/metadata author: 22304 -> 20649 bytes, first difference at 7	-	
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt	odt	exact		byte-exact	/body/p[2] text	-	
-libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt	odt	exact		value-exact	/body/p[1] text: 2503 -> 2330 bytes, first difference at 2260	-	
-libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt	odt	exact		value-exact	/body/p[1] text: 8307 -> 6834 bytes, first difference at 7	-	
+libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt	odt	exact		byte-exact	/body/p[1] text	-	
+libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:ruby (an element with text of ...	-	
 libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 2173 -> 2171 bytes, first difference at 1419	-	
 libreoffice-core/xmloff/qa/unit/data/floattable-wrap-all-pages2.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt	odt	exact		byte-exact	/metadata title	-	
 libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	odt	exact		value-exact	/metadata language: 14711 -> 12890 bytes, first difference at 7	-	
 libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg	odg	exact		byte-exact	/page[1] name	-	
 libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
-libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14503 -> 13639 bytes, first difference at 7	-	
+libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14503 -> 13672 bytes, first difference at 7	-	
 libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg	odg	exact		value-exact	/page[1] name: 32729 -> 31132 bytes, first difference at 7	-	
 libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt	odt	exact		value-exact	/metadata author: 11023 -> 9087 bytes, first difference at 7	-	
 libreoffice-core/xmlsecurity/qa/unit/signing/data/odb_signed_macros.odb	odb	exact		none		-	
@@ -458,18 +458,18 @@ odf/ods/sheet-shapes.fods	ods	exact		refused	/sheet[1] name: unsupported_capabil
 odf/ods/sparklines.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
 odf/odt/drawing-style-resources.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 odf/odt/font-face-declarations-flat.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-odf/odt/form-controls.fodt	odt	exact		value-exact	/body/p[1] text: 3431 -> 3372 bytes, first difference at 3291	-	
+odf/odt/form-controls.fodt	odt	exact		value-exact	/body/p[1] text: 3431 -> 3430 bytes, first difference at 3279	-	
 odf/odt/libreoffice-linked-object-compact.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	-	
 odf/odt/libreoffice-page-columns-compact.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-odf/odt/libreoffice-user-field-compact.fodt	odt	exact		value-exact	/body/p[1] text: 1283 -> 1168 bytes, first difference at 1098	-	
-odf/odt/nested-frame-paragraphs.fodt	odt	exact		value-exact	/body/p[1] text: 7202 -> 5171 bytes, first difference at 5103	-	
+odf/odt/libreoffice-user-field-compact.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1283 -> 1314 bytes, first difference at 1091	-	
+odf/odt/nested-frame-paragraphs.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 odf/odt/note-drawing.fodt	odt	exact		refused	/body/p[1]/footnote[1]/p[1] style: invalid_value: the ODT style does not exist	-	
-odf/odt/note-hyperlink-host.fodt	odt	exact		value-exact	/body/p[1] text: 5033 -> 4949 bytes, first difference at 3515	-	
-odf/odt/note-nested.fodt	odt	exact		value-exact	/body/p[1] text: 834 -> 421 bytes, first difference at 360	-	
-odf/odt/note-ordinary-numbering.fodt	odt	exact		value-exact	/body/p[1] text: 1966 -> 1691 bytes, first difference at 1484	-	
+odf/odt/note-hyperlink-host.fodt	odt	exact		value-exact	/body/p[1] text: 5033 -> 5033 bytes, first difference at 3564	-	
+odf/odt/note-nested.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	-	
+odf/odt/note-ordinary-numbering.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 1966 -> 1964 bytes, first difference at 1341	-	
 odf/odt/note-tracked-changes.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	-	
 odf/odt/outline-ten-level-extension.fodt	odt	exact		none		-	
-odf/odt/ruby-hyperlink.fodt	odt	exact		value-exact	/body/p[1] text: 1609 -> 1300 bytes, first difference at 1233	-	
+odf/odt/ruby-hyperlink.fodt	odt	exact		byte-exact	/body/p[1]/hyperlink[1] text	-	
 odf/odt/shape-text-in-paragraph.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
 odf/odt/table-cell-column-span.odt	odt	exact		value-exact	/body/tbl[1] name: 9254 -> 7863 bytes, first difference at 7	-	
 odf/odt/title-field-invalidate.fodt	odt	exact		byte-exact	/metadata title	-	
@@ -996,8 +996,8 @@ rtf/typed_hyperlinks_and_references.rtf	rtf	exact		refused	/body/p[1] text: unsu
 rtf/watermark.rtf	rtf	exact		none		none	
 unified-ops/0294/comments.odp	odp	exact		value-exact	/slide[1] name: 2157 -> 2180 bytes, first difference at 91	-	
 unified-ops/0294/connectors.ppt	ppt	exact		none		-	
-unified-ops/0294/frames.odm	odm	exact		value-exact	/body/p[1] text: 1218 -> 1058 bytes, first difference at 98	-	
-unified-ops/0294/frames.oth	oth	exact		value-exact	/body/p[1] text: 1639 -> 1479 bytes, first difference at 95	-	
+unified-ops/0294/frames.odm	odm	exact		byte-exact	/body/p[1] text	-	
+unified-ops/0294/frames.oth	oth	exact		byte-exact	/body/p[1] text	-	
 unified-ops/0294/layers.odg	odg	exact		byte-exact	/page[1] name	-	
 unified-ops/0294/modern-comments.pptx	pptx	exact		value-exact	/slide[1]/shape[3] font: 10725 -> 10752 bytes, first difference at 3034	byte-exact	slide move+back
 unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	-	

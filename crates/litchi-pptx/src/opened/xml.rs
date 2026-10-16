@@ -358,6 +358,8 @@ struct OpenElement {
 struct TextElement {
     span: Range<usize>,
     empty_name: Option<Vec<u8>>,
+    /// Whether the slot is a field's (`a:fld`) cached result.
+    field: bool,
 }
 
 struct ShapeTextEdit<'a> {
@@ -648,13 +650,101 @@ where
     check_execution_context(context)?;
     output.extend_from_slice(span_bytes(xml, target.span.end..xml.len())?);
     check_execution_context(context)?;
+    // The removed slide leaves its p14 section too (record 0303).
+    if super::sections::present(&output) {
+        if let Some(sectioned) = super::sections::remove(&output, selected_id)? {
+            check_execution_context(context)?;
+            return Ok(sectioned);
+        }
+    }
     Ok(output)
+}
+
+/// The byte spans that [`remove_slide_binding`] deletes for the slide
+/// `selected_id`: its `p:sldId` entry and, in a sectioned root, its
+/// `p14:sldId` section entry, in document order.
+pub(crate) fn slide_binding_removal_spans(
+    xml: &[u8],
+    selected_id: u32,
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<Vec<Range<usize>>> {
+    let entry = slide_id_elements(xml, false, context)?
+        .into_iter()
+        .find(|element| element.id == selected_id)
+        .ok_or_else(|| invalid("opened-presentation slide removal identity is missing"))?;
+    let mut spans = vec![entry.span];
+    if super::sections::present(xml) {
+        spans.extend(super::sections::member_spans(xml, selected_id)?);
+    }
+    spans.sort_unstable_by_key(|span| span.start);
+    Ok(spans)
 }
 
 /// Prove that a root delta changes only slide-list membership and order.
 /// Non-entry bytes and every retained binding remain exact. Scanning each
 /// root once preserves inter-entry trivia without quadratic repeated removal.
+///
+/// A root with a p14 section list may also change section membership: the
+/// proof then runs on both roots with every section entry stripped, and the
+/// membership itself must be one that the catalog change keeps
+/// ([`super::sections::validate_membership`], record 0303).
 pub(crate) fn validate_slide_catalog_delta<'a, 'b, I, J>(
+    before: &[u8],
+    before_order: I,
+    after: &[u8],
+    after_order: J,
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<()>
+where
+    I: ExactSizeIterator<Item = (u32, &'a str)>,
+    J: ExactSizeIterator<Item = (u32, &'b str)>,
+{
+    if !super::sections::present(before) && !super::sections::present(after) {
+        return validate_unsectioned_catalog_delta(
+            before,
+            before_order,
+            after,
+            after_order,
+            context,
+        );
+    }
+    let before_order: Vec<(u32, &'a str)> = before_order.collect();
+    let after_order: Vec<(u32, &'b str)> = after_order.collect();
+    match (
+        super::sections::strip(before)?,
+        super::sections::strip(after)?,
+    ) {
+        (None, None) => validate_unsectioned_catalog_delta(
+            before,
+            before_order.into_iter(),
+            after,
+            after_order.into_iter(),
+            context,
+        ),
+        (Some((before_stripped, before_members)), Some((after_stripped, after_members))) => {
+            let before_ids: Vec<u32> = before_order.iter().map(|(id, _)| *id).collect();
+            let after_ids: Vec<u32> = after_order.iter().map(|(id, _)| *id).collect();
+            super::sections::validate_membership(
+                &before_members,
+                &after_members,
+                &before_ids,
+                &after_ids,
+            )?;
+            validate_unsectioned_catalog_delta(
+                &before_stripped,
+                before_order.into_iter(),
+                &after_stripped,
+                after_order.into_iter(),
+                context,
+            )
+        },
+        _ => Err(invalid(
+            "source slide catalog proof adds or removes the section list",
+        )),
+    }
+}
+
+fn validate_unsectioned_catalog_delta<'a, 'b, I, J>(
     before: &[u8],
     before_order: I,
     after: &[u8],
@@ -1390,6 +1480,19 @@ fn rewrite_shape_texts(
     if !edits.iter().any(|edit| edit.changed) {
         return Ok(None);
     }
+    // A shape text set fills the run slots; writing into a field's cached
+    // result, or blanking it, would lose the field's text (record 0304).
+    if edits
+        .iter()
+        .zip(&elements)
+        .any(|(edit, spans)| edit.changed && spans.iter().any(|span| span.field))
+    {
+        return Err(Error::UnsafeEdit {
+            operation: "set_shape_text",
+            reason: "the shape text holds a field (a:fld), which a shape text set would \
+                     overwrite; set the text of its runs instead",
+        });
+    }
     let mut escaped = Vec::new();
     escaped
         .try_reserve_exact(edits.len())
@@ -1926,6 +2029,16 @@ fn shape_removal_plan(
             reason: "shape removal does not support markup-compatibility branch selection",
         });
     }
+    shape_removal_plan_in(&scene, xml, key)
+}
+
+/// [`shape_removal_plan`] on an already read scene whose spans are defined
+/// against `xml` (the processed owner of a rewritten scene, record 0303).
+pub(super) fn shape_removal_plan_in(
+    scene: &crate::shape::Scene<'_>,
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
     let selected = scene.shape(key)?;
     let selected_index = selected.common().index();
     let root = scene
@@ -2621,6 +2734,8 @@ fn drawing_text_elements_for_owners(
         })?;
     spans.resize_with(owners.len(), Vec::new);
     let mut active: Option<(usize, usize, usize)> = None;
+    // The depth of the open `a:fld`, while one is open.
+    let mut field: Option<usize> = None;
     let mut owner_position = 0usize;
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -2654,6 +2769,13 @@ fn drawing_text_elements_for_owners(
                 let owner = owners
                     .get(owner_position)
                     .filter(|owner| owner.contains(&start));
+                if owner.is_some()
+                    && drawing_namespace
+                    && field.is_none()
+                    && element.local_name().as_ref() == b"fld"
+                {
+                    field = Some(depth);
+                }
                 if owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t" {
                     if active.replace((end, depth, owner_position)).is_some() {
                         return Err(invalid(
@@ -2700,6 +2822,7 @@ fn drawing_text_elements_for_owners(
                     group.push(TextElement {
                         span: start..end,
                         empty_name: Some(element.name().as_ref().to_vec()),
+                        field: field.is_some(),
                     });
                 }
             },
@@ -2719,8 +2842,12 @@ fn drawing_text_elements_for_owners(
                     group.push(TextElement {
                         span: content_start..start,
                         empty_name: None,
+                        field: field.is_some(),
                     });
                     active = None;
+                }
+                if field == Some(depth) {
+                    field = None;
                 }
                 depth = depth
                     .checked_sub(1)

@@ -298,13 +298,12 @@ impl Edit {
         Ok(true)
     }
 
-    /// Remove one dependency-free slide through the same bounded ownership
-    /// proof used by [`Snapshot::plan_slide_removal`].
+    /// Remove one slide through the same bounded ownership proof used by
+    /// [`Snapshot::plan_slide_removal`].
     ///
-    /// The selected slide may retain only its one registered shared layout
-    /// edge. Notes, charts, media, external targets, custom relationships,
-    /// signatures, macros, MCE, protection, and incoming secondary owners are
-    /// refused before this transaction changes.
+    /// The Parts the slide owns exclusively leave with it (record 0303).
+    /// Signatures, macros, MCE, protection, and incoming secondary owners
+    /// are refused before this transaction changes.
     ///
     /// # Errors
     ///
