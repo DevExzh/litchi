@@ -16,10 +16,16 @@ pub mod dimension;
 pub mod edit;
 /// Header, footer, and repeating-row/column semantics.
 pub mod headers;
+/// Exact-source transactions that add an empty table to a sheet or remove a
+/// table and its private graph. Start with
+/// [`crate::Package::edit_table_lifecycle`].
+pub mod lifecycle;
 /// Archive-free interactive table-lock semantics.
 pub mod lock;
 /// Compact merged-cell geometry and topology algebra.
 pub mod merge;
+/// Exact-source table order within a sheet.
+pub mod order;
 /// Exact-source transactions for moving a rooted table between sheets.
 pub mod relocation;
 /// Checked, archive-free table sort semantics.
