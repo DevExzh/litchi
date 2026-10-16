@@ -7,10 +7,9 @@ use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeTyp
 use litchi_iwa_protos::{tn, tsce, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
 use litchi_numbers::{
-    CellPosition, Dimensions, Error as PackageError, MAX_MATERIALIZED_CELLS, MAX_SHEETS,
-    MAX_TABLES, MAX_TEXT_BYTES, Package, SheetBuilder, TableBuilder, Workbook,
-    workbook::ReadError as DocumentReadError, workbook::ReadLimitKind as DocumentReadLimitKind,
-    workbook::Stats as DocumentStats,
+    CellPosition, Dimensions, MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, MAX_TEXT_BYTES,
+    Package, SheetBuilder, TableBuilder, Workbook, workbook::ReadError as DocumentReadError,
+    workbook::ReadLimitKind as DocumentReadLimitKind, workbook::Stats as DocumentStats,
 };
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
@@ -503,12 +502,76 @@ fn archive_free_document_has_path_byte_directory_and_package_parity() -> TestRes
     Ok(())
 }
 
+/// Every file below `root`, by `/`-separated relative name.
+fn bundle_files(root: &Path) -> TestResult<std::collections::BTreeMap<String, Vec<u8>>> {
+    fn walk(
+        directory: &Path,
+        prefix: &str,
+        files: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    ) -> TestResult {
+        for entry in std::fs::read_dir(directory)? {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let name = if prefix.is_empty() {
+                name
+            } else {
+                format!("{prefix}/{name}")
+            };
+            if entry.file_type()?.is_dir() {
+                walk(&entry.path(), &name, files)?;
+            } else {
+                files.insert(name, std::fs::read(entry.path())?);
+            }
+        }
+        Ok(())
+    }
+    let mut files = std::collections::BTreeMap::new();
+    walk(root, "", &mut files)?;
+    Ok(files)
+}
+
 #[test]
-fn package_remains_exact_file_only_authority() {
+fn package_directories_convert_and_save_back_byte_exactly() -> TestResult {
+    let source = fixture("directory/numbers/basic.numbers");
+    // A directory bundle converts to an exact-source single-file package.
+    let package = Package::open(&source)?;
+    let text = package.workbook_ref().plain_text()?;
+    assert_eq!(text, Workbook::open(&source)?.plain_text()?);
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    assert_eq!(
+        Package::from_bytes(&bytes)?.workbook_ref().plain_text()?,
+        text
+    );
+    let mut again = Vec::new();
+    Package::open(&source)?.write_to(&mut again)?;
+    assert_eq!(again, bytes, "a second capture converts to the same bytes");
+
+    // Saved back as a directory, every bundle file is the source's bytes.
+    let temp = tempfile::tempdir()?;
+    let path = temp.path().join("bundle.numbers");
+    package.save_directory(&path)?;
+    assert_eq!(bundle_files(&path)?, bundle_files(&source)?);
+    let mut round_trip = Vec::new();
+    Package::open(&path)?.write_to(&mut round_trip)?;
+    assert_eq!(round_trip, bytes);
+
+    // Saving over the existing directory replaces it, leaving no staging
+    // or retired directory behind; a file destination is refused.
+    let single = Package::open(fixture("numbers/basic.numbers"))?;
+    single.save_directory(&path)?;
+    assert_eq!(
+        Package::open(&path)?.workbook_ref().plain_text()?,
+        EXPECTED_TEXT
+    );
+    assert_eq!(std::fs::read_dir(temp.path())?.count(), 1);
+    let file = temp.path().join("file.numbers");
+    single.save(&file)?;
     assert!(matches!(
-        Package::open(fixture("directory/numbers/basic.numbers")),
-        Err(PackageError::InvalidFormat(_))
+        single.save_directory(&file),
+        Err(litchi_numbers::SaveError::Publication(_))
     ));
+    Ok(())
 }
 
 #[test]
