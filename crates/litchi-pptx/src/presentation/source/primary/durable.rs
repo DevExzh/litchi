@@ -351,10 +351,22 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
     }
     let root_changed = data.before_root.as_slice() != data.after_root.as_slice();
     let order_changed = data.before_order.as_ref() != data.after_order.as_ref();
-    if root_changed != order_changed {
+    // A root may change without an order change only in section membership
+    // (a slide moved out and back across a section boundary, record 0303).
+    if (order_changed && !root_changed)
+        || (root_changed
+            && !order_changed
+            && !order_delta_matches(
+                &data.before_root,
+                &data.before_order,
+                &data.after_order,
+                &data.after_root,
+                package.owner.package.execution_context().as_ref(),
+            )?)
+    {
         return Err(Error::PatchConflict);
     }
-    if order_changed {
+    if root_changed {
         validate_source_order_root(
             &package.owner.package,
             package.owner._presentation.source_partname(),
@@ -423,16 +435,16 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
     } else {
         None
     };
-    if order_changed {
-        let expected = reorder_stable_bindings(
+    if root_changed
+        && !order_delta_matches(
             &data.before_root,
             &data.before_order,
             &data.after_order,
+            &data.after_root,
             package.owner.package.execution_context().as_ref(),
-        )?;
-        if expected.as_slice() != data.after_root.as_slice() {
-            return Err(Error::PatchConflict);
-        }
+        )?
+    {
+        return Err(Error::PatchConflict);
     }
     let root = if let Some(reservation) = &reservation {
         RootPayload::ReservedEdit {
@@ -847,16 +859,54 @@ fn validate_root_delta(
 ) -> Result<()> {
     let root_changed = before_root != after_root;
     let order_changed = before_order != after_order;
-    if root_changed != order_changed {
+    if order_changed && !root_changed {
         return Err(invalid("root and stable order changed inconsistently"));
     }
-    if order_changed {
-        let expected = reorder_stable_bindings(before_root, before_order, after_order, None)?;
-        if expected.as_slice() != after_root {
-            return Err(invalid("root delta is not a native order permutation"));
+    // A root change without an order change may move section entries only.
+    if root_changed
+        && !order_delta_matches(before_root, before_order, after_order, after_root, None)?
+    {
+        if !order_changed {
+            return Err(invalid("root and stable order changed inconsistently"));
         }
+        return Err(invalid("root delta is not a native order permutation"));
     }
     Ok(())
+}
+
+/// Whether `after_root` is `before_root` with its slide catalog permuted to
+/// `after_order`. A sectioned root may also move section entries; their
+/// membership must be one the order change keeps (record 0303).
+fn order_delta_matches(
+    before_root: &[u8],
+    before_order: &[StableSlideKey],
+    after_order: &[StableSlideKey],
+    after_root: &[u8],
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<bool> {
+    let expected = reorder_stable_bindings(before_root, before_order, after_order, context)?;
+    if expected.as_slice() == after_root {
+        return Ok(true);
+    }
+    if !crate::opened::sections::present(before_root) {
+        return Ok(false);
+    }
+    let (Some((expected, _)), Some((actual, after_members)), Some((_, before_members))) = (
+        crate::opened::sections::strip(&expected)?,
+        crate::opened::sections::strip(after_root)?,
+        crate::opened::sections::strip(before_root)?,
+    ) else {
+        return Ok(false);
+    };
+    let before_ids: Vec<u32> = before_order.iter().map(|key| key.slide_id).collect();
+    let after_ids: Vec<u32> = after_order.iter().map(|key| key.slide_id).collect();
+    crate::opened::sections::validate_membership(
+        &before_members,
+        &after_members,
+        &before_ids,
+        &after_ids,
+    )?;
+    Ok(expected == actual)
 }
 
 fn copy(bytes: &[u8]) -> Result<Arc<Vec<u8>>> {

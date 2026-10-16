@@ -19,7 +19,7 @@ mod patch;
 mod properties;
 mod removal_proof;
 mod remove_plan;
-mod sections;
+pub(crate) mod sections;
 mod slide_properties;
 mod text_format;
 mod transaction;
@@ -83,6 +83,7 @@ pub(crate) use remove_plan::{
     NON_POSITIONAL_EXTENSIONS, removal_layout_edge, validate_insertion_owner,
     validate_removal_presentation_owner, validate_removal_slide_surface,
 };
+pub(crate) use sections::SECTION_EXTENSION_URI;
 pub(crate) use slide_properties::{
     normalize_slide_properties, slide_properties_skeleton, stage_slide_properties,
 };
@@ -94,7 +95,9 @@ pub(crate) use xml::{
     insert_slide_binding, reorder_slide_bindings, shape_text_skeleton, stage_shape_removal,
     stage_shape_texts, strip_appended_text_boxes, validate_slide_bindings,
 };
-pub(crate) use xml::{remove_slide_binding, validate_slide_catalog_delta};
+pub(crate) use xml::{
+    remove_slide_binding, slide_binding_removal_spans, validate_slide_catalog_delta,
+};
 
 #[cfg(test)]
 mod owner_commit_tests;

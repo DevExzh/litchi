@@ -739,8 +739,10 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
     validate_removal_presentation_owner(xml, &selected.relationship_id)
 }
 
+/// The removed slide's section entry leaves with it (record 0303), so the
+/// p14 section list is admitted as it is for insertion.
 pub(crate) fn validate_removal_presentation_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
-    validate_presentation_bindings(xml, relationship_id, 1, false)
+    validate_presentation_bindings(xml, relationship_id, 1, true)
 }
 
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";

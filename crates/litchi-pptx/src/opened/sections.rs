@@ -1,5 +1,6 @@
-//! Section membership of slides a transaction adds or moves (record 0252;
-//! ported from the M2 L-PPTX-W4 reference work).
+//! Section membership of slides a transaction adds, moves or removes
+//! (record 0252, ported from the M2 L-PPTX-W4 reference work; removal and
+//! the source-backed editor, record 0303).
 //!
 //! `PowerPoint` 2010 sections live in an extension of the presentation
 //! part: `p:extLst/p:ext[@uri="{521415D9-…}"]/p14:sectionLst/p14:section/
@@ -9,7 +10,9 @@
 //! order, or, at the start, the section of the slide just after it; with
 //! neither (no other slide is in a section) it joins the first section.
 //! A reorder that is not one move keeps every slide in its section and
-//! re-sorts each section's entries into the new order.
+//! re-sorts each section's entries into the new order. A removed slide
+//! leaves its section; the section stays even when it becomes empty, as
+//! `PowerPoint` keeps an empty section.
 //!
 //! Edits splice `p14:sldId` elements only: every other byte of the
 //! presentation part, the section names and identifiers included, stays as
@@ -29,7 +32,8 @@ use quick_xml::reader::NsReader;
 use super::xml::{MAX_XML_DEPTH, bump, is_presentation_namespace, position, span_bytes};
 use crate::{Error, Result, SlideOrderRefusal};
 
-const SECTION_EXTENSION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
+/// The `p:ext@uri` of the `PowerPoint` 2010 section list.
+pub(crate) const SECTION_EXTENSION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 
@@ -533,6 +537,151 @@ pub(crate) fn sort(xml: &[u8], order: &[u32]) -> Result<Option<Vec<u8>>> {
     }
     output.extend_from_slice(span_bytes(xml, cursor..xml.len())?);
     Ok(Some(output))
+}
+
+/// Whether the part may have a section list. A part without these bytes
+/// has none.
+pub(crate) fn present(xml: &[u8]) -> bool {
+    mentions(xml, b"sectionLst")
+}
+
+/// The spans of the section entries naming the slide `id`.
+pub(crate) fn member_spans(xml: &[u8], id: u32) -> Result<Vec<Range<usize>>> {
+    Ok(scan(xml)?
+        .map(|sections| {
+            sections
+                .sections
+                .iter()
+                .flat_map(|section| &section.members)
+                .filter(|member| member.id == id)
+                .map(|member| member.span.clone())
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// Remove the section entry of the slide `id`. Returns the rewritten part,
+/// or `None` when no section names the slide.
+pub(crate) fn remove(xml: &[u8], id: u32) -> Result<Option<Vec<u8>>> {
+    let Some(sections) = scan(xml)? else {
+        return Ok(None);
+    };
+    let mut spans = sections
+        .sections
+        .iter()
+        .flat_map(|section| &section.members)
+        .filter(|member| member.id == id)
+        .map(|member| member.span.clone());
+    let Some(span) = spans.next() else {
+        return Ok(None);
+    };
+    if spans.next().is_some() {
+        return Err(refusal("a slide belongs to more than one section"));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len() - span.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation section removal XML",
+            source,
+        })?;
+    output.extend_from_slice(span_bytes(xml, 0..span.start)?);
+    output.extend_from_slice(span_bytes(xml, span.end..xml.len())?);
+    let check = scan(&output)?.ok_or_else(|| refusal("the section list disappeared"))?;
+    if check.ids().contains(&id) || check.sections.len() != sections.sections.len() {
+        return Err(refusal("the section entry did not leave"));
+    }
+    Ok(Some(output))
+}
+
+/// The part with every section entry removed, and each section's entries
+/// in document order. `None` when the part has no section list.
+///
+/// Two parts whose stripped forms are equal differ only in section
+/// membership: entry removal keeps the whitespace between entries, so an
+/// entry added, removed or re-sorted by [`place`], [`remove`] or [`sort`]
+/// leaves the stripped bytes unchanged.
+pub(crate) fn strip(xml: &[u8]) -> Result<Option<(Vec<u8>, Vec<Vec<u32>>)>> {
+    let Some(sections) = scan(xml)? else {
+        return Ok(None);
+    };
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation section proof XML",
+            source,
+        })?;
+    let mut cursor = 0;
+    for member in sections
+        .sections
+        .iter()
+        .flat_map(|section| &section.members)
+    {
+        if member.span.start < cursor {
+            return Err(refusal("section entries overlap"));
+        }
+        output.extend_from_slice(span_bytes(xml, cursor..member.span.start)?);
+        cursor = member.span.end;
+    }
+    output.extend_from_slice(span_bytes(xml, cursor..xml.len())?);
+    let membership = sections
+        .sections
+        .iter()
+        .map(|section| section.members.iter().map(|member| member.id).collect())
+        .collect();
+    Ok(Some((output, membership)))
+}
+
+/// Prove that section membership after a slide catalog change is the one an
+/// order change, insertion or removal keeps (record 0303):
+///
+/// - the section count is unchanged and no slide is in two sections;
+/// - every entry names a slide of the new order, or a stale identifier the
+///   part already held;
+/// - each section's entries follow the new presentation order;
+/// - a slide that kept its place in the catalog and was in a section is
+///   still in one.
+pub(crate) fn validate_membership(
+    before: &[Vec<u32>],
+    after: &[Vec<u32>],
+    before_order: &[u32],
+    after_order: &[u32],
+) -> Result<()> {
+    if before.len() != after.len() {
+        return Err(refusal("a catalog change adds or removes a section"));
+    }
+    let rank: HashMap<u32, usize> = after_order
+        .iter()
+        .enumerate()
+        .map(|(position, id)| (*id, position))
+        .collect();
+    let before_members: std::collections::HashSet<u32> = before.iter().flatten().copied().collect();
+    let mut seen = std::collections::HashSet::new();
+    for section in after {
+        let mut previous = None;
+        for id in section {
+            if !seen.insert(*id) {
+                return Err(refusal("a slide belongs to more than one section"));
+            }
+            match rank.get(id) {
+                Some(position) => {
+                    if previous.is_some_and(|previous| previous > *position) {
+                        return Err(refusal("a section's entries leave presentation order"));
+                    }
+                    previous = Some(*position);
+                },
+                None if before_members.contains(id) && !before_order.contains(id) => {},
+                None => return Err(refusal("a section names a slide outside the catalog")),
+            }
+        }
+    }
+    for id in before.iter().flatten() {
+        if rank.contains_key(id) && !seen.contains(id) {
+            return Err(refusal("a retained slide left every section"));
+        }
+    }
+    Ok(())
 }
 
 /// One `p14:sldId` element for `id`, named as `section`'s list names its

@@ -3770,6 +3770,11 @@ fn registered_layouts(
 /// It validates the same physical master/layout/theme graph and reads only the
 /// selected layout XML needed for its `p:cSld@name`; it does not acquire the
 /// detached shape scenes used by the public source layout snapshots.
+///
+/// Slide insertion reads only the layout registration, so the presentation
+/// root's extensions (a section list, slide guides) and the masters' own
+/// content are read leniently, as for removal (record 0303); the root's
+/// slide bindings are proven separately by the insertion planner.
 pub(super) fn registered_source_layout_by_name(
     package: &SourceBackedPackage,
     presentation: &PartView<'_>,
@@ -3788,8 +3793,8 @@ pub(super) fn registered_source_layout_by_name(
         true,
         true,
         true,
-        true,
         false,
+        true,
         CONTEXT,
         execution_context,
     )?;
@@ -3799,7 +3804,7 @@ pub(super) fn registered_source_layout_by_name(
         xml,
         dialect,
         CONTEXT,
-        false,
+        true,
         execution_context,
     )?;
     let mut selected = None;

@@ -611,11 +611,18 @@ impl Package {
         })
     }
 
-    fn stage_order(&self, ordered: Vec<StableSlideKey>) -> Result<Self> {
+    /// Stage a new logical order. `moved` names the position of a slide
+    /// that one move placed; it leaves its p14 section and joins its new
+    /// neighbour's, as `PowerPoint` moves a slide. Without it every slide
+    /// keeps its section and each section is re-sorted (record 0303).
+    fn stage_order(&self, ordered: Vec<StableSlideKey>, moved: Option<usize>) -> Result<Self> {
         self.check()?;
         let ordered: Arc<[StableSlideKey]> = ordered.into();
         if ordered == self.order {
             return Ok(self.clone());
+        }
+        if crate::opened::sections::present(self.root.as_bytes()) {
+            return self.stage_sectioned_order(ordered, moved);
         }
         if self.topology.is_some() {
             let _reservation = reserve_managed_output(
@@ -659,6 +666,48 @@ impl Package {
                 },
                 None => RootPayload::Edited(Arc::new(xml)),
             }
+        };
+        self.with_order(root, ordered)
+    }
+
+    /// Stage an order on a root with a p14 section list. Section membership
+    /// depends on the sequence of moves, so the candidate is derived from
+    /// the current root rather than rebuilt from the source.
+    fn stage_sectioned_order(
+        &self,
+        ordered: Arc<[StableSlideKey]>,
+        moved: Option<usize>,
+    ) -> Result<Self> {
+        let context = self.owner.package.execution_context();
+        validate_source_order_root(
+            &self.owner.package,
+            self.owner._presentation.source_partname(),
+            self.root.as_bytes(),
+            &self.order,
+            context.as_ref(),
+        )?;
+        let reservation = reserve_managed_output(context.as_ref(), self.root.as_bytes().len())?;
+        let xml = reorder_stable_bindings(
+            self.root.as_bytes(),
+            &self.order,
+            &ordered,
+            context.as_ref(),
+        )?;
+        let ids: Vec<u32> = ordered.iter().map(|key| key.slide_id).collect();
+        let sectioned = match moved {
+            Some(position) => crate::opened::sections::place(&xml, &ids, position)?,
+            None => crate::opened::sections::sort(&xml, &ids)?,
+        };
+        let xml = Arc::new(sectioned.unwrap_or(xml));
+        if self.topology.is_some() {
+            return topology::reorder(self, xml, ordered);
+        }
+        let root = match reservation {
+            Some(reservation) => RootPayload::ReservedEdit {
+                bytes: xml,
+                _reservation: reservation,
+            },
+            None => RootPayload::Edited(xml),
         };
         self.with_order(root, ordered)
     }
@@ -1235,7 +1284,7 @@ impl Edit {
         let mut order = self.working.order.to_vec();
         let key = order.remove(from);
         order.insert(to, key);
-        let candidate = self.working.stage_order(order)?;
+        let candidate = self.working.stage_order(order, Some(to))?;
         let changed = candidate.order != self.working.order;
         self.working = candidate;
         Ok(changed)
@@ -1264,7 +1313,7 @@ impl Edit {
         }
         let mut order = self.working.order.to_vec();
         order.swap(left, right);
-        let candidate = self.working.stage_order(order)?;
+        let candidate = self.working.stage_order(order, None)?;
         let changed = candidate.order != self.working.order;
         self.working = candidate;
         Ok(changed)

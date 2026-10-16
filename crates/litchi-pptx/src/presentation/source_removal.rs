@@ -297,11 +297,17 @@ impl SourceBackedPresentationEditor {
             self.package.execution_context().as_ref(),
         )?;
         let candidate_xml = Arc::new(candidate_xml);
+        let deletions = crate::opened::slide_binding_removal_spans(
+            presentation_xml,
+            selected.slide_id,
+            self.package.execution_context().as_ref(),
+        )?;
         let mut topology = SourceTopologyPlan::new();
         let source_xml = stage_presentation_replacement(
             &presentation,
             presentation_xml,
             &candidate_xml,
+            &deletions,
             &mut topology,
         )?;
         topology
@@ -370,6 +376,7 @@ fn stage_presentation_replacement(
     presentation: &litchi_opc::PartView<'_>,
     source_bytes: &[u8],
     candidate_bytes: &Arc<Vec<u8>>,
+    deletions: &[std::ops::Range<usize>],
     topology: &mut SourceTopologyPlan,
 ) -> Result<Option<litchi_opc::SourceXmlPart>> {
     if candidate_bytes.as_slice() == source_bytes {
@@ -394,13 +401,18 @@ fn stage_presentation_replacement(
     if source_xml.bytes() != source_bytes {
         return Err(Error::PatchConflict);
     }
-    let (start, end) = deletion_range(source_bytes, candidate_bytes.as_slice())?;
-    let expected = source_bytes
-        .get(start..end)
-        .ok_or_else(|| Error::Invalid("slide-removal XML deletion range is invalid".into()))?;
-    let proof = source_xml.checked_range(start..end, expected)?;
+    validate_deletions(source_bytes, candidate_bytes.as_slice(), deletions)?;
+    let mut proofs = Vec::new();
+    for range in deletions {
+        let expected = source_bytes
+            .get(range.clone())
+            .ok_or_else(|| Error::Invalid("slide-removal XML deletion range is invalid".into()))?;
+        proofs.push(source_xml.checked_range(range.clone(), expected)?);
+    }
     let mut publication = source_xml.into_publication()?;
-    publication.replace(proof, AuthoredXmlFragment::empty())?;
+    for proof in proofs {
+        publication.replace(proof, AuthoredXmlFragment::empty())?;
+    }
     let staged = publication.finish()?;
     if staged.bytes() != candidate_bytes.as_slice() {
         return Err(Error::Invalid(
@@ -446,31 +458,38 @@ fn reserve_candidate_xml(
         .map_err(|error| Error::from(litchi_opc::OpcError::Execution(error)))
 }
 
-fn deletion_range(source: &[u8], candidate: &[u8]) -> Result<(usize, usize)> {
-    let mut start = 0usize;
-    let prefix = source.len().min(candidate.len());
-    while start < prefix && source[start] == candidate[start] {
-        start += 1;
+/// The candidate must be the source with exactly these sorted, disjoint,
+/// nonempty spans deleted: the removed slide's catalog entry and its section
+/// entry (record 0303).
+fn validate_deletions(
+    source: &[u8],
+    candidate: &[u8],
+    deletions: &[std::ops::Range<usize>],
+) -> Result<()> {
+    let mut expected = Vec::new();
+    expected
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "slide-removal deletion proof",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for range in deletions {
+        if range.start < cursor || range.start >= range.end || range.end > source.len() {
+            return Err(Error::Invalid(
+                "slide-removal root candidate is not a set of lexical deletions".into(),
+            ));
+        }
+        expected.extend_from_slice(&source[cursor..range.start]);
+        cursor = range.end;
     }
-    let mut source_end = source.len();
-    let mut candidate_end = candidate.len();
-    while source_end > start
-        && candidate_end > start
-        && source[source_end - 1] == candidate[candidate_end - 1]
-    {
-        source_end -= 1;
-        candidate_end -= 1;
-    }
-    if candidate_end != start
-        || source_end <= start
-        || source[..start] != candidate[..start]
-        || source[source_end..] != candidate[candidate_end..]
-    {
+    expected.extend_from_slice(&source[cursor..]);
+    if deletions.is_empty() || expected != candidate {
         return Err(Error::Invalid(
-            "slide-removal root candidate is not one lexical deletion".into(),
+            "slide-removal root candidate is not a set of lexical deletions".into(),
         ));
     }
-    Ok((start, source_end))
+    Ok(())
 }
 
 fn validate_selected_presentation_relationship(
