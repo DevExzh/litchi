@@ -1,0 +1,12 @@
+per call = (15 loops - 5 loops) / 10; docx_large_bench DOCX_LARGE_PROFILE=1
+build leg Ir I1mr D1mr D1mw
+base leaf_set 17056112 2533 23077 4042
+base auto_set 28660335 5798 41730 3678
+base committed_set 42959936 5212 60227 12937
+base eager_add 8077319 2926 12717 9143
+base auto_add 38216265 6494 48004 6507
+after leaf_set 17050416 2620 23102 4079
+after auto_set 9990566 4845 22458 3455
+after committed_set 10215290 3444 41635 6032
+after eager_add 8090554 2939 12818 9308
+after auto_add 9977067 5274 16808 6180
