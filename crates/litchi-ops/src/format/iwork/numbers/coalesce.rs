@@ -7,6 +7,14 @@
 //! stages the changes per table when it is flushed. A repeated coordinate,
 //! a query, any other key or verb closes the run, so every operation still
 //! observes the result of the ones before it.
+//!
+//! A run publishes what its assignments publish one at a time (record
+//! 0314): a formula is published on its own (its new calculation objects
+//! take identities derived from the package it is written to, and the
+//! leaf's formula budget is checked against that package, so a change
+//! written before it in the same transaction would change both), and a run
+//! whose commit fails finds the assignment that fails first, so the error
+//! names the item a one-at-a-time application stops at.
 
 use std::collections::{BTreeMap, HashSet};
 use std::hash::{BuildHasherDefault, Hasher};
@@ -32,6 +40,10 @@ pub(crate) struct Plan {
     /// Whether the change can alter the cell (a clear of an empty cell
     /// cannot).
     changes: bool,
+    /// Whether the change writes a formula.
+    formula: bool,
+    /// Whether the leaf stores the cell already.
+    stored: bool,
 }
 
 /// A table a run's cell paths name: its leaf address and grid extent.
@@ -97,6 +109,8 @@ impl Iwork {
             address,
             change: write.change(address.position()),
             changes,
+            formula: matches!(write, super::CellWrite::Formula(_)),
+            stored,
         }))
     }
 
@@ -170,7 +184,14 @@ impl Iwork {
 /// A run of coalesced cell writes over one base snapshot.
 pub(crate) struct Run {
     base: Iwork,
-    cells: BTreeMap<(usize, usize), Vec<Change>>,
+    /// The staged changes in staging order: table, change, item index.
+    staged: Vec<((usize, usize), Change, usize)>,
+    /// Whether the run holds a formula.
+    formula: bool,
+    /// Per table, the rows of the unstored cells the run writes, and the
+    /// last of them: the leaf creates the row headers of new cells' rows in
+    /// ascending order, one at a time in staging order.
+    created: Vec<((usize, usize), u32, Vec<u32>)>,
     /// The cells planned so far, by [`cell_key`].
     planned: HashSet<(usize, usize, u64), BuildHasherDefault<CellHasher>>,
     tables: Tables,
@@ -185,7 +206,9 @@ impl Run {
         base.admit_edit()?;
         Ok(Self {
             base: base.clone(),
-            cells: BTreeMap::new(),
+            staged: Vec::new(),
+            formula: false,
+            created: Vec::new(),
             planned: HashSet::default(),
             tables: Tables::new(),
             first: None,
@@ -204,9 +227,19 @@ impl Run {
             .numbers_cell_plan(target, props, Some(&mut self.tables))
     }
 
-    /// Whether `plan` must start a new run: its cell was planned already.
+    /// Whether `plan` must start a new run: its cell was planned already,
+    /// it or the run holds a formula, or it creates a cell in a row before
+    /// the rows of the cells the run creates.
     pub(crate) fn requires_barrier(&self, plan: &Plan) -> bool {
-        self.planned.contains(&cell_key(plan.address))
+        let table = (plan.address.sheet, plan.address.table);
+        let row = plan.address.row;
+        self.formula
+            || (plan.formula && !self.staged.is_empty())
+            || (!plan.stored
+                && self.created.iter().any(|(held, last, rows)| {
+                    *held == table && *last > row && rows.binary_search(&row).is_err()
+                }))
+            || self.planned.contains(&cell_key(plan.address))
     }
 
     /// The wire index of the run's first operation.
@@ -229,15 +262,52 @@ impl Run {
         self.operations = operations;
         self.first.get_or_insert(index);
         self.planned.insert(cell_key(plan.address));
-        self.cells
-            .entry((plan.address.sheet, plan.address.table))
-            .or_default()
-            .push(plan.change);
+        self.formula |= plan.formula;
+        if !plan.stored {
+            let table = (plan.address.sheet, plan.address.table);
+            let row = plan.address.row;
+            match self.created.iter_mut().find(|(held, _, _)| *held == table) {
+                // Rows arrive ascending (an earlier new row is a barrier),
+                // so the list stays sorted.
+                Some((_, last, rows)) => {
+                    if let Err(at) = rows.binary_search(&row) {
+                        rows.insert(at, row);
+                    }
+                    *last = (*last).max(row);
+                },
+                None => self.created.push((table, row, vec![row])),
+            }
+        }
+        self.staged
+            .push(((plan.address.sheet, plan.address.table), plan.change, index));
         Ok(plan.changes)
     }
 
     /// Commit the run: one leaf cell transaction per table.
+    ///
+    /// # Errors
+    ///
+    /// The refusal of the first change that a one-at-a-time application
+    /// refuses, with its item index (found by committing ever shorter
+    /// prefixes of the run, on the error path only).
     pub(crate) fn commit(self) -> Result<(Iwork, Commit)> {
+        let chain = match self.publish(self.staged.len()) {
+            Ok(chain) => chain,
+            Err(error) => return Err(self.first_failure(error)),
+        };
+        let commit = finish(
+            &self.base,
+            chain.changed,
+            Owner::Numbers(chain.package),
+            chain.patches,
+            self.operations,
+            &self.limits,
+        )?;
+        Ok((self.base, commit))
+    }
+
+    /// Commit the first `count` staged changes onto the base.
+    fn publish(&self, count: usize) -> Result<Chain<litchi_numbers::Package>> {
         #[allow(
             irrefutable_let_patterns,
             reason = "a Numbers-only build has one owner variant"
@@ -248,17 +318,36 @@ impl Run {
                 "Numbers cell run lost its owner",
             ));
         };
+        let mut cells: BTreeMap<(usize, usize), Vec<Change>> = BTreeMap::new();
+        for (table, change, _) in self.staged.iter().take(count) {
+            cells.entry(*table).or_default().push(change.clone());
+        }
         let mut chain = Chain::new(package.clone());
-        commit_cells(&mut chain, self.cells)?;
-        let commit = finish(
-            &self.base,
-            chain.changed,
-            Owner::Numbers(chain.package),
-            chain.patches,
-            self.operations,
-            &self.limits,
-        )?;
-        Ok((self.base, commit))
+        commit_cells(&mut chain, cells)?;
+        Ok(chain)
+    }
+
+    /// The error of the shortest failing prefix of the run, with the item
+    /// index of its last change; `error` (the whole run's) when no shorter
+    /// prefix fails.
+    fn first_failure(&self, error: Error) -> Error {
+        let (mut low, mut high) = (1, self.staged.len());
+        let mut found = None;
+        while low < high {
+            let middle = low + (high - low) / 2;
+            match self.publish(middle) {
+                Ok(_) => low = middle + 1,
+                Err(error) => {
+                    found = Some(error);
+                    high = middle;
+                },
+            }
+        }
+        let error = found.unwrap_or(error);
+        match self.staged.get(high.saturating_sub(1)) {
+            Some((_, _, index)) if error.item().is_none() => error.with_item(*index),
+            _ => error,
+        }
     }
 }
 

@@ -998,6 +998,52 @@ pub(super) fn native_body(package: &Package) -> Result<NativeBodySnapshot, Error
     })
 }
 
+/// The attribute boundaries of the body storage around one section's text,
+/// in section-relative UTF-16 units: what decides whether a sequence of
+/// paragraph splices of the section may publish as one (record 0314).
+pub(crate) struct SectionBoundaries {
+    storage: litchi_iwa_text_wire::StorageBoundaries,
+    offset: usize,
+}
+
+impl SectionBoundaries {
+    /// Whether splices within `hull` (section-relative, both ends inclusive)
+    /// publish exactly what one splice from the first text to the last does;
+    /// see [`litchi_iwa_text_wire::StorageBoundaries::admits_combined_splice`].
+    pub(crate) fn admits(&self, hull: Range<usize>) -> bool {
+        match (
+            self.offset.checked_add(hull.start),
+            self.offset.checked_add(hull.end),
+        ) {
+            (Some(start), Some(end)) => self.storage.admits_combined_splice(start..end),
+            _ => false,
+        }
+    }
+}
+
+/// Read [`SectionBoundaries`] for section `position` from the body storage.
+/// The first section begins the body; a later one's offset is read from the
+/// native section references.
+pub(crate) fn section_boundaries(
+    package: &Package,
+    position: Position,
+) -> Result<SectionBoundaries, Error> {
+    let offset = if position.get() == 0 {
+        0
+    } else {
+        section_start(package, position)?
+    };
+    let mut budget = transaction::TransactionBudget::new(package).map_err(map_transaction_error)?;
+    let target = transaction::resolve_body_target(package, position, &mut budget)
+        .map_err(map_transaction_error)?;
+    let payload = transaction::selected_payload(package, target).map_err(map_transaction_error)?;
+    let limits = storage_rewrite_limits(package.state.source.limits())
+        .map_err(map_storage_wire_limits_error)?;
+    let storage = litchi_iwa_text_wire::storage_boundaries_with_limits(payload, limits)
+        .map_err(map_text_rewrite_error)?;
+    Ok(SectionBoundaries { storage, offset })
+}
+
 /// The UTF-16 body offset where section `position` starts.
 pub(crate) fn section_start(package: &Package, position: Position) -> Result<usize, Error> {
     let body = native_body(package)?;

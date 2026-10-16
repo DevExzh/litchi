@@ -224,6 +224,35 @@ impl<'a> Edit<'a> {
         &self.before
     }
 
+    /// Whether a sequence of edits of these notes, each a splice within
+    /// `hull` (UTF-16 code units of [`Self::text`], both ends inclusive),
+    /// publishes exactly what one splice from the text before them to the
+    /// text after them publishes (record 0314). `false` asks the caller to
+    /// commit the edits one at a time. Whether a later edit follows an
+    /// emptied text is the caller's to check.
+    ///
+    /// # Errors
+    ///
+    /// A typed read or wire error for the notes storage.
+    pub fn admits_combined_splice(&self, hull: Range<usize>) -> Result<bool, Error> {
+        let package = self.source;
+        let storage = package
+            .required_object(self.storage_identifier, "Keynote speaker-note storage")
+            .map_err(map_read_error)?;
+        let (_, message) = one_message(&storage.messages, STORAGE_MESSAGE_TYPE)?;
+        let archive_limits = package
+            .state
+            .options
+            .archive()
+            .effective_archive_limits()
+            .map_err(map_archive_error)?;
+        let limits = storage_rewrite_limits(package, archive_limits.max_message_bytes())?;
+        let boundaries =
+            litchi_iwa_text_wire::storage_boundaries_with_limits(&message.data, limits)
+                .map_err(map_text_rewrite_error)?;
+        Ok(boundaries.admits_combined_splice(hull))
+    }
+
     /// Return the staged notes-relative span, when present.
     #[must_use]
     pub fn span(&self) -> Option<TextSpan> {
