@@ -3,7 +3,9 @@
 //! `Edit::replace_paragraph_text` / `insert_paragraph` + commit against the
 //! unified `set` / `add` on a default (`SourceMode::Auto`, source-backed)
 //! owner and on an eager owner, and (record 0311, `committed_*`) on a handle
-//! already committed from the default owner. Each leg: two warm-ups, nine samples of
+//! already committed from the default owner, and (record 0313, `fresh_*`) the
+//! first add on a handle opened for that call, so the overlay audits the
+//! original and the insertion as a pair. Each leg: two warm-ups, nine samples of
 //! `DOCX_LARGE_LOOPS` calls (default 20), the median in µs per call.
 //! `DOCX_LARGE_ONLY=<leg>` runs one leg; `DOCX_LARGE_PROFILE=1` loops it
 //! once for a profiler.
@@ -158,6 +160,40 @@ mod bench {
                                     .at(Placement::Position(Position::new(500))),
                             )
                             .unwrap(),
+                    );
+                }),
+            ),
+            (
+                "fresh_auto_add",
+                Box::new(|| {
+                    let file = litchi_ops::open_bytes(bytes.clone()).unwrap();
+                    black_box(
+                        file.add(
+                            "/body",
+                            NewNode::new("paragraph")
+                                .prop("text", "Inserted")
+                                .at(Placement::Position(Position::new(500))),
+                        )
+                        .unwrap(),
+                    );
+                }),
+            ),
+            (
+                "fresh_eager_add",
+                Box::new(|| {
+                    let file = litchi_ops::open_bytes_with(
+                        bytes.clone(),
+                        &OpenOptions::new().source_mode(SourceMode::Eager),
+                    )
+                    .unwrap();
+                    black_box(
+                        file.add(
+                            "/body",
+                            NewNode::new("paragraph")
+                                .prop("text", "Inserted")
+                                .at(Placement::Position(Position::new(500))),
+                        )
+                        .unwrap(),
                     );
                 }),
             ),
