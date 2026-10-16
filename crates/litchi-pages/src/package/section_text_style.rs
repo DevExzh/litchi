@@ -570,7 +570,7 @@ const fn mix(mut value: u64) -> u64 {
 }
 
 /// Decompress and parse one member for editing.
-fn parse_member(package: &Package, name: &str) -> Result<Archive, Error> {
+pub(super) fn parse_member(package: &Package, name: &str) -> Result<Archive, Error> {
     let catalog = &package.state.source;
     let entry = catalog
         .package()
@@ -593,7 +593,7 @@ fn parse_member(package: &Package, name: &str) -> Result<Archive, Error> {
     Ok(archive)
 }
 
-fn component_name_of(package: &Package, identifier: u64) -> Result<String, Error> {
+pub(super) fn component_name_of(package: &Package, identifier: u64) -> Result<String, Error> {
     let mut found = None;
     for component in package.state.source.components().iter() {
         if component.archive().object(identifier).is_some()
