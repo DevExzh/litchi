@@ -1355,7 +1355,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
-                reason: "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility-selected content have no proven raw position",
+                reason: "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position (record 0307)",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1394,8 +1394,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "complex-leaf-content",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2 / record 0011",
-                reason: "fields, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits",
+                follow_up: "L-DOCX-W2 / record 0011 / record 0307 (text-box stories)",
+                reason: "fields and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits; markup-compatibility alternate content in a run is one opaque object, so a text set over one whose branches hold text (a text box) is refused",
             },
             GapSpec {
                 subject: Subject::Operation {

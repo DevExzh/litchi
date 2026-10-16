@@ -39,10 +39,9 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error
 /// Pages body text that the native reader projects into a rich-text storage
 /// reaches the facade reader as one paragraph.
 ///
-/// M0a step S8c: Pages has no `litchi::File` variant, so the facade reader is
-/// `litchi::iwork::Document` (the facade's `Document` read the same
-/// storage); `litchi::open` refuses the file with its format and a
-/// suggestion to use that reader.
+/// The unified `File` reads that storage (records 0296 and 0306; the
+/// facade's read-only `litchi::iwork::Document` that read it before is
+/// deleted).
 #[test]
 fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
@@ -64,32 +63,6 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
         .text();
     assert!(!expected.is_empty());
 
-    #[cfg(feature = "iwork")]
-    {
-        use litchi::iwork::{SectionKind, TextRole};
-
-        let snapshot = litchi::iwork::Document::open(&path)?.snapshot();
-        // The document's text is exactly the storage's text, as one
-        // paragraph-level item (the facade's `text()`, `paragraph_count()`,
-        // `paragraphs()` and `elements()` all reported that one paragraph).
-        let text = snapshot.iter_text().collect::<Vec<_>>();
-        assert_eq!(text.len(), 1);
-        let paragraph = text
-            .first()
-            .ok_or_else(|| io::Error::other("iWork reader returned no Pages text"))?;
-        assert_eq!(paragraph.value(), expected);
-        assert_eq!(paragraph.role(), TextRole::SectionAdditional);
-        assert_eq!(snapshot.all_text(), [expected.to_owned()]);
-
-        assert_eq!(snapshot.section_count(), 1);
-        let body = snapshot
-            .section(0)
-            .ok_or_else(|| io::Error::other("iWork reader returned no Pages section"))?;
-        assert_eq!(body.kind(), SectionKind::Body);
-        assert_eq!(body.paragraphs().len(), 0);
-        assert_eq!(body.additional_text().collect::<Vec<_>>(), [expected]);
-    }
-
     // `litchi::open` reads the same body through the unified `File`
     // (record 0296): one paragraph per line of the section's text.
     let file = litchi::open(&path)?;
@@ -97,6 +70,19 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
     let first_line = expected.split('\n').next().unwrap_or_default();
     let paragraph = file.get("/body/p[1]")?;
     assert_eq!(paragraph.view().text()?.as_deref(), Some(first_line));
+    // One body section whose text is exactly the storage, as the deleted
+    // snapshot reported it (one section, one text item).
+    let section = file.get("/section[1]")?;
+    assert_eq!(section.view().text()?.as_deref(), Some(expected));
+    assert_eq!(
+        file.get("/section[2]").map(|_| ()).unwrap_err().code(),
+        litchi::Code::PathNotFound
+    );
+    assert_eq!(
+        file.query("p")?.count(),
+        expected.split('\n').count(),
+        "one paragraph per line"
+    );
 
     Ok(())
 }

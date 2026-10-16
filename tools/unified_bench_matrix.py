@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0302 (`docs/unified-ops/02[4-9]*.md`, `030[0-2]*.md`)
+operations records 0249-0306 (`docs/unified-ops/02[4-9]*.md`, `030[0-6]*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -39,7 +39,8 @@ Conventions:
 * Before/after-build records (0250, 0263, 0268, 0289, 0290, 0293) compare
   builds, not unified with leaf: comparison "after/before", budget 1.05.
 
-Records 0285-0302 (record 0294 extended the tool to them) are collected
+Records 0285-0306 (record 0294 extended the tool to 0302; record 0306
+added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers) are collected
 only when their record file is on this tree; the Markdown lists every
 record of that range, absent ones as "not on this tree", so the tool can
 be rerun unchanged after later merges.
@@ -978,7 +979,7 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 302)
+FOLLOW_RANGE = (285, 306)
 
 
 def record_file(record: str):
@@ -1093,6 +1094,9 @@ def abba_builds(record, paths, labels, comparison):
                         build, []).append(r[field])
     out = []
     for (scen, field), runs in acc.items():
+        # A scenario one build refuses (record 0303's base) has no pair.
+        if not all("before" in b and "after" in b for b in runs.values()):
+            continue
         fmt, op, label = labels[scen]
         leg = {"median_us": "", "native_median_us": "native", "unified_median_us": "unified"}[field]
         before = [med(b["before"]) for _, b in sorted(runs.items())]
@@ -1237,13 +1241,18 @@ def p0295():
     return out
 
 
-def iwork_summary(record, path, size_fn):
-    """iwork_bench / pages_bench summary JSONL (records 0296, 0299): one row
-    per run with the per-run median ratio."""
-    rows = [r for r in load_jsonl(path) if r.get("summary")]
+def iwork_summary(record, path, size_fn, labels=None):
+    """iwork_bench / pages_bench / keynote_bench summary JSONL (records 0296,
+    0298, 0299, 0302): one row per run with the per-run median ratio. `path`
+    is one file or a list of files (one run each); `labels` maps a scenario
+    to (operation, label, budget) where the generic naming does not fit."""
+    paths = path if isinstance(path, list) else [path]
+    rows = [r for p in paths for r in load_jsonl(p) if r.get("summary")]
     out = []
     for (fmt, scen), items in group_cases([rows], lambda r: (r["format"], r["scenario"])).items():
-        if scen.startswith("batch_"):
+        if labels and scen in labels:
+            op, label, budget = labels[scen]
+        elif scen.startswith("batch_"):
             n = int(scen.split("_")[1])
             op, budget = "batch set", BATCH if n in (1000, 10000) else SCALING
             label = f"batch {n} (one File::edit vs one leaf edit)"
@@ -1256,7 +1265,7 @@ def iwork_summary(record, path, size_fn):
                        us(med(i["leaf_median_ns"] for i in items)),
                        us(med(i["unified_median_ns"] for i in items)),
                        [i["ratio_median"] for i in items], budget, f"iwork:{fmt}:{scen}",
-                       src([path])))
+                       src(paths)))
     return out
 
 
@@ -1273,21 +1282,81 @@ NUMBERS_SCEN = {
     "rename_sheet": ("set (sheet rename)", "rename sheet", SINGLE),
     "merge_add": ("add (merge)", "merge add", SINGLE),
     "sheet_move": ("move", "sheet move", SINGLE),
+    "sheet_add": ("add (sheet)", "sheet add", SINGLE),
+    "sheet_remove": ("remove (sheet)", "sheet remove", SINGLE),
+    "table_add": ("add (table)", "table add", SINGLE),
+    "table_remove": ("remove (table)", "table remove", SINGLE),
+    "table_move": ("move (table)", "table move within its sheet", SINGLE),
 }
+
+
+def numbers_docs(record, docs, paths):
+    """numbers_unified_bench scenarios (records 0297, 0301, 0302)."""
+    out = []
+    for name, items in group_cases(docs, lambda s: s["name"]).items():
+        op, label, budget = NUMBERS_SCEN[name]
+        fixture = Path(items[0]["fixture"]).name
+        out.append(row(record, "numbers", op, label, fixture,
+                       us(med(i["leaf_median_ns"] for i in items)),
+                       us(med(i["unified_median_ns"] for i in items)),
+                       [i["ratio"] for i in items], budget, f"numbers:{name}", src(paths)))
+    return out
 
 
 @needs("0297")
 def p0297():
     path = RES / "0297" / "numbers-bench.jsonl"
-    docs = [d["scenarios"] for d in load_jsonl(path)]
-    out = []
-    for name, items in group_cases(docs, lambda s: s["name"]).items():
-        op, label, budget = NUMBERS_SCEN[name]
-        fixture = Path(items[0]["fixture"]).name
-        out.append(row("0297", "numbers", op, label, fixture,
-                       us(med(i["leaf_median_ns"] for i in items)),
-                       us(med(i["unified_median_ns"] for i in items)),
-                       [i["ratio"] for i in items], budget, f"numbers:{name}", src([path])))
+    return numbers_docs("0297", [d["scenarios"] for d in load_jsonl(path)], [path])
+
+
+NO_BUDGET_0298 = (None, "none (record 0298 §5: —)", "none")
+KEYNOTE_SCEN = {
+    "open": ("open", "open (in memory)", OPEN),
+    "open_get": ("open + get", "open + one element's text", OPEN),
+    "set": ("set", "set slide title", SINGLE),
+    "notes": ("set (notes)", "set speaker notes", SINGLE),
+    "frame": ("set (frame)", "set drawable frame", SINGLE),
+    "batch_1000": ("batch set", "batch 1000 (one File::edit vs one leaf edit)", BATCH),
+    "duplicate": ("add (duplicate slide)", "duplicate slide", NO_BUDGET_0298),
+    "add_slide": ("add (slide)", "add slide", NO_BUDGET_0298),
+    "add_textbox": ("add (text box)", "add text box", NO_BUDGET_0298),
+    "remove_slide": ("remove (slide)", "remove slide", NO_BUDGET_0298),
+}
+
+
+@needs("0298")
+def p0298():
+    return iwork_summary("0298", RES / "0298" / "keynote-bench-summary.jsonl",
+                         lambda f, s: "multi-slide.key", KEYNOTE_SCEN)
+
+
+@needs("0301")
+def p0301():
+    path = RES / "0301" / "numbers-structure-bench.jsonl"
+    return numbers_docs("0301", [d["scenarios"] for d in load_jsonl(path)], [path])
+
+
+@needs("0302")
+def p0302():
+    """Record 0302 measures base and after builds of each harness; the base
+    legs re-measure states earlier records carry, so only the after legs
+    are rows (record 0294's convention)."""
+    base = RES / "0302"
+    out = docx_fanout("0302", trials(base.glob("docx-after-*.json")))
+    odt = trials(base.glob("odt-after-*.txt"))
+    docs = [d["scenarios"] for p in odt for d in load_jsonl(p)]
+    for (scen, size), items in group_cases(docs, lambda s: (s["scenario"], s["size"])).items():
+        op, label = M4_FORMATS[scen]
+        out.append(row("0302", "odt", op, label, f"{size} paragraphs",
+                       med(i["leaf_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items),
+                       [i["ratio"] for i in items], SINGLE, f"m4_formats:{scen}:{size}",
+                       src(odt)))
+    out += iwork_summary("0302", trials(base.glob("pages-after-*.jsonl")),
+                         lambda f, s: "10,000-paragraph document")
+    numbers = trials(base.glob("numbers-after-*.json"))
+    out += numbers_docs("0302", [load_json(p)["scenarios"] for p in numbers], numbers)
+    out += rtf_destination("0302", trials((base / "rtf").glob("rtf-after-*.json")))
     return out
 
 
@@ -1298,11 +1367,97 @@ def p0299():
                          else "basic.pages")
 
 
+PPTX_GAPS = {
+    "pptx_slide_remove_owned": ("pptx", "remove (slide)",
+                                "remove slide 1 of 45545_Comment.pptx (notes, comments, VML, OLE)"),
+    "pptx_ole_remove": ("pptx", "remove (OLE frame)", "remove the OLE frame of ole.pptx"),
+    "pptx_section_move": ("pptx", "move (slide)", "move a slide of slide-sections.pptx"),
+    "pptx_slide_remove_plain": ("pptx", "remove (slide)",
+                                "remove dependency-free slide 6 of shapes.pptx"),
+    "pptx_slide_move_plain": ("pptx", "move (slide)", "move slide 1 after slide 2 of shapes.pptx"),
+    "pptx_shape_text_set": ("pptx", "set", "set one shape's text of shapes.pptx"),
+}
+
+
+@needs("0303")
+def p0303():
+    """pptx_gaps_bench ABBA JSONL: unified/native in the after build, and the
+    before/after builds on the plain paths (the base refuses the others)."""
+    path = RES / "0303" / "pptx-gaps-bench-abba.jsonl"
+    rows = [r for r in load_jsonl(path) if r.get("build") == "after" and "ratio" in r]
+    out = []
+    for scen, items in group_cases([rows], lambda r: r["scenario"]).items():
+        fmt, op, label = PPTX_GAPS[scen]
+        out.append(row("0303", fmt, op, label, "",
+                       med(i["native_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items),
+                       [i["ratio"] for i in items], SINGLE, f"pptx_gaps:{scen}",
+                       src([path]), comparison="unified/native"))
+    return out + abba_builds("0303", [path], PPTX_GAPS, "unified/native")
+
+
+TEXT_SET = {
+    "odt_plain": ("odt", "set (paragraph text)", "plain paragraph, 1,000 paragraphs"),
+    "odt_frames": ("odt", "set (paragraph text)", "paragraph with a frame"),
+    "pptx_shape": ("pptx", "set (shape text)", "shape text"),
+    "pptx_paragraph": ("pptx", "set (paragraph text)", "paragraph text"),
+    "pptx_cell": ("pptx", "set (table cell text)", "table cell text"),
+    "ppt_shape": ("ppt", "set (shape text)", "shape text"),
+    "docx_cell": ("docx", "set (table cell text)", "table cell text"),
+    "odp_shape": ("odp", "set (shape text)", "shape text"),
+}
+
+
+@needs("0304")
+def p0304():
+    """text_set_bench runs (record 0304): after/before per after run against
+    the median of the before runs, and unified/leaf where the run has a leaf
+    leg (ODT)."""
+    paths = trials((RES / "0304").glob("run*-*.json"))
+    runs = {"before": [], "after": []}
+    for p in paths:
+        runs["after" if p.stem.endswith("after") else "before"].append(load_json(p))
+    out = []
+    for scen, (fmt, op, label) in TEXT_SET.items():
+        before = [i["unified_us"] for doc in runs["before"] for i in doc if i["scenario"] == scen]
+        after = [i for doc in runs["after"] for i in doc if i["scenario"] == scen]
+        if not before or not after:
+            continue
+        base = med(before)
+        out.append(row("0304", fmt, op, label, "", base, med(i["unified_us"] for i in after),
+                       [i["unified_us"] / base for i in after], regression("0304"),
+                       f"text_set:{scen}", src(paths),
+                       comparison="after/before (unified leg)"))
+        paired = [i for i in after if i.get("leaf_us")]
+        if paired:
+            out.append(row("0304", fmt, op, label, "", med(i["leaf_us"] for i in paired),
+                           med(i["unified_us"] for i in paired),
+                           [i["unified_us"] / i["leaf_us"] for i in paired], SINGLE,
+                           f"text_set_unified:{scen}", src(paths)))
+    return out
+
+
+IWORK_0306 = {
+    "dir_open": ("open (package directory)", "open the package directory fixture", OPEN),
+    "file_open": ("open (path)", "open the single-file fixture from its path", OPEN),
+    "bytes_open": ("open (bytes)", "open in-memory bytes (leaf from shared bytes)", OPEN),
+    "bytes_open_options": ("open (bytes, leaf options)",
+                           "open in-memory bytes with the leaf options set", OPEN),
+}
+
+
+@needs("0306")
+def p0306():
+    return iwork_summary("0306", RES / "0306" / "iwork-directory-bench.jsonl",
+                         lambda f, s: {"pages": "basic.pages", "keynote": "basic.key",
+                                       "numbers": "basic.numbers"}[f], IWORK_0306)
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
-           p0293, p0295, p0296, p0297, p0299]
+           p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0306]
 
 
 # ---------------------------------------------------------------- merge
@@ -1483,7 +1638,8 @@ def to_md(rows, conflicts, agreements, cur):
       "`docs/unified-ops/results/` and the curated rows in "
       "`results/0289/bench-matrix-curated.json`. Do not edit by hand; "
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
-      "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294.")
+      "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
+      "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "

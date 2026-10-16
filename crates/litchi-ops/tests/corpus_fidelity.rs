@@ -19,6 +19,11 @@
 //! duplicated and a slide added and both removed, or a Numbers table added
 //! and removed, must read back with the same node texts.
 //!
+//! An iWork package directory (the app-authored bundle form, record 0306)
+//! is a corpus entry too: a copy of it goes through `open` → empty `edit`
+//! → `save()` in place, and every file of the saved bundle must equal the
+//! source file of the same name.
+//!
 //! An empty edit the leaf editor refuses (typed) is reported with its
 //! cause, and the file then goes through `open` → `save_as`, which must be
 //! exact too. The whole corpus runs in about 20 s in a debug build, so no
@@ -138,6 +143,14 @@ fn corpus() -> Vec<(String, u64)> {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
+                if is_bundle(&path) {
+                    let relative = path
+                        .strip_prefix(&root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned();
+                    found.push((relative, 0));
+                }
                 stack.push(path);
             } else if let Ok(meta) = entry.metadata() {
                 let relative = path
@@ -151,6 +164,94 @@ fn corpus() -> Vec<(String, u64)> {
     }
     found.sort();
     found
+}
+
+/// Whether `path` is an iWork package directory: a `.pages`, `.key` or
+/// `.numbers` directory holding `Index.zip`.
+fn is_bundle(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|extension| matches!(extension.to_str(), Some("pages" | "key" | "numbers")))
+        && path.join("Index.zip").is_file()
+}
+
+/// Every file below `root`, by `/`-separated relative name.
+fn bundle_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
+    fn walk(directory: &Path, prefix: &str, files: &mut BTreeMap<String, Vec<u8>>) {
+        for entry in std::fs::read_dir(directory).unwrap().flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let name = if prefix.is_empty() {
+                name
+            } else {
+                format!("{prefix}/{name}")
+            };
+            if entry.path().is_dir() {
+                walk(&entry.path(), &name, files);
+            } else {
+                files.insert(name, std::fs::read(entry.path()).unwrap());
+            }
+        }
+    }
+    let mut files = BTreeMap::new();
+    walk(root, "", &mut files);
+    files
+}
+
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap().flatten() {
+        let target = to.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+/// The no-op round trip of a package directory (record 0306): a copy is
+/// opened, edited with no mutation and saved in place; every saved file must
+/// equal its source.
+fn run_bundle(relative: &str, dir: &Path) -> Result<Outcome, String> {
+    let source = test_data().join(relative);
+    let copy = dir.join(format!(
+        "bundle.{}",
+        relative.rsplit('.').next().unwrap_or("bin")
+    ));
+    let _ = std::fs::remove_dir_all(&copy);
+    copy_tree(&source, &copy);
+    let file = guarded(|| open(&copy))?;
+    let format = file.format().map_or("other", name);
+    let (noop, detail) = match guarded(|| file.edit(|_| Ok(()))) {
+        Err(error) if untyped(&error) => ("error", format!("edit: {error}")),
+        Err(error) => ("refused", format!("edit: {error}")),
+        Ok(commit) => match guarded(|| commit.file.save()) {
+            Ok(_) => {
+                let (before, after) = (bundle_files(&source), bundle_files(&copy));
+                if before == after {
+                    ("exact", String::new())
+                } else {
+                    let changed: Vec<&String> = before
+                        .keys()
+                        .chain(after.keys())
+                        .filter(|name| before.get(*name) != after.get(*name))
+                        .collect();
+                    ("differs", format!("bundle files differ: {changed:?}"))
+                }
+            },
+            Err(error) if untyped(&error) => ("error", format!("save: {error}")),
+            Err(error) => ("refused", format!("save: {error}")),
+        },
+    };
+    let _ = std::fs::remove_dir_all(&copy);
+    Ok(Outcome {
+        format,
+        noop,
+        detail,
+        revert: "-",
+        revert_detail: String::new(),
+        structure: "-",
+        structure_detail: String::new(),
+    })
 }
 
 /// The outcome of one file.
@@ -467,6 +568,9 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
 /// does not open as a claimed format.
 fn run(relative: &str, dir: &Path) -> Result<Outcome, String> {
     let path = test_data().join(relative);
+    if path.is_dir() {
+        return run_bundle(relative, dir);
+    }
     let input = std::fs::read(&path).map_err(|error| error.to_string())?;
     let file = guarded(|| open(&path))?;
     let format = file.format().map_or("other", name);

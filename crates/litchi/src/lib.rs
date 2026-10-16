@@ -174,8 +174,9 @@
 //! `File::Pages`, `File::Keynote` and `File::Numbers` (the `pages`, `keynote`
 //! and `numbers` features): paths, queries, views, the leaves' focused writes
 //! and atomic saves, like every other format (record 0296). An app-authored
-//! package *directory* is refused with [`Code::UnsupportedFormat`]; the
-//! read-only `litchi::iwork::Document` (the `iwork` feature) reads it.
+//! package *directory* opens the same way, as its single-file form, and
+//! `save()` writes it back as a directory (record 0306). The `iwork` feature
+//! enables all three formats.
 //!
 //! # Unified operations
 //!
@@ -637,14 +638,6 @@ pub mod numbers {
         }
     }
 }
-
-/// Format-neutral, bounded Apple iWork reading APIs.
-///
-/// This facade detects Pages, Keynote, and Numbers from one immutable package
-/// snapshot, then publishes only archive-free semantic values. Enable the
-/// aggregate `iwork` feature to use it.
-#[cfg(feature = "iwork")]
-pub mod iwork;
 
 /// OpenDocument Presentation (`.odp`) package and semantic APIs.
 #[cfg(feature = "odp")]

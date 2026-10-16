@@ -206,6 +206,25 @@ class RustdocTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "glob target requires module"):
             gate.violations(doc, profile())
 
+    def test_a_delegated_external_glob_is_left_to_its_crate_profile(self):
+        # Record 0306: the facade re-exports leaf crates by glob; a profile
+        # names the crates whose own profiles check those names.
+        doc = copy.deepcopy(self.document)
+        use = next(v["inner"]["use"] for v in doc["index"].values()
+                   if v.get("inner", {}).get("use", {}).get("is_glob"))
+        use["id"] = "external-module"
+        doc["paths"]["external-module"] = {
+            "crate_id": 99, "kind": "module", "path": ["external", "module"],
+        }
+        self.assertEqual(gate.violations(doc, profile(delegated_globs=["external"])), [])
+        with self.assertRaisesRegex(ValueError, "glob target requires module"):
+            gate.violations(doc, profile(delegated_globs=["other"]))
+
+    def test_delegated_globs_must_be_crate_names(self):
+        policy = {"version": 1, "profiles": [profile(delegated_globs=["not a crate"])]}
+        with self.assertRaisesRegex(ValueError, "delegated_globs"):
+            gate.checked_policy(policy)
+
     def test_rustdoc_opaque_signature_ids_do_not_imply_missing_local_types(self):
         doc = copy.deepcopy(self.document)
         function = next(v for v in doc["index"].values() if v.get("name") == "foreign")

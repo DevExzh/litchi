@@ -710,7 +710,11 @@ def add_iwa_shared_image_adjustments_scaffold(
         )
         package.write_text(
             ("#[cfg(feature = \"internal-iwork-source\")]\n" if semantic_module_gate else "")
-            + ("pub(crate) mod image_adjustments;\n" if w1_family else "mod image_adjustments;\n")
+            + (
+                "pub(crate) mod image_adjustments;\n"
+                if ecosystem in ("Pages", "Keynote")
+                else "mod image_adjustments;\n"
+            )
             + semantic_reexport
             + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
             + ("" if missing_hidden_gate else "#[doc(hidden)]\n")

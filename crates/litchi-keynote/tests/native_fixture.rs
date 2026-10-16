@@ -256,13 +256,86 @@ fn focused_reader_surface_is_exact_shareable_and_archive_free()
     Ok(())
 }
 
+/// Every file below `root`, by `/`-separated relative name.
+fn bundle_files(
+    root: &std::path::Path,
+) -> Result<std::collections::BTreeMap<String, Vec<u8>>, Box<dyn std::error::Error>> {
+    fn walk(
+        directory: &std::path::Path,
+        prefix: &str,
+        files: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for entry in std::fs::read_dir(directory)? {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let name = if prefix.is_empty() {
+                name
+            } else {
+                format!("{prefix}/{name}")
+            };
+            if entry.file_type()?.is_dir() {
+                walk(&entry.path(), &name, files)?;
+            } else {
+                files.insert(name, std::fs::read(entry.path())?);
+            }
+        }
+        Ok(())
+    }
+    let mut files = std::collections::BTreeMap::new();
+    walk(root, "", &mut files)?;
+    Ok(files)
+}
+
 #[test]
-fn focused_package_refuses_directory_backing_without_treating_index_as_complete()
--> Result<(), Box<dyn std::error::Error>> {
-    let options = OpenOptions::default();
-    let error = Package::open_with_options(directory_fixture_path(), options)
-        .expect_err("focused exact-package reader must refuse a directory bundle");
-    assert!(matches!(error, litchi_keynote::ReadError::Io(_)));
+fn package_directories_convert_and_save_back_byte_exactly() -> Result<(), Box<dyn std::error::Error>>
+{
+    // A directory bundle converts to an exact-source single-file package.
+    let package = Package::open_with_options(directory_fixture_path(), OpenOptions::default())?;
+    package.validate()?;
+    assert_eq!(package.text()?, EXPECTED_TEXT);
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    let reopened = Package::from_bytes(&bytes)?;
+    assert_eq!(reopened.text()?, EXPECTED_TEXT);
+    // Deterministic: a second capture converts to the same bytes.
+    let mut again = Vec::new();
+    Package::open(directory_fixture_path())?.write_to(&mut again)?;
+    assert_eq!(again, bytes);
+
+    // Saved back as a directory, every bundle file is the source's bytes.
+    let temp = tempfile::tempdir()?;
+    let path = temp.path().join("bundle.key");
+    package.save_directory(&path)?;
+    assert_eq!(
+        bundle_files(&path)?,
+        bundle_files(&directory_fixture_path())?
+    );
+    let mut round_trip = Vec::new();
+    Package::open(&path)?.write_to(&mut round_trip)?;
+    assert_eq!(round_trip, bytes);
+
+    // Saving over the existing directory replaces it, leaving no staging
+    // or retired directory behind; a file destination is refused.
+    let single = Package::open(fixture_path())?;
+    single.save_directory(&path)?;
+    assert_eq!(Package::open(&path)?.text()?, EXPECTED_TEXT);
+    assert_eq!(std::fs::read_dir(temp.path())?.count(), 1);
+    let file = temp.path().join("file.key");
+    single.save(&file)?;
+    assert!(matches!(
+        single.save_directory(&file),
+        Err(litchi_keynote::SaveError::Publication(_))
+    ));
+
+    // The capture is bounded by the selected source limits.
+    let limits = SourceLimits::builder().max_input_bytes(1024)?.build()?;
+    assert!(
+        Package::open_with_options(
+            directory_fixture_path(),
+            OpenOptions::default().source_limits(limits)
+        )
+        .is_err()
+    );
     Ok(())
 }
 

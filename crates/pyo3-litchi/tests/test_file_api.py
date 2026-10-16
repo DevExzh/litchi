@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 import unittest
 import warnings
@@ -197,34 +198,31 @@ class OpenTests(ErrorAssertions):
                 self.assertEqual(file.get(path, 0)["text"], text)
                 self.assertEqual(file.to_bytes(), read_fixture(relative))
 
-    def test_pages_package_directory_opens_as_a_single_file_package(self):
-        # Record 0299: the Pages leaf converts the app-authored directory to
-        # its single-file form; the handle has no origin, so it saves with
-        # save_as.
-        directory = TEST_DATA / "iwork/directory/pages/basic.pages"
-        self.assertTrue(directory.is_dir(), directory)
-        file = L.open(str(directory))
-        self.assertEqual(str(file.format), "Pages")
-        single = open_fixture("iwork/pages/basic.pages")
-        self.assertEqual(file.get("/body/p[1]", 0)["text"], single.get("/body/p[1]", 0)["text"])
-
-    def test_iwork_package_directory_refusal_names_the_family_opener(self):
-        # The Keynote and Numbers leaves edit and save only single-file
-        # packages; the family classes read the app-authored directory form.
-        for relative, name, opener in (
-            ("iwork/directory/keynote/basic.key", "Keynote", "Presentation.open"),
-            ("iwork/directory/numbers/basic.numbers", "Numbers", "Workbook.open"),
+    def test_iwork_package_directories_open_and_save_back_in_place(self):
+        # Records 0299, 0301 and 0306: every iWork leaf converts the
+        # app-authored directory to its single-file form; the directory is
+        # the origin, so save() writes the bundle back.
+        for relative, single, name, path in (
+            ("iwork/directory/pages/basic.pages", "iwork/pages/basic.pages", "Pages", "/body/p[1]"),
+            ("iwork/directory/keynote/basic.key", "iwork/keynote/basic.key", "Keynote",
+             "/slide[1]/placeholder[title]"),
+            ("iwork/directory/numbers/basic.numbers", "iwork/numbers/basic.numbers", "Numbers",
+             "/sheet[1]/table[1]/B2"),
         ):
             with self.subTest(fixture=relative):
                 directory = TEST_DATA / relative
                 self.assertTrue(directory.is_dir(), directory)
-                error = raised(lambda: L.open(str(directory)))
-                self.assertError(
-                    error, L.UnsupportedError, "unsupported_format", f"open it with {opener}"
-                )
-                self.assertEqual(
-                    error.message, f"detected {name}, which this operation does not handle"
-                )
+                file = L.open(str(directory))
+                self.assertEqual(str(file.format), name)
+                self.assertEqual(file.get(path, 0)["text"], open_fixture(single).get(path, 0)["text"])
+                with tempfile.TemporaryDirectory() as temp:
+                    copy = os.path.join(temp, os.path.basename(relative))
+                    shutil.copytree(directory, copy)
+                    key = "value" if name == "Numbers" else "text"
+                    edited = L.open(copy).set(path, {key: "Saved in place"})
+                    edited.save()
+                    self.assertTrue(os.path.isfile(os.path.join(copy, "Index.zip")))
+                    self.assertEqual(L.open(copy).get(path, 0)["text"], "Saved in place")
 
     def test_open_takes_a_path(self):
         for argument in (None, 42, [fixture(HYPERLINK)]):

@@ -49,7 +49,10 @@ impl Package {
     /// with a typed unsafe-edit error, and a projection error is returned as
     /// is. Payloads that never mention the namespace, bind it without using
     /// it, or carry valid `mc:Ignorable` directives that hide nothing a
-    /// reader sees are admitted.
+    /// reader sees are admitted, and so are payloads whose only selections
+    /// are `mc:AlternateContent` wrappers inside runs (a drawing or text box
+    /// with a fallback; record 0307), each an opaque inline object to the
+    /// snapshot's edits.
     ///
     /// The snapshot shares the main part's payload allocation instead of
     /// copying it. `Part::set_blob` and `set_blob_shared` replace the part's

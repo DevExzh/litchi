@@ -609,6 +609,12 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - the coordinator watches `MemAvailable` (alert below 16 GB) and free disk.
 - Resumed: `iwork-found` (0296), `checklist-fixes` (0290), `perf-path` (0291), `producer-structure` (0293). Held: `odf-verbs` (0292), `acceptance2` (0294), `m4-ext` (0295).
 
+## Incident (2026-10-16): coordinator session lost to an OOM kill
+The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were running.
+- Cause, now confirmed: the user journal shows a kernel OOM kill in the session's tmux scope (memory peak 106.8 GB). That scope has `OOMPolicy=stop`, so systemd stopped the whole scope, coordinator included. The policy cannot be changed at runtime.
+- Mitigation: a coordinator-side cargo shim (`.coord/bin/cargo`) runs every cargo command in its own `systemd-run --user --scope` with `OOMPolicy=continue` and `MemoryMax=26G`. An OOM now kills only that command. Every agent env, the gate and the rebless scripts put the shim first on `PATH`, and the agent rules require the same scoping for valgrind and perf.
+- Resumed all four agents.
+
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
   - `File::metadata()` reports `dc:language` for every ODF format (six Markdown golden rows updated);
@@ -721,6 +727,19 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - a format × content × behaviour audit test for every format;
   - `Leaf::{Pptx, Xlsx}` boxed (combined-feature clippy clean).
   - Open: ODT plain-paragraph sets are 3.4–4.7% slower in wall time with +0.22% instructions (unexplained, under the 5% trigger), and the F1/F3–F6 notes in the record.
+
+- Merged `docx-mc` (0307):
+  - DOCX documents with run-level `mc:AlternateContent` are admitted (new `admit_held` proof); block positions are proven, so set/remove/add/move work;
+  - each wrapper is one opaque object to find, merge and text sets; a text set over a text box is refused with a typed error;
+  - compactor whitespace-reference bug fixed; DOCX fidelity refusals 1 → 0.
+  - Finding: unified DOCX text set and add on a 1,000-paragraph document are 2.5× and 2.1× the leaf, handed to 0305.
+  - Merge fix: the boundary test scaffold now matches 0298's `pub(crate) mod` (failing on trunk since 0298; the gate now runs the boundary and non-iWork unit tests).
+- Merged `iwork-facade` (0306) — **plan step 28 done**:
+  - `litchi::iwork::Document` is deleted and every caller (facade, Python, CLI, examples, fuzz, docs) uses `File`; the glossary bans the old names;
+  - Keynote and Numbers package directories open and save back as directories through the shared `litchi_iwa_archive::bundle`;
+  - `OpenOptions::{pages,keynote,numbers}_options` reach the leaves;
+  - bench matrix parsers through 0307 (1,522 rows, 102 open misses).
+  - Open: Keynote bytes open 5.3% over a no-copy leaf; loose `Index/` bundles save in the `Index.zip` layout.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 

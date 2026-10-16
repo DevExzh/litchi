@@ -658,6 +658,59 @@ fn debug_assert_reused_body_index(
     );
 }
 
+/// The element a main document's opaque alternate content lies in: a
+/// WordprocessingML run, Transitional or Strict (record 0307).
+const RUN_HOLDER: litchi_ooxml_common::mce::admission::Holder<'static> =
+    litchi_ooxml_common::mce::admission::Holder {
+        namespaces: &[
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        ],
+        local: "r",
+    };
+
+/// Whether every `mc:AlternateContent` of a main-document payload lies
+/// inside a run, and everything outside those wrappers agrees with the
+/// visible projection as the shared admission proof states, with at least
+/// one wrapper (record 0307).
+///
+/// The projection replaces each wrapper, inside its run, with the content
+/// of the branch it selects, so every block and every run keeps its parent
+/// and its order: raw and visible positions agree. The proof does not cover
+/// processing inside the wrappers; a caller runs the projection, which
+/// fails on a malformed wrapper.
+pub(crate) fn holds_run_alternate_content(raw: &[u8]) -> bool {
+    litchi_ooxml_common::mce::admission::admit_held(
+        raw,
+        &visible_document_capabilities(),
+        &litchi_ooxml_common::mce::Limits::default(),
+        RUN_HOLDER,
+    )
+    .is_ok_and(|held| held.wrappers > 0)
+}
+
+/// How [`admit_document_source`] admitted a main-document part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SourceAdmission {
+    /// The shared admission proof holds for the whole part.
+    Proven(litchi_ooxml_common::mce::admission::Admission),
+    /// Every `mc:AlternateContent` lies inside a run
+    /// ([`holds_run_alternate_content`]) and the projection succeeds. The
+    /// transaction scanners treat each wrapper as one opaque inline object.
+    RunAlternateContent,
+}
+
+impl SourceAdmission {
+    /// Whether the projection differs from the part only in spelling and in
+    /// the document element's `Ignorable` attribute.
+    pub(crate) const fn is_lexical(self) -> bool {
+        match self {
+            Self::Proven(admission) => admission.is_lexical(),
+            Self::RunAlternateContent => false,
+        }
+    }
+}
+
 /// Admit a main-document part to a transaction that reads and publishes its
 /// source bytes while readers see the visible projection.
 ///
@@ -673,34 +726,44 @@ fn debug_assert_reused_body_index(
 /// foreign markup as opaque, as the projection drops it, so positions, text
 /// and every WordprocessingML element and attribute agree.
 ///
-/// A part the proof cannot admit keeps the historical answer: the projection
-/// runs, its error is returned as is (for example an unsatisfiable
-/// `MustUnderstand`), and a projection that differs from the source is
-/// refused as an unsafe edit with `reason`. Decisions are made on decoded
-/// names, so a namespace declaration that spells the namespace with
-/// character references is a binding like any other.
+/// A part the proof cannot admit runs the projection, whose error is
+/// returned as is (for example an unsatisfiable `MustUnderstand`). A
+/// projection equal to the source is admitted. One that differs is admitted
+/// when its only selections are `mc:AlternateContent` wrappers inside runs
+/// (record 0307: drawings and text boxes with a fallback), which the
+/// transaction treats as opaque inline objects: their branches' text is
+/// never document text to an edit, and an edit that would have to replace
+/// it is refused. Everything else is refused as an unsafe edit with
+/// `reason`. Decisions are made on decoded names, so a namespace declaration
+/// that spells the namespace with character references is a binding like
+/// any other.
 ///
 /// # Errors
 ///
 /// Returns the projection's markup-compatibility error, or
 /// [`crate::Error::UnsafeEdit`] for a part whose projection selects, unwraps
-/// or hides content.
+/// or hides content outside run-level alternate content.
 pub(crate) fn admit_document_source(
     raw: &[u8],
     operation: &'static str,
     reason: &'static str,
-) -> Result<litchi_ooxml_common::mce::admission::Admission> {
+) -> Result<SourceAdmission> {
     use litchi_ooxml_common::mce;
 
     if !mce::mentions_namespace(raw) {
-        return Ok(mce::admission::Admission::Unbound);
+        return Ok(SourceAdmission::Proven(mce::admission::Admission::Unbound));
     }
     let capabilities = visible_document_capabilities();
     let limits = mce::Limits::default();
     match mce::admission::admit(raw, &capabilities, &limits) {
-        Ok(admission) => Ok(admission),
+        Ok(admission) => Ok(SourceAdmission::Proven(admission)),
         Err(_) => match mce::process_markup_compatibility(raw, &capabilities, &limits)?.xml {
-            std::borrow::Cow::Borrowed(_) => Ok(mce::admission::Admission::Unbound),
+            std::borrow::Cow::Borrowed(_) => {
+                Ok(SourceAdmission::Proven(mce::admission::Admission::Unbound))
+            },
+            std::borrow::Cow::Owned(_) if holds_run_alternate_content(raw) => {
+                Ok(SourceAdmission::RunAlternateContent)
+            },
             std::borrow::Cow::Owned(_) => Err(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
