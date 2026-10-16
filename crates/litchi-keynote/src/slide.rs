@@ -2,7 +2,9 @@
 
 pub mod audio;
 pub mod comment;
+pub mod creation;
 pub mod delete;
+pub mod drawable;
 pub mod image;
 pub mod media;
 pub mod movie;
@@ -382,6 +384,21 @@ impl Builder {
             transition: self.transition,
         }
     }
+}
+
+/// Exact-source transactions for one slide's speaker notes.
+pub mod notes {
+    pub use crate::package::slide_notes::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+}
+
+/// Exact-source transactions reordering slides.
+pub mod order {
+    pub use crate::package::slide_order::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+}
+
+/// Exact-source transactions for one slide's title or body text.
+pub mod text {
+    pub use crate::package::slide_text::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 }
 
 #[cfg(test)]

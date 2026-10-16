@@ -187,10 +187,10 @@ fn native_metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
     Ok(tsp::PackageMetadata::decode(payload.as_slice())?)
 }
 
-fn metadata_component<'a>(
-    metadata: &'a tsp::PackageMetadata,
+fn metadata_component(
+    metadata: &tsp::PackageMetadata,
     identifier: u64,
-) -> TestResult<&'a tsp::ComponentInfo> {
+) -> TestResult<&tsp::ComponentInfo> {
     metadata
         .components
         .iter()
@@ -199,10 +199,7 @@ fn metadata_component<'a>(
         .map_err(Into::into)
 }
 
-fn data_record<'a>(
-    metadata: &'a tsp::PackageMetadata,
-    identifier: u64,
-) -> TestResult<&'a tsp::DataInfo> {
+fn data_record(metadata: &tsp::PackageMetadata, identifier: u64) -> TestResult<&tsp::DataInfo> {
     metadata
         .datas
         .iter()
@@ -1154,7 +1151,7 @@ fn audio_position_validates_build_payload_before_admitting_its_header_edge() -> 
     let forged_package = Package::from_bytes(&forged)?;
     assert!(matches!(
         forged_package.edit_slide_audio_position(SlideSelector::index(0), selector),
-        Err(litchi_keynote::SlideAudioPositionError::UnsupportedDependency),
+        Err(litchi_keynote::slide::audio::position::Error::UnsupportedDependency),
     ));
     assert_eq!(package_bytes(&forged_package)?, forged);
     Ok(())

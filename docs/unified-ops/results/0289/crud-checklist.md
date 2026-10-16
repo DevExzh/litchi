@@ -34,7 +34,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | odm | 22 | 205 | 184 | 0 | 17 | 0 | 37 | 26 | 2 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 11 | 85 | 85 | 0 | 0 | 0 | 36 | 2 | 14 |
-| keynote | 4 | 26 | 21 | 1 | 4 | 12 | 10 | 0 | 1 |
+| keynote | 16 | 122 | 113 | 0 | 9 | 0 | 54 | 14 | 4 |
 | numbers | 5 | 41 | 41 | 0 | 0 | 5 | 14 | 1 | 1 |
 
 ## docx
@@ -567,15 +567,27 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## keynote
 
-- fixtures: `iwork/keynote/basic.key`
-- document views on `iwork/keynote/basic.key`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- fixtures: `create()`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`
+- document views on `iwork/keynote/multi-slide.key`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| presentation | ok | ok | n/a | ok | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
-| slide | ok | ok | ok | ok | ok | gap | FAIL | no pair | gap | ok | ok | gap | ok |
-| placeholder | ok | ok | ok | ok | ok | gap | n/a | refused | gap | ok | ok | gap | ok |
-| notes | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| presentation | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| placeholder | ok | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | ok | ok | ok |
+| notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| run | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| shape | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| picture | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| connector | unreached | unreached | unreached | unreached | n/a | n/a | unreached | no pair | no pair | n/a | n/a | ok | ok |
+| video | ok | ok | ok | ok | n/a | n/a | n/a | ok | ok | n/a | n/a | ok | ok |
+| audio | ok | ok | ok | ok | n/a | n/a | n/a | ok | ok | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| tc | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| group | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 
 ## numbers
 

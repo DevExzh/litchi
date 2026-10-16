@@ -347,7 +347,16 @@ impl Iwork {
         {
             self.expand_all();
         }
-        #[cfg(not(feature = "pages"))]
+        // Keynote character runs join the tree under their paragraphs
+        // (record 0298).
+        #[cfg(feature = "keynote")]
+        if self.0.full.get().is_none()
+            && matches!(self.0.owner, Owner::Keynote(_))
+            && self.tree().item(parent).type_name() == "paragraph"
+        {
+            self.expand_all();
+        }
+        #[cfg(not(any(feature = "pages", feature = "keynote")))]
         let _ = parent;
     }
 
@@ -361,9 +370,21 @@ impl Iwork {
                     error: None,
                 });
             },
+            #[cfg(feature = "keynote")]
+            Owner::Keynote(package) => {
+                self.0
+                    .full
+                    .get_or_init(|| match keynote::build_full(package) {
+                        Ok(tree) => Built { tree, error: None },
+                        Err(error) => Built {
+                            tree: Tree::root_only(),
+                            error: Some(error),
+                        },
+                    });
+            },
             #[allow(
                 unreachable_patterns,
-                reason = "only the Pages tree builds children on demand"
+                reason = "only the Pages and Keynote trees build children on demand"
             )]
             _ => {},
         }
@@ -503,9 +524,8 @@ impl Iwork {
         Ok(written)
     }
 
-    /// A fresh package of `format`: the Pages (record 0299) and Numbers
-    /// (record 0297) leaves' deterministic `Package::new()`; Keynote has no
-    /// from-scratch builder yet (`IWORK_API_REQUESTS.md` request 1).
+    /// A fresh package of `format`: the Pages (record 0299), Numbers (record
+    /// 0297) and Keynote (record 0298) leaves' deterministic `Package::new()`.
     pub(crate) fn create(format: FileFormat, options: &crate::CreateOptions) -> Result<Self> {
         #[cfg(feature = "numbers")]
         if format == FileFormat::Numbers {
@@ -520,9 +540,14 @@ impl Iwork {
                 .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?;
             return Ok(Self::from_owner(Owner::Pages(package), None));
         }
+        #[cfg(feature = "keynote")]
+        if format == FileFormat::Keynote {
+            let package = litchi_keynote::Package::new();
+            return Ok(Self::from_owner(Owner::Keynote(package), None));
+        }
         Err(Error::new(
             crate::Code::UnsupportedCapability,
-            "creating a Keynote document from scratch needs a leaf `Package::new()`, which that owner does not have yet",
+            "this build cannot create the format from scratch",
         )
         .with_format(format)
         .with_suggestion("open an existing package and edit it"))

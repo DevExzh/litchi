@@ -7,15 +7,15 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::wire::patch_varint_field;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, ReadError, strict_slide_node_skipped};
 use crate::{SlideSelector, SlideSelectorError};
 
 /// An error raised while staging or committing a Keynote slide-state edit.
-#[derive(Debug, Error)]
+#[derive(Debug, ThisError)]
 #[non_exhaustive]
-pub enum EditError {
+pub enum Error {
     /// The immutable source package could not provide its semantic snapshot.
     #[error(transparent)]
     Read(#[from] ReadError),
@@ -63,6 +63,17 @@ pub enum EditError {
     PatchConflict,
 }
 
+/// A resource bounded by the primary slide-state transaction.
+///
+/// The transaction stages exactly one fixed-size skip/include rewrite and
+/// bounds no resource of its own: package ingress and archive ceilings are
+/// reported through [`ReadError`] and the archive, IWA and wire variants of
+/// [`Error`]. The enum is non-exhaustive so a future bounded operation can
+/// name its dimension without a breaking change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
 #[derive(Debug, Clone, Copy)]
 struct SkipIntent {
     position: Position,
@@ -100,16 +111,16 @@ impl<'a> Edit<'a> {
         &mut self,
         selector: impl Into<SlideSelector<'selector>>,
         is_skipped: bool,
-    ) -> Result<&mut Self, EditError> {
+    ) -> Result<&mut Self, Error> {
         if self.intent.is_some() {
-            return Err(EditError::OperationAlreadyStaged);
+            return Err(Error::OperationAlreadyStaged);
         }
 
         let semantic_selector = selector.into();
         let selected = self.source.show()?.select_slide(semantic_selector)?;
         let slide = selected.ok_or(match semantic_selector {
-            SlideSelector::Name(_) => EditError::SlideNameNotFound,
-            SlideSelector::Position(position) => EditError::SlidePositionNotFound { position },
+            SlideSelector::Name(_) => Error::SlideNameNotFound,
+            SlideSelector::Position(position) => Error::SlidePositionNotFound { position },
         })?;
         self.intent = Some(SkipIntent {
             position: Position::new(slide.index()),
@@ -127,7 +138,7 @@ impl<'a> Edit<'a> {
     pub fn skip_slide<'selector>(
         &mut self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<&mut Self, EditError> {
+    ) -> Result<&mut Self, Error> {
         self.set_slide_skipped(selector, true)
     }
 
@@ -139,7 +150,7 @@ impl<'a> Edit<'a> {
     pub fn include_slide<'selector>(
         &mut self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<&mut Self, EditError> {
+    ) -> Result<&mut Self, Error> {
         self.set_slide_skipped(selector, false)
     }
 
@@ -153,8 +164,8 @@ impl<'a> Edit<'a> {
     ///
     /// Returns an error without modifying the source when staging is empty or
     /// any wire, IWA, ZIP, limit, or readback invariant fails.
-    pub fn commit(self) -> Result<Commit, EditError> {
-        let intent = self.intent.ok_or(EditError::NoStagedOperation)?;
+    pub fn commit(self) -> Result<Commit, Error> {
+        let intent = self.intent.ok_or(Error::NoStagedOperation)?;
         let source_fingerprint = fingerprint(self.source.source_bytes());
         if intent.before == intent.after {
             return Ok(Commit {
@@ -290,26 +301,26 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`EditError::PatchConflict`] when this is not the exact patch
+    /// Returns [`Error::PatchConflict`] when this is not the exact patch
     /// source, or another validation error when the retained target is invalid
     /// under this package's limits.
-    pub fn apply(&self, patch: &Patch) -> Result<Commit, EditError> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit, Error> {
         if fingerprint(self.source_bytes()) != patch.source_fingerprint
             || self.source_bytes() != patch.source.as_ref()
         {
-            return Err(EditError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
 
         let source_slide = self
             .show()?
             .select_slide(patch.position)?
-            .ok_or(EditError::PatchConflict)?;
+            .ok_or(Error::PatchConflict)?;
         if source_slide.is_skipped() != patch.before {
-            return Err(EditError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             if patch.source.as_ref() != patch.target.as_ref() {
-                return Err(EditError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
             return Ok(Commit {
                 package: self.snapshot(),
@@ -323,7 +334,7 @@ impl Package {
         }
 
         if fingerprint(&patch.target) != patch.target_fingerprint {
-            return Err(EditError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate =
             Package::from_source_with_options(Arc::clone(&patch.target), self.state.options)?;
@@ -332,11 +343,11 @@ impl Package {
             candidate
                 .show()?
                 .select_slide(patch.position)?
-                .ok_or(EditError::Verification {
+                .ok_or(Error::Verification {
                     reason: "patch target slide position is missing",
                 })?;
         if target_slide.is_skipped() != patch.after {
-            return Err(EditError::Verification {
+            return Err(Error::Verification {
                 reason: "patch target semantic skip state is invalid",
             });
         }
@@ -415,13 +426,12 @@ impl Commit {
     }
 }
 
-fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, EditError> {
-    let record =
-        source
-            .slide_record_at(intent.position.get())?
-            .ok_or(EditError::InvalidTarget {
-                reason: "resolved semantic slide has no native slide-node record",
-            })?;
+fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, Error> {
+    let record = source
+        .slide_record_at(intent.position.get())?
+        .ok_or(Error::InvalidTarget {
+            reason: "resolved semantic slide has no native slide-node record",
+        })?;
 
     let mut components = source
         .state
@@ -429,11 +439,11 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
         .components()
         .iter()
         .filter(|component| component.archive().object(record.node_identifier).is_some());
-    let component = components.next().ok_or(EditError::InvalidTarget {
+    let component = components.next().ok_or(Error::InvalidTarget {
         reason: "slide-node component is missing",
     })?;
     if components.next().is_some() {
-        return Err(EditError::InvalidTarget {
+        return Err(Error::InvalidTarget {
             reason: "slide-node component is ambiguous",
         });
     }
@@ -443,11 +453,11 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(EditError::InvalidTarget {
+        .ok_or(Error::InvalidTarget {
             reason: "slide-node package member is missing",
         })?;
     if entry.is_opaque() {
-        return Err(EditError::InvalidTarget {
+        return Err(Error::InvalidTarget {
             reason: "slide-node package member uses unsupported compression",
         });
     }
@@ -460,7 +470,7 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
     let object = archive
         .object(record.node_identifier)
-        .ok_or(EditError::InvalidTarget {
+        .ok_or(Error::InvalidTarget {
             reason: "selected slide node disappeared from its component",
         })?;
     let mut messages = object
@@ -468,11 +478,11 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
         .iter()
         .enumerate()
         .filter(|(_index, message)| message.type_ == 4);
-    let (message_index, message) = messages.next().ok_or(EditError::InvalidTarget {
+    let (message_index, message) = messages.next().ok_or(Error::InvalidTarget {
         reason: "selected slide node has no type-4 payload",
     })?;
     if messages.next().is_some() {
-        return Err(EditError::InvalidTarget {
+        return Err(Error::InvalidTarget {
             reason: "selected slide node has multiple type-4 payloads",
         });
     }
@@ -480,25 +490,25 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     let wire_limits = source.wire_limits()?;
     let physical_before = strict_slide_node_skipped(&message.data, wire_limits)?;
     if physical_before != intent.before {
-        return Err(EditError::InvalidTarget {
+        return Err(Error::InvalidTarget {
             reason: "selected slide-node wire state disagrees with the base snapshot",
         });
     }
     let patched = patch_varint_field(&message.data, 4, true, Some(u64::from(intent.after)))?;
     if patched.len() != message.data.len() {
-        return Err(EditError::InvalidTarget {
+        return Err(Error::InvalidTarget {
             reason: "Boolean slide-state rewrite changed payload length",
         });
     }
     if strict_slide_node_skipped(&patched, wire_limits)? != intent.after {
-        return Err(EditError::Verification {
+        return Err(Error::Verification {
             reason: "rewritten slide-node wire value was not retained",
         });
     }
 
     archive
         .object_mut(record.node_identifier)
-        .ok_or(EditError::InvalidTarget {
+        .ok_or(Error::InvalidTarget {
             reason: "selected slide node disappeared during staging",
         })?
         .replace_message_with_limits(
@@ -518,15 +528,14 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
 
     let candidate = Package::from_source_with_options(output.into(), source.state.options)?;
     candidate.validate()?;
-    let readback =
-        candidate
-            .show()?
-            .select_slide(intent.position)?
-            .ok_or(EditError::Verification {
-                reason: "committed slide position is missing",
-            })?;
+    let readback = candidate
+        .show()?
+        .select_slide(intent.position)?
+        .ok_or(Error::Verification {
+            reason: "committed slide position is missing",
+        })?;
     if readback.is_skipped() != intent.after {
-        return Err(EditError::Verification {
+        return Err(Error::Verification {
             reason: "committed semantic skip state does not match the request",
         });
     }

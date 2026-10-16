@@ -15,7 +15,9 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd};
-use litchi_keynote::{MediaPart, MovieKind, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{
+    MovieKind, MovieSelector, Package, SlideSelector, slide::media::data::MediaPart,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

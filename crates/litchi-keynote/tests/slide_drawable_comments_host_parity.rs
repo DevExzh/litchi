@@ -456,11 +456,9 @@ fn append_comment_reference(payload: &[u8], path: &[u32], identifier: u64) -> Te
         append_length_delimited_field(&mut output, field_number, &reference)?;
         return Ok(output);
     }
-    Ok(transform_length_delimited_field(
-        payload,
-        field_number,
-        |nested| append_comment_reference(nested, remainder, identifier),
-    )?)
+    transform_length_delimited_field(payload, field_number, |nested| {
+        append_comment_reference(nested, remainder, identifier)
+    })
 }
 
 fn attach_comment(source: &[u8], entry: &DrawableEntry, comment_id: u64) -> TestResult<Vec<u8>> {
@@ -529,11 +527,11 @@ fn append_reply_and_second_root(
     let second_root_identifier = reply_identifier
         .checked_add(1)
         .ok_or_else(|| io::Error::other("second root identifier overflow"))?;
-    let author = root.author.clone();
+    let author = root.author;
     let reply_payload = tsd::CommentStorageArchive {
         text: Some("shared reply branch".to_owned()),
         creation_date: Some(tsp::Date { seconds: 42.5 }),
-        author: author.clone(),
+        author,
         storage_uuid: Some(tsp::Uuid {
             lower: 0x1111_2222_3333_4444,
             upper: 0x5555_6666_7777_8888,
@@ -595,7 +593,6 @@ fn append_reply_and_second_root(
             lower: 0x9999_aaaa_bbbb_cccc,
             upper: 0xdddd_eeee_ffff_0001,
         }),
-        ..Default::default()
     }
     .encode_to_vec();
     let mut second_root = ArchiveObject::new(

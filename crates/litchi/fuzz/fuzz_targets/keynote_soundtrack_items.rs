@@ -17,7 +17,7 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    Limits, Package, Position, ReadOptions, SemanticLimits,
+    OpenOptions, Package, Position, SemanticLimits, SourceLimits,
     soundtrack::items::{AudioSource, Error as ItemError, Item, ItemSelector, OperationKind},
 };
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::to_bytes};
@@ -108,27 +108,33 @@ fuzz_target!(|data: &[u8]| {
     exercise_input_limit();
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote item fuzz archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Keynote item fuzz semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote item fuzz archive limits: {error}")
+            });
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid Keynote item fuzz semantic limits: {error}")
+            });
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 

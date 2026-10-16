@@ -10,10 +10,7 @@ mod reader;
 mod transaction;
 
 pub use reader::MergeReader;
-pub use transaction::{
-    SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
-    SlideTableMergesPatch,
-};
+pub use transaction::{Commit, Diagnostics, Edit, Patch};
 
 use std::fmt;
 
@@ -22,7 +19,7 @@ use litchi_iwa_common::{LimitKind as WireLimitKind, WireLimits, table::merge::Re
 use litchi_numbers_wire::table_merges::{
     self, FORMULA_INDEX_BYTES, MergeReadError, PAIR_REFERENCE_BYTES, REGION_BYTES,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Package;
 use super::slide_table_core as core;
@@ -35,7 +32,7 @@ const MERGE_READER_SCRATCH_PER_REGION: usize = PAIR_REFERENCE_BYTES + FORMULA_IN
 /// Finite resources charged by a focused Keynote merged-cell read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableMergesLimitKind {
+pub enum LimitKind {
     /// Source package bytes inspected while resolving the selected table.
     InputBytes,
     /// Candidate package bytes produced by a lower-level read or transaction.
@@ -70,7 +67,7 @@ pub enum SlideTableMergesLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideTableMergesLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -96,14 +93,14 @@ impl fmt::Display for SlideTableMergesLimitKind {
 /// Content-free semantic location for a focused merged-cell read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableMergesPath {
+pub enum Path {
     /// The complete package.
     Package,
     /// One checked slide/table selection.
     Table { slide: Position, table: Position },
 }
 
-impl fmt::Display for SlideTableMergesPath {
+impl fmt::Display for Path {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => formatter.write_str("package"),
@@ -120,9 +117,9 @@ impl fmt::Display for SlideTableMergesPath {
 }
 
 /// Failure from a focused Keynote merged-cell read or transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableMergesError {
+pub enum Error {
     #[error("this Keynote source does not support focused slide-table merge reads")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table merge graph has an unsupported dependency")]
@@ -147,7 +144,7 @@ pub enum SlideTableMergesError {
         "Keynote slide-table merges {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
     LimitExceeded {
-        kind: SlideTableMergesLimitKind,
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -171,7 +168,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<Vec<Region>, SlideTableMergesError> {
+    ) -> Result<Vec<Region>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         let target = core::select_table(self, slide.into(), table.into(), &mut budget)
             .map_err(map_core_error)?;
@@ -188,7 +185,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<Vec<Region>, SlideTableMergesError> {
+    ) -> Result<Vec<Region>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         let target =
             core::select_table_from_components(self, slide.into(), table.into(), &mut budget)
@@ -200,7 +197,7 @@ impl Package {
         &self,
         target: core::Target,
         budget: &mut core::Budget,
-    ) -> Result<Vec<Region>, SlideTableMergesError> {
+    ) -> Result<Vec<Region>, Error> {
         let source = core::model_payload(self, &target).map_err(map_core_error)?;
         let wire = budget.residual(self).map_err(map_core_error)?;
         // The shared decoder reserves one pair-slice, one index vector, and
@@ -272,89 +269,85 @@ fn charge_attempted(budget: &mut core::Budget, error: &MergeReadError) {
     let _ = budget.work(attempted.work);
 }
 
-fn map_merge_error(error: MergeReadError) -> SlideTableMergesError {
+fn map_merge_error(error: MergeReadError) -> Error {
     match error.error() {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_wire_limit(*kind),
             observed: *observed as u64,
             maximum: *limit as u64,
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideTableMergesError::Allocation { amount: *amount }
+            Error::Allocation { amount: *amount }
         },
         litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => SlideTableMergesError::InvalidSource,
+        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
     }
 }
 
-fn map_wire_limit(kind: WireLimitKind) -> SlideTableMergesLimitKind {
+fn map_wire_limit(kind: WireLimitKind) -> LimitKind {
     match kind {
-        WireLimitKind::InputBytes => SlideTableMergesLimitKind::InputBytes,
-        WireLimitKind::Fields => SlideTableMergesLimitKind::WireFields,
-        WireLimitKind::OutputBytes => SlideTableMergesLimitKind::OutputBytes,
-        WireLimitKind::Nesting => SlideTableMergesLimitKind::WireNesting,
-        WireLimitKind::RewriteWork => SlideTableMergesLimitKind::WireWork,
+        WireLimitKind::InputBytes => LimitKind::InputBytes,
+        WireLimitKind::Fields => LimitKind::WireFields,
+        WireLimitKind::OutputBytes => LimitKind::OutputBytes,
+        WireLimitKind::Nesting => LimitKind::WireNesting,
+        WireLimitKind::RewriteWork => LimitKind::WireWork,
         WireLimitKind::TableRows
         | WireLimitKind::TableColumns
         | WireLimitKind::TableCells
-        | WireLimitKind::MaterializedCells => SlideTableMergesLimitKind::PayloadItems,
+        | WireLimitKind::MaterializedCells => LimitKind::PayloadItems,
     }
 }
 
-fn map_core_error(error: core::Error) -> SlideTableMergesError {
+fn map_core_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => SlideTableMergesError::UnsupportedSource,
-        core::Error::UnsupportedDependency => SlideTableMergesError::UnsupportedDependency,
-        core::Error::UnsupportedTopology => SlideTableMergesError::UnsupportedTopology,
-        core::Error::AmbiguousSelector => SlideTableMergesError::AmbiguousSelector,
-        core::Error::EmptySlideName => SlideTableMergesError::EmptySlideName,
-        core::Error::SlideNameNotFound => SlideTableMergesError::SlideNameNotFound,
-        core::Error::SlidePositionNotFound(position) => {
-            SlideTableMergesError::SlidePositionNotFound { position }
-        },
-        core::Error::TablePositionNotFound(position) => {
-            SlideTableMergesError::TablePositionNotFound { position }
-        },
+        core::Error::UnsupportedSource => Error::UnsupportedSource,
+        core::Error::UnsupportedDependency => Error::UnsupportedDependency,
+        core::Error::UnsupportedTopology => Error::UnsupportedTopology,
+        core::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        core::Error::EmptySlideName => Error::EmptySlideName,
+        core::Error::SlideNameNotFound => Error::SlideNameNotFound,
+        core::Error::SlidePositionNotFound(position) => Error::SlidePositionNotFound { position },
+        core::Error::TablePositionNotFound(position) => Error::TablePositionNotFound { position },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_core_limit(kind),
             observed,
             maximum,
         },
-        core::Error::Allocation(amount) => SlideTableMergesError::Allocation { amount },
+        core::Error::Allocation(amount) => Error::Allocation { amount },
         core::Error::InvalidSource
         | core::Error::Read
         | core::Error::Wire
         | core::Error::Codec
         | core::Error::Archive
-        | core::Error::Verification => SlideTableMergesError::InvalidSource,
+        | core::Error::Verification => Error::InvalidSource,
     }
 }
 
-fn map_core_limit(kind: core::LimitKind) -> SlideTableMergesLimitKind {
+fn map_core_limit(kind: core::LimitKind) -> LimitKind {
     match kind {
-        core::LimitKind::InputBytes => SlideTableMergesLimitKind::InputBytes,
-        core::LimitKind::OutputBytes => SlideTableMergesLimitKind::OutputBytes,
-        core::LimitKind::Entries => SlideTableMergesLimitKind::Entries,
-        core::LimitKind::EntryBytes => SlideTableMergesLimitKind::EntryBytes,
-        core::LimitKind::TotalBytes => SlideTableMergesLimitKind::TotalBytes,
-        core::LimitKind::PayloadObjects => SlideTableMergesLimitKind::PayloadObjects,
-        core::LimitKind::PayloadMessages => SlideTableMergesLimitKind::PayloadMessages,
-        core::LimitKind::References => SlideTableMergesLimitKind::References,
-        core::LimitKind::WireFields => SlideTableMergesLimitKind::WireFields,
-        core::LimitKind::WireNesting => SlideTableMergesLimitKind::WireNesting,
-        core::LimitKind::WireWork => SlideTableMergesLimitKind::WireWork,
-        core::LimitKind::Allocations => SlideTableMergesLimitKind::Allocations,
-        core::LimitKind::Retained => SlideTableMergesLimitKind::Retained,
-        core::LimitKind::Scratch => SlideTableMergesLimitKind::Scratch,
-        core::LimitKind::Components => SlideTableMergesLimitKind::Components,
+        core::LimitKind::InputBytes => LimitKind::InputBytes,
+        core::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        core::LimitKind::Entries => LimitKind::Entries,
+        core::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        core::LimitKind::TotalBytes => LimitKind::TotalBytes,
+        core::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        core::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        core::LimitKind::References => LimitKind::References,
+        core::LimitKind::WireFields => LimitKind::WireFields,
+        core::LimitKind::WireNesting => LimitKind::WireNesting,
+        core::LimitKind::WireWork => LimitKind::WireWork,
+        core::LimitKind::Allocations => LimitKind::Allocations,
+        core::LimitKind::Retained => LimitKind::Retained,
+        core::LimitKind::Scratch => LimitKind::Scratch,
+        core::LimitKind::Components => LimitKind::Components,
     }
 }
 

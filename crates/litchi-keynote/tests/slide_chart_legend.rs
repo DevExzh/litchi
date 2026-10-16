@@ -15,8 +15,11 @@ use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp};
 use litchi_keynote::{
-    ChartLegendVisibilityDiagnostics, ChartLegendVisibilityError, ChartLegendVisibilityLimitKind,
-    ChartLegendVisibilityPatch, ChartSelector, Package, Position, SlideSelector,
+    ChartSelector, Package, Position, SlideSelector,
+    chart::legend::Diagnostics as ChartLegendVisibilityDiagnostics,
+    chart::legend::Error as ChartLegendVisibilityError,
+    chart::legend::LimitKind as ChartLegendVisibilityLimitKind,
+    chart::legend::Patch as ChartLegendVisibilityPatch,
 };
 use prost::Message as _;
 

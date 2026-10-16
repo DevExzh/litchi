@@ -12,7 +12,7 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
 use litchi_keynote::slide::media::{Point, Size};
-use litchi_keynote::{MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector};
+use litchi_keynote::{MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -381,17 +381,17 @@ fn strict_native_saved_readback(expected: Point) -> TestResult {
         "unselected Audio B position changed"
     );
 
-    for index in 0..baseline_media.len() {
+    for (index, _) in baseline_media.iter().enumerate() {
         assert_eq!(
             saved.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             baseline.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             "saved media content changed at source position {index}"
         );
@@ -400,12 +400,12 @@ fn strict_native_saved_readback(expected: Point) -> TestResult {
                 saved.slide_media_data(
                     SlideSelector::index(0),
                     MovieSelector::index(index),
-                    litchi_keynote::MediaPart::Poster,
+                    litchi_keynote::slide::media::data::MediaPart::Poster,
                 )?,
                 baseline.slide_media_data(
                     SlideSelector::index(0),
                     MovieSelector::index(index),
-                    litchi_keynote::MediaPart::Poster,
+                    litchi_keynote::slide::media::data::MediaPart::Poster,
                 )?,
                 "saved movie poster changed at source position {index}"
             );
@@ -749,12 +749,12 @@ fn native_ui_position_oracle_reads_back_without_losing_siblings() -> TestResult 
             oracle.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             baseline.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             "native UI position oracle changed media bytes at source position {index}"
         );
@@ -940,12 +940,12 @@ fn native_audio_position_preserves_unselected_graph_and_invalidates_previews() -
     let before_audio = package.slide_media_data(
         SlideSelector::index(0),
         MovieSelector::index(0),
-        litchi_keynote::MediaPart::Content,
+        litchi_keynote::slide::media::data::MediaPart::Content,
     )?;
     let before_audio_b = package.slide_media_data(
         SlideSelector::index(0),
         MovieSelector::index(1),
-        litchi_keynote::MediaPart::Content,
+        litchi_keynote::slide::media::data::MediaPart::Content,
     )?;
     let before_objects = object_payloads(NATIVE_BASELINE)?;
     let audio_id = *native_audio_ids(NATIVE_BASELINE)?
@@ -973,7 +973,7 @@ fn native_audio_position_preserves_unselected_graph_and_invalidates_previews() -
         commit.package().slide_media_data(
             SlideSelector::index(0),
             MovieSelector::index(0),
-            litchi_keynote::MediaPart::Content,
+            litchi_keynote::slide::media::data::MediaPart::Content,
         )?,
         before_audio
     );
@@ -981,7 +981,7 @@ fn native_audio_position_preserves_unselected_graph_and_invalidates_previews() -
         commit.package().slide_media_data(
             SlideSelector::index(0),
             MovieSelector::index(1),
-            litchi_keynote::MediaPart::Content,
+            litchi_keynote::slide::media::data::MediaPart::Content,
         )?,
         before_audio_b
     );
@@ -1167,15 +1167,8 @@ fn native_audio_position_rejects_non_finite_values_and_wrong_kinds_atomically() 
 
 #[test]
 fn native_audio_position_limits_preempt_publication() -> TestResult {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
-    let options = ReadOptions::new(Limits::default(), semantic);
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
+    let options = OpenOptions::new().semantic_limits(semantic);
     match Package::from_bytes_with_options(NATIVE_BASELINE, options) {
         Err(_) => {},
         Ok(package) => {

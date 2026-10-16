@@ -1,0 +1,695 @@
+//! Slide drawables: inventory, geometry, removal, z-order and creation of
+//! text boxes, shapes and images (record 0298).
+
+use std::path::{Path, PathBuf};
+
+use litchi_keynote::slide::drawable::{
+    Drawable, Error, Geometry, Kind, Preset, Style, TextSpan, Unsupported,
+};
+use litchi_keynote::{DrawableSelector, Package, Position, SlideSelector};
+
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+/// A valid 2 x 3 RGB PNG.
+const PNG: [u8; 74] = [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x08, 0x02, 0x00, 0x00, 0x00, 0x36, 0x88, 0x49,
+    0xd6, 0x00, 0x00, 0x00, 0x11, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+    0x44, 0x60, 0x02, 0x4e, 0x03, 0x00, 0x3e, 0xd6, 0x05, 0xfb, 0x58, 0x82, 0xcf, 0x46, 0x00, 0x00,
+    0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+];
+
+fn keynote_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote")
+}
+
+fn open(name: &str) -> TestResult<Package> {
+    Ok(Package::open(keynote_dir().join(name))?)
+}
+
+fn bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut output = Vec::new();
+    package.write_to(&mut output)?;
+    Ok(output)
+}
+
+fn list(package: &Package, slide: usize) -> TestResult<Vec<Drawable>> {
+    Ok(package
+        .slide_drawable_list(SlideSelector::index(slide))?
+        .into_vec())
+}
+
+fn kinds(package: &Package, slide: usize) -> TestResult<Vec<Kind>> {
+    Ok(list(package, slide)?.iter().map(Drawable::kind).collect())
+}
+
+/// Reopen from serialized bytes, as a consumer would.
+fn reopen(package: &Package) -> TestResult<Package> {
+    Ok(Package::from_bytes(&bytes(package)?)?)
+}
+
+#[test]
+fn inventory_reads_kinds_text_geometry_and_z_order() -> TestResult {
+    let package = open("basic.key")?;
+    let drawables = list(&package, 0)?;
+    assert_eq!(
+        drawables.iter().map(Drawable::kind).collect::<Vec<_>>(),
+        [Kind::TextBox, Kind::TitlePlaceholder, Kind::BodyPlaceholder]
+    );
+    assert_eq!(drawables[0].text(), Some("2026-08-07"));
+    assert_eq!(
+        drawables[1].text(),
+        package.slide_title(SlideSelector::index(0))?.as_deref()
+    );
+    for (index, drawable) in drawables.iter().enumerate() {
+        assert_eq!(drawable.selector(), DrawableSelector::index(index));
+        assert_eq!(drawable.z_position(), Some(Position::new(index)));
+        assert!(!drawable.is_locked());
+        assert_eq!(drawable.name(), None);
+        let geometry = drawable.geometry().ok_or("geometry")?;
+        assert!(geometry.width > 0.0 && geometry.height > 0.0);
+        assert_eq!(geometry.rotation, Some(0.0));
+    }
+    assert!(matches!(
+        package.slide_drawable_list(SlideSelector::index(9)),
+        Err(Error::SlidePositionNotFound { .. })
+    ));
+    assert!(matches!(
+        package.slide_drawable_list(SlideSelector::name("")),
+        Err(Error::EmptySlideName)
+    ));
+    let runs =
+        package.slide_drawable_text_runs(SlideSelector::index(0), DrawableSelector::index(0))?;
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].text(), "2026-08-07");
+    assert_eq!(runs[0].span(), TextSpan::new(0, 10));
+    assert_eq!(*runs[0].style(), Style::new());
+    Ok(())
+}
+
+#[test]
+fn set_geometry_reads_back_and_keeps_other_drawables() -> TestResult {
+    let package = open("basic.key")?;
+    let before = list(&package, 0)?;
+    let frame = Geometry::new(120.0, 300.5, 640.25, 90.0).with_rotation(12.5);
+    let body = Geometry::new(100.0, 700.0, 900.0, 200.0);
+    let mut edit = package.edit_slide_drawables();
+    edit.set_geometry(SlideSelector::index(0), DrawableSelector::index(0), frame)?
+        .set_geometry(SlideSelector::index(0), DrawableSelector::index(2), body)?;
+    let commit = edit.commit()?;
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().operations(), 2);
+    assert!(commit.diagnostics().full_reparse_performed());
+    for package in [commit.package().clone(), reopen(commit.package())?] {
+        let after = list(&package, 0)?;
+        assert_eq!(after[0].geometry(), Some(frame));
+        // No rotation keeps the current one.
+        assert_eq!(after[2].geometry(), Some(body.with_rotation(0.0)));
+        assert_eq!(after[1], before[1]);
+        assert_eq!(after[0].text(), before[0].text());
+        assert_eq!(after[2].text(), before[2].text());
+    }
+    let (edited, patch) = commit.into_parts();
+    let restored = edited.apply_slide_drawables(&patch.inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn setting_a_geometry_to_itself_is_a_no_op_patch() -> TestResult {
+    let package = open("basic.key")?;
+    let current = list(&package, 0)?[0].geometry().ok_or("geometry")?;
+    let mut edit = package.edit_slide_drawables();
+    edit.set_geometry(SlideSelector::index(0), DrawableSelector::index(0), current)?;
+    edit.move_to(
+        SlideSelector::index(0),
+        DrawableSelector::index(1),
+        Position::new(1),
+    )?;
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    assert_eq!(list(commit.package(), 0)?, list(&package, 0)?);
+    Ok(())
+}
+
+#[test]
+fn remove_drops_the_text_box_and_its_private_objects() -> TestResult {
+    let package = open("basic.key")?;
+    let mut edit = package.edit_slide_drawables();
+    edit.remove(SlideSelector::index(0), DrawableSelector::index(0))?;
+    let commit = edit.commit()?;
+    assert_eq!(commit.diagnostics().removed_drawables(), 1);
+    assert_eq!(commit.diagnostics().removed_objects(), 4);
+    let reopened = reopen(commit.package())?;
+    assert_eq!(
+        kinds(&reopened, 0)?,
+        [Kind::TitlePlaceholder, Kind::BodyPlaceholder]
+    );
+    let after = list(&reopened, 0)?;
+    assert_eq!(after[0].z_position(), Some(Position::new(0)));
+    assert_eq!(
+        reopened.slide_title(SlideSelector::index(0))?,
+        package.slide_title(SlideSelector::index(0))?
+    );
+    let (edited, patch) = commit.into_parts();
+    let restored = edited.apply_slide_drawables(&patch.inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn move_to_reorders_the_z_order_only() -> TestResult {
+    let package = open("basic.key")?;
+    let mut edit = package.edit_slide_drawables();
+    edit.move_to(
+        SlideSelector::index(0),
+        DrawableSelector::index(0),
+        Position::new(2),
+    )?;
+    let commit = edit.commit()?;
+    let after = list(&reopen(commit.package())?, 0)?;
+    assert_eq!(
+        after
+            .iter()
+            .map(|drawable| drawable.z_position().map(Position::get))
+            .collect::<Vec<_>>(),
+        [Some(2), Some(0), Some(1)]
+    );
+    assert_eq!(
+        after.iter().map(Drawable::kind).collect::<Vec<_>>(),
+        kinds(&package, 0)?
+    );
+    assert!(matches!(
+        package.edit_slide_drawables().move_to(
+            SlideSelector::index(0),
+            DrawableSelector::index(0),
+            Position::new(3)
+        ),
+        Err(Error::ZPositionOutOfRange { count: 3, .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn add_text_box_and_shapes_read_back() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let text_frame = Geometry::new(80.0, 80.0, 400.0, 60.0);
+    let shapes = [
+        (Preset::Rectangle, Geometry::new(100.0, 400.0, 200.0, 100.0)),
+        (
+            Preset::RoundedRectangle { radius: 12.0 },
+            Geometry::new(400.0, 400.0, 200.0, 100.0).with_rotation(30.0),
+        ),
+        (Preset::Ellipse, Geometry::new(700.0, 400.0, 150.0, 150.0)),
+    ];
+    let mut edit = package.edit_slide_drawables();
+    edit.add_text_box(slide, text_frame, "Agenda: one, two")?;
+    for (index, (preset, frame)) in shapes.iter().enumerate() {
+        edit.add_shape(slide, *preset, *frame, &format!("Shape {index}"))?;
+    }
+    let commit = edit.commit()?;
+    assert_eq!(commit.diagnostics().created_drawables(), 4);
+    let created = commit.created().to_vec();
+    assert_eq!(
+        created
+            .iter()
+            .map(|item| item.drawable().as_index())
+            .collect::<Vec<_>>(),
+        [3, 4, 5, 6]
+    );
+    assert!(created.iter().all(|item| item.slide() == Position::new(0)));
+    let reopened = reopen(commit.package())?;
+    let after = list(&reopened, 0)?;
+    assert_eq!(after.len(), 7);
+    assert_eq!(after[..3], list(&package, 0)?[..]);
+    assert_eq!(after[3].kind(), Kind::TextBox);
+    assert_eq!(after[3].text(), Some("Agenda: one, two"));
+    assert_eq!(after[3].geometry(), Some(text_frame.with_rotation(0.0)));
+    assert_eq!(after[3].z_position(), Some(Position::new(3)));
+    for (offset, (_, frame)) in shapes.iter().enumerate() {
+        let drawable = &after[4 + offset];
+        assert_eq!(drawable.kind(), Kind::Shape);
+        assert_eq!(drawable.text(), Some(format!("Shape {offset}").as_str()));
+        let expected = Geometry {
+            rotation: Some(frame.rotation.unwrap_or(0.0)),
+            ..*frame
+        };
+        assert_eq!(drawable.geometry(), Some(expected));
+    }
+    let (edited, patch) = commit.into_parts();
+    let restored = edited.apply_slide_drawables(&patch.inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+
+    // A created text box can be edited and removed in a later edit.
+    let mut edit = reopened.edit_slide_drawables();
+    edit.remove(slide, DrawableSelector::index(3))?
+        .set_geometry(
+            slide,
+            DrawableSelector::index(4),
+            Geometry::new(0.0, 0.0, 50.0, 50.0),
+        )?;
+    let later = edit.commit()?;
+    assert_eq!(later.diagnostics().removed_objects(), 4);
+    assert_eq!(list(later.package(), 0)?.len(), 6);
+    Ok(())
+}
+
+#[test]
+fn add_image_creates_data_and_reads_back() -> TestResult {
+    let package = open("multi-slide.key")?;
+    let slide = SlideSelector::index(1);
+    let frame = Geometry::new(200.0, 200.0, 320.0, 480.0);
+    let before = list(&package, 1)?;
+    let mut edit = package.edit_slide_drawables();
+    edit.add_image(slide, &PNG, "pixel.png", frame)?;
+    let commit = edit.commit()?;
+    let created = commit.created()[0];
+    let reopened = reopen(commit.package())?;
+    let after = list(&reopened, 1)?;
+    assert_eq!(after.len(), before.len() + 1);
+    let image = &after[created.drawable().as_index()];
+    assert_eq!(image.kind(), Kind::Image);
+    assert_eq!(image.geometry(), Some(frame.with_rotation(0.0)));
+    assert_eq!(image.text(), None);
+    // The image is removable again; its data item stays in the package.
+    let mut edit = reopened.edit_slide_drawables();
+    edit.remove(slide, created.drawable())?;
+    let removed = edit.commit()?;
+    assert_eq!(list(&reopen(removed.package())?, 1)?, before);
+
+    let mut edit = package.edit_slide_drawables();
+    assert!(matches!(
+        edit.add_image(slide, b"not an image", "x.png", frame),
+        Err(Error::Unsupported {
+            reason: Unsupported::ImageFormat
+        })
+    ));
+    assert!(matches!(
+        edit.add_image(slide, &PNG, ".png", frame),
+        Err(Error::InvalidImage)
+    ));
+    assert!(matches!(
+        edit.add_image(slide, &PNG, "a/b.png", frame),
+        Err(Error::InvalidImage)
+    ));
+    Ok(())
+}
+
+#[test]
+fn several_operations_on_several_slides_commit_once() -> TestResult {
+    let package = open("multi-slide.key")?;
+    let counts = (0..5)
+        .map(|slide| list(&package, slide).map(|drawables| drawables.len()))
+        .collect::<TestResult<Vec<_>>>()?;
+    let mut edit = package.edit_slide_drawables();
+    // Selectors address the base snapshot: removing drawable 0 does not
+    // shift drawable 2.
+    edit.remove(SlideSelector::index(0), DrawableSelector::index(0))?
+        .set_geometry(
+            SlideSelector::index(0),
+            DrawableSelector::index(2),
+            Geometry::new(10.0, 10.0, 500.0, 100.0),
+        )?
+        .add_text_box(
+            SlideSelector::index(3),
+            Geometry::new(10.0, 10.0, 300.0, 50.0),
+            "Added",
+        )?
+        .move_to(
+            SlideSelector::index(4),
+            DrawableSelector::index(2),
+            Position::new(0),
+        )?
+        .add_shape(
+            SlideSelector::index(4),
+            Preset::Ellipse,
+            Geometry::new(10.0, 10.0, 50.0, 50.0),
+            "",
+        )?;
+    let commit = edit.commit()?;
+    assert_eq!(commit.diagnostics().operations(), 5);
+    let reopened = reopen(commit.package())?;
+    assert_eq!(list(&reopened, 0)?.len(), counts[0] - 1);
+    assert_eq!(
+        list(&reopened, 0)?[1].geometry(),
+        Some(Geometry::new(10.0, 10.0, 500.0, 100.0).with_rotation(0.0))
+    );
+    assert_eq!(list(&reopened, 1)?, list(&package, 1)?);
+    assert_eq!(list(&reopened, 2)?, list(&package, 2)?);
+    assert_eq!(list(&reopened, 3)?.len(), counts[3] + 1);
+    let slide4 = list(&reopened, 4)?;
+    assert_eq!(slide4.len(), counts[4] + 1);
+    assert_eq!(slide4[2].z_position(), Some(Position::new(0)));
+    assert_eq!(
+        slide4.last().map(Drawable::z_position),
+        Some(Some(Position::new(counts[4])))
+    );
+    assert_eq!(
+        commit
+            .created()
+            .iter()
+            .map(|item| item.slide().get())
+            .collect::<Vec<_>>(),
+        [3, 4]
+    );
+    let (edited, patch) = commit.into_parts();
+    assert_eq!(patch.operations(), 5);
+    let restored = edited.apply_slide_drawables(&patch.inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn stale_patches_conflict_and_empty_edits_are_no_ops() -> TestResult {
+    let basic = open("basic.key")?;
+    let multi = open("multi-slide.key")?;
+    let mut edit = basic.edit_slide_drawables();
+    edit.remove(SlideSelector::index(0), DrawableSelector::index(0))?;
+    let commit = edit.commit()?;
+    let patch = commit.patch().clone();
+    assert!(matches!(
+        multi.apply_slide_drawables(&patch),
+        Err(Error::PatchConflict)
+    ));
+    assert!(matches!(
+        commit.package().apply_slide_drawables(&patch),
+        Err(Error::PatchConflict)
+    ));
+    let replayed = open("basic.key")?.apply_slide_drawables(&patch)?;
+    assert_eq!(bytes(replayed.package())?, bytes(commit.package())?);
+
+    let empty = basic.edit_slide_drawables().commit()?;
+    assert!(empty.patch().is_noop());
+    assert!(!empty.diagnostics().changed());
+    Ok(())
+}
+
+#[test]
+fn unsupported_operations_are_typed_refusals() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    assert!(matches!(
+        edit.remove(slide, DrawableSelector::index(1)),
+        Err(Error::Unsupported {
+            reason: Unsupported::Kind {
+                kind: Kind::TitlePlaceholder
+            }
+        })
+    ));
+    assert!(matches!(
+        edit.remove(slide, DrawableSelector::index(7)),
+        Err(Error::DrawablePositionNotFound { .. })
+    ));
+    assert!(matches!(
+        edit.set_geometry(
+            slide,
+            DrawableSelector::index(0),
+            Geometry::new(0.0, 0.0, 0.0, 10.0)
+        ),
+        Err(Error::InvalidGeometry)
+    ));
+    assert!(matches!(
+        edit.set_geometry(
+            slide,
+            DrawableSelector::index(0),
+            Geometry::new(f32::NAN, 0.0, 1.0, 10.0)
+        ),
+        Err(Error::InvalidGeometry)
+    ));
+    assert!(matches!(
+        edit.add_shape(
+            slide,
+            Preset::RoundedRectangle { radius: 80.0 },
+            Geometry::new(0.0, 0.0, 100.0, 100.0),
+            ""
+        ),
+        Err(Error::InvalidGeometry)
+    ));
+    assert!(matches!(
+        edit.set_text_style(
+            slide,
+            DrawableSelector::index(0),
+            TextSpan::new(0, 4),
+            Style::new().with_bold(true)
+        ),
+        Err(Error::Unsupported {
+            reason: Unsupported::TextStyling
+        })
+    ));
+    assert!(matches!(
+        edit.set_text_style(
+            slide,
+            DrawableSelector::index(0),
+            TextSpan::new(4, 40),
+            Style::new()
+        ),
+        Err(Error::InvalidSpan)
+    ));
+    edit.remove(slide, DrawableSelector::index(0))?;
+    assert!(matches!(
+        edit.remove(slide, DrawableSelector::index(0)),
+        Err(Error::DrawableRemoved)
+    ));
+    assert!(matches!(
+        edit.set_geometry(
+            slide,
+            DrawableSelector::index(0),
+            Geometry::new(0.0, 0.0, 1.0, 1.0)
+        ),
+        Err(Error::DrawableRemoved)
+    ));
+    // The refusals left the staged removal intact.
+    assert_eq!(edit.commit()?.diagnostics().removed_drawables(), 1);
+    Ok(())
+}
+
+#[test]
+fn corpus_inventories_read_or_refuse_and_identity_geometry_is_a_no_op() -> TestResult {
+    let mut paths = std::fs::read_dir(keynote_dir())?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()?;
+    paths.retain(|path| path.extension().and_then(|extension| extension.to_str()) == Some("key"));
+    paths.sort();
+    let mut opened = 0;
+    let mut shapes = 0;
+    let (mut removed, mut refused, mut added) = (0, 0, 0);
+    for path in paths {
+        let Ok(package) = Package::open(&path) else {
+            continue;
+        };
+        opened += 1;
+        let slides = package.slides()?.len();
+        for slide in 0..slides {
+            match package.slide_drawable_list(SlideSelector::index(slide)) {
+                Ok(_) | Err(Error::Unsupported { .. } | Error::LimitExceeded { .. }) => {},
+                Err(error) => panic!("{}: slide {slide}: {error}", path.display()),
+            }
+        }
+        if slides == 0 {
+            continue;
+        }
+        let drawables = package.slide_drawable_list(SlideSelector::index(0))?;
+        // Every removable drawable is removed or refused with a typed reason;
+        // a text box can be added to every slide 0.
+        for drawable in drawables.iter() {
+            let mut edit = package.edit_slide_drawables();
+            if edit
+                .remove(SlideSelector::index(0), drawable.selector())
+                .is_err()
+            {
+                continue;
+            }
+            match edit.commit() {
+                Ok(commit) => {
+                    assert_eq!(list(commit.package(), 0)?.len() + 1, drawables.len());
+                    removed += 1;
+                },
+                Err(Error::Unsupported { .. }) => refused += 1,
+                Err(error) => panic!("{}: {error}", path.display()),
+            }
+        }
+        let mut edit = package.edit_slide_drawables();
+        edit.add_text_box(
+            SlideSelector::index(0),
+            Geometry::new(1.0, 2.0, 3.0, 4.0),
+            "corpus",
+        )?;
+        match edit.commit() {
+            Ok(commit) => {
+                assert_eq!(list(commit.package(), 0)?.len(), drawables.len() + 1);
+                added += 1;
+            },
+            Err(Error::Unsupported { .. }) => {},
+            Err(error) => panic!("{}: {error}", path.display()),
+        }
+        let Some(shape) = drawables.iter().find(|drawable| {
+            matches!(drawable.kind(), Kind::Shape | Kind::TextBox) && drawable.geometry().is_some()
+        }) else {
+            continue;
+        };
+        shapes += 1;
+        let geometry = shape.geometry().ok_or("geometry")?;
+        let mut edit = package.edit_slide_drawables();
+        edit.set_geometry(SlideSelector::index(0), shape.selector(), geometry)?;
+        let commit = edit
+            .commit()
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        assert!(commit.patch().is_noop(), "{}", path.display());
+        assert_eq!(
+            list(commit.package(), 0)?,
+            drawables.into_vec(),
+            "{}",
+            path.display()
+        );
+    }
+    assert!(opened >= 10);
+    assert!(shapes >= 2);
+    eprintln!("corpus: removed {removed}, refused {refused}, added {added} of {opened}");
+    assert!(removed >= 2 && added >= 10);
+    Ok(())
+}
+
+#[test]
+fn set_text_rewrites_the_changed_span_and_reads_back() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(0), "2026-10-15\nSecond line")?;
+    let commit = edit.commit()?;
+    assert!(commit.diagnostics().changed());
+    let edited = reopen(commit.package())?;
+    let drawables = list(&edited, 0)?;
+    assert_eq!(drawables[0].text(), Some("2026-10-15\nSecond line"));
+    // Every other drawable reads back unchanged.
+    assert_eq!(drawables[1..], list(&package, 0)?[1..]);
+    // The inverse restores the exact source bytes.
+    let (edited, patch) = commit.into_parts();
+    let restored = edited.apply_slide_drawables(&patch.inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn set_text_of_the_current_text_is_a_no_op_and_the_last_set_wins() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(0), "2026-08-07")?;
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    assert_eq!(bytes(commit.package())?, bytes(&package)?);
+
+    let mut edit = package.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(0), "first")?
+        .set_text(slide, DrawableSelector::index(0), "second")?
+        .set_geometry(
+            slide,
+            DrawableSelector::index(0),
+            Geometry::new(10.0, 20.0, 300.0, 40.0),
+        )?;
+    let commit = edit.commit()?;
+    let drawables = list(commit.package(), 0)?;
+    assert_eq!(drawables[0].text(), Some("second"));
+    assert_eq!(
+        drawables[0].geometry(),
+        Some(Geometry::new(10.0, 20.0, 300.0, 40.0).with_rotation(0.0))
+    );
+    Ok(())
+}
+
+#[test]
+fn set_text_refuses_placeholders_images_and_inline_markers() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(1), "Title"),
+        Err(Error::Unsupported {
+            reason: Unsupported::Kind {
+                kind: Kind::TitlePlaceholder
+            }
+        })
+    ));
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(0), "object \u{fffc} marker"),
+        Err(Error::Unsupported {
+            reason: Unsupported::InlineObjects
+        })
+    ));
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(7), "x"),
+        Err(Error::DrawablePositionNotFound { .. })
+    ));
+    // A new image has no text storage.
+    let mut edit = package.edit_slide_drawables();
+    edit.add_image(
+        slide,
+        &PNG,
+        "pixel.png",
+        Geometry::new(0.0, 0.0, 20.0, 30.0),
+    )?;
+    let with_image = edit.commit()?.into_package();
+    let image = list(&with_image, 0)?.len() - 1;
+    let mut edit = with_image.edit_slide_drawables();
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(image), "x"),
+        Err(Error::Unsupported {
+            reason: Unsupported::Kind { kind: Kind::Image }
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn set_text_on_a_new_shape_and_on_every_corpus_text_box() -> TestResult {
+    let package = open("multi-slide.key")?;
+    let slide = SlideSelector::index(1);
+    let mut edit = package.edit_slide_drawables();
+    edit.add_shape(
+        slide,
+        Preset::Ellipse,
+        Geometry::new(100.0, 100.0, 200.0, 200.0),
+        "Old",
+    )?;
+    let created = edit.commit()?.into_package();
+    let shape = list(&created, 1)?.len() - 1;
+    let mut edit = created.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(shape), "New\ntext")?;
+    let edited = reopen(edit.commit()?.package())?;
+    assert_eq!(list(&edited, 1)?[shape].text(), Some("New\ntext"));
+
+    for entry in std::fs::read_dir(keynote_dir())? {
+        let path = entry?.path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("key")
+            || !path.is_file()
+        {
+            continue;
+        }
+        let package = Package::open(&path)?;
+        let Ok(drawables) = package.slide_drawable_list(SlideSelector::index(0)) else {
+            continue;
+        };
+        let Some(index) = drawables
+            .iter()
+            .position(|drawable| drawable.kind() == Kind::TextBox && drawable.text().is_some())
+        else {
+            continue;
+        };
+        let mut edit = package.edit_slide_drawables();
+        edit.set_text(
+            SlideSelector::index(0),
+            DrawableSelector::index(index),
+            "Changed",
+        )?;
+        let commit = edit.commit()?;
+        assert_eq!(
+            list(commit.package(), 0)?[index].text(),
+            Some("Changed"),
+            "{}",
+            path.display()
+        );
+    }
+    Ok(())
+}

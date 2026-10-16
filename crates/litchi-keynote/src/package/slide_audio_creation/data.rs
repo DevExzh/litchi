@@ -3,8 +3,8 @@
 use litchi_core::Position;
 
 use super::super::slide_media_replacement::{
-    MediaBudget, MediaPart, SlideMediaDataError, SlideMediaDataLimitKind, read_selected_media,
-    read_selected_media_pair, select_media, select_media_pair,
+    Error as SlideMediaDataError, LimitKind as SlideMediaDataLimitKind, MediaBudget, MediaPart,
+    read_selected_media, read_selected_media_pair, select_media, select_media_pair,
 };
 use super::{CreationBudget, Package, SlideAudioCreationError, SlideAudioCreationLimitKind};
 use crate::{MovieSelector, SlideSelector};

@@ -14,7 +14,9 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector, slide::movie::Options};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, slide::media::data::MediaPart, slide::movie::Options,
+};
 use prost::Message as _;
 use sha1::{Digest as _, Sha1};
 
@@ -406,8 +408,8 @@ fn unmapped_opaque_map_keys_reject_creation_atomically() -> TestResult {
     assert!(
         matches!(
             result,
-            Err(litchi_keynote::SlideMovieCreationError::InvalidSource
-                | litchi_keynote::SlideMovieCreationError::Verification)
+            Err(litchi_keynote::slide::movie::creation::Error::InvalidSource
+                | litchi_keynote::slide::movie::creation::Error::Verification)
         ),
         "dangling map keys must reject creation without a resource-limit failure"
     );

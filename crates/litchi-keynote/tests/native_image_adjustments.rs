@@ -16,7 +16,9 @@ use litchi_iwa_protos::tsd;
 use litchi_keynote::slide::image::{
     ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector,
 };
-use litchi_keynote::{Package, SlideImageAdjustmentsError, SlideSelector};
+use litchi_keynote::{
+    Package, SlideSelector, slide::image::adjustments::Error as SlideImageAdjustmentsError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

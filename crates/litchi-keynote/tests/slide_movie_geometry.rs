@@ -12,7 +12,9 @@ use litchi_keynote::slide::media::{
     Point, Size,
     geometry::{MovieFlipAxis, MovieGeometry, MovieTransform},
 };
-use litchi_keynote::{Package, ReadOptions, SlideMovieGeometryError};
+use litchi_keynote::{
+    OpenOptions, Package, SourceLimits, slide::movie::geometry::Error as SlideMovieGeometryError,
+};
 use prost::Message as _;
 
 const DOCUMENT: &str = "Index/Document.iwa";
@@ -1124,19 +1126,15 @@ fn selectors_and_input_limit_fail_before_publication() -> R<()> {
     assert!(package.slide_movie_geometry(9usize, 0usize).is_err());
     assert!(package.slide_movie_geometry(0usize, 9usize).is_err());
     let defaults = Limits::default();
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
+    let tight = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
     assert!(
-        Package::from_bytes_with_options(
-            &source,
-            ReadOptions::new(tight, litchi_keynote::SemanticLimits::default())
-        )
-        .is_err()
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(tight)).is_err()
     );
     let before = bytes(&package)?;
     let result = package

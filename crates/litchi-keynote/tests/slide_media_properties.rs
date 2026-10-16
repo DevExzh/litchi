@@ -12,8 +12,9 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::{
-    MediaPart, MediaProperties, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits,
-    SlideAudioPositionError, SlideMediaPropertiesError, SlideSelector,
+    MediaProperties, MovieKind, MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::audio::position::Error as SlideAudioPositionError, slide::media::data::MediaPart,
+    slide::media::properties::Error as SlideMediaPropertiesError,
 };
 use prost::Message as _;
 
@@ -50,7 +51,7 @@ fn edit_properties(
     package: &Package,
     movie: usize,
     replacement: MediaProperties,
-) -> TestResult<litchi_keynote::SlideMediaPropertiesCommit> {
+) -> TestResult<litchi_keynote::slide::media::properties::Commit> {
     Ok(package
         .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(movie))?
         .set(replacement)?
@@ -1384,15 +1385,8 @@ fn native_audio_properties_reject_duplicate_wrong_wire_and_noncanonical_fields_a
 
 #[test]
 fn native_media_properties_tight_reference_budget_preempts_publication_atomically() -> TestResult {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
-    let options = ReadOptions::new(Limits::default(), semantic);
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
+    let options = OpenOptions::new().semantic_limits(semantic);
     let package = Package::from_bytes_with_options(NATIVE_BASELINE, options)?;
     let before = exact_bytes(&package)?;
     let error = package

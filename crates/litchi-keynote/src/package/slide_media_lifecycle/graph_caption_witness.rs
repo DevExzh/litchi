@@ -18,7 +18,7 @@ use litchi_iwa_core::ArchiveObject;
 use litchi_iwa_protos::{keynote_movie_caption_codec, pages_movie_caption_codec};
 
 use super::budget::LifecycleBudget;
-use super::{Package, SlideMediaLifecycleError};
+use super::{Error, Package};
 
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
@@ -44,10 +44,10 @@ pub(in crate::package) trait CaptionWitnessBudget {
 }
 
 impl CaptionWitnessBudget for LifecycleBudget {
-    type Error = SlideMediaLifecycleError;
+    type Error = Error;
 
     fn invalid_source() -> Self::Error {
-        SlideMediaLifecycleError::InvalidSource
+        Error::InvalidSource
     }
 
     fn charge_codec_pass(&mut self, payload: &[u8]) -> Result<(), Self::Error> {

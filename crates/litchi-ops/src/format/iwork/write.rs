@@ -36,19 +36,7 @@ pub(crate) enum LeafPatch {
     #[cfg(feature = "pages")]
     Pages(super::pages::Patch),
     #[cfg(feature = "keynote")]
-    KeynoteText(litchi_keynote::SlideTextPatch),
-    #[cfg(feature = "keynote")]
-    KeynoteSkip(litchi_keynote::Patch),
-    #[cfg(feature = "keynote")]
-    KeynoteOrder(litchi_keynote::SlideOrderPatch),
-    #[cfg(feature = "keynote")]
-    KeynoteDeletion(
-        #[allow(
-            dead_code,
-            reason = "retained as the leaf's reversible proof; a committed deletion is never a no-op"
-        )]
-        litchi_keynote::slide::delete::Patch,
-    ),
+    Keynote(super::keynote::Patch),
     #[cfg(feature = "numbers")]
     NumbersCells(litchi_numbers::table::cells::Patch),
     /// One of the other Numbers transactions (record 0297).
@@ -62,14 +50,7 @@ impl LeafPatch {
             #[cfg(feature = "pages")]
             Self::Pages(patch) => patch.is_noop(),
             #[cfg(feature = "keynote")]
-            Self::KeynoteText(patch) => patch.is_noop(),
-            #[cfg(feature = "keynote")]
-            Self::KeynoteSkip(patch) => patch.is_noop(),
-            #[cfg(feature = "keynote")]
-            Self::KeynoteOrder(patch) => patch.is_noop(),
-            // A committed deletion always removes one slide.
-            #[cfg(feature = "keynote")]
-            Self::KeynoteDeletion(_) => false,
+            Self::Keynote(patch) => patch.is_noop(),
             #[cfg(feature = "numbers")]
             Self::NumbersCells(patch) => patch.is_noop(),
             #[cfg(feature = "numbers")]
@@ -385,17 +366,19 @@ pub(crate) fn add<'p, 'n>(
     match file.owner() {
         #[cfg(feature = "pages")]
         Owner::Pages(package) => super::pages::add(file, package, &parent, &node, limits),
+        #[cfg(feature = "keynote")]
+        Owner::Keynote(package) => super::keynote::add(file, package, &parent, &node, limits),
         #[cfg(feature = "numbers")]
         Owner::Numbers(package) => super::numbers::add(file, package, &parent, &node, limits),
         #[allow(
             unreachable_patterns,
-            reason = "the Pages and Numbers leaves add elements; Keynote does not yet"
+            reason = "every iWork leaf adds elements; the arm covers a build without them"
         )]
         _ => {
             let _ = (parent, node, limits);
             Err(refusal(
                 Code::UnsupportedCapability,
-                "adding Keynote slides or shapes needs leaf slide-add and shape APIs (IWORK_API_REQUESTS.md requests 8 and 9)",
+                "this build cannot add elements to the format",
             ))
         },
     }
@@ -465,15 +448,17 @@ pub(crate) fn swap<'p, 'q>(
     match file.owner() {
         #[cfg(feature = "pages")]
         Owner::Pages(package) => super::pages::swap(file, package, &left, &right, limits),
+        #[cfg(feature = "keynote")]
+        Owner::Keynote(package) => super::keynote::swap(file, package, &left, &right, limits),
         #[allow(
             unreachable_patterns,
-            reason = "the Pages leaf exchanges paragraphs; Keynote and Numbers do not yet"
+            reason = "the Pages and Keynote leaves exchange elements; Numbers does not yet"
         )]
         _ => {
             let _ = (left, right, limits);
             Err(refusal(
                 Code::UnsupportedCapability,
-                "swapping Keynote or Numbers elements is not wired yet (follow-up: records 0297-0298)",
+                "swapping Numbers elements is not wired yet (follow-up: record 0297)",
             ))
         },
     }

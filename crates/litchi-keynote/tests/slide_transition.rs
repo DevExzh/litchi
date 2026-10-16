@@ -8,6 +8,7 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -18,7 +19,7 @@ use litchi_iwa_protos::{
     kn, tsa, tsd, tsk, tsp,
 };
 use litchi_keynote::{
-    Limits, Package, Position, SlideSelector,
+    OpenOptions, Package, Position, SlideSelector, SourceLimits,
     transition::{
         Acceleration, AnimationParameters, Commit, CustomParameters, Diagnostics, Direction, Edit,
         Effect, Error, LimitKind, MosaicType, Patch, Settings, TextDelivery, TimingCurveSlot,
@@ -1463,14 +1464,15 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
         .package()
         .exact_bytes()
         .len();
-    let limits = Limits::new(
-        u64::try_from(target_len - 1)?,
-        8,
-        1024 * 1024,
-        1024 * 1024,
-        1024 * 1024,
-    )?;
-    let limited = Package::from_bytes_with_limits(&flat, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_len - 1)?)?
+        .max_entries(8)?
+        .max_entry_bytes(1024 * 1024)?
+        .max_aggregate_bytes(1024 * 1024)?
+        .max_component_bytes(1024 * 1024)?
+        .build()?;
+    let limited =
+        Package::from_bytes_with_options(&flat, OpenOptions::new().source_limits(limits))?;
     let limited_edit = limited
         .edit_slide_transition("Alpha")?
         .set(full_settings()?)?;

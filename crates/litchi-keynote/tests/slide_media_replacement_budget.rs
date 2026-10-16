@@ -9,10 +9,11 @@
 
 use std::io;
 
-use litchi_iwa_archive::{Limits, package::Catalog};
+use litchi_iwa_archive::package::Catalog;
 use litchi_keynote::{
-    MediaPart, MovieSelector, Package, ReadOptions, SemanticLimits, SlideMediaDataError,
-    SlideMediaDataLimitKind, SlideSelector,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::media::data::Error as SlideMediaDataError,
+    slide::media::data::LimitKind as SlideMediaDataLimitKind, slide::media::data::MediaPart,
 };
 
 const NATIVE_SOURCE: &[u8] =
@@ -38,17 +39,10 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn package_with_reference_limit(limit: usize) -> TestResult<Package> {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        limit,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
+    let semantic = SemanticLimits::builder().max_references(limit)?.build()?;
     Ok(Package::from_bytes_with_options(
         NATIVE_SOURCE,
-        ReadOptions::new(Limits::default(), semantic),
+        OpenOptions::new().semantic_limits(semantic),
     )?)
 }
 

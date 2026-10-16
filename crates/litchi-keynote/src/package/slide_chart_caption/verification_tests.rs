@@ -169,8 +169,8 @@ fn immutable_external_style_accepts_exact_bytes_and_enforces_comparison_budget()
             Some(style_identifier),
             &mut one_under,
         ),
-        Err(ChartCaptionError::LimitExceeded {
-            kind: ChartCaptionLimitKind::WireWork,
+        Err(Error::LimitExceeded {
+            kind: LimitKind::WireWork,
             ..
         })
     ));
@@ -202,7 +202,7 @@ fn immutable_external_style_rejects_payload_or_header_mutation() {
                 Some(style_identifier),
                 &mut budget,
             ),
-            Err(ChartCaptionError::Verification)
+            Err(Error::Verification)
         ));
     }
 }
@@ -228,6 +228,6 @@ fn immutable_external_style_rejects_component_migration() {
             Some(style_identifier),
             &mut budget,
         ),
-        Err(ChartCaptionError::Verification)
+        Err(Error::Verification)
     ));
 }

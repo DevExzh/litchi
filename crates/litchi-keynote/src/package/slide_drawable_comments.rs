@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::{SourceCatalog, package::ExactArtifacts};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::slide::comment::{Comment, Reply};
@@ -35,7 +35,6 @@ use graph::Selection;
 /// The type remains crate-private; callers only see the format-owned limit
 /// variants below.
 type Budget = super::slide_media_lifecycle::LifecycleBudget;
-type Error = SlideDrawableCommentError;
 
 const MAX_COMMENT_TEXT_BYTES: usize = 64 * 1024 * 1024;
 // An add-reply operation may create a cloned root, one reply, and the
@@ -66,7 +65,7 @@ enum Operation {
 /// Finite resource categories reported by a drawable-comment transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideDrawableCommentLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -95,7 +94,7 @@ pub enum SlideDrawableCommentLimitKind {
     CommentBytes,
 }
 
-impl fmt::Display for SlideDrawableCommentLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -116,9 +115,9 @@ impl fmt::Display for SlideDrawableCommentLimitKind {
 }
 
 /// Content-redacted failure raised by a direct-drawable comment operation.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideDrawableCommentError {
+pub enum Error {
     /// The source was not retained as an exact physical Keynote package.
     #[error("this Keynote source does not support direct-drawable comment edits")]
     UnsupportedSource,
@@ -158,7 +157,7 @@ pub enum SlideDrawableCommentError {
     )]
     LimitExceeded {
         /// Resource category that exceeded its configured ceiling.
-        kind: SlideDrawableCommentLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -178,8 +177,8 @@ pub enum SlideDrawableCommentError {
     Read,
 }
 
-impl From<super::slide_media_lifecycle::SlideMediaLifecycleError> for SlideDrawableCommentError {
-    fn from(error: super::slide_media_lifecycle::SlideMediaLifecycleError) -> Self {
+impl From<super::slide_media_lifecycle::Error> for Error {
+    fn from(error: super::slide_media_lifecycle::Error) -> Self {
         map_lifecycle_error(error)
     }
 }
@@ -249,7 +248,7 @@ impl DrawableSummary {
 
 /// One mutable direct-drawable comment edit staged against an immutable
 /// package snapshot.
-pub struct SlideDrawableCommentEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: Selection,
     before: ThreadSnapshot,
@@ -257,10 +256,10 @@ pub struct SlideDrawableCommentEdit<'a> {
     budget: Budget,
 }
 
-impl fmt::Debug for SlideDrawableCommentEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideDrawableCommentEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.selection.slide_position)
             .field("drawable_position", &self.selection.drawable_position)
             .field("kind", &self.selection.kind)
@@ -270,7 +269,7 @@ impl fmt::Debug for SlideDrawableCommentEdit<'_> {
     }
 }
 
-impl<'a> SlideDrawableCommentEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -383,7 +382,7 @@ impl<'a> SlideDrawableCommentEdit<'a> {
     }
 
     /// Validate and publish the staged immutable candidate.
-    pub fn commit(self) -> Result<SlideDrawableCommentCommit, Error> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let mut budget = self.budget;
         let current = graph::select_drawable(
             self.source,
@@ -404,9 +403,9 @@ impl<'a> SlideDrawableCommentEdit<'a> {
             .is_none_or(|operation| operation_is_noop(operation, &self.before))
         {
             self.source.validate().map_err(map_read_error)?;
-            return Ok(SlideDrawableCommentCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: SlideDrawableCommentPatch {
+                patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                     slide_position: self.selection.slide_position,
                     drawable_position: self.selection.drawable_position,
@@ -416,7 +415,7 @@ impl<'a> SlideDrawableCommentEdit<'a> {
                     touched_components: 0,
                     deleted_previews: 0,
                 },
-                diagnostics: SlideDrawableCommentDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         self.source.validate().map_err(map_read_error)?;
@@ -441,9 +440,9 @@ impl<'a> SlideDrawableCommentEdit<'a> {
         let target_thread = read_snapshot(&candidate, &target_selection, &mut budget)?;
         verify_operation(&self.before, &target_thread, &operation)?;
         let diagnostics = map_engine_diagnostics(&output.diagnostics);
-        Ok(SlideDrawableCommentCommit {
+        Ok(Commit {
             package: candidate,
-            patch: SlideDrawableCommentPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, target),
                 slide_position: self.selection.slide_position,
                 drawable_position: self.selection.drawable_position,
@@ -460,7 +459,7 @@ impl<'a> SlideDrawableCommentEdit<'a> {
 
 /// An exact-source-checked reversible direct-drawable comment patch.
 #[derive(Clone, PartialEq)]
-pub struct SlideDrawableCommentPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     slide_position: Position,
     drawable_position: Position,
@@ -471,10 +470,10 @@ pub struct SlideDrawableCommentPatch {
     deleted_previews: usize,
 }
 
-impl fmt::Debug for SlideDrawableCommentPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideDrawableCommentPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("drawable_position", &self.drawable_position)
             .field("kind", &self.kind)
@@ -484,7 +483,7 @@ impl fmt::Debug for SlideDrawableCommentPatch {
     }
 }
 
-impl SlideDrawableCommentPatch {
+impl Patch {
     /// Return the selected slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -551,14 +550,14 @@ impl SlideDrawableCommentPatch {
 
 /// Compact evidence describing one direct-drawable comment commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideDrawableCommentDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideDrawableCommentDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -606,13 +605,13 @@ impl SlideDrawableCommentDiagnostics {
 /// The fully verified result of one immutable direct-drawable comment edit.
 #[must_use = "a Keynote direct-drawable comment commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideDrawableCommentCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideDrawableCommentPatch,
-    diagnostics: SlideDrawableCommentDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideDrawableCommentCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -627,21 +626,19 @@ impl SlideDrawableCommentCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideDrawableCommentPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideDrawableCommentDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
 
-fn map_engine_diagnostics(
-    diagnostics: &engine::EngineDiagnostics,
-) -> SlideDrawableCommentDiagnostics {
-    SlideDrawableCommentDiagnostics::published(diagnostics.touched_components, 0)
+fn map_engine_diagnostics(diagnostics: &engine::EngineDiagnostics) -> Diagnostics {
+    Diagnostics::published(diagnostics.touched_components, 0)
 }
 
 impl Package {
@@ -649,7 +646,7 @@ impl Package {
     pub fn slide_drawables<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
-    ) -> Result<Box<[DrawableSummary]>, SlideDrawableCommentError> {
+    ) -> Result<Box<[DrawableSummary]>, Error> {
         let mut budget = budget_for(self)?;
         graph::inventory_drawables(self, slide_selector.into(), &mut budget)
     }
@@ -659,7 +656,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         drawable_selector: impl Into<DrawableSelector>,
-    ) -> Result<Option<Comment>, SlideDrawableCommentError> {
+    ) -> Result<Option<Comment>, Error> {
         let mut budget = budget_for(self)?;
         let selection = graph::select_drawable(
             self,
@@ -677,7 +674,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         drawable_selector: impl Into<DrawableSelector>,
-    ) -> Result<Box<[Reply]>, SlideDrawableCommentError> {
+    ) -> Result<Box<[Reply]>, Error> {
         let mut budget = budget_for(self)?;
         let selection = graph::select_drawable(
             self,
@@ -693,15 +690,12 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         drawable_selector: impl Into<DrawableSelector>,
-    ) -> Result<SlideDrawableCommentEdit<'_>, SlideDrawableCommentError> {
-        SlideDrawableCommentEdit::new(self, slide_selector, drawable_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, drawable_selector)
     }
 
     /// Apply an exact-source-checked direct-drawable comment patch.
-    pub fn apply_slide_drawable_comment(
-        &self,
-        patch: &SlideDrawableCommentPatch,
-    ) -> Result<SlideDrawableCommentCommit, SlideDrawableCommentError> {
+    pub fn apply_slide_drawable_comment(&self, patch: &Patch) -> Result<Commit, Error> {
         let source_catalog = physical_catalog(self)?;
         let source = source_catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
@@ -720,10 +714,10 @@ impl Package {
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideDrawableCommentCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideDrawableCommentDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         charge_candidate_reopen(&mut budget, self, patch.artifacts.target().len(), true)?;
@@ -744,13 +738,10 @@ impl Package {
         if candidate_thread != patch.after {
             return Err(Error::Verification);
         }
-        Ok(SlideDrawableCommentCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: SlideDrawableCommentDiagnostics::published(
-                patch.touched_components,
-                patch.deleted_previews,
-            ),
+            diagnostics: Diagnostics::published(patch.touched_components, patch.deleted_previews),
         })
     }
 }
@@ -799,7 +790,7 @@ fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
 fn copy_text(text: &str, budget: &mut Budget) -> Result<Box<str>, Error> {
     if text.len() > MAX_COMMENT_TEXT_BYTES {
         return Err(Error::LimitExceeded {
-            kind: SlideDrawableCommentLimitKind::CommentBytes,
+            kind: LimitKind::CommentBytes,
             observed: text.len() as u64,
             maximum: MAX_COMMENT_TEXT_BYTES as u64,
         });
@@ -824,7 +815,7 @@ fn same_selection(left: &Selection, right: &Selection) -> bool {
         && left.comment_wire_path == right.comment_wire_path
 }
 
-fn same_selection_profile(patch: &SlideDrawableCommentPatch, selection: &Selection) -> bool {
+fn same_selection_profile(patch: &Patch, selection: &Selection) -> bool {
     patch.slide_position == selection.slide_position
         && patch.drawable_position == selection.drawable_position
         && patch.kind == selection.kind
@@ -950,8 +941,8 @@ fn verify_operation(
     Ok(())
 }
 
-fn map_lifecycle_error(error: super::slide_media_lifecycle::SlideMediaLifecycleError) -> Error {
-    use super::slide_media_lifecycle::SlideMediaLifecycleError as SourceError;
+fn map_lifecycle_error(error: super::slide_media_lifecycle::Error) -> Error {
+    use super::slide_media_lifecycle::Error as SourceError;
     match error {
         SourceError::UnsupportedSource => Error::UnsupportedSource,
         SourceError::EmptySlideName => Error::EmptySlideName,
@@ -983,23 +974,21 @@ fn map_lifecycle_error(error: super::slide_media_lifecycle::SlideMediaLifecycleE
     }
 }
 
-fn map_limit_kind(
-    kind: super::slide_media_lifecycle::SlideMediaLifecycleLimitKind,
-) -> SlideDrawableCommentLimitKind {
-    use super::slide_media_lifecycle::SlideMediaLifecycleLimitKind as SourceKind;
+fn map_limit_kind(kind: super::slide_media_lifecycle::LimitKind) -> LimitKind {
+    use super::slide_media_lifecycle::LimitKind as SourceKind;
     match kind {
-        SourceKind::InputBytes => SlideDrawableCommentLimitKind::InputBytes,
-        SourceKind::OutputBytes => SlideDrawableCommentLimitKind::OutputBytes,
-        SourceKind::Entries => SlideDrawableCommentLimitKind::Entries,
-        SourceKind::EntryBytes => SlideDrawableCommentLimitKind::EntryBytes,
-        SourceKind::TotalBytes => SlideDrawableCommentLimitKind::TotalBytes,
-        SourceKind::Slides => SlideDrawableCommentLimitKind::Slides,
-        SourceKind::References => SlideDrawableCommentLimitKind::References,
-        SourceKind::MediaBytes => SlideDrawableCommentLimitKind::MediaBytes,
-        SourceKind::WireFields => SlideDrawableCommentLimitKind::WireFields,
-        SourceKind::WireNesting => SlideDrawableCommentLimitKind::WireNesting,
-        SourceKind::WireWork => SlideDrawableCommentLimitKind::WireWork,
-        SourceKind::Allocations => SlideDrawableCommentLimitKind::Allocations,
+        SourceKind::InputBytes => LimitKind::InputBytes,
+        SourceKind::OutputBytes => LimitKind::OutputBytes,
+        SourceKind::Entries => LimitKind::Entries,
+        SourceKind::EntryBytes => LimitKind::EntryBytes,
+        SourceKind::TotalBytes => LimitKind::TotalBytes,
+        SourceKind::Slides => LimitKind::Slides,
+        SourceKind::References => LimitKind::References,
+        SourceKind::MediaBytes => LimitKind::MediaBytes,
+        SourceKind::WireFields => LimitKind::WireFields,
+        SourceKind::WireNesting => LimitKind::WireNesting,
+        SourceKind::WireWork => LimitKind::WireWork,
+        SourceKind::Allocations => LimitKind::Allocations,
     }
 }
 
@@ -1012,9 +1001,9 @@ fn map_read_error(error: ReadError) -> Error {
             ..
         } => Error::LimitExceeded {
             kind: match kind {
-                SemanticLimitKind::Slides => SlideDrawableCommentLimitKind::Slides,
-                SemanticLimitKind::References => SlideDrawableCommentLimitKind::References,
-                _ => SlideDrawableCommentLimitKind::WireWork,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1026,10 +1015,10 @@ fn map_read_error(error: ReadError) -> Error {
             ..
         } => Error::LimitExceeded {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideDrawableCommentLimitKind::OutputBytes,
-                super::PayloadLimitKind::Fields => SlideDrawableCommentLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideDrawableCommentLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideDrawableCommentLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::OutputBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,

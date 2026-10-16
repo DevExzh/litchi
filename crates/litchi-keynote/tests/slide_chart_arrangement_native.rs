@@ -12,7 +12,8 @@ use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsch;
 use litchi_keynote::{
-    ChartArrangement, ChartArrangementError, ChartSelector, Package, SlideSelector,
+    ChartArrangement, ChartSelector, Package, SlideSelector,
+    chart::arrangement::Error as ChartArrangementError,
 };
 use prost::Message as _;
 

@@ -35,7 +35,7 @@ use litchi_numbers_wire::table_sidecars::{
     SidecarReadBudget, SidecarReference, SidecarTables,
 };
 use std::mem::size_of;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Package;
 use super::slide_table_core as core;
@@ -260,7 +260,7 @@ impl<'source> Iterator for NativeMessageIter<'source> {
 /// Finite resources charged by a focused Keynote slide-table cell read.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum SlideTableCellsLimitKind {
+pub enum LimitKind {
     /// Source bytes inspected by the selected graph and storage readers.
     InputBytes,
     /// Semantic output bytes retained by formula/rich-text rendering.
@@ -295,7 +295,7 @@ pub enum SlideTableCellsLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideTableCellsLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -321,14 +321,14 @@ impl fmt::Display for SlideTableCellsLimitKind {
 /// Content-free semantic location for a focused slide-table cell read.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum SlideTableCellsPath {
+pub enum Path {
     /// The complete Keynote package.
     Package,
     /// One selected slide/table pair.
     Table { slide: Position, table: Position },
 }
 
-impl fmt::Display for SlideTableCellsPath {
+impl fmt::Display for Path {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Package => formatter.write_str("package"),
@@ -345,9 +345,9 @@ impl fmt::Display for SlideTableCellsPath {
 }
 
 /// Failure from a focused Keynote slide-table cell read.
-#[derive(Clone, Debug, Eq, PartialEq, Error)]
+#[derive(Clone, Debug, Eq, PartialEq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableCellsError {
+pub enum Error {
     /// The source is not a physical Keynote package.
     #[error("this Keynote source does not support focused slide-table cell reads")]
     UnsupportedSource,
@@ -381,7 +381,7 @@ pub enum SlideTableCellsError {
     )]
     LimitExceeded {
         /// Resource category.
-        kind: SlideTableCellsLimitKind,
+        kind: LimitKind,
         /// Observed resource count.
         observed: u64,
         /// Configured resource ceiling.
@@ -410,7 +410,7 @@ struct ReadBudget<'package> {
 }
 
 impl<'package> ReadBudget<'package> {
-    fn new(package: &'package Package) -> Result<Self, SlideTableCellsError> {
+    fn new(package: &'package Package) -> Result<Self, Error> {
         Ok(Self {
             package,
             budget: core::Budget::new(package).map_err(map_core_error)?,
@@ -419,7 +419,7 @@ impl<'package> ReadBudget<'package> {
         })
     }
 
-    fn limits(&self) -> Result<WireLimits, SlideTableCellsError> {
+    fn limits(&self) -> Result<WireLimits, Error> {
         let residual = self.budget.residual(self.package).map_err(map_core_error)?;
         let input = self
             .budget
@@ -437,15 +437,12 @@ impl<'package> ReadBudget<'package> {
             .map_err(map_common_wire_error)
     }
 
-    fn storage_options(
-        &self,
-        source: &[u8],
-    ) -> Result<storage::DecodeOptions, SlideTableCellsError> {
+    fn storage_options(&self, source: &[u8]) -> Result<storage::DecodeOptions, Error> {
         let limits = self.limits()?;
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
             return Err(limit_error(
-                SlideTableCellsLimitKind::InputBytes,
+                LimitKind::InputBytes,
                 input,
                 limits.max_input_bytes(),
             ));
@@ -461,10 +458,7 @@ impl<'package> ReadBudget<'package> {
         ))
     }
 
-    fn charge_storage_report(
-        &mut self,
-        report: storage::DecodeReport,
-    ) -> Result<(), SlideTableCellsError> {
+    fn charge_storage_report(&mut self, report: storage::DecodeReport) -> Result<(), Error> {
         self.budget
             .input(report.source_bytes())
             .map_err(map_core_error)?;
@@ -488,26 +482,26 @@ impl<'package> ReadBudget<'package> {
         work: usize,
         references: usize,
         depth: usize,
-    ) -> Result<(), SlideTableCellsError> {
+    ) -> Result<(), Error> {
         self.budget.fields(fields).map_err(map_core_error)?;
         self.budget.work(work).map_err(map_core_error)?;
         self.budget.references(references).map_err(map_core_error)?;
         self.budget.nesting(depth).map_err(map_core_error)
     }
 
-    fn charge_text(&mut self, amount: usize) -> Result<(), SlideTableCellsError> {
+    fn charge_text(&mut self, amount: usize) -> Result<(), Error> {
         self.budget.retained(amount).map_err(map_core_error)?;
         self.budget.output(amount).map_err(map_core_error)
     }
 
-    fn copy_owned_text(&mut self, source: &str) -> Result<String, SlideTableCellsError> {
+    fn copy_owned_text(&mut self, source: &str) -> Result<String, Error> {
         self.budget.allocations(1).map_err(map_core_error)?;
         self.budget.retained(source.len()).map_err(map_core_error)?;
         self.budget.work(source.len()).map_err(map_core_error)?;
         let mut owned = String::new();
         owned
             .try_reserve_exact(source.len())
-            .map_err(|_| SlideTableCellsError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: source.len(),
             })?;
         owned.push_str(source);
@@ -516,7 +510,7 @@ impl<'package> ReadBudget<'package> {
 }
 
 impl TableCellReadBudget for ReadBudget<'_> {
-    type Error = SlideTableCellsError;
+    type Error = Error;
 
     fn storage_options(&mut self, source: &[u8]) -> Result<storage::DecodeOptions, Self::Error> {
         ReadBudget::storage_options(self, source)
@@ -546,7 +540,7 @@ impl TableCellReadBudget for ReadBudget<'_> {
         self.budget.allocations(amount).map_err(map_core_error)?;
         let bytes = amount
             .checked_mul(size_of::<u32>())
-            .ok_or(SlideTableCellsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.budget.retained(bytes).map_err(map_core_error)
     }
 
@@ -555,10 +549,10 @@ impl TableCellReadBudget for ReadBudget<'_> {
     }
 }
 
-fn check_materialized_cell_limit(observed: usize) -> Result<(), SlideTableCellsError> {
+fn check_materialized_cell_limit(observed: usize) -> Result<(), Error> {
     if observed > MAX_MATERIALIZED_CELLS {
         return Err(limit_error(
-            SlideTableCellsLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
             observed,
             MAX_MATERIALIZED_CELLS,
         ));
@@ -567,7 +561,7 @@ fn check_materialized_cell_limit(observed: usize) -> Result<(), SlideTableCellsE
 }
 
 impl SidecarReadBudget for ReadBudget<'_> {
-    type Error = SlideTableCellsError;
+    type Error = Error;
 
     fn list_options(
         &mut self,
@@ -623,7 +617,7 @@ impl SidecarReadBudget for ReadBudget<'_> {
                     .retained(
                         amount
                             .checked_mul(size_of::<u64>())
-                            .ok_or(SlideTableCellsError::InvalidSource)?,
+                            .ok_or(Error::InvalidSource)?,
                     )
                     .map_err(map_core_error)?;
             },
@@ -657,7 +651,7 @@ impl SidecarReadBudget for ReadBudget<'_> {
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
             return Err(limit_error(
-                SlideTableCellsLimitKind::InputBytes,
+                LimitKind::InputBytes,
                 input,
                 limits.max_input_bytes(),
             ));
@@ -705,7 +699,7 @@ impl SidecarReadBudget for ReadBudget<'_> {
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
             return Err(limit_error(
-                SlideTableCellsLimitKind::InputBytes,
+                LimitKind::InputBytes,
                 input,
                 limits.max_input_bytes(),
             ));
@@ -747,7 +741,7 @@ impl SidecarReadBudget for ReadBudget<'_> {
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
             return Err(limit_error(
-                SlideTableCellsLimitKind::InputBytes,
+                LimitKind::InputBytes,
                 input,
                 limits.max_input_bytes(),
             ));
@@ -800,22 +794,22 @@ impl SidecarReadBudget for ReadBudget<'_> {
 }
 
 impl FormulaRenderBudget for ReadBudget<'_> {
-    type Error = SlideTableCellsError;
+    type Error = Error;
 
     fn output_limit(&self, observed: usize) -> Self::Error {
         limit_error(
-            SlideTableCellsLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
             observed,
             self.package.limits().max_total_bytes() as usize,
         )
     }
 
     fn allocation(&self, _resource: &'static str, amount: usize) -> Self::Error {
-        SlideTableCellsError::Allocation { amount }
+        Error::Allocation { amount }
     }
 
     fn invalid(&self, _message: &'static str) -> Self::Error {
-        SlideTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 
     fn check(&self, amount: usize) -> Result<(), Self::Error> {
@@ -833,11 +827,7 @@ impl FormulaRenderBudget for ReadBudget<'_> {
     fn check_structure(&self, nodes: usize, parts: usize) -> Result<(), Self::Error> {
         let maximum = self.budget.remaining_work().map_err(map_core_error)?;
         if nodes > maximum || parts > maximum {
-            return Err(limit_error(
-                SlideTableCellsLimitKind::WireWork,
-                nodes.max(parts),
-                maximum,
-            ));
+            return Err(limit_error(LimitKind::WireWork, nodes.max(parts), maximum));
         }
         Ok(())
     }
@@ -848,7 +838,7 @@ impl FormulaRenderBudget for ReadBudget<'_> {
         self.output_bytes = self
             .output_bytes
             .checked_add(amount)
-            .ok_or(SlideTableCellsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(())
     }
 }
@@ -857,21 +847,17 @@ impl FormulaEventRenderBudget for ReadBudget<'_> {
     fn check_render_depth(&self, depth: usize) -> Result<(), Self::Error> {
         let maximum = self.limits()?.max_nesting();
         if depth > maximum {
-            return Err(limit_error(
-                SlideTableCellsLimitKind::WireNesting,
-                depth,
-                maximum,
-            ));
+            return Err(limit_error(LimitKind::WireNesting, depth, maximum));
         }
         Ok(())
     }
 
     fn parse_error(&self, _message: String) -> Self::Error {
-        SlideTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 
     fn invalid_format(&self, _message: String) -> Self::Error {
-        SlideTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 }
 
@@ -946,7 +932,7 @@ const FORMULA_OWNER_MESSAGE_KIND: u32 = 4_008;
 const FORMULA_CATEGORY_MESSAGE_KIND: u32 = 6_383;
 
 impl FormulaNameResolver {
-    fn build(package: &Package, budget: &mut ReadBudget<'_>) -> Result<Self, SlideTableCellsError> {
+    fn build(package: &Package, budget: &mut ReadBudget<'_>) -> Result<Self, Error> {
         let rooted =
             core::rooted_table_name_catalog(package, &mut budget.budget).map_err(map_core_error)?;
         let target_count = rooted.len();
@@ -958,14 +944,14 @@ impl FormulaNameResolver {
                 .retained(
                     target_count
                         .checked_mul(size_of::<Box<str>>())
-                        .ok_or(SlideTableCellsError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
                 .map_err(map_core_error)?;
-            table_names.try_reserve_exact(target_count).map_err(|_| {
-                SlideTableCellsError::Allocation {
+            table_names
+                .try_reserve_exact(target_count)
+                .map_err(|_| Error::Allocation {
                     amount: target_count,
-                }
-            })?;
+                })?;
         }
         let mut table_indices = HashMap::new();
         if target_count != 0 {
@@ -975,14 +961,14 @@ impl FormulaNameResolver {
                 .retained(
                     target_count
                         .checked_mul(size_of::<(u64, usize)>())
-                        .ok_or(SlideTableCellsError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
                 .map_err(map_core_error)?;
-            table_indices.try_reserve(target_count).map_err(|_| {
-                SlideTableCellsError::Allocation {
+            table_indices
+                .try_reserve(target_count)
+                .map_err(|_| Error::Allocation {
                     amount: target_count,
-                }
-            })?;
+                })?;
         }
         for table in rooted {
             let index = table_names.len();
@@ -990,7 +976,7 @@ impl FormulaNameResolver {
                 .insert(table.table_info_identifier, index)
                 .is_some()
             {
-                return Err(SlideTableCellsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             table_names.push(table.name);
         }
@@ -1007,7 +993,7 @@ impl FormulaNameResolver {
                         .data
                         .len()
                         .checked_add(1)
-                        .ok_or(SlideTableCellsError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     budget.budget.work(work).map_err(map_core_error)?;
                     if message.type_ == FORMULA_CATEGORY_MESSAGE_KIND {
                         read_formula_categories(&message.data, &mut categories, budget)?;
@@ -1056,12 +1042,12 @@ impl FormulaNameResolver {
                         .map_err(map_core_error)?;
                     owners
                         .try_reserve(1)
-                        .map_err(|_| SlideTableCellsError::Allocation { amount: 1 })?;
+                        .map_err(|_| Error::Allocation { amount: 1 })?;
                     if owners
                         .insert(projection.cfuuid_words(), table_index)
                         .is_some()
                     {
-                        return Err(SlideTableCellsError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                 }
             }
@@ -1080,20 +1066,20 @@ impl FormulaNameResolver {
 fn formula_name_wire_limits(
     budget: &ReadBudget<'_>,
     source_len: usize,
-) -> Result<WireLimits, SlideTableCellsError> {
+) -> Result<WireLimits, Error> {
     let limits = budget.limits()?;
     let fields = limits.max_fields();
     let work = limits.max_rewrite_work();
     if fields == 0 {
-        return Err(limit_error(SlideTableCellsLimitKind::WireFields, 1, fields));
+        return Err(limit_error(LimitKind::WireFields, 1, fields));
     }
     if work == 0 {
-        return Err(limit_error(SlideTableCellsLimitKind::WireWork, 1, work));
+        return Err(limit_error(LimitKind::WireWork, 1, work));
     }
     let input = work.max(source_len);
     if input > limits.max_input_bytes() {
         return Err(limit_error(
-            SlideTableCellsLimitKind::InputBytes,
+            LimitKind::InputBytes,
             input,
             limits.max_input_bytes(),
         ));
@@ -1111,7 +1097,7 @@ fn charge_formula_name_report(
     input_bytes: usize,
     fields: usize,
     work: usize,
-) -> Result<(), SlideTableCellsError> {
+) -> Result<(), Error> {
     budget.budget.input(input_bytes).map_err(map_core_error)?;
     budget.charge_budget_report(fields, work, 0, 0)
 }
@@ -1120,7 +1106,7 @@ fn read_formula_categories(
     source: &[u8],
     categories: &mut HashMap<[u64; 2], Box<str>>,
     budget: &mut ReadBudget<'_>,
-) -> Result<(), SlideTableCellsError> {
+) -> Result<(), Error> {
     let limits = formula_name_wire_limits(budget, source.len())?;
     let category_limits = formula_names::CategoryReadLimits {
         wire: limits,
@@ -1164,12 +1150,12 @@ fn read_formula_categories(
                 .entries
                 .len()
                 .checked_mul(size_of::<([u64; 2], Box<str>)>())
-                .ok_or(SlideTableCellsError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_core_error)?;
     categories
         .try_reserve(projection.entries.len())
-        .map_err(|_| SlideTableCellsError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: projection.entries.len(),
         })?;
     for entry in projection.entries {
@@ -1180,13 +1166,13 @@ fn read_formula_categories(
         let mut label = String::new();
         label
             .try_reserve_exact(reserve)
-            .map_err(|_| SlideTableCellsError::Allocation { amount: reserve })?;
-        write!(&mut label, "{}", entry.label()).map_err(|_| SlideTableCellsError::InvalidSource)?;
+            .map_err(|_| Error::Allocation { amount: reserve })?;
+        write!(&mut label, "{}", entry.label()).map_err(|_| Error::InvalidSource)?;
         if categories
             .insert(entry.id(), label.into_boxed_str())
             .is_some()
         {
-            return Err(SlideTableCellsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1196,7 +1182,7 @@ fn read_sidecars(
     package: &Package,
     data_store: storage::DataStoreSnapshot<'_>,
     budget: &mut ReadBudget<'_>,
-) -> Result<SidecarTables, SlideTableCellsError> {
+) -> Result<SidecarTables, Error> {
     let mut tables = SidecarTables::new();
     let required = [
         (SidecarKind::Strings, data_store.string_table().identifier()),
@@ -1232,7 +1218,7 @@ fn read_one_sidecar(
     kind: SidecarKind,
     identifier: u64,
     budget: &mut ReadBudget<'_>,
-) -> Result<sidecars::SidecarList, SlideTableCellsError> {
+) -> Result<sidecars::SidecarList, Error> {
     let Some(root) =
         resolve_messages(package, identifier, &mut budget.budget).map_err(map_core_error)?
     else {
@@ -1279,7 +1265,7 @@ impl<'sidecars, 'names> KeynoteCellSink<'sidecars, 'names> {
         }
     }
 
-    fn finish(self) -> Result<TableRead, SlideTableCellsError> {
+    fn finish(self) -> Result<TableRead, Error> {
         let table = self.table.finish().map_err(map_common_table_error)?;
         TableRead::try_from_owned_parts(table, self.comments).map_err(map_common_table_error)
     }
@@ -1290,7 +1276,7 @@ impl CellValueSink<ReadBudget<'_>> for KeynoteCellSink<'_, '_> {
         &mut self,
         cell: wire_cells::CellSource<'_>,
         budget: &mut ReadBudget<'_>,
-    ) -> Result<(), SlideTableCellsError> {
+    ) -> Result<(), Error> {
         budget.budget.allocations(1).map_err(map_core_error)?;
         budget
             .budget
@@ -1322,7 +1308,7 @@ impl CellValueSink<ReadBudget<'_>> for KeynoteCellSink<'_, '_> {
                 .map_err(map_core_error)?;
             self.comments
                 .try_reserve(1)
-                .map_err(|_| SlideTableCellsError::Allocation {
+                .map_err(|_| Error::Allocation {
                     amount: self.comments.len().saturating_add(1),
                 })?;
             self.comments.push(CellComment::new(
@@ -1345,60 +1331,57 @@ impl<'package, 'budget, 'names> KeynoteCellSidecarResolver<'package, 'budget, 'n
     fn canonical_message<'source>(
         messages: NativeMessages<'source>,
         kind: u32,
-    ) -> Result<&'source [u8], SlideTableCellsError> {
+    ) -> Result<&'source [u8], Error> {
         let mut payload = None;
         for message in messages {
             if message.kind != kind {
                 continue;
             }
             if payload.replace(message.data).is_some() {
-                return Err(SlideTableCellsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
-        payload.ok_or(SlideTableCellsError::InvalidSource)
+        payload.ok_or(Error::InvalidSource)
     }
 
     fn canonical_message_kinds<'source>(
         messages: NativeMessages<'source>,
         kinds: &[u32; 2],
-    ) -> Result<&'source [u8], SlideTableCellsError> {
+    ) -> Result<&'source [u8], Error> {
         let mut payload = None;
         for message in messages {
             if !kinds.contains(&message.kind) {
                 continue;
             }
             if payload.replace(message.data).is_some() {
-                return Err(SlideTableCellsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
-        payload.ok_or(SlideTableCellsError::InvalidSource)
+        payload.ok_or(Error::InvalidSource)
     }
 
     fn resolve_object_payload(
         &mut self,
         reference: SidecarReference,
         kind: u32,
-    ) -> Result<&'package [u8], SlideTableCellsError> {
+    ) -> Result<&'package [u8], Error> {
         let messages = resolve_messages(
             self.budget.package,
             reference.identifier(),
             &mut self.budget.budget,
         )
         .map_err(map_core_error)?
-        .ok_or(SlideTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
         Self::canonical_message(messages, kind)
     }
 
-    fn read_author(
-        &mut self,
-        reference: SidecarReference,
-    ) -> Result<CommentAuthor, SlideTableCellsError> {
+    fn read_author(&mut self, reference: SidecarReference) -> Result<CommentAuthor, Error> {
         let payload = self.resolve_object_payload(reference, ANNOTATION_AUTHOR_MESSAGE_KIND)?;
         let limits = self.budget.limits()?;
         let bytes = payload.len().max(1);
         if bytes > limits.max_input_bytes() {
             return Err(limit_error(
-                SlideTableCellsLimitKind::InputBytes,
+                LimitKind::InputBytes,
                 bytes,
                 limits.max_input_bytes(),
             ));
@@ -1424,7 +1407,7 @@ impl<'package, 'budget, 'names> KeynoteCellSidecarResolver<'package, 'budget, 'n
         );
         let (snapshot, report) =
             annotation_author_codec::decode_annotation_author_with_report(payload, options)
-                .map_err(|_| SlideTableCellsError::InvalidSource)?;
+                .map_err(|_| Error::InvalidSource)?;
         self.budget
             .budget
             .input(report.source_bytes())
@@ -1450,21 +1433,18 @@ impl<'package, 'budget, 'names> KeynoteCellSidecarResolver<'package, 'budget, 'n
             .map_err(map_common_table_error)
     }
 
-    fn read_reply(
-        &mut self,
-        reference: SidecarReference,
-    ) -> Result<CommentReply, SlideTableCellsError> {
+    fn read_reply(&mut self, reference: SidecarReference) -> Result<CommentReply, Error> {
         let messages = resolve_messages(
             self.budget.package,
             reference.identifier(),
             &mut self.budget.budget,
         )
         .map_err(map_core_error)?
-        .ok_or(SlideTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
         let storage = sidecars::read_comment_storage(reference, messages, &mut *self.budget)?;
         let (text, timestamp, author_reference, replies, _storage_uuid) = storage.into_parts();
         if !replies.is_empty() {
-            return Err(SlideTableCellsError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         let author = author_reference
             .map(|reference| self.read_author(reference))
@@ -1474,7 +1454,7 @@ impl<'package, 'budget, 'names> KeynoteCellSidecarResolver<'package, 'budget, 'n
 }
 
 impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
-    type Error = SlideTableCellsError;
+    type Error = Error;
 
     fn rich_text(&mut self, reference: SidecarReference) -> Result<String, Self::Error> {
         let payload = self.resolve_object_payload(reference, RICH_TEXT_PAYLOAD_MESSAGE_KIND)?;
@@ -1487,14 +1467,14 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
             report.max_depth(),
         )?;
         let storage_reference =
-            SidecarReference::new(storage_identifier).ok_or(SlideTableCellsError::InvalidSource)?;
+            SidecarReference::new(storage_identifier).ok_or(Error::InvalidSource)?;
         let messages = resolve_messages(
             self.budget.package,
             storage_reference.identifier(),
             &mut self.budget.budget,
         )
         .map_err(map_core_error)?
-        .ok_or(SlideTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
         let storage_payload =
             Self::canonical_message_kinds(messages, &RICH_TEXT_STORAGE_MESSAGE_KINDS)?;
         self.budget
@@ -1507,9 +1487,9 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
             limits.max_fields().max(1),
             limits.max_rewrite_work().max(1),
         )
-        .map_err(|_| SlideTableCellsError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
         let storage = litchi_iwa_text_wire::from_bytes_with_limits(storage_payload, text_limits)
-            .map_err(|_| SlideTableCellsError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         self.budget.charge_text(storage.len())?;
         Ok(storage.into_text())
     }
@@ -1522,7 +1502,7 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
         column: u32,
     ) -> Result<String, Self::Error> {
         let Some(resolver) = self.formula_names else {
-            return Err(SlideTableCellsError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         };
         let rendered = sidecars::render_formula(
             source,
@@ -1535,7 +1515,7 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
             &mut *self.budget,
         )?;
         if resolver.has_unresolved_reference() {
-            return Err(SlideTableCellsError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         Ok(rendered)
     }
@@ -1547,7 +1527,7 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
             &mut self.budget.budget,
         )
         .map_err(map_core_error)?
-        .ok_or(SlideTableCellsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
         let storage = sidecars::read_comment_storage(reference, messages, &mut *self.budget)?;
         let (text, timestamp, author_reference, reply_references, _storage_uuid) =
             storage.into_parts();
@@ -1562,14 +1542,14 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
                     reply_references
                         .len()
                         .checked_mul(size_of::<CommentReply>())
-                        .ok_or(SlideTableCellsError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
                 .map_err(map_core_error)?;
         }
         let mut replies = Vec::new();
         replies
             .try_reserve_exact(reply_references.len())
-            .map_err(|_| SlideTableCellsError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: reply_references.len(),
             })?;
         for reply in reply_references {
@@ -1593,7 +1573,7 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
         let mut value = String::new();
         value
             .try_reserve_exact(source.len())
-            .map_err(|_| SlideTableCellsError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: source.len(),
             })?;
         value.push_str(source);
@@ -1601,22 +1581,22 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
     }
 
     fn missing(&mut self, _kind: SidecarKind, _key: u32) -> Self::Error {
-        SlideTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 
     fn invalid_scalar(&mut self) -> Self::Error {
-        SlideTableCellsError::InvalidSource
+        Error::InvalidSource
     }
 }
 
 fn preflight_rich_text_payload(
     source: &[u8],
     limits: WireLimits,
-) -> Result<(u64, litchi_iwa_common::wire::WirePreflight), SlideTableCellsError> {
+) -> Result<(u64, litchi_iwa_common::wire::WirePreflight), Error> {
     let input = source.len().max(1);
     if input > limits.max_input_bytes() {
         return Err(limit_error(
-            SlideTableCellsLimitKind::InputBytes,
+            LimitKind::InputBytes,
             input,
             limits.max_input_bytes(),
         ));
@@ -1648,14 +1628,11 @@ fn preflight_rich_text_payload(
         }
         Ok(WireDescent::Skip)
     })
-    .map_err(|_| SlideTableCellsError::InvalidSource)?;
+    .map_err(|_| Error::InvalidSource)?;
     if !has_cell_owner {
-        return Err(SlideTableCellsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    Ok((
-        storage_identifier.ok_or(SlideTableCellsError::InvalidSource)?,
-        report,
-    ))
+    Ok((storage_identifier.ok_or(Error::InvalidSource)?, report))
 }
 
 fn parse_local_reference(
@@ -1699,7 +1676,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<TableRead, SlideTableCellsError> {
+    ) -> Result<TableRead, Error> {
         let mut budget = ReadBudget::new(self)?;
         let selected =
             selected_slide_table_storage(self, slide.into(), table.into(), &mut budget.budget)
@@ -1732,12 +1709,8 @@ impl Package {
     }
 }
 
-fn limit_error(
-    kind: SlideTableCellsLimitKind,
-    observed: usize,
-    maximum: usize,
-) -> SlideTableCellsError {
-    SlideTableCellsError::LimitExceeded {
+fn limit_error(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
         kind,
         observed: usize_as_u64(observed),
         maximum: usize_as_u64(maximum),
@@ -1748,64 +1721,58 @@ fn usize_as_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
-fn map_core_error(error: core::Error) -> SlideTableCellsError {
+fn map_core_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => SlideTableCellsError::UnsupportedSource,
-        core::Error::UnsupportedDependency => SlideTableCellsError::UnsupportedDependency,
-        core::Error::UnsupportedTopology => SlideTableCellsError::UnsupportedTopology,
-        core::Error::AmbiguousSelector => SlideTableCellsError::AmbiguousSelector,
-        core::Error::EmptySlideName => SlideTableCellsError::EmptySlideName,
-        core::Error::SlideNameNotFound => SlideTableCellsError::SlideNameNotFound,
-        core::Error::SlidePositionNotFound(position) => {
-            SlideTableCellsError::SlidePositionNotFound { position }
-        },
-        core::Error::TablePositionNotFound(position) => {
-            SlideTableCellsError::TablePositionNotFound { position }
-        },
+        core::Error::UnsupportedSource => Error::UnsupportedSource,
+        core::Error::UnsupportedDependency => Error::UnsupportedDependency,
+        core::Error::UnsupportedTopology => Error::UnsupportedTopology,
+        core::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        core::Error::EmptySlideName => Error::EmptySlideName,
+        core::Error::SlideNameNotFound => Error::SlideNameNotFound,
+        core::Error::SlidePositionNotFound(position) => Error::SlidePositionNotFound { position },
+        core::Error::TablePositionNotFound(position) => Error::TablePositionNotFound { position },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableCellsError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_core_limit(kind),
             observed,
             maximum,
         },
-        core::Error::Allocation(amount) => SlideTableCellsError::Allocation { amount },
+        core::Error::Allocation(amount) => Error::Allocation { amount },
         core::Error::InvalidSource
         | core::Error::Read
         | core::Error::Wire
         | core::Error::Codec
         | core::Error::Archive
-        | core::Error::Verification => SlideTableCellsError::InvalidSource,
+        | core::Error::Verification => Error::InvalidSource,
     }
 }
 
-fn map_core_limit(kind: core::LimitKind) -> SlideTableCellsLimitKind {
+fn map_core_limit(kind: core::LimitKind) -> LimitKind {
     match kind {
-        core::LimitKind::InputBytes => SlideTableCellsLimitKind::InputBytes,
-        core::LimitKind::OutputBytes => SlideTableCellsLimitKind::OutputBytes,
-        core::LimitKind::Entries => SlideTableCellsLimitKind::Entries,
-        core::LimitKind::EntryBytes => SlideTableCellsLimitKind::EntryBytes,
-        core::LimitKind::TotalBytes => SlideTableCellsLimitKind::TotalBytes,
-        core::LimitKind::PayloadObjects => SlideTableCellsLimitKind::PayloadObjects,
-        core::LimitKind::PayloadMessages => SlideTableCellsLimitKind::PayloadMessages,
-        core::LimitKind::References => SlideTableCellsLimitKind::References,
-        core::LimitKind::WireFields => SlideTableCellsLimitKind::WireFields,
-        core::LimitKind::WireNesting => SlideTableCellsLimitKind::WireNesting,
-        core::LimitKind::WireWork => SlideTableCellsLimitKind::WireWork,
-        core::LimitKind::Allocations => SlideTableCellsLimitKind::Allocations,
-        core::LimitKind::Retained => SlideTableCellsLimitKind::Retained,
-        core::LimitKind::Scratch => SlideTableCellsLimitKind::Scratch,
-        core::LimitKind::Components => SlideTableCellsLimitKind::Components,
+        core::LimitKind::InputBytes => LimitKind::InputBytes,
+        core::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        core::LimitKind::Entries => LimitKind::Entries,
+        core::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        core::LimitKind::TotalBytes => LimitKind::TotalBytes,
+        core::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        core::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        core::LimitKind::References => LimitKind::References,
+        core::LimitKind::WireFields => LimitKind::WireFields,
+        core::LimitKind::WireNesting => LimitKind::WireNesting,
+        core::LimitKind::WireWork => LimitKind::WireWork,
+        core::LimitKind::Allocations => LimitKind::Allocations,
+        core::LimitKind::Retained => LimitKind::Retained,
+        core::LimitKind::Scratch => LimitKind::Scratch,
+        core::LimitKind::Components => LimitKind::Components,
     }
 }
 
-fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> SlideTableCellsError {
+fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> Error {
     match issue {
-        wire_cells::TableCellIssue::Allocation { amount, .. } => {
-            SlideTableCellsError::Allocation { amount }
-        },
+        wire_cells::TableCellIssue::Allocation { amount, .. } => Error::Allocation { amount },
         wire_cells::TableCellIssue::StorageDecode(error) => map_storage_error(error),
         wire_cells::TableCellIssue::CellValueDecode { error, .. } => map_cell_value_error(error),
         wire_cells::TableCellIssue::CounterOverflow
@@ -1817,52 +1784,44 @@ fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> SlideTableCellsErr
         | wire_cells::TableCellIssue::RowCoordinateOverflow { .. }
         | wire_cells::TableCellIssue::TableRowOutOfBounds { .. }
         | wire_cells::TableCellIssue::DuplicateTileRow { .. }
-        | wire_cells::TableCellIssue::CellStorageOutOfBounds { .. } => {
-            SlideTableCellsError::InvalidSource
-        },
+        | wire_cells::TableCellIssue::CellStorageOutOfBounds { .. } => Error::InvalidSource,
     }
 }
 
-fn map_storage_error(error: storage::DecodeError) -> SlideTableCellsError {
+fn map_storage_error(error: storage::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return SlideTableCellsError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
         storage::DecodeLimit::Bytes { observed, maximum }
         | storage::DecodeLimit::Retained { observed, maximum } => {
-            limit_error(SlideTableCellsLimitKind::InputBytes, observed, maximum)
+            limit_error(LimitKind::InputBytes, observed, maximum)
         },
         storage::DecodeLimit::References { observed, maximum } => {
-            limit_error(SlideTableCellsLimitKind::References, observed, maximum)
+            limit_error(LimitKind::References, observed, maximum)
         },
         storage::DecodeLimit::Text { observed, maximum } => {
-            limit_error(SlideTableCellsLimitKind::Retained, observed, maximum)
+            limit_error(LimitKind::Retained, observed, maximum)
         },
         storage::DecodeLimit::Fields { observed, maximum } => {
-            limit_error(SlideTableCellsLimitKind::WireFields, observed, maximum)
+            limit_error(LimitKind::WireFields, observed, maximum)
         },
         storage::DecodeLimit::Work { observed, maximum } => {
-            limit_error(SlideTableCellsLimitKind::WireWork, observed, maximum)
+            limit_error(LimitKind::WireWork, observed, maximum)
         },
-        storage::DecodeLimit::Nesting { observed, maximum } => limit_error(
-            SlideTableCellsLimitKind::WireNesting,
-            observed as usize,
-            maximum as usize,
-        ),
-        storage::DecodeLimit::Allocation { requested } => {
-            SlideTableCellsError::Allocation { amount: requested }
+        storage::DecodeLimit::Nesting { observed, maximum } => {
+            limit_error(LimitKind::WireNesting, observed as usize, maximum as usize)
         },
-        _ => SlideTableCellsError::InvalidSource,
+        storage::DecodeLimit::Allocation { requested } => Error::Allocation { amount: requested },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_cell_value_error(
-    _error: litchi_numbers_wire::cell_value::DecodeError,
-) -> SlideTableCellsError {
-    SlideTableCellsError::InvalidSource
+fn map_cell_value_error(_error: litchi_numbers_wire::cell_value::DecodeError) -> Error {
+    Error::InvalidSource
 }
 
-fn map_common_wire_error(error: litchi_iwa_common::Error) -> SlideTableCellsError {
+fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
@@ -1870,32 +1829,28 @@ fn map_common_wire_error(error: litchi_iwa_common::Error) -> SlideTableCellsErro
             limit,
         } => limit_error(
             match kind {
-                litchi_iwa_common::LimitKind::InputBytes => SlideTableCellsLimitKind::InputBytes,
-                litchi_iwa_common::LimitKind::Fields => SlideTableCellsLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::OutputBytes => SlideTableCellsLimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::Nesting => SlideTableCellsLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => SlideTableCellsLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    SlideTableCellsLimitKind::PayloadItems
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::PayloadItems,
             },
             observed,
             limit,
         ),
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SlideTableCellsError::Allocation { amount }
-        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => SlideTableCellsError::InvalidSource,
+        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
     }
 }
 
-fn map_sidecar_issue(issue: SidecarIssue) -> SlideTableCellsError {
+fn map_sidecar_issue(issue: SidecarIssue) -> Error {
     match issue {
-        SidecarIssue::Allocation { amount, .. } => SlideTableCellsError::Allocation { amount },
+        SidecarIssue::Allocation { amount, .. } => Error::Allocation { amount },
         SidecarIssue::Coordinator(_)
         | SidecarIssue::StorageDecode { .. }
         | SidecarIssue::CommentDecode(_)
@@ -1907,20 +1862,20 @@ fn map_sidecar_issue(issue: SidecarIssue) -> SlideTableCellsError {
         | SidecarIssue::DuplicateKey { .. }
         | SidecarIssue::DuplicateSegmentReference { .. }
         | SidecarIssue::DuplicateList { .. }
-        | SidecarIssue::InvalidReplies => SlideTableCellsError::InvalidSource,
-        _ => SlideTableCellsError::InvalidSource,
+        | SidecarIssue::InvalidReplies => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_common_table_error(error: litchi_iwa_common::table::model::Error) -> SlideTableCellsError {
+fn map_common_table_error(error: litchi_iwa_common::table::model::Error) -> Error {
     match error {
         litchi_iwa_common::table::model::Error::Allocation { amount, .. } => {
-            SlideTableCellsError::Allocation { amount }
+            Error::Allocation { amount }
         },
         litchi_iwa_common::table::model::Error::BudgetExceeded { requested, maximum } => {
-            limit_error(SlideTableCellsLimitKind::PayloadItems, requested, maximum)
+            limit_error(LimitKind::PayloadItems, requested, maximum)
         },
-        _ => SlideTableCellsError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1985,8 +1940,8 @@ mod tests {
             .expect_err("the next cumulative cell must be refused");
         assert_eq!(
             error,
-            SlideTableCellsError::LimitExceeded {
-                kind: SlideTableCellsLimitKind::PayloadItems,
+            Error::LimitExceeded {
+                kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(MAX_MATERIALIZED_CELLS + 1),
                 maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
             }
@@ -2063,7 +2018,7 @@ mod tests {
         ];
         assert!(matches!(
             preflight_rich_text_payload(&source, WireLimits::default()),
-            Err(SlideTableCellsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -2098,7 +2053,7 @@ mod tests {
                     },
                     &RICH_TEXT_STORAGE_MESSAGE_KINDS,
                 ),
-                Err(SlideTableCellsError::InvalidSource)
+                Err(Error::InvalidSource)
             ));
         }
     }

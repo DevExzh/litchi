@@ -1,6 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
@@ -11,7 +12,7 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
 use litchi_keynote::{
-    Limits, Package, ReadError, ReadOptions, Seconds, SemanticLimits,
+    OpenOptions, Package, ReadError, Seconds, SemanticLimits, SourceLimits,
     show::{
         Commit as ShowSettingsCommit, Diagnostics as ShowSettingsDiagnostics,
         Edit as ShowSettingsEdit, Error as ShowSettingsError, LimitKind as ShowSettingsLimitKind,
@@ -1023,7 +1024,7 @@ fn assert_optional_fields(package: &[u8], expected_count: usize) -> TestResult<(
     Ok(())
 }
 
-fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<Limits> {
+fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<SourceLimits> {
     let mut max_input_bytes = 0u64;
     let mut max_entries = 0usize;
     let mut max_entry_bytes = 0u64;
@@ -1055,13 +1056,13 @@ fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<Limits> {
     }
     max_total_bytes = max_total_bytes.max(u64::try_from(max_iwa_stream_bytes)?);
 
-    Ok(Limits::new(
-        max_input_bytes,
-        max_entries,
-        max_entry_bytes,
-        max_total_bytes,
-        max_iwa_stream_bytes,
-    )?)
+    Ok(SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)?
+        .max_entries(max_entries)?
+        .max_entry_bytes(max_entry_bytes)?
+        .max_aggregate_bytes(max_total_bytes)?
+        .max_component_bytes(max_iwa_stream_bytes)?
+        .build()?)
 }
 
 #[test]
@@ -1425,31 +1426,40 @@ fn nondefault_tight_limits_survive_read_edit_commit_and_apply() -> TestResult<()
     let target_bytes = written(baseline_commit.package())?;
 
     let physical = tight_limits_for(&[&bytes, &target_bytes])?;
-    let semantic = SemanticLimits::new(2, 1, 16, 1, 1, 64)?;
-    let options = ReadOptions::new(physical, semantic);
-    assert_ne!(options, ReadOptions::default());
+    let semantic = SemanticLimits::builder()
+        .max_objects(2)?
+        .max_slides(1)?
+        .max_references(16)?
+        .max_text_storages(1)?
+        .max_text_fragments(1)?
+        .max_text_bytes(64)?
+        .build()?;
+    let options = OpenOptions::new()
+        .source_limits(physical)
+        .semantic_limits(semantic);
+    assert_ne!(options, OpenOptions::default());
     assert_eq!(physical.max_entries(), 2);
     let expected_max_input = u64::try_from(bytes.len().max(target_bytes.len()))?;
     assert_eq!(physical.max_input_bytes(), expected_max_input);
 
     let package = Package::from_bytes_with_options(&bytes, options)?;
-    assert_eq!(package.read_options(), options);
+    assert_eq!(package.options(), options);
     assert_eq!(*package.show()?.settings(), Settings::default());
 
     let edit = package.edit_show_settings()?;
     assert_eq!(edit.settings(), Settings::default());
     let commit = edit.set(present_settings()?).commit()?;
-    assert_eq!(commit.package().read_options(), options);
+    assert_eq!(commit.package().options(), options);
     assert_eq!(written(commit.package())?, target_bytes);
 
     let applied = package.apply_show_settings(commit.patch())?;
-    assert_eq!(applied.package().read_options(), options);
+    assert_eq!(applied.package().options(), options);
     assert_eq!(written(applied.package())?, target_bytes);
 
     let restored = commit
         .package()
         .apply_show_settings(&commit.patch().inverse())?;
-    assert_eq!(restored.package().read_options(), options);
+    assert_eq!(restored.package().options(), options);
     assert_eq!(written(restored.package())?, bytes);
     Ok(())
 }
@@ -1458,9 +1468,16 @@ fn nondefault_tight_limits_survive_read_edit_commit_and_apply() -> TestResult<()
 fn focused_reader_reports_typed_slide_limit_before_publication() -> TestResult<()> {
     let bytes =
         package_bytes_with_slide_nodes(NativeSettings::absent(), Malformation::None, 150, &[3, 4])?;
-    let semantic = SemanticLimits::new(8, 1, 16, 1, 1, 64)?;
+    let semantic = SemanticLimits::builder()
+        .max_objects(8)?
+        .max_slides(1)?
+        .max_references(16)?
+        .max_text_storages(1)?
+        .max_text_fragments(1)?
+        .max_text_bytes(64)?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
 
     let expected = ShowSettingsError::LimitExceeded {
         kind: ShowSettingsLimitKind::Slides,
@@ -1969,7 +1986,7 @@ fn null_show_reader_matches_full_semantics_and_only_exact_noop_is_editable() -> 
     assert_eq!(*package.show()?.settings(), Settings::default());
     assert!(package.show()?.is_empty());
     assert!(package.slides()?.is_empty());
-    assert!(package.semantic_snapshot()?.slides().is_empty());
+    assert!(package.presentation()?.slides().is_empty());
     assert_eq!(package.text()?, "");
 
     let noop = package.edit_show_settings()?.commit()?;

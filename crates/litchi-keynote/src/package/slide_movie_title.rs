@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::{MovieSelector, SlideSelector};
@@ -28,7 +28,7 @@ const MAX_TITLE_BYTES: usize = 64 * 1024 * 1024;
 /// published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideMovieTitleLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     WireBytes,
@@ -46,7 +46,7 @@ pub enum SlideMovieTitleLimitKind {
     TitleBytes,
 }
 
-impl fmt::Display for SlideMovieTitleLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -69,9 +69,9 @@ impl fmt::Display for SlideMovieTitleLimitKind {
 }
 
 /// A content-redacted failure raised by a movie-title transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideMovieTitleError {
+pub enum Error {
     #[error("this Keynote source does not support physical movie-title edits")]
     UnsupportedSource,
     #[error("the requested Keynote movie-title graph operation is unsupported")]
@@ -90,7 +90,7 @@ pub enum SlideMovieTitleError {
     InvalidSource,
     #[error("Keynote movie-title {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     LimitExceeded {
-        kind: SlideMovieTitleLimitKind,
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -103,16 +103,16 @@ pub enum SlideMovieTitleError {
 }
 
 /// One mutable movie-title value staged against an immutable package.
-pub struct SlideMovieTitleEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: super::slide_movie_caption::MovieCaptionSelection,
     after: Option<String>,
 }
 
-impl fmt::Debug for SlideMovieTitleEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideMovieTitleEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.selection.slide_position)
             .field("movie_position", &self.selection.movie_position)
             .field("has_before", &self.selection.text.is_some())
@@ -121,12 +121,12 @@ impl fmt::Debug for SlideMovieTitleEdit<'_> {
     }
 }
 
-impl<'a> SlideMovieTitleEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Self, SlideMovieTitleError> {
+    ) -> Result<Self, Error> {
         let selection = select_title(source, slide_selector.into(), movie_selector.into(), true)?;
         let after = selection.text.as_deref().map(copy_title).transpose()?;
         Ok(Self {
@@ -156,17 +156,17 @@ impl<'a> SlideMovieTitleEdit<'a> {
         self.after.as_deref()
     }
 
-    pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, SlideMovieTitleError> {
+    pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, Error> {
         self.after = Some(copy_title(title.as_ref())?);
         Ok(self)
     }
 
-    pub fn clear(mut self) -> Result<Self, SlideMovieTitleError> {
+    pub fn clear(mut self) -> Result<Self, Error> {
         self.after = None;
         Ok(self)
     }
 
-    pub fn commit(self) -> Result<SlideMovieTitleCommit, SlideMovieTitleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
         let current = select_title(
@@ -176,13 +176,13 @@ impl<'a> SlideMovieTitleEdit<'a> {
             true,
         )?;
         if !current.same_identity(&self.selection) || current.text != self.selection.text {
-            return Err(SlideMovieTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if self.selection.text == self.after {
             self.source.validate().map_err(map_read_error)?;
-            return Ok(SlideMovieTitleCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: SlideMovieTitlePatch {
+                patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                     selection: self.selection,
                     target_selection: current,
@@ -191,11 +191,11 @@ impl<'a> SlideMovieTitleEdit<'a> {
                     deleted_previews: 0,
                     target_requires_invalidated_previews: false,
                 },
-                diagnostics: SlideMovieTitleDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(SlideMovieTitleError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
         self.source.validate().map_err(map_read_error)?;
         if self
@@ -208,7 +208,7 @@ impl<'a> SlideMovieTitleEdit<'a> {
                 .as_deref()
                 .is_some_and(super::slide_movie_caption::contains_dependent_marker)
         {
-            return Err(SlideMovieTitleError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         let mut budget = super::slide_chart_caption::CaptionBudget::for_package(self.source)
             .map_err(map_chart_error)?;
@@ -234,7 +234,7 @@ impl<'a> SlideMovieTitleEdit<'a> {
             true,
         )?;
         if !candidate.same_movie_identity(&self.selection) || candidate.text != self.after {
-            return Err(SlideMovieTitleError::Verification);
+            return Err(Error::Verification);
         }
         budget
             .charge_validation_scan(&package, 1)
@@ -251,9 +251,9 @@ impl<'a> SlideMovieTitleEdit<'a> {
         budget
             .charge_exact_artifacts(source_bytes.len(), target.len())
             .map_err(map_chart_error)?;
-        Ok(SlideMovieTitleCommit {
+        Ok(Commit {
             package,
-            patch: SlideMovieTitlePatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, target),
                 selection: self.selection,
                 target_selection: candidate,
@@ -262,17 +262,14 @@ impl<'a> SlideMovieTitleEdit<'a> {
                 deleted_previews,
                 target_requires_invalidated_previews: true,
             },
-            diagnostics: SlideMovieTitleDiagnostics::published(
-                touched_components,
-                deleted_previews,
-            ),
+            diagnostics: Diagnostics::published(touched_components, deleted_previews),
         })
     }
 }
 
 /// An exact-source-checked reversible movie-title patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideMovieTitlePatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: super::slide_movie_caption::MovieCaptionSelection,
     target_selection: super::slide_movie_caption::MovieCaptionSelection,
@@ -282,10 +279,10 @@ pub struct SlideMovieTitlePatch {
     target_requires_invalidated_previews: bool,
 }
 
-impl fmt::Debug for SlideMovieTitlePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideMovieTitlePatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.selection.slide_position)
             .field("movie_position", &self.selection.movie_position)
             .field("has_before", &self.selection.text.is_some())
@@ -294,7 +291,7 @@ impl fmt::Debug for SlideMovieTitlePatch {
     }
 }
 
-impl SlideMovieTitlePatch {
+impl Patch {
     #[must_use]
     pub const fn slide_position(&self) -> Position {
         self.selection.slide_position
@@ -347,14 +344,14 @@ impl SlideMovieTitlePatch {
 
 /// Compact evidence describing one movie-title commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SlideMovieTitleDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideMovieTitleDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -397,13 +394,13 @@ impl SlideMovieTitleDiagnostics {
 /// The fully verified result of one immutable movie-title transaction.
 #[must_use = "a Keynote movie-title commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideMovieTitleCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideMovieTitlePatch,
-    diagnostics: SlideMovieTitleDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideMovieTitleCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -415,12 +412,12 @@ impl SlideMovieTitleCommit {
     }
 
     #[must_use]
-    pub const fn patch(&self) -> &SlideMovieTitlePatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideMovieTitleDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -431,7 +428,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Option<String>, SlideMovieTitleError> {
+    ) -> Result<Option<String>, Error> {
         Ok(select_title(self, slide_selector.into(), movie_selector.into(), true)?.text)
     }
 
@@ -440,19 +437,16 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         movie_selector: impl Into<MovieSelector>,
-    ) -> Result<SlideMovieTitleEdit<'_>, SlideMovieTitleError> {
-        SlideMovieTitleEdit::new(self, slide_selector, movie_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, movie_selector)
     }
 
     /// Apply an exact-source-checked movie-title patch.
-    pub fn apply_slide_movie_title(
-        &self,
-        patch: &SlideMovieTitlePatch,
-    ) -> Result<SlideMovieTitleCommit, SlideMovieTitleError> {
+    pub fn apply_slide_movie_title(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(SlideMovieTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = select_title(
             self,
@@ -461,18 +455,18 @@ impl Package {
             true,
         )?;
         if !current.same_identity(&patch.selection) || current.text != patch.selection.text {
-            return Err(SlideMovieTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideMovieTitleCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideMovieTitleDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(SlideMovieTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = super::slide_chart_caption::CaptionBudget::for_package(self)
             .map_err(map_chart_error)?;
@@ -500,7 +494,7 @@ impl Package {
             true,
         )?;
         if !selected.same_identity(&patch.target_selection) || selected.text != patch.after {
-            return Err(SlideMovieTitleError::Verification);
+            return Err(Error::Verification);
         }
         budget
             .charge_validation_scan(&candidate, 1)
@@ -513,13 +507,10 @@ impl Package {
             patch.target_requires_invalidated_previews,
             &mut budget,
         )?;
-        Ok(SlideMovieTitleCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: SlideMovieTitleDiagnostics::published(
-                patch.touched_components,
-                patch.deleted_previews,
-            ),
+            diagnostics: Diagnostics::published(patch.touched_components, patch.deleted_previews),
         })
     }
 }
@@ -529,7 +520,7 @@ fn select_title(
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
     mutation_guards: bool,
-) -> Result<super::slide_movie_caption::MovieCaptionSelection, SlideMovieTitleError> {
+) -> Result<super::slide_movie_caption::MovieCaptionSelection, Error> {
     super::slide_movie_caption::select_movie_text(
         package,
         slide_selector,
@@ -545,23 +536,21 @@ fn rewrite_title(
     selection: &super::slide_movie_caption::MovieCaptionSelection,
     after: Option<&str>,
     budget: &mut super::slide_chart_caption::CaptionBudget,
-) -> Result<(Package, usize, usize), SlideMovieTitleError> {
+) -> Result<(Package, usize, usize), Error> {
     let result = if selection.storage_identifier.is_some() && after.is_some() {
         let end = selection
             .text
             .as_deref()
-            .ok_or(SlideMovieTitleError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .encode_utf16()
             .count();
         super::slide_chart_caption::rewrite_existing_caption_text_with_metadata_budget(
             source,
-            selection
-                .storage_identifier
-                .ok_or(SlideMovieTitleError::InvalidSource)?,
+            selection.storage_identifier.ok_or(Error::InvalidSource)?,
             selection.slide_node_identifier,
             &selection.slide_component_name,
             end,
-            after.ok_or(SlideMovieTitleError::InvalidSource)?,
+            after.ok_or(Error::InvalidSource)?,
             budget,
         )
     } else {
@@ -586,14 +575,12 @@ fn verify_title_transition(
     target: &super::slide_movie_caption::MovieCaptionSelection,
     require_invalidated_previews: bool,
     budget: &mut super::slide_chart_caption::CaptionBudget,
-) -> Result<(), SlideMovieTitleError> {
+) -> Result<(), Error> {
     if before.storage_identifier.is_some() && target.storage_identifier.is_some() {
         super::slide_chart_caption::verify_existing_text_metadata_candidate(
             source,
             candidate,
-            before
-                .storage_identifier
-                .ok_or(SlideMovieTitleError::InvalidSource)?,
+            before.storage_identifier.ok_or(Error::InvalidSource)?,
             before.slide_node_identifier,
             require_invalidated_previews,
             budget,
@@ -620,144 +607,108 @@ fn verify_title_transition(
             && !super::rendering_invalidation::root_previews_absent(
                 candidate.state.source.package(),
             )
-            .map_err(|_| SlideMovieTitleError::Verification)?
+            .map_err(|_| Error::Verification)?
         {
-            return Err(SlideMovieTitleError::Verification);
+            return Err(Error::Verification);
         }
         Ok(())
     }
 }
 
-fn copy_title(value: &str) -> Result<String, SlideMovieTitleError> {
+fn copy_title(value: &str) -> Result<String, Error> {
     if value.len() > MAX_TITLE_BYTES {
-        return Err(SlideMovieTitleError::LimitExceeded {
-            kind: SlideMovieTitleLimitKind::TitleBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::TitleBytes,
             observed: usize_to_u64(value.len()),
             maximum: usize_to_u64(MAX_TITLE_BYTES),
         });
     }
     let mut copy = String::new();
     copy.try_reserve_exact(value.len())
-        .map_err(|_| SlideMovieTitleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: value.len(),
         })?;
     copy.push_str(value);
     Ok(copy)
 }
 
-fn physical_catalog(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideMovieTitleError> {
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideMovieTitleError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
     }
 }
 
-fn map_movie_caption_error(
-    error: super::slide_movie_caption::SlideMovieCaptionError,
-) -> SlideMovieTitleError {
+fn map_movie_caption_error(error: super::slide_movie_caption::Error) -> Error {
     match error {
-        super::slide_movie_caption::SlideMovieCaptionError::UnsupportedSource => {
-            SlideMovieTitleError::UnsupportedSource
+        super::slide_movie_caption::Error::UnsupportedSource => Error::UnsupportedSource,
+        super::slide_movie_caption::Error::UnsupportedDependency => Error::UnsupportedDependency,
+        super::slide_movie_caption::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        super::slide_movie_caption::Error::EmptySlideName => Error::EmptySlideName,
+        super::slide_movie_caption::Error::SlideNameNotFound => Error::SlideNameNotFound,
+        super::slide_movie_caption::Error::SlidePositionNotFound { position } => {
+            Error::SlidePositionNotFound { position }
         },
-        super::slide_movie_caption::SlideMovieCaptionError::UnsupportedDependency => {
-            SlideMovieTitleError::UnsupportedDependency
+        super::slide_movie_caption::Error::MoviePositionNotFound { position } => {
+            Error::MoviePositionNotFound { position }
         },
-        super::slide_movie_caption::SlideMovieCaptionError::AmbiguousSelector => {
-            SlideMovieTitleError::AmbiguousSelector
-        },
-        super::slide_movie_caption::SlideMovieCaptionError::EmptySlideName => {
-            SlideMovieTitleError::EmptySlideName
-        },
-        super::slide_movie_caption::SlideMovieCaptionError::SlideNameNotFound => {
-            SlideMovieTitleError::SlideNameNotFound
-        },
-        super::slide_movie_caption::SlideMovieCaptionError::SlidePositionNotFound { position } => {
-            SlideMovieTitleError::SlidePositionNotFound { position }
-        },
-        super::slide_movie_caption::SlideMovieCaptionError::MoviePositionNotFound { position } => {
-            SlideMovieTitleError::MoviePositionNotFound { position }
-        },
-        super::slide_movie_caption::SlideMovieCaptionError::LimitExceeded {
+        super::slide_movie_caption::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => SlideMovieTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_caption_limit(kind),
             observed,
             maximum,
         },
-        super::slide_movie_caption::SlideMovieCaptionError::Allocation { amount } => {
-            SlideMovieTitleError::Allocation { amount }
-        },
-        super::slide_movie_caption::SlideMovieCaptionError::Verification => {
-            SlideMovieTitleError::Verification
-        },
-        super::slide_movie_caption::SlideMovieCaptionError::PatchConflict => {
-            SlideMovieTitleError::PatchConflict
-        },
-        _ => SlideMovieTitleError::InvalidSource,
+        super::slide_movie_caption::Error::Allocation { amount } => Error::Allocation { amount },
+        super::slide_movie_caption::Error::Verification => Error::Verification,
+        super::slide_movie_caption::Error::PatchConflict => Error::PatchConflict,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_chart_error(error: super::slide_chart_caption::ChartCaptionError) -> SlideMovieTitleError {
+fn map_chart_error(error: super::slide_chart_caption::Error) -> Error {
     match error {
-        super::slide_chart_caption::ChartCaptionError::UnsupportedSource => {
-            SlideMovieTitleError::UnsupportedSource
+        super::slide_chart_caption::Error::UnsupportedSource => Error::UnsupportedSource,
+        super::slide_chart_caption::Error::UnsupportedDependency => Error::UnsupportedDependency,
+        super::slide_chart_caption::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        super::slide_chart_caption::Error::EmptySlideName => Error::EmptySlideName,
+        super::slide_chart_caption::Error::SlideNameNotFound => Error::SlideNameNotFound,
+        super::slide_chart_caption::Error::SlidePositionNotFound { position } => {
+            Error::SlidePositionNotFound { position }
         },
-        super::slide_chart_caption::ChartCaptionError::UnsupportedDependency => {
-            SlideMovieTitleError::UnsupportedDependency
-        },
-        super::slide_chart_caption::ChartCaptionError::AmbiguousSelector => {
-            SlideMovieTitleError::AmbiguousSelector
-        },
-        super::slide_chart_caption::ChartCaptionError::EmptySlideName => {
-            SlideMovieTitleError::EmptySlideName
-        },
-        super::slide_chart_caption::ChartCaptionError::SlideNameNotFound => {
-            SlideMovieTitleError::SlideNameNotFound
-        },
-        super::slide_chart_caption::ChartCaptionError::SlidePositionNotFound { position } => {
-            SlideMovieTitleError::SlidePositionNotFound { position }
-        },
-        super::slide_chart_caption::ChartCaptionError::LimitExceeded {
+        super::slide_chart_caption::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => SlideMovieTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_chart_limit(kind),
             observed,
             maximum,
         },
-        super::slide_chart_caption::ChartCaptionError::Allocation { amount } => {
-            SlideMovieTitleError::Allocation { amount }
-        },
-        super::slide_chart_caption::ChartCaptionError::Verification => {
-            SlideMovieTitleError::Verification
-        },
-        super::slide_chart_caption::ChartCaptionError::PatchConflict => {
-            SlideMovieTitleError::PatchConflict
-        },
-        _ => SlideMovieTitleError::InvalidSource,
+        super::slide_chart_caption::Error::Allocation { amount } => Error::Allocation { amount },
+        super::slide_chart_caption::Error::Verification => Error::Verification,
+        super::slide_chart_caption::Error::PatchConflict => Error::PatchConflict,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideMovieTitleError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideMovieTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                SemanticLimitKind::Objects => SlideMovieTitleLimitKind::Entries,
-                SemanticLimitKind::Slides => SlideMovieTitleLimitKind::Slides,
-                SemanticLimitKind::References => SlideMovieTitleLimitKind::References,
-                SemanticLimitKind::TextStorages => SlideMovieTitleLimitKind::TextStorages,
-                SemanticLimitKind::TextFragments => SlideMovieTitleLimitKind::TextFragments,
-                SemanticLimitKind::TextBytes => SlideMovieTitleLimitKind::TextBytes,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::TextStorages => LimitKind::TextStorages,
+                SemanticLimitKind::TextFragments => LimitKind::TextFragments,
+                SemanticLimitKind::TextBytes => LimitKind::TextBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -767,64 +718,60 @@ fn map_read_error(error: ReadError) -> SlideMovieTitleError {
             observed,
             maximum,
             ..
-        } => SlideMovieTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideMovieTitleLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => SlideMovieTitleLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideMovieTitleLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideMovieTitleLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => SlideMovieTitleError::Allocation { amount },
-        _ => SlideMovieTitleError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_caption_limit(
-    kind: super::slide_movie_caption::SlideMovieCaptionLimitKind,
-) -> SlideMovieTitleLimitKind {
-    use super::slide_movie_caption::SlideMovieCaptionLimitKind as K;
+fn map_caption_limit(kind: super::slide_movie_caption::LimitKind) -> LimitKind {
+    use super::slide_movie_caption::LimitKind as K;
     match kind {
-        K::InputBytes => SlideMovieTitleLimitKind::InputBytes,
-        K::OutputBytes => SlideMovieTitleLimitKind::OutputBytes,
-        K::WireBytes => SlideMovieTitleLimitKind::WireBytes,
-        K::Entries => SlideMovieTitleLimitKind::Entries,
-        K::EntryBytes => SlideMovieTitleLimitKind::EntryBytes,
-        K::TotalBytes => SlideMovieTitleLimitKind::TotalBytes,
-        K::Slides => SlideMovieTitleLimitKind::Slides,
-        K::References => SlideMovieTitleLimitKind::References,
-        K::TextStorages => SlideMovieTitleLimitKind::TextStorages,
-        K::TextFragments => SlideMovieTitleLimitKind::TextFragments,
-        K::TextBytes => SlideMovieTitleLimitKind::TextBytes,
-        K::WireFields => SlideMovieTitleLimitKind::WireFields,
-        K::WireNesting => SlideMovieTitleLimitKind::WireNesting,
-        K::WireWork => SlideMovieTitleLimitKind::WireWork,
-        K::CaptionBytes => SlideMovieTitleLimitKind::TitleBytes,
+        K::InputBytes => LimitKind::InputBytes,
+        K::OutputBytes => LimitKind::OutputBytes,
+        K::WireBytes => LimitKind::WireBytes,
+        K::Entries => LimitKind::Entries,
+        K::EntryBytes => LimitKind::EntryBytes,
+        K::TotalBytes => LimitKind::TotalBytes,
+        K::Slides => LimitKind::Slides,
+        K::References => LimitKind::References,
+        K::TextStorages => LimitKind::TextStorages,
+        K::TextFragments => LimitKind::TextFragments,
+        K::TextBytes => LimitKind::TextBytes,
+        K::WireFields => LimitKind::WireFields,
+        K::WireNesting => LimitKind::WireNesting,
+        K::WireWork => LimitKind::WireWork,
+        K::CaptionBytes => LimitKind::TitleBytes,
     }
 }
 
-fn map_chart_limit(
-    kind: super::slide_chart_caption::ChartCaptionLimitKind,
-) -> SlideMovieTitleLimitKind {
-    use super::slide_chart_caption::ChartCaptionLimitKind as K;
+fn map_chart_limit(kind: super::slide_chart_caption::LimitKind) -> LimitKind {
+    use super::slide_chart_caption::LimitKind as K;
     match kind {
-        K::InputBytes => SlideMovieTitleLimitKind::InputBytes,
-        K::OutputBytes => SlideMovieTitleLimitKind::OutputBytes,
-        K::WireBytes => SlideMovieTitleLimitKind::WireBytes,
-        K::Entries => SlideMovieTitleLimitKind::Entries,
-        K::EntryBytes => SlideMovieTitleLimitKind::EntryBytes,
-        K::TotalBytes => SlideMovieTitleLimitKind::TotalBytes,
-        K::Slides => SlideMovieTitleLimitKind::Slides,
-        K::References => SlideMovieTitleLimitKind::References,
-        K::TextStorages => SlideMovieTitleLimitKind::TextStorages,
-        K::TextFragments => SlideMovieTitleLimitKind::TextFragments,
-        K::TextBytes => SlideMovieTitleLimitKind::TextBytes,
-        K::WireFields => SlideMovieTitleLimitKind::WireFields,
-        K::WireNesting => SlideMovieTitleLimitKind::WireNesting,
-        K::WireWork => SlideMovieTitleLimitKind::WireWork,
-        K::CaptionBytes => SlideMovieTitleLimitKind::TitleBytes,
+        K::InputBytes => LimitKind::InputBytes,
+        K::OutputBytes => LimitKind::OutputBytes,
+        K::WireBytes => LimitKind::WireBytes,
+        K::Entries => LimitKind::Entries,
+        K::EntryBytes => LimitKind::EntryBytes,
+        K::TotalBytes => LimitKind::TotalBytes,
+        K::Slides => LimitKind::Slides,
+        K::References => LimitKind::References,
+        K::TextStorages => LimitKind::TextStorages,
+        K::TextFragments => LimitKind::TextFragments,
+        K::TextBytes => LimitKind::TextBytes,
+        K::WireFields => LimitKind::WireFields,
+        K::WireNesting => LimitKind::WireNesting,
+        K::WireWork => LimitKind::WireWork,
+        K::CaptionBytes => LimitKind::TitleBytes,
     }
 }
 

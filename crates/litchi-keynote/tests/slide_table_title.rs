@@ -328,7 +328,7 @@ fn selector_read_noop_change_apply_inverse_and_locality() -> TestResult {
     assert_eq!(exact_bytes(applied.package())?, candidate_bytes);
     assert!(matches!(
         commit.package().apply_slide_table_title(commit.patch()),
-        Err(litchi_keynote::SlideTableTitleError::PatchConflict)
+        Err(litchi_keynote::slide::table::title::transaction::Error::PatchConflict)
     ));
     let restored = commit
         .package()
@@ -343,7 +343,7 @@ fn positions_and_locks_fail_closed_without_mutating_source() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_table_title_settings("Tables", TableSelector::index(2)),
-        Err(litchi_keynote::SlideTableTitleError::TablePositionNotFound { .. })
+        Err(litchi_keynote::slide::table::title::transaction::Error::TablePositionNotFound { .. })
     ));
     assert_eq!(exact_bytes(&package)?, source);
 
@@ -384,7 +384,7 @@ fn positions_and_locks_fail_closed_without_mutating_source() -> TestResult {
             .edit_slide_table_title("Tables", 0usize)?
             .set(Settings::new(Some(false), None))
             .commit(),
-        Err(litchi_keynote::SlideTableTitleError::Locked)
+        Err(litchi_keynote::slide::table::title::transaction::Error::Locked)
     ));
     assert_eq!(exact_bytes(&locked)?, locked_source);
     Ok(())
@@ -425,11 +425,11 @@ fn duplicate_known_title_field_is_rejected_atomically() -> TestResult {
     let package = Package::from_bytes(&malformed_source)?;
     assert!(matches!(
         package.slide_table_title_settings(SlideSelector::index(0), TableSelector::index(0)),
-        Err(litchi_keynote::SlideTableTitleError::InvalidSource)
+        Err(litchi_keynote::slide::table::title::transaction::Error::InvalidSource)
     ));
     assert!(matches!(
         package.edit_slide_table_title(SlideSelector::index(0), TableSelector::index(0)),
-        Err(litchi_keynote::SlideTableTitleError::InvalidSource)
+        Err(litchi_keynote::slide::table::title::transaction::Error::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, malformed_source);
     Ok(())

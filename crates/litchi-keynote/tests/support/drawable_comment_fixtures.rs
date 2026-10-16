@@ -301,11 +301,11 @@ fn append_comment_reference(payload: &[u8], path: &[u32], identifier: u64) -> Te
         return Err(io::Error::other("drawable route has no unique envelope").into());
     }
     let rewritten = append_comment_reference(fields[0].payload(), remainder, identifier)?;
-    Ok(litchi_iwa_common::wire::transform_length_delimited_field(
+    litchi_iwa_common::wire::transform_length_delimited_field(
         payload,
         field_number,
         |_| -> TestResult<Vec<u8>> { Ok(rewritten.clone()) },
-    )?)
+    )
 }
 
 fn attach_comment(source: &[u8], target: &DrawableTarget, comment: u64) -> TestResult<Vec<u8>> {
@@ -444,7 +444,6 @@ fn register_object_uuid(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let (_, _, _, comment) = comment_object(source, identifier)?;
     let uuid = comment
         .storage_uuid
-        .clone()
         .ok_or_else(|| io::Error::other("comment object has no storage UUID"))?;
     let mut metadata = tsp::PackageMetadata::decode(metadata_payload(source)?.as_slice())?;
     if metadata

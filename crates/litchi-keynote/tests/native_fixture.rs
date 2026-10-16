@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_keynote::{
-    Document, DocumentReadError, DocumentReadLimitKind, DocumentReadOptions,
-    DocumentSemanticLimits, DocumentSourceLimits, DocumentStats, Package, ReadOptions,
-    SlideSelector, Stats, show::Mode,
+    OpenOptions, Package, Presentation, SemanticLimits, SlideSelector, SourceLimits, Stats,
+    presentation::Error as PresentationError, presentation::LimitKind as PresentationLimitKind,
+    presentation::Stats as PresentationStats, show::Mode,
 };
 
 const EXPECTED_TEXT: &str =
@@ -118,7 +118,7 @@ fn archive_free_document_accepts_borrowed_package_bytes() -> Result<(), Box<dyn 
 {
     let source = std::fs::read(fixture_path())?;
     let package = Package::from_bytes(&source)?;
-    let document = Document::from_bytes(&source)?;
+    let document = Presentation::from_bytes(&source)?;
 
     assert_eq!(document.show(), package.show()?);
     assert_eq!(document.text()?, EXPECTED_TEXT);
@@ -143,47 +143,45 @@ fn archive_free_document_accepts_borrowed_package_bytes() -> Result<(), Box<dyn 
 fn archive_free_byte_ingress_honors_source_and_semantic_limits()
 -> Result<(), Box<dyn std::error::Error>> {
     let source = std::fs::read(fixture_path())?;
-    let defaults = DocumentSourceLimits::default();
-    let exact_source = DocumentSourceLimits::new(
-        u64::try_from(source.len())?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_aggregate_bytes(),
-        defaults.max_component_bytes(),
-    )?;
-    let source_error = Document::from_bytes_with_options(
+    let defaults = SourceLimits::default();
+    let exact_source = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_aggregate_bytes())?
+        .max_component_bytes(defaults.max_component_bytes())?
+        .build()?;
+    let source_error = Presentation::from_bytes_with_options(
         &source,
-        DocumentReadOptions::new(
-            DocumentSourceLimits::new(
-                u64::try_from(source.len().saturating_sub(1))?,
-                defaults.max_entries(),
-                defaults.max_entry_bytes(),
-                defaults.max_aggregate_bytes(),
-                defaults.max_component_bytes(),
-            )?,
-            DocumentSemanticLimits::default(),
-        ),
+        OpenOptions::new()
+            .source_limits(
+                SourceLimits::builder()
+                    .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+                    .max_entries(defaults.max_entries())?
+                    .max_entry_bytes(defaults.max_entry_bytes())?
+                    .max_aggregate_bytes(defaults.max_aggregate_bytes())?
+                    .max_component_bytes(defaults.max_component_bytes())?
+                    .build()?,
+            )
+            .semantic_limits(SemanticLimits::default()),
     )
     .expect_err("source max-minus-one must reject complete package bytes");
-    assert!(matches!(source_error, DocumentReadError::Limit { .. }));
+    assert!(matches!(source_error, PresentationError::Limit { .. }));
 
-    let semantic = DocumentSemanticLimits::new(
-        EXPECTED_OBJECTS - 1,
-        DocumentSemanticLimits::MAX_SLIDES,
-        DocumentSemanticLimits::MAX_REFERENCES,
-        DocumentSemanticLimits::MAX_TEXT_STORAGES,
-        DocumentSemanticLimits::MAX_TEXT_FRAGMENTS,
-        DocumentSemanticLimits::MAX_TEXT_BYTES,
-    )?;
-    let semantic_error = Document::from_bytes_with_options(
+    let semantic = SemanticLimits::builder()
+        .max_objects(EXPECTED_OBJECTS - 1)?
+        .build()?;
+    let semantic_error = Presentation::from_bytes_with_options(
         &source,
-        DocumentReadOptions::new(exact_source, semantic),
+        OpenOptions::new()
+            .source_limits(exact_source)
+            .semantic_limits(semantic),
     )
     .expect_err("object max-minus-one must reject before publishing a document");
     assert!(matches!(
         semantic_error,
-        DocumentReadError::Limit {
-            kind: DocumentReadLimitKind::Objects,
+        PresentationError::Limit {
+            kind: PresentationLimitKind::Objects,
             maximum,
             ..
         } if maximum == (EXPECTED_OBJECTS - 1) as u64
@@ -196,8 +194,8 @@ fn focused_reader_surface_is_exact_shareable_and_archive_free()
 -> Result<(), Box<dyn std::error::Error>> {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Package>();
-    assert_send_sync::<Document>();
-    assert_send_sync::<DocumentStats>();
+    assert_send_sync::<Presentation>();
+    assert_send_sync::<PresentationStats>();
     assert_send_sync::<Stats>();
 
     let bytes = std::fs::read(fixture_path())?;
@@ -212,13 +210,13 @@ fn focused_reader_surface_is_exact_shareable_and_archive_free()
     let mut exact = Vec::new();
     snapshot.write_to(&mut exact)?;
     assert_eq!(exact, bytes);
-    assert_eq!(snapshot.read_options(), package.read_options());
+    assert_eq!(snapshot.options(), package.options());
     assert_eq!(snapshot.stats()?, package.stats()?);
     assert_eq!(snapshot.text()?, EXPECTED_TEXT);
     assert_eq!(snapshot.show()?, package.show()?);
     assert_eq!(snapshot.slides()?.as_ptr(), package.slides()?.as_ptr());
 
-    let semantic = package.semantic_snapshot()?;
+    let semantic = package.presentation()?;
     let semantic_snapshot = semantic.snapshot();
     assert_eq!(semantic.show(), package.show()?);
     assert_eq!(semantic.slides(), package.slides()?);
@@ -261,7 +259,7 @@ fn focused_reader_surface_is_exact_shareable_and_archive_free()
 #[test]
 fn focused_package_refuses_directory_backing_without_treating_index_as_complete()
 -> Result<(), Box<dyn std::error::Error>> {
-    let options = ReadOptions::default();
+    let options = OpenOptions::default();
     let error = Package::open_with_options(directory_fixture_path(), options)
         .expect_err("focused exact-package reader must refuse a directory bundle");
     assert!(matches!(error, litchi_keynote::ReadError::Io(_)));
@@ -304,7 +302,7 @@ fn metadata_ignores_earlier_malformed_near_names_and_preserves_source()
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("canonical-metadata.key");
     std::fs::write(&path, candidate)?;
-    let document = Document::open(path)?;
+    let document = Presentation::open(path)?;
     assert_eq!(document.show(), package.show()?);
     let document_metadata = document
         .metadata()
@@ -321,8 +319,8 @@ fn metadata_ignores_earlier_malformed_near_names_and_preserves_source()
 fn archive_free_document_rejects_other_iwork_formats_before_semantic_publication() {
     for path in [pages_fixture_path(), pages_directory_fixture_path()] {
         assert!(matches!(
-            Document::open(path),
-            Err(DocumentReadError::NotKeynote)
+            Presentation::open(path),
+            Err(PresentationError::UnexpectedFormat { .. })
         ));
     }
 }
@@ -331,8 +329,8 @@ fn archive_free_document_rejects_other_iwork_formats_before_semantic_publication
 fn archive_free_document_has_full_zip_and_directory_semantic_parity()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let zipped = Document::open(fixture_path())?;
-    let directory = Document::open(directory_fixture_path())?;
+    let zipped = Presentation::open(fixture_path())?;
+    let directory = Presentation::open(directory_fixture_path())?;
 
     zipped.validate()?;
     directory.validate()?;
@@ -398,50 +396,53 @@ fn archive_free_directory_is_frozen_and_enforces_source_and_semantic_limits()
     let index_bytes = std::fs::metadata(source.join("Index.zip"))?.len();
     let properties_bytes = std::fs::metadata(source.join("Metadata/Properties.plist"))?.len();
     let exact_input = index_bytes + properties_bytes;
-    let defaults = DocumentSourceLimits::default();
-    let exact_source = DocumentSourceLimits::new(
-        exact_input,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_aggregate_bytes(),
-        defaults.max_component_bytes(),
-    )?;
-    let exact = Document::open_with_options(
+    let defaults = SourceLimits::default();
+    let exact_source = SourceLimits::builder()
+        .max_input_bytes(exact_input)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_aggregate_bytes())?
+        .max_component_bytes(defaults.max_component_bytes())?
+        .build()?;
+    let exact = Presentation::open_with_options(
         &source,
-        DocumentReadOptions::new(exact_source, DocumentSemanticLimits::default()),
+        OpenOptions::new()
+            .source_limits(exact_source)
+            .semantic_limits(SemanticLimits::default()),
     )?;
     assert_eq!(exact.text()?, EXPECTED_TEXT);
     assert_eq!(exact.stats().map(|stats| stats.slide_count), Some(1));
 
-    let too_small_source = DocumentSourceLimits::new(
-        exact_input - 1,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_aggregate_bytes(),
-        defaults.max_component_bytes(),
-    )?;
-    let error = Document::open_with_options(
+    let too_small_source = SourceLimits::builder()
+        .max_input_bytes(exact_input - 1)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_aggregate_bytes())?
+        .max_component_bytes(defaults.max_component_bytes())?
+        .build()?;
+    let error = Presentation::open_with_options(
         &source,
-        DocumentReadOptions::new(too_small_source, DocumentSemanticLimits::default()),
+        OpenOptions::new()
+            .source_limits(too_small_source)
+            .semantic_limits(SemanticLimits::default()),
     )
     .expect_err("aggregate index plus properties max-minus-one must refuse");
-    assert!(matches!(error, DocumentReadError::Limit { .. }));
+    assert!(matches!(error, PresentationError::Limit { .. }));
 
-    let semantic = DocumentSemanticLimits::new(
-        EXPECTED_OBJECTS - 1,
-        DocumentSemanticLimits::MAX_SLIDES,
-        DocumentSemanticLimits::MAX_REFERENCES,
-        DocumentSemanticLimits::MAX_TEXT_STORAGES,
-        DocumentSemanticLimits::MAX_TEXT_FRAGMENTS,
-        DocumentSemanticLimits::MAX_TEXT_BYTES,
-    )?;
-    let error =
-        Document::open_with_options(&source, DocumentReadOptions::new(exact_source, semantic))
-            .expect_err("object max-minus-one must refuse before publishing a document");
+    let semantic = SemanticLimits::builder()
+        .max_objects(EXPECTED_OBJECTS - 1)?
+        .build()?;
+    let error = Presentation::open_with_options(
+        &source,
+        OpenOptions::new()
+            .source_limits(exact_source)
+            .semantic_limits(semantic),
+    )
+    .expect_err("object max-minus-one must refuse before publishing a document");
     assert!(matches!(
         error,
-        DocumentReadError::Limit {
-            kind: DocumentReadLimitKind::Objects,
+        PresentationError::Limit {
+            kind: PresentationLimitKind::Objects,
             observed,
             maximum,
             ..

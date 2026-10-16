@@ -79,7 +79,7 @@ fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKe
     })
 }
 
-fn map_focused_chart_arrangement_error(error: litchi_keynote::ChartArrangementError) -> Error {
+fn map_focused_chart_arrangement_error(error: litchi_keynote::chart::arrangement::Error) -> Error {
     Error::InvalidFormat(format!(
         "focused Keynote chart arrangement operation failed: {error}"
     ))

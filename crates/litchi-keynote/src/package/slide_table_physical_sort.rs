@@ -35,7 +35,7 @@ use litchi_iwa_protos::{
 use litchi_numbers_wire::{BncCellView, CachedScalar, StoredValue};
 
 use super::slide_table_core as core;
-use super::slide_table_sort_order::SlideTableSortError;
+use super::slide_table_sort_order::Error as SlideTableSortError;
 use super::{Package, PayloadLimitKind, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
 use crate::slide::table::TableSelector;
@@ -67,16 +67,16 @@ const PHYSICAL_MUTABLE_MESSAGE_TYPES: [u32; 4] = [
 const HEADER_BUCKET_ROWS: u32 = 65_536;
 
 /// Package-owned immutable edit staged against one exact selected table.
-pub struct SlideTablePhysicalSortEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: PhysicalSelection,
     budget: core::Budget,
 }
 
-impl fmt::Debug for SlideTablePhysicalSortEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTablePhysicalSortEdit")
+            .debug_struct("Edit")
             .field("path", &self.selection.path())
             .field("order", &self.selection.order)
             .field("range", &self.selection.range)
@@ -84,7 +84,7 @@ impl fmt::Debug for SlideTablePhysicalSortEdit<'_> {
     }
 }
 
-impl SlideTablePhysicalSortEdit<'_> {
+impl Edit<'_> {
     /// Return the body-relative range, when this edit is row-scoped.
     #[must_use]
     pub const fn rows(&self) -> Option<RowRange> {
@@ -104,7 +104,7 @@ impl SlideTablePhysicalSortEdit<'_> {
     }
 
     /// Start the immutable physical transaction.
-    pub fn commit(self) -> Result<SlideTablePhysicalSortCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let mut budget = self.budget;
         execute_transaction(self.source, &self.selection, &mut budget)
     }
@@ -112,17 +112,17 @@ impl SlideTablePhysicalSortEdit<'_> {
 
 /// Exact-source checked reversible physical row-sort patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTablePhysicalSortPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: PhysicalSelection,
     destination_by_source: Arc<[u32]>,
     moved_rows: usize,
 }
 
-impl fmt::Debug for SlideTablePhysicalSortPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTablePhysicalSortPatch")
+            .debug_struct("Patch")
             .field("path", &self.selection.path())
             .field("moved_rows", &self.moved_rows)
             .field("source_fingerprint", &self.source_fingerprint())
@@ -131,7 +131,7 @@ impl fmt::Debug for SlideTablePhysicalSortPatch {
     }
 }
 
-impl SlideTablePhysicalSortPatch {
+impl Patch {
     /// Return the compact exact-source diagnostic fingerprint.
     #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
@@ -187,13 +187,13 @@ impl SlideTablePhysicalSortPatch {
 /// Fully verified physical row-sort result.
 #[must_use = "a Keynote physical-sort commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTablePhysicalSortCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTablePhysicalSortPatch,
+    patch: Patch,
     diagnostics: Diagnostics,
 }
 
-impl SlideTablePhysicalSortCommit {
+impl Commit {
     /// Borrow the reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -208,7 +208,7 @@ impl SlideTablePhysicalSortCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTablePhysicalSortPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
@@ -218,15 +218,6 @@ impl SlideTablePhysicalSortCommit {
         &self.diagnostics
     }
 }
-
-/// Canonical package-facing diagnostics alias.
-pub type SlideTablePhysicalSortDiagnostics = Diagnostics;
-/// Canonical package-facing error alias.
-pub type SlideTablePhysicalSortError = Error;
-/// Canonical package-facing finite limit alias.
-pub type SlideTablePhysicalSortLimitKind = LimitKind;
-/// Canonical package-facing semantic path alias.
-pub type SlideTablePhysicalSortPath = Path;
 
 #[derive(Clone, PartialEq, Eq)]
 struct PhysicalSelection {
@@ -463,7 +454,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<SlideTablePhysicalSortCommit> {
+    ) -> Result<Commit> {
         let slide = slide.into();
         let table = table.into();
         let mut budget = core::Budget::new(self).map_err(|error| map_core(error, Path::Package))?;
@@ -477,7 +468,7 @@ impl Package {
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
         rows: RowRange,
-    ) -> Result<SlideTablePhysicalSortCommit> {
+    ) -> Result<Commit> {
         let slide = slide.into();
         let table = table.into();
         let mut budget = core::Budget::new(self).map_err(|error| map_core(error, Path::Package))?;
@@ -497,7 +488,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<SlideTablePhysicalSortEdit<'_>> {
+    ) -> Result<Edit<'_>> {
         let mut budget = core::Budget::new(self).map_err(|error| map_core(error, Path::Package))?;
         let selection = select_physical(
             self,
@@ -507,7 +498,7 @@ impl Package {
             None,
             &mut budget,
         )?;
-        Ok(SlideTablePhysicalSortEdit {
+        Ok(Edit {
             source: self,
             selection,
             budget,
@@ -520,7 +511,7 @@ impl Package {
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
         rows: RowRange,
-    ) -> Result<SlideTablePhysicalSortEdit<'_>> {
+    ) -> Result<Edit<'_>> {
         let mut budget = core::Budget::new(self).map_err(|error| map_core(error, Path::Package))?;
         let selection = select_physical(
             self,
@@ -530,7 +521,7 @@ impl Package {
             Some(rows),
             &mut budget,
         )?;
-        Ok(SlideTablePhysicalSortEdit {
+        Ok(Edit {
             source: self,
             selection,
             budget,
@@ -538,10 +529,7 @@ impl Package {
     }
 
     /// Apply an exact-source physical-sort patch and reopen its candidate.
-    pub fn apply_slide_table_physical_sort(
-        &self,
-        patch: &SlideTablePhysicalSortPatch,
-    ) -> Result<SlideTablePhysicalSortCommit> {
+    pub fn apply_slide_table_physical_sort(&self, patch: &Patch) -> Result<Commit> {
         let path = patch.selection.path();
         let mut budget = core::Budget::new(self).map_err(|error| map_core(error, path))?;
         let catalog =
@@ -562,7 +550,7 @@ impl Package {
         }
         if patch.is_noop() {
             self.validate().map_err(map_read)?;
-            return Ok(SlideTablePhysicalSortCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
                 diagnostics: Diagnostics::unchanged(),
@@ -584,7 +572,7 @@ impl Package {
             &mut budget,
         )?;
         let deleted_previews = preview_deletion_count(self, &candidate);
-        Ok(SlideTablePhysicalSortCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
             diagnostics: Diagnostics::published(
@@ -679,7 +667,7 @@ fn execute_transaction(
     source: &Package,
     selection: &PhysicalSelection,
     budget: &mut core::Budget,
-) -> Result<SlideTablePhysicalSortCommit> {
+) -> Result<Commit> {
     let path = selection.path();
     let scan = scan_table(source, selection, budget)?;
     let permutation = plan_permutation(selection, &scan, budget)?;
@@ -687,9 +675,9 @@ fn execute_transaction(
         let bytes = core::physical_catalog(source)
             .map_err(|error| map_core(error, path))?
             .shared_source();
-        return Ok(SlideTablePhysicalSortCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideTablePhysicalSortPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 destination_by_source: permutation.destination_by_source,
@@ -725,9 +713,9 @@ fn execute_transaction(
     let target_artifact = core::physical_catalog(&candidate)
         .map_err(|error| map_core(error, path))?
         .shared_source();
-    Ok(SlideTablePhysicalSortCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTablePhysicalSortPatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(source_artifact, Arc::clone(&target_artifact)),
             selection: selection.clone(),
             destination_by_source: permutation.destination_by_source,
@@ -3689,41 +3677,23 @@ fn map_sort_error(error: SlideTableSortError, path: Path) -> Error {
     }
 }
 
-fn map_sort_limit(kind: super::slide_table_sort_order::SlideTableSortLimitKind) -> LimitKind {
+fn map_sort_limit(kind: super::slide_table_sort_order::LimitKind) -> LimitKind {
     match kind {
-        super::slide_table_sort_order::SlideTableSortLimitKind::InputBytes => LimitKind::InputBytes,
-        super::slide_table_sort_order::SlideTableSortLimitKind::OutputBytes => {
-            LimitKind::OutputBytes
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::Entries => LimitKind::Entries,
-        super::slide_table_sort_order::SlideTableSortLimitKind::EntryBytes => LimitKind::EntryBytes,
-        super::slide_table_sort_order::SlideTableSortLimitKind::TotalBytes => {
-            LimitKind::TotalEntryBytes
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::PayloadObjects => {
-            LimitKind::PayloadObjects
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::PayloadMessages => {
-            LimitKind::PayloadMessages
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::References => {
-            LimitKind::PayloadReferences
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::WireFields => LimitKind::WireFields,
-        super::slide_table_sort_order::SlideTableSortLimitKind::WireNesting => {
-            LimitKind::WireNesting
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::WireWork => LimitKind::WireWork,
-        super::slide_table_sort_order::SlideTableSortLimitKind::Allocations => {
-            LimitKind::WireAllocations
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::Retained => {
-            LimitKind::WireRetainedBytes
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::Scratch => {
-            LimitKind::WireScratchBytes
-        },
-        super::slide_table_sort_order::SlideTableSortLimitKind::Components => LimitKind::Components,
+        super::slide_table_sort_order::LimitKind::InputBytes => LimitKind::InputBytes,
+        super::slide_table_sort_order::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        super::slide_table_sort_order::LimitKind::Entries => LimitKind::Entries,
+        super::slide_table_sort_order::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        super::slide_table_sort_order::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+        super::slide_table_sort_order::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        super::slide_table_sort_order::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        super::slide_table_sort_order::LimitKind::References => LimitKind::PayloadReferences,
+        super::slide_table_sort_order::LimitKind::WireFields => LimitKind::WireFields,
+        super::slide_table_sort_order::LimitKind::WireNesting => LimitKind::WireNesting,
+        super::slide_table_sort_order::LimitKind::WireWork => LimitKind::WireWork,
+        super::slide_table_sort_order::LimitKind::Allocations => LimitKind::WireAllocations,
+        super::slide_table_sort_order::LimitKind::Retained => LimitKind::WireRetainedBytes,
+        super::slide_table_sort_order::LimitKind::Scratch => LimitKind::WireScratchBytes,
+        super::slide_table_sort_order::LimitKind::Components => LimitKind::Components,
     }
 }
 
