@@ -5867,8 +5867,9 @@ struct PartCache {
     /// Physical Parts whose source bytes passed the source XML audit under
     /// the default limits, with the source revision they were read from (see
     /// [`SourceBackedPackage::audit_physical_replacement_xml`]). At most one
-    /// entry per catalog Part.
-    audited_source_xml: Mutex<Vec<(usize, SourceVersion)>>,
+    /// entry per catalog Part, and at most [`RETAINED_SOURCE_XML_PROOFS`] of
+    /// them keep the audit's indexed proof.
+    audited_source_xml: Mutex<Vec<AuditedSourceXml>>,
     #[cfg(test)]
     publication_hook: Mutex<Option<Arc<TestPublicationHook>>>,
     #[cfg(test)]
@@ -10762,7 +10763,7 @@ impl SourceBackedPackage {
                 ) {
                     self.audit_physical_replacement_xml(
                         replacement.target,
-                        original.as_bytes(),
+                        &original,
                         &replacement.replacement,
                         replacement.replacement_spans.as_deref(),
                         replacement.proof.as_ref(),
@@ -15159,17 +15160,28 @@ impl SourceBackedPackage {
     ///   for any other bytes or limits, gets the complete audit.
     /// * `original`, once it has passed here for this Part and source
     ///   revision of an unmanaged package; then the replacement alone is
-    ///   audited (completely, as no window can be proven without the original
-    ///   scan). The physical bytes of one revision
+    ///   audited, from the original's retained indexed proof when there is
+    ///   one (below), completely otherwise. The physical bytes of one revision
     ///   do not change, and a failure is never remembered, so an original
     ///   that fails is audited, and reported, every time.
     ///
     /// Bounded multi-window hints keep their windowed audit and return no
     /// proof.
+    ///
+    /// On an unmanaged package the remembered original also keeps its audit's
+    /// proof with the content boundaries that audit recorded
+    /// ([`xml_minifier::audit::VerifiedSource::verify_indexed`]; record
+    /// 0313). An unproven replacement is then audited by
+    /// [`xml_minifier::audit::VerifiedSource::verify_successor`], whose
+    /// verdict and error are the replacement's complete source audit but
+    /// which scans only the bytes that took the place of a run between two
+    /// recorded boundaries, such as an inserted paragraph. The proof keeps
+    /// the original's allocation alive; at most
+    /// [`RETAINED_SOURCE_XML_PROOFS`] are kept per package.
     fn audit_physical_replacement_xml(
         &self,
         target: usize,
-        original: &[u8],
+        original: &PartData,
         replacement: &Arc<Vec<u8>>,
         spans: Option<&[ReplacementSpan]>,
         proof: Option<&xml_minifier::audit::VerifiedSource>,
@@ -15181,52 +15193,110 @@ impl SourceBackedPackage {
             source,
         };
         let version = self.source.version();
+        // Unmanaged payloads can be shared as bare allocations, and only
+        // unmanaged packages remember an audit.
+        let shared_original = (!self.cache.is_managed())
+            .then(|| original.into_arc().ok())
+            .flatten();
         let proof = proof.filter(|proof| proof.covers(replacement.as_slice(), limits));
         if let Some(proof) = proof {
-            if !self.original_source_xml_audited(target, version) {
-                let _report = xml_minifier::audit::verify_source(original, limits)
-                    .map_err(publication_error)?;
-                self.remember_source_xml_audit(target, version);
+            if self.remembered_source_xml_audit(target, version).is_none() {
+                let base = match shared_original {
+                    Some(bytes) => Some(
+                        xml_minifier::audit::VerifiedSource::verify_indexed(bytes, limits)
+                            .map_err(publication_error)?,
+                    ),
+                    None => {
+                        let _report =
+                            xml_minifier::audit::verify_source(original.as_bytes(), limits)
+                                .map_err(publication_error)?;
+                        None
+                    },
+                };
+                self.remember_source_xml_audit(target, version, base);
             }
             return Ok(Some(proof.clone()));
         }
-        if self.original_source_xml_audited(target, version) {
+        if let Some(base) = self.remembered_source_xml_audit(target, version) {
             // The pair's verdict on `original` is known to pass, so it is the
             // replacement's own audit, error included.
-            let proof =
-                xml_minifier::audit::VerifiedSource::verify(Arc::clone(replacement), limits)
-                    .map_err(publication_error)?;
+            let proof = match base {
+                Some(base) => {
+                    base.verify_successor(Arc::clone(replacement), limits)
+                        .map_err(publication_error)?
+                        .0
+                },
+                None => {
+                    xml_minifier::audit::VerifiedSource::verify(Arc::clone(replacement), limits)
+                        .map_err(publication_error)?
+                },
+            };
             return Ok(Some(proof));
         }
         if let Some(spans) = spans
             && spans.len() > 1
             && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS
         {
-            audit_source_part_replacement_xml(part, original, replacement, Some(spans))?;
-            self.remember_source_xml_audit(target, version);
+            audit_source_part_replacement_xml(part, original.as_bytes(), replacement, Some(spans))?;
+            self.remember_source_xml_audit(target, version, None);
             return Ok(None);
         }
-        let (proof, _how) = xml_minifier::audit::VerifiedSource::verify_replacement(
-            original,
-            Arc::clone(replacement),
-            limits,
-        )
-        .map_err(|error| publication_error(error.into_error()))?;
-        self.remember_source_xml_audit(target, version);
+        let (base, proof) = match shared_original {
+            Some(bytes) => {
+                let (base, proof, _how) =
+                    xml_minifier::audit::VerifiedSource::verify_indexed_replacement(
+                        bytes,
+                        Arc::clone(replacement),
+                        limits,
+                    )
+                    .map_err(|error| publication_error(error.into_error()))?;
+                (Some(base), proof)
+            },
+            None => {
+                let (proof, _how) = xml_minifier::audit::VerifiedSource::verify_replacement(
+                    original.as_bytes(),
+                    Arc::clone(replacement),
+                    limits,
+                )
+                .map_err(|error| publication_error(error.into_error()))?;
+                (None, proof)
+            },
+        };
+        self.remember_source_xml_audit(target, version, base);
         Ok(Some(proof))
     }
 
-    fn original_source_xml_audited(&self, target: usize, version: SourceVersion) -> bool {
+    /// `None` when the original of `target` at `version` has not passed here;
+    /// otherwise its retained indexed proof, if any.
+    fn remembered_source_xml_audit(
+        &self,
+        target: usize,
+        version: SourceVersion,
+    ) -> Option<Option<xml_minifier::audit::VerifiedSource>> {
         self.cache
             .audited_source_xml
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .contains(&(target, version))
+            .iter()
+            .find(|audited| audited.target == target && audited.version == version)
+            .map(|audited| audited.proof.clone())
     }
 
-    /// Remember a passed original. Managed packages retain no memory they do
-    /// not reserve, so they keep auditing it.
-    fn remember_source_xml_audit(&self, target: usize, version: SourceVersion) {
+    #[cfg(test)]
+    fn original_source_xml_audited(&self, target: usize, version: SourceVersion) -> bool {
+        self.remembered_source_xml_audit(target, version).is_some()
+    }
+
+    /// Remember a passed original, with its indexed proof when there is one.
+    /// Managed packages retain no memory they do not reserve, so they keep
+    /// auditing it. Keeping a proof beyond [`RETAINED_SOURCE_XML_PROOFS`]
+    /// drops the oldest kept proof; its verdict stays remembered.
+    fn remember_source_xml_audit(
+        &self,
+        target: usize,
+        version: SourceVersion,
+        proof: Option<xml_minifier::audit::VerifiedSource>,
+    ) {
         if self.cache.is_managed() {
             return;
         }
@@ -15235,10 +15305,42 @@ impl SourceBackedPackage {
             .audited_source_xml
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if !audited.contains(&(target, version)) && audited.try_reserve(1).is_ok() {
-            audited.push((target, version));
+        if audited
+            .iter()
+            .any(|audited| audited.target == target && audited.version == version)
+            || audited.try_reserve(1).is_err()
+        {
+            return;
         }
+        if proof.is_some()
+            && audited
+                .iter()
+                .filter(|audited| audited.proof.is_some())
+                .count()
+                >= RETAINED_SOURCE_XML_PROOFS
+            && let Some(oldest) = audited.iter_mut().find(|audited| audited.proof.is_some())
+        {
+            oldest.proof = None;
+        }
+        audited.push(AuditedSourceXml {
+            target,
+            version,
+            proof,
+        });
     }
+}
+
+/// How many remembered originals keep their indexed proof (and so their
+/// allocation) per package.
+const RETAINED_SOURCE_XML_PROOFS: usize = 4;
+
+/// One physical Part's original that passed the source XML audit.
+#[derive(Debug)]
+struct AuditedSourceXml {
+    target: usize,
+    version: SourceVersion,
+    /// The audit's proof with its recorded content boundaries, while kept.
+    proof: Option<xml_minifier::audit::VerifiedSource>,
 }
 
 fn validate_source_part_replacement_xml(
@@ -17410,6 +17512,88 @@ mod tests {
     }
 
     #[test]
+    fn a_remembered_original_proves_insertions_from_its_boundaries() {
+        // Record 0313: the remembered original keeps its indexed proof, and
+        // an unproven replacement gets its complete audit's verdict and error
+        // from a scan of the inserted run alone.
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        let mut document = String::from("<w:document xmlns:w=\"urn:w\"><w:body>");
+        for index in 0..40 {
+            document.push_str(&format!(
+                "<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>Paragraph {index}</w:t></w:r></w:p>"
+            ));
+        }
+        document.push_str("</w:body></w:document>");
+        let package = SourceBackedPackage::from_vec(archive_bytes(
+            root_relationships(),
+            document.as_bytes(),
+            false,
+        ))
+        .unwrap();
+        let target = package.part_index(&partname).unwrap();
+        let original = package.read_part(target).unwrap();
+        let version = package.source.version();
+        let at = document
+            .find("<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>Paragraph 20<")
+            .unwrap();
+        let insert = |fragment: &str| {
+            Arc::new(format!("{}{fragment}{}", &document[..at], &document[at..]).into_bytes())
+        };
+        let inserted = insert("<w:p><w:r><w:t>Inserted</w:t></w:r></w:p>");
+        // The first pair audits the original once and keeps its boundaries.
+        let proof = package
+            .audit_physical_replacement_xml(target, &original, &inserted, None, None)
+            .unwrap()
+            .unwrap();
+        assert!(proof.covers(&inserted, xml_minifier::audit::Limits::default()));
+        let base = package
+            .remembered_source_xml_audit(target, version)
+            .unwrap()
+            .expect("an unmanaged original keeps its indexed proof");
+        assert!(format!("{base:?}").contains("boundaries: Some("));
+        assert_eq!(base.bytes().as_slice(), document.as_bytes());
+        for replacement in [
+            inserted,
+            insert("<w:tbl/>"),
+            insert("<w:p>"),
+            insert("</w:body><w:body>"),
+            insert("<x:p/>"),
+            insert("<w:p><w:t>&bogus;</w:t></w:p>"),
+        ] {
+            let actual =
+                package.audit_physical_replacement_xml(target, &original, &replacement, None, None);
+            match xml_minifier::audit::verify_source(
+                &replacement,
+                xml_minifier::audit::Limits::default(),
+            ) {
+                Ok(_) => {
+                    let proof = actual.unwrap().unwrap();
+                    assert!(proof.covers(&replacement, xml_minifier::audit::Limits::default()));
+                },
+                Err(expected) => match actual {
+                    Err(OpcError::XmlPublication { source, .. }) => assert_eq!(source, expected),
+                    other => panic!("{other:?} instead of {expected:?}"),
+                },
+            }
+        }
+        // At most four remembered originals keep their proofs; every verdict
+        // stays remembered.
+        for other in 1_000..1_006 {
+            package.remember_source_xml_audit(other, version, Some(base.clone()));
+        }
+        let audited = package.cache.audited_source_xml.lock().unwrap();
+        assert_eq!(audited.len(), 7);
+        assert_eq!(
+            audited
+                .iter()
+                .filter(|audited| audited.proof.is_some())
+                .count(),
+            RETAINED_SOURCE_XML_PROOFS
+        );
+        assert!(audited[0].proof.is_none());
+    }
+
+    #[test]
     fn physical_replacement_audit_remembers_only_passing_originals() {
         // Record 0311: the remembered original verdict and the plan's proof.
         let partname = PackURI::new("/word/document.xml").unwrap();
@@ -17425,7 +17609,7 @@ mod tests {
             package
                 .audit_physical_replacement_xml(
                     target,
-                    original.as_bytes(),
+                    &original,
                     &Arc::new(b"<a>".to_vec()),
                     None,
                     None,
@@ -17435,7 +17619,7 @@ mod tests {
         assert!(!package.original_source_xml_audited(target, version));
         let replacement = Arc::new(b"<after/>".to_vec());
         let proof = package
-            .audit_physical_replacement_xml(target, original.as_bytes(), &replacement, None, None)
+            .audit_physical_replacement_xml(target, &original, &replacement, None, None)
             .unwrap()
             .expect("a complete pair audit proves its replacement");
         assert!(proof.covers(&replacement, xml_minifier::audit::Limits::default()));
@@ -17445,7 +17629,7 @@ mod tests {
         assert!(matches!(
             package.audit_physical_replacement_xml(
                 target,
-                original.as_bytes(),
+                &original,
                 &Arc::new(b"<a>".to_vec()),
                 None,
                 None,
