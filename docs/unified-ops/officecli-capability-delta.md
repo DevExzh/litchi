@@ -39,7 +39,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6a2731d888a494e6e9b2cdcb95c7dc3e2d6434b0872a612b4acc8d8a14f93cf` |
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `ae58459a816d8f5e9589778be23054de447115fe445e805eda0bb7ac6fee9445` |
 | golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `ff30dfda02183baa2952667b60f97fc880ae89102392884fb022c2e1bb416eae` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `6a14cabd33f6f0f65d9397307fddea6917e0b5380d4921266cf0000ca3648929` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `634b4300cceeab83f03358d88d8777bf451bb8d21c145a5c6bff93aa41fe14ef` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `adbc9fc35ffae00c3089b29ffbe50bf327f8a0f7ec11080651ed8ddda00f87ba` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d7ed0734b44bf5cec561cea44b5e7629e2c19e96ce1834aecacf776daf95b990` |
@@ -123,7 +123,7 @@ Property reads:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 70 | 3 | 80 | 0 | 123 | 0 | 411 | 65 |
+| odp | 80 | 2 | 80 | 0 | 122 | 0 | 403 | 67 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
 | odt | 63 | 0 | 199 | 0 | 168 | 1 | 530 | 45 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -149,7 +149,7 @@ Property writes:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 3 | 37 | 521 | 0 | 17 | 174 |
+| odp | 3 | 47 | 511 | 0 | 19 | 174 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
 | odt | 12 | 32 | 752 | 0 | 31 | 179 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -8444,10 +8444,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | paragraph | `marginLeft` | length | asg |  | missing | gap |  |
 | paragraph | `marginRight` | length | asg |  | missing | gap |  |
 | paragraph | `lineRule` | enum | --- |  | write-only | — |  |
-| paragraph | `bold` | bool | asg |  | missing | gap |  |
-| paragraph | `italic` | bool | asg |  | missing | gap |  |
-| paragraph | `color` | color | asg |  | missing | gap |  |
-| paragraph | `size` | length | asg |  | missing | gap |  |
+| paragraph | `bold` | bool | asg | -sg | supported | partial |  |
+| paragraph | `italic` | bool | asg | -sg | supported | partial |  |
+| paragraph | `color` | color | asg | -sg | supported | partial |  |
+| paragraph | `size` | length | asg | -sg | supported | partial |  |
 | paragraph | `lang` | string | asg |  | missing | gap |  |
 | paragraph | `list` | string | asg |  | missing | gap |  |
 | paragraph | `tabs` | string | asg |  | missing | gap |  |
@@ -8455,6 +8455,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | paragraph | `lineSpacing` | string | asg |  | missing | gap |  |
 | paragraph | `text` | string | asg | -s- | write-only | partial |  |
 | paragraph | `style` | string |  | --g | litchi-only | — |  |
+| paragraph | `underline` | bool |  | -sg | litchi-only | litchi-only |  |
+| paragraph | `font` | string |  | -sg | litchi-only | litchi-only |  |
 | picture | `id` | number | a-g |  | missing | gap |  |
 | picture | `mediaType` | string | --g |  | missing | — |  |
 | picture | `x` | length | asg | -sg | supported | partial |  |
@@ -8566,7 +8568,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | presentation | `theme.formatScheme` | string | --g |  | missing | — |  |
 | presentation | `theme.name` | string | --g |  | missing | — |  |
 | presentation | `slideCount` | int |  | --g | litchi-only | — |  |
-| run | `font` | string | as- |  | write-only | gap |  |
+| run | `font` | string | as- | -sg | supported | partial |  |
 | run | `baseline` | string | asg |  | missing | gap |  |
 | run | `highlight` | color | asg |  | missing | gap |  |
 | run | `kern` | int | asg |  | missing | gap |  |
@@ -8582,11 +8584,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `effective.bold` | bool | --g |  | missing | — |  |
 | run | `effective.color` | color | --g |  | missing | — |  |
 | run | `effective.size` | font-size | --g |  | missing | — |  |
-| run | `underline` | enum | asg |  | missing | gap |  |
-| run | `bold` | bool | asg |  | gap | gap | M6 ODP text styles |
-| run | `color` | color | asg |  | missing | gap |  |
-| run | `italic` | bool | asg |  | missing | gap |  |
-| run | `size` | font-size | asg |  | missing | gap |  |
+| run | `underline` | enum | asg | -sg | supported | partial |  |
+| run | `bold` | bool | asg | -sg | supported | partial |  |
+| run | `color` | color | asg | -sg | supported | partial |  |
+| run | `italic` | bool | asg | -sg | supported | partial |  |
+| run | `size` | font-size | asg | -sg | supported | partial |  |
 | run | `text` | string | asg | -s- | write-only | partial |  |
 | run | `style` | string |  | --g | litchi-only | — |  |
 | run | `link` | string |  | --g | litchi-only | — |  |
@@ -8912,7 +8914,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `set` | `run` | `field-run` | page-number, date and other field runs are computed by the producer and refuse text | M6 ODP field editing |
-| `set` | `shape` | `character-format` | text sets write plain paragraphs in the first paragraph's style; bold, size, colour and other character formatting live in automatic styles the adapter does not author | M6 ODP text styles |
+| `set` | `shape` | `character-format` | bold, italic, underline, size, colour and font are set on paragraphs and runs (derived automatic styles); a shape, table cell or notes story takes no character formatting, and its text sets write plain paragraphs in the first paragraph's style | 0308 ODP shape and cell character formatting |
 | `set` | `shape` | `non-paragraph-story` | a whole-story text set refuses a text box that holds drawing objects or other non-paragraph children; set paragraphs or runs instead | M6 ODP rich text boxes |
 | `add` | `shape` | `positioned-insert` | new text boxes are appended at the end of the slide's objects; move them afterwards | M6 ODP z-order insertion |
 | `add` | `shape` | `picture-table-chart` | only text boxes are added; pictures, tables, charts and media need package resources the scene splice does not author | M6 ODP media and table creation |
