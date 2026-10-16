@@ -278,11 +278,15 @@ pub enum Unsupported {
     MissingThemeStyle,
     /// The image bytes are not PNG, JPEG or GIF.
     ImageFormat,
-    /// Writing character styles is not supported: the corpus carries no
-    /// native character-style overrides to port the host's layout from, so
-    /// [`Edit::set_text_style`] refuses; [`Package::slide_drawable_text_runs`]
-    /// reads runs.
+    /// A character style that sets nothing ([`Edit::set_text_style`]).
     TextStyling,
+    /// The table holds formulas, or a formula or chart elsewhere reads it,
+    /// so a value change would need a recalculation
+    /// ([`Edit::set_table_cell`]).
+    TableFormulas,
+    /// The table's cell storage is outside the shared cell writer (a legacy
+    /// tile, a missing tile, a rich-text, formula or commented cell).
+    TableStorage,
     /// A native message without a reference schema holds references.
     UnmodelledContent,
     /// A package-registry record uses an unmodelled shape.
@@ -301,7 +305,9 @@ impl fmt::Display for Unsupported {
             Self::ForeignComponent => f.write_str("a drawable outside its slide component"),
             Self::MissingThemeStyle => f.write_str("a theme without the needed style preset"),
             Self::ImageFormat => f.write_str("an image format other than PNG, JPEG or GIF"),
-            Self::TextStyling => f.write_str("character-style writes"),
+            Self::TextStyling => f.write_str("a character style that sets nothing"),
+            Self::TableFormulas => f.write_str("a table in a formula graph"),
+            Self::TableStorage => f.write_str("this table cell storage"),
             Self::UnmodelledContent => f.write_str("unmodelled native content with references"),
             Self::RegistryShape => f.write_str("an unmodelled package-registry shape"),
             Self::InlineObjects => f.write_str("text with inline object markers"),
@@ -492,6 +498,27 @@ enum Operation {
         span: TextSpan,
         style: Style,
     },
+    TableCell {
+        slide: u64,
+        drawable: u64,
+        row: u32,
+        column: u32,
+        value: TableCellValue,
+    },
+}
+
+/// A value [`Edit::set_table_cell`] stores in a table cell.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum TableCellValue {
+    /// Plain text.
+    Text(String),
+    /// A finite number.
+    Number(f64),
+    /// A boolean.
+    Boolean(bool),
+    /// No value (the cell's style and format stay).
+    Empty,
 }
 
 /// A drawable created by a commit: its slide and its new selector.
@@ -770,9 +797,10 @@ impl<'a> Edit<'a> {
             return Err(Error::ZPositionOutOfRange { position, count });
         }
         let untouched = !self.operations.iter().any(|operation| match operation {
-            Operation::Geometry { .. } | Operation::Text { .. } | Operation::TextStyle { .. } => {
-                false
-            },
+            Operation::Geometry { .. }
+            | Operation::Text { .. }
+            | Operation::TextStyle { .. }
+            | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::AddText { slide, .. }
@@ -1138,6 +1166,67 @@ impl<'a> Edit<'a> {
             storage,
             span,
             style,
+        });
+        Ok(self)
+    }
+
+    /// Stage a value in one cell (zero-based `row`, `column`) of a slide
+    /// table.
+    ///
+    /// Text is interned in the table's string list; the cell keeps its
+    /// style and format keys; a cleared cell without them leaves the
+    /// storage. Tables in a formula graph are refused
+    /// ([`Unsupported::TableFormulas`]).
+    ///
+    /// # Errors
+    ///
+    /// Typed selector errors, [`Error::Unsupported`] for drawables other
+    /// than tables, [`Error::InvalidSpan`] for a cell outside the table.
+    ///
+    /// ```no_run
+    /// use litchi_keynote::slide::drawable::TableCellValue;
+    /// use litchi_keynote::{DrawableSelector, Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// let mut edit = package.edit_slide_drawables();
+    /// edit.set_table_cell(
+    ///     SlideSelector::index(0),
+    ///     DrawableSelector::index(2),
+    ///     1,
+    ///     1,
+    ///     TableCellValue::Text("Q3".into()),
+    /// )?;
+    /// let commit = edit.commit()?;
+    /// # let _ = commit;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_table_cell<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        row: u32,
+        column: u32,
+        value: TableCellValue,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item) = self.drawable(slide.into(), drawable.into())?;
+        if item.kind != Kind::Table {
+            return Err(Error::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            });
+        }
+        if let TableCellValue::Number(number) = value
+            && !number.is_finite()
+        {
+            return Err(Error::InvalidSpan);
+        }
+        self.operations.push(Operation::TableCell {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            row,
+            column,
+            value,
         });
         Ok(self)
     }
@@ -1684,6 +1773,16 @@ fn commit_operations(
                 if staged.item(*drawable).and_then(|item| item.text.clone()) != before {
                     return Err(Error::Verification);
                 }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::TableCell {
+                slide,
+                drawable,
+                row,
+                column,
+                value,
+            } => {
+                stage::set_table_cell(&mut workspace, *drawable, *row, *column, value)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::AddImage {

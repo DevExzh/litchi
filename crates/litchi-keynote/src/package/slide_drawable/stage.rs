@@ -790,3 +790,202 @@ pub(super) fn set_text_style(
     }
     Ok(())
 }
+
+/// `TST.TableInfoArchive`.
+const TABLE_INFO: u32 = 6_000;
+/// `TST.TableModelArchive`.
+const TABLE_MODEL: u32 = 6_001;
+/// `TST.Tile`.
+const TILE: u32 = 6_002;
+/// `TST.TableDataList` (and its legacy type).
+const DATA_LIST: [u32; 2] = [6_005, 6_201];
+/// `TST.HeaderStorageBucket`.
+const HEADER_BUCKET: u32 = 6_006;
+/// `TSCE.FormulaOwnerDependenciesArchive`.
+const FORMULA_OWNER: u32 = 4_008;
+/// Rows one header bucket covers.
+const HEADER_BUCKET_ROWS: u32 = 65_536;
+
+fn table_storage() -> Error {
+    Error::Unsupported {
+        reason: Unsupported::TableStorage,
+    }
+}
+
+fn first_reference(payload: &[u8], number: u32, wire: WireLimits) -> Result<Option<u64>, Error> {
+    let fields = Fields::parse(payload, wire).map_err(lift)?;
+    fields
+        .all(number)
+        .next()
+        .map(|field| {
+            field
+                .message()
+                .and_then(|reference| wire::reference_identifier(reference, wire))
+        })
+        .transpose()
+        .map_err(lift)
+}
+
+fn first_varint(payload: &[u8], number: u32, wire: WireLimits) -> Result<Option<u64>, Error> {
+    let fields = Fields::parse(payload, wire).map_err(lift)?;
+    fields
+        .unique(number)
+        .map_err(lift)?
+        .map(|field| field.varint())
+        .transpose()
+        .map_err(lift)
+}
+
+fn first_message(payload: &[u8], number: u32, wire: WireLimits) -> Result<Option<Vec<u8>>, Error> {
+    let fields = Fields::parse(payload, wire).map_err(lift)?;
+    fields
+        .unique(number)
+        .map_err(lift)?
+        .map(|field| field.message().map(<[u8]>::to_vec))
+        .transpose()
+        .map_err(lift)
+}
+
+/// The unique message of `types` an object holds, with its index.
+fn payload_of<'w>(
+    workspace: &'w Workspace<'_>,
+    identifier: u64,
+    types: &[u32],
+) -> Result<(usize, u32, &'w [u8]), Error> {
+    let object = workspace.require(identifier).map_err(lift)?;
+    let mut found = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        if types.contains(&message.type_)
+            && found
+                .replace((index, message.type_, message.data.as_slice()))
+                .is_some()
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
+    found.ok_or(Error::InvalidSource)
+}
+
+/// Write one cell of the table whose drawable is `info`.
+pub(super) fn set_table_cell(
+    workspace: &mut Workspace<'_>,
+    info: u64,
+    row: u32,
+    column: u32,
+    value: &super::TableCellValue,
+) -> Result<(), Error> {
+    use litchi_numbers_wire::table_write::{self, CellInput, FormulaState};
+    let wire = workspace.wire;
+    let package = workspace.package();
+    // The calculation graph: no formula reads or is read by the table.
+    let mut owners: Vec<&[u8]> = Vec::new();
+    for component in package.state.source.components().iter() {
+        for object in &component.archive().objects {
+            for message in &object.messages {
+                if message.type_ == FORMULA_OWNER {
+                    owners.push(&message.data);
+                }
+            }
+        }
+    }
+    let object = |identifier: u64| -> Option<&[u8]> {
+        package
+            .object_with_component(identifier)
+            .and_then(|(_, object)| object.messages.first())
+            .map(|message| message.data.as_slice())
+    };
+    match table_write::cell_formula_state(&owners, &object, info, row, column)
+        .map_err(|_| table_storage())?
+    {
+        FormulaState::Inert => {},
+        _ => {
+            return Err(Error::Unsupported {
+                reason: Unsupported::TableFormulas,
+            });
+        },
+    }
+    let (_, _, info_payload) = payload_of(workspace, info, &[TABLE_INFO])?;
+    let model = first_reference(info_payload, 2, wire)?.ok_or(Error::InvalidSource)?;
+    let (_, _, model_payload) = payload_of(workspace, model, &[TABLE_MODEL])?;
+    let rows = first_varint(model_payload, 6, wire)?.ok_or(Error::InvalidSource)?;
+    let columns = first_varint(model_payload, 7, wire)?.ok_or(Error::InvalidSource)?;
+    if u64::from(row) >= rows || u64::from(column) >= columns {
+        return Err(Error::InvalidSpan);
+    }
+    let columns = u32::try_from(columns).map_err(|_| Error::InvalidSource)?;
+    let store = first_message(model_payload, 4, wire)?.ok_or(Error::InvalidSource)?;
+    let tiles = first_message(&store, 3, wire)?.ok_or(Error::InvalidSource)?;
+    let size = first_varint(&tiles, 2, wire)?.unwrap_or(256).max(1);
+    let key = u64::from(row) / size;
+    let mut tile = None;
+    for entry in Fields::parse(&tiles, wire).map_err(lift)?.all(1) {
+        let entry = entry.message().map_err(lift)?;
+        if first_varint(entry, 1, wire)? == Some(key) {
+            tile = first_reference(entry, 2, wire)?;
+        }
+    }
+    let tile = tile.ok_or_else(table_storage)?;
+    let local = u32::try_from(u64::from(row) % size).map_err(|_| Error::InvalidSource)?;
+    let strings = first_reference(&store, 4, wire)?.ok_or(Error::InvalidSource)?;
+    let (tile_index, tile_type, tile_payload) = payload_of(workspace, tile, &[TILE])?;
+    let previous =
+        table_write::tile_cell(tile_payload, local, column).map_err(|_| table_storage())?;
+    let (list_index, list_type, list_payload) = payload_of(workspace, strings, &DATA_LIST)?;
+    let mut list = list_payload.to_vec();
+    let mut string_key = None;
+    let input = match value {
+        super::TableCellValue::Text(text) => {
+            let (interned, key) =
+                table_write::list_intern(&list, text).map_err(|_| table_storage())?;
+            list = interned;
+            string_key = Some(key);
+            CellInput::Text(text)
+        },
+        super::TableCellValue::Number(number) => CellInput::Number(*number),
+        super::TableCellValue::Boolean(flag) => CellInput::Boolean(*flag),
+        super::TableCellValue::Empty => CellInput::Empty,
+    };
+    let (cell, released) = table_write::cell_bytes(previous.as_deref(), &input, string_key)
+        .map_err(|_| table_storage())?;
+    if let Some(released) = released {
+        list = table_write::list_release(&list, released).map_err(|_| table_storage())?;
+    }
+    let written = table_write::tile_set_cell(tile_payload, local, column, columns, cell.as_deref())
+        .map_err(|_| table_storage())?;
+    let delta = i64::from(cell.is_some()) - i64::from(written.previous.is_some());
+    let mut replacements = vec![
+        (tile, tile_index, tile_type, written.tile),
+        (strings, list_index, list_type, list),
+    ];
+    if delta != 0 {
+        let headers = first_message(&store, 1, wire)?.ok_or(Error::InvalidSource)?;
+        let buckets: Vec<u64> = Fields::parse(&headers, wire)
+            .map_err(lift)?
+            .all(2)
+            .map(|field| {
+                field
+                    .message()
+                    .and_then(|reference| wire::reference_identifier(reference, wire))
+            })
+            .collect::<Result<_, _>>()
+            .map_err(lift)?;
+        let bucket = *buckets
+            .get((row / HEADER_BUCKET_ROWS) as usize)
+            .ok_or_else(table_storage)?;
+        let (index, message_type, payload) = payload_of(workspace, bucket, &[HEADER_BUCKET])?;
+        let adjusted =
+            table_write::header_adjust(payload, row, delta).map_err(|_| table_storage())?;
+        replacements.push((bucket, index, message_type, adjusted));
+        if let Some(column_headers) = first_reference(&store, 2, wire)? {
+            let (index, message_type, payload) =
+                payload_of(workspace, column_headers, &[HEADER_BUCKET])?;
+            let adjusted =
+                table_write::header_adjust(payload, column, delta).map_err(|_| table_storage())?;
+            replacements.push((column_headers, index, message_type, adjusted));
+        }
+    }
+    for (identifier, index, message_type, data) in replacements {
+        replace_payload(workspace, identifier, index, message_type, data).map_err(lift)?;
+    }
+    Ok(())
+}

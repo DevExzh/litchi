@@ -815,3 +815,134 @@ fn corpus_text_boxes_take_character_styles() -> TestResult {
     assert!(styled >= 10, "only {styled} styled");
     Ok(())
 }
+
+/// Slide-table cell writes (record 0309): text, numbers, booleans and
+/// clears read back through the table reader and invert exactly.
+#[test]
+fn slide_table_cells_take_values() -> TestResult {
+    use litchi_iwa_common::table::cell::value::Value;
+    use litchi_iwa_common::table::coordinate::CellPosition;
+    use litchi_keynote::slide::drawable::TableCellValue;
+    for name in [
+        "slide-table-read-native.key",
+        "slide-table-merges-native.key",
+        "table-discovery.key",
+    ] {
+        let package = open(name)?;
+        let source = bytes(&package)?;
+        let slides = package.slides()?.len();
+        let mut done = false;
+        for slide_index in 0..slides {
+            let slide = SlideSelector::index(slide_index);
+            let drawables = list(&package, slide_index)?;
+            let Some(table_drawable) = drawables
+                .iter()
+                .position(|drawable| drawable.kind() == Kind::Table)
+            else {
+                continue;
+            };
+            let read = package.slide_table_cells(slide, 0_usize)?;
+            let dimensions = read.table().dimensions();
+            let (rows, columns) = (dimensions.rows(), dimensions.columns());
+            let mut edit = package.edit_slide_drawables();
+            let drawable = DrawableSelector::index(table_drawable);
+            edit.set_table_cell(
+                slide,
+                drawable,
+                rows - 1,
+                columns - 1,
+                TableCellValue::Text("written".into()),
+            )?
+            .set_table_cell(
+                slide,
+                drawable,
+                0,
+                columns - 1,
+                TableCellValue::Number(42.5),
+            )?;
+            let commit = match edit.commit() {
+                Ok(commit) => commit,
+                Err(
+                    error @ Error::Unsupported {
+                        reason: Unsupported::TableFormulas | Unsupported::TableStorage,
+                    },
+                ) => {
+                    eprintln!("{name}: refused {error:?}");
+                    break;
+                },
+                Err(error) => panic!("{name}: {error:?}"),
+            };
+            let edited = commit.package();
+            let reopened = Package::from_bytes(&bytes(edited)?)?;
+            for candidate in [edited, &reopened] {
+                let read = candidate.slide_table_cells(slide, 0_usize)?;
+                let table = read.table();
+                assert_eq!(
+                    table.get(CellPosition::new(rows - 1, columns - 1)),
+                    Some(&Value::Text("written".into())),
+                    "{name}"
+                );
+                assert!(matches!(
+                    table.get(CellPosition::new(0, columns - 1)),
+                    Some(Value::Number(number)) if number.get() == 42.5
+                ));
+            }
+            let restored = edited.apply_slide_drawables(&commit.patch().inverse())?;
+            assert_eq!(bytes(restored.package())?, source);
+            // Clearing the written cell removes its value.
+            let mut edit = edited.edit_slide_drawables();
+            edit.set_table_cell(
+                slide,
+                drawable,
+                rows - 1,
+                columns - 1,
+                TableCellValue::Empty,
+            )?;
+            let cleared = edit.commit()?.into_package();
+            let read = cleared.slide_table_cells(slide, 0_usize)?;
+            assert!(!matches!(
+                read.table().get(CellPosition::new(rows - 1, columns - 1)),
+                Some(Value::Text(_))
+            ));
+            done = true;
+            break;
+        }
+        eprintln!("{name}: written {done}");
+    }
+    Ok(())
+}
+
+/// A formula cell, and a cell a formula reads, refuse a value write.
+#[test]
+fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
+    use litchi_keynote::slide::drawable::TableCellValue;
+    let package = open("slide-table-read-native.key")?;
+    let slide_index = (0..package.slides()?.len())
+        .find(|index| {
+            list(&package, *index)
+                .is_ok_and(|drawables| drawables.iter().any(|item| item.kind() == Kind::Table))
+        })
+        .expect("a slide with a table");
+    let slide = SlideSelector::index(slide_index);
+    let table = list(&package, slide_index)?
+        .iter()
+        .position(|item| item.kind() == Kind::Table)
+        .expect("table");
+    for (row, column) in [(1, 3), (1, 1)] {
+        let mut edit = package.edit_slide_drawables();
+        edit.set_table_cell(
+            slide,
+            DrawableSelector::index(table),
+            row,
+            column,
+            TableCellValue::Number(1.0),
+        )?;
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::Unsupported {
+                reason: Unsupported::TableFormulas
+            })
+        ));
+    }
+    Ok(())
+}
