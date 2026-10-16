@@ -25,6 +25,10 @@ fn restart_at_seven() -> ParagraphListNumbering {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
     let restart = restart_at_seven();
 

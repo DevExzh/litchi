@@ -89,6 +89,35 @@ FORBIDDEN_CRATES = frozenset(
 )
 
 
+# Archive-free semantic value modules inside an otherwise forbidden crate.
+# `litchi-iwa-common` mixes wire helpers with the neutral table vocabulary
+# that Pages, Keynote and Numbers share, so the crate stays forbidden and only
+# these module prefixes are allowed. Each module imports nothing but `std` and
+# its siblings in this list (`tools/test_check_iwork_leaf_public_api.py`
+# verifies that from the sources); record 0300 triaged the 45 Numbers
+# findings to these three modules.
+ALLOWED_SEMANTIC_MODULES: Mapping[tuple[str, ...], str] = {
+    ("litchi_iwa_common", "table", "model"): (
+        "shared sparse table model (Table, Builder, Cell, Grid, View, "
+        "Dimensions and their errors) behind the Numbers table facade"
+    ),
+    ("litchi_iwa_common", "table", "coordinate"): (
+        "checked cell coordinates and A1 ranges (CellPosition, CellRange)"
+    ),
+    ("litchi_iwa_common", "table", "cell", "value"): (
+        "presence-preserving semantic cell values"
+    ),
+}
+
+
+def _allowed_semantic_module(path: tuple[str, ...]) -> bool:
+    """Return whether a resolved path lies in an allowlisted value module."""
+    return any(
+        path[: len(prefix)] == prefix and len(path) > len(prefix)
+        for prefix in ALLOWED_SEMANTIC_MODULES
+    )
+
+
 RAW_ARGUMENT_NAMES = frozenset(
     {
         "id",
@@ -370,6 +399,11 @@ def _semantic_path_violation(
     if not path:
         return None
     referenced_crate = _crate_path(path)
+    if _allowed_semantic_module(path):
+        reason = _name_violation(path[-1])
+        if reason is not None:
+            return f"{reason} `{'::'.join(path)}`"
+        return None
     if referenced_crate in FORBIDDEN_CRATES:
         return f"forbidden type `{'::'.join(path)}`"
     if referenced_crate == crate_name:

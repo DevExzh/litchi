@@ -265,7 +265,7 @@ fn pages_chart_caption_reference(editor: &PagesEditor, drawable_object_id: u64) 
 }
 
 fn pages_chart_caption_reference_from_data(data: &[u8]) -> u64 {
-    IWorkChartArchive::decode(&data)
+    IWorkChartArchive::decode(data)
         .unwrap()
         .drawable
         .super_
@@ -1222,10 +1222,7 @@ fn pages_chart_caption_retarget_preserves_unknown_archive_header_and_metadata_on
         .retain(|identifier| *identifier != old_reference_id);
     expected_info.object_references.push(replacement_id);
     for field in &mut expected_info.field_infos {
-        let had_old_reference = field
-            .object_references
-            .iter()
-            .any(|identifier| *identifier == old_reference_id);
+        let had_old_reference = field.object_references.contains(&old_reference_id);
         field
             .object_references
             .retain(|identifier| *identifier != old_reference_id);

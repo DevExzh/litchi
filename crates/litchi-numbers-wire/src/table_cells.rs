@@ -4,7 +4,8 @@
 //! maps, and their aggregate budget implementation. This module owns the
 //! common tile/row topology checks, sparse offset validation, and source-backed
 //! cell classification. A sink must stage its side effects and publish them
-//! only after [`read_table_cells`] returns successfully.
+//! only after [`read_table_cells`](crate::table_cells::read_table_cells)
+//! returns successfully.
 
 use std::collections::HashSet;
 

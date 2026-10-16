@@ -4,7 +4,7 @@ use litchi_iwa::numbers::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
     FormulaPivotCategoryReference, FormulaUuid, NumbersEditor,
 };
-use litchi_numbers::{Position, Workbook, cell::FiniteF64};
+use litchi_numbers::{CellPosition, Workbook, cell::FiniteF64};
 
 fn parse_address(address: &str) -> Result<FormulaCellReference, String> {
     let mut input = address;
@@ -261,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .flat_map(|sheet| sheet.tables())
         .find(|table| table.name() == table_name)
         .and_then(|table| {
-            Position::try_from_usize(row, column)
+            CellPosition::try_from_usize(row, column)
                 .ok()
                 .and_then(|position| table.get(position))
         });

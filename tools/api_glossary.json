@@ -8660,6 +8660,30 @@
           "scope": "litchi_numbers::table::dimension::transaction",
           "replacement": "use table::dimension::transaction::Error (ADR 0034 §3)",
           "recursive": false
+        },
+        {
+          "name": "Position",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "recursive": false
+        },
+        {
+          "name": "Range",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "recursive": false
+        },
+        {
+          "name": "Position",
+          "scope": "litchi_numbers::table",
+          "replacement": "use litchi_numbers::table::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "recursive": false
+        },
+        {
+          "name": "Range",
+          "scope": "litchi_numbers::table",
+          "replacement": "use litchi_numbers::table::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "recursive": false
         }
       ],
       "families": [
@@ -9238,6 +9262,30 @@
           "name": "TransactionError",
           "scope": "litchi_numbers::table::dimension::transaction",
           "replacement": "use table::dimension::transaction::Error (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "Position",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "recursive": false
+        },
+        {
+          "name": "Range",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "recursive": false
+        },
+        {
+          "name": "Position",
+          "scope": "litchi_numbers::table",
+          "replacement": "use litchi_numbers::table::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "recursive": false
+        },
+        {
+          "name": "Range",
+          "scope": "litchi_numbers::table",
+          "replacement": "use litchi_numbers::table::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
         }
       ],

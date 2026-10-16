@@ -21,6 +21,10 @@ fn deep_start() -> TextPosition {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
     let level_two = ParagraphListLevel::new(2).unwrap();
     let expected = vec![

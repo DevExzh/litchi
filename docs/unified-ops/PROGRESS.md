@@ -669,6 +669,14 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - Typed gaps: sheet/table/row/column add/remove (requests 4–6), formulas on created workbooks (18), comments (19), text styles.
   - Single ops 1.00–1.04×, open+get 1.17×, 1k batch 1.44–1.48×.
 
+- Merged `iwork-hygiene` (0300):
+  - the release-only Numbers builder failure was a `debug_assert!` around the name-index insert in `litchi-iwa-package`, fixed with release-mode tests;
+  - Numbers/Pages merge owner UUIDs are derived, not random (Keynote to follow in 0298);
+  - `litchi-iwa` chart examples compile (typed `ChartData` error) and clippy is clean on all targets;
+  - the crate-boundary test derives its edges from the JSON;
+  - the iWork leaf public-API checker exits 0 (Numbers `Position`/`Range` aliases deleted and banned; shared table modules allowed with reasons).
+- Usage-limit pause (weekly limit hit 2026-10-15, reset 2026-10-18): `iwork-keynote` (0298), `iwork-structure` (0301) and `perf-residual` (0302) stopped mid-task and were resumed afterwards.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.

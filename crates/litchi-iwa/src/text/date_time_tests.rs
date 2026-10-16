@@ -121,6 +121,10 @@ fn invalid_positions_and_text_replacement_are_safe() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn scratch_text_box_date_time_fields_work_across_the_suite() {
     let prefix = "When: ";
     let position = TextPosition::from_utf16_index(prefix.encode_utf16().count()).unwrap();

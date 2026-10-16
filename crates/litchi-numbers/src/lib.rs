@@ -370,7 +370,6 @@ pub use table::dimension::{Dimension, Points, Size};
 pub use table::topology::{ColumnDeletion, RowDeletion};
 pub use table::{
     AddressError, Builder as TableBuilder, Cell, CellPosition, CellRange, CoordinateError,
-    Dimensions, Error as TableError, Grid, GridBudget, InsertError, InsertResult, Position, Range,
-    Table, View,
+    Dimensions, Error as TableError, Grid, GridBudget, InsertError, InsertResult, Table, View,
 };
 pub use workbook::Workbook;

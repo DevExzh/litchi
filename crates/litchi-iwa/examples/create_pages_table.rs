@@ -55,7 +55,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut header_bytes = Vec::new();
     header_commit.package().write_to(&mut header_bytes)?;
-    editor = PagesEditor::from_bytes(&header_bytes)?;
     let mut dimensions = Package::from_bytes(&header_bytes)?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
         dimensions = set_body_table_dimension(
