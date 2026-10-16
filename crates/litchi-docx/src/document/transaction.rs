@@ -1801,7 +1801,14 @@ impl Snapshot {
     /// Attach a publication audit proof. A proof that does not cover exactly
     /// these bytes is dropped, so a snapshot never carries a proof for other
     /// bytes.
-    fn with_publication_proof(mut self, proof: xml_minifier::audit::VerifiedSource) -> Self {
+    ///
+    /// Besides [`Edit::commit`], the source-backed owner attaches the proof
+    /// its OPC package retained for a transaction's base bytes (record 0317),
+    /// which [`commit_preserving_unmodified`] then proves the candidate from.
+    pub(crate) fn with_publication_proof(
+        mut self,
+        proof: xml_minifier::audit::VerifiedSource,
+    ) -> Self {
         if proof.covers(self.xml_bytes(), xml_minifier::audit::Limits::default()) {
             self.publication = Some(proof);
         }
@@ -7173,6 +7180,16 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// returned exactly where it was. A candidate whose bytes cannot be shared
 /// (a managed projection) takes the historical gate and carries no proof.
 ///
+/// When the source snapshot itself carries a proof (record 0317: the
+/// source-backed owner attaches the one its OPC package retained for these
+/// bytes, with the content boundaries that audit recorded), the gate's
+/// verdict on the source is that proof's, and the candidate is audited with
+/// [`xml_minifier::audit::VerifiedSource::verify_successor`]: its verdict and
+/// error are the candidate's complete source audit, but it scans only the
+/// paragraphs that changed, and the original is not scanned at all. The
+/// resulting proof keeps boundaries of its own, so the next commit on the
+/// published revision is proved the same way.
+///
 /// Two writers consume the proof: [`crate::Package::apply`], for patches
 /// whose source snapshot carries no source identity
 /// (`Package::document_snapshot`'s), and the source-backed writer
@@ -7185,13 +7202,17 @@ fn commit_preserving_unmodified(base: &Snapshot, projected: &Snapshot) -> Result
         .as_ref()
         .ok()
         .and_then(|candidate| candidate.shared_xml().ok());
-    let (source_publishes, proof) = match replacement {
-        Some(replacement) => match xml_minifier::audit::VerifiedSource::verify_replacement(
-            base.xml_bytes(),
-            replacement,
-            xml_minifier::audit::Limits::default(),
-        ) {
+    let limits = xml_minifier::audit::Limits::default();
+    let (source_publishes, proof) = match (replacement, base.publication_proof()) {
+        // The source passed the writer's audit under these limits.
+        (Some(replacement), Some(source)) => match source.verify_successor(replacement, limits) {
             Ok((proof, _how)) => (true, Some(proof)),
+            // As below: the writer's own audit refuses it where it always has.
+            Err(_) => (true, None),
+        },
+        (None, Some(_)) => (true, None),
+        (Some(replacement), None) => match base_pair_audit(base, replacement, limits) {
+            Ok(proof) => (true, Some(proof)),
             // The source's own `verify_source` error: the gate refuses.
             Err(xml_minifier::audit::ReplacementError::Original(_)) => (false, None),
             // The source passes and the candidate does not. Publish it
@@ -7199,7 +7220,7 @@ fn commit_preserving_unmodified(base: &Snapshot, projected: &Snapshot) -> Result
             // has.
             Err(_) => (true, None),
         },
-        None => (publication_accepts_preserved_xml(base.xml_bytes()), None),
+        (None, None) => (publication_accepts_preserved_xml(base.xml_bytes()), None),
     };
     if !source_publishes {
         return compact_whole_document(projected);
@@ -7209,6 +7230,41 @@ fn commit_preserving_unmodified(base: &Snapshot, projected: &Snapshot) -> Result
         Some(proof) => candidate.with_publication_proof(proof),
         None => candidate,
     })
+}
+
+/// The pair audit of the preserving commit's gate, with the candidate's
+/// proof: [`xml_minifier::audit::VerifiedSource::verify_indexed_replacement`]
+/// for a source snapshot bound to a source identity (the source-backed
+/// owner's) whose bytes can be shared, so the candidate's proof keeps the
+/// content boundaries derived from the source's single scan (record 0317) and
+/// a commit on the revision the owner publishes is proved from them; the plain
+/// [`xml_minifier::audit::VerifiedSource::verify_replacement`] otherwise,
+/// which records nothing, since no other writer keeps the proof for a next
+/// commit. Both have the verdict and error of `verify_source_replacement`.
+fn base_pair_audit(
+    base: &Snapshot,
+    replacement: Arc<Vec<u8>>,
+    limits: xml_minifier::audit::Limits,
+) -> core::result::Result<xml_minifier::audit::VerifiedSource, xml_minifier::audit::ReplacementError>
+{
+    let shared = base
+        .source_identity()
+        .and_then(|_identity| base.shared_xml().ok());
+    match shared {
+        Some(source) => xml_minifier::audit::VerifiedSource::verify_indexed_replacement(
+            source,
+            replacement,
+            limits,
+            xml_minifier::audit::IndexDepth::CHILDREN,
+        )
+        .map(|(_source, proof, _how)| proof),
+        None => xml_minifier::audit::VerifiedSource::verify_replacement(
+            base.xml_bytes(),
+            replacement,
+            limits,
+        )
+        .map(|(proof, _how)| proof),
+    }
 }
 
 /// Compact the whole projected main document: the

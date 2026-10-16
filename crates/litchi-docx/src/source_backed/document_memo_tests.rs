@@ -305,3 +305,97 @@ fn committed_handles_share_one_effective_transaction_snapshot() {
     };
     assert_eq!(chain(false), chain(true));
 }
+
+/// Record 0317: the transaction snapshot carries the source XML audit proof
+/// the OPC package retained for its exact bytes, so the preserving commit
+/// proves its candidate from it instead of scanning the base again, and the
+/// candidate's proof keeps boundaries of its own for the next commit. Every
+/// chain publishes what one fresh edit of the same paragraphs publishes.
+#[test]
+fn preserving_commits_prove_their_candidates_from_retained_proofs() {
+    let mut body = String::new();
+    for index in 0..40 {
+        body.push_str(&format!(
+            "<w:p><w:r><w:t>Paragraph {index}</w:t></w:r></w:p>"
+        ));
+    }
+    let bytes = docx(word_document("", &body));
+    let open = || Package::from_read_at(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+    let write = |package: &Package| {
+        let mut out = Vec::new();
+        package.write_to(&mut out).unwrap();
+        out
+    };
+    let source_proof = |package: &Package| {
+        let (_, snapshot) = package.main_document_snapshot("edit", true).unwrap();
+        snapshot
+            .publication_proof()
+            .cloned()
+            .map(|proof| (proof, snapshot))
+    };
+    let package = open();
+    // Nothing has been audited yet: the first commit takes the pair audit.
+    assert!(source_proof(&package).is_none());
+    let mut edit = package.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(2), "two")
+        .unwrap();
+    let (committed, patch) = edit.commit().unwrap().into_parts();
+    let proof = patch
+        .target()
+        .publication_proof()
+        .expect("the pair audit proves the candidate");
+    assert!(proof.index_depth().is_some(), "an indexed pair audit");
+
+    // The physical owner's next transaction starts from the retained proof.
+    let (base, snapshot) =
+        source_proof(&package).expect("the package retained the original's proof");
+    assert!(core::ptr::eq(base.bytes().as_slice(), snapshot.xml_bytes()));
+    let mut edit = package.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(30), "thirty")
+        .unwrap();
+    let (second, patch) = edit.commit().unwrap().into_parts();
+    assert!(
+        patch
+            .target()
+            .publication_proof()
+            .is_some_and(|proof| proof.index_depth().is_some())
+    );
+    let mut fresh_edit = open().edit().unwrap();
+    fresh_edit
+        .replace_paragraph_text(Position::new(30), "thirty")
+        .unwrap();
+    assert_eq!(
+        write(&second),
+        write(&fresh_edit.commit().unwrap().into_package())
+    );
+
+    // The committed revision's transaction shares its proven allocation, and
+    // a chain of commits far apart keeps a proof at every step.
+    let mut current = committed;
+    for (position, text) in [(38, "thirty-eight"), (10, "ten")] {
+        let (source, snapshot) = source_proof(&current).expect("the revision keeps its proof");
+        let topology = current.effective.as_ref().unwrap();
+        let effective = topology.main_document_part().unwrap().data().unwrap();
+        assert!(core::ptr::eq(
+            source.bytes().as_slice(),
+            effective.as_bytes()
+        ));
+        assert!(core::ptr::eq(snapshot.xml_bytes(), effective.as_bytes()));
+        let mut edit = current.edit().unwrap();
+        edit.replace_paragraph_text(Position::new(position), text)
+            .unwrap();
+        let (next, patch) = edit.commit().unwrap().into_parts();
+        assert!(patch.target().publication_proof().is_some());
+        current = next;
+    }
+    let mut fresh_edit = open().edit().unwrap();
+    for (position, text) in [(2, "two"), (38, "thirty-eight"), (10, "ten")] {
+        fresh_edit
+            .replace_paragraph_text(Position::new(position), text)
+            .unwrap();
+    }
+    assert_eq!(
+        write(&current),
+        write(&fresh_edit.commit().unwrap().into_package())
+    );
+}
