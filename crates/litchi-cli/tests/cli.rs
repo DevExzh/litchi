@@ -390,7 +390,8 @@ fn exit_statuses_follow_the_code_families() {
     let text = dir.path().join("plain.txt");
     std::fs::write(&text, "hello").expect("write");
     expect(5, ["get", arg(&text)]);
-    expect(5, ["create", arg(&dir.path().join("x.key"))]);
+    // Every iWork format creates since records 0297-0299: `x.key` is now
+    // exit 0 (keynote_structure_from_the_command_line).
     // 6: I/O.
     expect(6, ["get", arg(&dir.path().join("missing.docx"))]);
     expect(6, ["create", arg(&copy)]);
