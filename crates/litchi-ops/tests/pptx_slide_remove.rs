@@ -355,7 +355,7 @@ fn removal_batches_are_atomic_or_best_effort_at_item_boundaries() {
 }
 
 #[test]
-fn native_final_slide_and_dependency_bearing_slide_refuse_without_mutation() {
+fn native_final_slide_refuses_and_notes_slides_leave_with_their_slide() {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
     let mut package = builder.build().unwrap();
@@ -366,36 +366,23 @@ fn native_final_slide_and_dependency_bearing_slide_refuse_without_mutation() {
     assert!(patch.is_noop());
     assert_eq!(after.to_bytes().unwrap(), before);
 
-    let dependency_bytes = notes_fixture();
-    let dependency = litchi_ops::open_bytes_with(
-        dependency_bytes,
-        &OpenOptions::new().source_mode(SourceMode::Eager),
-    )
-    .unwrap();
-    let dependency_before = dependency.to_bytes().unwrap();
-    let dependency_error = dependency
-        .remove("/slide[1]")
-        .expect_err("notes relationship is outside dependency-free removal");
-    assert_eq!(dependency_error.code(), Code::UnsupportedCapability);
-    assert_eq!(dependency.to_bytes().unwrap(), dependency_before);
-    // Slide 2 is removed from the local candidate before notes on slide 1
-    // refuse the second removal; slide 3 keeps this from being FinalSlide.
-    let late = dependency
-        .remove(scoped_slide_query("slide[1], slide[2]"))
-        .unwrap_err();
-    assert_eq!(late.code(), Code::UnsupportedCapability);
-    assert_eq!(dependency.to_bytes().unwrap(), dependency_before);
-
-    let source_dependency = litchi_ops::open_bytes(notes_fixture()).unwrap();
-    let source_dependency_before = source_dependency.to_bytes().unwrap();
-    let source_dependency_error = source_dependency
-        .remove("/slide[1]")
-        .expect_err("source dependency refusal");
-    assert_eq!(source_dependency_error.code(), Code::UnsupportedCapability);
-    assert_eq!(
-        source_dependency.to_bytes().unwrap(),
-        source_dependency_before
-    );
+    // Record 0303: a slide's own notes slide leaves with it, on the eager
+    // and the source-backed owner.
+    for mode in [SourceMode::Eager, SourceMode::Auto] {
+        let dependency =
+            litchi_ops::open_bytes_with(notes_fixture(), &OpenOptions::new().source_mode(mode))
+                .unwrap();
+        let removed = dependency.remove("/slide[1]").unwrap();
+        assert_eq!(texts(&removed), ["B", "C"]);
+        // Removing every slide is still refused atomically: the final-slide
+        // rule fires after two removals were staged.
+        let before = dependency.to_bytes().unwrap();
+        let late = dependency
+            .remove(scoped_slide_query("slide[1], slide[2], slide[3]"))
+            .unwrap_err();
+        assert_eq!(late.code(), Code::InvalidArgument);
+        assert_eq!(dependency.to_bytes().unwrap(), before);
+    }
 }
 
 #[test]
@@ -429,8 +416,8 @@ fn source_removal_keeps_retained_slide_notes_and_late_refusal_is_atomic() {
         "speaker notes"
     );
     let failure = source
-        .remove(scoped_slide_query("slide[1], slide[2]"))
+        .remove(scoped_slide_query("slide[1], slide[2], slide[3]"))
         .unwrap_err();
-    assert_eq!(failure.code(), Code::UnsupportedCapability);
+    assert_eq!(failure.code(), Code::InvalidArgument);
     assert_eq!(source.to_bytes().unwrap(), original);
 }
