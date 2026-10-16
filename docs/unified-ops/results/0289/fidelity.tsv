@@ -171,7 +171,7 @@ libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	xls	exact		va
 libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	xls	exact		refused	/sheet[1] name: corrupt_file: Invalid data: Font name has 0 characters; expected 1..=31	refused	row add+remove: corrupt_file: Invalid data: Font name has 0 characters; expected 1..=31
-libreoffice-core/sc/qa/unit/data/xls/validation.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close a data validation formula with cell references
+libreoffice-core/sc/qa/unit/data/xls/validation.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 libreoffice-core/sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9702 -> 7895 bytes, first difference at 6	-	
 libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7651 -> 5717 bytes, first difference at 6	-	
 libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10911 -> 8983 bytes, first difference at 6	-	
@@ -539,10 +539,10 @@ ole/ppt/ppt_with_png.ppt	ppt	exact		none		-
 ole/ppt/text-margins.ppt	ppt	exact		none		-	
 ole/ppt/text_shapes.ppt	ppt	exact		none		-	
 ole/xls/ComplexFunctionTestCaseData.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-ole/xls/ConditionalFormattingSamples copy.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 6 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 6 was not published by the complete XLS reader
-ole/xls/ConditionalFormattingSamples.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 6 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 6 was not published by the complete XLS reader
+ole/xls/ConditionalFormattingSamples copy.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot read a workbook formula's references
+ole/xls/ConditionalFormattingSamples.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot read a workbook formula's references
 ole/xls/DateFormats.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-ole/xls/DateTimeToNumberTestCases.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 1 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 1 was not published by the complete XLS reader
+ole/xls/DateTimeToNumberTestCases.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/FormulaEvalTestData.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement refuses Formula records with RgbExtra ancillary references
 ole/xls/FormulaRefs.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/FormulaSheetRange.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
@@ -552,14 +552,14 @@ ole/xls/SimpleChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+
 ole/xls/SimpleMacro.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleMultiCell.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleScatterChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-ole/xls/SimpleWithAutofilter copy.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: a position-locked drawing anchor is not shiftable without row and column sizes
-ole/xls/SimpleWithAutofilter.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: a position-locked drawing anchor is not shiftable without row and column sizes
+ole/xls/SimpleWithAutofilter copy.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement only supports coordinate-free drawing Obj records
+ole/xls/SimpleWithAutofilter.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement only supports coordinate-free drawing Obj records
 ole/xls/SimpleWithChoose copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleWithChoose.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-ole/xls/SimpleWithColours copy.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
-ole/xls/SimpleWithColours.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
-ole/xls/SimpleWithComments copy.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: a position-locked drawing anchor is not shiftable without row and column sizes
-ole/xls/SimpleWithComments.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: a position-locked drawing anchor is not shiftable without row and column sizes
+ole/xls/SimpleWithColours copy.xls	xls	exact		byte-exact	/sheet[1] name	value-exact	row add+remove: 6144 -> 6144 bytes, first difference at 2906
+ole/xls/SimpleWithColours.xls	xls	exact		byte-exact	/sheet[1] name	value-exact	row add+remove: 6144 -> 6144 bytes, first difference at 2906
+ole/xls/SimpleWithComments copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
+ole/xls/SimpleWithComments.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleWithDataFormat copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleWithDataFormat.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleWithFormula copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
@@ -576,19 +576,19 @@ ole/xls/SimpleWithSkip copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	
 ole/xls/SimpleWithSkip.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleWithStyling copy.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/SimpleWithStyling.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-ole/xls/SingleLetterRanges.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
+ole/xls/SingleLetterRanges.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WeekNumFunctionTestCaseData.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WeekNumFunctionTestCaseData2013.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WithChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WithCheckBoxes.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement only supports coordinate-free drawing Obj records
-ole/xls/WithConditionalFormatting.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close a conditional format formula with cell refe...
+ole/xls/WithConditionalFormatting.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WithCustomViews.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close dependency record 0x0090
 ole/xls/WithEmbeddedObjects.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement only supports coordinate-free drawing Obj records
 ole/xls/WithExtendedStyles.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-ole/xls/WithFormattedGraphTitle.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: cell (1, 0) has duplicate BIFF8 Number records
+ole/xls/WithFormattedGraphTitle.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WithHyperlink.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WithThreeCharts.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-ole/xls/WithTwoCharts.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
+ole/xls/WithTwoCharts.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/WithTwoHyperLinks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/empty.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/password.xls	xls	locked		-		-	
@@ -855,7 +855,7 @@ poi/test-data/spreadsheet/47889.xlsx	xlsx	exact		value-exact	/sheet[1] name: 355
 poi/test-data/spreadsheet/48962.xlsx	xlsx	exact		value-exact	/sheet[1] name: 50260 -> 50265 bytes, first difference at 2199	-	
 poi/test-data/spreadsheet/48968.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/49609.xlsx	xlsx	exact		one-way	/sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...	-	
-poi/test-data/spreadsheet/50939.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close workbook dependency record 0x01B0
+poi/test-data/spreadsheet/50939.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot read a workbook formula's references
 poi/test-data/spreadsheet/53109.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/54016.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close dependency record 0x0090
 poi/test-data/spreadsheet/54071.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9150 -> 9158 bytes, first difference at 2315	-	
@@ -869,7 +869,7 @@ poi/test-data/spreadsheet/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 106
 poi/test-data/spreadsheet/62834.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9629 -> 9619 bytes, first difference at 2338	-	
 poi/test-data/spreadsheet/66365.xlsx	xlsx	exact		value-exact	/sheet[1] name: 4753 -> 4759 bytes, first difference at 2769	-	
 poi/test-data/spreadsheet/AmpersandHeader.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9480 -> 9489 bytes, first difference at 2307	-	
-poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 6 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 6 was not published by the complete XLS reader
+poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot read a workbook formula's references
 poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx	xlsx	exact		value-exact	/sheet[1] name: 654688 -> 654676 bytes, first difference at 2803	-	
 poi/test-data/spreadsheet/CustomXMLMappings.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9906 -> 9915 bytes, first difference at 2269	-	
 poi/test-data/spreadsheet/DBCSHeader.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
@@ -884,13 +884,13 @@ poi/test-data/spreadsheet/FormatKM.xlsx	xlsx	exact		value-exact	/sheet[1] name: 
 poi/test-data/spreadsheet/Formatting.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement refuses a hyperlink with an internal location dependency
 poi/test-data/spreadsheet/MRExtraLines.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close workbook dependency record 0x0879
+poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/ShrinkToFit.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/Simple.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/SimpleMacro.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/SimpleScatterChart.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-poi/test-data/spreadsheet/SimpleWithColours.xls	xls	exact		refused	/sheet[1] name: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
-poi/test-data/spreadsheet/SimpleWithComments.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: a position-locked drawing anchor is not shiftable without row and column sizes
+poi/test-data/spreadsheet/SimpleWithColours.xls	xls	exact		byte-exact	/sheet[1] name	value-exact	row add+remove: 6144 -> 6144 bytes, first difference at 2906
+poi/test-data/spreadsheet/SimpleWithComments.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/SimpleWithPrintArea.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx	xlsx	exact		value-exact	/sheet[1] name: 325446 -> 324624 bytes, first difference at 2555	-	
@@ -898,7 +898,7 @@ poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx	xlsx	exact		value-exact
 poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/UncalcedRecord.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/WithChartSheet.xlsx	xlsx	exact		value-exact	/sheet[1] name: 30333 -> 30331 bytes, first difference at 2534	-	
-poi/test-data/spreadsheet/WithConditionalFormatting.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot close a conditional format formula with cell refe...
+poi/test-data/spreadsheet/WithConditionalFormatting.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/WithEmbeded.xlsx	xlsx	exact		value-exact	/sheet[1] name: 23668 -> 23677 bytes, first difference at 2326	-	
 poi/test-data/spreadsheet/WithTextBox.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10076 -> 8128 bytes, first difference at 6	-	
 poi/test-data/spreadsheet/WithTwoHyperLinks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
@@ -906,7 +906,7 @@ poi/test-data/spreadsheet/XRefCalc.xls	xls	exact		byte-exact	/sheet[1] name	byte
 poi/test-data/spreadsheet/bug64512_embed.xlsx	xlsx	exact		value-exact	/sheet[1] name: 49746 -> 49730 bytes, first difference at 1806	-	
 poi/test-data/spreadsheet/chart_sheet.xlsx	xlsx	exact		refused	/sheet[1] name: unsupported_capability: cannot rename tab at position 0 ('Sheet1') while processing '/docProps/app.xml': an unmodeled or ...	-	
 poi/test-data/spreadsheet/colwidth.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-poi/test-data/spreadsheet/comments.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: a position-locked drawing anchor is not shiftable without row and column sizes
+poi/test-data/spreadsheet/comments.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/customIndexedColors.xlsx	xlsx	exact		value-exact	/sheet[1]/B1 formula: 19534 -> 18513 bytes, first difference at 6	-	
 poi/test-data/spreadsheet/dataValidationTableRange.xlsx	xlsx	exact		value-exact	/sheet[1] name: 116554 -> 116000 bytes, first difference at 2562	-	
 poi/test-data/spreadsheet/duprich1.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove

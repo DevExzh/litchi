@@ -9,7 +9,7 @@ use crate::error::{Error, Result};
 use crate::formula::{FormulaContext, ptg_exp_anchor, render_formula};
 use crate::formula_metadata::array::{self, Owner as ArrayFormula};
 use crate::formula_metadata::{Cell as FormulaCell, Defect as FormulaDefect, FlagDefect};
-use crate::leniency::{EncodingDefect, ToleranceReport};
+use crate::leniency::{EncodingDefect, ToleranceReport, WorksheetDefect};
 use crate::number_format::Formatting;
 use crate::records::{
     BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue, SharedStringProperties,
@@ -430,6 +430,13 @@ impl<R: Read + Seek> Reader<R> {
                 tolerance,
             )?;
             view_collector.feed_record(record.kind().get(), record.payload())?;
+            for defect in view_collector.take_zoom_defects() {
+                tolerance.record(
+                    WorksheetDefect::ZoomLevel,
+                    u32::try_from(record_position).unwrap_or(u32::MAX),
+                    u32::from(defect.raw),
+                );
+            }
             page_setup_collector.feed_record(record.kind().get(), record.payload())?;
             protection_collector.feed_record(record.kind().get(), record.payload())?;
             conditional_format_collector.feed_record(
@@ -708,14 +715,26 @@ impl<R: Read + Seek> Reader<R> {
                 0x00FD | // LabelSst
                 0x0006   // Formula
                 => {
-                    let preserve_formula_defect = record.kind().get() == 0x0006
-                        && compatibility_profile
-                            .preserves_shared_formula_flag_without_ptg_exp();
-                    let (cell_record, formula_defect) = if preserve_formula_defect {
-                        CellRecord::parse_formula_preserving_defect(record.payload())?
+                    let preserve_formula_defect = compatibility_profile
+                        .preserves_shared_formula_flag_without_ptg_exp();
+                    let (cell_record, formula_defect) = if record.kind().get() == 0x0006 {
+                        CellRecord::parse_formula_reporting_defect(
+                            record.payload(),
+                            preserve_formula_defect,
+                        )?
                     } else {
                         (CellRecord::parse(record.kind().get(), record.payload(), encoding)?, None)
                     };
+                    if !preserve_formula_defect
+                        && matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp))
+                    {
+                        // The stale flag is ignored (record 0316).
+                        tolerance.record(
+                            WorksheetDefect::SharedFormulaFlag,
+                            u32::from(cell_record.row()),
+                            u32::from(cell_record.col()),
+                        );
+                    }
                     if let Some((row, col, _unit)) =
                         CellRecord::label_unpaired_surrogate(record.kind().get(), record.payload())
                     {
@@ -725,7 +744,9 @@ impl<R: Read + Seek> Reader<R> {
                             u32::from(col),
                         );
                     }
-                    if matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp)) {
+                    if preserve_formula_defect
+                        && matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp))
+                    {
                         if formula_metadata_defects.len() >= tracking_limit {
                             return Err(Error::InvalidRecord {
                                 record_type: 0x0006,
