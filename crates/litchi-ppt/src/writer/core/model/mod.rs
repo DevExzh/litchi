@@ -171,6 +171,9 @@ pub enum ShapeType {
     Placeholder,
     /// Line
     Line,
+    /// Straight connector (`msosptStraightConnector1`), read back as a
+    /// connector rather than a plain line
+    Connector,
     /// Ellipse
     Ellipse,
     /// Rounded rectangle

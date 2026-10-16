@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (record 0289).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0284 (`docs/unified-ops/02[4-8]*.md`) into one
-table: format x operation x scenario/size -> leaf, unified, ratio, budget,
+operations records 0249-0302 (`docs/unified-ops/02[4-9]*.md`, `030[0-2]*.md`)
+into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
 
@@ -36,6 +36,13 @@ Conventions:
 * A row whose series is measured again by a later record (or a later stage
   of the same record) is superseded; a superseded miss is reported as
   "miss (superseded by NNNN)" and the open misses are the latest rows.
+* Before/after-build records (0250, 0263, 0268, 0289, 0290, 0293) compare
+  builds, not unified with leaf: comparison "after/before", budget 1.05.
+
+Records 0285-0302 (record 0294 extended the tool to them) are collected
+only when their record file is on this tree; the Markdown lists every
+record of that range, absent ones as "not on this tree", so the tool can
+be rerun unchanged after later merges.
 
 Outputs: docs/unified-ops/results/0289/bench-matrix.tsv and bench-matrix.md.
 `--check` regenerates in memory and exits non-zero when the committed
@@ -482,7 +489,7 @@ def p0261():
     return out
 
 
-def query_routes(record, paths, stage="", stage_rank=1):
+def query_routes(record, paths, stage="", stage_rank=1, build=""):
     docs = [load_jsonl(p) for p in paths]
     out = []
     for route, items in group_cases(docs, lambda r: r["route"]).items():
@@ -495,10 +502,12 @@ def query_routes(record, paths, stage="", stage_rank=1):
             op, budget = "query (full)", QUERY_TRIGGER
         else:
             op, budget = "query (early stop)", NONE
-        out.append(row(record, fmt, op, name, f"{items[0]['matches']} matches",
+        tag = f"[{build}]" if build else ""
+        out.append(row(record, fmt, op, name + (f" ({build} build)" if build else ""),
+                       f"{items[0]['matches']} matches",
                        us(min(i["leaf_median_ns"] for i in items)),
                        us(min(i["unified_median_ns"] for i in items)),
-                       [i["ratio_median"] for i in items], budget, f"query:{name}",
+                       [i["ratio_median"] for i in items], budget, f"query{tag}:{name}",
                        src(paths), stage, stage_rank))
     return out
 
@@ -541,14 +550,16 @@ def p0264():
     return out
 
 
-def scenarios_us(record, path, mapping):
-    d = load_json(path)["scenarios"]
+def scenarios_us(record, paths, mapping):
+    paths = [paths] if isinstance(paths, Path) else paths
+    docs = [list(load_json(p)["scenarios"].items()) for p in paths]
     out = []
-    for key, s in d.items():
-        fmt, op, scen, size, budget, series = mapping(key, s)
-        out.append(row(record, fmt, op, scen, size, s["leaf_us"]["median"],
-                       s["unified_us"]["median"], [s["ratio_of_medians"]], budget,
-                       series, src([path])))
+    for key, items in group_cases(docs, lambda kv: kv[0]).items():
+        items = [s for _, s in items]
+        fmt, op, scen, size, budget, series = mapping(key, items[0])
+        out.append(row(record, fmt, op, scen, size, med(s["leaf_us"]["median"] for s in items),
+                       med(s["unified_us"]["median"] for s in items),
+                       [s["ratio_of_medians"] for s in items], budget, series, src(paths)))
     return out
 
 
@@ -673,8 +684,11 @@ def find_replace(record, paths):
     out = []
     for (fmt, cont, matches), items in group_cases(
             docs, lambda c: (c["format"], c["containers"], c["matches"])).items():
-        unit = "paragraphs" if fmt == "docx" else "slides"
-        out.append(row(record, fmt, "set (find/replace)", f"find/replace, {matches} matches",
+        unit = "paragraphs" if fmt.startswith("docx") else "slides"
+        scen = f"find/replace, {matches} matches"
+        if fmt == "docx-paragraph":
+            scen = f"find/replace scoped to one paragraph (/body/p[5001] of 10,000), {matches} matches"
+        out.append(row(record, fmt.split("-")[0], "set (find/replace)", scen,
                        f"{cont} {unit}", us(med(i["leaf_median_ns"] for i in items)),
                        us(med(i["unified_median_ns"] for i in items)),
                        [i["ratio"] for i in items], SINGLE,
@@ -686,37 +700,44 @@ def p0273():
     return find_replace("0273", [RES / "0273-find-replace-bench.json"])
 
 
-def p0274():
-    labels = {
-        "records/auto": ("1,000 records into an 8-placeholder template, source-backed (auto) open", "1000 records"),
-        "records/eager": ("1,000 records into an 8-placeholder template, eager open", "1000 records"),
-        "placeholders-10k": ("one record into a 2,000-paragraph template with 10,000 placeholders", "10000 placeholders"),
-    }
+MERGE_LABELS = {
+    "records/auto": ("1,000 records into an 8-placeholder template, source-backed (auto) open", "1000 records"),
+    "records/eager": ("1,000 records into an 8-placeholder template, eager open", "1000 records"),
+    "placeholders-10k": ("one record into a 2,000-paragraph template with 10,000 placeholders", "10000 placeholders"),
+}
 
-    def m(key, s):
-        scen, size = labels[key]
-        return ("docx", "merge", scen, size, SINGLE, f"merge:{key}")
-    return scenarios_us("0274", RES / "0274-merge" / "merge-bench.json", m)
+
+def merge_label(key, s):
+    scen, size = MERGE_LABELS[key]
+    return ("docx", "merge", scen, size, SINGLE, f"merge:{key}")
+
+
+def p0274():
+    return scenarios_us("0274", RES / "0274-merge" / "merge-bench.json", merge_label)
+
+
+RTF_ROUTES = (("batch", "edit closure (coalesced)"),
+              ("fanout", "query fan-out"),
+              ("fanout_plan", "query fan-out, selector compiled once into a Plan"),
+              ("direct", "direct File::set/remove"))
 
 
 def rtf_destination(record, paths):
     docs = [load_json(p)["cases"] for p in paths]
     out = []
     for (fam, count), items in group_cases(docs, lambda c: (c["family"], c["count"])).items():
-        for route, label in (("batch", "edit closure (coalesced)"),
-                             ("fanout", "query fan-out"),
-                             ("direct", "direct File::set/remove")):
-            ratios = [i[f"{route}_ratio"] for i in items]
+        for route, label in RTF_ROUTES:
+            ratios = [i.get(f"{route}_ratio") for i in items]
             if all(r is None for r in ratios):
                 continue
-            native_key = "native_shared_median_ns" if route == "fanout" else "native_median_ns"
+            native_key = "native_shared_median_ns" if route.startswith("fanout") else "native_median_ns"
             budget = SINGLE if count == 1 else BATCH
             op = "remove" if fam == "picture_removal" else "set"
             if count > 1:
                 op = "batch " + op
             out.append(row(record, "rtf", op, f"{fam}, {label}", f"{count} targets",
                            us(med(i[native_key] for i in items)),
-                           us(med(i[f"unified_{route}_median_ns"] for i in items)),
+                           us(med(i.get(f"unified_{route}_median_ns") for i in items)),
                            ratios, budget, f"rtf_destination:{fam}:{count}:{route}",
                            src(paths), comparison="unified/native"))
     return out
@@ -759,7 +780,7 @@ def odt_budget(record, scen, n_ops):
     if scen == "open_first_get":
         return OPEN, "open + first get"
     if scen.startswith("query_all"):
-        if record == "0280":
+        if record >= "0280":
             return (1.10, "1.10 (review trigger; record 0280 follows up the open PERFORMANCE BAR misses)", "read"), scen
         return (None, "none (record 0276 §6: no numeric query budget)", "none"), scen
     if scen == "single_set":
@@ -785,6 +806,17 @@ def odt_rows(record, items_by_key, source):
 ODT_LINE = re.compile(r"^\s*(\S+)\s+(\d+)\s+leaf\s+([\d.]+) µs\s+unified\s+([\d.]+) µs\s+ratio\s+([\d.]+)")
 
 
+def odt_text(record, paths):
+    acc: dict = {}
+    for p in paths:
+        for line in open(p, encoding="utf-8"):
+            m = ODT_LINE.match(line)
+            if m:
+                acc.setdefault((m.group(1), int(m.group(2))), []).append(
+                    (float(m.group(3)), float(m.group(4)), float(m.group(5))))
+    return odt_rows(record, acc, src(paths))
+
+
 def p0276():
     paths = trials((RES / "0276").glob("paired-cpu9-run*.json"))
     acc: dict = {}
@@ -804,7 +836,7 @@ def ods_rows(record, paths):
         elif name.startswith("query"):
             op = "query (full)"
             budget = ((1.10, "1.10 (review trigger; record 0280 follows up the open PERFORMANCE BAR misses)", "read")
-                      if record == "0280" else (None, "none (record 0277 §6: no budget applies)", "none"))
+                      if record >= "0280" else (None, "none (record 0277 §6: no budget applies)", "none"))
         elif name == "set":
             op, budget = "set", SINGLE
         else:
@@ -862,15 +894,7 @@ def p0280():
     out = query_routes("0280", trials(base.glob("query-*-after.jsonl")))
     # Record 0280 applies the review trigger to every full query, including the
     # fair (owned/fenced) baselines: they are the follow-up of 0262's misses.
-    paths = trials(base.glob("odt-*-after.txt"))
-    acc: dict = {}
-    for p in paths:
-        for line in open(p, encoding="utf-8"):
-            m = ODT_LINE.match(line)
-            if m:
-                acc.setdefault((m.group(1), int(m.group(2))), []).append(
-                    (float(m.group(3)), float(m.group(4)), float(m.group(5))))
-    out += odt_rows("0280", acc, src(paths))
+    out += odt_text("0280", trials(base.glob("odt-*-after.txt")))
     out += ods_rows("0280", trials(base.glob("ods-*-after.json")))
     out += rtf_destination("0280", trials(base.glob("rtf-*-after.json")))
     return out
@@ -948,10 +972,337 @@ def p0284():
     return out
 
 
+# ------------------------------------------------- records 0285-0302
+#
+# Records in FOLLOW_RANGE are collected only when their record file is on
+# this tree (`needs`), so the tool can be rerun unchanged after later merges;
+# absent records are listed in the Markdown output as "not on this tree".
+
+FOLLOW_RANGE = (285, 302)
+
+
+def record_file(record: str):
+    hits = sorted(UO.glob(f"{record}-*.md"))
+    return hits[0] if hits else None
+
+
+def needs(record: str):
+    def wrap(fn):
+        def inner():
+            return fn() if record_file(record) else []
+        inner.__name__ = fn.__name__
+        return inner
+    return wrap
+
+
+@needs("0285")
+def p0285():
+    # The "before" legs (trunk 9fe45629ab) re-measure 0273/0274/0281 states;
+    # only the after build is listed (convention: earlier states are not repeated).
+    base = RES / "0285"
+    return (find_replace("0285", trials(base.glob("find.after*.json")))
+            + scenarios_us("0285", trials(base.glob("merge.after*.json")), merge_label))
+
+
+@needs("0286")
+def p0286():
+    base = RES / "0286"
+    return (ooxml_metadata("0286", trials(base.glob("meta-after-*.txt")))
+            + chart("0286", trials(base.glob("chartset-after-*.json")), "native")
+            + docx_fanout("0286", trials(base.glob("fanout-after-*.json")))
+            + docx_element("0286", trials(base.glob("elem-after-*.json")))
+            + query_routes("0286", trials(base.glob("query-after-*.jsonl"))))
+
+
+@needs("0287")
+def p0287():
+    base = RES / "0287"
+    out = query_routes("0287", trials(base.glob("query-[0-9]-after.jsonl")))
+    out += query_routes("0287", trials(base.glob("query-all-*-after.jsonl")), build="all-formats")
+    out += rtf_destination("0287", trials(base.glob("rtf-*-after.json")))
+    out += ods_rows("0287", trials(base.glob("ods-*-after.json")))
+    out += odt_text("0287", trials(base.glob("odt-*-after.txt")))
+    out += xls_read("0287", trials(base.glob("xls-*-after.json")))
+    return out
+
+
+ODF_LINE = re.compile(r"^\s*([a-z]+)\s+([a-z_]+\d*)\s+leaf\s+([\d.]+) µs\s+unified\s+([\d.]+) µs\s+ratio\s+([\d.]+)")
+
+ODF_GAPS_BATCH = {"odg": ("shape text", "1000 shapes"),
+                  "odb": ("query command", "1000 queries"),
+                  "odf": ("token text", "1000 tokens")}
+ODF_SINGLE = {
+    ("odg", "metadata_set"): ("metadata set", "/metadata set", "3page.odg"),
+    ("odg", "insert_page"): ("add", "insert page first", "3page.odg"),
+    ("odg", "move_page"): ("move", "move page last", "3page.odg"),
+    ("ods", "metadata_set"): ("metadata set", "/metadata set", "calc-two-sheets"),
+    ("odp", "metadata_set"): ("metadata set", "/metadata set", "impress-basic"),
+    ("odc", "title_set"): ("set", "title set (typed chart)", ""),
+    ("odi", "geometry_set"): ("set", "geometry set (fresh image)", ""),
+    ("odg", "cross_page_move"): ("move", "cross-page shape move", "2 pages, 100 shapes"),
+    ("odb", "query_move"): ("move", "query move", "100 queries"),
+    ("odc", "series_swap"): ("swap", "series swap (typed chart)", "10 series"),
+    ("odf", "element_move"): ("move", "formula element move", "50 tokens"),
+    ("fodt", "open"): ("open", "flat ODT open", "54 KB"),
+    ("fodt", "paragraph_set"): ("set", "flat ODT paragraph text set", "54 KB"),
+}
+
+
+def odf_lines(record, paths, family):
+    """odf_gaps_bench / odf_verbs_bench text output (records 0288, 0291, 0292)."""
+    acc: dict = {}
+    for p in paths:
+        for line in open(p, encoding="utf-8"):
+            m = ODF_LINE.match(line)
+            if m:
+                acc.setdefault((m.group(1), m.group(2)), []).append(
+                    (float(m.group(3)), float(m.group(4)), float(m.group(5))))
+    out = []
+    for (fmt, scen), items in acc.items():
+        if scen.startswith("batch_"):
+            n = int(scen.split("_")[1])
+            what, size = ODF_GAPS_BATCH[fmt]
+            op = "set (batch of 1)" if n == 1 else "batch set"
+            label = f"batch {n} ({what}), one leaf Edit vs one File::edit"
+            budget = SINGLE if n == 1 else BATCH if n == 1000 else SCALING
+        else:
+            op, label, size = ODF_SINGLE[(fmt, scen)]
+            budget = OPEN if op == "open" else SINGLE
+        out.append(row(record, fmt, op, label, size, med(i[0] for i in items),
+                       med(i[1] for i in items), [i[2] for i in items], budget,
+                       f"{family}:{fmt}:{scen}", src(paths)))
+    return out
+
+
+@needs("0288")
+def p0288():
+    return odf_lines("0288", [RES / "0288" / "odf_gaps_bench.txt"], "odf_gaps")
+
+
+def abba_builds(record, paths, labels, comparison):
+    """Before/after build ABBA JSONL (records 0289, 0290, 0293): per run the
+    median of each build's per-leg medians; ratio = after/before per run."""
+    acc: dict = {}
+    for n, p in enumerate(paths, 1):
+        for r in load_jsonl(p):
+            run = r.get("run", n)
+            build = re.sub(r"\d+$", "", r.get("build") or r.get("leg"))  # 0289 run 2: "before2"
+            for field in ("median_us", "native_median_us", "unified_median_us"):
+                if field in r:
+                    acc.setdefault((r["scenario"], field), {}).setdefault(run, {}).setdefault(
+                        build, []).append(r[field])
+    out = []
+    for (scen, field), runs in acc.items():
+        fmt, op, label = labels[scen]
+        leg = {"median_us": "", "native_median_us": "native", "unified_median_us": "unified"}[field]
+        before = [med(b["before"]) for _, b in sorted(runs.items())]
+        after = [med(b["after"]) for _, b in sorted(runs.items())]
+        out.append(row(record, fmt, op, label + (f" ({leg} leg)" if leg else ""), "",
+                       med(before), med(after), [a / b for a, b in zip(after, before)],
+                       regression(record), f"abba{record}:{scen}" + (f":{leg}" if leg else ""),
+                       src(paths), comparison=f"after/before ({leg or comparison})"))
+    return out
+
+
+@needs("0289")
+def p0289():
+    labels = {
+        "docx_edit_bold_1k": ("docx", "batch (edit)", "docx_edit_bold_1k: 1,000 run sets in one edit"),
+        "doc_edit_text_200": ("doc", "batch (edit)", "doc_edit_text_200"),
+        "odt_metadata_set_publish": ("odt", "metadata set", "odt_metadata_set_publish (LibreOffice ODT)"),
+    }
+    return abba_builds("0289", trials((RES / "0289").glob("phase-g-bench-abba-*.jsonl")),
+                       labels, "unified")
+
+
+@needs("0290")
+def p0290():
+    labels = {
+        "pptx_query_shape": ("pptx", "query", "pptx_query_shape (shapes.pptx)"),
+        "pptx_chart_view": ("pptx", "get", "pptx_chart_view (tdf114821.pptx)"),
+        "odt_metadata_set_publish": ("odt", "metadata set", "odt_metadata_set_publish (writer-definition-lists.odt)"),
+        "odp_metadata_set_publish": ("odp", "metadata set", "odp_metadata_set_publish (impress-master-layouts.odp)"),
+        "odp_metadata_read": ("odp", "get", "odp_metadata_read (impress-master-layouts.odp)"),
+    }
+    return abba_builds("0290", [RES / "0290" / "checklist-fixes-bench-abba.jsonl"], labels, "unified")
+
+
+RTF_RUN_LINE = re.compile(r"^\('(\w+)', (\d+)\) (.*)$")
+
+
+def rtf_eight_runs(record, text_path, json_paths):
+    """rtf-ratios-8-runs.txt (record 0291): per-run ratios of the after binary;
+    the µs columns come from the committed after JSON runs."""
+    times = {}
+    for doc in (load_json(p)["cases"] for p in json_paths):
+        for c in doc:
+            times.setdefault((c["family"], c["count"]), []).append(c)
+    section, out = None, []
+    for line in open(text_path, encoding="utf-8"):
+        if line.startswith("=="):
+            section = line.split()[1]
+            continue
+        m = RTF_RUN_LINE.match(line.strip())
+        if section != "after" or not m:
+            continue
+        fam, count = m.group(1), int(m.group(2))
+        parts = m.group(3).split()
+        legs = dict(zip(parts[0::2], parts[1::2]))
+        items = times.get((fam, count), [])
+        for route, label in RTF_ROUTES:
+            vals = legs.get("plan" if route == "fanout_plan" else route, "-")
+            if vals == "-":
+                continue
+            native_key = "native_shared_median_ns" if route.startswith("fanout") else "native_median_ns"
+            budget = SINGLE if count == 1 else BATCH
+            op = "remove" if fam == "picture_removal" else "set"
+            if count > 1:
+                op = "batch " + op
+            out.append(row(record, "rtf", op, f"{fam}, {label}", f"{count} targets",
+                           us(med(i.get(native_key) for i in items)),
+                           us(med(i.get(f"unified_{route}_median_ns") for i in items)),
+                           [float(v) for v in vals.split("/")], budget,
+                           f"rtf_destination:{fam}:{count}:{route}",
+                           src([text_path] + list(json_paths)), comparison="unified/native"))
+    return out
+
+
+@needs("0291")
+def p0291():
+    # Profiling-profile builds (record 0291 §3), not release.
+    base = RES / "0291"
+    out = docx_fanout("0291", trials(base.glob("docx_fanout_bench-after-*.json")))
+    out += rtf_eight_runs("0291", base / "rtf-ratios-8-runs.txt",
+                          trials(base.glob("rtf_destination_bench-after-*.json")))
+    out += odf_lines("0291", trials(base.glob("odf_gaps_bench-after-*.txt")), "odf_gaps")
+    out += ods_rows("0291", trials(base.glob("ods_unified_bench-after-*.json")))
+    out += odt_text("0291", trials(base.glob("odt_paired_bench-after-*.txt")))
+    out += xls_read("0291", trials(base.glob("xls_read_bench-after-*.json")))
+    return out
+
+
+@needs("0292")
+def p0292():
+    base = RES / "0292"
+    return (odf_lines("0292", trials(base.glob("odf_verbs_bench-run*.txt")), "odf_verbs")
+            + odf_lines("0292", [base / "odf_gaps_bench-rerun.txt"], "odf_gaps"))
+
+
+@needs("0293")
+def p0293():
+    path = RES / "0293" / "producer-structure-bench-abba.jsonl"
+    labels = {
+        "xls_complete_open_20k": ("xls", "open", "complete XLS reader open, 20k-cell workbook"),
+        "xls_complete_open_formula_eval": ("xls", "open", "complete XLS reader open, FormulaEvalTestData.xls"),
+        "xls_row_insert_10k": ("xls", "add (row insert)", "row insert, 10k-cell Litchi workbook"),
+        "rtf_move_1k": ("rtf", "move", "paragraph move, 1k paragraphs"),
+    }
+    out = abba_builds("0293", [path], labels, "leaf reader")
+    rows = [r for r in load_jsonl(path) if r.get("build") == "after" and "ratio" in r]
+    for scen, items in group_cases([rows], lambda r: r["scenario"]).items():
+        fmt, op, label = labels[scen]
+        out.append(row("0293", fmt, op, label, "",
+                       med(i["native_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items),
+                       [i["ratio"] for i in items], SINGLE, f"producer_structure:{scen}",
+                       src([path]), comparison="unified/native"))
+    return out
+
+
+M4_FORMATS = {
+    "odt_find_1": ("set (find/replace)", "find/replace, 1 match"),
+    "odt_find_1000": ("set (find/replace)", "find/replace, every paragraph matches"),
+    "odt_find_10000": ("set (find/replace)", "find/replace, every paragraph matches"),
+    "odt_merge": ("merge", "template merge"),
+    "doc_find_1": ("set (find/replace)", "find/replace, 1 match"),
+    "doc_find_100": ("set (find/replace)", "find/replace, 100 matches"),
+    "ods_import": ("import", "CSV import (one atomic commit)"),
+}
+
+
+@needs("0295")
+def p0295():
+    paths = trials((RES / "0295").glob("m4-formats-run*.json"))
+    docs = [load_json(p)["scenarios"] for p in paths]
+    out = []
+    for (scen, size), items in group_cases(docs, lambda s: (s["scenario"], s["size"])).items():
+        fmt = scen.split("_")[0]
+        op, label = M4_FORMATS[scen]
+        budget = (None, "none (record 0266 states no budget)", "none") if op == "import" else SINGLE
+        out.append(row("0295", fmt, op, label,
+                       f"{size} rows × 4" if fmt == "ods" else f"{size} paragraphs",
+                       med(i["leaf_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items),
+                       [i["ratio"] for i in items], budget, f"m4_formats:{scen}:{size}", src(paths)))
+    return out
+
+
+def iwork_summary(record, path, size_fn):
+    """iwork_bench / pages_bench summary JSONL (records 0296, 0299): one row
+    per run with the per-run median ratio."""
+    rows = [r for r in load_jsonl(path) if r.get("summary")]
+    out = []
+    for (fmt, scen), items in group_cases([rows], lambda r: (r["format"], r["scenario"])).items():
+        if scen.startswith("batch_"):
+            n = int(scen.split("_")[1])
+            op, budget = "batch set", BATCH if n in (1000, 10000) else SCALING
+            label = f"batch {n} (one File::edit vs one leaf edit)"
+        elif scen in ("open", "open_get"):
+            op, budget = ("open" if scen == "open" else "open + get"), OPEN
+            label = "open (in memory)" if scen == "open" else "open + one element's text"
+        else:
+            op, budget, label = scen, SINGLE, f"{scen} (one op and commit)"
+        out.append(row(record, fmt, op, label, size_fn(fmt, scen),
+                       us(med(i["leaf_median_ns"] for i in items)),
+                       us(med(i["unified_median_ns"] for i in items)),
+                       [i["ratio_median"] for i in items], budget, f"iwork:{fmt}:{scen}",
+                       src([path])))
+    return out
+
+
+@needs("0296")
+def p0296():
+    return iwork_summary("0296", RES / "0296" / "iwork-bench-summary.jsonl", lambda f, s: "")
+
+
+NUMBERS_SCEN = {
+    "open_get": ("open + get", "open + one cell's text", OPEN),
+    "set": ("set", "set one value", SINGLE),
+    "batch_1000": ("batch set", "batch 1000 (one File::edit vs one leaf edit)", BATCH),
+    "formula": ("formula", "formula", SINGLE),
+    "rename_sheet": ("set (sheet rename)", "rename sheet", SINGLE),
+    "merge_add": ("add (merge)", "merge add", SINGLE),
+    "sheet_move": ("move", "sheet move", SINGLE),
+}
+
+
+@needs("0297")
+def p0297():
+    path = RES / "0297" / "numbers-bench.jsonl"
+    docs = [d["scenarios"] for d in load_jsonl(path)]
+    out = []
+    for name, items in group_cases(docs, lambda s: s["name"]).items():
+        op, label, budget = NUMBERS_SCEN[name]
+        fixture = Path(items[0]["fixture"]).name
+        out.append(row("0297", "numbers", op, label, fixture,
+                       us(med(i["leaf_median_ns"] for i in items)),
+                       us(med(i["unified_median_ns"] for i in items)),
+                       [i["ratio"] for i in items], budget, f"numbers:{name}", src([path])))
+    return out
+
+
+@needs("0299")
+def p0299():
+    return iwork_summary("0299", RES / "0299" / "pages-bench-summary.jsonl",
+                         lambda f, s: "10,000-paragraph document" if s.startswith("batch_")
+                         else "basic.pages")
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
-           p0283, p0284]
+           p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
+           p0293, p0295, p0296, p0297, p0299]
 
 
 # ---------------------------------------------------------------- merge
@@ -1126,12 +1477,13 @@ def md_cell(s):
 def to_md(rows, conflicts, agreements, cur):
     L = []
     a = L.append
-    a("# Unified-vs-leaf benchmark matrix (records 0249–0284)")
+    a(f"# Unified-vs-leaf benchmark matrix (records 0249–{FOLLOW_RANGE[1]:04d})")
     a("")
     a("Generated by `tools/unified_bench_matrix.py` from the evidence under "
       "`docs/unified-ops/results/` and the curated rows in "
       "`results/0289/bench-matrix-curated.json`. Do not edit by hand; "
-      "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`.")
+      "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
+      "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "
@@ -1141,7 +1493,8 @@ def to_md(rows, conflicts, agreements, cur):
       "single-op write 1.10; 1k-op batch 2.0 against one hand-written leaf edit; "
       "other batch sizes are scaling only unless the record applies 2.0; "
       "reads and queries carry a budget only where the record states one "
-      "(record 0262's 1.10 review trigger for full queries).")
+      "(record 0262's 1.10 review trigger for full queries); before/after-build "
+      "records use 1.05 (no regression above 5%).")
     a("- A series measured again later is superseded: its miss shows as "
       "`miss (superseded by NNNN)` and the open misses are the latest measurements.")
     a("- Source `parsed:<file>` rows come from evidence files; `curated:<record §>` "
@@ -1149,6 +1502,22 @@ def to_md(rows, conflicts, agreements, cur):
     a("")
     for note in cur.get("notes", []):
         a(f"- {note}")
+    a("")
+    a(f"## Records {FOLLOW_RANGE[0]:04d}–{FOLLOW_RANGE[1]:04d}")
+    a("")
+    a("| record | file | rows | parsed | curated | open misses |")
+    a("|---|---|---:|---:|---:|---:|")
+    for n in range(FOLLOW_RANGE[0], FOLLOW_RANGE[1] + 1):
+        rec = f"{n:04d}"
+        f = record_file(rec)
+        if f is None:
+            a(f"| {rec} | not on this tree | | | | |")
+            continue
+        rr = [r for r in rows if r["record"] == rec]
+        a(f"| {rec} | `{f.name}` | {len(rr)} | "
+          f"{sum(r['source'].startswith('parsed') for r in rr)} | "
+          f"{sum(r['source'].startswith('curated') for r in rr)} | "
+          f"{sum(r['status'] == 'miss' for r in rr)} |")
     a("")
     fmts = sorted({r["format"] for r in rows})
     a("## Summary")

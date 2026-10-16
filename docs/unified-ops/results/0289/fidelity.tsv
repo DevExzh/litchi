@@ -815,6 +815,7 @@ poi/test-data/slideshow/WithLinks.ppt	ppt	exact		none		-
 poi/test-data/slideshow/basic_test_ppt_file.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/bug58144-headers-footers-2003.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/bug58144-headers-footers-2007.ppt	ppt	exact		none		-	
+poi/test-data/slideshow/bug61881.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/bug62513.pptx	pptx	exact		none		refused	slide move+back: unsupported_capability: PPTX OPC error: source-backed OPC Part overlay is unavailable: source ZIP archive has trailing b...
 poi/test-data/slideshow/bug65551.pptx	pptx	exact		refused	/slidemaster[1]/shape[1] font: unsupported_capability: master and layout text writes are not integrated	none	
 poi/test-data/slideshow/cryptoapi-proc2356.ppt	ppt	locked		-		-	
@@ -990,3 +991,10 @@ rtf/testUnicode.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: 
 rtf/testUpr.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body has mixed run or paragraph formatting	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: a paragraph ends inside a group that continues with more content
 rtf/typed_hyperlinks_and_references.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	none	
 rtf/watermark.rtf	rtf	exact		none		none	
+unified-ops/0294/comments.odp	odp	exact		value-exact	/slide[1] name: 2157 -> 2180 bytes, first difference at 91	-	
+unified-ops/0294/connectors.ppt	ppt	exact		none		-	
+unified-ops/0294/frames.odm	odm	exact		value-exact	/body/p[1] text: 1218 -> 1058 bytes, first difference at 98	-	
+unified-ops/0294/frames.oth	oth	exact		value-exact	/body/p[1] text: 1639 -> 1479 bytes, first difference at 95	-	
+unified-ops/0294/layers.odg	odg	exact		byte-exact	/page[1] name	-	
+unified-ops/0294/modern-comments.pptx	pptx	exact		value-exact	/slide[1]/shape[3] font: 10725 -> 10752 bytes, first difference at 3034	byte-exact	slide move+back
+unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	-	

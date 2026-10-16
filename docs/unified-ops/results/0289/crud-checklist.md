@@ -17,21 +17,21 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 |---|---|---|---|---|---|---|---|---|---|
 | docx | 41 | 127 | 127 | 0 | 0 | 325 | 49 | 8 | 10 |
 | xlsx | 26 | 92 | 92 | 0 | 0 | 195 | 29 | 2 | 14 |
-| pptx | 37 | 189 | 180 | 1 | 8 | 156 | 86 | 2 | 28 |
-| xlsb | 26 | 58 | 54 | 0 | 4 | 234 | 30 | 2 | 6 |
+| pptx | 37 | 189 | 188 | 1 | 0 | 156 | 86 | 2 | 32 |
+| xlsb | 26 | 58 | 58 | 0 | 0 | 234 | 30 | 2 | 6 |
 | doc | 13 | 86 | 86 | 0 | 0 | 0 | 57 | 2 | 6 |
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
-| ppt | 36 | 76 | 68 | 0 | 8 | 338 | 34 | 2 | 8 |
+| ppt | 36 | 76 | 76 | 0 | 0 | 338 | 34 | 2 | 10 |
 | rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
 | odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
 | ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
-| odp | 30 | 170 | 166 | 0 | 4 | 143 | 39 | 6 | 10 |
-| odg | 4 | 33 | 29 | 0 | 4 | 0 | 11 | 4 | 0 |
+| odp | 30 | 170 | 170 | 0 | 0 | 143 | 39 | 6 | 12 |
+| odg | 4 | 33 | 33 | 0 | 0 | 0 | 11 | 4 | 2 |
 | odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 |
 | odi | 3 | 24 | 24 | 0 | 0 | 2 | 7 | 0 | 0 |
 | odb | 4 | 36 | 36 | 0 | 0 | 2 | 6 | 4 | 0 |
-| oth | 22 | 205 | 180 | 0 | 21 | 0 | 37 | 26 | 0 |
-| odm | 22 | 205 | 184 | 0 | 17 | 0 | 37 | 26 | 2 |
+| oth | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
+| odm | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 11 | 85 | 85 | 0 | 0 | 0 | 36 | 2 | 14 |
 | keynote | 16 | 122 | 113 | 0 | 9 | 0 | 54 | 14 | 4 |
@@ -122,7 +122,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## pptx
 
-- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `create() + add slide + add smartart + add node`
+- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `create() + add slide + add smartart + add node`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -144,7 +144,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | run | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | linebreak | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | notes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| comment | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| comment | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | video | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | audio | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | media | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
@@ -154,8 +154,8 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | slideMaster | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | slideLayout | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | theme | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| modernComment | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| reply | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| modernComment | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| reply | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | animation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | series | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
@@ -167,7 +167,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## xlsb
 
-- fixtures: `create()`, `ooxml/xlsb/date.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb`, `poi/test-data/spreadsheet/testVarious.xlsb`, `create() + add sheet`
+- fixtures: `create()`, `ooxml/xlsb/date.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb`, `poi/test-data/spreadsheet/testVarious.xlsb`, `unified-ops/0294/table.xlsb`, `create() + add sheet`
 - document views on `ooxml/xlsb/date.xlsb`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -178,7 +178,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | range | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| table | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | namedrange | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | comment | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | chart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
@@ -256,7 +256,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## ppt
 
-- fixtures: `create()`, `poi/test-data/slideshow/incorrect_slide_order.ppt`, `poi/test-data/slideshow/WithComments.ppt`, `ole/ppt/text_shapes.ppt`, `ole/ppt/ppt_with_png.ppt`, `poi/test-data/slideshow/headers_footers.ppt`, `poi/test-data/slideshow/basic_test_ppt_file.ppt`, `poi/test-data/slideshow/42485.ppt`, `create() + add slide`
+- fixtures: `create()`, `poi/test-data/slideshow/incorrect_slide_order.ppt`, `poi/test-data/slideshow/WithComments.ppt`, `ole/ppt/text_shapes.ppt`, `ole/ppt/ppt_with_png.ppt`, `poi/test-data/slideshow/headers_footers.ppt`, `poi/test-data/slideshow/basic_test_ppt_file.ppt`, `poi/test-data/slideshow/42485.ppt`, `poi/test-data/slideshow/bug61881.ppt`, `unified-ops/0294/connectors.ppt`, `create() + add slide`
 - document views on `poi/test-data/slideshow/incorrect_slide_order.ppt`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -266,12 +266,12 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | shape | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | placeholder | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| table | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | tr | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | tc | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | chart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | group | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| connector | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| connector | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | smartart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | paragraph | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
@@ -393,7 +393,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## odp
 
-- fixtures: `create()`, `odf/odp/tdf105502.odp`, `odf/odp/tdf169979.odp`, `odf/corpus/impress-basic.odp`, `odf/odp/text-in-image.odp`, `odf/odp/cellspan.odp`, `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp`, `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp`, `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp`, `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add shape + add paragraph`
+- fixtures: `create()`, `odf/odp/tdf105502.odp`, `odf/odp/tdf169979.odp`, `odf/corpus/impress-basic.odp`, `odf/odp/text-in-image.odp`, `odf/odp/cellspan.odp`, `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp`, `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp`, `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp`, `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp`, `unified-ops/0294/comments.odp`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add shape + add paragraph`
 - document views on `odf/odp/tdf105502.odp`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -418,7 +418,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | linebreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
-| comment | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| comment | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | equation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slideMaster | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | slideLayout | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
@@ -431,7 +431,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## odg
 
-- fixtures: `create()`, `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg`, `libreoffice-core/svx/qa/unit/data/FontWork.odg`, `libreoffice-core/desktop/qa/data/3page.odg`, `create() + add page`, `create() + add page + add shape`
+- fixtures: `create()`, `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg`, `libreoffice-core/svx/qa/unit/data/FontWork.odg`, `libreoffice-core/desktop/qa/data/3page.odg`, `unified-ops/0294/layers.odg`, `create() + add page`, `create() + add page + add shape`
 - document views on `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -439,7 +439,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | drawing | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | page | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| layer | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| layer | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## odc
 
@@ -478,8 +478,8 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## oth
 
-- fixtures: `create()`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
-- document views on `create() + add paragraph`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- fixtures: `create()`, `unified-ops/0294/frames.oth`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- document views on `unified-ops/0294/frames.oth`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -495,20 +495,20 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | row | ok | ok | ok | ok | n/a | ok | ok | ok | ok | n/a | n/a | ok | ok |
 | cell | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | section | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| frame | unreached | unreached | unreached | unreached | unreached | n/a | unreached | no pair | no pair | - | - | ok | ok |
-| picture | unreached | unreached | unreached | unreached | n/a | n/a | unreached | no pair | no pair | n/a | n/a | ok | ok |
-| textbox | unreached | unreached | unreached | unreached | unreached | n/a | unreached | no pair | no pair | - | - | ok | ok |
+| frame | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
+| picture | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
+| textbox | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | footnote | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | endnote | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | bookmark | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| style | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 
 ## odm
 
-- fixtures: `create()`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`, `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- fixtures: `create()`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`, `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm`, `unified-ops/0294/frames.odm`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
 - document views on `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -525,9 +525,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | row | ok | ok | ok | ok | n/a | ok | ok | ok | ok | n/a | n/a | ok | ok |
 | cell | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | section | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| frame | unreached | unreached | unreached | unreached | unreached | n/a | unreached | no pair | no pair | - | - | ok | ok |
-| picture | unreached | unreached | unreached | unreached | n/a | n/a | unreached | no pair | no pair | n/a | n/a | ok | ok |
-| textbox | unreached | unreached | unreached | unreached | unreached | n/a | unreached | no pair | no pair | - | - | ok | ok |
+| frame | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
+| picture | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
+| textbox | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | footnote | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | endnote | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
