@@ -14,7 +14,7 @@ use std::sync::Arc;
 use litchi_core::selector::Path;
 use litchi_core::{FileFormat, Position};
 use litchi_keynote::slide::creation::LayoutSelector;
-use litchi_keynote::slide::drawable::{Created, Geometry, Preset};
+use litchi_keynote::slide::drawable::{Created, Geometry, Preset, Style, TextSpan as DrawableSpan};
 use litchi_keynote::slide::placeholder::Kind as Role;
 use litchi_keynote::{DrawableSelector, Package, SlideSelector, TextPosition, TextSpan};
 
@@ -132,6 +132,9 @@ pub(super) struct Pending {
     adds: Vec<(Add, usize)>,
     /// Slide visibility: slide → (hidden, item).
     hidden: BTreeMap<usize, (bool, usize)>,
+    /// Character styles: (slide, drawable, first char, end char) → (style,
+    /// item) (record 0309).
+    styles: BTreeMap<(usize, usize, usize, usize), (Style, usize)>,
 }
 
 /// What publishing a pending set made.
@@ -141,16 +144,80 @@ pub(super) struct Published {
     pub(super) created: Vec<Created>,
 }
 
-/// A refusal of `key` on a run: character styles are read-only.
+/// A refusal of `key` on a run: only character properties are written.
 fn run_refusal(key: &str) -> Error {
     refusal(
         Code::UnsupportedCapability,
-        "Keynote character runs are read-only: the leaf refuses character-style writes",
+        "a Keynote run writes its character properties (bold, italic, underline, size, color, font.latin)",
     )
     .with_property(key.to_owned())
-    .with_suggestion(
-        "set the paragraph's or the shape's text instead (follow-up: IWORK_API_REQUESTS.md request 10)",
-    )
+    .with_suggestion("set the paragraph's or the shape's text to change the characters")
+}
+
+/// Fold one run property into `style`.
+fn run_style(style: &mut Style, key: &str, value: &PropValue<'_>) -> Result<()> {
+    let cleared = || {
+        refusal(
+            Code::InvalidValue,
+            "a run's character property cannot be cleared",
+        )
+        .with_property(key.to_owned())
+    };
+    match key {
+        "bold" => style.bold = Some(super::super::write::boolean(value, "bold")?),
+        "italic" => style.italic = Some(super::super::write::boolean(value, "italic")?),
+        "underline" => {
+            style.underline = Some(super::super::write::boolean(value, "underline")?);
+        },
+        "size" => {
+            let points = value
+                .with_coerced(super::FONT_SIZE, |scalar| {
+                    Ok(scalar.and_then(|scalar| match scalar {
+                        Scalar::Length(length) => Some(length.points()),
+                        Scalar::Number(value) => Some(value),
+                        #[allow(clippy::cast_precision_loss, reason = "point sizes are small")]
+                        Scalar::Int(value) => Some(value as f64),
+                        _ => None,
+                    }))
+                })
+                .map_err(|error| error.with_property("size"))?
+                .ok_or_else(cleared)?;
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "Keynote stores font sizes as 32-bit floats"
+            )]
+            let points = points as f32;
+            if !points.is_finite() || points <= 0.0 {
+                return Err(refusal(Code::InvalidValue, "a font size must be positive")
+                    .with_property("size".to_owned()));
+            }
+            style.font_size = Some(points);
+        },
+        "color" => {
+            let color = value
+                .with_coerced(super::COLOR, |scalar| {
+                    Ok(scalar.and_then(|scalar| match scalar {
+                        Scalar::Color(color) if color.transforms().is_empty() => {
+                            match color.base() {
+                                crate::value::Base::Rgb(rgba) => {
+                                    Some([rgba.red(), rgba.green(), rgba.blue()])
+                                },
+                                _ => None,
+                            }
+                        },
+                        _ => None,
+                    }))
+                })
+                .map_err(|error| error.with_property("color"))?
+                .ok_or_else(cleared)?;
+            style.color = Some(color);
+        },
+        _ => {
+            let name = super::super::write::text(value, "font.latin")?.ok_or_else(cleared)?;
+            style.font_name = Some(name);
+        },
+    }
+    Ok(())
 }
 
 /// The value of a length key in points; `null` is refused.
@@ -268,6 +335,7 @@ impl Pending {
             && self.removals.is_empty()
             && self.adds.is_empty()
             && self.hidden.is_empty()
+            && self.styles.is_empty()
     }
 
     /// The new drawables staged on `slide` so far.
@@ -291,6 +359,87 @@ impl Pending {
     /// Stage a whole text.
     pub(super) fn stage_text(&mut self, text: Text, value: String, index: usize) {
         self.texts.insert(text, (value, index));
+    }
+
+    /// Stage one character property of a run of a text box or shape: the
+    /// run's characters in its drawable's text (record 0309).
+    fn stage_run_style(
+        &mut self,
+        file: &Iwork,
+        node: &Node<'_>,
+        key: &str,
+        value: &PropValue<'_>,
+        index: usize,
+    ) -> Result<()> {
+        let [slide, container, line, drawable] = node.item().leaf().map(|value| value as usize);
+        if container != DRAWABLE {
+            return Err(refusal(
+                Code::UnsupportedCapability,
+                "character properties are written on runs of text boxes and shapes; placeholder and notes runs keep their layout's styles",
+            )
+            .with_property(key.to_owned()));
+        }
+        let text = Text {
+            slide,
+            container: DRAWABLE,
+            drawable,
+        };
+        if self.texts.contains_key(&text) {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "set a shape's text and its runs' character properties in separate writes",
+            )
+            .with_property(key.to_owned()));
+        }
+        let tree = file.tree();
+        // A placeholder's runs have no shape item: their text keeps its
+        // layout's styles.
+        let shape = text.item(file).ok_or_else(|| {
+            refusal(
+                Code::UnsupportedCapability,
+                "character properties are written on runs of text boxes and shapes; placeholder and notes runs keep their layout's styles",
+            )
+            .with_property(key.to_owned())
+        })?;
+        let paragraphs: Vec<_> = shape
+            .children()
+            .iter()
+            .map(|child| tree.item(*child))
+            .filter(|item| item.type_name() == "paragraph")
+            .collect();
+        let mut start = 0;
+        for paragraph in paragraphs.iter().take(line) {
+            start += paragraph.text().unwrap_or_default().chars().count() + 1;
+        }
+        let paragraph = paragraphs
+            .get(line)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the run's paragraph is missing"))?;
+        let runs: Vec<_> = paragraph
+            .children()
+            .iter()
+            .map(|child| tree.item(*child))
+            .filter(|item| item.type_name() == "run")
+            .collect();
+        let ordinal = runs
+            .iter()
+            .position(|run| std::ptr::eq(*run, node.item()))
+            .ok_or_else(|| refusal(Code::InternalError, "the run is not in its paragraph"))?;
+        for run in runs.iter().take(ordinal) {
+            start += run.text().unwrap_or_default().chars().count();
+        }
+        let length = node.item().text().unwrap_or_default().chars().count();
+        if length == 0 {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "the run holds no characters",
+            ));
+        }
+        let entry = self
+            .styles
+            .entry((slide, drawable, start, start + length))
+            .or_insert_with(|| (Style::new(), index));
+        run_style(&mut entry.0, key, value)?;
+        Ok(())
     }
 
     /// Stage one `key = value` assignment on `node`.
@@ -353,6 +502,9 @@ impl Pending {
                 }
                 self.frames.insert((slide, drawable), (geometry, index));
             },
+            ("run", "bold" | "italic" | "underline" | "size" | "color" | "font.latin") => {
+                self.stage_run_style(file, node, key, value, index)?;
+            },
             ("run", _) => return Err(run_refusal(key)),
             (
                 "slide" | "placeholder" | "notes" | "paragraph" | "shape" | "picture" | "connector"
@@ -392,6 +544,7 @@ impl Pending {
             || !self.frames.is_empty()
             || !self.removals.is_empty()
             || !self.adds.is_empty()
+            || !self.styles.is_empty()
         {
             let first = drawable_texts
                 .iter()
@@ -399,6 +552,7 @@ impl Pending {
                 .chain(self.frames.values().map(|(_, index)| *index))
                 .chain(self.removals.values().copied())
                 .chain(self.adds.iter().map(|(_, index)| *index))
+                .chain(self.styles.values().map(|(_, index)| *index))
                 .min();
             let at = |index: usize| {
                 move |error| (failure(LeafError::KeynoteDrawables(error)), Some(index))
@@ -418,6 +572,15 @@ impl Pending {
                         SlideSelector::index(text.slide),
                         DrawableSelector::index(text.drawable),
                         value,
+                    )
+                    .map_err(at(*index))?;
+                }
+                for ((slide, drawable, start, end), (style, index)) in &self.styles {
+                    edit.set_text_style(
+                        SlideSelector::index(*slide),
+                        DrawableSelector::index(*drawable),
+                        DrawableSpan::new(*start, *end),
+                        style.clone(),
                     )
                     .map_err(at(*index))?;
                 }
@@ -518,6 +681,7 @@ impl Pending {
         }
         self.frames.clear();
         self.removals.clear();
+        self.styles.clear();
         self.adds.clear();
         Ok(published)
     }

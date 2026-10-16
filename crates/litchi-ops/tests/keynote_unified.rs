@@ -657,3 +657,60 @@ fn a_failing_item_leaves_the_file_untouched() {
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert_eq!(file.to_bytes().unwrap(), bytes);
 }
+
+#[test]
+fn runs_of_shapes_take_character_properties() {
+    let file = read("multi-slide.key");
+    let added = file
+        .add(
+            "/slide[1]",
+            NewNode::new("shape").prop("text", "Styled words here"),
+        )
+        .expect("add a text box");
+    let shape = added.path.to_string();
+    let styled = added
+        .file
+        .set(
+            &format!("{shape}/p[1]/run[1]"),
+            props! { "bold" => true, "color" => "C80000", "size" => "24pt", "font.latin" => "Helvetica" },
+        )
+        .expect("style the run");
+    let reopened = reopen(&styled);
+    let run = format!("{shape}/p[1]/run[1]");
+    assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
+    assert_eq!(
+        prop(&reopened, &run, "font.latin").as_deref(),
+        Some("Helvetica")
+    );
+    assert!(prop(&reopened, &run, "color").is_some());
+    assert_eq!(
+        text(&reopened, &shape).as_deref(),
+        Some("Styled words here")
+    );
+    // A second write builds on the first.
+    let italic = reopened
+        .set(&run, props! { "italic" => true })
+        .expect("italic");
+    let reopened = reopen(&italic);
+    assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
+    assert_eq!(prop(&reopened, &run, "italic").as_deref(), Some("true"));
+    // Undo restores the bytes.
+    let commit = added
+        .file
+        .edit(|tx| tx.set(&run, props! { "underline" => true }))
+        .expect("underline");
+    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), added.file.to_bytes().unwrap());
+    // A text change, then a run style on the new text, in one edit.
+    let both = added
+        .file
+        .edit(|tx| {
+            tx.set(&shape, props! { "text" => "changed" })?;
+            tx.set(&run, props! { "bold" => true })?;
+            Ok(())
+        })
+        .expect("text then style");
+    let reopened = reopen(&both.file);
+    assert_eq!(text(&reopened, &shape).as_deref(), Some("changed"));
+    assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
+}

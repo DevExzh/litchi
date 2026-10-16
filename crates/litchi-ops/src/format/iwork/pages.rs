@@ -24,6 +24,7 @@ use std::collections::BTreeMap;
 
 use litchi_core::{FileFormat, Position};
 use litchi_pages::header_footer::{HeaderFooterSelector, Kind as HeaderKind, Template};
+use litchi_pages::section::text_style::CharacterProperties;
 use litchi_pages::{BodyTableSelector, Package};
 
 use super::tree::{ROOT, count, text};
@@ -74,10 +75,33 @@ const fn addable(name: &'static str, ty: ValueType) -> PropSpec {
     spec
 }
 
+/// A property `set` writes but the tree does not read back.
+const fn set_only(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access = crate::node::spec::Access {
+        get: false,
+        set: true,
+        add: false,
+    };
+    spec
+}
+
+/// A font size in points.
+const FONT_SIZE: ValueType = ValueType::Length(crate::value::LengthSpec::FONT_SIZE);
+/// A font color.
+const FONT_COLOR: ValueType = ValueType::Color(crate::value::ColorContext::Drawing);
+
 pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     addable("text", ValueType::Text),
     PropSpec::new("section", ValueType::Int),
     PropSpec::new("objects", ValueType::Int),
+    set_only("font.bold", ValueType::Bool),
+    set_only("font.italic", ValueType::Bool),
+    set_only("font.underline", ValueType::Bool),
+    set_only("font.strike", ValueType::Bool),
+    set_only("font.size", FONT_SIZE),
+    set_only("font.name", ValueType::Text),
+    set_only("font.color", FONT_COLOR),
 ];
 
 pub(crate) const SECTION_PROPS: &[PropSpec] = &[
@@ -116,8 +140,8 @@ static GAPS: [GapSpec; 2] = [
     GapSpec {
         subject: Subject::Element("r"),
         code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 13 (Pages text runs and formatting)",
-        reason: "the Pages leaf reads and writes body text as plain section text; character runs and their styles have no transaction yet",
+        follow_up: "record 0309 follow-up: Pages run elements",
+        reason: "Pages body text has no run elements in the tree yet; character properties are written on a whole paragraph (`font.*` on `p`) through the leaf's section::text_style family, and Package::section_text_runs reads the runs",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -347,6 +371,7 @@ pub(crate) enum Patch {
     Footnote(litchi_pages::footnote::text::Patch),
     Footnotes(litchi_pages::footnote::body::transaction::Patch),
     Metadata(litchi_pages::metadata::Patch),
+    TextStyle(litchi_pages::section::text_style::Patch),
     TableDeletion(
         #[allow(
             dead_code,
@@ -366,6 +391,7 @@ impl Patch {
             Self::Footnote(patch) => patch.is_noop(),
             Self::Footnotes(patch) => patch.is_noop(),
             Self::Metadata(patch) => patch.is_noop(),
+            Self::TextStyle(patch) => patch.is_noop(),
             Self::TableDeletion(_) => false,
         }
     }
@@ -680,6 +706,12 @@ pub(crate) fn set(
                 ("paragraph", "text") => {
                     pending.stage(leaf[SECTION], leaf[LINE], paragraph_text(value)?);
                 },
+                ("paragraph", _) if key.len() > 5 && key[..5].eq_ignore_ascii_case("font.") => {
+                    pending.flush(&mut chain)?;
+                    let mut properties = CharacterProperties::new();
+                    super::write::font_property(&mut properties, key, value, FONT_COLOR)?;
+                    style_paragraph(&mut chain, leaf[SECTION], leaf[LINE], properties)?;
+                },
                 ("section", "text") => {
                     pending.flush(&mut chain)?;
                     let value = super::write::text(value, "text")?.unwrap_or_default();
@@ -771,6 +803,57 @@ pub(crate) fn set(
         operations,
         limits,
     )
+}
+
+/// Style one whole paragraph of a section (record 0309).
+fn style_paragraph(
+    chain: &mut Chain<Package>,
+    section: usize,
+    line: usize,
+    properties: CharacterProperties,
+) -> Result<()> {
+    let text = chain
+        .package
+        .sections()
+        .get(section)
+        .and_then(|section| section.body_text())
+        .ok_or_else(|| {
+            refusal(
+                Code::PathNotFound,
+                "the section is no longer in the document",
+            )
+        })?;
+    let lines: Vec<&str> = text.split('\n').collect();
+    let paragraph = lines.get(line).ok_or_else(|| {
+        refusal(
+            Code::PathNotFound,
+            "the paragraph is no longer in its section",
+        )
+    })?;
+    let start: usize = lines
+        .iter()
+        .take(line)
+        .map(|line| line.encode_utf16().count() + 1)
+        .sum();
+    let length = paragraph.encode_utf16().count();
+    if length == 0 {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "an empty paragraph has no characters to style",
+        ));
+    }
+    let error = |error| failure(LeafError::PagesTextStyle(error));
+    let span = litchi_pages::TextSpan::from_utf16_indexes(start, start + length)
+        .map_err(|_| refusal(Code::InvalidArgument, "the paragraph span is out of range"))?;
+    let mut edit = chain
+        .package
+        .edit_section_text_style(section)
+        .map_err(error)?;
+    edit.set(span, properties).map_err(error)?;
+    let commit = edit.commit().map_err(error)?;
+    let (package, patch) = commit.into_parts();
+    push(chain, package, Patch::TextStyle(patch));
+    Ok(())
 }
 
 /// Whether `target` is exactly the `/metadata` path.

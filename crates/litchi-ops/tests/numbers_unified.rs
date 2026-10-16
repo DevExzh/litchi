@@ -658,3 +658,63 @@ fn rows_and_columns_are_inserted_and_removed() {
         .expect_err("formulas");
     assert_eq!(error.code(), Code::UnsupportedCapability);
 }
+
+#[test]
+fn cell_fonts_are_written() {
+    let file = create(FileFormat::Numbers)
+        .expect("create")
+        .set("/sheet[1]/table[1]/B2", props! { "value" => "styled" })
+        .expect("value");
+    let styled = file
+        .set(
+            "/sheet[1]/table[1]/B2",
+            props! {
+                "font.bold" => true,
+                "font.italic" => true,
+                "font.size" => "16pt",
+                "font.color" => "FF0000",
+                "font.name" => "Helvetica",
+            },
+        )
+        .expect("font");
+    let package = leaf(&styled);
+    let style = package
+        .table_cell_text_style(0, 0, litchi_numbers::CellPosition::new(1, 1))
+        .expect("style");
+    assert_eq!(style.bold, Some(true));
+    assert_eq!(style.italic, Some(true));
+    assert_eq!(style.size, Some(16.0));
+    assert_eq!(style.color, Some([255, 0, 0]));
+    assert_eq!(style.font_name.as_deref(), Some("Helvetica"));
+    assert_eq!(
+        prop(&reopen(&styled), "/sheet[1]/table[1]/B2", "value").as_deref(),
+        Some("styled")
+    );
+    let batch = file
+        .batch(
+            vec![
+                batch_set(
+                    "/sheet[1]/table[1]/B2".to_owned(),
+                    Props::new().with("font.bold", true),
+                ),
+                batch_set(
+                    "/sheet[1]/table[1]/C3".to_owned(),
+                    Props::new().with("value", 3_i64),
+                ),
+            ],
+            BatchMode::Atomic,
+        )
+        .expect("batch");
+    let package = leaf(&batch.file);
+    assert_eq!(
+        package
+            .table_cell_text_style(0, 0, litchi_numbers::CellPosition::new(1, 1))
+            .expect("style")
+            .bold,
+        Some(true)
+    );
+    let error = file
+        .set("/sheet[1]/table[1]/D4", props! { "font.bold" => true })
+        .expect_err("empty cell");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+}

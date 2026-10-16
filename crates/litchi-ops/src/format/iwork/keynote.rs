@@ -112,12 +112,12 @@ const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
 const PARAGRAPH_PROPS: &[PropSpec] = &[addable("text", ValueType::Text)];
 
 const RUN_PROPS: &[PropSpec] = &[
-    PropSpec::new("bold", ValueType::Bool),
-    PropSpec::new("italic", ValueType::Bool),
-    PropSpec::new("underline", ValueType::Bool),
-    PropSpec::new("size", FONT_SIZE),
-    PropSpec::new("color", COLOR),
-    PropSpec::new("font.latin", ValueType::Text),
+    writable("bold", ValueType::Bool),
+    writable("italic", ValueType::Bool),
+    writable("underline", ValueType::Bool),
+    writable("size", FONT_SIZE),
+    writable("color", COLOR),
+    writable("font.latin", ValueType::Text),
 ];
 
 const SHAPE_PROPS: &[PropSpec] = &[
@@ -200,9 +200,9 @@ static OPERATION_GAPS: [GapSpec; 10] = [
     operation_gap(
         "set",
         "run",
-        "character formatting",
-        "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
-        "the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling)",
+        "placeholder and notes runs",
+        "record 0309 follow-ups",
+        "character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles",
     ),
     operation_gap(
         "add",
@@ -495,6 +495,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "placeholder",
         "notes",
         "paragraph",
+        "run",
         "shape",
         "picture",
     ],

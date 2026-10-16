@@ -36,6 +36,7 @@ use litchi_numbers::cell::Value as CellValue;
 use litchi_numbers::cell::data_format::{
     DecimalPlaces, NegativeStyle, Number, Percentage, ThousandsSeparator,
 };
+use litchi_numbers::cell::text_style::CharacterProperties;
 use litchi_numbers::formula::Expression;
 use litchi_numbers::table::cells::{Change, Edit, Input};
 use litchi_numbers::table::merge::Region;
@@ -120,7 +121,19 @@ pub(crate) const CELL_PROPS: &[PropSpec] = &[
     PropSpec::new("merge", ValueType::Text),
     PropSpec::new("mergeAnchor", ValueType::Bool),
     set_only("numberFormat", ValueType::Text),
+    set_only("font.bold", ValueType::Bool),
+    set_only("font.italic", ValueType::Bool),
+    set_only("font.underline", ValueType::Bool),
+    set_only("font.strike", ValueType::Bool),
+    set_only("font.size", FONT_SIZE),
+    set_only("font.name", ValueType::Text),
+    set_only("font.color", FONT_COLOR),
 ];
+
+/// A font size in points.
+const FONT_SIZE: ValueType = ValueType::Length(crate::value::LengthSpec::FONT_SIZE);
+/// A font color.
+const FONT_COLOR: ValueType = ValueType::Color(crate::value::ColorContext::Spreadsheet);
 
 pub(crate) const MERGE_PROPS: &[PropSpec] = &[{
     let mut spec = PropSpec::new("ref", ValueType::Text);
@@ -130,16 +143,7 @@ pub(crate) const MERGE_PROPS: &[PropSpec] = &[{
 
 const FOLLOW_UP: &str = "record 0297 follow-ups (IWORK_API_REQUESTS.md)";
 
-static GAPS: [GapSpec; 3] = [
-    GapSpec {
-        subject: Subject::Property {
-            element: "cell",
-            key: "font.bold",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 7",
-        reason: "the Numbers leaf has no cell text-style transaction; `numberFormat` covers decimal and percentage display formats only",
-    },
+static GAPS: [GapSpec; 2] = [
     GapSpec {
         subject: Subject::Property {
             element: "cell",
@@ -315,6 +319,8 @@ pub enum EditError {
     TableOrder(litchi_numbers::table::order::Error),
     /// A row or column insertion or removal.
     Topology(litchi_numbers::table::topology::Error),
+    /// Cell character properties.
+    TextStyle(litchi_numbers::cell::text_style::Error),
 }
 
 impl fmt::Display for EditError {
@@ -332,6 +338,7 @@ impl fmt::Display for EditError {
             Self::TableLifecycle(error) => error.fmt(formatter),
             Self::TableOrder(error) => error.fmt(formatter),
             Self::Topology(error) => error.fmt(formatter),
+            Self::TextStyle(error) => error.fmt(formatter),
         }
     }
 }
@@ -351,6 +358,7 @@ impl EditError {
             Self::TableLifecycle(error) => error,
             Self::TableOrder(error) => error,
             Self::Topology(error) => error,
+            Self::TextStyle(error) => error,
         })
     }
 
@@ -480,6 +488,19 @@ impl EditError {
                     _ => Code::InternalError,
                 }
             },
+            Self::TextStyle(error) => {
+                use litchi_numbers::cell::text_style::Error as E;
+                match error {
+                    E::SheetNotFound | E::TableNotFound | E::CellNotFound => Code::PathNotFound,
+                    E::EmptyStyle => Code::InvalidArgument,
+                    E::EmptyCell | E::UnsupportedDependency | E::UnsupportedSource => {
+                        Code::UnsupportedCapability
+                    },
+                    E::LimitExceeded { .. } => Code::LimitExceeded,
+                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+                    _ => Code::InternalError,
+                }
+            },
         }
     }
 }
@@ -506,6 +527,8 @@ pub(crate) enum Patch {
     TableOrder(litchi_numbers::table::order::Patch),
     /// Row and column insertions and removals.
     Topology(litchi_numbers::table::topology::Patch),
+    /// Cell character properties.
+    TextStyle(litchi_numbers::cell::text_style::Patch),
 }
 
 impl Patch {
@@ -521,6 +544,7 @@ impl Patch {
             Self::TableLifecycle(patch) => patch.is_noop(),
             Self::TableOrder(patch) => patch.is_noop(),
             Self::Topology(patch) => patch.is_noop(),
+            Self::TextStyle(patch) => patch.is_noop(),
         }
     }
 }
@@ -907,6 +931,8 @@ struct Staged {
     renames_tables: Vec<(usize, usize, String)>,
     cells: BTreeMap<(usize, usize), Vec<Change>>,
     formats: Vec<(Address, DisplayFormat)>,
+    /// Cell character properties, per table (record 0309).
+    text_styles: BTreeMap<(usize, usize), Vec<(CellPosition, CharacterProperties)>>,
 }
 
 /// Set properties on every target. Renames share one names transaction,
@@ -930,6 +956,25 @@ pub(crate) fn set(
                     .push(write.change(address.position()));
             } else if key.eq_ignore_ascii_case("numberformat") {
                 staged.formats.push((address, display_format(value)?));
+            } else if key.len() > 5 && key[..5].eq_ignore_ascii_case("font.") {
+                let cells = staged
+                    .text_styles
+                    .entry((address.sheet, address.table))
+                    .or_default();
+                let index = match cells
+                    .iter()
+                    .position(|(cell, _)| *cell == address.position())
+                {
+                    Some(index) => index,
+                    None => {
+                        cells.push((address.position(), CharacterProperties::new()));
+                        cells.len() - 1
+                    },
+                };
+                if !super::write::font_property(&mut cells[index].1, key, value, FONT_COLOR)? {
+                    return Err(property_gap("cell", key)
+                        .unwrap_or_else(|| super::write::unwritable("cell", key)));
+                }
             } else {
                 return Err(property_gap("cell", key)
                     .unwrap_or_else(|| super::write::unwritable("cell", key)));
@@ -1018,6 +1063,19 @@ fn commit_staged(chain: &mut Chain<Package>, staged: Staged) -> Result<()> {
         push(chain, commit.into_package(), Patch::Names(patch));
     }
     commit_cells(chain, staged.cells)?;
+    for ((sheet, table), cells) in staged.text_styles {
+        let error = |error| edit_error(EditError::TextStyle(error));
+        let mut edit = chain
+            .package
+            .edit_table_cell_text_style(SheetSelector::index(sheet), TableSelector::index(table))
+            .map_err(error)?;
+        for (position, properties) in cells {
+            edit = edit.set(position, properties).map_err(error)?;
+        }
+        let commit = edit.commit().map_err(error)?;
+        let (next, patch) = commit.into_parts();
+        push(chain, next, Patch::TextStyle(patch));
+    }
     for (address, format) in staged.formats {
         let sheet = SheetSelector::index(address.sheet);
         let table = TableSelector::index(address.table);

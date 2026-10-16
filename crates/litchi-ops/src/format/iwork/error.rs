@@ -30,6 +30,9 @@ pub enum LeafError {
     /// A Pages section-name transaction failed.
     #[cfg(feature = "pages")]
     PagesName(litchi_pages::section::name::Error),
+    /// A Pages character-style transaction failed (record 0309).
+    #[cfg(feature = "pages")]
+    PagesTextStyle(litchi_pages::section::text_style::Error),
     /// A Pages header or footer text transaction failed.
     #[cfg(feature = "pages")]
     PagesHeaderFooter(litchi_pages::header_footer::text::Error),
@@ -115,6 +118,8 @@ impl fmt::Display for LeafError {
             #[cfg(feature = "pages")]
             Self::PagesName(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
+            Self::PagesTextStyle(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
             Self::PagesFootnote(error) => error.fmt(formatter),
@@ -176,6 +181,8 @@ impl std::error::Error for LeafError {
             Self::PagesParagraphs(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesName(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTextStyle(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => Some(error),
             #[cfg(feature = "pages")]
@@ -245,6 +252,8 @@ impl LeafError {
             Self::PagesParagraphs(error) => pages_paragraphs_code(error),
             #[cfg(feature = "pages")]
             Self::PagesName(error) => pages_name_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTextStyle(error) => pages_text_style_code(error),
             #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => pages_region_code(error),
             #[cfg(feature = "pages")]
@@ -395,6 +404,19 @@ fn pages_name_code(error: &litchi_pages::section::name::Error) -> Code {
         E::PatchConflict | E::InvalidSource => Code::InvalidInput,
         E::Allocation { .. } | E::Verification => Code::InternalError,
         _ => Code::InvalidValue,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_text_style_code(error: &litchi_pages::section::text_style::Error) -> Code {
+    use litchi_pages::section::text_style::Error as E;
+    match error {
+        E::SectionNotFound => Code::PathNotFound,
+        E::InvalidSpan | E::EmptyStyle => Code::InvalidArgument,
+        E::UnsupportedDependency | E::UnsupportedSource => Code::UnsupportedCapability,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 
