@@ -228,6 +228,13 @@ pub(crate) const SHAPE_PROPS: &[PropSpec] = &[
     length("height", LengthSpec::EXTENT),
     PropSpec::new("zorder", ValueType::Int),
     PropSpec::new("style", ValueType::Text),
+    // The formatting every run of the shape's text shares (record 0316).
+    PropSpec::new("bold", ValueType::Bool),
+    PropSpec::new("italic", ValueType::Bool),
+    PropSpec::new("underline", ValueType::Bool),
+    length("size", LengthSpec::FONT_SIZE),
+    PropSpec::new("color", ValueType::Color(ColorContext::Word)),
+    PropSpec::new("font", ValueType::Text),
 ];
 
 /// An image, chart, embedded-object or media frame.
@@ -269,11 +276,18 @@ pub(crate) const GROUP_PROPS: &[PropSpec] = &[
 pub(crate) const CELL_PROPS: &[PropSpec] = &[
     PropSpec::new("colSpan", ValueType::Int),
     PropSpec::new("rowSpan", ValueType::Int),
+    PropSpec::new("bold", ValueType::Bool),
+    PropSpec::new("italic", ValueType::Bool),
+    PropSpec::new("underline", ValueType::Bool),
+    length("size", LengthSpec::FONT_SIZE),
+    PropSpec::new("color", ValueType::Color(ColorContext::Word)),
+    PropSpec::new("font", ValueType::Text),
 ];
 
-/// The character properties a paragraph or span's automatic style sets
-/// locally (record 0308): read from, and written as, a derived automatic
-/// style.
+/// The character properties of paragraphs and runs (record 0308), and of
+/// shapes, table cells and notes (record 0316): read through the node's
+/// style chain, common styles included, and written as derived automatic
+/// styles.
 pub(crate) const CHARACTER_KEYS: &[&str] =
     &["bold", "italic", "underline", "size", "color", "font"];
 
@@ -302,7 +316,15 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
 ];
 
 /// Speaker notes.
-pub(crate) const NOTES_PROPS: &[PropSpec] = &[PropSpec::new("text", ValueType::Text)];
+pub(crate) const NOTES_PROPS: &[PropSpec] = &[
+    PropSpec::new("text", ValueType::Text),
+    PropSpec::new("bold", ValueType::Bool),
+    PropSpec::new("italic", ValueType::Bool),
+    PropSpec::new("underline", ValueType::Bool),
+    length("size", LengthSpec::FONT_SIZE),
+    PropSpec::new("color", ValueType::Color(ColorContext::Word)),
+    PropSpec::new("font", ValueType::Text),
+];
 
 /// An annotation.
 pub(crate) const COMMENT_PROPS: &[PropSpec] = &[

@@ -2,8 +2,9 @@ use std::io::Cursor;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use litchi_odraw::shape::Kind;
+use litchi_xls::AnchorBehavior;
 use litchi_xls::shapes::extract_shapes_from_workbook;
-use litchi_xls::writer::shape::{Anchor, Behavior, Point, Rect};
+use litchi_xls::writer::shape::{Anchor, Point, Rect};
 use litchi_xls::writer::{
     Builder, ShapeColor, ShapeFill, ShapeGroupChild, ShapeGroupWrite, ShapeKind, ShapeLine,
     ShapeText, ShapeWrite,
@@ -13,7 +14,7 @@ fn anchor() -> Anchor {
     Anchor::new(
         Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
         Point::new(9, 6).unwrap().offset(200, 900).unwrap(),
-        Behavior::MoveAndSize,
+        AnchorBehavior::Absolute,
     )
     .unwrap()
 }

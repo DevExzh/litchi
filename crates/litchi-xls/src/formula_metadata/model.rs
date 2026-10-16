@@ -56,8 +56,10 @@ impl Ancillary {
 
 /// A bounded, inert producer defect preserved while opening a workbook.
 ///
-/// Defects never authorize formula evaluation or canonical writing. The
-/// strict Formula codec continues to reject these wire combinations.
+/// Defects never authorize formula evaluation or canonical writing. They are
+/// reported only under the explicit compatibility profile that preserves
+/// them; the strict profile ignores a stale `fShrFmla` flag and records
+/// [`crate::WorksheetDefect::SharedFormulaFlag`] instead (record 0316).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Defect {

@@ -491,14 +491,15 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::shape::{Behavior, Point};
+    use crate::AnchorBehavior;
+    use crate::writer::shape::Point;
 
     #[test]
     fn checked_anchor_serializes_exact_client_anchor_bytes() {
         let anchor = Anchor::new(
             Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
             Point::new(6, 4).unwrap().offset(200, 900).unwrap(),
-            Behavior::MoveAndSize,
+            AnchorBehavior::Absolute,
         )
         .unwrap();
         let mut bytes = Vec::new();

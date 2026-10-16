@@ -59,14 +59,20 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ole/xls/ConditionalFormattingSamples.xls"
     );
+    // The strict profile ignores the stale flag and records the repair
+    // (record 0316); the explicit profile keeps it.
     let strict = Reader::new(File::open(sparse_path).unwrap()).unwrap();
     assert!(
         strict
             .sheet(13)
             .and_then(litchi_xls::SheetMetadata::parsed_worksheet_index)
-            .is_none(),
-        "strict workbook parsing must not accept the malformed Formula metadata"
+            .is_some(),
+        "strict workbook parsing reads the formula and ignores its stale fShrFmla flag"
     );
+    assert!(strict.tolerance_report().defects().iter().any(|defect| {
+        defect.defect()
+            == litchi_xls::Defect::Worksheet(litchi_xls::WorksheetDefect::SharedFormulaFlag)
+    }));
     let compatibility_profile = CompatibilityProfile::SharedFormulaFlagWithoutPtgExpV1;
     let workbook = Reader::new_with_options(
         File::open(sparse_path).unwrap(),

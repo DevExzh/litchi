@@ -682,6 +682,7 @@ pub use layout::{Column, Row};
 pub use leniency::{
     CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, PaletteDefect,
     SharedStringDefect, SheetDefect, SheetNameDefect, ToleranceReport, ToleratedDefect,
+    WorksheetDefect,
 };
 pub use list_object::{
     CachedDiskHeader, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,

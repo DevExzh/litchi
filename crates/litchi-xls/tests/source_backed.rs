@@ -3316,28 +3316,26 @@ fn the_whole_sheet_walk_refuses_what_a_selected_cell_query_refuses() {
         "the walk must carry the query's error identity"
     );
 
-    // A real defect: three worksheets of the flagship fixture carry shared
-    // formula metadata this reader refuses, which is why its text extraction
-    // is refused (0568, 0585). The walk must refuse them identically.
+    // Three worksheets of the flagship fixture set `fShrFmla` on formulas
+    // that carry their own tokens. The stale flag is ignored (record 0316;
+    // 0568 and 0585 refused them), so the walk and a cell query both read
+    // every sheet.
     let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(ole_fixture(
         "ConditionalFormattingSamples.xls",
     ))))
     .unwrap();
-    let mut refusals = 0_usize;
     for sheet in [6_usize, 7, 13] {
         let worksheet = owner.worksheet_by_index(sheet).unwrap().unwrap();
-        let walk = worksheet
-            .visit_cells(|_cell| Ok(()))
-            .unwrap_err()
-            .to_string();
-        // Find the position the query refuses at: the walk stops at the same
-        // record, so any query over the sheet refuses with the same message.
-        let query = worksheet.cell(0, 0).unwrap_err().to_string();
-        assert_eq!(walk, query, "sheet {sheet} refusals differ");
-        assert!(walk.contains("PtgExp"), "unexpected refusal: {walk}");
-        refusals += 1;
+        let mut cells = 0_usize;
+        worksheet
+            .visit_cells(|_cell| {
+                cells += 1;
+                Ok(())
+            })
+            .unwrap();
+        assert!(cells > 0, "sheet {sheet} has cells");
+        worksheet.cell(0, 0).unwrap();
     }
-    assert_eq!(refusals, 3);
 }
 
 #[test]

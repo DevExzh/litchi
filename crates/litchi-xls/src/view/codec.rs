@@ -38,7 +38,33 @@ pub(super) fn parse_zoom_percent(value: u16, record_type: u16, name: &str) -> Re
     }
 }
 
+/// A WINDOW2 zoom field outside `0` and `10..=400`, read as the default
+/// zoom (record 0316). `[MS-XLS]` 2.4.346 notes \<144\> and \<145\> say
+/// Excel truncates both fields into a byte when saving, and the page-break
+/// zoom is undefined while page-break preview has an SCL, so a reader cannot
+/// rely on the range; LibreOffice and Apache POI read any value. The record
+/// bytes are kept as written.
+pub(crate) struct ZoomDefect {
+    pub(crate) raw: u16,
+}
+
+/// Reads a WINDOW2 zoom field, keeping an out-of-range value as a defect.
+fn window_zoom(value: u16, defects: &mut Vec<ZoomDefect>) -> Option<u16> {
+    match parse_zoom_percent(value, WINDOW2_RECORD_TYPE, "zoom") {
+        Ok(percent) => percent,
+        Err(_) => {
+            defects.push(ZoomDefect { raw: value });
+            None
+        },
+    }
+}
+
+#[cfg(test)]
 pub(super) fn parse_window2(data: &[u8]) -> Result<View> {
+    parse_window2_reporting(data, &mut Vec::new())
+}
+
+pub(super) fn parse_window2_reporting(data: &[u8], defects: &mut Vec<ZoomDefect>) -> Result<View> {
     if data.len() != 18 {
         return Err(invalid(
             WINDOW2_RECORD_TYPE,
@@ -96,16 +122,14 @@ pub(super) fn parse_window2(data: &[u8]) -> Result<View> {
         first_visible_row,
         first_visible_column: crate::utils::truncate_u16_to_u8(first_visible_column),
         gridline_color_index,
-        page_break_zoom_percent: parse_zoom_percent(
+        page_break_zoom_percent: window_zoom(
             read_u16(data, 10, WINDOW2_RECORD_TYPE, "WINDOW2.page_break_zoom")?,
-            WINDOW2_RECORD_TYPE,
-            "page-break zoom",
-        )?,
-        normal_zoom_percent: parse_zoom_percent(
+            defects,
+        ),
+        normal_zoom_percent: window_zoom(
             read_u16(data, 12, WINDOW2_RECORD_TYPE, "WINDOW2.normal_zoom")?,
-            WINDOW2_RECORD_TYPE,
-            "normal zoom",
-        )?,
+            defects,
+        ),
         zoom_fraction: None,
         pane: None,
         selections: Vec::new(),
@@ -268,6 +292,7 @@ pub(crate) struct ViewCollector {
     current: Option<View>,
     phase: ViewPhase,
     saw_plv: bool,
+    zoom_defects: Vec<ZoomDefect>,
 }
 
 impl ViewCollector {
@@ -277,6 +302,7 @@ impl ViewCollector {
             current: None,
             phase: ViewPhase::Start,
             saw_plv: false,
+            zoom_defects: Vec::new(),
         }
     }
 
@@ -317,7 +343,7 @@ impl ViewCollector {
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if record_type == WINDOW2_RECORD_TYPE {
             self.finish_current()?;
-            self.current = Some(parse_window2(data)?);
+            self.current = Some(parse_window2_reporting(data, &mut self.zoom_defects)?);
             return Ok(());
         }
         let Some(view) = self.current.as_mut() else {
@@ -360,6 +386,12 @@ impl ViewCollector {
             _ => self.finish_current()?,
         }
         Ok(())
+    }
+
+    /// The out-of-range zoom values read since the last call, in record
+    /// order; the caller records them as tolerated defects.
+    pub(crate) fn take_zoom_defects(&mut self) -> impl Iterator<Item = ZoomDefect> + '_ {
+        self.zoom_defects.drain(..)
     }
 
     pub(crate) fn finish(mut self) -> Result<Vec<View>> {

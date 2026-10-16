@@ -169,10 +169,10 @@ pub enum Change {
         text: String,
     },
     /// Set character formatting on a paragraph (`run: None`, through its
-    /// paragraph style) or on one run (a `text:span`, or plain text, which
-    /// a new span wraps). A new automatic style derived from the node's own
+    /// paragraph style) or on one run: a `text:span`; plain text or a field,
+    /// which a new span wraps; a hyperlink, whose content span carries it
+    /// (record 0316). A new automatic style derived from the node's own
     /// carries the properties; no existing style changes (record 0308).
-    /// Link and field runs are refused.
     SetTextProperties {
         /// The story.
         story: StoryRef,
@@ -740,12 +740,17 @@ impl<'a> Planner<'a> {
         if selected.kind != RunKind::Field {
             return Err(invalid("the ODP run is not a field"));
         }
-        let tag_end = if selected.content.start > selected.range.start {
-            selected.content.start
-        } else {
-            selected.range.end
+        // A formatted field is the field element inside its span.
+        let (element, content) = match &selected.field {
+            Some(field) => (field.range.clone(), field.content.clone()),
+            None => (selected.range.clone(), selected.content.clone()),
         };
-        let name = StartTag::parse(&self.xml[selected.range.start..tag_end])?.name;
+        let tag_end = if content.start > element.start {
+            content.start
+        } else {
+            element.end
+        };
+        let name = StartTag::parse(&self.xml[element.start..tag_end])?.name;
         let local = name.rsplit(':').next().unwrap_or(name);
         if !TEXT_FIELDS.contains(&local) {
             return Err(unsupported(
@@ -755,8 +760,7 @@ impl<'a> Planner<'a> {
         if selected.text == text {
             return Ok(());
         }
-        let range = selected.range.clone();
-        let content = selected.content.clone();
+        let range = element;
         let empty = content.start == range.end;
         let prefix = self.text_prefix()?;
         let encoded = encode(prefix, text)?;
@@ -842,30 +846,38 @@ impl<'a> Planner<'a> {
             ),
             Some(run) => {
                 let selected = paragraph.runs.get(run).ok_or_else(|| missing("run"))?;
-                match selected.kind {
-                    RunKind::Span => {
-                        let tag_end = if selected.content.start > selected.range.start {
-                            selected.content.start
-                        } else {
-                            selected.range.end
-                        };
-                        (
-                            selected.range.start..tag_end,
-                            Pointer::StartTag,
-                            "text",
-                            selected.style_name.clone(),
-                        )
+                match (selected.kind, &selected.inner_span) {
+                    // A span, or the span that formats a field (record
+                    // 0316): derive its style.
+                    (RunKind::Span, _) => (
+                        selected.start_tag.clone(),
+                        Pointer::StartTag,
+                        "text",
+                        selected.style_name.clone(),
+                    ),
+                    (RunKind::Field, _) if selected.field.is_some() => (
+                        selected.start_tag.clone(),
+                        Pointer::StartTag,
+                        "text",
+                        selected.style_name.clone(),
+                    ),
+                    // Plain text and a bare field: a new span wraps them.
+                    (RunKind::Text | RunKind::Field, _) => {
+                        (selected.range.clone(), Pointer::Wrap, "text", None)
                     },
-                    RunKind::Text => (selected.range.clone(), Pointer::Wrap, "text", None),
-                    RunKind::Link => {
-                        return Err(unsupported(
-                            "character formatting of an ODP hyperlink run is not supported; format the paragraph",
-                        ));
+                    // A link keeps its own (link character) style: the span
+                    // its content is, or a new one inside it, carries the
+                    // text's formatting (record 0316).
+                    (RunKind::Link, Some((tag, style))) => {
+                        (tag.clone(), Pointer::StartTag, "text", style.clone())
                     },
-                    RunKind::Field => {
-                        return Err(unsupported(
-                            "character formatting of an ODP field run is not supported; format the paragraph",
-                        ));
+                    (RunKind::Link, None) => {
+                        if selected.content.is_empty() {
+                            return Err(unsupported(
+                                "an empty ODP hyperlink run has no text to format",
+                            ));
+                        }
+                        (selected.content.clone(), Pointer::Wrap, "text", None)
                     },
                 }
             },

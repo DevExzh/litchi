@@ -3173,10 +3173,13 @@ impl CellRecord {
         })
     }
 
-    pub(crate) fn parse_formula_preserving_defect(
+    /// Parses a Formula and reports its stale `fShrFmla` flag, preserved in
+    /// the metadata when `preserve` holds and ignored otherwise.
+    pub(crate) fn parse_formula_reporting_defect(
         data: &[u8],
+        preserve: bool,
     ) -> Result<(Self, Option<crate::formula_metadata::FlagDefect>)> {
-        let (parsed, defect) = crate::formula_metadata::parse_record_preserving(data)?;
+        let (parsed, defect) = crate::formula_metadata::parse_record_reporting(data, preserve)?;
         Ok((
             CellRecord::Formula {
                 row: parsed.row,
@@ -3693,7 +3696,7 @@ mod cell_measure_tests {
             &formula(&[0x1E, 0x2A, 0x00], 0xFFFF, &[], number),
             "reserved flags",
         );
-        // `shared Formula metadata requires a leading PtgExp token`.
+        // A stale `fShrFmla` on a complete token stream is ignored (record 0316).
         agree(
             0x0006,
             &formula(&[0x1E, 0x2A, 0x00], 0x0008, &[], number),

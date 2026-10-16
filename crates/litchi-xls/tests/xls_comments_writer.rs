@@ -1,6 +1,7 @@
 use std::io::Cursor;
 
-use litchi_xls::writer::shape::{Anchor, Behavior, Point};
+use litchi_xls::AnchorBehavior;
+use litchi_xls::writer::shape::{Anchor, Point};
 use litchi_xls::writer::{
     Builder, CommentTextRunWrite, CommentWriteOptions, PivotCacheValue, PivotDataItemConfig,
     PivotFieldConfig, PivotItemConfig, PivotTableConfig,
@@ -43,7 +44,7 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
                     Anchor::new(
                         Point::new(3, 4).unwrap().offset(20, 10).unwrap(),
                         Point::new(8, 7).unwrap().offset(200, 900).unwrap(),
-                        Behavior::MoveAndSize,
+                        AnchorBehavior::Absolute,
                     )
                     .unwrap(),
                 ),

@@ -1,0 +1,8 @@
+{"median_us":5707.57365,"min_us":5595.3771,"repeats":20,"rounds":15,"scenario":"xls_complete_open_20k"}
+{"median_us":1784.2415,"min_us":1779.586,"repeats":20,"rounds":15,"scenario":"xls_complete_open_formula_eval"}
+{"median_us":883.3362000000001,"min_us":879.70715,"repeats":20,"rounds":15,"scenario":"xls_source_visit_20k"}
+{"native_median_us":10548.2902,"native_min_us":10461.4382,"order":"ABBA","ratio":0.9972124202650399,"repeats":5,"rounds":15,"scenario":"xls_row_insert_10k","unified_median_us":10518.886,"unified_min_us":10447.702000000001}
+{"native_median_us":147.7312,"native_min_us":147.2177,"order":"ABBA","ratio":1.0081194764545336,"repeats":20,"rounds":15,"scenario":"xls_row_insert_images","unified_median_us":148.9307,"unified_min_us":147.71319999999997}
+{"median_us":487.28779999999995,"min_us":486.46385,"repeats":20,"rounds":15,"scenario":"odp_scene_parse_200"}
+{"median_us":318.95550000000003,"min_us":318.3645,"repeats":10,"rounds":15,"scenario":"odp_run_read_200"}
+{"native_median_us":1779.4425999999999,"native_min_us":1769.4424,"order":"ABBA","ratio":1.0019229617184617,"repeats":5,"rounds":15,"scenario":"odp_run_format_200","unified_median_us":1782.8644,"unified_min_us":1765.0684}

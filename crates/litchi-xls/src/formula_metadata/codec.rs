@@ -111,10 +111,15 @@ pub(crate) fn parse_record(data: &[u8]) -> Result<Parsed> {
     parse_record_with(data, false).map(|(parsed, _)| parsed)
 }
 
-/// Parse a Formula while preserving the one explicitly modeled producer
-/// defect. All framing, size, reserved-bit, and value checks remain strict.
-pub(crate) fn parse_record_preserving(data: &[u8]) -> Result<(Parsed, Option<FlagDefect>)> {
-    parse_record_with(data, true)
+/// Parse a Formula and report the one modeled producer defect: `preserve`
+/// keeps a stale `fShrFmla` flag in the metadata (the explicit
+/// compatibility profile), otherwise it is ignored (`decode_flags`). All
+/// framing, size, reserved-bit, and value checks remain strict.
+pub(crate) fn parse_record_reporting(
+    data: &[u8],
+    preserve: bool,
+) -> Result<(Parsed, Option<FlagDefect>)> {
+    parse_record_with(data, preserve)
 }
 
 /// Run every check [`parse_record`] runs, without retaining anything.
@@ -148,7 +153,7 @@ fn parse_record_with(data: &[u8], preserve_defect: bool) -> Result<(Parsed, Opti
     let (mut metadata, defect) = if preserve_defect {
         decode_flags_preserving(framed.flags, &formula)?
     } else {
-        (decode_flags(framed.flags, &formula)?, None)
+        decode_flags(framed.flags, &formula)?
     };
     metadata = metadata.with_calculation_cache(framed.calculation_cache);
     if let Some(ancillary) = ancillary {

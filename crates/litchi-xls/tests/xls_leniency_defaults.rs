@@ -1157,3 +1157,67 @@ fn property_set_repairs_join_the_eager_workbook_report() {
     assert!(!summary.tolerance_report().is_clean());
     assert_eq!(workbook.tolerance_report().defects().len(), 1);
 }
+
+// ---------------------------------------------------------------------------
+// Record 0316: worksheet-record repairs
+// ---------------------------------------------------------------------------
+
+const WINDOW2: u16 = 0x023E;
+const FORMULA: u16 = 0x0006;
+
+/// A WINDOW2 page-break zoom of 1 (as `SimpleWithColours.xls` stores it) reads
+/// as the default zoom, keeps the worksheet, and is recorded at the record's
+/// offset with the raw value. MS-XLS notes 144/145 document Excel truncating
+/// the field into a byte.
+#[test]
+fn an_out_of_range_window_zoom_reads_as_the_default_zoom() {
+    let mut stream = Stream::simple();
+    stream.payload_mut(WINDOW2, 0)[10..12].copy_from_slice(&1u16.to_le_bytes());
+    let offset = stream.offset_of_kind(WINDOW2, 0);
+    let workbook = assert_eager_repairs(
+        &stream.package(),
+        &[(
+            Defect::Worksheet(litchi_xls::WorksheetDefect::ZoomLevel),
+            offset,
+            1,
+        )],
+    );
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    assert_eq!(
+        worksheet
+            .worksheet_view()
+            .unwrap()
+            .page_break_zoom_percent(),
+        None
+    );
+    assert_eq!(
+        worksheet.get_cell(0, 0).unwrap().value(),
+        &CellValue::Float(42.5)
+    );
+}
+
+/// A Formula that sets `fShrFmla` while carrying its own tokens reads as an
+/// ordinary formula; the stale flag is recorded at the cell.
+#[test]
+fn a_stale_shared_formula_flag_is_ignored() {
+    let mut stream = Stream::from_writer(|writer| {
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_number(sheet, 0, 0, 2.0).unwrap();
+        writer.write_formula(sheet, 1, 0, "A1*3").unwrap();
+    });
+    assert_clean(&stream.package());
+    let flags = &mut stream.payload_mut(FORMULA, 0)[14..16];
+    let value = u16::from_le_bytes([flags[0], flags[1]]) | 0x0008;
+    flags.copy_from_slice(&value.to_le_bytes());
+    let workbook = assert_eager_repairs(
+        &stream.package(),
+        &[(
+            Defect::Worksheet(litchi_xls::WorksheetDefect::SharedFormulaFlag),
+            1,
+            0,
+        )],
+    );
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    assert!(worksheet.get_cell(1, 0).is_some());
+    assert!(worksheet.formula_metadata_defects().is_empty());
+}

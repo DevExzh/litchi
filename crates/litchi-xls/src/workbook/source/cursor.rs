@@ -398,11 +398,58 @@ mod tests {
                 batched += usize::from(expected.0.len() > super::BATCH);
             }
         }
-        // The corpus exercises resumed scans.
+        // The corpus exercises resumed scans. Its out-of-order sheets were
+        // embedded chart caches read as cells, which record 0316 skips; the
+        // unordered case is pinned by `a_sheet_whose_positions_descend_has_no_cursor`.
         assert!(
-            sheets > 100 && cells > 10_000 && batched > 10 && unordered > 0,
+            sheets > 100 && cells > 10_000 && batched > 10,
             "{sheets} {cells} {batched} {unordered}"
         );
+    }
+
+    #[test]
+    fn a_sheet_whose_positions_descend_has_no_cursor() {
+        use std::io::Cursor;
+
+        let mut builder = crate::writer::Builder::new();
+        let sheet = builder.add_worksheet("Data").unwrap();
+        builder.write_number(sheet, 0, 0, 1.0).unwrap();
+        builder.write_number(sheet, 1, 0, 2.0).unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
+        let mut stream = litchi_cfb::OleFile::open(Cursor::new(&bytes))
+            .unwrap()
+            .open_stream(&["Workbook"])
+            .unwrap();
+        // Swap the two Number records, which have the same length.
+        let mut numbers = Vec::new();
+        let mut offset = 0;
+        while offset + 4 <= stream.len() {
+            let kind = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+            let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+            if kind == 0x0203 {
+                numbers.push(offset);
+            }
+            offset += 4 + length;
+        }
+        let [first, second] = numbers[..] else {
+            panic!("two Number records");
+        };
+        let a = stream[first..first + 18].to_vec();
+        let b = stream[second..second + 18].to_vec();
+        stream[first..first + 18].copy_from_slice(&b);
+        stream[second..second + 18].copy_from_slice(&a);
+        let mut writer = litchi_cfb::OleWriter::new();
+        writer.create_stream(&["Workbook"], &stream).unwrap();
+        let mut package = Vec::new();
+        writer.write_to(&mut Cursor::new(&mut package)).unwrap();
+
+        let workbook = SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
+            litchi_core::OwnedSource::new(package),
+        ))
+        .unwrap();
+        let sheet = workbook.worksheet_by_index(0).unwrap().unwrap();
+        assert!(streamed(&sheet).is_none());
+        assert_eq!(visited(&sheet).0.len(), 2);
     }
 
     #[test]
