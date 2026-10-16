@@ -54,6 +54,9 @@ pub enum LeafError {
     /// A Pages body-table deletion failed.
     #[cfg(feature = "pages")]
     PagesTableDeletion(litchi_pages::table::deletion::Error),
+    /// A Pages section add or remove failed (record 0312).
+    #[cfg(feature = "pages")]
+    PagesSectionLifecycle(litchi_pages::section::lifecycle::Error),
     /// The Keynote package could not be read.
     #[cfg(feature = "keynote")]
     Keynote(litchi_keynote::ReadError),
@@ -142,6 +145,8 @@ impl fmt::Display for LeafError {
             Self::PagesSave(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesSectionLifecycle(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
@@ -212,6 +217,8 @@ impl std::error::Error for LeafError {
             Self::PagesSave(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesSectionLifecycle(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => Some(error),
             #[cfg(feature = "keynote")]
@@ -293,6 +300,8 @@ impl LeafError {
             },
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => pages_deletion_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesSectionLifecycle(error) => pages_section_lifecycle_code(error),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => keynote_code(error),
             #[cfg(feature = "keynote")]
@@ -552,6 +561,20 @@ fn pages_deletion_code(error: &litchi_pages::table::deletion::Error) -> Code {
         E::LimitExceeded { .. } => Code::LimitExceeded,
         E::PatchConflict => Code::InvalidInput,
         E::Verification => Code::InternalError,
+        _ => Code::UnsupportedCapability,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_section_lifecycle_code(error: &litchi_pages::section::lifecycle::Error) -> Code {
+    use litchi_pages::section::lifecycle::Error as E;
+    match error {
+        E::SectionNotFound => Code::PathNotFound,
+        E::InvalidName => Code::InvalidValue,
+        E::InitialSection | E::EmptySection => Code::InvalidArgument,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict => Code::InvalidInput,
+        E::Verification | E::OperationAlreadyStaged | E::NoStagedOperation => Code::InternalError,
         _ => Code::UnsupportedCapability,
     }
 }

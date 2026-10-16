@@ -309,11 +309,11 @@
       "element": "section",
       "parent": "document",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -680,24 +680,6 @@
       "code": "unsupported_capability",
       "followUp": "record 0299 Pages metadata node",
       "reason": "`set(\"/metadata\", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata()"
-    },
-    {
-      "subject": "operation",
-      "verb": "add",
-      "element": "section",
-      "context": "a new section",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 11",
-      "reason": "the Pages leaf has no section lifecycle transaction (a section break plus a new native section object)"
-    },
-    {
-      "subject": "operation",
-      "verb": "remove",
-      "element": "section",
-      "context": "a section",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 11",
-      "reason": "the Pages leaf has no section lifecycle transaction"
     },
     {
       "subject": "operation",

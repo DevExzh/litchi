@@ -178,7 +178,7 @@ impl Owner {
     fn tree(&self) -> Result<(Tree, Box<[Part]>)> {
         match self {
             #[cfg(feature = "pages")]
-            Self::Pages(package) => Ok((pages::build(package), Box::new([]))),
+            Self::Pages(package) => Ok(pages::build(package)),
             #[cfg(feature = "keynote")]
             Self::Keynote(package) => keynote::build(package),
             #[cfg(feature = "numbers")]
@@ -412,7 +412,7 @@ impl Iwork {
             Owner::Pages(package) => {
                 self.0
                     .full
-                    .get_or_init(|| Built::new(Ok((pages::build_full(package), Box::new([])))));
+                    .get_or_init(|| Built::new(Ok(pages::build_full(package))));
             },
             #[allow(
                 unreachable_patterns,

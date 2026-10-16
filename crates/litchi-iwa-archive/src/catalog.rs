@@ -115,6 +115,13 @@ impl Component {
     /// [`Self::archive`] always borrows the retained record.
     #[must_use]
     pub fn into_parts(self) -> (String, Archive) {
+        #[cfg_attr(
+            not(feature = "internal-iwork-source"),
+            allow(
+                clippy::infallible_destructuring_match,
+                reason = "the shared arm exists only with internal-iwork-source"
+            )
+        )]
         let archive = match self.archive {
             ComponentArchive::Owned(archive) => archive,
             #[cfg(feature = "internal-iwork-source")]

@@ -12,7 +12,15 @@
 //!   appended when a read reaches a paragraph's children;
 //! - the cells and merged ranges of a Numbers table are one part whose items
 //!   are materialized one by one: a cell step looks its cell up in the
-//!   leaf's sorted cell list and builds only that item.
+//!   leaf's sorted cell list and builds only that item;
+//! - the contents of a Keynote slide table or a Pages body table (the
+//!   table's own properties, its rows and cells) are built whole the first
+//!   time a read reaches the table's properties or children (record 0312).
+//!   The tree holding the table lists a stand-in item with the table's kind,
+//!   ordinal, path and leaf positions; [`Iwork::item`] serves the stand-in's
+//!   reads from the built table. A Pages body table's contents are a part
+//!   of their own; a Keynote slide table's live in its slide's part, at
+//!   indices flagged with [`TABLE`].
 //!
 //! A step's kind and ordinal are known without materializing the item.
 //! Every item keeps its place ([`At`]) once built, so nodes taken before a
@@ -23,12 +31,12 @@
     reason = "a build with one lazily built format has fewer kinds of part"
 )]
 
-#[cfg(feature = "keynote")]
+#[cfg(any(feature = "keynote", feature = "pages"))]
 use std::sync::OnceLock;
 
 use super::Iwork;
 use super::tree::{At, Item};
-#[cfg(feature = "keynote")]
+#[cfg(any(feature = "keynote", feature = "pages"))]
 use super::tree::{ROOT, Tree};
 
 /// One lazily built part.
@@ -42,6 +50,57 @@ pub(crate) enum Part {
     /// The cells and merged ranges of a Numbers table.
     #[cfg(feature = "numbers")]
     Table(super::numbers::Cells),
+    /// The contents of a Pages body table.
+    #[cfg(feature = "pages")]
+    Contents(Contents),
+}
+
+/// The contents of one table: the table item itself (the anchor, at
+/// [`ROOT`]), its rows and cells, built whole on the first read that needs
+/// them from the stand-in item the holding tree lists (record 0312).
+#[cfg(any(feature = "keynote", feature = "pages"))]
+pub(crate) struct Contents {
+    /// The leaf's selector of the table: a Keynote table's position among
+    /// its slide's tables in z-order, a Pages body table's catalog position.
+    selector: usize,
+    /// The index of the stand-in in its holding tree (the eager Pages
+    /// tree, a Keynote slide's part).
+    stand_in: u32,
+    built: OnceLock<Tree>,
+}
+
+#[cfg(any(feature = "keynote", feature = "pages"))]
+impl Contents {
+    pub(crate) fn new(selector: usize, stand_in: u32) -> Self {
+        Self {
+            selector,
+            stand_in,
+            built: OnceLock::new(),
+        }
+    }
+}
+
+/// The flag of an index in a Keynote slide's part that addresses an item
+/// of one of the slide's tables: bits 21–30 hold the table, bits 0–20 the
+/// item's index in the table's contents.
+#[cfg(feature = "keynote")]
+pub(crate) const TABLE: u32 = 1 << 31;
+/// The bits of a flagged index holding the item's index in its table.
+#[cfg(feature = "keynote")]
+const TABLE_ITEM: u32 = (1 << 21) - 1;
+/// How many items one Keynote slide table's contents can hold; a larger
+/// table keeps its frame without rows.
+#[cfg(feature = "keynote")]
+pub(crate) const TABLE_ITEMS: usize = TABLE_ITEM as usize;
+/// How many tables one Keynote slide's part addresses; later tables keep
+/// their frames without rows.
+#[cfg(feature = "keynote")]
+pub(crate) const SLIDE_TABLES: usize = 1 << 10;
+
+/// The flagged base index of the items of table `table` of a slide.
+#[cfg(feature = "keynote")]
+const fn table_base(table: u32) -> u32 {
+    TABLE | (table << 21)
 }
 
 /// A part built whole, then again with its deferred items appended.
@@ -55,6 +114,9 @@ pub(crate) struct Whole {
     /// The part with its deferred items: every item of `built` keeps its
     /// index here.
     full: OnceLock<Tree>,
+    /// The contents of the slide's tables, the `k`-th held by the stand-in
+    /// whose part is `k + 1` (record 0312); set by the first build.
+    tables: OnceLock<Box<[Contents]>>,
 }
 
 #[cfg(feature = "keynote")]
@@ -65,7 +127,13 @@ impl Whole {
             path,
             built: OnceLock::new(),
             full: OnceLock::new(),
+            tables: OnceLock::new(),
         }
+    }
+
+    /// The contents held by the stand-in whose part is `part`.
+    fn table(&self, part: u32) -> Option<&Contents> {
+        self.tables.get()?.get(part.checked_sub(1)? as usize)
     }
 }
 
@@ -78,8 +146,9 @@ pub(crate) struct Kids<'f> {
 
 #[derive(Clone, Copy)]
 enum List<'f> {
-    /// The item's child list.
-    Items(&'f [u32]),
+    /// The item's child list, each index with the flag bits of its part
+    /// (a Keynote table's base, [`TABLE`]).
+    Items(&'f [u32], u32),
     /// Every slot of a part materialized item by item, in order.
     #[cfg(any(feature = "keynote", feature = "numbers"))]
     Slots(u32),
@@ -88,7 +157,7 @@ enum List<'f> {
 impl<'f> Kids<'f> {
     pub(crate) const fn len(&self) -> usize {
         match self.list {
-            List::Items(items) => items.len(),
+            List::Items(items, _) => items.len(),
             #[cfg(any(feature = "keynote", feature = "numbers"))]
             List::Slots(count) => count as usize,
         }
@@ -96,7 +165,7 @@ impl<'f> Kids<'f> {
 
     pub(crate) fn get(&self, position: usize) -> Option<At> {
         let index = match self.list {
-            List::Items(items) => *items.get(position)?,
+            List::Items(items, flag) => *items.get(position)? | flag,
             #[cfg(any(feature = "keynote", feature = "numbers"))]
             List::Slots(count) => u32::try_from(position).ok().filter(|slot| *slot < count)?,
         };
@@ -127,15 +196,73 @@ impl Iwork {
     fn build_whole(&self, whole: &Whole, deferred: bool) -> Tree {
         match &self.0.owner {
             super::Owner::Keynote(package) => {
-                super::keynote::build_slide(package, whole.position, &whole.path, deferred)
+                let (tree, tables) =
+                    super::keynote::build_slide(package, whole.position, &whole.path, deferred);
+                // Both builds list the same tables; the first sets them.
+                let _ = whole.tables.set(
+                    tables
+                        .into_iter()
+                        .map(|(selector, stand_in)| Contents::new(selector, stand_in))
+                        .collect(),
+                );
+                tree
             },
             #[allow(unreachable_patterns, reason = "only Keynote slides build whole parts")]
             _ => Tree::root_only(),
         }
     }
 
-    /// The item at `at`.
-    pub(crate) fn item(&self, at: At) -> &Item {
+    /// The contents of a table whose stand-in is `stand_in`, built on the
+    /// first call.
+    #[cfg(any(feature = "keynote", feature = "pages"))]
+    fn contents<'f>(&'f self, contents: &'f Contents, stand_in: &Item) -> &'f Tree {
+        contents.built.get_or_init(|| match &self.0.owner {
+            #[cfg(feature = "keynote")]
+            super::Owner::Keynote(package) => {
+                super::keynote::build_table(package, stand_in, contents.selector)
+            },
+            #[cfg(feature = "pages")]
+            super::Owner::Pages(package) => {
+                super::pages::build_table(package, stand_in, contents.selector)
+            },
+            #[allow(unreachable_patterns, reason = "only Keynote and Pages tables")]
+            _ => Tree::root_only(),
+        })
+    }
+
+    /// The table contents a stand-in item of part `at.part` holds, if it
+    /// is one: its part is a table's.
+    #[cfg(any(feature = "keynote", feature = "pages"))]
+    fn held<'f>(&'f self, at: At, item: &'f Item) -> Option<(&'f Contents, u32)> {
+        let part = item.part();
+        if part == 0 {
+            return None;
+        }
+        match (at.part, self.part_or_slots(at.part)) {
+            #[cfg(feature = "pages")]
+            (0, _) => match *self.part(part) {
+                Part::Contents(ref contents) => Some((contents, 0)),
+                #[allow(unreachable_patterns, reason = "the part arms depend on features")]
+                _ => None,
+            },
+            #[cfg(feature = "keynote")]
+            (_, Some(Part::Slide(whole))) => whole
+                .table(part)
+                .map(|contents| (contents, table_base(part - 1))),
+            _ => None,
+        }
+    }
+
+    /// The part `part`, or `None` for the eager tree.
+    #[cfg(any(feature = "keynote", feature = "pages"))]
+    fn part_or_slots(&self, part: u32) -> Option<&Part> {
+        (part != 0).then(|| self.part(part))
+    }
+
+    /// The item at `at` as its tree holds it: a table's stand-in, not the
+    /// table (record 0312). Its kind, ordinal, path, leaf positions and
+    /// part are the element's; its properties and children may not be.
+    pub(crate) fn stand_in(&self, at: At) -> &Item {
         if at.part == 0 {
             return self.tree().item(at.index);
         }
@@ -143,10 +270,43 @@ impl Iwork {
             #[cfg(feature = "keynote")]
             Part::Slides(ref slides) => slides.item(self, at.index),
             #[cfg(feature = "keynote")]
-            Part::Slide(ref whole) => self.whole(whole).item(at.index),
+            Part::Slide(ref whole) => {
+                if at.index & TABLE != 0 {
+                    return self.table_item(whole, at.index);
+                }
+                self.whole(whole).item(at.index)
+            },
             #[cfg(feature = "numbers")]
             Part::Table(ref cells) => cells.item(self, at.index),
+            #[cfg(feature = "pages")]
+            Part::Contents(ref contents) => self
+                .contents(contents, self.tree().item(contents.stand_in))
+                .item(at.index),
         }
+    }
+
+    /// The item at a flagged index of a Keynote slide's part.
+    #[cfg(feature = "keynote")]
+    fn table_item<'f>(&'f self, whole: &'f Whole, index: u32) -> &'f Item {
+        let table = (index & !TABLE) >> 21;
+        let tree = self.whole(whole);
+        match whole.table(table + 1) {
+            Some(contents) => self
+                .contents(contents, tree.item(contents.stand_in))
+                .item(index & TABLE_ITEM),
+            // A flagged index is handed out only by its table's contents.
+            None => tree.item(ROOT),
+        }
+    }
+
+    /// The item at `at`.
+    pub(crate) fn item(&self, at: At) -> &Item {
+        let item = self.stand_in(at);
+        #[cfg(any(feature = "keynote", feature = "pages"))]
+        if let Some((contents, _)) = self.held(at, item) {
+            return self.contents(contents, item).item(ROOT);
+        }
+        item
     }
 
     /// The kind ordinal of the item at `at`, without materializing it.
@@ -161,7 +321,7 @@ impl Iwork {
                 _ => {},
             }
         }
-        self.item(at).kind()
+        self.stand_in(at).kind()
     }
 
     /// The position of the item at `at` among its parent's children of its
@@ -177,7 +337,7 @@ impl Iwork {
                 _ => {},
             }
         }
-        self.item(at).ordinal()
+        self.stand_in(at).ordinal()
     }
 
     /// The part holding the children of the item at `at` (0: its own),
@@ -189,7 +349,7 @@ impl Iwork {
         {
             return super::keynote::Slides::child_part(at.index);
         }
-        self.item(at).part()
+        self.stand_in(at).part()
     }
 
     /// The child of kind `kind` at cell `row`, `column` among `kids`, when
@@ -224,10 +384,22 @@ impl Iwork {
     /// runs).
     pub(crate) fn kids(&self, at: At) -> Kids<'_> {
         self.expand(at);
+        #[cfg(any(feature = "keynote", feature = "pages"))]
+        if !self.is_slot(at) {
+            let item = self.stand_in(at);
+            if let Some((contents, base)) = self.held(at, item) {
+                let tree = self.contents(contents, item);
+                let part = if at.part == 0 { item.part() } else { at.part };
+                return Kids {
+                    part,
+                    list: List::Items(tree.item(ROOT).children(), base),
+                };
+            }
+        }
         match self.child_part(at) {
             0 => Kids {
                 part: at.part,
-                list: List::Items(self.item(at).children()),
+                list: List::Items(self.stand_in(at).children(), Self::flag(at)),
             },
             part => match *self.part(part) {
                 #[cfg(feature = "keynote")]
@@ -238,15 +410,52 @@ impl Iwork {
                 #[cfg(feature = "keynote")]
                 Part::Slide(ref whole) => Kids {
                     part,
-                    list: List::Items(self.whole(whole).item(ROOT).children()),
+                    list: List::Items(self.whole(whole).item(ROOT).children(), 0),
                 },
                 #[cfg(feature = "numbers")]
                 Part::Table(ref cells) => Kids {
                     part,
                     list: List::Slots(cells.len()),
                 },
+                #[cfg(feature = "pages")]
+                Part::Contents(_) => Kids {
+                    part,
+                    list: List::Items(&[], 0),
+                },
             },
         }
+    }
+
+    /// Whether `at` is a slot of a part materialized item by item (a
+    /// Keynote slide, a Numbers cell), which holds no table.
+    #[cfg(any(feature = "keynote", feature = "pages"))]
+    fn is_slot(&self, at: At) -> bool {
+        if at.part == 0 {
+            return false;
+        }
+        match *self.part(at.part) {
+            #[cfg(feature = "keynote")]
+            Part::Slides(_) => true,
+            #[cfg(feature = "numbers")]
+            Part::Table(_) => true,
+            #[allow(unreachable_patterns, reason = "the part arms depend on features")]
+            _ => false,
+        }
+    }
+
+    /// The flag bits the children of the item at `at` share with it: a
+    /// Keynote table's rows hold their cells at the table's flagged base.
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "const in builds without Keynote only"
+    )]
+    fn flag(at: At) -> u32 {
+        #[cfg(feature = "keynote")]
+        if at.index & TABLE != 0 {
+            return at.index & !TABLE_ITEM;
+        }
+        let _ = at;
+        0
     }
 
     /// Complete the tree before the children of `at` are read, when the
@@ -264,6 +473,7 @@ impl Iwork {
         // (record 0298).
         #[cfg(feature = "keynote")]
         if at.part != 0
+            && at.index & TABLE == 0
             && let Part::Slide(whole) = self.part(at.part)
             && whole.full.get().is_none()
             && self.whole(whole).item(at.index).type_name() == "paragraph"
@@ -307,8 +517,19 @@ impl Iwork {
     }
 
     /// Push `item` and, after it, the items of the part holding its
-    /// children (a part's deferred items excepted).
+    /// children (a part's deferred items excepted). A table's stand-in
+    /// pushes the table, then its rows and cells.
     fn push_ordered<'f>(&'f self, at: At, item: &'f Item, items: &mut Vec<(At, &'f Item)>) {
+        #[cfg(any(feature = "keynote", feature = "pages"))]
+        if let Some((contents, base)) = self.held(at, item) {
+            let tree = self.contents(contents, item);
+            items.push((at, tree.item(ROOT)));
+            let part = if at.part == 0 { item.part() } else { at.part };
+            for index in 1..u32::try_from(tree.len()).unwrap_or(u32::MAX) {
+                items.push((At::new(part, index | base), tree.item(index)));
+            }
+            return;
+        }
         items.push((at, item));
         let part = item.part();
         if part == 0 {
@@ -325,7 +546,7 @@ impl Iwork {
             Part::Slide(ref whole) => {
                 let tree = self.whole(whole);
                 for index in 1..tree.deferred() {
-                    items.push((At::new(part, index), tree.item(index)));
+                    self.push_ordered(At::new(part, index), tree.item(index), items);
                 }
             },
             #[cfg(feature = "numbers")]
@@ -334,11 +555,13 @@ impl Iwork {
                     items.push((At::new(part, slot), cells.item(self, slot)));
                 }
             },
+            #[cfg(feature = "pages")]
+            Part::Contents(_) => {},
         }
     }
 }
 
-#[cfg(all(test, any(feature = "keynote", feature = "numbers")))]
+#[cfg(all(test, any(feature = "keynote", feature = "numbers", feature = "pages")))]
 impl Iwork {
     /// What each part has built: `slides m/n` (materialized slide items,
     /// `+layouts` once the catalog was read), `slide`, `slide+runs` or `-`,
@@ -351,19 +574,39 @@ impl Iwork {
                 #[cfg(feature = "keynote")]
                 Part::Slides(ref slides) => slides.state(),
                 #[cfg(feature = "keynote")]
-                Part::Slide(ref whole) => match (whole.built.get(), whole.full.get()) {
-                    (_, Some(_)) => "slide+runs".to_owned(),
-                    (Some(_), None) => "slide".to_owned(),
-                    (None, None) => "-".to_owned(),
+                Part::Slide(ref whole) => {
+                    let state = match (whole.built.get(), whole.full.get()) {
+                        (_, Some(_)) => "slide+runs",
+                        (Some(_), None) => "slide",
+                        (None, None) => "-",
+                    };
+                    match whole.tables.get().filter(|tables| !tables.is_empty()) {
+                        Some(tables) => format!(
+                            "{state} tables {}/{}",
+                            tables
+                                .iter()
+                                .filter(|table| table.built.get().is_some())
+                                .count(),
+                            tables.len()
+                        ),
+                        None => state.to_owned(),
+                    }
                 },
                 #[cfg(feature = "numbers")]
                 Part::Table(ref cells) => cells.state(),
+                #[cfg(feature = "pages")]
+                Part::Contents(ref contents) => if contents.built.get().is_some() {
+                    "table"
+                } else {
+                    "-"
+                }
+                .to_owned(),
             })
             .collect()
     }
 }
 
-#[cfg(all(test, any(feature = "keynote", feature = "numbers")))]
+#[cfg(all(test, any(feature = "keynote", feature = "numbers", feature = "pages")))]
 mod tests {
     use crate::{File, open_bytes};
 
@@ -380,6 +623,8 @@ mod tests {
             File::Keynote(handle) => handle.part_states(),
             #[cfg(feature = "numbers")]
             File::Numbers(handle) => handle.part_states(),
+            #[cfg(feature = "pages")]
+            File::Pages(handle) => handle.part_states(),
             _ => unreachable!("an iWork fixture"),
         }
     }
@@ -469,5 +714,74 @@ mod tests {
             .count();
         assert_eq!(texts, 110);
         assert_eq!(states(&file), ["cells 110/110"]);
+    }
+
+    #[cfg(feature = "keynote")]
+    #[test]
+    fn keynote_slide_tables_build_when_a_read_reaches_them() {
+        let file = open("keynote/table-discovery.key");
+        // The slide's other children leave the table unread.
+        assert_eq!(
+            text(&file, "/slide[1]/shape[1]").as_deref(),
+            Some("2026-08-07")
+        );
+        assert_eq!(states(&file), ["slides 0/1", "slide tables 0/1"]);
+        // A kind query and the table's kind and ordinal read the stand-in.
+        assert_eq!(file.query("table").expect("query").count(), 1);
+        assert_eq!(states(&file), ["slides 0/1", "slide tables 0/1"]);
+        // A cell builds the table once.
+        assert_eq!(
+            text(&file, "/slide[1]/table[1]/tr[1]/tc[1]").as_deref(),
+            Some("\"Buffa discovery\n\"")
+        );
+        assert_eq!(states(&file), ["slides 0/1", "slide tables 1/1"]);
+        let node = file.get("/slide[1]/table[1]").expect("table");
+        let format = node.view().format().expect("format");
+        assert!(format.into_iter().any(|prop| prop.key() == "rows"));
+        // A direct cell write commits without reading the table.
+        let fresh = open("keynote/table-discovery.key");
+        let edited = fresh
+            .set(
+                "/slide[1]/table[1]/tr[2]/tc[3]",
+                crate::props! { "text" => "Q3" },
+            )
+            .expect("set");
+        assert_eq!(states(&fresh), ["slides 0/1", "slide tables 0/1"]);
+        assert_eq!(
+            text(&edited, "/slide[1]/table[1]/tr[2]/tc[3]").as_deref(),
+            Some("Q3")
+        );
+        // A view completes the table.
+        let fresh = open("keynote/table-discovery.key");
+        fresh.view(crate::view::Mode::Outline).expect("outline");
+        assert_eq!(
+            states(&fresh),
+            ["slides 1/1+layouts", "slide+runs tables 1/1"]
+        );
+    }
+
+    #[cfg(feature = "pages")]
+    #[test]
+    fn pages_body_tables_build_when_a_read_reaches_them() {
+        let file = open("pages/body-table-catalog-native.pages");
+        assert!(text(&file, "/body/p[1]").is_some());
+        assert_eq!(states(&file), ["-", "-"]);
+        assert_eq!(file.query("tbl").expect("query").count(), 2);
+        assert_eq!(states(&file), ["-", "-"]);
+        let node = file.get("/body/tbl[2]").expect("table");
+        let format = node.view().format().expect("format");
+        assert!(format.into_iter().any(|prop| prop.key() == "rows"));
+        assert_eq!(states(&file), ["-", "table"]);
+        assert_eq!(text(&file, "/body/tbl[1]/tr[1]/tc[1]").as_deref(), Some(""));
+        assert_eq!(states(&file), ["table", "table"]);
+        let fresh = open("pages/body-table-catalog-native.pages");
+        let edited = fresh
+            .set("/body/tbl[1]/tr[1]/tc[1]", crate::props! { "text" => "Q3" })
+            .expect("set");
+        assert_eq!(states(&fresh), ["-", "-"]);
+        assert_eq!(
+            text(&edited, "/body/tbl[1]/tr[1]/tc[1]").as_deref(),
+            Some("Q3")
+        );
     }
 }
