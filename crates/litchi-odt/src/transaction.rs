@@ -1538,13 +1538,25 @@ impl Edit {
     /// tabs and line feeds are kept as `text:s`, `text:tab` and
     /// `text:line-break`; a cell becomes a string cell.
     ///
+    /// The set replaces text, not content (record 0304): an element inside
+    /// the node that shows no text — a frame, a note, an annotation, a
+    /// bookmark, a reference, index or change mark, a soft page break — is
+    /// kept, at the character offset it had in the old text (clamped to the
+    /// new text's length), so setting the old text back puts it back where
+    /// it was.
+    ///
     /// Body edits name nodes of [`Document::body`] of this edit's source and
     /// must be staged before any other operation.
     ///
     /// # Errors
     ///
     /// Returns an error for a node without text, text XML cannot carry, or
-    /// an edit overlapping another staged body edit.
+    /// an edit overlapping another staged body edit, and
+    /// [`litchi_core::Error::Unsupported`] naming the first element the set
+    /// could neither keep nor replace: an element with text of its own (a
+    /// text field such as `text:page-number`, `text:meta`, `text:ruby`) or,
+    /// in a cell, list item, text box or note, a block other than a
+    /// paragraph (a table, a nested list, a section).
     pub fn set_text(
         &mut self,
         node: crate::body::NodeId,

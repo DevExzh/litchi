@@ -993,6 +993,27 @@ fn alignment_token(value: Alignment) -> &'static [u8] {
 // Runs, paragraphs, bodies
 // ---------------------------------------------------------------------------
 
+/// Refuse a text replacement of `range` of `owner` (a paragraph) when one of
+/// its children there is not a run or a line break: a field (`a:fld`) or
+/// any other markup would be lost (record 0304). Paragraph and end-of-
+/// paragraph properties are kept by the rewrites.
+fn check_replaceable(owner: &[u8], kids: &[Node], range: &Range<usize>) -> Result<()> {
+    for kid in kids.iter().filter(|kid| range.contains(&kid.span.start)) {
+        if !matches!(kid.local(owner), b"r" | b"br" | b"pPr" | b"endParaRPr") {
+            return Err(dropped_content());
+        }
+    }
+    Ok(())
+}
+
+fn dropped_content() -> Error {
+    Error::UnsafeEdit {
+        operation: "set_text_properties",
+        reason: "the replaced text holds a field (a:fld) or other markup that is not a run \
+                 or a line break; set the text of its runs instead",
+    }
+}
+
 fn is_run(local: &[u8]) -> bool {
     matches!(local, b"r" | b"br" | b"fld")
 }
@@ -1270,7 +1291,9 @@ fn rewrite_paragraph(
             .collect();
         match (run_nodes.first(), run_nodes.last()) {
             (Some(first), Some(last)) => {
-                splices.replace(first.span.start..last.span.end, runs);
+                let replaced = first.span.start..last.span.end;
+                check_replaceable(paragraph, &kids, &replaced)?;
+                splices.replace(replaced, runs);
             },
             _ => {
                 // After pPr if present, else at the start; before endParaRPr.
@@ -1647,6 +1670,19 @@ fn rewrite_body_text(
     let node = root(body)?;
     let kids = children(body, &node)?;
     let paragraphs: Vec<&Node> = kids.iter().filter(|kid| kid.local(body) == b"p").collect();
+    if let (Some(first), Some(last)) = (paragraphs.first(), paragraphs.last()) {
+        let replaced = first.span.start..last.span.end;
+        for kid in kids.iter().filter(|kid| replaced.contains(&kid.span.start)) {
+            if kid.local(body) != b"p" {
+                return Err(dropped_content());
+            }
+            let paragraph = &body[kid.span.clone()];
+            let local = root(paragraph)?;
+            let inner = children(paragraph, &local)?;
+            let all = 0..paragraph.len();
+            check_replaceable(paragraph, &inner, &all)?;
+        }
+    }
     let (ppr, rpr, end) = match paragraphs.first() {
         Some(first) => {
             let paragraph = &body[first.span.clone()];

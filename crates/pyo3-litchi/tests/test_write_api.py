@@ -36,7 +36,9 @@ SIGNED_DOCX = "poi/test-data/xmldsign/hello-world-signed.docx"
 SIGNED_XLSX = "poi/test-data/xmldsign/hello-world-signed.xlsx"
 LOCKED = ("ole/doc/PasswordProtected.doc", "ole/xls/password.xls")
 #: The only PPT fixture whose shapes the native PPT editor accepts.
-EDITABLE_PPT = "poi/test-data/slideshow/datetime.ppt"
+#: A PPT whose third shape holds plain text. (`datetime.ppt` holds only
+#: date fields, whose text a set now refuses: record 0304.)
+EDITABLE_PPT = "ole/ppt/text_shapes.ppt"
 SLIDESHOW_PPT = "ole/ppt/SampleShow.ppt"
 NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
 #: An RTF body of one contiguous root-level span, which the RTF structural
@@ -386,12 +388,11 @@ class LegacyVerbTests(WriteAssertions):
         self.assertEqual(cell_text(self.assertReopens(file), "/sheet[1]/A1"), "7")
 
     def test_ppt_shapes_and_slides(self):
-        # The fixture's text records only accept text of the same length.
         file = L.open(fixture(EDITABLE_PPT))
-        changed = file.set("/slide[1]/shape[1]", {"text": "x", "x": "1in"})
-        view = changed.get("/slide[1]/shape[1]", 0)
+        changed = file.set("/slide[1]/shape[3]", {"text": "x", "x": "1in"})
+        view = changed.get("/slide[1]/shape[3]", 0)
         self.assertEqual((view["text"], view["format"]["x"]), ("x", "2.54cm"))
-        self.assertEqual(self.assertReopens(changed).get("/slide[1]/shape[1]", 0), view)
+        self.assertEqual(self.assertReopens(changed).get("/slide[1]/shape[3]", 0), view)
         show = L.open(fixture(SLIDESHOW_PPT))
         titles = [show.get(path, 0)["preview"] for path in child_paths(show, "/", "slide")]
         order = lambda f: [f.get(path, 0)["preview"] for path in child_paths(f, "/", "slide")]
@@ -837,7 +838,7 @@ class BatchTests(WriteAssertions):
             (L.create("xls"), set_items(3)),
             (L.create("doc"), [{"command": "set", "path": "/body/p[1]", "props": {"text": "x"}}]),
             (L.create("rtf"), [{"command": "add", "parent": "/body", "type": "paragraph", "props": {"text": "x"}}]),
-            (L.open(fixture(EDITABLE_PPT)), [{"command": "set", "path": "/slide[1]/shape[1]", "props": {"text": "x"}}]),
+            (L.open(fixture(EDITABLE_PPT)), [{"command": "set", "path": "/slide[1]/shape[3]", "props": {"text": "x"}}]),
             (L.open(fixture(SLIDESHOW_PPT)), [{"command": "swap", "path": "/slide[1]", "path2": "/slide[2]"}]),
         )
         for file, items in cases:

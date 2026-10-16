@@ -26,19 +26,19 @@ was refused (typed), `none` nothing to move.
 | odc | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odf | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odg | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 9 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odm | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odm | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 14 | 0 | 2 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | ods | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odt | 70 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 27 | 38 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| oth | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odt | 70 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 32 | 29 | 0 | 0 | 8 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| oth | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 32 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 |
 | ppt | 29 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pptx | 81 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 52 | 24 | 11 | 0 | 0 | 0 | 1 | 69 |
-| rtf | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 61 | 37 | 16 | 39 | 0 | 1 | 18 | 88 |
-| xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 103 | 3 | 0 | 0 | 13 | 0 | 80 | 2 | 0 | 0 | 37 | 0 |
+| rtf | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 61 | 37 | 15 | 10 | 0 | 0 | 49 | 88 |
+| xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 100 | 3 | 0 | 0 | 16 | 0 | 58 | 2 | 0 | 0 | 59 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 977 | 0 | 1 | 0 | 7 | 0 | 0 | 14 | 216 | 466 | 0 | 4 | 165 | 126 | 136 | 96 | 0 | 2 | 99 | 157 |
+| **all** | 977 | 0 | 1 | 0 | 7 | 0 | 0 | 14 | 220 | 455 | 0 | 4 | 172 | 126 | 113 | 67 | 0 | 1 | 152 | 157 |
 
 ## Office-extension files the unified layer does not open
 
@@ -58,7 +58,6 @@ was refused (typed), `none` nothing to move.
 - `iwork/numbers/formula-envelope-native.numbers` (numbers): exact ; structure one-way: table add+remove: the inverse is refused: unsupported_capability: source representation does not support table lifecycle changes
 - `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx` (docx): refused edit: unsupported_capability: unsafe DOCX edit 'edit' rejected: source-backed document transactions do not support markup-compatibility b...
 - `libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf` (rtf): exact ; revert one-way: /body/p[1] text: the set back is refused: unsupported_capability: unsupported RTF edit source: candidate body text did not survive RTF va...
-- `libreoffice-core/sw/qa/extras/rtfexport/data/tdf158830.rtf` (rtf): exact ; structure one-way: paragraph move+back: the inverse is refused: unsupported_capability: unsupported RTF edit source: the spliced paragraph segments do not r...
 - `odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `odf/native-resave/litchi-changed/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `poi/test-data/spreadsheet/49609.xlsx` (xlsx): exact ; revert one-way: /sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...

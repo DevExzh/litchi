@@ -358,6 +358,8 @@ struct OpenElement {
 struct TextElement {
     span: Range<usize>,
     empty_name: Option<Vec<u8>>,
+    /// Whether the slot is a field's (`a:fld`) cached result.
+    field: bool,
 }
 
 struct ShapeTextEdit<'a> {
@@ -1477,6 +1479,19 @@ fn rewrite_shape_texts(
     }
     if !edits.iter().any(|edit| edit.changed) {
         return Ok(None);
+    }
+    // A shape text set fills the run slots; writing into a field's cached
+    // result, or blanking it, would lose the field's text (record 0304).
+    if edits
+        .iter()
+        .zip(&elements)
+        .any(|(edit, spans)| edit.changed && spans.iter().any(|span| span.field))
+    {
+        return Err(Error::UnsafeEdit {
+            operation: "set_shape_text",
+            reason: "the shape text holds a field (a:fld), which a shape text set would \
+                     overwrite; set the text of its runs instead",
+        });
     }
     let mut escaped = Vec::new();
     escaped
@@ -2719,6 +2734,8 @@ fn drawing_text_elements_for_owners(
         })?;
     spans.resize_with(owners.len(), Vec::new);
     let mut active: Option<(usize, usize, usize)> = None;
+    // The depth of the open `a:fld`, while one is open.
+    let mut field: Option<usize> = None;
     let mut owner_position = 0usize;
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -2752,6 +2769,13 @@ fn drawing_text_elements_for_owners(
                 let owner = owners
                     .get(owner_position)
                     .filter(|owner| owner.contains(&start));
+                if owner.is_some()
+                    && drawing_namespace
+                    && field.is_none()
+                    && element.local_name().as_ref() == b"fld"
+                {
+                    field = Some(depth);
+                }
                 if owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t" {
                     if active.replace((end, depth, owner_position)).is_some() {
                         return Err(invalid(
@@ -2798,6 +2822,7 @@ fn drawing_text_elements_for_owners(
                     group.push(TextElement {
                         span: start..end,
                         empty_name: Some(element.name().as_ref().to_vec()),
+                        field: field.is_some(),
                     });
                 }
             },
@@ -2817,8 +2842,12 @@ fn drawing_text_elements_for_owners(
                     group.push(TextElement {
                         span: content_start..start,
                         empty_name: None,
+                        field: field.is_some(),
                     });
                     active = None;
+                }
+                if field == Some(depth) {
+                    field = None;
                 }
                 depth = depth
                     .checked_sub(1)

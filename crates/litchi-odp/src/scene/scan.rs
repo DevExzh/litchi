@@ -200,6 +200,8 @@ struct ParagraphBuilder {
     wrappers: Vec<Wrapper>,
     /// The index of the innermost list item among the story's wrappers.
     item: Option<usize>,
+    /// Inline content that is not text (record 0304).
+    objects: Vec<(usize, String)>,
 }
 
 struct RunBuilder {
@@ -411,6 +413,9 @@ impl Scanner<'_> {
                 if self.is_control(ns, local) {
                     self.push_control(element, start, end, false)?;
                     return Ok(Frame::InRun);
+                }
+                if !(ns == Some(TEXT_NS) && local == b"span") {
+                    self.note_object(element, start);
                 }
                 if is_opaque(ns, local) {
                     return Ok(Frame::Opaque);
@@ -888,8 +893,20 @@ impl Scanner<'_> {
             run: None,
             wrappers,
             item,
+            objects: Vec::new(),
         });
         Ok(())
+    }
+
+    /// Record inline content of the open paragraph that is not text: a
+    /// frame, a note, an annotation, a field or a hyperlink (record 0304).
+    fn note_object(&mut self, element: &BytesStart<'_>, start: usize) {
+        if let Some(paragraph) = &mut self.paragraph
+            && paragraph.objects.len() < 8
+        {
+            let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
+            paragraph.objects.push((start, name));
+        }
     }
 
     fn is_control(&self, ns: Option<&[u8]>, local: &[u8]) -> bool {
@@ -960,6 +977,9 @@ impl Scanner<'_> {
             return Ok(Frame::InRun);
         }
         self.finish_plain();
+        if !(ns == Some(TEXT_NS) && local == b"span") {
+            self.note_object(element, start);
+        }
         if is_opaque(ns, local) {
             return Ok(Frame::Opaque);
         }
@@ -1370,6 +1390,7 @@ impl Scanner<'_> {
             wrappers: paragraph.wrappers,
             removal: range,
             item: None,
+            objects: paragraph.objects,
         });
         if let Some(item) = paragraph.item
             && let Some(wrapper) = story.wrappers.get_mut(item)

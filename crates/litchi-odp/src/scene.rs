@@ -632,6 +632,10 @@ pub struct Paragraph {
     pub(crate) removal: Range<usize>,
     /// The innermost enclosing `text:list-item`, when there is one.
     pub(crate) item: Option<Range<usize>>,
+    /// The start offsets and names of the inline content that is not text
+    /// (frames, notes, annotations, fields, hyperlinks), at most eight:
+    /// a text set that would replace one is refused (record 0304).
+    pub(crate) objects: Vec<(usize, String)>,
 }
 
 /// One enclosing list wrapper of a paragraph.

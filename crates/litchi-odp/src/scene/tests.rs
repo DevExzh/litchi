@@ -326,10 +326,25 @@ fn objects_and_pages_move_remove_and_insert() {
 fn references_and_overlaps_are_refused() {
     let xml = document(concat!(
         r#"<draw:page draw:name="A" draw:master-page-name="M"><draw:frame draw:name="Link"><draw:text-box>"#,
-        r##"<text:p><text:a xlink:href="#B">go</text:a></text:p></draw:text-box></draw:frame></draw:page>"##,
+        r##"<text:p><text:a xlink:href="#B">go</text:a></text:p></draw:text-box></draw:frame>"##,
+        r#"<draw:frame draw:name="Plain"><draw:text-box><text:p>plain</text:p></draw:text-box></draw:frame></draw:page>"#,
         r#"<draw:page draw:name="B" draw:master-page-name="M"/>"#,
     ));
     let scene = Scene::parse(&xml).unwrap();
+    // A text set over the link would drop it (record 0304).
+    let error = plan(
+        &xml,
+        &scene,
+        &[Change::SetStoryText {
+            story: StoryRef::object(ObjectRef::new(0, 0)),
+            text: "x".into(),
+        }],
+    )
+    .unwrap_err();
+    assert!(
+        matches!(&error, litchi_core::Error::Unsupported(message) if message.contains("text:a")),
+        "{error:?}"
+    );
     let error = plan(&xml, &scene, &[Change::RemovePage { page: 1 }]).unwrap_err();
     assert!(
         matches!(error, litchi_core::Error::Unsupported(_)),
@@ -340,11 +355,11 @@ fn references_and_overlaps_are_refused() {
         &scene,
         &[
             Change::SetStoryText {
-                story: StoryRef::object(ObjectRef::new(0, 0)),
+                story: StoryRef::object(ObjectRef::new(0, 1)),
                 text: "x".into(),
             },
             Change::SetParagraphText {
-                story: StoryRef::object(ObjectRef::new(0, 0)),
+                story: StoryRef::object(ObjectRef::new(0, 1)),
                 paragraph: 0,
                 text: "y".into(),
             },

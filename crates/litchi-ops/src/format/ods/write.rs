@@ -567,18 +567,25 @@ impl CellAssignments {
             clear_content(&mut cell);
         }
         if let Some(value) = &self.value {
-            match value {
-                Some((value, text)) => {
-                    cell.value = value.clone();
-                    cell.text.clone_from(text);
-                },
-                None => {
-                    cell.value = CellValue::Empty;
-                    cell.text.clear();
-                },
+            let (new_value, new_text) = match value {
+                Some((value, text)) => (value.clone(), text.clone()),
+                None => (CellValue::Empty, String::new()),
+            };
+            // The cell's hyperlinks live in its text (`text:a`), and the
+            // registry has no writable link: a value set that changes the
+            // text would drop them, so it is refused until `clear` removes
+            // them explicitly; the same value keeps them (record 0304).
+            let same = cell.value == new_value && cell.text == new_text;
+            if !cell.hyperlinks.is_empty() && !same {
+                return Err(Error::new(
+                    Code::UnsupportedCapability,
+                    "the ODS cell holds a hyperlink, which a value set would drop",
+                )
+                .with_suggestion("clear the cell first (`clear=true`), then set its value"));
             }
+            cell.value = new_value;
+            cell.text = new_text;
             cell.formula = None;
-            cell.hyperlinks.clear();
         }
         if let Some(formula) = &self.formula {
             match formula {
