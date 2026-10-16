@@ -1,21 +1,22 @@
 //! What a text set keeps (record 0304).
 //!
 //! A text set replaces the *text* of a node: its character data, `text:s`,
-//! `text:tab` and `text:line-break`, and the `text:span` and `text:a`
-//! wrappers that hold that text, formatting included. Everything else inside
+//! `text:tab` and `text:line-break`, and the `text:span` wrappers that hold
+//! that text, formatting included. Everything else inside
 //! the node is content the set does not address, and is either kept or
 //! refused, never dropped:
 //!
 //! - An element that adds nothing to [`super::Node::text`] — a frame or
 //!   drawing shape, a note, an annotation and its end marker, a bookmark, a
 //!   reference, index or change mark, a soft page break, a field that shows
-//!   no text — is **kept**. It moves out of any span or hyperlink and goes
+//!   no text — is **kept**. It moves out of any span and goes
 //!   to the character offset it had in the old text, clamped to the length
 //!   of the new text. Elements at one offset keep their order. Setting the
 //!   old text back therefore returns every kept element to its offset.
 //! - An element that adds text — a text field such as `text:page-number`,
-//!   `text:date` or `text:sequence`, `text:meta`, `text:ruby`, a frame with
-//!   text inside a text box — is **refused**: keeping it would add its text
+//!   `text:date` or `text:sequence`, a hyperlink (`text:a`) inside the
+//!   node, `text:meta`, `text:ruby`, a frame with text inside a text box —
+//!   is **refused**: keeping it would add its text
 //!   to the new text, and replacing it would lose the element.
 //! - In a block container (a cell, list item, text box, note or
 //!   annotation) the new text becomes one paragraph. A block child other
@@ -197,7 +198,7 @@ pub(super) fn plan(node: Node<'_>) -> Result<Vec<Kept>> {
                     walk.last_space = true;
                     Class::Wrapper
                 },
-                Some((Ns::Text, b"span" | b"a")) => Class::Wrapper,
+                Some((Ns::Text, b"span")) => Class::Wrapper,
                 Some((Ns::Text, b"p" | b"h")) if object.is_some() => {
                     if walk.blocks > 0 {
                         walk.pending_break = true;
@@ -480,6 +481,17 @@ mod tests {
              <table:table/><text:p>x</text:p></table:table-cell></table:table-row></table:table>";
         let error = set(nested, Kind::Cell, "y").unwrap_err();
         assert!(matches!(&error, Error::Unsupported(message) if message.contains("table:table")));
+    }
+
+    #[test]
+    fn hyperlinks_inside_are_refused() {
+        let body =
+            r#"<text:p>See <text:a xlink:href="https://example.com/">this</text:a></text:p>"#;
+        let error = set(body, Kind::Paragraph, "x").unwrap_err();
+        assert!(matches!(&error, Error::Unsupported(message) if message.contains("text:a")));
+        // The hyperlink's own text is set.
+        let (text, _) = set(body, Kind::Hyperlink, "that").unwrap();
+        assert_eq!(text, "that");
     }
 
     #[test]
