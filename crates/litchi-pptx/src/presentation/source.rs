@@ -1065,6 +1065,9 @@ pub struct SourceBackedSlideSnapshot {
     source_version: SourceVersion,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
+    /// Markup compatibility enclosed in shape-tree children admits only
+    /// whole top-level shape removal (record 0303).
+    mce: crate::presentation::transition::SlideMce,
 }
 
 /// An isolated focused edit of one exact-source slide snapshot.
@@ -2424,7 +2427,7 @@ impl SourceBackedPresentationEditor {
         SlidePart::from_part(&part)?;
         #[cfg(test)]
         record_test_semantic_scene_read();
-        crate::presentation::transition::validate_source(part.source_data().as_bytes(), operation)?;
+        crate::presentation::transition::admit_source(part.source_data().as_bytes(), operation)?;
         self.package.check_execution()?;
         let _source_version = self.package.source_version()?;
         Ok(())
@@ -2477,6 +2480,8 @@ impl SourceBackedPresentationEditor {
             source_version,
             lineage,
             context,
+            // Read and publication snapshots are never edited.
+            mce: crate::presentation::transition::SlideMce::Plain,
         })
     }
 
@@ -2505,9 +2510,14 @@ impl SourceBackedPresentationEditor {
         &self,
         slide: SourceBackedSlideSnapshot,
         image_position: usize,
-        _operation: &'static str,
+        operation: &'static str,
     ) -> Result<SourceBackedSvgSnapshot> {
         self.package.check_execution()?;
+        if slide.mce != crate::presentation::transition::SlideMce::Plain {
+            return Err(crate::presentation::transition::enclosed_edit_refusal(
+                operation,
+            ));
+        }
         let view = self.package.part(&slide.part_uri)?;
         let source_part = SourcePart::from_view(&view, view.data()?)?;
         validate_source_slide_root(&source_part)?;
@@ -2666,7 +2676,7 @@ impl SourceBackedPresentationEditor {
         #[cfg(test)]
         record_test_semantic_scene_read();
         crate::source_limits::validate_xml_limits(raw.as_bytes(), self.limits)?;
-        crate::presentation::transition::validate_source(raw.as_bytes(), operation)?;
+        let mce = crate::presentation::transition::admit_source(raw.as_bytes(), operation)?;
         let part = SourcePart::from_view(&view, raw)?;
         #[cfg(test)]
         record_test_semantic_slide_part_read();
@@ -2695,6 +2705,7 @@ impl SourceBackedPresentationEditor {
             source_version,
             lineage,
             context,
+            mce,
         })
     }
 }
@@ -2802,6 +2813,7 @@ impl SourceBackedSlideEdit {
         hidden: Option<bool>,
     ) -> Result<bool> {
         self.check_execution()?;
+        self.refuse_enclosed("set_slide_properties")?;
         if name.is_none() && hidden.is_none() {
             return Ok(false);
         }
@@ -2966,11 +2978,22 @@ impl SourceBackedSlideEdit {
             self.source.max_output_bytes,
         )?;
         self.check_execution()?;
-        let (xml, changed) = crate::opened::stage_shape_removal(
-            self.working.as_bytes(),
-            shape.into(),
-            self.source.max_output_bytes,
-        )?;
+        // A slide that encloses markup compatibility in shape children is
+        // spliced on its source bytes (record 0303).
+        let (xml, changed) = if self.source.mce == crate::presentation::transition::SlideMce::Plain
+        {
+            crate::opened::stage_shape_removal(
+                self.working.as_bytes(),
+                shape.into(),
+                self.source.max_output_bytes,
+            )?
+        } else {
+            crate::opened::stage_enclosed_shape_removal(
+                self.working.as_bytes(),
+                shape.into(),
+                self.source.max_output_bytes,
+            )?
+        };
         let Some(xml) = xml else {
             return Ok(false);
         };
@@ -2998,6 +3021,7 @@ impl SourceBackedSlideEdit {
         replacements: &[crate::opened::ShapeTextReplacement<'_>],
     ) -> Result<usize> {
         self.check_execution()?;
+        self.refuse_enclosed("set_shape_texts")?;
         if replacements.is_empty() {
             return Ok(0);
         }
@@ -3036,6 +3060,7 @@ impl SourceBackedSlideEdit {
         chunks: &[&[crate::opened::ShapeTextReplacement<'_>]],
     ) -> Result<usize> {
         self.check_execution()?;
+        self.refuse_enclosed("set_shape_text_chunks")?;
         if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
             return Err(Error::Limit {
                 resource: "source-backed shape text chunks",
@@ -3092,6 +3117,7 @@ impl SourceBackedSlideEdit {
         replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
     ) -> Result<usize> {
         self.check_execution()?;
+        self.refuse_enclosed("set_shape_properties")?;
         if replacements.is_empty() {
             return Ok(0);
         }
@@ -3134,6 +3160,7 @@ impl SourceBackedSlideEdit {
         chunks: &[&[crate::opened::ShapePropertiesReplacement<'_>]],
     ) -> Result<usize> {
         self.check_execution()?;
+        self.refuse_enclosed("set_shape_property_chunks")?;
         if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
             return Err(Error::Limit {
                 resource: "source-backed shape property chunks",
@@ -3186,6 +3213,7 @@ impl SourceBackedSlideEdit {
     /// slide payload changes, so the source-backed proof path still applies.
     pub fn set_text_properties(&mut self, edits: &[crate::opened::TextEdit<'_>]) -> Result<usize> {
         self.check_execution()?;
+        self.refuse_enclosed("set_text_properties")?;
         if edits.is_empty() {
             return Ok(0);
         }
@@ -3221,6 +3249,7 @@ impl SourceBackedSlideEdit {
         bounds: (i64, i64, i64, i64),
     ) -> Result<u32> {
         self.check_execution()?;
+        self.refuse_enclosed("add_text_box")?;
         if self.operation_used {
             return Err(Error::UnsafeEdit {
                 operation: "add_text_box",
@@ -3256,6 +3285,19 @@ impl SourceBackedSlideEdit {
         check_execution_context(self.context.as_ref())
     }
 
+    /// Markup compatibility enclosed in shape children admits only whole
+    /// top-level shape removal; every other edit keeps the guard
+    /// (record 0303).
+    fn refuse_enclosed(&self, operation: &'static str) -> Result<()> {
+        if self.source.mce == crate::presentation::transition::SlideMce::Plain {
+            Ok(())
+        } else {
+            Err(crate::presentation::transition::enclosed_edit_refusal(
+                operation,
+            ))
+        }
+    }
+
     fn into_commit(self) -> SourceBackedSlideCommit {
         let snapshot = SourceBackedSlideSnapshot {
             position: self.source.position,
@@ -3266,6 +3308,7 @@ impl SourceBackedSlideEdit {
             source_version: self.source.source_version,
             lineage: self.source.lineage.clone(),
             context: self.source.context.clone(),
+            mce: self.source.mce,
         };
         let patch = SourceBackedSlidePatch {
             before: self.source,
@@ -6209,6 +6252,7 @@ mod tests {
             source_version: before.source_version,
             lineage: before.lineage.clone(),
             context: before.context.clone(),
+            mce: before.mce,
         };
         (before, after)
     }

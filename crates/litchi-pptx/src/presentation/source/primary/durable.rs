@@ -499,6 +499,19 @@ pub(super) fn validate_pair(
                 })
         })
         .transpose()?;
+    // A slide that encloses markup compatibility in shape-tree children
+    // admits only whole top-level shape removal, proven on the source bytes
+    // (record 0303).
+    if shape_removals {
+        if let Some(limits) = limits {
+            for xml in [before, after] {
+                crate::source_limits::validate_xml_limits(xml, limits)?;
+            }
+        }
+        if crate::opened::validate_enclosed_removal_pair(before, after, "apply")? {
+            return Ok(());
+        }
+    }
     for xml in [before, after] {
         if let Some(limits) = limits {
             if xml.len() as u64 > limits.max_part_bytes() {

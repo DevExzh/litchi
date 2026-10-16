@@ -2014,6 +2014,16 @@ fn shape_removal_plan(
             reason: "shape removal does not support markup-compatibility branch selection",
         });
     }
+    shape_removal_plan_in(&scene, xml, key)
+}
+
+/// [`shape_removal_plan`] on an already read scene whose spans are defined
+/// against `xml` (the processed owner of a rewritten scene, record 0303).
+pub(super) fn shape_removal_plan_in(
+    scene: &crate::shape::Scene<'_>,
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
     let selected = scene.shape(key)?;
     let selected_index = selected.common().index();
     let root = scene

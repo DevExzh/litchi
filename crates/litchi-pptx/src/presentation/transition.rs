@@ -33,6 +33,51 @@ struct Layout {
     namespace: Box<str>,
 }
 
+const MCE_OUTSIDE_TRANSITION: &str = "source-backed transition edits refuse markup-compatibility outside the direct transition owner";
+const MCE_BRANCH_SELECTION: &str = "source-backed slide edits do not support markup-compatibility branch selection outside the direct transition owner";
+
+/// How much markup compatibility a source-backed slide holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SlideMce {
+    /// None outside a direct transition owner: every edit is admitted.
+    Plain,
+    /// Some strictly inside top-level shape-tree children (record 0303).
+    /// Only whole-child removal is admitted, proven on the source bytes.
+    Enclosed,
+}
+
+/// Admit a source-backed slide for a snapshot, publication or replay.
+/// A slide [`validate_source`] refuses only for markup compatibility that
+/// lies strictly inside top-level shape-tree children (an OLE object's
+/// `mc:AlternateContent` under its `p:graphicFrame`) is admitted as
+/// [`SlideMce::Enclosed`]; any other refusal stands.
+pub(crate) fn admit_source(xml: &[u8], operation: &'static str) -> Result<SlideMce> {
+    match validate_source(xml, operation) {
+        Ok(()) => return Ok(SlideMce::Plain),
+        Err(Error::UnsafeEdit { reason, .. })
+            if reason == MCE_OUTSIDE_TRANSITION || reason == MCE_BRANCH_SELECTION => {},
+        Err(error) => return Err(error),
+    }
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
+        return Err(Error::UnsafeEdit {
+            operation,
+            reason: MCE_BRANCH_SELECTION,
+        });
+    }
+    let layout = locate_with(xml, operation, true)?;
+    let _ = validate_owner_for_read(xml, &layout)?;
+    Ok(SlideMce::Enclosed)
+}
+
+/// The refusal for an edit other than whole-child removal on an
+/// [`SlideMce::Enclosed`] slide.
+pub(crate) fn enclosed_edit_refusal(operation: &'static str) -> Error {
+    Error::UnsafeEdit {
+        operation,
+        reason: MCE_BRANCH_SELECTION,
+    }
+}
+
 /// Validate a source-backed slide while allowing its direct transition owner
 /// to use markup-compatibility. Shape edits still require every other owner to
 /// remain byte-stable after MCE preprocessing.
@@ -48,7 +93,7 @@ pub(super) fn validate_source(xml: &[u8], operation: &'static str) -> Result<()>
     if scene_is_rewritten {
         return Err(Error::UnsafeEdit {
             operation,
-            reason: "source-backed slide edits do not support markup-compatibility branch selection outside the direct transition owner",
+            reason: MCE_BRANCH_SELECTION,
         });
     }
     Ok(())
@@ -1418,6 +1463,12 @@ fn validate_target(value: &Transition, operation: &'static str) -> Result<()> {
 }
 
 fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
+    locate_with(xml, operation, false)
+}
+
+/// [`locate`], optionally admitting markup compatibility strictly inside a
+/// top-level shape-tree child (`p:sld/p:cSld/p:spTree/*/…`, record 0303).
+fn locate_with(xml: &[u8], operation: &'static str, enclosed: bool) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
@@ -1433,6 +1484,10 @@ fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
     let mut previous_rank = 0u8;
     let mut insertion = None;
     let mut child_counts = [0u8; 5];
+    // The open `p:cSld`, its `p:spTree`, and a top-level shape-tree child.
+    let mut common_slide = false;
+    let mut shape_tree = false;
+    let mut tree_child = false;
 
     loop {
         let start = position(&reader, origin)?;
@@ -1445,6 +1500,12 @@ fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
             Event::Start(element) => {
                 nodes = add_node(nodes)?;
                 depth = enter_depth(depth)?;
+                match depth {
+                    2 => common_slide = is_pml(&namespace, element.name(), b"cSld"),
+                    3 => shape_tree = common_slide && is_pml(&namespace, element.name(), b"spTree"),
+                    4 => tree_child = shape_tree,
+                    _ => {},
+                }
                 if depth == 1 {
                     if root_seen || !is_pml(&namespace, element.name(), b"sld") {
                         return Err(invalid("slide XML must contain exactly one p:sld root"));
@@ -1477,10 +1538,11 @@ fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
                     }
                 } else if is_markup_element(&namespace)
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
+                    && !(enclosed && tree_child && depth >= 5)
                 {
                     return Err(Error::UnsafeEdit {
                         operation,
-                        reason: "source-backed transition edits refuse markup-compatibility outside the direct transition owner",
+                        reason: MCE_OUTSIDE_TRANSITION,
                     });
                 } else if is_pml(&namespace, element.name(), b"transition")
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
@@ -1521,10 +1583,11 @@ fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
                     }
                 } else if is_markup_element(&namespace)
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
+                    && !(enclosed && tree_child && event_depth >= 5)
                 {
                     return Err(Error::UnsafeEdit {
                         operation,
-                        reason: "source-backed transition edits refuse markup-compatibility outside the direct transition owner",
+                        reason: MCE_OUTSIDE_TRANSITION,
                     });
                 } else if is_pml(&namespace, element.name(), b"transition")
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
@@ -1538,6 +1601,12 @@ fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
             Event::End(element) => {
                 if depth == 0 {
                     return Err(invalid("slide XML contains an unmatched end element"));
+                }
+                match depth {
+                    2 => common_slide = false,
+                    3 => shape_tree = false,
+                    4 => tree_child = false,
+                    _ => {},
                 }
                 if depth == 2 {
                     let is_direct_close = is_pml(&namespace, element.name(), b"transition");

@@ -1032,7 +1032,7 @@ pptx	ole	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/ol
 pptx	ole	view	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	set	n/a	set not offered for this element	-
 pptx	ole	add	n/a	add not offered for this element	-
-pptx	ole	remove	supported		FAILED unsupported_capability: unsafe PPTX edit during slide_snapshot: source-backed transition edits refuse markup-compatibility outside the direct transiti...
+pptx	ole	remove	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	move	format-verb		unreached
 pptx	ole	swap	format-verb		unreached
 pptx	ole	edit	n/a	edit not offered for this element	-

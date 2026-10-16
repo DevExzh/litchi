@@ -10,6 +10,7 @@
 mod chunks;
 mod copy_plan;
 pub(crate) mod cross_copy_plan;
+mod enclosed_removal;
 mod geometry;
 mod insert;
 mod limit;
@@ -66,6 +67,7 @@ pub(crate) use chunks::{
     stage_shape_property_chunks, stage_shape_property_chunks_admitted, stage_shape_text_chunks,
     stage_shape_text_chunks_admitted,
 };
+pub(crate) use enclosed_removal::{stage_enclosed_shape_removal, validate_enclosed_removal_pair};
 pub(crate) use geometry::geometry_skeleton;
 pub(crate) use model::{
     PartDigests, capture_with_parent_digests, capture_with_provenance, package_fingerprint,

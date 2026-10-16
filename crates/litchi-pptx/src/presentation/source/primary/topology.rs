@@ -209,6 +209,11 @@ impl Revision {
             source_version,
             lineage: package.owner.package.source_lineage(),
             context,
+            // A prepared slide that encloses markup compatibility in shape
+            // children admits only whole-shape removal (record 0303); other
+            // slides keep the edit-time guards of each operation.
+            mce: crate::presentation::transition::admit_source(bytes, "slide_snapshot")
+                .unwrap_or(crate::presentation::transition::SlideMce::Plain),
         })
     }
 }
@@ -1348,7 +1353,9 @@ fn validate_changes_against_effective(
                     after.xml.as_slice(),
                     package.owner.limits,
                 )?;
-                crate::presentation::transition::validate_source(after.xml.as_slice(), "apply")?;
+                // A restored slide is an exact image; markup compatibility
+                // enclosed in its shapes is admitted (record 0303).
+                crate::presentation::transition::admit_source(after.xml.as_slice(), "apply")?;
             },
             (Some(_), None) => validate_removal_admission(
                 package,
