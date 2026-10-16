@@ -152,6 +152,13 @@ pub struct Package {
     /// one main-document payload, so publishing an edit started from it does
     /// not prove the same bytes again.
     main_admission: Arc<Mutex<Option<SourceVersion>>>,
+    /// The unmanaged main-document transaction snapshot last built from the
+    /// physical source (record 0305). A snapshot is cheap to clone and
+    /// carries its source identity (lineage, revision, part name); it is
+    /// reused only when that identity matches and its bytes equal the
+    /// current payload, so one revision is scanned once, not once per edit
+    /// and again per commit.
+    main_snapshot: Arc<Mutex<Option<Snapshot>>>,
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -457,6 +464,7 @@ impl Package {
             tolerance: Arc::new(Mutex::new(tolerance)),
             properties_recorded: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             main_admission: Arc::new(Mutex::new(None)),
+            main_snapshot: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -2165,12 +2173,23 @@ impl Package {
                 let raw = data.into_arc().map_err(Error::from)?;
                 let snapshot: TransactionResult<Snapshot> = (|| {
                     self.admit_main_document(raw.as_slice(), source_version, operation)?;
-                    Snapshot::from_shared_xml_with_source_identity(
+                    if let Some(snapshot) =
+                        self.memoized_main_snapshot(&raw, &source_lineage, source_version, partname)
+                    {
+                        return Ok(snapshot);
+                    }
+                    let snapshot = Snapshot::from_shared_xml_with_source_identity(
                         raw,
                         source_lineage.clone(),
                         source_version,
                         partname,
-                    )
+                    )?;
+                    *self
+                        .main_snapshot
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                        Some(snapshot.clone());
+                    Ok(snapshot)
                 })();
                 snapshot?
             };
@@ -2183,6 +2202,27 @@ impl Package {
             .check_execution()
             .map_err(Error::from)?;
         result
+    }
+
+    /// The memoized unmanaged snapshot, when it was built from this source
+    /// revision's main part and its bytes equal `raw`.
+    fn memoized_main_snapshot(
+        &self,
+        raw: &[u8],
+        lineage: &litchi_opc::SourceLineage,
+        version: SourceVersion,
+        partname: &PackURI,
+    ) -> Option<Snapshot> {
+        let memo = self
+            .main_snapshot
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let snapshot = memo.as_ref()?;
+        let held = snapshot.xml_bytes();
+        (snapshot.source_identity_matches(lineage, version, partname)
+            && held.len() == raw.len()
+            && (held.as_ptr() == raw.as_ptr() || held == raw))
+            .then(|| snapshot.clone())
     }
 
     /// Prove the unmanaged main document admissible to a transaction over its
