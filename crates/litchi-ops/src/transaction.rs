@@ -1633,10 +1633,10 @@ impl Edit {
             return Ok(Some(changed));
         }
         #[cfg(feature = "pages")]
-        if let File::Pages(handle) = self.current.clone() {
+        if let File::Pages(handle) = &self.current {
             // Paragraph `text` sets keep every paragraph's position, so a
             // run of them shares one leaf paragraph transaction per section.
-            let plan = match crate::format::iwork::pages::plan(&handle, _target, _props) {
+            let plan = match crate::format::iwork::pages::plan(handle, _target, _props) {
                 Ok(Some(plan)) => plan,
                 Ok(None) => {
                     if self.pages.is_some() {
@@ -1657,9 +1657,12 @@ impl Edit {
                 }
                 .into());
             }
-            let run = self.pages.get_or_insert_with(|| {
-                crate::format::iwork::pages::Run::new(&handle, &self.limits)
-            });
+            let File::Pages(handle) = &self.current else {
+                return Err(pending());
+            };
+            let run = self
+                .pages
+                .get_or_insert_with(|| crate::format::iwork::pages::Run::new(handle, &self.limits));
             let changed = run.stage(plan, _index)?;
             self.operations += 1;
             return Ok(Some(changed));
@@ -1669,15 +1672,13 @@ impl Edit {
             // Direct text, paragraph, frame and visibility sets join one
             // run: one slide-drawable commit plus one commit per text
             // (record 0298). A run holding new slides publishes first.
-            let plan = self
-                .keynote
-                .as_ref()
-                .is_none_or(crate::format::iwork::keynote::Run::accepts_sets)
-                .then(|| {
-                    crate::format::iwork::keynote::coalesce::plan_set(&handle, _target, _props)
-                })
-                .flatten();
-            let Some(node) = plan else {
+            let plan = match self.keynote.as_mut() {
+                // Record 0314: the run memoizes the paths it resolved.
+                Some(run) if run.accepts_sets() => run.plan_set(_target, _props),
+                Some(_) => None,
+                None => crate::format::iwork::keynote::coalesce::plan_set(&handle, _target, _props),
+            };
+            let Some(mut node) = plan else {
                 if self.keynote.is_some() {
                     self.flush_pending()?;
                 }
@@ -1690,6 +1691,24 @@ impl Edit {
                     maximum: self.limits.max_operations(),
                 }
                 .into());
+            }
+            let mut handle = handle;
+            if self
+                .keynote
+                .as_mut()
+                .is_some_and(|run| run.requires_barrier(node, _props))
+            {
+                // Record 0314: publish the run, then plan on its result.
+                self.flush_pending()?;
+                let File::Keynote(current) = self.current.clone() else {
+                    return Err(pending());
+                };
+                let Some(replanned) =
+                    crate::format::iwork::keynote::coalesce::plan_set(&current, _target, _props)
+                else {
+                    return Ok(None);
+                };
+                (node, handle) = (replanned, current);
             }
             let run = self.keynote.get_or_insert_with(|| {
                 crate::format::iwork::keynote::Run::new(&handle, &self.limits)

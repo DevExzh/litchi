@@ -310,6 +310,21 @@ impl<'a> Edit<'a> {
         &self.before
     }
 
+    /// Whether a sequence of edits of this text, each a splice within
+    /// `hull` (UTF-16 code units of [`Self::text`], both ends inclusive),
+    /// publishes exactly what one splice from the text before them to the
+    /// text after them publishes (record 0314): no attribute entry of the
+    /// storage lies where the two could differ. `false` asks the caller to
+    /// commit the edits one at a time. Whether a later edit follows an
+    /// emptied text is the caller's to check.
+    ///
+    /// # Errors
+    ///
+    /// A typed read or wire error for the selected storage.
+    pub fn admits_combined_splice(&self, hull: Range<usize>) -> Result<bool, Error> {
+        owned_storage_admits_combined_splice(self.source, self.storage_identifier, hull)
+    }
+
     /// Return the staged storage-relative span, when present.
     #[must_use]
     pub fn span(&self) -> Option<TextSpan> {
@@ -1211,6 +1226,32 @@ pub(super) fn read_owned_storage_text(
     )
     .map_err(map_text_rewrite_error)?;
     Ok(decoded.into_storage().into_text())
+}
+
+/// Whether splices within `hull` of the owned text storage
+/// `storage_identifier` publish what one combined splice publishes; see
+/// [`Edit::admits_combined_splice`].
+pub(super) fn owned_storage_admits_combined_splice(
+    source: &Package,
+    storage_identifier: u64,
+    hull: Range<usize>,
+) -> Result<bool, Error> {
+    let object = source
+        .required_object(storage_identifier, "Keynote text storage")
+        .map_err(map_read_error)?;
+    let (_, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let boundaries = litchi_iwa_text_wire::storage_boundaries_with_limits(
+        &message.data,
+        storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
+    )
+    .map_err(map_text_rewrite_error)?;
+    Ok(boundaries.admits_combined_splice(hull))
 }
 
 /// Rewrite one already-proven, exclusively owned text storage and invalidate
