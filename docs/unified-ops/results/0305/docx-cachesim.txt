@@ -1,0 +1,16 @@
+callgrind --cache-sim=yes --I1=32768,8,64 --D1=32768,8,64 --LL=33554432,16,64
+docx_fanout_bench, DOCX_FANOUT_SIZES=1, DOCX_FANOUT_PROFILE=leaf|unified,
+per call = (run at DOCX_FANOUT_LOOPS=3000 - run at 1000) / 2000.
+Driver: docx_cg.sh (scratch). Builds: base f24868dfb5; B = unboxed editor
+(rejected); CD = patch-free File::set commit + unboxed eager package;
+F = CD + direct /body/p[N] route (the committed code).
+
+build leg      Ir        I1mr    D1mr   D1mw
+base  leaf     125087.9  2618.2  116.1  120.0
+base  unified  131677.5  3209.3  326.8  468.6
+B     leaf     125081.5  2656.2  122.2  105.0
+B     unified  132838.4  3267.5  318.7  498.6
+CD    leaf     125627.0  2598.8  114.7  100.7
+CD    unified  131723.2  3177.8  280.8  323.0
+F     leaf     124692.5  2658.9  144.2  108.3
+F     unified  128714.4  2978.7  226.5  299.0
