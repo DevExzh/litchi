@@ -640,6 +640,13 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - DOC: `litchi_doc::Package::edit` re-parsed the whole file per edit and now keeps its body snapshot. Unified is 1.03–1.04× the `Package::edit` leaf it wraps, and 1.12–1.27× the bare body-text leaf (the commit's `Document` validation).
   - The ODP scan (0308) and ODT plain set (0290) wall-time gaps are binary code layout: isolated benches show equal or faster times with fewer instructions. No code change.
   - Open: DOCX add vs the eager owner 1.05–1.22× (needs a deferred overlay audit or an `xml-minifier` insertion proof).
+- Merged `iwork-tables` (0312):
+  - Keynote slide tables and Pages body tables build lazily, and direct cell sets skip the table read: Keynote `table_cell` 1.99 → 1.02, Pages 1.065 → 1.02 (both met). A test proves that the direct and general routes give identical bytes or errors on 300 corpus cells.
+  - Pages `section::lifecycle` (request 11): section add/remove; 31/31 corpus documents round trip.
+  - Keynote title/body placeholder runs take character styles; placeholder `hidden` is readable.
+  - Default-feature clippy fixed in `litchi-numbers` and `litchi-iwa-archive`.
+  - Merge fix: one rustfmt hunk in `tests/iwork_unified.rs` (trunk gate fmt failure); the rebless run that followed was clean.
+  - Open (to 0314): Numbers comments (request 19, diagnosed), the formula-coordinate shift, table creation, notes runs; batch misses Pages `batch_10000` 1.53×, Numbers `batch_1000` 1.32×, Pages `batch_1000` 1.08×, Keynote `batch_1000` 1.067×.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;

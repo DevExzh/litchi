@@ -160,9 +160,7 @@ mod pages {
             .add("/", litchi_ops::NewNode::new("section"))
             .expect("add a section");
         assert_eq!(added.path.to_string(), "/section[2]");
-        let error = file
-            .add("/", litchi_ops::NewNode::new("tbl"))
-            .unwrap_err();
+        let error = file.add("/", litchi_ops::NewNode::new("tbl")).unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);
         let capabilities = Capabilities::of(FileFormat::Pages);
         assert!(capabilities.verb(Verb::Get).is_supported());
