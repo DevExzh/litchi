@@ -14,7 +14,7 @@ use crate::node::spec::{
 };
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
-use crate::value::{LengthSpec, ValueType};
+use crate::value::{ColorContext, LengthSpec, ValueType};
 
 /// A node kind in an OpenDocument presentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -271,16 +271,34 @@ pub(crate) const CELL_PROPS: &[PropSpec] = &[
     PropSpec::new("rowSpan", ValueType::Int),
 ];
 
+/// The character properties a paragraph or span's automatic style sets
+/// locally (record 0308): read from, and written as, a derived automatic
+/// style.
+pub(crate) const CHARACTER_KEYS: &[&str] =
+    &["bold", "italic", "underline", "size", "color", "font"];
+
 /// A paragraph: its text is the node text.
 pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     PropSpec::new("style", ValueType::Text),
     PropSpec::new("level", ValueType::Int),
+    PropSpec::new("bold", ValueType::Bool),
+    PropSpec::new("italic", ValueType::Bool),
+    PropSpec::new("underline", ValueType::Bool),
+    length("size", LengthSpec::FONT_SIZE),
+    PropSpec::new("color", ValueType::Color(ColorContext::Word)),
+    PropSpec::new("font", ValueType::Text),
 ];
 
 /// A run: its text is the node text.
 pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec::new("style", ValueType::Text),
     PropSpec::new("link", ValueType::Text),
+    PropSpec::new("bold", ValueType::Bool),
+    PropSpec::new("italic", ValueType::Bool),
+    PropSpec::new("underline", ValueType::Bool),
+    length("size", LengthSpec::FONT_SIZE),
+    PropSpec::new("color", ValueType::Color(ColorContext::Word)),
+    PropSpec::new("font", ValueType::Text),
 ];
 
 /// Speaker notes.
@@ -446,15 +464,6 @@ static SHAPE_FILL_GAP: GapSpec = GapSpec {
     code: Code::UnsupportedCapability,
     follow_up: "M6 ODP graphic styles",
     reason: "fill and line come from automatic graphic styles, which the adapter does not resolve",
-};
-static RUN_FONT_GAP: GapSpec = GapSpec {
-    subject: Subject::Property {
-        element: "run",
-        key: "bold",
-    },
-    code: Code::UnsupportedCapability,
-    follow_up: "M6 ODP text styles",
-    reason: "character formatting comes from automatic text styles, which the adapter does not resolve; runs report their style name",
 };
 static STATS_FONT_GAP: GapSpec = GapSpec {
     subject: Subject::View("stats.fonts"),
@@ -763,7 +772,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &COL_GAP,
         ),
     ],
-    gaps: &[SHAPE_FILL_GAP, RUN_FONT_GAP, STATS_FONT_GAP],
+    gaps: &[SHAPE_FILL_GAP, STATS_FONT_GAP],
 };
 
 check_format_spec!(SPEC);

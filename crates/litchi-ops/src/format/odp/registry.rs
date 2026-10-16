@@ -2,8 +2,8 @@
 //! tables of [`super::spec`] (record 0278).
 
 use super::spec::{
-    CELL_PROPS, FRAME_PROPS, GROUP_PROPS, NOTES_PROPS, PARAGRAPH_PROPS, RUN_PROPS, SHAPE_PROPS,
-    SLIDE_PROPS, TABLE_PROPS,
+    CELL_PROPS, CHARACTER_KEYS, FRAME_PROPS, GROUP_PROPS, NOTES_PROPS, PARAGRAPH_PROPS, RUN_PROPS,
+    SHAPE_PROPS, SLIDE_PROPS, TABLE_PROPS,
 };
 use crate::Code;
 use crate::node::spec::{GapSpec, PropSpec, Subject};
@@ -24,6 +24,18 @@ pub(crate) enum Setter {
     Width,
     /// `svg:height`.
     Height,
+    /// Bold, through a derived automatic style (record 0308).
+    Bold,
+    /// Italic.
+    Italic,
+    /// Single underline.
+    Underline,
+    /// Font size.
+    Size,
+    /// Font colour.
+    Color,
+    /// Font family.
+    Font,
 }
 
 const fn same_name(left: &str, right: &str) -> bool {
@@ -83,8 +95,20 @@ const fn write_entries<const N: usize>(
                 Setter::Y
             } else if same_name(name, "width") {
                 Setter::Width
-            } else {
+            } else if same_name(name, "height") {
                 Setter::Height
+            } else if same_name(name, "bold") {
+                Setter::Bold
+            } else if same_name(name, "italic") {
+                Setter::Italic
+            } else if same_name(name, "underline") {
+                Setter::Underline
+            } else if same_name(name, "size") {
+                Setter::Size
+            } else if same_name(name, "color") {
+                Setter::Color
+            } else {
+                Setter::Font
             };
             entries[index].access = WriteAccess::Set(setter);
             if same_name(name, "text") {
@@ -128,9 +152,9 @@ pub(crate) const TABLE_WRITE_TABLE: crate::registry::Table<Setter, TABLE_WRITE_C
 pub(crate) const GROUP_WRITE_TABLE: crate::registry::Table<Setter, GROUP_WRITE_COUNT, 0> =
     crate::registry::Table::new(write_entries(GROUP_PROPS, &["name"]), []);
 pub(crate) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<Setter, PARAGRAPH_WRITE_COUNT, 0> =
-    crate::registry::Table::new(write_entries(PARAGRAPH_PROPS, &[]), []);
+    crate::registry::Table::new(write_entries(PARAGRAPH_PROPS, CHARACTER_KEYS), []);
 pub(crate) const RUN_WRITE_TABLE: crate::registry::Table<Setter, RUN_WRITE_COUNT, 0> =
-    crate::registry::Table::new(write_entries(RUN_PROPS, &[]), []);
+    crate::registry::Table::new(write_entries(RUN_PROPS, CHARACTER_KEYS), []);
 pub(crate) const CELL_WRITE_TABLE: crate::registry::Table<Setter, CELL_WRITE_COUNT, 0> =
     crate::registry::Table::new(write_entries(CELL_PROPS, &[]), []);
 pub(crate) const NOTES_WRITE_TABLE: crate::registry::Table<Setter, NOTES_WRITE_COUNT, 0> =
@@ -231,8 +255,8 @@ pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
         "set",
         "shape",
         "character-format",
-        "M6 ODP text styles",
-        "text sets write plain paragraphs in the first paragraph's style; bold, size, colour and other character formatting live in automatic styles the adapter does not author",
+        "0308 ODP shape and cell character formatting",
+        "bold, italic, underline, size, colour and font are set on paragraphs and runs (derived automatic styles); a shape, table cell or notes story takes no character formatting, and its text sets write plain paragraphs in the first paragraph's style",
     ),
     operation_gap(
         "set",
