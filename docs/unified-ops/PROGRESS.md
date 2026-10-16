@@ -628,6 +628,12 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - DOCX 1,000-paragraph set 2.5× → 1.56× and add 2.1× → 1.46× through a source-backed snapshot memo (the eager owner is at 1.00×).
   - RTF `&Query` route: a plan-cache hit costs ~0.05 µs, so no change.
   - Open (to 0311): litchi-opc audits the replacement part a second time after the commit's own audit.
+- Merged `iwork-elements` (0309):
+  - Numbers rows and columns (`table::topology`, request 6) through unified `add`/`remove` of `row[N]`/`col[N]`; 28 corpus tables round trip. Tables with formulas, merges, filters or pivots are refused, typed.
+  - Character styling on one shared wire module: Keynote runs (request 10), Pages paragraph `font.*` (request 13), Numbers cell `font.*` (request 7).
+  - Pages and Keynote table cells write `text`/`value`; Keynote media removal and placeholder hide/show; formulas on created Numbers workbooks (request 18).
+  - Performance: Numbers within 1%; Keynote run/placeholder/media and Pages paragraph within 3%.
+  - Open (to 0312): Keynote `table_cell` 1.99× and Pages 1.065× (+103 µs), both from the first-read tree build; requests 11 and 19; table creation; formula-coordinate shift for row/column edits.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
