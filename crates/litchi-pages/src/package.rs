@@ -589,13 +589,29 @@ impl Package {
     #[cfg(feature = "internal-iwork-source")]
     #[doc(hidden)]
     pub fn __from_prepared_source(source: PreparedSource) -> PackageResult<Self> {
+        Self::__from_prepared_source_with_semantic_limits(source, crate::SemanticLimits::DEFAULT)
+    }
+
+    /// [`Self::__from_prepared_source`] under explicit semantic limits; the
+    /// prepared source's physical profile stays authoritative (record 0306).
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::__from_prepared_source`], with semantic limit
+    /// failures measured against `semantic`.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_prepared_source_with_semantic_limits(
+        source: PreparedSource,
+        semantic: crate::SemanticLimits,
+    ) -> PackageResult<Self> {
         validate_prepared_format(&source)?;
         let source_catalog = source.__into_source_catalog().ok_or_else(|| {
             PackageError::InvalidFormat(
                 "directory-backed Pages sources support semantic projection only".to_owned(),
             )
         })?;
-        Self::from_source_catalog(source_catalog)
+        Self::from_source_catalog_with(source_catalog, semantic)
     }
 
     /// Classify a public ingress source before projecting it: a package of
