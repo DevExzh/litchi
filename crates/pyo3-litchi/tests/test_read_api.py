@@ -272,7 +272,7 @@ class OdtReadTests(unittest.TestCase):
 
 
 class PagesReadTests(unittest.TestCase):
-    """Pages through ``Document`` (record 0003 R6: S8a moves these onto litchi::iwork)."""
+    """Pages through ``Document`` (record 0003 R6; since record 0306 the class reads the Pages ``File``)."""
 
     BASIC = "iwork/pages/basic.pages"
     UNICODE = "iwork/pages/body-sections-unicode.pages"

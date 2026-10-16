@@ -34,7 +34,7 @@ fn assert_reads(file: &File, kinds: &[&str]) {
     black_box(file.view(Mode::Outline).ok());
     black_box(file.view(Mode::Stats).ok());
     for kind in kinds {
-        let Ok(nodes) = file.query(kind) else {
+        let Ok(nodes) = file.query(*kind) else {
             continue;
         };
         for node in nodes.take(256) {

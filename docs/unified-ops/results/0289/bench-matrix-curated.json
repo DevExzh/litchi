@@ -12,7 +12,9 @@
   "[0294] Records with no paired measurement: 0300 (§7: 'No new or slower hot path, so no paired measurement was made'). 0295 §3 'DOC find first measured 1.4–1.9× against the leaf' names no scenario and is not listed as a row (fixed in the same record).",
   "[0294] 0287's query rows come from two builds: harness features (`query:`) and every format (`query[all-formats]:`, §3.2). 0291's binaries are `profiling`-profile builds, not release; its RTF ratios are the eight runs of rtf-ratios-8-runs.txt (µs from the two committed after JSON runs).",
   "[0294] 0296 and 0299 commit per-run summaries only (raw JSONL kept outside the repository); the ratio column holds the per-run median ratios. 0291 and 0292 re-measure 0288's odf_gaps_bench scenarios; 0299 re-measures 0296's Pages open/open+get/set.",
-  "[0294] Inconsistencies found: 0286 §3 gives the repeated /metadata sets as '1.007–1.053 (unchanged)' after, but meta-after-2.txt has XLSX source 1.058 and XLSB source 0.626–0.629 (unified faster); 0293 §6 says the move ratio stays at 0.99–1.00, but one after-build ABBA of run 2 reads 1.018 (cross-check below); 0291's ODS `query` and `query_cold` ratios swing between its two runs (7.8–20.3×, 17.2–28.0×) and are not discussed in 0291 §3.4."
+  "[0294] Inconsistencies found: 0286 §3 gives the repeated /metadata sets as '1.007–1.053 (unchanged)' after, but meta-after-2.txt has XLSX source 1.058 and XLSB source 0.626–0.629 (unified faster); 0293 §6 says the move ratio stays at 0.99–1.00, but one after-build ABBA of run 2 reads 1.018 (cross-check below); 0291's ODS `query` and `query_cold` ratios swing between its two runs (7.8–20.3×, 17.2–28.0×) and are not discussed in 0291 §3.4.",
+  "[0306] Parsers added for 0298 (keynote_bench summary), 0301 (numbers structure bench) and 0302 (after legs of its docx, odt, pages, numbers and rtf harnesses; the base legs re-measure states earlier records carry). 0303–0305 are listed as 'not on this tree' until their records merge; rerun the tool after those merges.",
+  "[0306] Parsers added for 0303 (pptx_gaps_bench: unified/native in the after build, after/before on the plain paths the base accepts), 0304 (text_set_bench: each after run against the median of the before runs, and ODT unified/leaf) and 0306 (iwork_directory_bench). 0305 is listed as 'not on this tree' until it merges."
  ],
  "rows": [
   {
@@ -2288,6 +2290,36 @@
    "record": "0299",
    "series": "iwork:pages:batch_10000",
    "explanation": "Record 0299 §8 'Missed': 'the 2× target is set at 1k; 10k only has to scale linearly, which it does'; the constant ~1.4 ms of the unified legs is the object tree built on the first read (10,000 paragraph items) and the snapshot-size count of the published package. Follow-up (§9 'Tree build cost'): share each item's text with its text property and build paragraph paths on demand."
+  },
+  {
+   "record": "0298",
+   "series": "iwork:keynote:open_get",
+   "explanation": "Record 0298 §5: 'open + get is ≈150 µs (8.5–8.9 %) over the leaf; callgrind (results/0298/callgrind-open-get.txt) shows the first read builds every slide's drawable list and layout (≈41 % of the tree build). Follow-up: build drawables and layouts per slide on demand.' Lazy trees: record 0305 (perf agent)."
+  },
+  {
+   "record": "0302",
+   "series": "docx_fanout:1",
+   "explanation": "Record 0302 §4.1: 1.105–1.111; instructions 5.3 % over the leaf (6.64 K of 124.6 K), the rest is L1 instruction/data misses that land in the leaf's own commit. Follow-up: keep the leaf editor and committed package unboxed on the single-op path (an inline DocxEditor variant)."
+  },
+  {
+   "record": "0302",
+   "series": "numbers:open_get",
+   "explanation": "Record 0302 §4.3: 1.24–1.26; the first read builds the workbook's object tree (0.24 M Ir) and dropping the handle drops it (0.17 M). Follow-up: a lazily built per-table tree in the iWork tree module (record 0305)."
+  },
+  {
+   "record": "0302",
+   "series": "rtf_destination:.*:1:fanout(_plan)?",
+   "explanation": "Record 0302 §3.5/§4.4: unchanged within noise; a plan-cache hit costs ≈1.0 K Ir and the measured gap to the Plan route is mostly the harness passing query.clone() (2.0 K Ir, two allocations per call). Follow-up: a harness route that passes &Query under a new name."
+  },
+  {
+   "record": "0304",
+   "series": "text_set:odt_plain",
+   "explanation": "Record 0304 §5: '+3.4–4.7% wall time, every run' (its per-process after/before; the matrix divides each after run by the median of the before runs, so its worst value is higher). Callgrind over both ODT scenarios and legs counts +0.22% instructions (6.018 G → 6.032 G Ir), each top function within 0.2%: the wall-time change is not explained by work the record adds. Follow-up F2."
+  },
+  {
+   "record": "0306",
+   "series": "iwork:keynote:bytes_open(_options)?",
+   "explanation": "Record 0306 §5: 5.2–5.5 % (+80 µs) against a leaf leg that adopts shared bytes without copying; the unified leg moves the owned Vec into an Arc<[u8]> (a copy of the 500 KB fixture) and runs detection. The same route measured 0.97–0.98 against Package::from_bytes (which copies) in 0296/0298. The option plumbing itself adds nothing (bytes_open_options = bytes_open). Follow-up G4."
   }
  ]
 }
