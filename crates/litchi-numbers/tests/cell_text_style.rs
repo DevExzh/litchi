@@ -23,15 +23,13 @@ fn bold() -> CharacterProperties {
 
 #[test]
 fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
-    let package = Package::open(
-        "/home/zhuhe/code/litchi-worktrees/.coord/iwork-elements/blank-extents.numbers",
-    )?
-    .edit_table_cells(0, 0)?
-    .set(CellPosition::new(1, 1), Input::Text("b".into()))?
-    .set(CellPosition::new(2, 1), Input::Text("c".into()))?
-    .set(CellPosition::new(2, 2), Input::number(4.0)?)?
-    .commit()?
-    .into_package();
+    let package = Package::new()
+        .edit_table_cells(0, 0)?
+        .set(CellPosition::new(1, 1), Input::Text("b".into()))?
+        .set(CellPosition::new(2, 1), Input::Text("c".into()))?
+        .set(CellPosition::new(2, 2), Input::number(4.0)?)?
+        .commit()?
+        .into_package();
     let source = bytes(&package)?;
     let base = package.table_cell_text_style(0, 0, CellPosition::new(1, 1))?;
     let mut red = CharacterProperties::new();
@@ -209,3 +207,4 @@ fn formulas_work_on_a_created_workbook() -> TestResult {
     ));
     Ok(())
 }
+

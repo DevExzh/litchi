@@ -16,7 +16,6 @@ pub(crate) struct Profile {
 
 impl Profile {
     /// Combine checked physical and semantic resource profiles.
-    #[cfg(feature = "internal-iwork-source")]
     pub(crate) const fn new(archive: litchi_iwa_archive::Limits, semantic: SemanticLimits) -> Self {
         Self { archive, semantic }
     }
