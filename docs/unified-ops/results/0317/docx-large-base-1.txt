@@ -1,0 +1,10 @@
+leaf_set 763.8 us
+auto_set 409.4 us
+eager_set 761.1 us
+committed_set 416.0 us
+leaf_add 1106.1 us
+auto_add 73.6 us
+eager_add 424.1 us
+committed_add 269.6 us
+fresh_auto_add 1404.9 us
+fresh_eager_add 1461.7 us

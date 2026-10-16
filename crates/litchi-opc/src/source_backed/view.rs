@@ -447,6 +447,29 @@ impl PreparedPartView {
         }
     }
 
+    /// The source XML audit's retained proof of this Part's effective bytes,
+    /// when one is kept; nothing is audited (record 0317).
+    ///
+    /// A replaced Part answers with the proof its replacement's audit
+    /// returned, which an unmanaged revision keeps for at most four Parts. An
+    /// unchanged physical Part answers with the indexed proof its source
+    /// bytes earned when the package last audited a replacement of them
+    /// ([`SourceBackedPackage::xml_audit_proof`]). The proof covers exactly
+    /// the bytes [`Self::data`] returns, so a caller may hand it to a source
+    /// XML audit of an edit of them, such as
+    /// [`xml_minifier::audit::VerifiedSource::verify_successor`], whose
+    /// verdict is the edit's own complete audit either way.
+    #[must_use]
+    pub fn xml_audit_proof(&self) -> Option<xml_minifier::audit::VerifiedSource> {
+        match self.effective() {
+            Some(part) if part.replacement.is_some() => part.xml_proof.clone(),
+            Some(part) => part
+                .source_index
+                .and_then(|index| self.topology.package.retained_xml_audit_proof(index)),
+            None => self.topology.package.retained_xml_audit_proof(self.index),
+        }
+    }
+
     /// Lazily capture immutable payload bytes without detaching admissions.
     ///
     /// Prepared payloads share their existing allocation; unchanged payloads

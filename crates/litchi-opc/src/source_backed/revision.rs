@@ -210,12 +210,23 @@ impl PreparedTopology {
             )?;
             let physical = self.package.part(partname)?;
             let original = physical.data()?;
+            // The effective revision's own proof, when it keeps one: the
+            // replacement edits those bytes, not the physical original's
+            // (record 0317).
+            let predecessor = (!self.state.no_op)
+                .then(|| {
+                    self.state.effective_data().parts[part.index]
+                        .xml_proof
+                        .as_ref()
+                })
+                .flatten();
             let proof = self.package.audit_physical_replacement_xml(
                 physical.index,
                 &original,
                 &replacement,
                 None,
                 proof.as_ref(),
+                predecessor,
             )?;
             if replacement.as_slice() == current.as_bytes() {
                 return Ok(self.clone());
@@ -230,7 +241,7 @@ impl PreparedTopology {
                 }
                 self.package.clone().prepare_topology(plan)
             } else {
-                self.replace_effective_payload(part.index, replacement, None)
+                self.replace_effective_payload(part.index, replacement, None, proof)
             }
         })();
         self.check_source()?;
@@ -251,7 +262,7 @@ impl PreparedTopology {
             original.as_bytes(),
             self.package.limits,
         )?;
-        self.replace_effective_payload(index, result.payload_arc(), Some(result))
+        self.replace_effective_payload(index, result.payload_arc(), Some(result), None)
     }
 
     fn replace_effective_payload(
@@ -259,6 +270,7 @@ impl PreparedTopology {
         index: usize,
         payload: Arc<Vec<u8>>,
         proof: Option<SourceXmlPart>,
+        xml_proof: Option<xml_minifier::audit::VerifiedSource>,
     ) -> Result<Self> {
         let data = self.state.effective_data();
         let old_part = &data.parts[index];
@@ -411,9 +423,17 @@ impl PreparedTopology {
                 source,
             })?;
         parts.extend(data.parts.iter().cloned());
+        let xml_proof = xml_proof.filter(|xml_proof| {
+            !self.package.cache.is_managed()
+                && xml_proof.covers(payload.as_slice(), xml_minifier::audit::Limits::default())
+        });
+        if xml_proof.is_some() {
+            retain_effective_xml_proofs(&mut parts, index);
+        }
         let mut part = old_part.as_ref().clone();
         part.replacement = Some(Arc::clone(&payload));
         part.source_xml = proof;
+        part.xml_proof = xml_proof;
         part._metadata_reservation = part_reservation;
         parts[index] = Arc::new(part);
         let retained = self.state.retained();
@@ -443,5 +463,29 @@ impl PreparedTopology {
             }),
             _state_reservation: reservation,
         })
+    }
+}
+
+/// Make room for one more retained replacement proof at `index`: when
+/// [`RETAINED_EFFECTIVE_XML_PROOFS`] other Parts of the revision keep one,
+/// the first of them gives its proof up. Its verdict is unaffected; its next
+/// edit is audited from the physical original's proof instead.
+fn retain_effective_xml_proofs(parts: &mut [Arc<PreparedPart>], index: usize) {
+    let kept = parts
+        .iter()
+        .enumerate()
+        .filter(|(at, part)| *at != index && part.xml_proof.is_some())
+        .count();
+    if kept < RETAINED_EFFECTIVE_XML_PROOFS {
+        return;
+    }
+    if let Some((_, part)) = parts
+        .iter_mut()
+        .enumerate()
+        .find(|(at, part)| *at != index && part.xml_proof.is_some())
+    {
+        let mut stripped = part.as_ref().clone();
+        stripped.xml_proof = None;
+        *part = Arc::new(stripped);
     }
 }

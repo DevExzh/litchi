@@ -229,26 +229,36 @@ impl Package {
                 if let Some(snapshot) =
                     self.memoized_main_snapshot(data.as_bytes(), &lineage, version, &name)
                 {
+                    let snapshot =
+                        self.with_retained_main_proof(snapshot, || main.xml_audit_proof());
                     return Ok((name, snapshot));
                 }
-                let mut bytes = Vec::new();
-                bytes
-                    .try_reserve_exact(data.as_bytes().len())
-                    .map_err(|source| {
-                        Error::Opc(litchi_opc::OpcError::Allocation {
-                            resource: "effective document snapshot",
-                            source,
-                        })
-                    })?;
-                bytes.extend_from_slice(data.as_bytes());
-                let snapshot = Snapshot::from_shared_xml_with_source_identity(
-                    Arc::new(bytes),
-                    lineage,
-                    version,
-                    &name,
-                )?;
+                // The revision's retained proof shares the effective bytes'
+                // allocation, so the snapshot shares it too instead of copying
+                // it, and carries the proof (record 0317).
+                let retained = main
+                    .xml_audit_proof()
+                    .filter(|proof| core::ptr::eq(proof.bytes().as_slice(), data.as_bytes()));
+                let bytes = match &retained {
+                    Some(proof) => Arc::clone(proof.bytes()),
+                    None => {
+                        let mut bytes = Vec::new();
+                        bytes
+                            .try_reserve_exact(data.as_bytes().len())
+                            .map_err(|source| {
+                                Error::Opc(litchi_opc::OpcError::Allocation {
+                                    resource: "effective document snapshot",
+                                    source,
+                                })
+                            })?;
+                        bytes.extend_from_slice(data.as_bytes());
+                        Arc::new(bytes)
+                    },
+                };
+                let snapshot =
+                    Snapshot::from_shared_xml_with_source_identity(bytes, lineage, version, &name)?;
                 self.remember_main_snapshot(&snapshot);
-                snapshot
+                self.with_retained_main_proof(snapshot, || retained)
             };
             Ok((name, snapshot))
         })();

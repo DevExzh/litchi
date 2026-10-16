@@ -2180,7 +2180,11 @@ impl Package {
                     if let Some(snapshot) =
                         self.memoized_main_snapshot(&raw, &source_lineage, source_version, partname)
                     {
-                        return Ok(snapshot);
+                        return Ok(self.with_retained_main_proof(snapshot, || {
+                            self.physical_package()
+                                .ok()
+                                .and_then(|package| package.xml_audit_proof(partname))
+                        }));
                     }
                     let snapshot = Snapshot::from_shared_xml_with_source_identity(
                         raw,
@@ -2189,7 +2193,11 @@ impl Package {
                         partname,
                     )?;
                     self.remember_main_snapshot(&snapshot);
-                    Ok(snapshot)
+                    Ok(self.with_retained_main_proof(snapshot, || {
+                        self.physical_package()
+                            .ok()
+                            .and_then(|package| package.xml_audit_proof(partname))
+                    }))
                 })();
                 snapshot?
             };
@@ -2202,6 +2210,33 @@ impl Package {
             .check_execution()
             .map_err(Error::from)?;
         result
+    }
+
+    /// `snapshot` with the source XML audit proof the OPC package retained
+    /// for its exact bytes, when it has none yet and `retained` finds one
+    /// (record 0317); the memo then keeps the proven snapshot.
+    ///
+    /// The proof is the package's own audit of these bytes (its indexed
+    /// proof of the original, or the proof an earlier commit's candidate
+    /// earned), so the preserving commit proves its candidate from it
+    /// without scanning the base again. A proof for any other allocation is
+    /// dropped by [`Snapshot::with_publication_proof`].
+    pub(super) fn with_retained_main_proof(
+        &self,
+        snapshot: Snapshot,
+        retained: impl FnOnce() -> Option<xml_minifier::audit::VerifiedSource>,
+    ) -> Snapshot {
+        if snapshot.publication_proof().is_some() {
+            return snapshot;
+        }
+        let Some(proof) = retained() else {
+            return snapshot;
+        };
+        let proven = snapshot.with_publication_proof(proof);
+        if proven.publication_proof().is_some() {
+            self.remember_main_snapshot(&proven);
+        }
+        proven
     }
 
     /// Keep `snapshot` as the unmanaged transaction snapshot memo.
