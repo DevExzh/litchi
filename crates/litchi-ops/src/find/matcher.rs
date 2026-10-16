@@ -8,6 +8,12 @@ pub(crate) struct Matcher<'p> {
     pattern: &'p str,
     /// The pattern's folded characters, for a case-insensitive find.
     folded: Option<Box<[char]>>,
+    /// The case-sensitive searcher, built once: `str::find` builds its
+    /// searcher on every call, which cost more than the scan of a short
+    /// paragraph (record 0302). A byte match of a UTF-8 pattern in UTF-8
+    /// text starts and ends on character boundaries, so its offsets are the
+    /// ones `str::find` reports.
+    finder: Option<memchr::memmem::Finder<'p>>,
     whole_word: bool,
 }
 
@@ -16,6 +22,7 @@ impl<'p> Matcher<'p> {
         Self {
             pattern,
             folded: (!match_case).then(|| pattern.chars().map(fold).collect()),
+            finder: match_case.then(|| memchr::memmem::Finder::new(pattern)),
             whole_word,
         }
     }
@@ -41,9 +48,13 @@ impl<'p> Matcher<'p> {
     fn candidate(&self, text: &str, from: usize) -> Option<Range<usize>> {
         let rest = text.get(from..)?;
         match &self.folded {
-            None => rest
-                .find(self.pattern)
-                .map(|start| from + start..from + start + self.pattern.len()),
+            None => {
+                let start = match &self.finder {
+                    Some(finder) => finder.find(rest.as_bytes()),
+                    None => rest.find(self.pattern),
+                };
+                start.map(|start| from + start..from + start + self.pattern.len())
+            },
             Some(folded) => {
                 let first = *folded.first()?;
                 for (offset, character) in rest.char_indices() {
@@ -129,4 +140,38 @@ fn is_whole_word(text: &str, found: &Range<usize>) -> bool {
     let before = text[..found.start].chars().next_back();
     let after = text[found.end..].chars().next();
     !before.is_some_and(is_word) && !after.is_some_and(is_word)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Matcher;
+
+    #[test]
+    fn prebuilt_search_reports_the_offsets_of_str_find() {
+        let texts = [
+            "",
+            "needle",
+            "a needle and a needle",
+            "ééneedleé",
+            "nee dle needl needle",
+            "Größe größe GRÖSSE",
+            "日本語の日本",
+        ];
+        for pattern in ["needle", "é", "größe", "日本", "e", "needlex"] {
+            let matcher = Matcher::new(pattern, true, false);
+            for text in texts {
+                let mut expected = Vec::new();
+                let mut from = 0;
+                while let Some(start) = text[from..].find(pattern) {
+                    expected.push(from + start..from + start + pattern.len());
+                    from += start + pattern.len();
+                }
+                assert_eq!(
+                    matcher.find_iter(text).collect::<Vec<_>>(),
+                    expected,
+                    "{pattern:?} in {text:?}"
+                );
+            }
+        }
+    }
 }
