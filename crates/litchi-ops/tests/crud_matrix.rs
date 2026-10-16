@@ -120,6 +120,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx",
             "libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx",
             "ooxml/pptx/sample.pptx",
+            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            "unified-ops/0294/modern-comments.pptx",
         ],
     },
     Spec {
@@ -131,6 +133,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb",
             "libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb",
             "poi/test-data/spreadsheet/testVarious.xlsb",
+            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            "unified-ops/0294/table.xlsb",
         ],
     },
     Spec {
@@ -172,6 +176,10 @@ const SPECS: &[Spec] = &[
             "poi/test-data/slideshow/headers_footers.ppt",
             "poi/test-data/slideshow/basic_test_ppt_file.ppt",
             "poi/test-data/slideshow/42485.ppt",
+            // Record 0294: a POI table deck, copied with provenance.
+            "poi/test-data/slideshow/bug61881.ppt",
+            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            "unified-ops/0294/connectors.ppt",
         ],
     },
     Spec {
@@ -230,6 +238,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp",
             "libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp",
             "libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp",
+            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            "unified-ops/0294/comments.odp",
         ],
     },
     Spec {
@@ -240,6 +250,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/desktop/qa/data/BlankDrawDocument.odg",
             "libreoffice-core/svx/qa/unit/data/FontWork.odg",
             "libreoffice-core/desktop/qa/data/3page.odg",
+            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            "unified-ops/0294/layers.odg",
         ],
     },
     Spec {
@@ -270,7 +282,10 @@ const SPECS: &[Spec] = &[
         format: FileFormat::Oth,
         name: "oth",
         extension: "oth",
-        fixtures: &[],
+        fixtures: &[
+            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            "unified-ops/0294/frames.oth",
+        ],
     },
     Spec {
         format: FileFormat::Odm,
@@ -279,6 +294,8 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             "libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm",
             "libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm",
+            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            "unified-ops/0294/frames.odm",
         ],
     },
     Spec {

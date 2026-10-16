@@ -922,10 +922,10 @@ pptx	placeholder	edit	supported		ok tx.set
 pptx	placeholder	batch	supported		ok set item
 pptx	placeholder	create	supported		ok format
 pptx	placeholder	save	supported		ok format
-pptx	picture	get	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
-pptx	picture	find	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx
-pptx	picture	view	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	set	n/a	set not offered for this element	-
 pptx	picture	add	n/a	add not offered for this element	-
 pptx	picture	remove	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx` /slide[1]/picture[1]
@@ -935,10 +935,10 @@ pptx	picture	edit	n/a	edit not offered for this element	-
 pptx	picture	batch	n/a	batch not offered for this element	-
 pptx	picture	create	supported		ok format
 pptx	picture	save	supported		ok format
-pptx	table	get	supported		ok 3 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
-pptx	table	find	supported		ok 3 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	get	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	find	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	table	view	supported		ok 3 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	view	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	set	n/a	set not offered for this element	-
 pptx	table	add	n/a	add not offered for this element	-
 pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
@@ -948,10 +948,10 @@ pptx	table	edit	n/a	edit not offered for this element	-
 pptx	table	batch	n/a	batch not offered for this element	-
 pptx	table	create	supported		ok format
 pptx	table	save	supported		ok format
-pptx	tr	get	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
-pptx	tr	find	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
+pptx	tr	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
+pptx	tr	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
 pptx	tr	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	tr	view	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
+pptx	tr	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
 pptx	tr	set	n/a	set not offered for this element	-
 pptx	tr	add	n/a	add not offered for this element	-
 pptx	tr	remove	n/a	remove not offered for this element	-
@@ -961,10 +961,10 @@ pptx	tr	edit	n/a	edit not offered for this element	-
 pptx	tr	batch	n/a	batch not offered for this element	-
 pptx	tr	create	supported		ok format
 pptx	tr	save	supported		ok format
-pptx	tc	get	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
-pptx	tc	find	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
+pptx	tc	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
+pptx	tc	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
 pptx	tc	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	tc	view	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
+pptx	tc	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
 pptx	tc	set	n/a	set not offered for this element	-
 pptx	tc	add	n/a	add not offered for this element	-
 pptx	tc	remove	n/a	remove not offered for this element	-
@@ -987,10 +987,10 @@ pptx	chart	edit	supported		ok tx.set
 pptx	chart	batch	supported		ok set item
 pptx	chart	create	supported		ok format
 pptx	chart	save	supported		ok format
-pptx	group	get	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
-pptx	group	find	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	get	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	find	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
 pptx	group	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	group	view	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	view	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
 pptx	group	set	n/a	set not offered for this element	-
 pptx	group	add	n/a	add not offered for this element	-
 pptx	group	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
@@ -1000,10 +1000,10 @@ pptx	group	edit	n/a	edit not offered for this element	-
 pptx	group	batch	n/a	batch not offered for this element	-
 pptx	group	create	supported		ok format
 pptx	group	save	supported		ok format
-pptx	connector	get	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
-pptx	connector	find	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
+pptx	connector	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
+pptx	connector	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
 pptx	connector	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	connector	view	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
+pptx	connector	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
 pptx	connector	set	n/a	set not offered for this element	-
 pptx	connector	add	n/a	add not offered for this element	-
 pptx	connector	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
@@ -1013,10 +1013,10 @@ pptx	connector	edit	n/a	edit not offered for this element	-
 pptx	connector	batch	n/a	batch not offered for this element	-
 pptx	connector	create	supported		ok format
 pptx	connector	save	supported		ok format
-pptx	smartart	get	supported		ok 5 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
-pptx	smartart	find	supported		ok 5 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	get	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	find	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
 pptx	smartart	query	supported		ok matches in ooxml/pptx/smartart-composite-infer-right.pptx
-pptx	smartart	view	supported		ok 5 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	view	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
 pptx	smartart	set	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1] {"text":"Litchi"}
 pptx	smartart	add	supported		ok /slide[1]/smartart[1] on `create() + add slide` under /slide[1] {"layout":"process","text":"Plan\nBuild\nShip"}
 pptx	smartart	remove	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1]
@@ -1026,10 +1026,10 @@ pptx	smartart	edit	supported		ok tx.set
 pptx	smartart	batch	supported		ok set item
 pptx	smartart	create	supported		ok format
 pptx	smartart	save	supported		ok format
-pptx	ole	get	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
-pptx	ole	find	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/ole.pptx
-pptx	ole	view	supported		ok 4 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	set	n/a	set not offered for this element	-
 pptx	ole	add	n/a	add not offered for this element	-
 pptx	ole	remove	supported		FAILED unsupported_capability: unsafe PPTX edit during slide_snapshot: source-backed transition edits refuse markup-compatibility outside the direct transiti...
@@ -1065,10 +1065,10 @@ pptx	run	edit	n/a	edit not offered for this element	-
 pptx	run	batch	n/a	batch not offered for this element	-
 pptx	run	create	supported		ok format
 pptx	run	save	supported		ok format
-pptx	linebreak	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
-pptx	linebreak	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
 pptx	linebreak	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx
-pptx	linebreak	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
 pptx	linebreak	set	n/a	set not offered for this element	-
 pptx	linebreak	add	n/a	add not offered for this element	-
 pptx	linebreak	remove	n/a	remove not offered for this element	-
@@ -1078,10 +1078,10 @@ pptx	linebreak	edit	n/a	edit not offered for this element	-
 pptx	linebreak	batch	n/a	batch not offered for this element	-
 pptx	linebreak	create	supported		ok format
 pptx	linebreak	save	supported		ok format
-pptx	notes	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
-pptx	notes	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
 pptx	notes	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
-pptx	notes	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
 pptx	notes	set	n/a	set not offered for this element	-
 pptx	notes	add	n/a	add not offered for this element	-
 pptx	notes	remove	n/a	remove not offered for this element	-
@@ -1091,15 +1091,15 @@ pptx	notes	edit	n/a	edit not offered for this element	-
 pptx	notes	batch	n/a	batch not offered for this element	-
 pptx	notes	create	supported		ok format
 pptx	notes	save	supported		ok format
-pptx	comment	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
-pptx	comment	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	get	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	find	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
-pptx	comment	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	view	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	set	n/a	set not offered for this element	-
 pptx	comment	add	n/a	add not offered for this element	-
 pptx	comment	remove	n/a	remove not offered for this element	-
-pptx	comment	move	format-verb		unreached
-pptx	comment	swap	format-verb		unreached
+pptx	comment	move	format-verb		refused unsupported_type
+pptx	comment	swap	format-verb		refused unsupported_type
 pptx	comment	edit	n/a	edit not offered for this element	-
 pptx	comment	batch	n/a	batch not offered for this element	-
 pptx	comment	create	supported		ok format
@@ -1221,26 +1221,26 @@ pptx	theme	edit	gap	L-PPTX-R4	-
 pptx	theme	batch	gap	L-PPTX-R4	-
 pptx	theme	create	gap	L-PPTX-R4	ok format
 pptx	theme	save	gap	L-PPTX-R4	ok format
-pptx	modernComment	get	supported		unreached
-pptx	modernComment	find	supported		unreached
-pptx	modernComment	query	supported		unreached
-pptx	modernComment	view	supported		unreached
-pptx	modernComment	set	n/a	set not offered for this element	unreached
+pptx	modernComment	get	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	find	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
+pptx	modernComment	view	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	set	n/a	set not offered for this element	-
 pptx	modernComment	add	n/a	add not offered for this element	-
-pptx	modernComment	remove	n/a	remove not offered for this element	unreached
-pptx	modernComment	move	format-verb		unreached
-pptx	modernComment	swap	format-verb		unreached
+pptx	modernComment	remove	n/a	remove not offered for this element	-
+pptx	modernComment	move	format-verb		refused unsupported_type
+pptx	modernComment	swap	format-verb		refused unsupported_type
 pptx	modernComment	edit	n/a	edit not offered for this element	-
 pptx	modernComment	batch	n/a	batch not offered for this element	-
 pptx	modernComment	create	supported		ok format
 pptx	modernComment	save	supported		ok format
-pptx	reply	get	supported		unreached
-pptx	reply	find	supported		unreached
-pptx	reply	query	supported		unreached
-pptx	reply	view	supported		unreached
-pptx	reply	set	n/a	set not offered for this element	unreached
+pptx	reply	get	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	find	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
+pptx	reply	view	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	set	n/a	set not offered for this element	-
 pptx	reply	add	n/a	add not offered for this element	-
-pptx	reply	remove	n/a	remove not offered for this element	unreached
+pptx	reply	remove	n/a	remove not offered for this element	-
 pptx	reply	move	format-verb		unreached
 pptx	reply	swap	format-verb		unreached
 pptx	reply	edit	n/a	edit not offered for this element	-
@@ -1351,10 +1351,10 @@ pptx	node	edit	supported		ok tx.set
 pptx	node	batch	supported		ok set item
 pptx	node	create	supported		ok format
 pptx	node	save	supported		ok format
-xlsb	workbook	get	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /
-xlsb	workbook	find	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	get	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	find	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
 xlsb	workbook	query	n/a	query not offered for this element	-
-xlsb	workbook	view	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	view	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
 xlsb	workbook	set	n/a	set not offered for this element	-
 xlsb	workbook	add	n/a	add not offered for this element	-
 xlsb	workbook	remove	n/a	remove not offered for this element	-
@@ -1390,10 +1390,10 @@ xlsb	cell	edit	supported		ok tx.set
 xlsb	cell	batch	supported		ok set item
 xlsb	cell	create	supported		ok format
 xlsb	cell	save	supported		ok format
-xlsb	range	get	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
-xlsb	range	find	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	get	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	find	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
 xlsb	range	query	n/a	query not offered for this element	-
-xlsb	range	view	supported		ok 6 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	view	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
 xlsb	range	set	supported		ok `create() + add sheet` /sheet[1]/A1:B2 {"value":"Litchi"}
 xlsb	range	add	n/a	add not offered for this element	-
 xlsb	range	remove	n/a	remove not offered for this element	-
@@ -1429,13 +1429,13 @@ xlsb	column	edit	n/a	edit not offered for this element	-
 xlsb	column	batch	n/a	batch not offered for this element	-
 xlsb	column	create	supported		ok format
 xlsb	column	save	supported		ok format
-xlsb	table	get	supported		unreached
-xlsb	table	find	supported		unreached
-xlsb	table	query	supported		unreached
-xlsb	table	view	supported		unreached
-xlsb	table	set	n/a	set not offered for this element	unreached
+xlsb	table	get	supported		ok 1 instances, first `unified-ops/0294/table.xlsb` /sheet[1]/table[1]
+xlsb	table	find	supported		ok 1 instances, first `unified-ops/0294/table.xlsb` /sheet[1]/table[1]
+xlsb	table	query	supported		ok matches in unified-ops/0294/table.xlsb
+xlsb	table	view	supported		ok 1 instances, first `unified-ops/0294/table.xlsb` /sheet[1]/table[1]
+xlsb	table	set	n/a	set not offered for this element	-
 xlsb	table	add	n/a	add not offered for this element	-
-xlsb	table	remove	n/a	remove not offered for this element	unreached
+xlsb	table	remove	n/a	remove not offered for this element	-
 xlsb	table	move	format-verb		unreached
 xlsb	table	swap	format-verb		unreached
 xlsb	table	edit	n/a	edit not offered for this element	-
@@ -2248,10 +2248,10 @@ ppt	placeholder	edit	supported		ok tx.set
 ppt	placeholder	batch	supported		ok set item
 ppt	placeholder	create	supported		ok format
 ppt	placeholder	save	supported		ok format
-ppt	picture	get	supported		ok 1 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
-ppt	picture	find	supported		ok 1 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	get	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	find	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	query	supported		ok matches in ole/ppt/ppt_with_png.ppt
-ppt	picture	view	supported		ok 1 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	view	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	set	n/a	set not offered for this element	-
 ppt	picture	add	n/a	add not offered for this element	-
 ppt	picture	remove	n/a	remove not offered for this element	-
@@ -2261,13 +2261,13 @@ ppt	picture	edit	n/a	edit not offered for this element	-
 ppt	picture	batch	n/a	batch not offered for this element	-
 ppt	picture	create	supported		ok format
 ppt	picture	save	supported		ok format
-ppt	table	get	supported		unreached
-ppt	table	find	supported		unreached
-ppt	table	query	supported		unreached
-ppt	table	view	supported		unreached
-ppt	table	set	n/a	set not offered for this element	unreached
+ppt	table	get	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	find	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
+ppt	table	view	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	set	n/a	set not offered for this element	-
 ppt	table	add	n/a	add not offered for this element	-
-ppt	table	remove	n/a	remove not offered for this element	unreached
+ppt	table	remove	n/a	remove not offered for this element	-
 ppt	table	move	format-verb		unreached
 ppt	table	swap	format-verb		unreached
 ppt	table	edit	n/a	edit not offered for this element	-
@@ -2313,10 +2313,10 @@ ppt	chart	edit	gap	M1-extended	-
 ppt	chart	batch	gap	M1-extended	-
 ppt	chart	create	gap	M1-extended	ok format
 ppt	chart	save	gap	M1-extended	ok format
-ppt	group	get	supported		ok 2 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
-ppt	group	find	supported		ok 2 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
+ppt	group	get	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
+ppt	group	find	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
 ppt	group	query	supported		ok matches in poi/test-data/slideshow/42485.ppt
-ppt	group	view	supported		ok 2 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
+ppt	group	view	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
 ppt	group	set	n/a	set not offered for this element	-
 ppt	group	add	n/a	add not offered for this element	-
 ppt	group	remove	n/a	remove not offered for this element	-
@@ -2326,15 +2326,15 @@ ppt	group	edit	n/a	edit not offered for this element	-
 ppt	group	batch	n/a	batch not offered for this element	-
 ppt	group	create	supported		ok format
 ppt	group	save	supported		ok format
-ppt	connector	get	supported		unreached
-ppt	connector	find	supported		unreached
-ppt	connector	query	supported		unreached
-ppt	connector	view	supported		unreached
-ppt	connector	set	n/a	set not offered for this element	unreached
+ppt	connector	get	supported		ok 2 instances, first `unified-ops/0294/connectors.ppt` /slide[1]/connector[1]
+ppt	connector	find	supported		ok 2 instances, first `unified-ops/0294/connectors.ppt` /slide[1]/connector[1]
+ppt	connector	query	supported		ok matches in unified-ops/0294/connectors.ppt
+ppt	connector	view	supported		ok 2 instances, first `unified-ops/0294/connectors.ppt` /slide[1]/connector[1]
+ppt	connector	set	n/a	set not offered for this element	-
 ppt	connector	add	n/a	add not offered for this element	-
-ppt	connector	remove	n/a	remove not offered for this element	unreached
-ppt	connector	move	format-verb		unreached
-ppt	connector	swap	format-verb		unreached
+ppt	connector	remove	n/a	remove not offered for this element	-
+ppt	connector	move	format-verb		refused unsupported_type
+ppt	connector	swap	format-verb		refused unsupported_type
 ppt	connector	edit	n/a	edit not offered for this element	-
 ppt	connector	batch	n/a	batch not offered for this element	-
 ppt	connector	create	supported		ok format
@@ -2404,10 +2404,10 @@ ppt	linebreak	edit	gap	M1-extended	-
 ppt	linebreak	batch	gap	M1-extended	-
 ppt	linebreak	create	gap	M1-extended	ok format
 ppt	linebreak	save	gap	M1-extended	ok format
-ppt	notes	get	supported		ok 4 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
-ppt	notes	find	supported		ok 4 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
+ppt	notes	get	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
+ppt	notes	find	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
 ppt	notes	query	supported		ok matches in poi/test-data/slideshow/headers_footers.ppt
-ppt	notes	view	supported		ok 4 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
+ppt	notes	view	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
 ppt	notes	set	supported		ok `poi/test-data/slideshow/basic_test_ppt_file.ppt` /slide[1]/notes {"text":"Litchi"}
 ppt	notes	add	n/a	add not offered for this element	-
 ppt	notes	remove	n/a	remove not offered for this element	-
@@ -3600,10 +3600,10 @@ odp	shape	edit	supported		ok tx.set
 odp	shape	batch	supported		ok set item
 odp	shape	create	supported		ok format
 odp	shape	save	supported		ok format
-odp	placeholder	get	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
-odp	placeholder	find	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	get	supported		ok 7 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	find	supported		ok 7 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
 odp	placeholder	query	supported		ok matches in odf/odp/tdf169979.odp
-odp	placeholder	view	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	view	supported		ok 7 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
 odp	placeholder	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/shape[1] {"name":"Litchi"}
 odp	placeholder	add	n/a	add not offered for this element	-
 odp	placeholder	remove	supported		ok `odf/odp/tdf169979.odp` /slide[1]/shape[1]
@@ -3821,15 +3821,15 @@ odp	notes	edit	supported		ok tx.set
 odp	notes	batch	supported		ok set item
 odp	notes	create	supported		ok format
 odp	notes	save	supported		ok format
-odp	comment	get	supported		unreached
-odp	comment	find	supported		unreached
-odp	comment	query	supported		unreached
-odp	comment	view	supported		unreached
-odp	comment	set	n/a	set not offered for this element	unreached
+odp	comment	get	supported		ok 2 instances, first `unified-ops/0294/comments.odp` /slide[1]/comment[1]
+odp	comment	find	supported		ok 2 instances, first `unified-ops/0294/comments.odp` /slide[1]/comment[1]
+odp	comment	query	supported		ok matches in unified-ops/0294/comments.odp
+odp	comment	view	supported		ok 2 instances, first `unified-ops/0294/comments.odp` /slide[1]/comment[1]
+odp	comment	set	n/a	set not offered for this element	-
 odp	comment	add	n/a	add not offered for this element	-
-odp	comment	remove	n/a	remove not offered for this element	unreached
-odp	comment	move	format-verb		unreached
-odp	comment	swap	format-verb		unreached
+odp	comment	remove	n/a	remove not offered for this element	-
+odp	comment	move	format-verb		refused unsupported_capability
+odp	comment	swap	format-verb		refused unsupported_capability
 odp	comment	edit	n/a	edit not offered for this element	-
 odp	comment	batch	n/a	batch not offered for this element	-
 odp	comment	create	supported		ok format
@@ -3951,10 +3951,10 @@ odp	col	edit	gap	M6 ODP table columns	-
 odp	col	batch	gap	M6 ODP table columns	-
 odp	col	create	gap	M6 ODP table columns	ok format
 odp	col	save	gap	M6 ODP table columns	ok format
-odg	drawing	get	supported		ok 6 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
-odg	drawing	find	supported		ok 6 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
+odg	drawing	get	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
+odg	drawing	find	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	query	n/a	query not offered for this element	-
-odg	drawing	view	supported		ok 6 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
+odg	drawing	view	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	set	n/a	set not offered for this element	-
 odg	drawing	add	n/a	add not offered for this element	-
 odg	drawing	remove	n/a	remove not offered for this element	-
@@ -3977,10 +3977,10 @@ odg	page	edit	supported		ok tx.set
 odg	page	batch	supported		ok set item
 odg	page	create	supported		ok format
 odg	page	save	supported		ok format
-odg	shape	get	supported		ok 6 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
-odg	shape	find	supported		ok 6 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
+odg	shape	get	supported		ok 7 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
+odg	shape	find	supported		ok 7 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
 odg	shape	query	supported		ok matches in libreoffice-core/svx/qa/unit/data/FontWork.odg
-odg	shape	view	supported		ok 6 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
+odg	shape	view	supported		ok 7 instances, first `libreoffice-core/svx/qa/unit/data/FontWork.odg` /page[1]/shape[1]
 odg	shape	set	supported		ok `create() + add page + add shape` /page[1]/shape[1] {"text":"Litchi"}
 odg	shape	add	supported		ok /page[1]/shape[1] on `create() + add page` under /page[1] {"x":"1cm","y":"1cm","width":"4cm","height":"2cm","text":"Added"}
 odg	shape	remove	supported		ok `create() + add page + add shape` /page[1]/shape[1]
@@ -3990,15 +3990,15 @@ odg	shape	edit	supported		ok tx.set
 odg	shape	batch	supported		ok set item
 odg	shape	create	supported		ok format
 odg	shape	save	supported		ok format
-odg	layer	get	supported		unreached
-odg	layer	find	supported		unreached
-odg	layer	query	supported		unreached
-odg	layer	view	supported		unreached
-odg	layer	set	n/a	set not offered for this element	unreached
+odg	layer	get	supported		ok 2 instances, first `unified-ops/0294/layers.odg` /page[1]/layer[1]
+odg	layer	find	supported		ok 2 instances, first `unified-ops/0294/layers.odg` /page[1]/layer[1]
+odg	layer	query	supported		ok matches in unified-ops/0294/layers.odg
+odg	layer	view	supported		ok 2 instances, first `unified-ops/0294/layers.odg` /page[1]/layer[1]
+odg	layer	set	n/a	set not offered for this element	-
 odg	layer	add	n/a	add not offered for this element	-
-odg	layer	remove	n/a	remove not offered for this element	unreached
-odg	layer	move	format-verb		unreached
-odg	layer	swap	format-verb		unreached
+odg	layer	remove	n/a	remove not offered for this element	-
+odg	layer	move	format-verb		refused unsupported_capability
+odg	layer	swap	format-verb		refused unsupported_capability
 odg	layer	edit	n/a	edit not offered for this element	-
 odg	layer	batch	n/a	batch not offered for this element	-
 odg	layer	create	supported		ok format
@@ -4146,10 +4146,10 @@ odb	query	edit	supported		ok tx.set
 odb	query	batch	supported		ok set item
 odb	query	create	supported		ok format
 odb	query	save	supported		ok format
-oth	document	get	supported		ok 8 instances, first `create()` /
-oth	document	find	supported		ok 8 instances, first `create()` /
+oth	document	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /
+oth	document	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /
 oth	document	query	n/a	query not offered for this element	-
-oth	document	view	supported		ok 8 instances, first `create()` /
+oth	document	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /
 oth	document	set	n/a	set not offered for this element	-
 oth	document	add	n/a	add not offered for this element	-
 oth	document	remove	n/a	remove not offered for this element	-
@@ -4159,10 +4159,10 @@ oth	document	edit	n/a	edit not offered for this element	-
 oth	document	batch	n/a	batch not offered for this element	-
 oth	document	create	supported		ok format
 oth	document	save	supported		ok format
-oth	body	get	supported		ok 8 instances, first `create()` /body
-oth	body	find	supported		ok 8 instances, first `create()` /body
+oth	body	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body
+oth	body	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body
 oth	body	query	supported		ok matches in create()
-oth	body	view	supported		ok 8 instances, first `create()` /body
+oth	body	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body
 oth	body	set	n/a	set not offered for this element	-
 oth	body	add	n/a	add not offered for this element	-
 oth	body	remove	n/a	remove not offered for this element	-
@@ -4172,10 +4172,10 @@ oth	body	edit	n/a	edit not offered for this element	-
 oth	body	batch	n/a	batch not offered for this element	-
 oth	body	create	supported		ok format
 oth	body	save	supported		ok format
-oth	paragraph	get	supported		ok 8 instances, first `create() + add paragraph` /body/p[1]
-oth	paragraph	find	supported		ok 8 instances, first `create() + add paragraph` /body/p[1]
-oth	paragraph	query	supported		ok matches in create() + add paragraph
-oth	paragraph	view	supported		ok 8 instances, first `create() + add paragraph` /body/p[1]
+oth	paragraph	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]
+oth	paragraph	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]
+oth	paragraph	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	paragraph	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]
 oth	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] {"text":"Litchi"}
 oth	paragraph	add	supported		ok /body/p[1] on `create()` under /body {}
 oth	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
@@ -4198,10 +4198,10 @@ oth	heading	edit	supported		ok tx.set
 oth	heading	batch	supported		ok set item
 oth	heading	create	supported		ok format
 oth	heading	save	supported		ok format
-oth	run	get	supported		ok 4 instances, first `create() + add paragraph + add run` /body/p[1]/r[1]
-oth	run	find	supported		ok 4 instances, first `create() + add paragraph + add run` /body/p[1]/r[1]
-oth	run	query	supported		ok matches in create() + add paragraph + add run
-oth	run	view	supported		ok 4 instances, first `create() + add paragraph + add run` /body/p[1]/r[1]
+oth	run	get	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	find	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	run	view	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
 oth	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] {"text":"Litchi"}
 oth	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] {}
 oth	run	remove	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1]
@@ -4302,43 +4302,43 @@ oth	section	edit	supported		ok tx.set
 oth	section	batch	supported		ok set item
 oth	section	create	supported		ok format
 oth	section	save	supported		ok format
-oth	frame	get	supported		unreached
-oth	frame	find	supported		unreached
-oth	frame	query	supported		unreached
-oth	frame	view	supported		unreached
-oth	frame	set	supported		unreached
+oth	frame	get	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	find	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	frame	view	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	set	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1] {"name":"Litchi"}
 oth	frame	add	n/a	add not offered for this element	-
-oth	frame	remove	supported		unreached
-oth	frame	move	format-verb		unreached
-oth	frame	swap	format-verb		unreached
-oth	frame	edit	supported		-
-oth	frame	batch	supported		-
+oth	frame	remove	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	move	format-verb		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1] /body/p[1]/frame[2]
+oth	frame	swap	format-verb		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1] /body/p[1]/frame[2]
+oth	frame	edit	supported		ok tx.set
+oth	frame	batch	supported		ok set item
 oth	frame	create	supported		ok format
 oth	frame	save	supported		ok format
-oth	picture	get	supported		unreached
-oth	picture	find	supported		unreached
-oth	picture	query	supported		unreached
-oth	picture	view	supported		unreached
-oth	picture	set	n/a	set not offered for this element	unreached
+oth	picture	get	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
+oth	picture	find	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
+oth	picture	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	picture	view	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
+oth	picture	set	n/a	set not offered for this element	-
 oth	picture	add	n/a	add not offered for this element	-
-oth	picture	remove	supported		unreached
+oth	picture	remove	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1]/picture[1]
 oth	picture	move	format-verb		unreached
 oth	picture	swap	format-verb		unreached
 oth	picture	edit	n/a	edit not offered for this element	-
 oth	picture	batch	n/a	batch not offered for this element	-
 oth	picture	create	supported		ok format
 oth	picture	save	supported		ok format
-oth	textbox	get	supported		unreached
-oth	textbox	find	supported		unreached
-oth	textbox	query	supported		unreached
-oth	textbox	view	supported		unreached
-oth	textbox	set	supported		unreached
+oth	textbox	get	supported		ok 1 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
+oth	textbox	find	supported		ok 1 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
+oth	textbox	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	textbox	view	supported		ok 1 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
+oth	textbox	set	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1] {"text":"Litchi"}
 oth	textbox	add	n/a	add not offered for this element	-
-oth	textbox	remove	supported		unreached
+oth	textbox	remove	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[2]/textbox[1]
 oth	textbox	move	format-verb		unreached
 oth	textbox	swap	format-verb		unreached
-oth	textbox	edit	supported		-
-oth	textbox	batch	supported		-
+oth	textbox	edit	supported		ok tx.set
+oth	textbox	batch	supported		ok set item
 oth	textbox	create	supported		ok format
 oth	textbox	save	supported		ok format
 oth	footnote	get	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
@@ -4393,10 +4393,10 @@ oth	bookmark	edit	supported		ok tx.set
 oth	bookmark	batch	supported		ok set item
 oth	bookmark	create	supported		ok format
 oth	bookmark	save	supported		ok format
-oth	styles	get	supported		ok 8 instances, first `create()` /styles
-oth	styles	find	supported		ok 8 instances, first `create()` /styles
+oth	styles	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /styles
+oth	styles	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /styles
 oth	styles	query	supported		ok matches in create()
-oth	styles	view	supported		ok 8 instances, first `create()` /styles
+oth	styles	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /styles
 oth	styles	set	n/a	set not offered for this element	-
 oth	styles	add	n/a	add not offered for this element	-
 oth	styles	remove	n/a	remove not offered for this element	-
@@ -4406,23 +4406,23 @@ oth	styles	edit	n/a	edit not offered for this element	-
 oth	styles	batch	n/a	batch not offered for this element	-
 oth	styles	create	supported		ok format
 oth	styles	save	supported		ok format
-oth	style	get	supported		unreached
-oth	style	find	supported		unreached
-oth	style	query	supported		unreached
-oth	style	view	supported		unreached
-oth	style	set	n/a	set not offered for this element	unreached
+oth	style	get	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	find	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	query	supported		ok matches in unified-ops/0294/frames.oth
+oth	style	view	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	set	n/a	set not offered for this element	-
 oth	style	add	n/a	add not offered for this element	-
-oth	style	remove	n/a	remove not offered for this element	unreached
-oth	style	move	format-verb		unreached
-oth	style	swap	format-verb		unreached
+oth	style	remove	n/a	remove not offered for this element	-
+oth	style	move	format-verb		refused unsupported_type
+oth	style	swap	format-verb		refused unsupported_type
 oth	style	edit	n/a	edit not offered for this element	-
 oth	style	batch	n/a	batch not offered for this element	-
 oth	style	create	supported		ok format
 oth	style	save	supported		ok format
-oth	metadata	get	supported		ok 8 instances, first `create()` /metadata
-oth	metadata	find	supported		ok 8 instances, first `create()` /metadata
+oth	metadata	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /metadata
+oth	metadata	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /metadata
 oth	metadata	query	supported		ok matches in create()
-oth	metadata	view	supported		ok 8 instances, first `create()` /metadata
+oth	metadata	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /metadata
 oth	metadata	set	supported		ok `create() + add paragraph` /metadata {"title":"Litchi"}
 oth	metadata	add	n/a	add not offered for this element	-
 oth	metadata	remove	n/a	remove not offered for this element	-
@@ -4588,43 +4588,43 @@ odm	section	edit	supported		ok tx.set
 odm	section	batch	supported		ok set item
 odm	section	create	supported		ok format
 odm	section	save	supported		ok format
-odm	frame	get	supported		unreached
-odm	frame	find	supported		unreached
-odm	frame	query	supported		unreached
-odm	frame	view	supported		unreached
-odm	frame	set	supported		unreached
+odm	frame	get	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	find	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	query	supported		ok matches in unified-ops/0294/frames.odm
+odm	frame	view	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	set	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1] {"name":"Litchi"}
 odm	frame	add	n/a	add not offered for this element	-
-odm	frame	remove	supported		unreached
-odm	frame	move	format-verb		unreached
-odm	frame	swap	format-verb		unreached
-odm	frame	edit	supported		-
-odm	frame	batch	supported		-
+odm	frame	remove	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	move	format-verb		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1] /body/p[1]/frame[2]
+odm	frame	swap	format-verb		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1] /body/p[1]/frame[2]
+odm	frame	edit	supported		ok tx.set
+odm	frame	batch	supported		ok set item
 odm	frame	create	supported		ok format
 odm	frame	save	supported		ok format
-odm	picture	get	supported		unreached
-odm	picture	find	supported		unreached
-odm	picture	query	supported		unreached
-odm	picture	view	supported		unreached
-odm	picture	set	n/a	set not offered for this element	unreached
+odm	picture	get	supported		ok 2 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
+odm	picture	find	supported		ok 2 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
+odm	picture	query	supported		ok matches in unified-ops/0294/frames.odm
+odm	picture	view	supported		ok 2 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
+odm	picture	set	n/a	set not offered for this element	-
 odm	picture	add	n/a	add not offered for this element	-
-odm	picture	remove	supported		unreached
+odm	picture	remove	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1]/picture[1]
 odm	picture	move	format-verb		unreached
 odm	picture	swap	format-verb		unreached
 odm	picture	edit	n/a	edit not offered for this element	-
 odm	picture	batch	n/a	batch not offered for this element	-
 odm	picture	create	supported		ok format
 odm	picture	save	supported		ok format
-odm	textbox	get	supported		unreached
-odm	textbox	find	supported		unreached
-odm	textbox	query	supported		unreached
-odm	textbox	view	supported		unreached
-odm	textbox	set	supported		unreached
+odm	textbox	get	supported		ok 1 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
+odm	textbox	find	supported		ok 1 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
+odm	textbox	query	supported		ok matches in unified-ops/0294/frames.odm
+odm	textbox	view	supported		ok 1 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
+odm	textbox	set	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1] {"text":"Litchi"}
 odm	textbox	add	n/a	add not offered for this element	-
-odm	textbox	remove	supported		unreached
+odm	textbox	remove	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[2]/textbox[1]
 odm	textbox	move	format-verb		unreached
 odm	textbox	swap	format-verb		unreached
-odm	textbox	edit	supported		-
-odm	textbox	batch	supported		-
+odm	textbox	edit	supported		ok tx.set
+odm	textbox	batch	supported		ok set item
 odm	textbox	create	supported		ok format
 odm	textbox	save	supported		ok format
 odm	footnote	get	supported		ok 2 instances, first `create() + add paragraph + add footnote` /body/p[1]/footnote[1]
