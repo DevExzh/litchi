@@ -298,8 +298,29 @@ impl BoundaryIndex {
             scopes,
             ..
         } = recorder;
+        // Every boundary from the run's end on moves by these.
+        let shift = |from: u32, to: usize| -> Option<i32> {
+            i32::try_from(i64::try_from(to).ok()? - i64::from(from)).ok()
+        };
+        let after_counters = end.counters();
+        let offset_shift = shift(end.offset, window_end)?;
+        let attributes_shift = shift(
+            u32::try_from(after_counters.attributes).ok()?,
+            after_window.attributes,
+        )?;
+        let events_shift = shift(
+            u32::try_from(after_counters.events).ok()?,
+            after_window.events,
+        )?;
+        let text_shift = shift(
+            u32::try_from(after_counters.text_bytes).ok()?,
+            after_window.text_bytes,
+        )?;
         let mut levels: [Vec<Boundary>; MAX_INDEXED_DEPTH] = Default::default();
         let mut count = 0usize;
+        // Whether a dropped boundary was the only reference to a parent other
+        // than the run's own, which the start boundary keeps referenced.
+        let mut orphaned = false;
         for (level, (old, window)) in levels
             .iter_mut()
             .zip(self.levels.iter().zip(window_levels.iter()))
@@ -314,17 +335,37 @@ impl BoundaryIndex {
             if count > allowance {
                 return None;
             }
+            // The run's start boundary is kept, so for an empty run `before`
+            // is one past `after` and nothing is dropped.
+            orphaned |= old
+                .get(before.min(after)..after)?
+                .iter()
+                .any(|boundary| boundary.parent != start.parent);
             level.try_reserve_exact(total).ok()?;
             level.extend_from_slice(&old[..before]);
             level.extend_from_slice(&window[..inside]);
             for boundary in &old[after..] {
-                let offset = (boundary.offset as usize)
-                    .checked_sub(run_end)?
-                    .checked_add(window_end)?;
-                let counters =
-                    add_counters(after_window, boundary.counters().since(end.counters())?)?;
-                level.push(Boundary::at(offset, boundary.parent, counters)?);
+                level.push(Boundary {
+                    offset: boundary.offset.checked_add_signed(offset_shift)?,
+                    parent: boundary.parent,
+                    attributes: boundary.attributes.checked_add_signed(attributes_shift)?,
+                    events: boundary.events.checked_add_signed(events_shift)?,
+                    text_bytes: boundary.text_bytes.checked_add_signed(text_shift)?,
+                });
             }
+        }
+        if !orphaned && parents.len() == self.parents.len() {
+            // No parent was opened in the window and none lost its last
+            // boundary: the parents and scopes are this index's.
+            return Some(Self {
+                depth: self.depth,
+                totals,
+                levels,
+                parents,
+                root: self.root,
+                scopes,
+                scope_bytes: self.scope_bytes,
+            });
         }
         compact(self.depth, totals, levels, &parents, &scopes, self.root)
     }
