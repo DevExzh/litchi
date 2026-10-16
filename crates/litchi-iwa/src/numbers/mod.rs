@@ -103,7 +103,7 @@ pub(crate) trait SemanticTableCellAssertions {
 #[cfg(test)]
 impl SemanticTableCellAssertions for litchi_numbers::Table {
     fn get_cell(&self, row: usize, column: usize) -> Option<&litchi_numbers::cell::Value> {
-        litchi_numbers::Position::try_from_usize(row, column)
+        litchi_numbers::CellPosition::try_from_usize(row, column)
             .ok()
             .and_then(|position| self.get(position))
     }

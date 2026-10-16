@@ -1284,6 +1284,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        deprecated,
+        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+    )]
     fn scratch_presentation_supports_rectangle_crud_without_a_source_drawable() {
         let mut editor = KeynoteDocumentBuilder::new()
             .title("Scratch shape")
@@ -1925,6 +1929,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        deprecated,
+        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+    )]
     fn invalid_rectangle_creation_and_cross_type_updates_are_transactional() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();

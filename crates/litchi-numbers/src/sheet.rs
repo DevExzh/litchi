@@ -351,7 +351,7 @@ fn fallible_name_copy(name: &str) -> std::result::Result<String, Error> {
 mod tests {
     use super::*;
     use crate::cell::Value;
-    use crate::table::{Builder as TableBuilder, Dimensions, Position};
+    use crate::table::{Builder as TableBuilder, CellPosition, Dimensions};
 
     #[test]
     fn sheets_store_immutable_tables_without_peer_dependencies() {
@@ -359,7 +359,7 @@ mod tests {
         assert!(
             table_builder
                 .set(
-                    Position::new(1, 1),
+                    CellPosition::new(1, 1),
                     Value::number(42.0).expect("finite test number"),
                 )
                 .is_ok()

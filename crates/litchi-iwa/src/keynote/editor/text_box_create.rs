@@ -469,6 +469,10 @@ mod tests {
     };
 
     #[test]
+    #[expect(
+        deprecated,
+        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+    )]
     fn scratch_presentation_supports_text_box_crud_without_a_source_drawable() {
         let mut editor = KeynoteDocumentBuilder::new()
             .title("Scratch presentation")
@@ -606,6 +610,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        deprecated,
+        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+    )]
     fn created_text_box_graph_has_private_objects_and_component_uuids() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let created = editor

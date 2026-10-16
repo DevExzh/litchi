@@ -11,9 +11,9 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi_pages::Document;
+//! use litchi_pages::Package;
 //!
-//! let doc = Document::open("document.pages")?;
+//! let doc = Package::open("document.pages")?.document();
 //! let text = doc.plain_text();
 //! let sections = doc.sections();
 //!

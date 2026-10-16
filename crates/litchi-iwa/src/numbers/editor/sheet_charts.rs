@@ -992,7 +992,7 @@ mod tests {
     }
 
     fn numbers_chart_caption_reference_from_data(data: &[u8]) -> u64 {
-        IWorkChartArchive::decode(&data)
+        IWorkChartArchive::decode(data)
             .unwrap()
             .drawable
             .super_
@@ -1969,10 +1969,7 @@ mod tests {
             .retain(|identifier| *identifier != old_reference_id);
         expected_info.object_references.push(replacement_id);
         for field in &mut expected_info.field_infos {
-            let had_old_reference = field
-                .object_references
-                .iter()
-                .any(|identifier| *identifier == old_reference_id);
+            let had_old_reference = field.object_references.contains(&old_reference_id);
             field
                 .object_references
                 .retain(|identifier| *identifier != old_reference_id);

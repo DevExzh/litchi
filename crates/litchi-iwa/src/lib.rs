@@ -99,7 +99,7 @@
 //! ```rust,no_run
 //! use litchi_numbers::Workbook;
 //!
-//! let doc = Document::open("spreadsheet.numbers")?;
+//! let doc = Workbook::open("spreadsheet.numbers")?;
 //!
 //! for sheet in doc.sheets() {
 //!     for table in sheet.tables() {
@@ -244,6 +244,10 @@ pub enum Error {
 
     #[error(transparent)]
     IwaCommon(#[from] litchi_iwa_common::Error),
+
+    /// Chart data rejected by [`charts::ChartData::new`].
+    #[error(transparent)]
+    ChartData(#[from] litchi_iwa_common::chart::DataError),
 
     #[error(transparent)]
     PagesSemantic(#[from] litchi_pages::Error),

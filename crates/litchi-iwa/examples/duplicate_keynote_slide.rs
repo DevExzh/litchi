@@ -15,9 +15,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = KeynoteEditor::open(input)?;
     let slide = editor.duplicate_slide(slide_index)?;
     editor.save(output)?;
-    println!(
-        "duplicated slide {} as slide {} (node {}, object {})",
-        slide_index, slide.index, slide.node_id, slide.slide_id
-    );
+    println!("duplicated slide {} as slide {}", slide_index, slide.index);
     Ok(())
 }

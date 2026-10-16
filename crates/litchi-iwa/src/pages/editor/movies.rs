@@ -649,6 +649,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        deprecated,
+        reason = "exercises the legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility"
+    )]
     fn scratch_document_supports_movie_crud_without_a_source_package() {
         let mut editor = PagesEditor::create_with_text("Quarterly report").unwrap();
         let anchor = "Quarterly report".encode_utf16().count();
