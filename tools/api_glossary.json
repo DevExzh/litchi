@@ -8700,6 +8700,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::order",
@@ -8716,7 +8717,8 @@
         "litchi_numbers::table::order",
         "litchi_numbers::table::relocation",
         "litchi_numbers::table::sort::transaction",
-        "litchi_numbers::table::title"
+        "litchi_numbers::table::title",
+        "litchi_numbers::table::topology"
       ]
     },
     {
@@ -9306,6 +9308,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::order",
@@ -9322,7 +9325,8 @@
         "litchi_numbers::table::order",
         "litchi_numbers::table::relocation",
         "litchi_numbers::table::sort::transaction",
-        "litchi_numbers::table::title"
+        "litchi_numbers::table::title",
+        "litchi_numbers::table::topology"
       ]
     },
     {
@@ -10217,6 +10221,8 @@
         "litchi_pages::metadata",
         "litchi_pages::document_settings",
         "litchi_pages::section::text",
+        "litchi_pages::section::text_style",
+        "litchi_pages::table::values",
         "litchi_pages::section::name",
         "litchi_pages::section::settings",
         "litchi_pages::section::background",

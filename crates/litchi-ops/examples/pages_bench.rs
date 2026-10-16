@@ -13,6 +13,12 @@
 //!   identity). Leaf: one `edit_section_paragraphs` edit with N `set`s and
 //!   one commit; unified: `File::edit` with N `tx.set("/body/p[i]", text)`
 //!   calls, which coalesce into one leaf paragraph transaction.
+//! - record 0309: `paragraph_font` (bold on the first paragraph of
+//!   `basic.pages`; leaf `edit_section_text_style` + `set` of its span;
+//!   unified `set` of `font.bold`) and `table_cell` (a text value in the
+//!   first cell of `body-table-catalog-native.pages`; leaf
+//!   `edit_body_table_values`; unified `set` of `text`). Their outputs are
+//!   compared byte for byte before timing.
 //!
 //! Inputs (opened packages and files) are prepared outside the timed
 //! region; the unified legs include building the object tree on their first
@@ -94,6 +100,8 @@ fn main() {
     let iterations = number("--iterations", 30);
     let only = argument("--only");
     let basic = std::fs::read(test_data().join("iwork/pages/basic.pages")).unwrap();
+    let tables =
+        std::fs::read(test_data().join("iwork/pages/body-table-catalog-native.pages")).unwrap();
     let large_text = (0..10_000)
         .map(|index| format!("Paragraph {index}"))
         .collect::<Vec<_>>()
@@ -222,6 +230,99 @@ fn main() {
             }),
         });
     }
+    // Record 0309: character properties and table cell values.
+    let first = Package::from_bytes(basic_ref)
+        .unwrap()
+        .section_paragraphs(0_usize)
+        .unwrap()[0]
+        .encode_utf16()
+        .count();
+    let leaf_font = move |package: &Package| {
+        let mut bold = litchi_pages::section::text_style::CharacterProperties::new();
+        bold.bold = Some(true);
+        let mut edit = package.edit_section_text_style(0_usize).unwrap();
+        edit.set(
+            litchi_pages::TextSpan::from_utf16_indexes(0, first).unwrap(),
+            bold,
+        )
+        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    let unified_font = |file: &litchi_ops::File| {
+        file.set("/body/p[1]", props! { "font.bold" => true })
+            .unwrap()
+    };
+    assert!(
+        leaf_font(&Package::from_bytes(basic_ref).unwrap())
+            .to_bytes()
+            .unwrap()
+            == unified_font(&litchi_ops::open_bytes(basic.clone()).unwrap())
+                .to_bytes()
+                .unwrap(),
+        "paragraph_font outputs differ"
+    );
+    scenarios.push(Scenario {
+        name: "paragraph_font".to_owned(),
+        iterations,
+        leaf: Box::new(move |n| {
+            leg(
+                n,
+                || Package::from_bytes(basic_ref).unwrap(),
+                |package| drop(black_box(leaf_font(&package))),
+            )
+        }),
+        unified: Box::new(move |n| {
+            leg(
+                n,
+                || litchi_ops::open_bytes(basic_ref.clone()).unwrap(),
+                |file| drop(black_box(unified_font(&file))),
+            )
+        }),
+    });
+    let tables_ref = &tables;
+    let leaf_cell = |package: &Package| {
+        let mut edit = package
+            .edit_body_table_values(litchi_pages::BodyTableSelector::index(0))
+            .unwrap();
+        edit.set(
+            0,
+            0,
+            litchi_pages::table::values::Value::Text("Bench".into()),
+        )
+        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    let unified_cell = |file: &litchi_ops::File| {
+        file.set("/body/tbl[1]/tr[1]/tc[1]", props! { "text" => "Bench" })
+            .unwrap()
+    };
+    assert!(
+        leaf_cell(&Package::from_bytes(tables_ref).unwrap())
+            .to_bytes()
+            .unwrap()
+            == unified_cell(&litchi_ops::open_bytes(tables.clone()).unwrap())
+                .to_bytes()
+                .unwrap(),
+        "table_cell outputs differ"
+    );
+    scenarios.push(Scenario {
+        name: "table_cell".to_owned(),
+        iterations,
+        leaf: Box::new(move |n| {
+            leg(
+                n,
+                || Package::from_bytes(tables_ref).unwrap(),
+                |package| drop(black_box(leaf_cell(&package))),
+            )
+        }),
+        unified: Box::new(move |n| {
+            leg(
+                n,
+                || litchi_ops::open_bytes(tables_ref.clone()).unwrap(),
+                |file| drop(black_box(unified_cell(&file))),
+            )
+        }),
+    });
     let large_ref = &large;
     for count in [1_usize, 10, 100, 1_000, 10_000] {
         let paths: Vec<String> = (1..=count)

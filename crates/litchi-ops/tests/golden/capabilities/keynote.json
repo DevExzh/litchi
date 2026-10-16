@@ -263,7 +263,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -325,6 +325,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -429,7 +435,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -443,37 +449,37 @@
         "bold": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "underline": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "size": {
           "type": "font-size",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "color": {
           "type": "color",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "font.latin": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         }
       },
@@ -733,7 +739,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -801,7 +807,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -989,7 +995,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -1003,7 +1009,7 @@
         "text": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "type": {
@@ -1011,6 +1017,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -1163,10 +1175,10 @@
       "subject": "operation",
       "verb": "set",
       "element": "run",
-      "context": "character formatting",
+      "context": "placeholder and notes runs",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
-      "reason": "the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling)"
+      "followUp": "record 0309 follow-ups",
+      "reason": "character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles"
     },
     {
       "subject": "operation",
@@ -1181,10 +1193,10 @@
       "subject": "operation",
       "verb": "set",
       "element": "tc",
-      "context": "table cell values",
+      "context": "cells in a formula graph",
       "code": "unsupported_capability",
-      "followUp": "record 0298 follow-up: wire the Keynote slide-table cell transactions",
-      "reason": "the unified layer reads slide-table cells; their leaf write families are not wired yet"
+      "followUp": "record 0309 follow-ups",
+      "reason": "slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale"
     },
     {
       "subject": "operation",
@@ -1206,21 +1218,12 @@
     },
     {
       "subject": "operation",
-      "verb": "remove",
-      "element": "video",
-      "context": "a movie or audio clip",
-      "code": "unsupported_capability",
-      "followUp": "record 0298 follow-up: wire slide::media lifecycle removal",
-      "reason": "movies and audio are removed through the leaf's media lifecycle family, not wired yet"
-    },
-    {
-      "subject": "operation",
       "verb": "add",
       "element": "video",
       "context": "a new movie or audio clip",
       "code": "unsupported_capability",
-      "followUp": "record 0298 follow-up: wire slide::movie and slide::audio creation",
-      "reason": "the leaf's movie and audio creation families are not wired yet"
+      "followUp": "record 0309 follow-up: wire slide::movie and slide::audio creation",
+      "reason": "the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet"
     },
     {
       "subject": "operation",
@@ -1235,10 +1238,10 @@
       "subject": "operation",
       "verb": "remove",
       "element": "placeholder",
-      "context": "a title or body placeholder",
+      "context": "slide-number and object placeholders",
       "code": "unsupported_capability",
-      "followUp": "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-      "reason": "placeholders are hidden, not removed; set the text to empty instead"
+      "followUp": "record 0309 follow-ups",
+      "reason": "`remove` hides a title or body placeholder on its slide (and `hidden` = false shows it again); slide-number and object placeholders have no unified element"
     },
     {
       "subject": "operation",
@@ -1246,8 +1249,8 @@
       "element": "placeholder",
       "context": "a new placeholder",
       "code": "unsupported_capability",
-      "followUp": "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-      "reason": "a slide's placeholders come from its layout; add a slide from a layout instead"
+      "followUp": "record 0309 follow-ups",
+      "reason": "a slide's placeholders come from its layout; show a hidden one with `hidden` = false, or add a slide from a layout"
     },
     {
       "subject": "view",

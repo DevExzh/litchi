@@ -320,6 +320,8 @@ const SPECS: &[Spec] = &[
             "iwork/pages/basic.pages",
             // Record 0299: body tables, cells and anchored paragraphs.
             "iwork/pages/body-table-read-native.pages",
+            // Record 0309: a body table without formulas takes cell values.
+            "iwork/pages/body-table-name-focused.pages",
         ],
     },
     Spec {
@@ -628,6 +630,11 @@ const SEEDS: &[(&str, &[Step])] = &[
         ],
     ),
     ("ods", &[Step::Set("/Sheet1/A1:B2", &[("merge", "true")])]),
+    // Record 0309: character properties are written on runs of text boxes.
+    (
+        "keynote",
+        &[Step::Add("/slide[1]", "shape", &[("text", "Box\nSecond")])],
+    ),
 ];
 
 /// Claimed-supported cells that fail, with the cause record 0289 found:
@@ -869,8 +876,15 @@ fn instances(
         }
         let mut seen = BTreeSet::new();
         list.retain(|path| seen.insert(path.clone()));
-        // Slide content before master and layout content.
-        list.sort_by_key(|path| path.contains("master") || path.contains("layout"));
+        // Slide content before master and layout content; writes try
+        // drawables before placeholders, whose runs keep their layout's
+        // styles in Keynote (record 0309).
+        list.sort_by_key(|path| {
+            (
+                path.contains("master") || path.contains("layout"),
+                writes && path.contains("/placeholder["),
+            )
+        });
         per_fixture.push(list);
     }
     // Writes try the documents Litchi made first (added, seeded, created),

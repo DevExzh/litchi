@@ -43,5 +43,5 @@
 
 pub use crate::package::slide_drawable::{
     Commit, Created, Diagnostics, Drawable, Edit, Error, Geometry, ImageFormat, Kind, LimitKind,
-    Patch, Preset, Style, TextRun, TextSpan, Unsupported,
+    Patch, Preset, Style, TableCellValue, TextRun, TextSpan, Unsupported,
 };
