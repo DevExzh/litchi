@@ -682,6 +682,32 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - with the owner's approval, the main checkout's build directory (`/home/zhuhe/code/litchi/target`, about 965 GB of rebuildable output) was deleted, so free disk is about 1 TB;
   - memory (no swap) still caps concurrency at about four agents.
 
+- Merged `perf-residual` (0302):
+  - one-pass plain path parse in `litchi-core`;
+  - ODT find (1 match in 10k paragraphs) 1.10× → 1.02×;
+  - Pages coalesced sets skip the tree (1k 1.73× → 1.10×, 10k 2.45× → 1.61×);
+  - Numbers 1k batch 1.46× → 1.33×.
+  - Misses left: DOCX single set ~1.11× (cache pressure), Numbers open+get ~1.25× (tree build). Both go to 0305.
+- Merged `iwork-keynote` (0298):
+  - Keynote ADR 0034 W1 (`Presentation`, limits, 41 focused families);
+  - wire-level structural edits (slide duplicate/add-from-layout, drawables, text boxes, shapes, images);
+  - `Package::new`/`Builder`; F8 fixed (stale thumbnail record);
+  - unified set/add/remove/move/swap/create with coalesced batches;
+  - checklist 113/122 with 0 known failures; 56/56 no-op saves byte-exact.
+  - Miss: open+get 1.085× (eager drawable tree; 0305).
+- Merged `iwork-structure` (0301):
+  - Numbers `sheet::lifecycle`, `table::lifecycle` and `table::order`; the multi-table cell writer fixed;
+  - Pages `save_directory` and table-anchored paragraph removal;
+  - structural ops 0.98–1.03×.
+  - Open: Numbers rows/columns, formulas on created workbooks, styles, comments, Pages sections, runs and cells.
+- Merged `acceptance2` (0294):
+  - a Python mirror of the checklist (1,696 cells, 21 formats) and of no-op saves, agreeing with Rust;
+  - 66 of 70 unreached cells reached (7 generated fixtures plus 1 POI fixture);
+  - PPT builder connectors;
+  - bench matrix through 0297 (1,420 rows, 101 open misses explained; parsers for 0298, 0301 and 0302 pending).
+  - Finding: ODT-family paragraph text sets drop inline frames (fix in 0304).
+- With 0296–0301, all 21 claimed formats read and write through the single `File` enum. `litchi::iwork::Document` remains until Keynote package directories open.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.

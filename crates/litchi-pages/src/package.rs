@@ -765,6 +765,27 @@ impl Package {
         save::save(self, path)
     }
 
+    /// Save this package as an app-style package directory at `path`
+    /// (`IWORK_API_REQUESTS.md` request 16, record 0301): `Index.zip` holds
+    /// the `Index/` members with their records unchanged, and every other
+    /// member (metadata sidecars, previews, `Data/` media) is a plain file.
+    /// Opening the directory again gives back this package's exact bytes.
+    ///
+    /// The bundle is written into a sibling staging directory; an existing
+    /// destination directory is swapped out only after the new one is
+    /// complete and synchronized.
+    ///
+    /// # Errors
+    ///
+    /// [`SaveError::Publication`] when the destination exists and is not a
+    /// directory or the staging, synchronization or swap fails;
+    /// [`SaveError::Bundling`] when a staged file cannot be written;
+    /// [`SaveError::Bundle`] when the index archive cannot be assembled or a
+    /// member name cannot be a file.
+    pub fn save_directory(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
+        directory::save_bundle(&self.state.source, path.as_ref())
+    }
+
     /// Render all native Pages text through the immutable semantic snapshot.
     ///
     /// # Errors

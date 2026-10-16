@@ -193,6 +193,20 @@ class CreateTests(WriteAssertions):
         grown, _ = created.add("/", "slide")
         self.assertEqual(len(grown.query("slide")), len(created.query("slide")) + 1)
 
+    def test_numbers_sheets_and_tables_are_added_and_removed(self):
+        # Record 0301: Numbers sheet and table lifecycle through litchi_py.
+        workbook = L.create("numbers")
+        added, path = workbook.add("/", "sheet", {"name": "Extra"}, index=0)
+        self.assertEqual(path, "/sheet[1]")
+        with_table, table = added.add("/sheet[1]", "table", {"name": "Data", "rowCount": 3, "columnCount": 2})
+        self.assertEqual(table, "/sheet[1]/table[1]")
+        reopened = L.open_bytes(with_table.to_bytes())
+        self.assertEqual(reopened.get(table, 0)["format"]["rowCount"], 3)
+        written = reopened.set("/sheet[1]/table[1]/B2", {"value": 5})
+        self.assertEqual(L.open_bytes(written.to_bytes()).get("/sheet[1]/table[1]/B2", 0)["format"]["value"], 5)
+        removed = with_table.remove("/sheet[1]")
+        self.assertEqual(L.open_bytes(removed.to_bytes()).get("/", 0)["format"]["sheetCount"], 1)
+
     def test_a_created_file_has_no_path(self):
         error = raised(lambda: L.create("docx").save())
         self.assertError(error, L.IoError, "file_required")

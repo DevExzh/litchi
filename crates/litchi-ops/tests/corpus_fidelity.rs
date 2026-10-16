@@ -13,10 +13,11 @@
 //! Whether the reverted bytes also equal the input is reported, not
 //! required: a revert is a second edit, and the leaves may normalize what
 //! they rewrite. A structural round trip follows on XLS, PPTX and RTF
-//! (record 0293), Pages (record 0299) and Keynote (record 0298): a row
-//! inserted and removed, a slide or paragraph moved and moved back, a Pages
-//! paragraph added and removed, or a Keynote slide duplicated and a slide
-//! added and both removed, must read back with the same node texts.
+//! (record 0293), Pages (record 0299), Keynote (record 0298) and Numbers
+//! (record 0301): a row inserted and removed, a slide or paragraph moved
+//! and moved back, a Pages paragraph added and removed, a Keynote slide
+//! duplicated and a slide added and both removed, or a Numbers table added
+//! and removed, must read back with the same node texts.
 //!
 //! An empty edit the leaf editor refuses (typed) is reported with its
 //! cause, and the file then goes through `open` → `save_as`, which must be
@@ -412,6 +413,18 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 file.remove(format!("/slide[{last}]").as_str())?
                     .remove("/slide[2]")
             },
+        ),
+        // Record 0301: a Numbers table added first in the first sheet and
+        // removed again, through the leaf table-lifecycle and table-order
+        // transactions.
+        Some(FileFormat::Numbers) => (
+            "table add+remove",
+            &["/sheet[1]/table[1]/A1", "/sheet[1]/table[1]/B2"],
+            |file| {
+                file.add("/sheet[1]", NewNode::new("table").at(Placement::Start))
+                    .map(|added| added.file)
+            },
+            |file| file.remove("/sheet[1]/table[1]"),
         ),
         _ => return ("-", String::new()),
     };

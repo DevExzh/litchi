@@ -2206,8 +2206,23 @@ fn plan_final_cache_internal(
                 // table formula evaluation. A table-backed owner (or any owner
                 // used by the complete final formula set) still requires exact
                 // geometry and baseline authority.
-                if has_formula || owner.formula_owner().is_some() {
+                if has_formula {
                     return Err(Failure::UnsupportedDependency(Unsupported::MissingOwner));
+                }
+                if owner.formula_owner().is_some() {
+                    // Another table's owner with no formula in the final set
+                    // and no dependency record at all (record 0301): it
+                    // cannot reach the edited cells, so it needs no
+                    // geometry. Anything else still does.
+                    let inert = stage.records.is_empty()
+                        && stage.ranges.is_empty()
+                        && stage.tile_references.is_empty()
+                        && stage.range_references.is_empty()
+                        && stage.components.is_empty();
+                    if !inert || !inert_foreign_owner(owner) {
+                        return Err(Failure::UnsupportedDependency(Unsupported::MissingOwner));
+                    }
+                    continue;
                 }
                 if logical.is_none() {
                     continue;
@@ -3096,6 +3111,37 @@ fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
         && field.validate_canonical_framing().is_ok()
         && empty_message(field.payload())
         && fields.next().is_none()
+}
+
+/// Whether another table's owner holds nothing but its own range contexts:
+/// no range, volatile, whole-owner, UUID, error or spill state, and spanning
+/// records only in the native total/body context shape (record 0301).
+fn inert_foreign_owner(owner: dependency::FormulaOwnerDependenciesSnapshot<'_>) -> bool {
+    let context_shape = |payload: &[u8]| {
+        let Ok(view) = WireView::parse(payload) else {
+            return false;
+        };
+        view.fields().all(|field| {
+            matches!(field.number(), 2 | 3)
+                && field.wire_type() == 2
+                && field.validate_canonical_framing().is_ok()
+                && parse_varint_fields(field.payload(), [1, 2, 3, 4]).is_some()
+        })
+    };
+    owner.range_dependencies().is_none_or(empty_message)
+        && owner
+            .volatile_dependencies()
+            .is_none_or(empty_volatile_dependencies)
+        && owner
+            .whole_owner_dependencies()
+            .is_none_or(empty_whole_owner_dependencies)
+        && owner.uuid_references().is_none_or(empty_message)
+        && owner.cell_errors().is_none_or(empty_message)
+        && owner.spill_range_sizes().is_none_or(inactive_spill_sizes)
+        && owner
+            .spanning_column_dependencies()
+            .is_none_or(context_shape)
+        && owner.spanning_row_dependencies().is_none_or(context_shape)
 }
 
 fn owner_spanning_dependencies(payload: &[u8], owner: u32, source: CacheSource<'_>) -> bool {
@@ -6608,7 +6654,7 @@ mod tests {
     }
 
     #[test]
-    fn unregistered_non_table_owner_is_preserved_but_table_owner_requires_geometry() {
+    fn unregistered_non_table_owner_is_preserved_but_active_table_owner_requires_geometry() {
         let selected = tsce::FormulaOwnerDependenciesArchive {
             formula_owner_uid: tsp::Uuid {
                 lower: TABLE.uuid_lower,
@@ -6740,9 +6786,54 @@ mod tests {
             ],
             ..source
         };
+        // Another table's owner with no dependency record cannot reach the
+        // edited cells and needs no geometry (record 0301).
+        plan_final_cache(
+            missing_table_source,
+            &overlay,
+            limits(),
+            &Baseline(Vec::new()),
+            &mut evaluator,
+        )
+        .expect("an inert table owner is outside the table cache graph");
+
+        // One with a dependency tile still requires its table's geometry.
+        let active_table = tsce::FormulaOwnerDependenciesArchive {
+            formula_owner_uid: tsp::Uuid {
+                lower: 91,
+                upper: 92,
+            },
+            internal_formula_owner_id: external_owner,
+            owner_kind: Some(1),
+            formula_owner: Some(tsp::Reference {
+                identifier: 99,
+                ..Default::default()
+            }),
+            tiled_cell_dependencies: Some(tsce::CellDependenciesTiledArchive {
+                cell_record_tiles: vec![tsp::Reference {
+                    identifier: 98,
+                    ..Default::default()
+                }],
+            }),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let active_table_source = CacheSource {
+            owners: &[
+                DependencyPayload {
+                    identifier: 1,
+                    bytes: &selected,
+                },
+                DependencyPayload {
+                    identifier: 2,
+                    bytes: &active_table,
+                },
+            ],
+            ..source
+        };
         assert!(matches!(
             plan_final_cache(
-                missing_table_source,
+                active_table_source,
                 &overlay,
                 limits(),
                 &Baseline(Vec::new()),
