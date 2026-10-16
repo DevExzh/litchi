@@ -8,7 +8,7 @@ use quick_xml::events::{BytesRef, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::styles::{AutomaticStyle, StylesInsertion, TextProperties};
+use super::styles::StylesInsertion;
 use super::{
     Cell, FrameContent, Notes, Object, ObjectKind, Page, Paragraph, Prefixes, Row, Run, RunKind,
     Scene, Story, Table, Wrapper,
@@ -19,8 +19,8 @@ pub(super) const TEXT_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1
 pub(super) const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 pub(super) const PRESENTATION_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-const STYLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
-const FO_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
+pub(super) const STYLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+pub(super) const FO_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
 const TABLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const DR3D_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0";
 const XLINK_NS: &[u8] = b"http://www.w3.org/1999/xlink";
@@ -80,10 +80,6 @@ enum Frame {
     Description,
     /// `office:automatic-styles`.
     AutomaticStyles,
-    /// A `style:style` of `office:automatic-styles`.
-    AutomaticStyle,
-    /// A properties child of an automatic style (`style:*-properties`).
-    StyleProperties,
 }
 
 /// The slide parser's paragraph text rules.
@@ -246,8 +242,8 @@ struct Scanner<'x> {
     prefixes: Prefixes,
     root_seen: bool,
     body_end: Option<usize>,
-    styles: Vec<AutomaticStyle>,
-    style: Option<AutomaticStyle>,
+    /// The content of `office:automatic-styles`, indexed on demand.
+    styles_range: Option<Range<usize>>,
     styles_insertion: StylesInsertion,
 }
 
@@ -276,24 +272,16 @@ pub(super) fn scan(xml: &str) -> Result<Scene> {
         prefixes: Prefixes::default(),
         root_seen: false,
         body_end: None,
-        styles: Vec::new(),
-        style: None,
+        styles_range: None,
         styles_insertion: StylesInsertion::None,
     };
     scanner.run()?;
-    let mut style_order: Vec<usize> = (0..scanner.styles.len()).collect();
-    style_order.sort_by(|&left, &right| {
-        let (left, right) = (&scanner.styles[left], &scanner.styles[right]);
-        (left.family.as_str(), left.name.as_str())
-            .cmp(&(right.family.as_str(), right.name.as_str()))
-    });
     Ok(Scene {
         pages: scanner.pages,
         prefixes: scanner.prefixes,
         body_end: scanner.body_end,
         len: xml.len(),
-        styles: scanner.styles,
-        style_order,
+        styles_range: scanner.styles_range,
         styles_insertion: scanner.styles_insertion,
     })
 }
@@ -426,7 +414,10 @@ impl Scanner<'_> {
             Some(Frame::Title | Frame::Description) => return Ok(Frame::Opaque),
             _ => {},
         }
-        if let Some(frame) = self.open_style_element(ns, local, element, start, end, empty)? {
+        // `office:automatic-styles` and its children sit at depth 1 and 2.
+        if self.frames.len() <= 2
+            && let Some(frame) = self.open_style_element(ns, local, start, end, empty)
+        {
             return Ok(frame);
         }
         if ns == Some(OFFICE_NS) && local == b"presentation" {
@@ -479,81 +470,34 @@ impl Scanner<'_> {
         Ok(Frame::Other)
     }
 
-    /// Index `office:automatic-styles`, its `style:style` children and
-    /// their `style:text-properties`; note where `office:body` starts.
+    /// Note where `office:automatic-styles` holds its styles (indexed on
+    /// demand, `Scene::automatic_styles`) and where `office:body` starts.
     fn open_style_element(
         &mut self,
         ns: Option<&[u8]>,
         local: &[u8],
-        element: &BytesStart<'_>,
         start: usize,
         end: usize,
         empty: bool,
-    ) -> Result<Option<Frame>> {
-        let parent = self.parent();
+    ) -> Option<Frame> {
         if self.frames.len() == 1 && ns == Some(OFFICE_NS) {
             if local == b"automatic-styles" {
-                self.styles_insertion = if empty {
-                    StylesInsertion::Expand(start..end)
+                if empty {
+                    self.styles_insertion = StylesInsertion::Expand(start..end);
                 } else {
-                    // Replaced by `Before` at the end tag.
-                    StylesInsertion::None
-                };
-                return Ok(Some(Frame::AutomaticStyles));
+                    // `Before` and the range end are set at the end tag.
+                    self.styles_insertion = StylesInsertion::None;
+                    self.styles_range = Some(end..end);
+                }
+                return Some(Frame::AutomaticStyles);
             }
             if local == b"body" && self.styles_insertion == StylesInsertion::None {
                 self.styles_insertion = StylesInsertion::Create(start);
             }
-            return Ok(None);
+            return None;
         }
-        if parent == Some(Frame::AutomaticStyles) {
-            if ns == Some(STYLE_NS) && local == b"style" {
-                let name = self
-                    .attribute(element, STYLE_NS, b"name")?
-                    .unwrap_or_default();
-                let family = self
-                    .attribute(element, STYLE_NS, b"family")?
-                    .unwrap_or_default();
-                self.style = Some(AutomaticStyle {
-                    range: start..end,
-                    start_tag: start..end,
-                    empty,
-                    name,
-                    family,
-                    parent: self.attribute(element, STYLE_NS, b"parent-style-name")?,
-                    text_tag: None,
-                    text_insertion: end,
-                    text: TextProperties::default(),
-                });
-                return Ok(Some(Frame::AutomaticStyle));
-            }
-            return Ok(Some(Frame::Other));
-        }
-        if parent == Some(Frame::AutomaticStyle) {
-            if ns == Some(STYLE_NS) && local == b"text-properties" {
-                let text = TextProperties {
-                    font_weight: self.attribute(element, FO_NS, b"font-weight")?,
-                    font_style: self.attribute(element, FO_NS, b"font-style")?,
-                    underline: self.attribute(element, STYLE_NS, b"text-underline-style")?,
-                    font_size: self.attribute(element, FO_NS, b"font-size")?,
-                    color: self.attribute(element, FO_NS, b"color")?,
-                    font_name: self.attribute(element, STYLE_NS, b"font-name")?,
-                    font_family: self.attribute(element, FO_NS, b"font-family")?,
-                };
-                if let Some(style) = &mut self.style
-                    && style.text_tag.is_none()
-                {
-                    style.text_tag = Some(start..end);
-                    style.text = text;
-                }
-                return Ok(Some(Frame::Other));
-            }
-            if ns == Some(STYLE_NS) && local.ends_with(b"-properties") {
-                return Ok(Some(Frame::StyleProperties));
-            }
-            return Ok(Some(Frame::Other));
-        }
-        Ok(None)
+        // The styles' own subtree is not part of the scene.
+        (self.parent() == Some(Frame::AutomaticStyles)).then_some(Frame::Opaque)
     }
 
     fn read_prefixes(&mut self, element: &BytesStart<'_>) -> Result<()> {
@@ -1152,22 +1096,9 @@ impl Scanner<'_> {
             Frame::AutomaticStyles => {
                 if !empty {
                     self.styles_insertion = StylesInsertion::Before(content_end);
-                }
-            },
-            Frame::AutomaticStyle => {
-                if let Some(mut style) = self.style.take() {
-                    style.range.end = end;
-                    if self.styles.len() >= MAX_ITEMS {
-                        return Err(invalid("ODP content exceeds the automatic style limit"));
+                    if let Some(range) = &mut self.styles_range {
+                        range.end = content_end;
                     }
-                    self.styles.push(style);
-                }
-            },
-            Frame::StyleProperties => {
-                if let Some(style) = &mut self.style
-                    && style.text_tag.is_none()
-                {
-                    style.text_insertion = end;
                 }
             },
             Frame::Forms => {

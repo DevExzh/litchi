@@ -891,6 +891,10 @@ impl<'a> Planner<'a> {
     /// it, and insert the new styles into `office:automatic-styles`.
     fn finish_formats(&mut self) -> Result<()> {
         let formats = std::mem::take(&mut self.formats);
+        if formats.is_empty() {
+            return Ok(());
+        }
+        let styles = self.scene.automatic_styles(self.xml)?;
         let mut definitions = String::new();
         let mut taken: Vec<String> = Vec::new();
         for format in formats {
@@ -904,14 +908,14 @@ impl<'a> Planner<'a> {
             let base = format
                 .base
                 .as_deref()
-                .and_then(|name| self.scene.automatic_style(format.family, name));
+                .and_then(|name| styles.get(format.family, name));
             if base.is_some_and(|style| style.text.satisfies(&format.properties)) {
                 continue;
             }
             let style = self.prefix(self.scene.prefixes.style.as_ref(), "style")?;
             let fo = self.prefix(self.scene.prefixes.fo.as_ref(), "XSL-FO")?;
             let text = self.text_prefix()?;
-            let name = self.fresh_style_name(format.family, &taken);
+            let name = fresh_style_name(&styles, format.family, &taken);
             let changes = format.properties.attributes(style, fo);
             let definition = match base {
                 Some(base) => self.derive_style(base, &name, &changes, style)?,
@@ -1031,26 +1035,6 @@ impl<'a> Planner<'a> {
             },
         }
         Ok(out)
-    }
-
-    /// An automatic style name unused in the content and in this plan:
-    /// `T<n>` for text styles, `P<n>` for paragraph styles.
-    fn fresh_style_name(&self, family: &str, taken: &[String]) -> String {
-        let letter = if family == "paragraph" { 'P' } else { 'T' };
-        let mut number = self.scene.styles.len() + taken.len() + 1;
-        loop {
-            let candidate = format!("{letter}{number}");
-            let used = taken.contains(&candidate)
-                || self
-                    .scene
-                    .styles
-                    .iter()
-                    .any(|style| style.name == candidate);
-            if !used {
-                return candidate;
-            }
-            number += 1;
-        }
     }
 
     /// Replace a self-closing element with its open form holding `content`.
@@ -1409,6 +1393,20 @@ impl<'a> Planner<'a> {
 }
 
 /// The qualified name of a paragraph's start tag.
+/// An automatic style name unused in the content and in this plan: `T<n>`
+/// for text styles, `P<n>` for paragraph styles.
+fn fresh_style_name(styles: &super::AutomaticStyles, family: &str, taken: &[String]) -> String {
+    let letter = if family == "paragraph" { 'P' } else { 'T' };
+    let mut number = styles.as_slice().len() + taken.len() + 1;
+    loop {
+        let candidate = format!("{letter}{number}");
+        if !taken.contains(&candidate) && !styles.has_name(&candidate) {
+            return candidate;
+        }
+        number += 1;
+    }
+}
+
 /// A new `style:text-properties` element carrying `changes`.
 fn text_properties_tag(style: &str, changes: &[(String, Option<String>)]) -> String {
     let mut out = format!("<{style}:text-properties");

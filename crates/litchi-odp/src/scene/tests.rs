@@ -476,18 +476,19 @@ fn edit(build: impl FnOnce(&mut TextPropertyEdit)) -> TextPropertyEdit {
 fn automatic_styles_are_indexed() {
     let xml = styled();
     let scene = Scene::parse(&xml).unwrap();
-    assert_eq!(scene.automatic_styles().len(), 2);
+    let styles = scene.automatic_styles(&xml).unwrap();
+    assert_eq!(styles.as_slice().len(), 2);
     let span = &scene.pages()[0].objects()[0].story().unwrap().paragraphs()[0].runs()[1];
-    let properties = scene.run_text_properties(span).unwrap();
+    let properties = styles.run_text_properties(span).unwrap();
     assert_eq!(properties.bold(), Some(true));
     assert_eq!(properties.color(), Some("#112233"));
     assert_eq!(properties.italic(), None);
     let paragraph = &scene.pages()[0].objects()[0].story().unwrap().paragraphs()[0];
     assert_eq!(
-        scene.paragraph_text_properties(paragraph),
+        styles.paragraph_text_properties(paragraph),
         Some(&TextProperties::default())
     );
-    assert!(scene.automatic_style("text", "P1").is_none());
+    assert!(styles.get("text", "P1").is_none());
 }
 
 #[test]
@@ -506,9 +507,10 @@ fn span_formatting_derives_a_new_style() {
         }],
     );
     let scene = Scene::parse(&changed).unwrap();
+    let styles = scene.automatic_styles(&changed).unwrap();
     let span = &scene.pages()[0].objects()[0].story().unwrap().paragraphs()[0].runs()[1];
     assert_ne!(span.style_name(), Some("T1"));
-    let properties = scene.run_text_properties(span).unwrap();
+    let properties = styles.run_text_properties(span).unwrap();
     // Kept from T1, and added.
     assert_eq!(properties.bold(), Some(true));
     assert_eq!(properties.color(), Some("#112233"));
@@ -516,11 +518,7 @@ fn span_formatting_derives_a_new_style() {
     assert_eq!(properties.size(), Some("24pt"));
     // T1 itself is unchanged.
     assert_eq!(
-        scene
-            .automatic_style("text", "T1")
-            .unwrap()
-            .text_properties()
-            .italic(),
+        styles.get("text", "T1").unwrap().text_properties().italic(),
         None
     );
     assert_eq!(scene.pages()[0].objects()[0].text(), "Hello big world");
@@ -559,27 +557,26 @@ fn plain_text_runs_are_wrapped_and_paragraphs_restyled() {
         ],
     );
     let scene = Scene::parse(&changed).unwrap();
+    let styles = scene.automatic_styles(&changed).unwrap();
     let title_story = scene.pages()[0].objects()[0].story().unwrap();
     let paragraph = &title_story.paragraphs()[0];
     let first = &paragraph.runs()[0];
     assert_eq!(first.text(), "Hi");
     assert_eq!(first.kind(), RunKind::Span);
     assert_eq!(
-        scene.run_text_properties(first).unwrap().underline(),
+        styles.run_text_properties(first).unwrap().underline(),
         Some(true)
     );
-    let restyled = scene.paragraph_text_properties(paragraph).unwrap();
+    let restyled = styles.paragraph_text_properties(paragraph).unwrap();
     assert_eq!(restyled.font(), Some("Liberation Sans"));
     // The derived paragraph style keeps P1's paragraph properties.
-    let derived = scene
-        .automatic_style("paragraph", paragraph.style_name().unwrap())
+    let derived = styles
+        .get("paragraph", paragraph.style_name().unwrap())
         .unwrap();
     assert!(changed[derived.range()].contains(r#"fo:text-align="center""#));
     // A paragraph with no style gets one with no parent.
     let body = &scene.pages()[0].objects()[1].story().unwrap().paragraphs()[0];
-    let style = scene
-        .automatic_style("paragraph", body.style_name().unwrap())
-        .unwrap();
+    let style = styles.get("paragraph", body.style_name().unwrap()).unwrap();
     assert_eq!(style.parent(), None);
     assert_eq!(style.text_properties().bold(), Some(true));
 }

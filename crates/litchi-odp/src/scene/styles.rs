@@ -148,6 +148,230 @@ impl AutomaticStyle {
     }
 }
 
+/// The automatic styles of one presentation body, from
+/// [`super::Scene::automatic_styles`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AutomaticStyles {
+    pub(crate) styles: Vec<AutomaticStyle>,
+    /// Positions into `styles`, sorted by family and name.
+    pub(crate) order: Vec<usize>,
+}
+
+impl AutomaticStyles {
+    /// The styles, in document order.
+    #[must_use]
+    pub fn as_slice(&self) -> &[AutomaticStyle] {
+        &self.styles
+    }
+
+    /// The style of `family` (`text`, `paragraph`, ...) named `name`.
+    #[must_use]
+    pub fn get(&self, family: &str, name: &str) -> Option<&AutomaticStyle> {
+        let found = self
+            .order
+            .binary_search_by(|&index| {
+                let style = &self.styles[index];
+                (style.family.as_str(), style.name.as_str()).cmp(&(family, name))
+            })
+            .ok()?;
+        self.styles.get(self.order[found])
+    }
+
+    /// The character properties a paragraph's automatic style sets locally
+    /// (`None` when its style is a common style or absent).
+    #[must_use]
+    pub fn paragraph_text_properties(
+        &self,
+        paragraph: &super::Paragraph,
+    ) -> Option<&TextProperties> {
+        Some(
+            self.get("paragraph", paragraph.style_name()?)?
+                .text_properties(),
+        )
+    }
+
+    /// The character properties a span's automatic style sets locally.
+    #[must_use]
+    pub fn run_text_properties(&self, run: &super::Run) -> Option<&TextProperties> {
+        if run.kind() != super::RunKind::Span {
+            return None;
+        }
+        Some(self.get("text", run.style_name()?)?.text_properties())
+    }
+
+    /// Whether a style of any family has `name`.
+    pub(crate) fn has_name(&self, name: &str) -> bool {
+        self.styles.iter().any(|style| style.name == name)
+    }
+}
+
+/// Most automatic styles indexed.
+const MAX_STYLES: usize = 1 << 20;
+
+/// Index the `style:style` children of `office:automatic-styles`, whose
+/// content is `range` of `xml`. Element and attribute names are matched by
+/// the prefixes the document root binds.
+pub(crate) fn parse(
+    xml: &str,
+    range: Option<Range<usize>>,
+    prefixes: &super::Prefixes,
+) -> Result<AutomaticStyles> {
+    use quick_xml::events::{BytesStart, Event};
+
+    let (Some(range), Some(style), Some(fo)) = (range, &prefixes.style, &prefixes.fo) else {
+        return Ok(AutomaticStyles::default());
+    };
+    let invalid = |message: String| Error::InvalidFormat(message);
+    let body = xml
+        .get(range.clone())
+        .ok_or_else(|| invalid("ODP automatic styles are outside the content".to_string()))?;
+    let qualified = |prefix: &str, local: &str| format!("{prefix}:{local}");
+    let names = [
+        qualified(style, "style"),
+        qualified(style, "text-properties"),
+        qualified(style, "name"),
+        qualified(style, "family"),
+        qualified(style, "parent-style-name"),
+        qualified(fo, "font-weight"),
+        qualified(fo, "font-style"),
+        qualified(style, "text-underline-style"),
+        qualified(fo, "font-size"),
+        qualified(fo, "color"),
+        qualified(style, "font-name"),
+        qualified(fo, "font-family"),
+    ];
+    let style_prefix = format!("{style}:");
+    let decoder = quick_xml::Reader::from_str("").decoder();
+    let attributes = |element: &BytesStart<'_>| -> Result<Vec<(usize, String)>> {
+        let mut out = Vec::new();
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| invalid(format!("invalid ODP style attribute: {error}")))?;
+            let key = attribute.key.as_ref();
+            if let Some(slot) = names.iter().position(|name| name.as_bytes() == key) {
+                let value = attribute
+                    .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                    .map_err(|error| invalid(format!("invalid ODP style attribute: {error}")))?;
+                out.push((slot, value.into_owned()));
+            }
+        }
+        Ok(out)
+    };
+    let mut reader = quick_xml::Reader::from_str(body);
+    reader.config_mut().check_end_names = true;
+    let mut styles: Vec<AutomaticStyle> = Vec::new();
+    let mut open: Option<AutomaticStyle> = None;
+    let mut depth = 0_usize;
+    let mut properties_open = false;
+    loop {
+        let start = range.start + usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid ODP automatic styles: {error}")))?;
+        let end = range.start + usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let empty = end > start && xml.as_bytes().get(end - 2) == Some(&b'/');
+                let name = element.name();
+                let name = name.as_ref();
+                if depth == 0 && name == names[0].as_bytes() {
+                    let mut started = AutomaticStyle {
+                        range: start..end,
+                        start_tag: start..end,
+                        empty,
+                        name: String::new(),
+                        family: String::new(),
+                        parent: None,
+                        text_tag: None,
+                        text_insertion: end,
+                        text: TextProperties::default(),
+                    };
+                    for (slot, value) in attributes(&element)? {
+                        match slot {
+                            2 => started.name = value,
+                            3 => started.family = value,
+                            4 => started.parent = Some(value),
+                            _ => {},
+                        }
+                    }
+                    if empty {
+                        styles.push(started);
+                    } else {
+                        open = Some(started);
+                    }
+                } else if depth == 1
+                    && let Some(current) = &mut open
+                {
+                    if name == names[1].as_bytes() {
+                        if current.text_tag.is_none() {
+                            current.text_tag = Some(start..end);
+                            let text = &mut current.text;
+                            for (slot, value) in attributes(&element)? {
+                                let field = match slot {
+                                    5 => &mut text.font_weight,
+                                    6 => &mut text.font_style,
+                                    7 => &mut text.underline,
+                                    8 => &mut text.font_size,
+                                    9 => &mut text.color,
+                                    10 => &mut text.font_name,
+                                    11 => &mut text.font_family,
+                                    _ => continue,
+                                };
+                                *field = Some(value);
+                            }
+                        }
+                    } else if name.starts_with(style_prefix.as_bytes())
+                        && name.ends_with(b"-properties")
+                        && current.text_tag.is_none()
+                    {
+                        // A start tag's end is set at its end tag.
+                        if empty {
+                            current.text_insertion = end;
+                        } else {
+                            properties_open = true;
+                        }
+                    }
+                }
+                if !empty {
+                    depth += 1;
+                }
+            },
+            Event::End(_) => {
+                depth = depth.saturating_sub(1);
+                if depth == 1
+                    && properties_open
+                    && let Some(current) = &mut open
+                {
+                    // A new text-properties goes after the last other
+                    // properties child.
+                    current.text_insertion = end;
+                    properties_open = false;
+                }
+                if depth == 0
+                    && let Some(mut finished) = open.take()
+                {
+                    finished.range.end = end;
+                    styles.push(finished);
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        if styles.len() > MAX_STYLES {
+            return Err(invalid(
+                "ODP content exceeds the automatic style limit".to_string(),
+            ));
+        }
+    }
+    let mut order: Vec<usize> = (0..styles.len()).collect();
+    order.sort_by(|&left, &right| {
+        let (left, right) = (&styles[left], &styles[right]);
+        (left.family.as_str(), left.name.as_str())
+            .cmp(&(right.family.as_str(), right.name.as_str()))
+    });
+    Ok(AutomaticStyles { styles, order })
+}
+
 /// Where new automatic styles go in `content.xml`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) enum StylesInsertion {

@@ -51,7 +51,7 @@ use litchi_core::Result;
 
 use change::Fragment;
 pub use change::{Attribute, Change, NewPage, NewTextBox, ObjectRef, Scope, StoryRef};
-pub use styles::{AutomaticStyle, TextProperties, TextPropertyEdit};
+pub use styles::{AutomaticStyle, AutomaticStyles, TextProperties, TextPropertyEdit};
 
 /// Apply `changes` to the `content.xml` of `source` as checked splices.
 ///
@@ -100,10 +100,9 @@ pub struct Scene {
     /// before the end tag of `office:presentation`.
     pub(crate) body_end: Option<usize>,
     pub(crate) len: usize,
-    /// The automatic styles of the content, in document order.
-    pub(crate) styles: Vec<AutomaticStyle>,
-    /// Positions into `styles`, sorted by family and name.
-    pub(crate) style_order: Vec<usize>,
+    /// The content of `office:automatic-styles`, indexed on demand by
+    /// [`Scene::automatic_styles`].
+    pub(crate) styles_range: Option<Range<usize>>,
     /// Where new automatic styles go.
     pub(crate) styles_insertion: styles::StylesInsertion,
 }
@@ -159,43 +158,22 @@ impl Scene {
         self.len == 0
     }
 
-    /// The automatic styles of `office:automatic-styles`, in document
-    /// order.
-    #[must_use]
-    pub fn automatic_styles(&self) -> &[AutomaticStyle] {
-        &self.styles
-    }
-
-    /// The automatic style of `family` (`text`, `paragraph`, ...) named
-    /// `name`.
-    #[must_use]
-    pub fn automatic_style(&self, family: &str, name: &str) -> Option<&AutomaticStyle> {
-        let found = self
-            .style_order
-            .binary_search_by(|&index| {
-                let style = &self.styles[index];
-                (style.family.as_str(), style.name.as_str()).cmp(&(family, name))
-            })
-            .ok()?;
-        self.styles.get(self.style_order[found])
-    }
-
-    /// The character properties a paragraph's automatic style sets locally
-    /// (empty when its style is a common style or absent).
-    #[must_use]
-    pub fn paragraph_text_properties(&self, paragraph: &Paragraph) -> Option<&TextProperties> {
-        let name = paragraph.style_name()?;
-        Some(self.automatic_style("paragraph", name)?.text_properties())
-    }
-
-    /// The character properties a span's automatic style sets locally.
-    #[must_use]
-    pub fn run_text_properties(&self, run: &Run) -> Option<&TextProperties> {
-        if run.kind() != RunKind::Span {
-            return None;
+    /// Index the automatic styles of `xml`, the text this scene indexes
+    /// (`office:automatic-styles`: each `style:style`, its family, parent
+    /// and `style:text-properties`). The scan only records where they are,
+    /// so reading a presentation does not pay for them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::InvalidFormat`] when `xml` is not the
+    /// text this scene indexes or its styles are malformed.
+    pub fn automatic_styles(&self, xml: &str) -> Result<AutomaticStyles> {
+        if xml.len() != self.len {
+            return Err(litchi_core::Error::InvalidFormat(
+                "the ODP scene does not index this content".to_string(),
+            ));
         }
-        let name = run.style_name()?;
-        Some(self.automatic_style("text", name)?.text_properties())
+        styles::parse(xml, self.styles_range.clone(), &self.prefixes)
     }
 
     /// Resolve an object reference against this scene.
