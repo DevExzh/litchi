@@ -166,6 +166,7 @@ fn shape_type_to_escher(shape_type: ShapeType) -> u16 {
         ShapeType::Rectangle | ShapeType::Placeholder => escher_shape_type::RECTANGLE,
         ShapeType::TextBox => escher_shape_type::TEXT_BOX,
         ShapeType::Line => escher_shape_type::LINE,
+        ShapeType::Connector => 32, // STRAIGHT_CONNECTOR_1
         ShapeType::Ellipse => escher_shape_type::ELLIPSE,
         ShapeType::RoundRectangle => escher_shape_type::ROUND_RECTANGLE,
         ShapeType::Diamond => escher_shape_type::DIAMOND,
