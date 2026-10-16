@@ -1884,10 +1884,10 @@ xls	sheet	edit	supported		ok tx.set
 xls	sheet	batch	supported		ok set item
 xls	sheet	create	supported		ok format
 xls	sheet	save	supported		ok format
-xls	cell	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
-xls	cell	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
-xls	cell	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
-xls	cell	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
+xls	cell	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1
+xls	cell	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1
+xls	cell	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xls/external-ref.xls
+xls	cell	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1
 xls	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 {"formula":"7"}
 xls	cell	add	n/a	add not offered for this element	-
 xls	cell	remove	supported		ok `create() + add sheet` /sheet[1]/A1
@@ -1897,10 +1897,10 @@ xls	cell	edit	supported		ok tx.set
 xls	cell	batch	supported		ok set item
 xls	cell	create	supported		ok format
 xls	cell	save	supported		ok format
-xls	range	get	supported		ok 6 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1:B2
-xls	range	find	supported		ok 6 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1:B2
+xls	range	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1:B2
+xls	range	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1:B2
 xls	range	query	n/a	query not offered for this element	-
-xls	range	view	supported		ok 6 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1:B2
+xls	range	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1:B2
 xls	range	set	n/a	set not offered for this element	-
 xls	range	add	n/a	add not offered for this element	-
 xls	range	remove	n/a	remove not offered for this element	-
@@ -1910,10 +1910,10 @@ xls	range	edit	n/a	edit not offered for this element	-
 xls	range	batch	n/a	batch not offered for this element	-
 xls	range	create	supported		ok format
 xls	range	save	supported		ok format
-xls	row	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
-xls	row	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
-xls	row	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
-xls	row	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
+xls	row	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/row[1]
+xls	row	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/row[1]
+xls	row	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xls/external-ref.xls
+xls	row	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/row[1]
 xls	row	set	supported		ok `create() + add sheet` /sheet[1]/row[1] {"height":"12pt"}
 xls	row	add	supported		ok /sheet[1]/row[1] on `create()` under /sheet[1] {} at start
 xls	row	remove	supported		ok `create() + add row` /sheet[1]/row[1]
@@ -1923,10 +1923,10 @@ xls	row	edit	supported		ok tx.set
 xls	row	batch	supported		ok set item
 xls	row	create	supported		ok format
 xls	row	save	supported		ok format
-xls	column	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
-xls	column	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
-xls	column	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
-xls	column	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
+xls	column	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/col[A]
+xls	column	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/col[A]
+xls	column	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xls/external-ref.xls
+xls	column	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/col[A]
 xls	column	set	supported		ok `create() + add sheet` /sheet[1]/col[A] {"width":"1.5"}
 xls	column	add	supported		ok /sheet[1]/col[A] on `create()` under /sheet[1] {} at start
 xls	column	remove	supported		ok `create() + add column` /sheet[1]/col[A]
@@ -3760,7 +3760,7 @@ odp	paragraph	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slid
 odp	paragraph	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
 odp	paragraph	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	paragraph	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
-odp	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] {"text":"Litchi"}
+odp	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] {"bold":"true"}
 odp	paragraph	add	supported		ok /slide[1]/shape[1]/paragraph[2] on `create() + add slide + add shape` under /slide[1]/shape[1] {}
 odp	paragraph	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]
 odp	paragraph	move	format-verb		refused unsupported_capability
@@ -3773,7 +3773,7 @@ odp	run	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/t
 odp	run	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]/run[1]
 odp	run	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	run	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]/run[1]
-odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"text":"Litchi"}
+odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
 odp	run	add	n/a	add not offered for this element	-
 odp	run	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1]
 odp	run	move	format-verb		unreached
