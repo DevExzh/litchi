@@ -16,7 +16,9 @@ use litchi_iwa_protos::numbers_formula_codec::{
 };
 
 mod writer;
-pub use writer::{MergeWrite, rewrite_table_merges};
+pub use writer::{
+    MergeWrite, derive_merge_owner_uuid, rewrite_table_merges, rewrite_table_merges_derived,
+};
 
 const TABLE_MODEL_TABLE_ID_FIELD: u32 = 1;
 const TABLE_MODEL_ROWS_FIELD: u32 = 6;
@@ -244,6 +246,10 @@ struct TableUuid {
 }
 
 impl TableUuid {
+    const fn value(self) -> u128 {
+        ((self.upper as u128) << 64) | self.lower as u128
+    }
+
     const fn owner_cfuuid_words(self) -> [u32; 4] {
         let owner_lower = self.upper.swap_bytes();
         let owner_upper = self.lower.swap_bytes();

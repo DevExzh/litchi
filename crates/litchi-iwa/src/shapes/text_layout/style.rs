@@ -405,6 +405,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        deprecated,
+        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+    )]
     fn scratch_suite_text_boxes_support_composable_layout_crud() {
         let inset = Inset::from_points(9.0).unwrap();
         let layout = Layout::new(

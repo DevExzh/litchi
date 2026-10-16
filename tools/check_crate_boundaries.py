@@ -73846,7 +73846,9 @@ def _audit_table_merge_transaction_source_topology(
 
     marker_groups = {
         "source-preserving writer": (
-            ("rewrite_table_merges",),
+            # The derived entry point takes the new owner UUID from the
+            # table UUID instead of ambient randomness (record 0300).
+            ("rewrite_table_merges", "rewrite_table_merges_derived"),
             (
                 "replace_message_preserving_header_with_limits",
                 "rewrite_model",

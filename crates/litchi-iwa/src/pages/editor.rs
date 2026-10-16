@@ -5708,7 +5708,6 @@ mod drawable_order_projection_tests {
     fn order(identifiers: &[u64]) -> Vec<u8> {
         tp::DrawablesZOrderArchive {
             drawables: identifiers.iter().copied().map(reference).collect(),
-            ..Default::default()
         }
         .encode_to_vec()
     }

@@ -7,7 +7,6 @@
 
 use std::{fmt, sync::Arc};
 
-use litchi_core::id::generate_guid_bytes;
 use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
 use litchi_iwa_core::RawMessage;
@@ -477,7 +476,7 @@ fn rewrite_model(
         return Err(Error::InvalidSource);
     }
     let limits = writer_limits(budget, bounds, before.len().max(after.len()))?;
-    let write = table_merges::rewrite_table_merges(&current, after, generate_guid_bytes(), limits)
+    let write = table_merges::rewrite_table_merges_derived(&current, after, limits)
         .map_err(map_merge_error)?;
     if !write.changed || write.data.as_slice() == current.as_slice() {
         return Err(Error::Verification);

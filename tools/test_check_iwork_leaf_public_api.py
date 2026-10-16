@@ -260,6 +260,59 @@ class IworkLeafPublicApiGateTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("non-allowlisted crate", failures[0])
 
+    def test_shared_table_value_modules_are_allowlisted_narrowly(self) -> None:
+        for path in (
+            "litchi_iwa_common::table::model::Table",
+            "litchi_iwa_common::table::model::Builder",
+            "litchi_iwa_common::table::coordinate::CellPosition",
+            "litchi_iwa_common::table::cell::value::Value",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    public_api.violations(document(leak=path), "litchi_numbers"), []
+                )
+        for path in (
+            # Sibling modules and the crate root stay forbidden.
+            "litchi_iwa_common::table::merge::Region",
+            "litchi_iwa_common::wire::RawWireField",
+            "litchi_iwa_common::table::model",
+            # An allowlisted module cannot launder a physical name.
+            "litchi_iwa_common::table::model::WireView",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    len(public_api.violations(document(leak=path), "litchi_numbers")),
+                    1,
+                )
+
+    def test_allowlisted_value_modules_import_no_physical_crate(self) -> None:
+        source_root = public_api.ROOT / "crates" / "litchi-iwa-common" / "src"
+        sibling_modules = {prefix[1:] for prefix in public_api.ALLOWED_SEMANTIC_MODULES}
+        for prefix, reason in public_api.ALLOWED_SEMANTIC_MODULES.items():
+            with self.subTest(module="::".join(prefix)):
+                self.assertTrue(reason)
+                self.assertEqual(prefix[0], "litchi_iwa_common")
+                source = source_root.joinpath(*prefix[1:-1], f"{prefix[-1]}.rs")
+                text = source.read_text(encoding="utf-8")
+                production = text.split("#[cfg(test)]", 1)[0]
+                for line in production.splitlines():
+                    statement = line.strip()
+                    if not statement.startswith(("use ", "pub use ", "mod ", "pub mod ")):
+                        continue
+                    if statement.startswith(("use std::", "pub use std::")):
+                        continue
+                    if statement.startswith(("use super::", "pub use super::")):
+                        target = statement.split("super::", 1)[1].split("::")
+                        module = tuple(prefix[1:-1]) + tuple(
+                            part.strip("{};, ") for part in target[:-1]
+                        )
+                        self.assertTrue(
+                            any(module == sibling[: len(module)] for sibling in sibling_modules),
+                            f"{source}: {statement}",
+                        )
+                        continue
+                    self.fail(f"{source}: unexpected import or module `{statement}`")
+
     def test_local_generated_wire_archive_and_raw_names_are_rejected(self) -> None:
         for name, expected in (
             ("GeneratedSettings", "generated type"),

@@ -109,7 +109,7 @@ fn set_focused_table_name(
     let commit = match result {
         Ok(commit) => commit,
         Err(
-            litchi_keynote::slide::table::name::transaction::Error::InvalidSource { .. }
+            litchi_keynote::slide::table::name::transaction::Error::InvalidSource
             | litchi_keynote::slide::table::name::transaction::Error::UnsupportedDependency
             | litchi_keynote::slide::table::name::transaction::Error::UnsupportedSource,
         ) => {

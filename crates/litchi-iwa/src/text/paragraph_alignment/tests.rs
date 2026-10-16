@@ -390,6 +390,10 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn named_paragraph_style_application_and_replacement_deletion_are_transactional() {
     let mut pages = PagesEditor::create_with_text("Pages style application").unwrap();
     let first = pages
@@ -672,6 +676,10 @@ fn assert_keynote_style_lifecycle(editor: &mut KeynoteEditor, drawable_object_id
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn named_paragraph_style_redefinition_propagates_across_suites() {
     let mut pages = PagesEditor::create_with_text("Pages redefine").unwrap();
     let first = pages
@@ -1537,6 +1545,10 @@ fn native_paragraph_flow_rejects_noncanonical_boolean_wire() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
     let mut pages = PagesEditor::create_with_text("Scripts").unwrap();
     let pages_box = pages
@@ -1689,6 +1701,10 @@ fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
     let pages_shift = TextBaselineShift::from_points(4.0).unwrap();
     let mut pages = PagesEditor::create_with_text("Baseline shifts").unwrap();
@@ -1840,6 +1856,10 @@ fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
     let pages_shift = TextBaselineShift::from_points(4.0).unwrap();
@@ -2000,6 +2020,10 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
     let mut pages = PagesEditor::create_with_text("Ligatures").unwrap();
@@ -2158,6 +2182,10 @@ fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
     let mut pages = PagesEditor::create_with_text("Outlines").unwrap();
@@ -2306,6 +2334,10 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
     let mut pages = PagesEditor::create_with_text("Shadows").unwrap();
@@ -2454,6 +2486,10 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
     let pages_background = Background::Color(
         RgbaColor::new(0.95, 0.42, 0.17, 0.72, RgbColorSpace::DisplayP3).unwrap(),
@@ -2610,6 +2646,10 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
     let background = ParagraphBackground::Color(
         RgbaColor::new(1.0, 0.588_738_74, 0.552_926_2, 1.0, RgbColorSpace::Srgb).unwrap(),
@@ -2715,6 +2755,10 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
     let borders = Borders::Bordered(
         Border::new(
@@ -2840,6 +2884,10 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
     let flow = ParagraphFlow::new()
         .with_keep_lines_together(true)
@@ -2960,6 +3008,10 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
     let mut pages = PagesEditor::create_with_text("Directions").unwrap();
     let pages_box = pages
@@ -3070,6 +3122,10 @@ fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
     let interval = ParagraphDefaultTabInterval::from_points(54.0).unwrap();
     let character = ParagraphDecimalTabCharacter::COMMA;
@@ -3263,6 +3319,10 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
     let pages_font = TextFont::named("Georgia-Bold").unwrap();
     let pages_background =
@@ -3415,6 +3475,10 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
     let mut pages = PagesEditor::create_with_text("Caps").unwrap();
     let pages_box = pages
@@ -3546,6 +3610,10 @@ fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
     let pages_color = RgbaColor::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::DisplayP3).unwrap();
     let mut pages = PagesEditor::create_with_text("Colors").unwrap();
@@ -3672,6 +3740,10 @@ fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() {
     let pages_decorations = TextDecorations::new(TextUnderline::Single, TextStrikethrough::Double);
     let mut pages = PagesEditor::create_with_text("Decorations").unwrap();
@@ -3822,6 +3894,10 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
     let pages_style = TextStyle::new(TextPointSize::from_points(19.5).unwrap()).with_bold(true);
     let mut pages = PagesEditor::create_with_text("Character formatting").unwrap();
@@ -4328,6 +4404,10 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn keynote_spacing_reset_preserves_alignment() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let created = editor

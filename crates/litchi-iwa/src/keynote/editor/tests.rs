@@ -2019,6 +2019,10 @@ fn build_crud_tracks_only_native_uuid_objects_and_releases_highwater() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn slide_owned_text_storage_crud_covers_placeholders_and_text_boxes() {
     let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
     let text = editor.slide_text_storages(0).unwrap();
@@ -2157,6 +2161,10 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
     let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();
@@ -2223,6 +2231,10 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn ordinary_text_box_geometry_updates_are_guarded_and_byte_exact() {
     let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
     let original = editor.slide_text_box_geometry(0, 17).unwrap();
@@ -2278,6 +2290,10 @@ fn ordinary_text_box_geometry_updates_are_guarded_and_byte_exact() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn ordinary_text_box_properties_updates_are_guarded_and_byte_exact() {
     let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
     let original = editor.slide_text_box_properties(0, 17).unwrap();
@@ -2326,6 +2342,10 @@ fn ordinary_text_box_properties_updates_are_guarded_and_byte_exact() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_box_duplicate_delete_tracks_package_highwater_and_slide_uuids() {
     let mut package = test_package_with_text_box();
     let uuid_entry = |identifier| ObjectUuidMapEntry {
@@ -2395,6 +2415,10 @@ fn text_box_duplicate_delete_tracks_package_highwater_and_slide_uuids() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
     let mut package = test_package_with_text_box();
     package
@@ -2822,6 +2846,10 @@ fn slide_layout_update_materializes_and_removes_image_graphs() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn creates_slide_with_materialized_layout_image_graph() {
     let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
     let photo = editor
@@ -2902,6 +2930,10 @@ fn slide_layout_update_materializes_and_removes_live_video_graphs() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn creates_slide_with_materialized_layout_live_video_graph() {
     let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
     let live_video = editor
@@ -2981,6 +3013,10 @@ fn slide_layout_update_materializes_and_removes_file_movie_placeholders() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn creates_slide_with_materialized_file_movie_placeholder_graph() {
     let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(1)).unwrap();
     let movie_layout = editor
@@ -3106,6 +3142,10 @@ fn generated_movie_identities(
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn static_layout_movies_remain_template_only_for_update_and_creation() {
     let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(0)).unwrap();
     let movie_layout = editor
@@ -3693,6 +3733,10 @@ fn current_slide_layout_rejects_multiple_theme_mappings() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn creates_empty_slide_from_typed_theme_layout_transactionally() {
     let mut editor = KeynoteEditor::from_package(test_package_with_theme()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
@@ -3779,6 +3823,10 @@ fn duplicate_slide_tree_references_fail_transactionally() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn duplicates_slide_graph_with_independent_objects() {
     let mut package = test_package_with_slide_background();
     package
@@ -3868,6 +3916,10 @@ fn duplicates_slide_graph_with_independent_objects() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
     let mut package = test_package();
     package

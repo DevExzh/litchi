@@ -198,13 +198,12 @@ fn metadata_payload(bytes: &[u8]) -> TestResult<Vec<u8>> {
     let mut payload = None;
     for object in &component.archive().objects {
         for message in &object.messages {
-            if message.type_ == METADATA_MESSAGE_TYPE {
-                if payload.replace(message.data.clone()).is_some() {
-                    return Err(io::Error::other(
-                        "package contains multiple PackageMetadata payloads",
-                    )
-                    .into());
-                }
+            if message.type_ == METADATA_MESSAGE_TYPE
+                && payload.replace(message.data.clone()).is_some()
+            {
+                return Err(
+                    io::Error::other("package contains multiple PackageMetadata payloads").into(),
+                );
             }
         }
     }

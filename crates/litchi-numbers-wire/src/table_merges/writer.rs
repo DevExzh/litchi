@@ -101,6 +101,63 @@ pub fn rewrite_table_merges(
     owner_uuid: [u8; 16],
     limits: ReadLimits,
 ) -> Result<MergeWrite, MergeReadError> {
+    rewrite(source, regions, OwnerUuid::Supplied(owner_uuid), limits)
+}
+
+/// Rewrite the native table-model merge set without ambient randomness.
+///
+/// Identical to [`rewrite_table_merges`], except that a merge owner created
+/// by this call takes a UUID derived from the table model's own `table_id`
+/// (see [`derive_merge_owner_uuid`]) instead of a caller-supplied value. Two
+/// identical rewrites of identical sources are therefore byte-identical, as
+/// ADR 0034 §9 requires of writers, and distinct tables still receive
+/// distinct owners.
+pub fn rewrite_table_merges_derived(
+    source: &[u8],
+    regions: &[Region],
+    limits: ReadLimits,
+) -> Result<MergeWrite, MergeReadError> {
+    rewrite(source, regions, OwnerUuid::Derived, limits)
+}
+
+/// Source of the UUID for a newly created merge owner.
+#[derive(Debug, Clone, Copy)]
+enum OwnerUuid {
+    Supplied([u8; 16]),
+    Derived,
+}
+
+/// Domain separator for owner UUIDs derived from a table UUID, so a derived
+/// owner never equals the table UUID or its byte-swapped formula owner form.
+const MERGE_OWNER_DOMAIN: u128 = 0x6c69_7463_6869_2e6d_6572_6765_2d6f_776e;
+
+/// Derive the merge-owner UUID bytes for one table UUID.
+///
+/// The mapping is a fixed bijection of the 128-bit table UUID (domain XOR,
+/// then odd-multiplier and xor-shift rounds), so distinct tables map to
+/// distinct pre-image values; the RFC 4122 version-4 and variant bits are then
+/// set, matching the shape of the random owners this replaces.
+#[must_use]
+pub fn derive_merge_owner_uuid(table_uuid: u128) -> [u8; 16] {
+    const MULTIPLIER: u128 = 0x2360_ed05_1fc6_5da4_4385_df64_9fcc_f645;
+    let mut value = table_uuid ^ MERGE_OWNER_DOMAIN;
+    for _ in 0..2 {
+        value ^= value >> 67;
+        value = value.wrapping_mul(MULTIPLIER);
+        value ^= value >> 59;
+    }
+    let mut bytes = value.to_le_bytes();
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    bytes
+}
+
+fn rewrite(
+    source: &[u8],
+    regions: &[Region],
+    owner_uuid: OwnerUuid,
+    limits: ReadLimits,
+) -> Result<MergeWrite, MergeReadError> {
     let current = super::read_table_merges(source, limits)?;
     let mut decoder = Decoder::new(limits);
     decoder.report = current.report;
@@ -339,6 +396,10 @@ pub fn rewrite_table_merges(
         return finish_candidate(data, current_regions, regions, decoder, limits);
     }
 
+    let owner_uuid = match owner_uuid {
+        OwnerUuid::Supplied(bytes) => bytes,
+        OwnerUuid::Derived => derive_merge_owner_uuid(table_uuid.value()),
+    };
     let owner_id = match encode_owner_id(&mut decoder, owner_uuid, limits.wire.max_output_bytes()) {
         Ok(owner_id) => owner_id,
         Err(error) => return Err(decoder.failure(error)),
@@ -1365,6 +1426,41 @@ mod tests {
         let mut model = model_without_owner();
         model.extend(bytes_field(TABLE_MODEL_MERGE_OWNER_FIELD, &owner));
         model
+    }
+
+    #[test]
+    fn derived_owner_rewrites_are_deterministic_and_table_specific() {
+        let region = Region::new(1, 2, 2, 3).expect("region");
+        let write = |source: &[u8]| {
+            rewrite_table_merges_derived(source, &[region], ReadLimits::default())
+                .expect("write")
+                .data
+        };
+        let first = write(&model_without_owner());
+        assert_eq!(first, write(&model_without_owner()));
+        assert_eq!(
+            read_table_merges(&first, ReadLimits::default())
+                .expect("read")
+                .regions,
+            [region]
+        );
+        let table_uuid = 0x0011_2233_4455_6677_8899_aabb_ccdd_eeff_u128;
+        let owner = derive_merge_owner_uuid(table_uuid);
+        assert_eq!(
+            first,
+            rewrite_table_merges(
+                &model_without_owner(),
+                &[region],
+                owner,
+                ReadLimits::default()
+            )
+            .expect("supplied owner")
+            .data
+        );
+        assert_ne!(owner, table_uuid.to_le_bytes());
+        assert_ne!(owner, derive_merge_owner_uuid(table_uuid ^ 1));
+        assert_eq!(owner[6] >> 4, 4);
+        assert_eq!(owner[8] >> 6, 0b10);
     }
 
     #[test]

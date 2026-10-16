@@ -256,7 +256,7 @@ mod cases {
             .map_err(|error| format!("focused movie creation failed: {error}"))?;
         reopen_focused_package(editor, commit.package())?;
         let package = focused_package(editor)?;
-        Ok(movie_snapshot(&package, 0)?)
+        movie_snapshot(&package, 0)
     }
 
     fn remove_movie_poster(
@@ -349,7 +349,7 @@ mod cases {
             .slides()?
             .first()
             .map_or(0, |slide| slide.movies().len() - 1);
-        Ok(movie_snapshot(&package, index)?)
+        movie_snapshot(&package, index)
     }
 
     fn remove_movie(editor: &mut KeynoteEditor, movie: MovieSelector) -> TestResult<()> {

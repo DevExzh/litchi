@@ -23,6 +23,10 @@ use litchi_iwa_text::paragraph::drop_cap::{
 };
 use litchi_iwa_text::position::TextPosition;
 
+#[expect(
+    deprecated,
+    reason = "demonstrates the legacy raw-ID Keynote editor API, which takes native object IDs; litchi_keynote::Package has no equivalent text-box route yet"
+)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let output = arguments

@@ -1148,8 +1148,10 @@ mod tests {
     #[test]
     fn catalog_charges_borrowed_semantic_reads_and_rejects_stale_revisions() {
         let package = one_object_package();
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_semantic_decodes = 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_semantic_decodes: 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         let mut catalog =
             KeynoteObjectCatalog::build_with_limits(&package, limits).expect("catalog");
         catalog
@@ -1180,8 +1182,10 @@ mod tests {
     #[test]
     fn catalog_validates_nonzero_limits_and_missing_objects() {
         let package = one_object_package();
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_objects = 0;
+        let limits = KeynoteObjectCatalogLimits {
+            max_objects: 0,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert!(matches!(
             KeynoteObjectCatalog::build_with_limits(&package, limits),
             Err(KeynoteObjectCatalogError::InvalidLimit {
@@ -1313,57 +1317,73 @@ mod tests {
         assert!(baseline.reference_edges > 1);
         assert!(baseline.retained_bytes > 1);
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_archives = baseline.archives_scanned - 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_archives: baseline.archives_scanned - 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert_limit(
             KeynoteObjectCatalog::build_with_limits(&package, limits).map(|_| ()),
             KeynoteObjectCatalogLimitKind::Archives,
         );
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_archive_reads = baseline.archive_reads - 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_archive_reads: baseline.archive_reads - 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert_limit(
             KeynoteObjectCatalog::build_with_limits(&package, limits).map(|_| ()),
             KeynoteObjectCatalogLimitKind::ArchiveReads,
         );
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_objects = baseline.objects_indexed - 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_objects: baseline.objects_indexed - 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert_limit(
             KeynoteObjectCatalog::build_with_limits(&package, limits).map(|_| ()),
             KeynoteObjectCatalogLimitKind::Objects,
         );
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_messages = baseline.messages_indexed - 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_messages: baseline.messages_indexed - 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert_limit(
             KeynoteObjectCatalog::build_with_limits(&package, limits).map(|_| ()),
             KeynoteObjectCatalogLimitKind::Messages,
         );
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_payload_bytes = baseline.payload_bytes - 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_payload_bytes: baseline.payload_bytes - 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert_limit(
             KeynoteObjectCatalog::build_with_limits(&package, limits).map(|_| ()),
             KeynoteObjectCatalogLimitKind::PayloadBytes,
         );
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_reference_edges = baseline.reference_edges - 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_reference_edges: baseline.reference_edges - 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert_limit(
             KeynoteObjectCatalog::build_with_limits(&package, limits).map(|_| ()),
             KeynoteObjectCatalogLimitKind::ReferenceEdges,
         );
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_retained_bytes = baseline.retained_bytes - 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_retained_bytes: baseline.retained_bytes - 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         assert_limit(
             KeynoteObjectCatalog::build_with_limits(&package, limits).map(|_| ()),
             KeynoteObjectCatalogLimitKind::RetainedBytes,
         );
 
-        let mut limits = KeynoteObjectCatalogLimits::default();
-        limits.max_semantic_decodes = 1;
+        let limits = KeynoteObjectCatalogLimits {
+            max_semantic_decodes: 1,
+            ..KeynoteObjectCatalogLimits::default()
+        };
         let mut catalog = KeynoteObjectCatalog::build_with_limits(&package, limits)
             .expect("semantic-read catalog");
         catalog

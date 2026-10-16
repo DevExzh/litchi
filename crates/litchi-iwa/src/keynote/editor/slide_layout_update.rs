@@ -59,27 +59,6 @@ fn slide_preview_wire_limits_for(
         })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn slide_preview_payload_limits_do_not_use_header_only_budgets() {
-        let archive_limits = ArchiveLimits::default()
-            .with_header_fields(1)
-            .unwrap()
-            .with_header_nesting(1)
-            .unwrap();
-        let wire_limits =
-            slide_preview_wire_limits_for(archive_limits, archive_limits.max_archive_bytes())
-                .unwrap();
-
-        assert!(wire_limits.max_fields() > archive_limits.max_header_fields());
-        assert_eq!(wire_limits.max_nesting(), WireLimits::MAX_NESTING);
-        assert!(wire_limits.max_rewrite_work() > 1);
-    }
-}
-
 fn invalidate_slide_preview(
     package: &mut IWorkPackage,
     archive_name: &str,
@@ -363,4 +342,25 @@ fn verify_slide_semantics(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slide_preview_payload_limits_do_not_use_header_only_budgets() {
+        let archive_limits = ArchiveLimits::default()
+            .with_header_fields(1)
+            .unwrap()
+            .with_header_nesting(1)
+            .unwrap();
+        let wire_limits =
+            slide_preview_wire_limits_for(archive_limits, archive_limits.max_archive_bytes())
+                .unwrap();
+
+        assert!(wire_limits.max_fields() > archive_limits.max_header_fields());
+        assert_eq!(wire_limits.max_nesting(), WireLimits::MAX_NESTING);
+        assert!(wire_limits.max_rewrite_work() > 1);
+    }
 }

@@ -555,12 +555,12 @@ pub mod numbers {
         AddressError, Builder, Cell, CellPosition, CellRange, ColumnDeletion, CoordinateError,
         Dimension, Dimensions, Error, Grid, GridBudget, Identity, InsertError, InsertResult,
         LimitKind, MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
-        MAX_TEXT_BYTES, MergeReader, OpenOptions, Package, PayloadLimitKind, Points, Position,
-        Range, ResourceError, Result, RowDeletion, SemanticLimitKind, SemanticLimits,
-        SemanticLimitsBuilder, SemanticPath, Sheet, SheetBuilder, SheetSelector, Size,
-        SourceLimitKind, SourceLimits, SourceLimitsBuilder, Table, TableBuilder, TableError,
-        TableSelector, TableSelectorError, View, Workbook, WriteError,
-        compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
+        MAX_TEXT_BYTES, MergeReader, OpenOptions, Package, PayloadLimitKind, Points, ResourceError,
+        Result, RowDeletion, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+        SemanticPath, Sheet, SheetBuilder, SheetSelector, Size, SourceLimitKind, SourceLimits,
+        SourceLimitsBuilder, Table, TableBuilder, TableError, TableSelector, TableSelectorError,
+        View, Workbook, WriteError, compatibility_tables_from_bytes,
+        compatibility_tables_from_bytes_with_options,
     };
     pub use litchi_numbers::{
         cell, create, formula, limits, names, package, selector, sheet, table, workbook,
