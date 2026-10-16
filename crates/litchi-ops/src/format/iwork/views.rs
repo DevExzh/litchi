@@ -7,7 +7,7 @@ use std::fmt;
 use serde::Serialize;
 
 use super::Iwork;
-use super::tree::Item;
+use super::tree::{At, Item};
 use crate::error::{Code, Error, Result};
 use crate::node::NodePath;
 use crate::view::Mode;
@@ -86,13 +86,12 @@ fn depth(item: &Item) -> usize {
 /// The `mode` view as JSON.
 pub(crate) fn view_json(file: &Iwork, mode: Mode) -> Result<Json> {
     file.checked_tree()?;
-    file.expand_all();
-    let items = file.tree().items();
+    let items = file.ordered();
     match mode {
         Mode::Text => {
             let elements: Vec<TextElement> = items
                 .iter()
-                .filter_map(|item| {
+                .filter_map(|(_, item)| {
                     let text = item.text().filter(|text| !text.is_empty())?;
                     Some(TextElement {
                         path: path(item),
@@ -117,28 +116,28 @@ pub(crate) fn view_json(file: &Iwork, mode: Mode) -> Result<Json> {
         Mode::Outline => Ok(Json::Outline(OutlineJson {
             elements: items
                 .iter()
-                .map(|item| OutlineElement {
+                .map(|(at, item)| OutlineElement {
                     path: path(item),
                     kind: item.type_name(),
                     depth: depth(item),
                     name: item.label().map(str::to_owned),
-                    child_count: item.children().len(),
+                    child_count: file.kids(*at).len(),
                 })
                 .collect(),
         })),
-        Mode::Stats => Ok(Json::Stats(stats(file))),
+        Mode::Stats => Ok(Json::Stats(stats(&items))),
         _ => Err(unsupported(file, mode)),
     }
 }
 
-fn stats(file: &Iwork) -> StatsJson {
+fn stats(items: &[(At, &Item)]) -> StatsJson {
     let mut stats = StatsJson {
-        elements: file.tree().len(),
+        elements: items.len(),
         by_type: BTreeMap::new(),
         words: 0,
         total_characters: 0,
     };
-    for item in file.tree().items() {
+    for (_, item) in items {
         *stats.by_type.entry(item.type_name()).or_default() += 1;
         if let Some(text) = item.text() {
             stats.words += text.split_whitespace().count();
@@ -151,8 +150,7 @@ fn stats(file: &Iwork) -> StatsJson {
 /// Stream the `mode` view as text.
 pub(crate) fn view_to<W: fmt::Write>(file: &Iwork, mode: Mode, out: &mut W) -> Result<()> {
     file.checked_tree()?;
-    file.expand_all();
-    let items = file.tree().items();
+    let items = file.ordered();
     let sink = |_: fmt::Error| {
         Error::new(Code::IoError, "the view output sink refused to write")
             .with_format(file.format())
@@ -161,21 +159,21 @@ pub(crate) fn view_to<W: fmt::Write>(file: &Iwork, mode: Mode, out: &mut W) -> R
         Mode::Text => {
             for text in items
                 .iter()
-                .filter_map(Item::text)
+                .filter_map(|(_, item)| item.text())
                 .filter(|text| !text.is_empty())
             {
                 writeln!(out, "{text}").map_err(sink)?;
             }
         },
         Mode::Annotated => {
-            for item in items {
+            for (_, item) in &items {
                 if let Some(text) = item.text().filter(|text| !text.is_empty()) {
                     writeln!(out, "[{}] {text}", path(item)).map_err(sink)?;
                 }
             }
         },
         Mode::Outline => {
-            for item in items {
+            for (_, item) in &items {
                 let indent = "  ".repeat(depth(item));
                 match item.label() {
                     Some(name) => writeln!(out, "{indent}{} \"{name}\"", path(item)),
@@ -185,7 +183,7 @@ pub(crate) fn view_to<W: fmt::Write>(file: &Iwork, mode: Mode, out: &mut W) -> R
             }
         },
         Mode::Stats => {
-            let stats = stats(file);
+            let stats = stats(&items);
             writeln!(out, "elements: {}", stats.elements).map_err(sink)?;
             for (kind, count) in &stats.by_type {
                 writeln!(out, "{kind}: {count}").map_err(sink)?;

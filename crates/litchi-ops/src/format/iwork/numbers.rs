@@ -515,17 +515,20 @@ fn region_ref(region: Region) -> String {
     format!("{start}:{end}")
 }
 
-/// Build the tree of `package`, reading each table's merged regions.
+/// Build the eager tree of `package`: the workbook, its sheets and their
+/// tables, reading each table's merged regions. A table's cells and merged
+/// ranges are a lazily built part ([`Cells`], record 0305).
 ///
 /// # Errors
 ///
 /// The leaf's typed merge-reader error when a table's merge storage cannot
 /// be read.
-pub(crate) fn build(package: &Package) -> Result<super::Tree> {
+pub(crate) fn build(package: &Package) -> Result<(super::Tree, Box<[super::Part]>)> {
     let merges_error = |error| edit_error(EditError::Merges(error));
     let mut tree = TreeBuilder::new(SPEC.elements, Numbers::SINGLETONS);
     let sheets = package.sheets();
     tree.root().prop("sheetCount", count(sheets.len())).done();
+    let mut parts = Vec::new();
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         let sheet_item = tree
             .push(super::tree::ROOT, Kind::Sheet)
@@ -549,60 +552,218 @@ pub(crate) fn build(package: &Package) -> Result<super::Tree> {
                 .prop("mergeCount", count(regions.len()))
                 .label(Some(table.name()))
                 .leaf([sheet_index, table_index, 0, 0])
+                .part(u32::try_from(parts.len() + 1).unwrap_or(u32::MAX))
                 .done();
-            for cell in table.iter_cells() {
-                let position = cell.position();
-                let (kind, value, display) = cell_value(cell.value());
-                let formula = match cell.value() {
-                    CellValue::Formula(formula) => text(Some(formula)),
-                    _ => None,
-                };
-                let region = regions.iter().find(|region| {
-                    let (row, column) = (position.row(), position.column());
-                    row >= region.row()
-                        && row < region.row() + region.row_count()
-                        && column >= region.column()
-                        && column < region.column() + region.column_count()
-                });
-                let mut draft = tree
-                    .push_step(
-                        table_item,
-                        Kind::Cell,
-                        PathStep::cell(position.column(), position.row()),
-                    )
-                    .prop("type", text(Some(kind)))
-                    .prop("value", value)
-                    .prop("formula", formula)
-                    .prop("merge", region.map(|region| region_ref(*region).into()))
-                    .prop(
-                        "mergeAnchor",
-                        region.map(|region| Value::Bool(region.start() == position)),
-                    )
-                    .leaf([
-                        sheet_index,
-                        table_index,
-                        position.row() as usize,
-                        position.column() as usize,
-                    ]);
-                if let Some(display) = display {
-                    draft = draft.text(display);
-                }
-                draft.done();
-            }
-            for region in &regions {
-                tree.push(table_item, Kind::MergeCell)
-                    .prop("ref", text(Some(&region_ref(*region))))
-                    .leaf([
-                        sheet_index,
-                        table_index,
-                        region.row() as usize,
-                        region.column() as usize,
-                    ])
-                    .done();
-            }
+            parts.push(super::Part::Table(Cells::new(
+                [sheet_index, table_index],
+                tree.path_of(table_item),
+                table.cell_count(),
+                regions,
+            )));
         }
     }
-    Ok(tree.build())
+    Ok((tree.build(), parts.into_boxed_slice()))
+}
+
+/// The cells and merged ranges of one table, each tree item materialized
+/// the first time a read reaches it (record 0305): slot `i` below the cell
+/// count is the table's `i`-th stored cell in row-major order, the slots
+/// past it its merged ranges. A cell step looks its cell up in the leaf's
+/// sorted cell list, so `get` of one cell builds one item.
+pub(crate) struct Cells {
+    sheet: usize,
+    table: usize,
+    /// The table's path.
+    path: Box<[PathStep<'static>]>,
+    regions: Box<[Region]>,
+    cells: Box<[std::sync::OnceLock<Box<super::tree::Item>>]>,
+    merges: Box<[std::sync::OnceLock<Box<super::tree::Item>>]>,
+}
+
+impl Cells {
+    fn new(
+        [sheet, table]: [usize; 2],
+        path: Box<[PathStep<'static>]>,
+        cells: usize,
+        regions: Vec<Region>,
+    ) -> Self {
+        Self {
+            sheet,
+            table,
+            path,
+            cells: (0..cells).map(|_| std::sync::OnceLock::new()).collect(),
+            merges: regions.iter().map(|_| std::sync::OnceLock::new()).collect(),
+            regions: regions.into_boxed_slice(),
+        }
+    }
+
+    fn cell_count(&self) -> u32 {
+        u32::try_from(self.cells.len()).unwrap_or(u32::MAX)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn state(&self) -> String {
+        let built = self
+            .cells
+            .iter()
+            .chain(self.merges.iter())
+            .filter(|item| item.get().is_some())
+            .count();
+        format!("cells {built}/{}", self.cells.len() + self.merges.len())
+    }
+
+    /// The slot count: the stored cells, then the merged ranges.
+    pub(crate) fn len(&self) -> u32 {
+        u32::try_from(self.cells.len() + self.merges.len()).unwrap_or(u32::MAX)
+    }
+
+    /// The kind ordinal of slot `slot`.
+    pub(crate) fn kind(&self, slot: u32) -> u8 {
+        if slot < self.cell_count() {
+            Kind::Cell as u8
+        } else {
+            Kind::MergeCell as u8
+        }
+    }
+
+    /// The position of slot `slot` among the table's children of its kind.
+    pub(crate) fn ordinal(&self, slot: u32) -> u32 {
+        let cells = self.cell_count();
+        if slot < cells { slot } else { slot - cells }
+    }
+
+    /// The leaf table.
+    fn table<'p>(&self, package: &'p Package) -> Option<&'p litchi_numbers::Table> {
+        package.sheets().get(self.sheet)?.tables().nth(self.table)
+    }
+
+    fn package(file: &Iwork) -> Option<&Package> {
+        match file.owner() {
+            Owner::Numbers(package) => Some(package),
+            #[allow(unreachable_patterns, reason = "the owner arms depend on features")]
+            _ => None,
+        }
+    }
+
+    /// The item of slot `slot`, materialized on the first call.
+    pub(crate) fn item<'f>(&'f self, file: &'f Iwork, slot: u32) -> &'f super::tree::Item {
+        let cells = self.cell_count();
+        if slot < cells {
+            self.cells[slot as usize].get_or_init(|| Box::new(self.cell(file, slot)))
+        } else {
+            let merge = (slot - cells) as usize;
+            self.merges[merge].get_or_init(|| Box::new(self.merge(merge)))
+        }
+    }
+
+    fn cell(&self, file: &Iwork, slot: u32) -> super::tree::Item {
+        let spec = &SPEC.elements[Kind::Cell as usize];
+        let cell = Self::package(file)
+            .and_then(|package| self.table(package))
+            .and_then(|table| table.iter_cells().nth(slot as usize));
+        let Some(cell) = cell else {
+            // The handle's package is immutable: its table lists every
+            // slot `Cells::new` counted.
+            return super::tree::Item::detached(spec, self.path.clone(), slot);
+        };
+        let position = cell.position();
+        let mut path = Vec::with_capacity(self.path.len() + 1);
+        path.extend_from_slice(&self.path);
+        path.push(PathStep::cell(position.column(), position.row()));
+        let mut item = super::tree::Item::detached(spec, path.into_boxed_slice(), slot);
+        let (kind, value, display) = cell_value(cell.value());
+        let formula = match cell.value() {
+            CellValue::Formula(formula) => text(Some(formula)),
+            _ => None,
+        };
+        let region = self.regions.iter().find(|region| {
+            let (row, column) = (position.row(), position.column());
+            row >= region.row()
+                && row < region.row() + region.row_count()
+                && column >= region.column()
+                && column < region.column() + region.column_count()
+        });
+        let mut draft = item
+            .draft::<Kind>()
+            .prop("type", text(Some(kind)))
+            .prop("value", value)
+            .prop("formula", formula)
+            .prop("merge", region.map(|region| region_ref(*region).into()))
+            .prop(
+                "mergeAnchor",
+                region.map(|region| Value::Bool(region.start() == position)),
+            )
+            .leaf([
+                self.sheet,
+                self.table,
+                position.row() as usize,
+                position.column() as usize,
+            ]);
+        if let Some(display) = display {
+            draft = draft.text(display);
+        }
+        draft.done();
+        item
+    }
+
+    fn merge(&self, merge: usize) -> super::tree::Item {
+        let spec = &SPEC.elements[Kind::MergeCell as usize];
+        let region = self.regions[merge];
+        let mut path = Vec::with_capacity(self.path.len() + 1);
+        path.extend_from_slice(&self.path);
+        path.push(PathStep::at(
+            crate::path::navigate::ElementKind::name(Kind::MergeCell),
+            Position::new(merge),
+        ));
+        let ordinal = u32::try_from(merge).unwrap_or(u32::MAX);
+        let mut item = super::tree::Item::detached(spec, path.into_boxed_slice(), ordinal);
+        item.draft::<Kind>()
+            .prop("ref", text(Some(&region_ref(region))))
+            .leaf([
+                self.sheet,
+                self.table,
+                region.row() as usize,
+                region.column() as usize,
+            ])
+            .done();
+        item
+    }
+
+    /// The slot of the stored cell at `row`, `column` when `kind` is the
+    /// cell kind (`Some(None)`: the table stores no such cell); `None` for
+    /// another kind, which the caller scans for.
+    #[allow(
+        clippy::option_option,
+        reason = "`None` asks the caller to scan; `Some(None)` is a miss"
+    )]
+    pub(crate) fn locate(
+        &self,
+        file: &Iwork,
+        kind: u8,
+        row: u32,
+        column: u32,
+    ) -> Option<Option<u32>> {
+        if kind != Kind::Cell as u8 {
+            return None;
+        }
+        let table = Self::package(file).and_then(|package| self.table(package))?;
+        let wanted = CellPosition::new(row, column);
+        // The leaf keeps a table's stored cells sorted by position, without
+        // duplicates (its own lookups binary-search them).
+        let (mut low, mut high) = (0_usize, table.cell_count());
+        while low < high {
+            let middle = low + (high - low) / 2;
+            let position = table.iter_cells().nth(middle)?.position();
+            match position.cmp(&wanted) {
+                std::cmp::Ordering::Less => low = middle + 1,
+                std::cmp::Ordering::Greater => high = middle,
+                std::cmp::Ordering::Equal => {
+                    return Some(u32::try_from(middle).ok());
+                },
+            }
+        }
+        Some(None)
+    }
 }
 
 // -------------------------------------------------------------------- targets

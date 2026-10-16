@@ -76,12 +76,10 @@ impl Text {
 
     /// The item holding this text in `file`'s tree.
     fn item(self, file: &Iwork) -> Option<&super::super::tree::Item> {
-        let tree = file.tree();
-        let slide = *tree.item(super::ROOT).children().get(self.slide)?;
-        tree.item(slide)
-            .children()
+        let slide = file.kids(super::super::At::ROOT).get(self.slide)?;
+        file.kids(slide)
             .iter()
-            .map(|child| tree.item(*child))
+            .map(|child| file.item(child))
             .find(|item| {
                 let leaf = item.leaf().map(|value| value as usize);
                 match (item.type_name(), self.container) {
@@ -870,7 +868,7 @@ pub(crate) fn add(
                 Some(from) => SlideSource::Duplicate(slide_position(file, &from)?),
                 None => SlideSource::Layout(layout),
             };
-            let count = file.tree().item(super::ROOT).children().len();
+            let count = file.kids(super::super::At::ROOT).len();
             let destination = insertion(count, node.placement(), |anchor| slide_at(file, anchor))?;
             let mut chain = Chain::new(package.clone());
             create_slides(&mut chain, &[(source, destination, 0)]).map_err(|(error, _)| error)?;
@@ -898,12 +896,9 @@ pub(crate) fn add(
             let element = request.element;
             // A new drawable joins the end of its slide's drawables: its
             // ordinal among the slide's elements of its kind is their count.
-            let tree = file.tree();
-            let ordinal = tree
-                .item(parent_node.index())
-                .children()
-                .iter()
-                .filter(|child| tree.item(**child).type_name() == element)
+            let ordinal = parent_node
+                .child_nodes()
+                .filter(|child| child.item().type_name() == element)
                 .count();
             let mut pending = Pending::default();
             pending.stage_add(request.add, 0);
@@ -1144,7 +1139,7 @@ pub(crate) fn move_to(
     let mut chain = Chain::new(package.clone());
     let [slide, _, line, drawable] = node.item().leaf().map(|value| value as usize);
     if kind == "slide" {
-        let slides = file.tree().item(super::ROOT).children().len();
+        let slides = file.kids(super::super::At::ROOT).len();
         let to = destination(slide, slides, placement, |anchor| slide_at(file, anchor))?;
         move_slide(&mut chain, slide, to)?;
     } else if kind == "paragraph" {

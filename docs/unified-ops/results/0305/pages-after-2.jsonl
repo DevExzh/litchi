@@ -1,0 +1,3 @@
+{"summary":true,"format":"pages","scenario":"batch_1","leaf_median_ns":2185561,"unified_median_ns":2234571,"ratio_median":1.0177,"ratio_min":1.0173,"ratio_max":1.0190,"delta_ns":49010}
+{"summary":true,"format":"pages","scenario":"batch_1000","leaf_median_ns":2249322,"unified_median_ns":2467953,"ratio_median":1.0982,"ratio_min":1.0809,"ratio_max":1.1190,"delta_ns":218631}
+{"summary":true,"format":"pages","scenario":"batch_10000","leaf_median_ns":3016426,"unified_median_ns":4738925,"ratio_median":1.5678,"ratio_min":1.5514,"ratio_max":1.5769,"delta_ns":1722499}

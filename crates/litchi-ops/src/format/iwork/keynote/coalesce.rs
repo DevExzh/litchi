@@ -14,9 +14,9 @@ use litchi_core::FileFormat;
 use litchi_core::selector::Path;
 
 use super::super::write::{Chain, Commit, finish, refusal};
-use super::super::{Iwork, Nav, Node, Owner};
+use super::super::{At, Iwork, Nav, Node, Owner};
+use super::Keynote;
 use super::write::{Pending, SlideSource, drawable_request, insertion, slide_at, slide_position};
-use super::{Keynote, ROOT};
 use crate::error::{Code, Error};
 use crate::new_node::NewNode;
 use crate::path::PathArg;
@@ -40,13 +40,13 @@ fn coalescible(kind: &str, key: &str) -> bool {
 
 /// The tree item a set of `props` on `target` stages, when a run can stage
 /// it: a direct path to an element whose every key coalesces.
-pub(crate) fn plan_set(file: &Iwork, target: &TargetArg<'_>, props: &Props<'_>) -> Option<u32> {
+pub(crate) fn plan_set(file: &Iwork, target: &TargetArg<'_>, props: &Props<'_>) -> Option<At> {
     let path = target.path()?;
     file.checked_tree().ok()?;
     let node = crate::path::resolve::get(&Nav::<Keynote>::new(file), path).ok()?;
     let kind = node.item().type_name();
     (!props.is_empty() && props.iter().all(|(key, _)| coalescible(kind, key.as_str())))
-        .then_some(node.index())
+        .then_some(node.at())
 }
 
 /// The zero-based slide a plain positional `/slide[N]` path names.
@@ -78,7 +78,7 @@ pub(crate) struct Run {
 impl Run {
     /// A run over the immutable handle `base`.
     pub(crate) fn new(base: &Iwork, limits: &SemanticLimits) -> Self {
-        let slides = base.tree().item(ROOT).children().len();
+        let slides = base.kids(At::ROOT).len();
         Self {
             base: base.clone(),
             pending: Pending::default(),
@@ -118,7 +118,7 @@ impl Run {
     /// # Errors
     ///
     /// A refused value or key, or the run's operation limit.
-    pub(crate) fn stage_set(&mut self, node: u32, props: &Props<'_>, index: usize) -> Result<()> {
+    pub(crate) fn stage_set(&mut self, node: At, props: &Props<'_>, index: usize) -> Result<()> {
         if !self.accepts_sets() {
             return Err(refusal(
                 Code::InternalError,
@@ -195,12 +195,9 @@ impl Run {
             {
                 let slide = parent.item().leaf()[0] as usize;
                 let request = drawable_request(slide, node, &self.limits)?;
-                let tree = self.base.tree();
-                let existing = tree
-                    .item(parent.index())
-                    .children()
-                    .iter()
-                    .filter(|child| tree.item(**child).type_name() == request.element)
+                let existing = parent
+                    .child_nodes()
+                    .filter(|child| child.item().type_name() == request.element)
                     .count();
                 let staged = self
                     .pending

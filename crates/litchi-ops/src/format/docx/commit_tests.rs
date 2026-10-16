@@ -5,6 +5,7 @@ use std::io::{Cursor, Write as _};
 use super::{Commit, Docx, WorkEdit};
 use crate::format::docx::DocxOwner;
 use crate::path::IntoPath;
+use crate::props::{Key, PropValue};
 use crate::{File, IntoTarget, NewNode, OpenOptions, Placement, SourceMode, props};
 
 const XML: &str = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>FIRST_PRIVATE</w:t></w:r><w:r><w:t>tail</w:t></w:r></w:p><!--between--><w:p><w:r><w:t>second</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
@@ -491,4 +492,73 @@ fn fanout_write_proofs_load_at_most_one_body_per_admission() {
             BODY_LOADS.with(|loads| assert_eq!(loads.get(), loads_expected));
         }
     }
+}
+
+/// The direct `/body/p[N]` text route of `File::set` (record 0305) publishes
+/// exactly what the general route publishes, and fails exactly as it does:
+/// the first paragraphs and the last of every DOCX fixture, one past the
+/// last, values the text coercion accepts and refuses, and spellings and
+/// owners it leaves to the general route.
+#[test]
+fn direct_paragraph_text_matches_the_general_route() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ooxml/docx");
+    let mut fixtures: Vec<_> = std::fs::read_dir(&root)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "docx"))
+        .collect();
+    fixtures.sort();
+    let outcome = |result: crate::Result<Docx>| match result {
+        Ok(handle) => Ok(File::Docx(handle).to_bytes().unwrap()),
+        Err(error) => Err((error.code(), error.to_string())),
+    };
+    let mut direct = 0;
+    for fixture in fixtures {
+        let bytes = std::fs::read(&fixture).unwrap();
+        for eager in [true, false] {
+            if !eager && direct > 0 {
+                // A source-backed owner always takes the general route.
+                continue;
+            }
+            let options = OpenOptions::new().source_mode(if eager {
+                SourceMode::Eager
+            } else {
+                SourceMode::Auto
+            });
+            let Ok(File::Docx(handle)) = crate::open_bytes_with(bytes.clone(), &options) else {
+                continue;
+            };
+            let count = File::Docx(handle.clone())
+                .query("/body > p")
+                .map_or(0, Iterator::count);
+            let values: [PropValue<'_>; 3] = ["new\ttext\nline".into(), 42.into(), PropValue::Null];
+            let indices = (1..=count.min(6)).chain([count, count + 1]);
+            for index in indices.filter(|index| *index > 0) {
+                let mut paths = vec![format!("/body/p[{index}]")];
+                if index == 1 {
+                    paths.push(format!("/body/paragraph[{index}]"));
+                    paths.push(format!("body/p[{index}]"));
+                }
+                for path in paths {
+                    let target = path.as_str().into_target().unwrap();
+                    for value in &values {
+                        let props =
+                            crate::Props::from_props([(Key::from("text"), value.clone())]).unwrap();
+                        if handle.direct_paragraph(&target, &props).is_some() {
+                            direct += 1;
+                        }
+                        let general = handle.set(&target, props.clone()).map(Commit::into_file);
+                        let fast = handle.set_file(&target, props);
+                        assert_eq!(
+                            outcome(fast),
+                            outcome(general),
+                            "{} {path} {value:?} eager={eager}",
+                            fixture.display()
+                        );
+                    }
+                }
+            }
+        }
+    }
+    assert!(direct > 50, "the direct route ran {direct} times");
 }

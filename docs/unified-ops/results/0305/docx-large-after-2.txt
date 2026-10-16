@@ -1,0 +1,6 @@
+leaf_set 747.9 us
+auto_set 1167.9 us
+eager_set 751.7 us
+leaf_add 1094.6 us
+auto_add 1599.2 us
+eager_add 413.4 us

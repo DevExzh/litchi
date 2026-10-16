@@ -1,0 +1,87 @@
+# keynote_bench (ratio_median unified/leaf, rounds 8 x 30)
+open           base-1=0.982 after-1=0.982 after-2=0.998 base-2=0.983
+open_get       base-1=1.105 after-1=1.023 after-2=1.034 base-2=1.098
+set            base-1=1.036 after-1=1.008 after-2=1.006 base-2=1.038
+notes          base-1=1.075 after-1=1.047 after-2=1.024 base-2=1.080
+frame          base-1=1.057 after-1=1.023 after-2=1.015 base-2=1.063
+batch_1000     base-1=1.078 after-1=1.074 after-2=1.071 base-2=1.080
+duplicate      base-1=1.063 after-1=1.029 after-2=1.029 base-2=1.063
+add_slide      base-1=1.013 after-1=1.003 after-2=1.005 base-2=1.010
+add_textbox    base-1=1.056 after-1=1.030 after-2=1.026 base-2=1.056
+remove_slide   base-1=1.027 after-1=1.011 after-2=1.014 base-2=1.028
+# numbers_unified_bench (ratio, 7 samples)
+open_get       base-1=1.211 after-1=1.060 after-2=1.088 base-2=1.214
+set            base-1=1.006 after-1=1.000 after-2=1.026 base-2=0.998
+batch_1000     base-1=1.354 after-1=1.316 after-2=1.315 base-2=1.297
+formula        base-1=1.000 after-1=1.001 after-2=0.981 base-2=0.999
+rename_sheet   base-1=0.996 after-1=1.001 after-2=1.010 base-2=1.014
+merge_add      base-1=1.029 after-1=1.035 after-2=1.042 base-2=1.025
+sheet_move     base-1=0.997 after-1=1.002 after-2=0.994 base-2=1.001
+sheet_add      base-1=1.015 after-1=0.970 after-2=0.969 base-2=0.977
+sheet_remove   base-1=1.006 after-1=0.997 after-2=1.001 base-2=0.984
+table_add      base-1=1.010 after-1=1.001 after-2=0.994 base-2=1.001
+table_remove   base-1=0.988 after-1=0.978 after-2=0.998 base-2=0.987
+table_move     base-1=1.000 after-1=0.977 after-2=0.992 base-2=1.005
+# docx_fanout_bench (leaf us / unified us / ratio)
+base-1 1p 7.64/8.23/1.077 | 100p 344.49/365.54/1.061
+after-1 1p 7.54/7.94/1.053 | 100p 347.04/365.59/1.053
+after-2 1p 7.55/7.98/1.058 | 100p 345.78/366.43/1.060
+base-2 1p 7.56/8.29/1.095 | 100p 344.70/366.34/1.063
+# pages_bench
+base-1 batch_1 1.014
+base-1 batch_1000 1.084
+base-1 batch_10000 1.535
+after-1 batch_1 1.019
+after-1 batch_1000 1.087
+after-1 batch_10000 1.573
+after-2 batch_1 1.018
+after-2 batch_1000 1.098
+after-2 batch_10000 1.568
+base-2 batch_1 1.017
+base-2 batch_1000 1.088
+base-2 batch_10000 1.529
+# rtf_destination_bench (fanout/native_shared, plan/native_shared, ref/native_shared, ref/plan)
+base-1 table_cell_text  x1     1.147 1.105 - -
+base-1 table_cell_text  x100   1.045 1.036 - -
+base-1 table_cell_text  x1000  1.019 1.012 - -
+base-1 footnote_text    x1     1.122 1.086 - -
+base-1 footnote_text    x100   1.005 1.000 - -
+base-1 footnote_text    x1000  1.009 1.005 - -
+base-1 comment_text     x1     1.120 1.080 - -
+base-1 comment_text     x100   1.021 1.013 - -
+base-1 comment_text     x1000  1.006 1.009 - -
+base-1 picture_removal  x1     1.243 1.157 - -
+base-1 picture_removal  x64    1.355 1.343 - -
+after-1 table_cell_text  x1     1.144 1.113 1.119 1.005
+after-1 table_cell_text  x100   1.044 1.045 1.044 0.999
+after-1 table_cell_text  x1000  1.008 1.009 1.009 1.000
+after-1 footnote_text    x1     1.116 1.086 1.092 1.005
+after-1 footnote_text    x100   1.018 1.015 1.013 0.999
+after-1 footnote_text    x1000  1.004 1.003 1.005 1.002
+after-1 comment_text     x1     1.107 1.072 1.085 1.012
+after-1 comment_text     x100   1.019 1.009 1.015 1.006
+after-1 comment_text     x1000  0.996 0.993 0.994 1.002
+after-1 picture_removal  x1     1.262 1.161 1.186 1.022
+after-1 picture_removal  x64    1.334 1.323 1.331 1.006
+after-2 table_cell_text  x1     1.139 1.102 1.109 1.006
+after-2 table_cell_text  x100   1.034 1.025 1.027 1.002
+after-2 table_cell_text  x1000  1.005 0.984 0.977 0.993
+after-2 footnote_text    x1     1.117 1.082 1.087 1.004
+after-2 footnote_text    x100   1.017 1.014 1.017 1.003
+after-2 footnote_text    x1000  0.998 0.997 0.999 1.002
+after-2 comment_text     x1     1.117 1.078 1.090 1.011
+after-2 comment_text     x100   1.015 1.008 1.009 1.001
+after-2 comment_text     x1000  0.993 0.993 0.992 0.999
+after-2 picture_removal  x1     1.255 1.174 1.183 1.007
+after-2 picture_removal  x64    1.350 1.340 1.335 0.996
+base-2 table_cell_text  x1     1.154 1.104 - -
+base-2 table_cell_text  x100   1.041 1.032 - -
+base-2 table_cell_text  x1000  1.032 1.031 - -
+base-2 footnote_text    x1     1.123 1.086 - -
+base-2 footnote_text    x100   1.031 1.010 - -
+base-2 footnote_text    x1000  1.013 1.012 - -
+base-2 comment_text     x1     1.126 1.081 - -
+base-2 comment_text     x100   1.017 1.018 - -
+base-2 comment_text     x1000  1.044 1.043 - -
+base-2 picture_removal  x1     1.266 1.169 - -
+base-2 picture_removal  x64    1.338 1.322 - -
