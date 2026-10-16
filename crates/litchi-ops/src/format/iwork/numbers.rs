@@ -686,6 +686,18 @@ pub(crate) fn build(package: &Package) -> Result<super::Tree> {
                     ])
                     .done();
             }
+            // Rows and columns are structural nodes (record 0309): `add` and
+            // `remove` address them as `row[N]`/`col[N]`.
+            for row in 0..table.row_count() as usize {
+                tree.push(table_item, Kind::Row)
+                    .leaf([sheet_index, table_index, row, 0])
+                    .done();
+            }
+            for column in 0..table.column_count() as usize {
+                tree.push(table_item, Kind::Column)
+                    .leaf([sheet_index, table_index, 0, column])
+                    .done();
+            }
         }
     }
     Ok(tree.build())

@@ -207,4 +207,3 @@ fn formulas_work_on_a_created_workbook() -> TestResult {
     ));
     Ok(())
 }
-
