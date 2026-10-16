@@ -20,7 +20,7 @@ mod cases {
         MediaLoopMode, MediaPlaybackSettings, MediaProperties, MediaVolume, MovieKind,
         Point as KeynotePoint,
     };
-    use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+    use litchi_keynote::{MovieSelector, Package, SlideSelector, slide::media::data::MediaPart};
     use prost::Message as _;
 
     use super::super::*;

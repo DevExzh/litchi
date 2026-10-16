@@ -9,8 +9,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_keynote::{
-    MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    ReadOptions, SemanticLimits, SlideSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector,
     slide::placeholder::{Error, Kind, State},
 };
 
@@ -305,16 +304,9 @@ fn nested_body_reference_corruption_fails_closed_and_preserves_bytes() -> TestRe
 #[test]
 fn reference_limit_is_charged_on_placeholder_edit_admission() -> TestResult<()> {
     let source = std::fs::read(fixture())?;
-    let limits = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        1,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )?;
+    let limits = SemanticLimits::builder().max_references(1)?.build()?;
     let package =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), limits))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(limits))?;
     let before = bytes(&package)?;
     assert!(matches!(
         package.edit_slide_placeholder_visibility(0usize, Kind::Title),

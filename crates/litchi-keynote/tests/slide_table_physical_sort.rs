@@ -1828,8 +1828,8 @@ fn physical_transaction_types_are_archive_free_and_send_sync() {
     assert_send_sync_debug::<RowRange>();
     assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::transaction::Edit<'static>>(
     );
-    assert_send_sync_debug::<litchi_keynote::SlideTablePhysicalSortCommit>();
-    assert_send_sync_debug::<litchi_keynote::SlideTablePhysicalSortPatch>();
+    assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::transaction::Commit>();
+    assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::transaction::Patch>();
     assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::Diagnostics>();
     assert_send_sync_debug::<Error>();
     assert_send_sync_debug::<LimitKind>();

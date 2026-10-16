@@ -290,9 +290,10 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/starmath/qa/extras/data/tdf151842.odf",
         ],
     },
-    // Record 0296: the iWork formats. The corpus holds only one-slide
-    // Keynote decks, so a slide's `remove` meets the leaf's last-slide
-    // refusal.
+    // Record 0296: the iWork formats. Record 0298 added the multi-slide
+    // Keynote deck (a slide's `remove` no longer meets the leaf's
+    // last-slide refusal) and the decks holding pictures, movies, audio,
+    // tables and charts.
     Spec {
         format: FileFormat::Pages,
         name: "pages",
@@ -308,7 +309,15 @@ const SPECS: &[Spec] = &[
         format: FileFormat::Keynote,
         name: "keynote",
         extension: "key",
-        fixtures: &["iwork/keynote/basic.key"],
+        fixtures: &[
+            "iwork/keynote/multi-slide.key",
+            "iwork/keynote/basic.key",
+            "iwork/keynote/slide-table-read-native.key",
+            "iwork/keynote/chart-grid-authored-native.key",
+            "iwork/keynote/image-adjustments-native.key",
+            "iwork/keynote/media-lifecycle-audio-remove-native.key",
+            "iwork/keynote/media-lifecycle-remove-native.key",
+        ],
     },
     Spec {
         format: FileFormat::Numbers,
@@ -530,6 +539,22 @@ const RECIPES: &[Recipe] = &[
         start: false,
     },
     Recipe {
+        format: "keynote",
+        element: "picture",
+        fixture: "iwork/keynote/multi-slide.key",
+        parent: "/slide[1]",
+        props: &[("src", PNG)],
+        start: false,
+    },
+    Recipe {
+        format: "keynote",
+        element: "slide",
+        fixture: "iwork/keynote/multi-slide.key",
+        parent: "/",
+        props: &[("from", "/slide[2]")],
+        start: false,
+    },
+    Recipe {
         format: "odg",
         element: "shape",
         fixture: "create() + add page",
@@ -590,27 +615,17 @@ const SEEDS: &[(&str, &[Step])] = &[
 
 /// Claimed-supported cells that fail, with the cause record 0289 found:
 /// `(format, element, verb, cause)`. Each entry is a recorded bug. Record
-/// 0290 fixed F1, F2, F4, F6 and F7.
-const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[
-    (
-        "pptx",
-        "ole",
-        "remove",
-        "F3: every corpus OLE object sits in markup compatibility (the `mc:AlternateContent` \
+/// 0290 fixed F1, F2, F4, F6 and F7; record 0298 fixed F8 (Keynote slide
+/// removal, now exercised on the multi-slide deck).
+const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[(
+    "pptx",
+    "ole",
+    "remove",
+    "F3: every corpus OLE object sits in markup compatibility (the `mc:AlternateContent` \
          inside the `p:graphicFrame`); the source-backed slide guard refuses any markup \
          compatibility outside a direct transition at snapshot, apply and publication \
          (record 0290 §3), and `add` cannot make one",
-    ),
-    (
-        "keynote",
-        "slide",
-        "remove",
-        "F8 (record 0296): the corpus holds only one-slide Keynote decks, and the \
-         leaf refuses deleting the final slide (typed `invalid_argument`); \
-         `create` cannot make a second slide (IWORK_API_REQUESTS.md requests 1 \
-         and 8)",
-    ),
-];
+)];
 
 fn test_data() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data")

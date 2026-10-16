@@ -59,7 +59,7 @@ odb         = ["odf-objects", "dep:litchi-odb"]
 odf-formula = ["odf-objects", "dep:litchi-odf-formula"]
 odf-objects = ["dep:litchi-odf-common"]
 pages   = ["iwork-adapter", "dep:litchi-pages", "litchi-pages/internal-iwork-source"]
-keynote = ["iwork-adapter", "dep:litchi-keynote", "litchi-keynote/internal-iwork-source"]
+keynote = ["iwork-adapter", "dep:base64", "dep:litchi-keynote", "litchi-keynote/internal-iwork-source"]
 numbers = ["iwork-adapter", "dep:litchi-numbers", "litchi-numbers/internal-iwork-source"]
 iwork-adapter = ["dep:litchi-iwa-detect"]
 
@@ -102,7 +102,7 @@ caseless = { workspace = true }
 unicode-normalization = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-base64              = { workspace = true, optional = true } # Markdown, DOCX and PPTX picture image data URIs
+base64              = { workspace = true, optional = true } # Markdown, DOCX, PPTX and Keynote picture image data URIs
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps
 litchi-cfb          = { workspace = true, optional = true }
 litchi-core         = { workspace = true }
@@ -211,6 +211,11 @@ required-features = ["numbers"]
 [[example]]
 name              = "pages_bench"
 required-features = ["pages"]
+
+# Paired leaf-vs-unified Keynote measurements (record 0298).
+[[example]]
+name              = "keynote_bench"
+required-features = ["keynote"]
 
 # Paired leaf-vs-unified find, merge and import on more formats (record 0295).
 [[example]]

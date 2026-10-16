@@ -12,7 +12,9 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsp;
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector, slide::movie::Options};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, slide::media::data::MediaPart, slide::movie::Options,
+};
 use prost::Message as _;
 use sha1::{Digest as _, Sha1};
 

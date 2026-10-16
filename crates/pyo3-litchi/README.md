@@ -343,7 +343,7 @@ that do exist at a path.
 | OpenDocument Spreadsheet | .ods | ✅ | opens; paths and edits pending |
 | OpenDocument Presentation | .odp | ✅ | opens; paths and edits pending |
 | Apple Pages | .pages | ✅ | — |
-| Apple Keynote | .key | ✅ | — |
+| Apple Keynote | .key | ✅ | ✅ paths; edits: slides (add from a layout or as a copy, remove, move, swap, hidden), texts, paragraphs, notes, frames, text boxes, shapes, pictures, z-order, create, save |
 | Apple Numbers | .numbers | ✅ | — |
 | Rich Text Format | .rtf | ✅ | ✅ paths and edits |
 

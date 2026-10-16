@@ -13,8 +13,8 @@ use litchi_iwa_common::wire::append_length_delimited_field;
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::slide::media::{Point, Size};
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits, SlideMediaDataError,
-    SlideSelector,
+    MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
+    slide::media::data::Error as SlideMediaDataError, slide::media::data::MediaPart,
 };
 use prost::Message as _;
 
@@ -89,12 +89,12 @@ fn assert_common_movie_state(before: &Package, after: &Package) -> TestResult {
     let before_slide = before
         .show()?
         .slides()
-        .get(0)
+        .first()
         .ok_or_else(|| io::Error::other("missing source slide"))?;
     let after_slide = after
         .show()?
         .slides()
-        .get(0)
+        .first()
         .ok_or_else(|| io::Error::other("missing candidate slide"))?;
     assert_eq!(before_slide.movies(), after_slide.movies());
     assert_eq!(
@@ -328,7 +328,7 @@ fn native_fixture_admits_shared_media_and_preserves_semantic_context() -> TestRe
     let show = package.show()?;
     let slide = show
         .slides()
-        .get(0)
+        .first()
         .ok_or_else(|| io::Error::other("missing native slide"))?;
     for (movie_position, x) in [(2, 200.0_f32), (3, 700.0_f32)] {
         let media = slide.movies()[movie_position];
@@ -607,17 +607,14 @@ fn duplicate_registry_and_wrong_owner_records_are_refused() -> TestResult {
 fn finite_ingress_profile_refuses_before_media_publication() -> TestResult {
     let source = synthetic_package()?;
     let defaults = Limits::default();
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let result = Package::from_bytes_with_options(
-        &source,
-        ReadOptions::new(tight, SemanticLimits::default()),
-    );
+    let tight = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let result = Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(tight));
     assert!(result.is_err());
     Ok(())
 }

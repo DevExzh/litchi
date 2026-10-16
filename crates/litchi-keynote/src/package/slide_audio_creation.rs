@@ -26,8 +26,9 @@ use sha1::{Digest as _, Sha1};
 
 use super::{Package, PhysicalSource};
 use crate::slide::audio::creation::{
-    SlideAudioCreationCommit, SlideAudioCreationDiagnostics, SlideAudioCreationError,
-    SlideAudioCreationLimitKind, SlideAudioCreationPatch,
+    Commit as SlideAudioCreationCommit, Diagnostics as SlideAudioCreationDiagnostics,
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+    Patch as SlideAudioCreationPatch,
 };
 use crate::soundtrack::items::MAX_FILENAME_BYTES;
 use crate::{MovieKind, SlideSelector};

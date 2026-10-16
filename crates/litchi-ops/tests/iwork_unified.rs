@@ -240,7 +240,7 @@ mod keynote {
     }
 
     #[test]
-    fn refuses_removing_the_last_slide_and_adding_slides() {
+    fn refuses_removing_the_last_slide_and_moves_in_place() {
         let file = read("keynote/basic.key");
         let error = file.remove("/slide[1]").unwrap_err();
         assert_eq!(error.code(), Code::InvalidArgument);

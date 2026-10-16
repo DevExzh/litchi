@@ -2,11 +2,14 @@
 
 use std::{collections::BTreeMap, io, time::Duration};
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::{
-    Limits, MediaPart, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits,
-    SlideAudioCreationError, SlideAudioCreationLimitKind, SlideSelector, slide::audio::Options,
+    MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
+    slide::audio::Options, slide::audio::creation::Error as SlideAudioCreationError,
+    slide::audio::creation::LimitKind as SlideAudioCreationLimitKind,
+    slide::media::data::MediaPart,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -223,17 +226,15 @@ fn oversized_audio_reports_entry_limit_without_changing_source() -> TestResult {
         .max()
         .ok_or_else(|| io::Error::other("empty native fixture"))?;
     let defaults = Limits::default();
-    let limits = Limits::new(
-        defaults.max_input_bytes(),
-        defaults.max_entries(),
-        largest as u64,
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let source = Package::from_bytes_with_options(
-        NATIVE_SOURCE,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(defaults.max_input_bytes())?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(largest as u64)?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let source =
+        Package::from_bytes_with_options(NATIVE_SOURCE, OpenOptions::new().source_limits(limits))?;
     let mut data = audio();
     data.resize(largest + 1, 0);
     match source.add_slide_audio(SlideSelector::index(0), "oversized.wav", &data, options()?) {

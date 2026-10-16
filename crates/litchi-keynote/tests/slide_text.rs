@@ -6,9 +6,11 @@ use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::Wire
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp, tswp};
 use litchi_keynote::{
-    Package, Position, ReadOptions, SemanticLimits, SlideSelector, SlideTextCommit,
-    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch,
-    TextPosition, TextSpan, slide::placeholder::Kind,
+    OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits, TextPosition,
+    TextSpan, slide::placeholder::Kind, slide::text::Commit as SlideTextCommit,
+    slide::text::Diagnostics as SlideTextDiagnostics, slide::text::Edit as SlideTextEdit,
+    slide::text::Error as SlideTextError, slide::text::LimitKind as SlideTextLimitKind,
+    slide::text::Patch as SlideTextPatch,
 };
 use prost::Message as _;
 
@@ -1861,31 +1863,31 @@ fn errors_and_transaction_debug_are_content_free() -> TestResult<()> {
 fn selected_text_limit_is_inclusive_and_one_over_is_typed() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let semantic = SemanticLimits::default();
-    let exact = SemanticLimits::new(
-        semantic.max_objects(),
-        semantic.max_slides(),
-        semantic.max_references(),
-        semantic.max_text_storages(),
-        semantic.max_text_fragments(),
-        TITLE.len(),
-    )?;
+    let exact = SemanticLimits::builder()
+        .max_objects(semantic.max_objects())?
+        .max_slides(semantic.max_slides())?
+        .max_references(semantic.max_references())?
+        .max_text_storages(semantic.max_text_storages())?
+        .max_text_fragments(semantic.max_text_fragments())?
+        .max_text_bytes(TITLE.len())?
+        .build()?;
     let exact_package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), exact))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(exact))?;
     assert_eq!(
         exact_package.slide_title(SlideSelector::index(0))?,
         Some(TITLE.to_owned())
     );
 
-    let one_under = SemanticLimits::new(
-        semantic.max_objects(),
-        semantic.max_slides(),
-        semantic.max_references(),
-        semantic.max_text_storages(),
-        semantic.max_text_fragments(),
-        TITLE.len() - 1,
-    )?;
+    let one_under = SemanticLimits::builder()
+        .max_objects(semantic.max_objects())?
+        .max_slides(semantic.max_slides())?
+        .max_references(semantic.max_references())?
+        .max_text_storages(semantic.max_text_storages())?
+        .max_text_fragments(semantic.max_text_fragments())?
+        .max_text_bytes(TITLE.len() - 1)?
+        .build()?;
     let limited_package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), one_under))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(one_under))?;
     assert!(matches!(
         limited_package.slide_title(SlideSelector::index(0)),
         Err(SlideTextError::LimitExceeded {
@@ -1902,16 +1904,16 @@ fn selected_text_limit_is_inclusive_and_one_over_is_typed() -> TestResult<()> {
 fn candidate_text_limit_is_checked_when_staging_with_exact_amounts() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let semantic = SemanticLimits::default();
-    let limits = SemanticLimits::new(
-        semantic.max_objects(),
-        semantic.max_slides(),
-        semantic.max_references(),
-        semantic.max_text_storages(),
-        semantic.max_text_fragments(),
-        TITLE.len(),
-    )?;
+    let limits = SemanticLimits::builder()
+        .max_objects(semantic.max_objects())?
+        .max_slides(semantic.max_slides())?
+        .max_references(semantic.max_references())?
+        .max_text_storages(semantic.max_text_storages())?
+        .max_text_fragments(semantic.max_text_fragments())?
+        .max_text_bytes(TITLE.len())?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), limits))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(limits))?;
     let mut edit = package.edit_slide_title(SlideSelector::index(0))?;
     let error = edit
         .insert(TextPosition::ZERO, "x")
@@ -1935,8 +1937,15 @@ fn candidate_text_limit_is_checked_when_staging_with_exact_amounts() -> TestResu
 fn changed_slide_text_respects_the_retained_output_limit() -> TestResult<()> {
     let bytes = synthetic_package(false)?;
     let input_bytes = u64::try_from(bytes.len())?;
-    let limits = Limits::new(input_bytes, 16, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(input_bytes)?
+        .max_entries(16)?
+        .max_entry_bytes(1024 * 1024)?
+        .max_aggregate_bytes(1024 * 1024)?
+        .max_component_bytes(1024 * 1024)?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))?;
     let mut edit = package.edit_slide_title("Agenda")?;
     let mut expanded = String::with_capacity(128 * 1_024);
     let mut state = 0x5eed_1234_89ab_cdef_u64;

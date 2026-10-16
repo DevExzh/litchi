@@ -31,7 +31,8 @@ The focused owner is `litchi-keynote`. [`Package`](../src/package.rs) retains an
 regular-ZIP artifact and exposes selected source-bound transactions for slide state, chart
 metadata, movie geometry/playback, existing slide media data, soundtrack
 references/items, physical table sorting, and one existing cell's Number display format.
-[`Document`](../src/document.rs) is an archive-free semantic projection: its path ingress accepts a
+[`Presentation`](../src/presentation.rs) is the archive-free read-only semantic projection
+(`Package::presentation()` projects it from an open package): its path ingress accepts a
 ZIP or app-authored package directory, but it intentionally drops exact bytes, media, previews,
 and editing state. Package directories therefore have semantic-read support only. Detached
 [`Show`](../src/show.rs#L334) and [`Slide`](../src/slide.rs#L45) builders construct values, not
@@ -48,7 +49,7 @@ it is not a general Keynote package editor.
 |---------|--------|------|-------|-------|
 | Existing `.key` ZIP ingress from path or bytes | ✅ | ✅ | N/A | `Package::open` and `Package::from_bytes` validate the native root, retain the source artifact, and accept explicit archive/semantic profiles ([package ingress](../src/package.rs), [native fixture](../tests/native_fixture.rs)). |
 | Exact retained-artifact stream to a caller sink | ✅ | N/A | ✅ | `Package::write_to` emits the retained bytes and unmodeled members/fields unchanged; it does not flush, sync, rename, or atomically publish a filesystem path ([writer](../src/package.rs), [exact no-op test](../tests/native_fixture.rs)). |
-| Archive-free ZIP or package-directory semantic document | ✅ | ✅ | N/A | `Document::open` and `Document::from_bytes` retain only the bounded show, slides, text, source metadata, and statistics; directory input has no exact package artifact or edit path ([document boundary](../src/document.rs), [directory parity test](../tests/native_fixture.rs)). |
+| Archive-free ZIP or package-directory semantic presentation | ✅ | ✅ | N/A | `Presentation::open` and `Presentation::from_bytes` (configured through `OpenOptions` with checked `SourceLimits`/`SemanticLimits`) retain only the bounded show, slides, text, source metadata, and statistics; directory input has no exact package artifact or edit path ([presentation boundary](../src/presentation.rs), [directory parity test](../tests/native_fixture.rs)). |
 | Semantic show, slide order, text, notes, media/build summaries | 🟡 | ✅ | N/A | Rooted graph projection is typed and immutable, but the model intentionally exposes only selected content and no native IDs ([show model](../src/show.rs#L334), [slide model](../src/slide.rs#L45)). |
 | Unknown ZIP members, IWA components, and protobuf fields | 🟡 | ✅ | 🟡 | Untouched exact artifacts are retained; focused rewrites preserve unselected records only within each transaction's locality proof. Opaque/unsupported compression or unmodeled ownership can cause a typed refusal rather than a semantic edit ([physical source](../src/package.rs), [transaction source checks](../src/package/edit.rs#L281)). |
 | Focused source-bound transactions and reversible patches | 🟡 | ✅ | 🟡 | Selected owners expose one bounded operation per commit, exact-source authorization, inverse patches, and candidate rereadback; coverage is not a composable/durable patch history, and native acceptance remains operation-specific rather than a green suite claim ([base transaction](../src/package/edit.rs#L79), [slide-order transaction](../src/package/slide_order.rs#L151)). |
@@ -135,12 +136,12 @@ Litchi table mutation, native byte parity, or broader table support.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | ZIP/IWA/wire/semantic resource ceilings | 🟡 | ✅ | 🟡 | Physical archive limits and semantic ceilings cover input bytes, entries, component bytes, objects, slides, references, text storages/fragments, text bytes, wire fields/depth/work, and focused transaction output; aggregate graph/live-memory accounting is not a complete global budget ([limits](../src/package/limits.rs#L1), [semantic preflight](../src/package.rs)). |
-| Safe regular-file path ingress | ✅ | ✅ | N/A | `Package::open` documents descriptor-safe regular-file handling, no-follow behavior, mutation checks, and a bytes-ingress fallback; platform profiles fail closed when unavailable ([path ingress](../src/package.rs), [directory reader boundary](../src/document.rs)). |
+| Safe regular-file path ingress | ✅ | ✅ | N/A | `Package::open` documents descriptor-safe regular-file handling, no-follow behavior, mutation checks, and a bytes-ingress fallback; platform profiles fail closed when unavailable ([path ingress](../src/package.rs), [directory reader boundary](../src/presentation.rs)). |
 | Encrypted/password-protected packages | ❌ | ❌ | ❌ | Password/decryption support is not implemented; encrypted sources are rejected by the shared iWork detector ([detector boundary](../../litchi-iwa-detect/src/lib.rs#L1)). |
 | Digital signatures and trust verification | ❌ | ❌ | ❌ | No Keynote signature verification, certificate trust, invalidation, or re-signing API is exposed. |
 | External links/resources, actions, and playback targets | 🟡 | 🟡 | ❌ | Exact package preservation can retain opaque/inert values, but the focused crate does not fetch, resolve, follow, play, or execute external targets ([package preservation](../src/package.rs)). |
 | Macros, scripts, controls, and embedded code execution | ❌ | 🟡 | ❌ | No execution or activation path is provided; any opaque payload is data only. See the suite [safety audit](../../../docs/IWORK_PROGRESS_AUDIT.md#safety-and-integrity-findings). |
-| Rendering, layout calculation, playback, PDF/HTML export, and automation | ❌ | ❌ | ❌ | The crate edits package data and semantic metadata; it does not render or drive Keynote ([semantic document scope](../src/document.rs)). |
+| Rendering, layout calculation, playback, PDF/HTML export, and automation | ❌ | ❌ | ❌ | The crate edits package data and semantic metadata; it does not render or drive Keynote ([semantic presentation scope](../src/presentation.rs)). |
 
 ## Legacy migration-host delta
 

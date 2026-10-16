@@ -25,10 +25,14 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, 
 use litchi_iwa_protos::{kn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
 use litchi_keynote::slide::table::headers::{Count, Settings};
 use litchi_keynote::{
-    MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    ReadOptions, SemanticLimits, SlideSelector, SlideTableHeaderCommit,
-    SlideTableHeaderDiagnostics, SlideTableHeaderEdit, SlideTableHeaderError,
-    SlideTableHeaderLimitKind, SlideTableHeaderPatch, SlideTableHeaderPath, TableSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, TableSelector,
+    slide::table::headers::transaction::Commit as SlideTableHeaderCommit,
+    slide::table::headers::transaction::Diagnostics as SlideTableHeaderDiagnostics,
+    slide::table::headers::transaction::Edit as SlideTableHeaderEdit,
+    slide::table::headers::transaction::Error as SlideTableHeaderError,
+    slide::table::headers::transaction::LimitKind as SlideTableHeaderLimitKind,
+    slide::table::headers::transaction::Patch as SlideTableHeaderPatch,
+    slide::table::headers::transaction::Path as SlideTableHeaderPath,
 };
 use prost::Message as _;
 
@@ -1486,15 +1490,10 @@ fn finite_resource_limits_reject_before_publication() -> TestResult {
     // one over the configured budget.  Every rejected attempt must leave the
     // immutable source exact.
     for references in 1..=64 {
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            references,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
-        let options = ReadOptions::new(Limits::default(), semantic);
+        let semantic = SemanticLimits::builder()
+            .max_references(references)?
+            .build()?;
+        let options = OpenOptions::new().semantic_limits(semantic);
         let Ok(package) = Package::from_bytes_with_options(&source, options) else {
             continue;
         };

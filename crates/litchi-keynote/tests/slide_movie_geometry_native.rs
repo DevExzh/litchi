@@ -4,7 +4,10 @@ use litchi_keynote::slide::media::{
     Point, Size,
     geometry::{MovieFlipAxis, MovieGeometry, MovieTransform},
 };
-use litchi_keynote::{MovieKind, MovieSelector, Package, SlideMovieGeometryError, SlideSelector};
+use litchi_keynote::{
+    MovieKind, MovieSelector, Package, SlideSelector,
+    slide::movie::geometry::Error as SlideMovieGeometryError,
+};
 
 type R<T = ()> = Result<T, Box<dyn std::error::Error>>;
 const SOURCE: &[u8] = include_bytes!(
@@ -109,7 +112,7 @@ fn native_arrange_oracle_retains_original_size_rotation_and_reflection() -> R {
             assert_ne!(geometry.flags.unwrap_or_default() & 4, 0);
             let size = geometry.size.expect("native displayed size");
             assert_eq!((size.width, size.height), (320.0, 180.0));
-            assert_eq!(movie.original_size, Some(size.clone()));
+            assert_eq!(movie.original_size, Some(size));
             assert_eq!(movie.natural_size, Some(size));
         }
     }
@@ -281,8 +284,8 @@ fn native_geometry_saved_candidates_remain_editable_and_reversible() -> R {
             &baseline.slides()?[0].movies()[..4]
         );
         for part in [
-            litchi_keynote::MediaPart::Content,
-            litchi_keynote::MediaPart::Poster,
+            litchi_keynote::slide::media::data::MediaPart::Content,
+            litchi_keynote::slide::media::data::MediaPart::Poster,
         ] {
             assert_eq!(
                 package.slide_media_data(slide, movie, part)?,

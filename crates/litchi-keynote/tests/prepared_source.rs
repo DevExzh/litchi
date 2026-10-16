@@ -30,7 +30,7 @@ fn prepared_source_handoff_preserves_bytes_and_semantics() -> Result<(), Box<dyn
     assert_eq!(exact_bytes(&package)?, source.as_ref());
     assert_eq!(package.show()?, direct.show()?);
     assert_eq!(
-        package.semantic_snapshot()?.slides().as_ptr(),
+        package.presentation()?.slides().as_ptr(),
         package.slides()?.as_ptr()
     );
     Ok(())

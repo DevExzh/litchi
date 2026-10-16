@@ -323,7 +323,7 @@ fn assert_noop_and_inverse(fixture: &RelocatedFixture) -> TestResult<()> {
         other
             .package()
             .apply_slide_drawable_comment(changed.patch()),
-        Err(litchi_keynote::SlideDrawableCommentError::PatchConflict)
+        Err(litchi_keynote::slide::comment::transaction::Error::PatchConflict)
     ));
     assert_eq!(exact_bytes(other.package())?, other_bytes);
     Ok(())
@@ -528,7 +528,7 @@ fn data_reference_owner_rejects_reply_removal_atomically() -> TestResult<()> {
             .and_then(|edit| edit.commit());
         assert!(matches!(
             result,
-            Err(litchi_keynote::SlideDrawableCommentError::InvalidSource)
+            Err(litchi_keynote::slide::comment::transaction::Error::InvalidSource)
         ));
         assert_eq!(exact_bytes(&package)?, before);
     }

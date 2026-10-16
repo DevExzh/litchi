@@ -6,7 +6,9 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::append_length_delimited_field;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp};
-use litchi_keynote::{ChartSelector, Package, SlideChartMetadataError, SlideSelector};
+use litchi_keynote::{
+    ChartSelector, Package, SlideSelector, chart::metadata::Error as SlideChartMetadataError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

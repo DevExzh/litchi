@@ -20,7 +20,10 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideMediaLifecycleError, SlideSelector};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, slide::media::data::MediaPart,
+    slide::media::lifecycle::Error as SlideMediaLifecycleError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -353,11 +356,7 @@ fn native_component_stream_containing_object(
     .into())
 }
 
-fn native_object_message<'a>(
-    archive: &'a Archive,
-    identifier: u64,
-    type_: u32,
-) -> TestResult<&'a [u8]> {
+fn native_object_message(archive: &Archive, identifier: u64, type_: u32) -> TestResult<&[u8]> {
     archive
         .object(identifier)
         .and_then(|object| {
@@ -667,7 +666,6 @@ fn with_native_unselected_comment_reply(
             ..Default::default()
         }],
         storage_uuid: Some(SYNTHETIC_SURVIVING_COMMENT_UUID),
-        ..Default::default()
     }
     .encode_to_vec();
     let mut object = ArchiveObject::new(
