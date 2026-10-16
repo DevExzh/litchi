@@ -2,16 +2,20 @@
 
 - Status: implemented on `uo2/perf-lazy`, cut from `feat/unified-ops-api`
   at `f24868dfb5`, trunk `e7fe30fb24` merged (`109639b9e7`; the merge
-  changed no source on the measured routes).
+  changed no source on the measured routes), then trunk `6c8d517eff`
+  (`191da4bf26`).
 - Date: 2026-10-16
 - Inputs: the open misses against `docs/UNIFIED_OPS_GOAL.md`'s PERFORMANCE
   BAR from records 0298 (Keynote open + first `get`), 0297/0302 (Numbers
   open + first `get`), 0286/0291/0302 (DOCX single paragraph `set`) and
-  0302 §4.4 (RTF fan-out harness).
+  0302 §4.4 (RTF fan-out harness); and, added by the coordinator during
+  the work, record 0307's 1,000-paragraph DOCX text set (≈2.5×) and
+  paragraph add (≈2.1×).
 - Scope: `litchi-ops` `format/iwork{,/*}` (new `format/iwork/part.rs`),
   `format/docx{,/write,/publish,/commit_tests}`, one hunk in `write.rs`
-  (the DOCX arm of `File::set`), and `examples/rtf_destination_bench.rs`
-  (new route names only). No leaf crate changed.
+  (the DOCX arm of `File::set`), `examples/rtf_destination_bench.rs` (new
+  route names only), the new `examples/docx_large_bench.rs`, and one leaf
+  hook in `litchi-docx` (`source_backed.rs`: a snapshot memo, §2.4).
 - `performance_claim`: paired measurements in §3. `profiling` builds
   (release with debug info, stripped before timing) of
   `--features docx,pages,numbers,keynote,rtf`, pinned with `taskset -c 30`,
@@ -32,6 +36,9 @@
 | DOCX single paragraph `set` (`docx_fanout_bench`, 1 ¶) | 1.077–1.095 | 1.053–1.058 | **fixed** (≤ 10 %), cache misses reduced (§3.3) |
 | DOCX `/body > p`, 100 ¶ | 1.061–1.063 | 1.053–1.060 | unchanged within noise |
 | RTF fan-out, true plan-cache-hit cost (`&Query` vs `Plan`) | hidden by the harness | 0.99–1.02 (×1: +0.4–2.2 %) | measured; not material, no change (§4.3) |
+| DOCX 1,000 ¶ text set, default (source-backed) owner | 2.51 (1,878–1,884 µs) | 1.56–1.57 (1,168–1,175 µs) | improved, **miss** (§4.5) |
+| DOCX 1,000 ¶ paragraph add, default owner | 2.11 | 1.46 | improved, **miss** (§4.5) |
+| DOCX 1,000 ¶ text set / add, eager owner | 1.00 / 0.38 | 1.01 / 0.38 | met (no size-dependent adapter cost) |
 
 Every output stays byte-identical. The query-corpus differential, the
 corpus fidelity test, the checklist goldens, `path_allocations`, the
@@ -122,6 +129,33 @@ cloning an owned `Query` per call, and `fanout_ref_over_plan` compares it
 with the precompiled-`Plan` route F. Existing route names and fields are
 unchanged; the order string is now `ABCDEFGGFEDCBA`.
 
+### 2.4 Source-backed DOCX transaction snapshot memo (`litchi-docx`)
+
+Record 0307's harness opens its document with `open_bytes`, whose default
+`SourceMode::Auto` keeps a source-backed owner; its leaf leg edits an eager
+package. On the eager owner the unified set and add of a 1,000-paragraph
+document cost what the leaf costs (§3.6), so nothing in the adapter scales
+with document size. On the source-backed owner, callgrind of 20 sets
+(43.4 M instructions per call against 17.5 M on the eager owner) showed
+three whole-document passes the eager owner does not pay:
+
+| pass | per call |
+|---|---:|
+| `source_backed::Package::edit` → main-document transaction snapshot (`scan_document_with_context`) | 7.2 M |
+| the commit's `apply` → the same snapshot of the same revision, again | 7.2 M |
+| `PreparedTopology::apply_source_xml` → `audit_source_part_replacement_xml` (litchi-opc) | 9.5 M |
+
+`source_backed::Package` now memoizes the last unmanaged transaction
+snapshot it built (`main_snapshot`, shared by its clones beside the
+existing `main_admission` memo). It is served only when its source
+identity (lineage, source revision, part name) matches and its bytes equal
+the current payload (pointer or byte equality), so a revision is scanned
+once, not once per edit and again per commit. The managed branch already
+reused the edit's snapshot through its `before` hint; it is unchanged.
+Test `unmanaged_edits_share_one_transaction_snapshot` checks the memo
+answers for the same revision and bytes, never for other bytes, and that
+an edit from the memo publishes the bytes of an edit from a fresh scan.
+
 ## 3. Measurements
 
 Ratios are unified/leaf medians per process run, runs in the order base-1,
@@ -204,6 +238,26 @@ builds no tree; callgrind of the 10,000-item scenario counts 1,519.64 M
 instructions at base and 1,519.76 M after (+0.007 %), so the 2.5 % spread
 at 10k is layout and host noise, not added work.
 
+### 3.6 DOCX on a 1,000-paragraph document (`docx_large_bench`)
+
+The middle paragraph of record 0307's fixture shape; µs per call, base
+`191da4bf26` (this branch before §2.4) and after `5cda11f624`, B A A B
+(`docx-large-*.txt`):
+
+| leg | base 1 / 2 | after 1 / 2 |
+|---|---:|---:|
+| leaf text set | 751.4 / 749.0 | 746.2 / 747.9 |
+| unified set, default owner | 1,884.3 / 1,878.5 | 1,174.9 / 1,167.9 |
+| unified set, eager owner | 752.2 / 748.1 | 752.7 / 751.7 |
+| leaf `insert_paragraph` | 1,097.0 / 1,093.7 | 1,088.0 / 1,094.6 |
+| unified add, default owner | 2,310.0 / 2,307.9 | 1,589.0 / 1,599.2 |
+| unified add, eager owner | 418.4 / 418.9 | 419.1 / 413.4 |
+
+(The unified add on the eager owner is faster than the leaf leg because
+the leaf `insert_paragraph` the harness times is a different, heavier
+leaf call than the one the unified `add` stages; the comparison that
+matters is the owner: default against eager.)
+
 ## 4. Misses and residuals
 
 ### 4.1 Keynote open + first `get`: met
@@ -232,22 +286,42 @@ The rest is shared code outside this record's scope: path parsing and the
 target classification (`litchi-core`, `target.rs`), registry admission and
 value coercion, and the handle's two `Arc`s.
 
+### 4.5 DOCX large-document set and add on a source-backed owner: 1.46–1.57
+
+After §2.4 the source-backed set costs about 420 µs over the leaf, the add
+about 500 µs: the remaining size-dependent pass is litchi-opc's audit of
+the replacement main part when the source overlay publishes it
+(`PreparedTopology::apply_source_xml` → `check_for_replacement` →
+`audit_source_part_replacement_xml`, 9.5 M instructions on 1,000
+paragraphs). The transaction commit has already verified those bytes
+(`verify_with_policy`, paid by the eager leaf too); the eager route skips
+the publisher's second audit through the commit's `VerifiedSource` proof
+(change 0754), the source overlay has no way to receive it. Follow-up
+(litchi-opc, outside this record's scope): let `apply_source_xml` accept
+the transaction's publication proof for the exact target bytes. A handle
+committed from a source-backed owner edits through its effective topology,
+whose snapshot path (`effective_document_snapshot`) is not memoized; a
+chain of sets on successive handles still scans each revision once per
+edit — part of the same follow-up.
+
 ## 5. Gates
 
 Build environment per the rules (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`,
 one cargo command at a time, test executables pruned between chunks). Every
-exit status was checked, all on the merged tree `109639b9e7` plus this
-record.
+exit status was checked. The whole list ran on `109639b9e7` + this record
+and again, after the trunk merge and §2.4, on `5cda11f624`; the exits below
+are the final tree's.
 
 | Command | Exit |
 |---|---:|
 | `cargo fmt --all --check` | 0 |
-| `cargo clippy -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
-| `cargo clippy -p litchi-ops --no-default-features [--features F] --all-targets -- -D warnings`, F = none, docx, pages, keynote, numbers, rtf | 0 each |
-| `cargo test -p litchi-ops --all-features` in chunks: `--lib` (918), `--doc` (207), the 133 test targets in five groups (1,190) | 0 each |
+| `cargo clippy -p litchi-docx -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features F] --all-targets -- -D warnings`, F = none, docx (and pages, keynote, numbers, rtf on `109639b9e7`; those paths are unchanged since) | 0 each |
+| `cargo test -p litchi-docx --all-features` (2,396) | 0 |
+| `cargo test -p litchi-ops --all-features` in chunks: `--lib` (918), `--doc` (207), the test targets in five groups (1,214) | 0 each |
 | `cargo test -p litchi-ops --no-default-features --features` every litchi-ops feature but `encryption` `--test capabilities --test registry` (not re-blessed) | 0 |
 | `cargo test -p litchi --all-features` (260) | 0 |
-| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ops` | 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ops -p litchi-docx` | 0 |
 | `python3 tools/check_crate_boundaries.py` | 0 |
 | `python3 tools/non_iwork_gate.py verify` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target/glossary` (39 profiles, 2,305 bans, 221 families) | 0 |
@@ -262,6 +336,8 @@ was added or changed; no glossary row changes.
 ## 6. Not claimed
 
 - That Numbers open + first `get` meets the 5 % arm of the open budget.
+- That a DOCX set or add on a large source-backed document meets the 10 %
+  single-op budget (§4.5).
 - That the unboxed DOCX editor helps (it did not; §2.2).
 - Any change of a frozen route name; `rtf_destination_bench` only gained
   route G's fields.
