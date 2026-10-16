@@ -141,14 +141,19 @@ pub(super) struct Sheet {
     pub(super) position: usize,
     pub(super) handle: SheetHandle,
     grid: OnceLock<Grid>,
+    /// The fence key of the handle the sheet was read from
+    /// ([`super::XlsxOwner::fence_key`]). A sheet lives only inside a node
+    /// that borrows that handle, so the key names a live owner.
+    fence: usize,
 }
 
 impl Sheet {
-    pub(super) fn new(position: usize, handle: SheetHandle) -> Self {
+    pub(super) fn new(file: &Xlsx, position: usize, handle: SheetHandle) -> Self {
         Self {
             position,
             handle,
             grid: OnceLock::new(),
+            fence: file.0.owner.fence_key(),
         }
     }
 
@@ -162,8 +167,14 @@ impl Sheet {
         if let Some(grid) = self.grid.get() {
             // A source-backed grid is an immutable snapshot. Re-enter the
             // leaf route even when the snapshot is already pinned so its
-            // source-version fence still applies to cached reads.
-            if let SheetHandle::Source { sheet, .. } = &self.handle {
+            // source-version fence still applies to cached reads, except
+            // inside a resolver or query step for this sheet's handle, whose
+            // closing check observes the same source after the step (record
+            // 0262; record 0310: a header-row query read the source seven
+            // times per probed row through this re-entry).
+            if let SheetHandle::Source { sheet, .. } = &self.handle
+                && !crate::path::fence::is_active(self.fence)
+            {
                 let _ = sheet.grid()?;
             }
             return Ok(grid);

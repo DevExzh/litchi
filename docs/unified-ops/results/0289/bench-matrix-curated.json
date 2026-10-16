@@ -14,7 +14,9 @@
   "[0294] 0296 and 0299 commit per-run summaries only (raw JSONL kept outside the repository); the ratio column holds the per-run median ratios. 0291 and 0292 re-measure 0288's odf_gaps_bench scenarios; 0299 re-measures 0296's Pages open/open+get/set.",
   "[0294] Inconsistencies found: 0286 §3 gives the repeated /metadata sets as '1.007–1.053 (unchanged)' after, but meta-after-2.txt has XLSX source 1.058 and XLSB source 0.626–0.629 (unified faster); 0293 §6 says the move ratio stays at 0.99–1.00, but one after-build ABBA of run 2 reads 1.018 (cross-check below); 0291's ODS `query` and `query_cold` ratios swing between its two runs (7.8–20.3×, 17.2–28.0×) and are not discussed in 0291 §3.4.",
   "[0306] Parsers added for 0298 (keynote_bench summary), 0301 (numbers structure bench) and 0302 (after legs of its docx, odt, pages, numbers and rtf harnesses; the base legs re-measure states earlier records carry). 0303–0305 are listed as 'not on this tree' until their records merge; rerun the tool after those merges.",
-  "[0306] Parsers added for 0303 (pptx_gaps_bench: unified/native in the after build, after/before on the plain paths the base accepts), 0304 (text_set_bench: each after run against the median of the before runs, and ODT unified/leaf) and 0306 (iwork_directory_bench). 0305 is listed as 'not on this tree' until it merges."
+  "[0306] Parsers added for 0303 (pptx_gaps_bench: unified/native in the after build, after/before on the plain paths the base accepts), 0304 (text_set_bench: each after run against the median of the before runs, and ODT unified/leaf) and 0306 (iwork_directory_bench). 0305 is listed as 'not on this tree' until it merges.",
+  "[0310] Record 0310 re-measured every open miss's harness on trunk 0f3d8158cb (results/0310/trunk/) and the routes it changes in B A A B order (results/0310/abba/, after legs parsed). Its §2 groups the open misses by root cause (G1–G12); every open miss cites that grouping. Rows it cannot re-measure (before/after builds of 0263 and 0290) carry its note in their explanation.",
+  "[0310] Parsers added for 0305 (after legs of its keynote, numbers, docx, rtf — with its route G, the fan-out passing &Query — pages and docx_large harnesses) and 0309 (its element-write scenarios, against its stated 5 % or 20 µs bar). Records with no paired measurement: 0308 ('performance_claim: none; §7 shows the touched paths'). Record 0310 also added the 0311 (docx_large_bench with its committed-handle legs, the office_gaps_bench DOC scenarios) and 0312 (its keynote, pages and numbers runs) parsers after merging them."
  ],
  "rows": [
   {
@@ -278,7 +280,7 @@
    "budget_kind": "regression",
    "series": "schema0263:xls:unified_get:1",
    "cite": "0263-registry-schema-export.md §6 'Medians of all samples': '400 → 430 ns at one cell, where the timer step is 10 ns'",
-   "explanation": "0263 §6: timer quantization, not a regression — '400 → 430 ns at one cell, where the timer step is 10 ns'; 'No regression above 5% beyond that one-cell quantization.' Native legs moved 0.961–1.016 in the same runs. No follow-up."
+   "explanation": "0263 §6: timer quantization, not a regression — '400 → 430 ns at one cell, where the timer step is 10 ns'; 'No regression above 5% beyond that one-cell quantization.' Native legs moved 0.961–1.016 in the same runs. No follow-up. Record 0310 §2 G12: the get leg is re-measured unified/native as xls_read:get (G8)."
   },
   {
    "stage": "",
@@ -2279,7 +2281,7 @@
   {
    "record": "0290",
    "series": "abba0290:odp_metadata_read",
-   "explanation": "Record 0290 §5: +7 ns; File::metadata() returns a clone of the cached metadata, which now carries one more string (fr-FR): 'That is the requested output, not overhead.' No follow-up."
+   "explanation": "Record 0290 §5: +7 ns; File::metadata() returns a clone of the cached metadata, which now carries one more string (fr-FR): 'That is the requested output, not overhead.' No follow-up. Record 0310 §2 G12: an after/before reading of +7 ns on a 32 ns read; the trunk read measures 35–36 ns (results/0310/trunk/checklist-*.jsonl). The before build is not rebuilt; the added work is the requested string clone, so no fix applies."
   },
   {
    "record": "0295",
@@ -2320,6 +2322,106 @@
    "record": "0306",
    "series": "iwork:keynote:bytes_open(_options)?",
    "explanation": "Record 0306 §5: 5.2–5.5 % (+80 µs) against a leaf leg that adopts shared bytes without copying; the unified leg moves the owned Vec into an Arc<[u8]> (a copy of the 500 KB fixture) and runs detection. The same route measured 0.97–0.98 against Package::from_bytes (which copies) in 0296/0298. The option plumbing itself adds nothing (bytes_open_options = bytes_open). Follow-up G4."
+  },
+  {
+   "record": "0310",
+   "series": "query:xlsb_1000_(bytes|file)_all_cell(_value_gt)?",
+   "explanation": "Record 0310 §2 G1/§3.1: fixed part — XlsbOwner::finish now skips its two checks inside a fenced step and the per-match check reads the source once (the leaf's source_version read it twice). File cell[value>1000] 2,117 → 414 µs, file cell 926 → 533 µs (177 ns per match, XLSX's 173), bytes value>1000 438 → 340 µs. What remains is G4: the leaf leg is a borrowed loop over parsed records that yields no retainable node and makes no freshness check; the unified query builds an owned node per match and, on a file, checks the source per match (owner decision 2026-10-14). No fair (owned/fenced) XLSB leaf leg exists; follow-up: add one under a new route name."
+  },
+  {
+   "record": "0310",
+   "series": "query:xlsx_50000_(bytes|file)_all_row_header_gt",
+   "explanation": "Record 0310 §2 G2/§3.2: fixed part — Sheet::grid re-entered the leaf's fenced grid() on every cached read (four source observations per probed row, seven per row on a file); inside a fenced step it now relies on the step's closing check. File 32.8 → 11.7 ms, bytes 9.8 → 7.9 ms. Remaining: on a file the per-match check (≈150 ns × 25,000 matches, owner decision); on bytes ≈49 ns per probed row of walker step, row node and row_cell lookup over the leaf's typed column scan."
+  },
+  {
+   "record": "0310",
+   "series": "query(\\[all-formats\\])?:(xlsx|pptx)_[a-z0-9]+_(bytes|file)_all_(cell|shape)(_value_gt|_contains|_width)?",
+   "explanation": "Record 0310 §2 G4 (benchmark comparison, inherent): the leaf leg is a borrowed loop over the leaf's records that returns nothing retainable and checks nothing; the unified query yields an owned node per match (an Arc and the 184-byte node; 671 instructions per XLSX match, 1,068 per PPTX shape, callgrind) and on a file checks the source per match (≈125–150 ns fstat, kept by owner decision 2026-10-14). The fair pairings are the _owned/_fenced routes (G5). Property predicates (value>, width>, :contains) add one property or text read per candidate, which the borrowed leaf reads typed in place."
+  },
+  {
+   "record": "0310",
+   "series": "query(\\[all-formats\\])?:(xlsx|pptx)_[a-z0-9]+_(bytes|file)_all_(cell|shape)_(owned|fenced)",
+   "explanation": "Record 0310 §2 G5: against the fair leaves (owned handle per match; fenced adds the per-match freshness check) the residual is the generic walker step and the owned node: XLSX bytes 4.3–5.0× owned / 2.7–3.0× fenced, file fenced 1.19–1.21×; PPTX bytes 2.0–2.8× owned and fenced, file fenced 1.26–1.42×. _owned on a file compares against a leaf without the freshness check (15×). Unchanged by 0310 (PPTX file routes read +8% in one session while callgrind counts 2.2% fewer instructions: layout/noise). Follow-up (0287 §5): a walker fast path for single kind-only positionless plans, and smaller DOCX/PPTX nodes."
+  },
+  {
+   "record": "0310",
+   "series": "query:docx_.*_all_run_bold",
+   "explanation": "Record 0310 §2 G7 (format/docx, owned elsewhere): on a file the DOCX child iterator (Children::next) checks the source for every child it yields instead of skipping inside the fenced step — 491 version reads over 11 queries with no match (callgrind), ≈7 µs per query of the 1.50–1.54× on saut_page; on bytes 1.17–1.20× and drawing.docx 1.23× are the adapter's node and walk cost. Follow-up for the OOXML owner: the fence-scope skip XLSX/XLSB/PPTX use (record 0262), and the 176-byte DOCX node."
+  },
+  {
+   "record": "0310",
+   "series": "ods_bench:query.*",
+   "explanation": "Record 0310 §2 G6 (comparison, inherent): the leaf leg is a loop over borrowed cell runs (≈1.5 ns per cell) that yields nothing; the unified query builds an owned node per cell (≈35–40 ns). Re-measured on trunk 24.7–31.3× (0291: 16–23×; the leaf loop itself read 14–16 µs). Follow-up: a fair owned ODS leaf leg under a new name, and the walker fast path (G5)."
+  },
+  {
+   "record": "0310",
+   "series": "odt_paired:query_all.*",
+   "explanation": "Record 0310 §2 G6: re-measured on trunk 3.3–3.7×, unchanged since 0291 (3.1–3.9×). The leaf leg is a borrowed paragraph loop; about 45% of the unified cost is the leaf's Node::text, which both legs pay, and the rest is the walker step, the adapter's child step and the moves of the 176-byte ODT node (0287 §2). Follow-up: the walker fast path (G5)."
+  },
+  {
+   "record": "0310",
+   "series": "xls_read:(get|scan):(eager|positional):\\d+",
+   "explanation": "Record 0310 §2 G8: re-measured on trunk, unchanged. Eager get: 3.57 K instructions per call against the native 1.18 K (callgrind): path resolution 1.9 K (vocabulary rule/alias lookups 0.75 K, the sheet and cell child steps 0.73 K, validation and cell-reference parsing 0.34 K), the node and its label, and View::text; the native leg hoists the worksheet lookup out of the loop. Positional: each get and each match of the scan also checks the file (fstat) once and View::text once more (record 0291 §3.5); the native visit_cells checks nothing per cell. Inherent to per-call text-path resolution and the owner's per-match check; follow-up: cache the parsed sheet step per handle."
+  },
+  {
+   "record": "0310",
+   "series": "rtf_destination:.*:1:fanout(_plan|_ref)?",
+   "explanation": "Record 0310 §2 G9: re-measured on trunk, unchanged (fan-out 1.11–1.15, picture removal 1.25–1.27; Plan route 1.09–1.17). Fixed per-call costs one target cannot amortize: selector plan (cache hit ≈1.0 K instructions), walk, coalescing setup and the transaction; the fan-out leg also clones its owned Query each call (≈2.0 K instructions, record 0302 §4.4, a harness artifact). Follow-up: a harness route that passes &Query under a new name."
+  },
+  {
+   "record": "0310",
+   "series": "rtf_tiny:.*",
+   "explanation": "Record 0310 §2 G9: re-measured on trunk. An edit-closure single set executes 90.6 K instructions against the native 80.5 K (callgrind, 132 calls); the leaf commit underneath is the native's (81.1 K). The 10 K excess: Edit::set_with_policy 8.6 K — coalescing plan 5.7 K, of which coercing string props to typed values (≈0.9 K per length such as \"6pt\", paragraph properties 3.6 K, run format 1.5 K) and the source index (1.7 K) — plus the transaction and patch. The native leg receives typed patches. A plain-integer fast path in number parsing saved 0.24% and was not kept. Follow-up: a typed-props route (prop::LENGTH values) to separate coercion from the write path."
+  },
+  {
+   "record": "0310",
+   "series": "docx_fanout:1",
+   "explanation": "Record 0310 §2 G10 (format/docx, out of scope; another agent owns DOCX single sets): re-measured on trunk 1.103–1.105, unchanged since 0302 §4.1 (instructions 5.3% over the leaf, the rest L1 misses in the leaf's own commit). Follow-up: the inline DocxEditor variant (0302)."
+  },
+  {
+   "record": "0310",
+   "series": "iwork:keynote:(bytes_open|bytes_open_options)",
+   "explanation": "Record 0310 §2 G11 (format/iwork, owned by record 0305): re-measured on trunk 1.048–1.054 (+72–81 µs). The leaf leg receives its Arc<[u8]> prepared outside the timed region; the unified leg takes an owned Vec (the open_bytes API) and copies it into an Arc<[u8]> in Iwork::detect_bytes before detection. The Keynote fixture is 500 KB; Pages (96 KB) and Numbers (136 KB) pay the same steps at 0.99–1.01. Follow-up for the iWork owner: adopt the Vec without a copy."
+  },
+  {
+   "record": "0310",
+   "series": "iwork:keynote:open_get",
+   "explanation": "Record 0310 §2 G11 (iWork lazy trees, record 0305): re-measured on trunk 1.093–1.098; the first read builds every slide's drawables and layouts (record 0298 §5)."
+  },
+  {
+   "record": "0310",
+   "series": "numbers:open_get",
+   "explanation": "Record 0310 §2 G11 (iWork lazy trees, record 0305): re-measured on trunk 1.177–1.194 (0302: 1.24–1.26); the first read builds the workbook's object tree and dropping the handle drops it (record 0302 §4.3)."
+  },
+  {
+   "record": "0305",
+   "series": "docx_large:(set|add):auto",
+   "explanation": "Record 0305 §4.5: 'After §2.4 the source-backed set costs about 420 µs over the leaf, the add about 500 µs: the remaining size-dependent pass is litchi-opc's audit of the replacement main part when the source overlay publishes it (PreparedTopology::apply_source_xml → check_for_replacement → audit_source_part_replacement_xml, 9.5 M instructions on 1,000 paragraphs).' The eager route skips that second audit through the commit's VerifiedSource proof; the source overlay cannot receive it. Owned by the DOCX large-document agent (record 0310 out of scope)."
+  },
+  {
+   "record": "0305",
+   "series": "rtf_destination:.*:1:fanout_ref",
+   "explanation": "Record 0305 §3.4/§4.3: route G (borrowed &Query) is 1.004–1.022 over the precompiled Plan route at one target; 'a plan-cache hit itself costs about 0.04–0.08 µs on a 7–8 µs single-target fan-out'. The rest of the gap over native is the fixed per-call cost of planning, the walk and the transaction (record 0310 §2 G9)."
+  },
+  {
+   "record": "0309",
+   "series": "iwork:keynote:table_cell",
+   "explanation": "Record 0309 §6: 'Resolving …/tr[1]/tc[1] builds the slide's part (Iwork::kids → build_whole, 222M of 1487M Ir). That build decodes the slide table (select_table_after_inventory) to make its tr and tc items, which costs about as much as the leaf write. Follow-up: a lazy table part for Keynote slide tables (the record 0305 pattern for Numbers cells), or reuse of the decoded table between the tree and the write.'"
+  },
+  {
+   "record": "0309",
+   "series": "iwork:pages:table_cell",
+   "explanation": "Record 0309 §6: 'The unified path's only extra work is the first-read tree build (resolve → checked_tree → build_with, about 1.4M Ir per call against a 20.5M Ir leaf commit). The leaf work is identical in both legs. Follow-up: a lazy body-table part for Pages.'"
+  },
+  {
+   "record": "0310",
+   "series": "iwork:keynote:table_cell",
+   "explanation": "Record 0310 §2 G11: re-measured on the merged tree 2.0×, as record 0309 §6 found (1.99): resolving …/tr[1]/tc[1] builds the slide's part, which decodes the slide table (select_table_after_inventory) at about the cost of the leaf write. Follow-up (0309): a lazy table part for Keynote slide tables, or reuse of the decoded table between the tree and the write."
+  },
+  {
+   "record": "0311",
+   "series": "office_gaps:doc_text_set",
+   "explanation": "Record 0311 §4.2: 'Unified against the Package::edit leaf it wraps: 1.03–1.04×, inside the single-op budget. The body-text leaf's commit publishes only the next body snapshot. The package commit also parses the published file into the Document the returned package reads … This parse is the commit's validation of the output, so skipping it would weaken the commit. The wall-time gap is larger than the instruction gap because of L1i misses: 12.4 K against 10.8 K per call, from the second parser's code.'"
   }
  ]
 }

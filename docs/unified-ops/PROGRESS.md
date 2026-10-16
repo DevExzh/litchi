@@ -647,6 +647,17 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - Default-feature clippy fixed in `litchi-numbers` and `litchi-iwa-archive`.
   - Merge fix: one rustfmt hunk in `tests/iwork_unified.rs` (trunk gate fmt failure); the rebless run that followed was clean.
   - Open (to 0314): Numbers comments (request 19, diagnosed), the formula-coordinate shift, table creation, notes runs; batch misses Pages `batch_10000` 1.53×, Numbers `batch_1000` 1.32×, Pages `batch_1000` 1.08×, Keynote `batch_1000` 1.067×.
+- Merged `docx-insert` (0313):
+  - `xml-minifier` successor proofs: `VerifiedSource::verify_indexed` records content boundaries to depth 2, and `verify_successor` proves an edit between two boundaries of one parent by scanning only the new bytes; anything else gets the full audit. Every verdict is compared with the full audit (adversarial cases plus 3,000 random edits), and debug builds re-check every splice proof.
+  - litchi-opc keeps the remembered original's indexed proof (at most 4 per package; managed packages remember nothing).
+  - 1,000-paragraph DOCX add on the default owner: 442 → 74 µs (0.17× the eager owner, 0.07× the leaf); committed-handle add 454 → 270 µs; set legs unchanged.
+  - Open (to 0317): chained far-apart edits on committed handles, depth-3 (PPTX shape) boundaries, the set's one original scan in the litchi-docx commit.
+- Merged `miss-sweep` (0310):
+  - The 102 open bench misses are triaged into twelve root-cause groups (G1–G12), each re-measured; 98 remain open, each with a measured cause.
+  - XLSB queries skip nested freshness checks inside a fenced step and read the version once (file `cell[value>1000]` 2,117 → 414 µs); XLSX header rows no longer re-enter the fenced grid read (50,000 rows 32.8 → 11.7 ms); XLS positional row/column writes don't build the whole grid (1.11 → 1.03). Tests count source reads; outputs byte-identical.
+  - Bench matrix parsers through 0313; the `unified-query` lockfile gains `memchr`.
+  - Coordinator note: a leftover agent wait loop (`pgrep -f` matching its own command line) was killed; the agent rules now forbid that pattern.
+  - Open (to 0315): walker and owned-node residual (G4–G6, about 50 misses), DOCX `Children::next` freshness (G7), XLS sheet-step cache (G8), RTF typed props (G9); Keynote bytes-open copy (G11).
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;

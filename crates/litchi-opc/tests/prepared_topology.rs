@@ -2584,6 +2584,74 @@ fn a_remembered_original_still_audits_every_unproven_replacement() {
 }
 
 #[test]
+fn insertions_after_a_remembered_original_match_a_fresh_package() {
+    // Record 0313: once the original has passed, an unproven insertion is
+    // proved from the original's recorded boundaries. Every verdict, error
+    // and published byte is a fresh package's.
+    let mut document = String::from(r#"<w:document xmlns:w="urn:w"><w:body>"#);
+    for index in 0..40 {
+        document.push_str(&format!(
+            "<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>Paragraph {index}</w:t></w:r></w:p>"
+        ));
+    }
+    document.push_str("</w:body></w:document>");
+    let source = || {
+        open(Arc::new(VersionedSource::new(source_bytes_with_document(
+            document.as_bytes(),
+        ))))
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap()
+    };
+    let base = source();
+    let at = document
+        .find("<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>Paragraph 20<")
+        .unwrap();
+    let insert = |fragment: &str| {
+        Arc::new(format!("{}{fragment}{}", &document[..at], &document[at..]).into_bytes())
+    };
+    // The first pair remembers the original.
+    base.apply_xml_bytes(
+        &pack(DOCUMENT),
+        document.as_bytes(),
+        insert("<w:p><w:r><w:t>Inserted</w:t></w:r></w:p>"),
+    )
+    .unwrap();
+    for fragment in [
+        "<w:p><w:r><w:t>Inserted</w:t></w:r></w:p>",
+        "<w:tbl/>",
+        "<w:p><w:t>a &amp; b</w:t></w:p>",
+        "<w:p>",
+        "</w:body><w:body>",
+        "<x:p/>",
+        "<w:p><w:t>&bogus;</w:t></w:p>",
+        "<w:p><w:t>x]]>y</w:t></w:p>",
+    ] {
+        let replacement = insert(fragment);
+        let remembered = base.apply_xml_bytes(
+            &pack(DOCUMENT),
+            document.as_bytes(),
+            Arc::clone(&replacement),
+        );
+        let fresh = source().apply_xml_bytes(&pack(DOCUMENT), document.as_bytes(), replacement);
+        match (remembered, fresh) {
+            (Ok(remembered), Ok(fresh)) => assert_eq!(published(&remembered), published(&fresh)),
+            (Err(remembered), Err(fresh)) => {
+                assert!(
+                    matches!(remembered, OpcError::XmlPublication { .. }),
+                    "{remembered}"
+                );
+                assert_eq!(remembered.to_string(), fresh.to_string());
+            },
+            (remembered, fresh) => panic!(
+                "{fragment}: {:?} against {:?}",
+                remembered.err(),
+                fresh.err()
+            ),
+        }
+    }
+}
+
+#[test]
 fn full_document_byte_replacements_preserve_producer_namespaces_and_chain() {
     let physical = open(Arc::new(VersionedSource::new(source_bytes())));
     let base = physical

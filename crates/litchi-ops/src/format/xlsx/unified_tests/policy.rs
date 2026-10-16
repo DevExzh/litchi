@@ -1,5 +1,5 @@
 //! Source freshness and identity policy at the unified XLSX boundary.
-use super::{both, data_sheet, get, kitchen, small_sheet, styles, workbook};
+use super::{REL, SML, SheetPart, both, data_sheet, get, kitchen, small_sheet, styles, workbook};
 use crate::{Code, File, OpenOptions};
 use litchi_core::{ReadAt, SourceVersion};
 use std::io;
@@ -263,4 +263,99 @@ fn unmodeled_cells_are_not_misclassified_as_numbers() {
         );
         assert_eq!(file.query("cell[type=Unknown]").unwrap().count(), 1);
     }
+}
+
+/// A source that counts its version observations and can be changed.
+struct Counted {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+    versions: AtomicU64,
+}
+impl ReadAt for Counted {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+    fn read_at(&self, offset: u64, out: &mut [u8]) -> io::Result<usize> {
+        let start = usize::try_from(offset).unwrap_or(usize::MAX);
+        let data = self.bytes.get(start..).unwrap_or_default();
+        let count = out.len().min(data.len());
+        out[..count].copy_from_slice(&data[..count]);
+        Ok(count)
+    }
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.versions.fetch_add(1, Ordering::SeqCst);
+        Ok(SourceVersion::new(57, self.revision.load(Ordering::SeqCst)))
+    }
+}
+
+/// Observations of a header-row query's second full run over a `Data`
+/// sheet with a `Sales` header and `rows` rows of 10, and its match count.
+fn observed_header_query(rows: u32) -> (usize, u64) {
+    let last = rows + 1;
+    let mut xml = format!(
+        r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>"#
+    );
+    for row in 2..=last {
+        xml.push_str(&format!(
+            r#"<row r="{row}"><c r="A{row}" t="s"><v>2</v></c><c r="B{row}"><v>10</v></c></row>"#
+        ));
+    }
+    xml.push_str(
+        r#"</sheetData><tableParts count="1"><tablePart r:id="rId1"/></tableParts></worksheet>"#,
+    );
+    let table = format!(
+        r#"<table xmlns="{SML}" id="1" name="Sales" displayName="Sales" ref="A1:B{last}" totalsRowShown="0"><autoFilter ref="A1:B{last}"/><tableColumns count="2"><tableColumn id="1" name="Region"/><tableColumn id="2" name="Sales"/></tableColumns></table>"#
+    );
+    let sheet = SheetPart {
+        name: "Data",
+        state: None,
+        xml,
+        table: Some(table),
+    };
+    let source = Arc::new(Counted {
+        bytes: workbook(&[sheet], "", &["Region", "Sales", "East"], &styles()),
+        revision: AtomicU64::new(0),
+        versions: AtomicU64::new(0),
+    });
+    let package = litchi_opc::SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let handle = super::Xlsx::from_source_package(package, &OpenOptions::default()).unwrap();
+    let file = File::Xlsx(handle);
+    let matches = file.query("row[Sales>5]").unwrap().count();
+    let before = source.versions.load(Ordering::SeqCst);
+    assert_eq!(file.query("row[Sales>5]").unwrap().count(), matches);
+    (matches, source.versions.load(Ordering::SeqCst) - before)
+}
+
+/// Record 0310: a header-row query probes each row of the bound block
+/// through the sheet's cached grid. Inside the query step those probes
+/// share the step's closing check instead of re-entering the leaf's fenced
+/// grid read, so each further matching row costs its one per-match check
+/// (owner decision 2026-10-14) and nothing more. A change between two
+/// pulls still fails the next pull.
+#[test]
+fn header_row_probes_share_the_step_check() {
+    let (small_matches, small) = observed_header_query(10);
+    let (large_matches, large) = observed_header_query(20);
+    assert_eq!((small_matches, large_matches), (10, 20));
+    assert_eq!(large - small, 10, "{small} -> {large}");
+
+    let source = Arc::new(Counted {
+        bytes: kitchen(),
+        revision: AtomicU64::new(0),
+        versions: AtomicU64::new(0),
+    });
+    let package = litchi_opc::SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let handle = super::Xlsx::from_source_package(package, &OpenOptions::default()).unwrap();
+    let file = File::Xlsx(handle);
+    let paths = file
+        .query("row[Sales>1000]")
+        .unwrap()
+        .map(|node| node.unwrap().path().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(paths, ["/sheet[1]/row[2]", "/sheet[1]/row[5]"]);
+    let mut matches = file.query("row[Sales>1000]").unwrap();
+    assert!(matches.next().unwrap().is_ok());
+    source.revision.store(1, Ordering::SeqCst);
+    assert_eq!(matches.next().unwrap().unwrap_err().code(), Code::IoError);
+    assert!(matches.next().is_none());
 }

@@ -1,0 +1,64 @@
+== rtf_destination-1.json 14:17:59 load 7.42
+== xls_read-1.json 14:18:00 load 7.42
+== ods-1.json 14:18:02 load 7.42
+== odt-1.txt 14:18:17 load 7.62
+== docx_fanout-1.json 14:18:18 load 7.65
+== docx_element-1.json 14:18:18 load 7.65
+== checklist-1.jsonl 14:18:22 load 7.65
+== unified-rtf-add-1.json 14:18:22 load 7.65
+== unified-rtf-run-add-1.json 14:18:22 load 7.65
+== unified-rtf-layout-1.json 14:18:41 load 6.57
+== unified-rtf-batch-set-1.json 14:18:44 load 6.36
+== xls_p0-1.json 14:19:43 load 8.50
+== rtf_destination-2.json 14:20:18 load 7.12
+== xls_read-2.json 14:20:19 load 7.12
+== ods-2.json 14:20:21 load 7.12
+== odt-2.txt 14:20:36 load 6.36
+== docx_fanout-2.json 14:20:37 load 6.36
+== docx_element-2.json 14:20:37 load 6.36
+== checklist-2.jsonl 14:20:40 load 6.09
+== unified-rtf-add-2.json 14:20:40 load 6.09
+== unified-rtf-run-add-2.json 14:20:41 load 6.09
+== unified-rtf-layout-2.json 14:20:59 load 5.21
+== unified-rtf-batch-set-2.json 14:21:02 load 5.21
+== xls_p0-2.json 14:22:03 load 5.54
+== query-1 xlsx_1000_bytes 14:22:37 load 4.93
+== query-1 xlsx_1000_file 14:22:55 load 4.38
+== query-1 xlsx_50000_bytes 14:23:19 load 3.91
+== query-1 xlsx_50000_file 14:23:59 load 3.51
+== query-1 xlsb_1000_bytes 14:24:43 load 3.24
+== query-1 xlsb_1000_file 14:24:46 load 3.24
+== query-1 pptx_small_bytes 14:24:52 load 3.22
+== query-1 pptx_small_file 14:24:54 load 3.20
+== query-1 pptx_large_bytes 14:24:57 load 3.20
+== query-1 pptx_large_file 14:25:00 load 3.19
+== query-1 docx_drawing_file 14:25:05 load 3.17
+== query-1 docx_saut_bytes 14:25:07 load 3.17
+== query-1 docx_saut_file 14:25:09 load 3.32
+== query-all-1 xlsx_1000_bytes 14:25:10 load 3.32
+== query-all-1 pptx_large_bytes 14:25:28 load 3.58
+== query-2 xlsx_1000_bytes 14:25:32 load 3.58
+== query-2 xlsx_1000_file 14:25:50 load 7.27
+== query-2 xlsx_50000_bytes 14:26:14 load 6.29
+== query-2 xlsx_50000_file 14:26:54 load 6.22
+== query-2 xlsb_1000_bytes 14:27:38 load 7.26
+== query-2 xlsb_1000_file 14:27:42 load 7.26
+== query-2 pptx_small_bytes 14:27:48 load 6.92
+== query-2 pptx_small_file 14:27:49 load 6.60
+== query-2 pptx_large_bytes 14:27:52 load 6.60
+== query-2 pptx_large_file 14:27:56 load 6.48
+== query-2 docx_drawing_file 14:28:00 load 6.60
+== query-2 docx_saut_bytes 14:28:03 load 6.79
+== query-2 docx_saut_file 14:28:04 load 6.79
+== query-all-2 xlsx_1000_bytes 14:28:06 load 6.79
+== query-all-2 pptx_large_bytes 14:28:24 load 7.29
+== iwork-directory-1.jsonl 14:28:28 load 7.29
+== keynote-1.jsonl 14:28:41 load 6.48
+== numbers-1.json 14:30:07 load 7.31
+== iwork-directory-2.jsonl 14:30:07 load 7.31
+== keynote-2.jsonl 14:30:21 load 7.20
+== numbers-2.json 14:31:45 load 7.38
+== text_set-1.json 14:31:45 load 7.38
+== text_set-2.json 14:31:46 load 7.38
+== text_set-3.json 14:31:47 load 7.38
+done trunk
