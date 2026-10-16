@@ -13,7 +13,8 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
 use super::{
-    Admission, Refusal, admit, admit_with, binds_namespace_by_reference, mentions_namespace,
+    Admission, Held, Holder, Refusal, admit, admit_held, admit_with, binds_namespace_by_reference,
+    mentions_namespace,
 };
 use crate::mce::{
     Capabilities, Limits, NAMESPACE, OffsetLimits, active_offsets, process_markup_compatibility,
@@ -753,6 +754,16 @@ fn every_admission_is_sound_against_the_processor() {
                     &word_profile(),
                     &Limits::default(),
                 );
+                // The held proof is the plain proof wherever it finds no
+                // wrapper, and admits a wrapper only where the plain proof
+                // refuses an element.
+                match held(&xml) {
+                    Ok(held) if held.wrappers == 0 => {
+                        assert_eq!(Ok(held.outside), verdict(&xml), "{xml}");
+                    },
+                    Ok(_) => assert_eq!(verdict(&xml), Err(Refusal::Element), "{xml}"),
+                    Err(_) => assert!(verdict(&xml).is_err(), "{xml}"),
+                }
                 match verdict(&xml) {
                     Ok(admission) => {
                         admitted += 1;
@@ -835,4 +846,194 @@ fn observer_sees_every_event_and_can_stop_the_proof() {
     .unwrap();
     assert_eq!(unbound, Ok(Admission::Unbound));
     assert_eq!(unbound_events, 0);
+}
+
+/// The main document's holder: a WordprocessingML run.
+const RUN: Holder<'static> = Holder {
+    namespaces: &[W],
+    local: "r",
+};
+
+fn held(xml: &str) -> Result<Held, Refusal> {
+    admit_held(xml.as_bytes(), &word_profile(), &Limits::default(), RUN)
+}
+
+const RUN_WRAPPER: &str = r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14"><w:t>C</w:t></mc:Choice><mc:Fallback><w:t>F</w:t></mc:Fallback></mc:AlternateContent></w:r></w:p>"#;
+
+#[test]
+fn held_wrappers_are_opaque_only_inside_holders() {
+    let mc = format!(r#"xmlns:mc="{MC}""#);
+    let ignorable = format!(r#"{mc} mc:Ignorable="x""#);
+    let cases: Vec<(&str, String, Result<usize, Refusal>)> = vec![
+        ("a wrapper in a run", document(&mc, RUN_WRAPPER), Ok(1)),
+        (
+            "two runs with wrappers",
+            document(&mc, &RUN_WRAPPER.repeat(2)),
+            Ok(2),
+        ),
+        (
+            "a wrapper nested in a branch counts once",
+            document(
+                &mc,
+                r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14"><mc:AlternateContent><mc:Choice Requires="w14"/></mc:AlternateContent></mc:Choice></mc:AlternateContent></w:r></w:p>"#,
+            ),
+            Ok(1),
+        ),
+        (
+            "a wrapper deep inside a run's drawing",
+            document(
+                &mc,
+                r#"<w:p><w:r><w:drawing><x:anchor><mc:AlternateContent><mc:Choice Requires="w14"><x:size/></mc:Choice></mc:AlternateContent></x:anchor></w:drawing></w:r></w:p>"#,
+            ),
+            Ok(1),
+        ),
+        (
+            "an empty wrapper with its own declaration",
+            document(
+                &mc,
+                r#"<w:p><w:r><mc:AlternateContent xmlns:q="urn:q"/><w:t>A</w:t></w:r></w:p>"#,
+            ),
+            Ok(1),
+        ),
+        (
+            "anything inside a wrapper",
+            document(
+                &mc,
+                r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14" mc:Ignorable="zz" xmlns:zz="urn:zz"><zz:any mc:ProcessContent="zz:any"><w:p/></zz:any></mc:Choice><mc:Fallback><mc:Bogus/></mc:Fallback></mc:AlternateContent></w:r></w:p>"#,
+            ),
+            Ok(1),
+        ),
+        (
+            "outside wrappers the plain verdict holds",
+            document(&ignorable, r#"<w:p x:id="1"><w:r><w:t>A</w:t></w:r></w:p>"#),
+            Ok(0),
+        ),
+        (
+            "a wrapper in a paragraph, outside any run",
+            document(
+                &mc,
+                r#"<w:p><mc:AlternateContent><mc:Choice Requires="w14"><w:r/></mc:Choice></mc:AlternateContent></w:p>"#,
+            ),
+            Err(Refusal::Element),
+        ),
+        (
+            "a body-level wrapper",
+            document(
+                &mc,
+                r#"<mc:AlternateContent><mc:Choice Requires="w14"><w:p/></mc:Choice><mc:Fallback/></mc:AlternateContent>"#,
+            ),
+            Err(Refusal::Element),
+        ),
+        (
+            "a run of another namespace",
+            document(
+                &mc,
+                r#"<w:p><x:r><mc:AlternateContent><mc:Choice Requires="w14"/></mc:AlternateContent></x:r></w:p>"#,
+            ),
+            Err(Refusal::Element),
+        ),
+        (
+            "a branch without its wrapper",
+            document(
+                &mc,
+                r#"<w:p><w:r><mc:Choice Requires="w14"><w:t>C</w:t></mc:Choice></w:r></w:p>"#,
+            ),
+            Err(Refusal::Element),
+        ),
+        (
+            "a wrapper in a dropped subtree of a run",
+            document(
+                &ignorable,
+                r#"<w:p><w:r><x:ext><mc:AlternateContent/></x:ext></w:r></w:p>"#,
+            ),
+            Err(Refusal::Element),
+        ),
+        (
+            "a directive outside the wrappers",
+            document(
+                &mc,
+                &format!(
+                    r#"<w:p mc:ProcessContent="x:wrap">{}</w:p>"#,
+                    &RUN_WRAPPER[5..RUN_WRAPPER.len() - 6]
+                ),
+            ),
+            Err(Refusal::Directive),
+        ),
+        (
+            "an unbalanced wrapper",
+            document(
+                &mc,
+                r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14"></w:r></w:p>"#,
+            ),
+            Err(Refusal::Unproven),
+        ),
+    ];
+    for (name, xml, expected) in cases {
+        let verdict = held(&xml);
+        assert_eq!(verdict.map(|held| held.wrappers), expected, "{name}: {xml}");
+        if let Ok(held) = verdict {
+            if held.wrappers == 0 {
+                assert_eq!(Ok(held.outside), self::verdict(&xml), "{name}");
+            } else {
+                assert_eq!(self::verdict(&xml), Err(Refusal::Element), "{name}");
+            }
+        }
+    }
+    // Inside a wrapper the processor's own checks still decide: the proof
+    // holds, processing fails.
+    let unbound = document(
+        &mc,
+        r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="nowhere"/></mc:AlternateContent></w:r></w:p>"#,
+    );
+    assert_eq!(held(&unbound).map(|held| held.wrappers), Ok(1));
+    assert!(
+        process_markup_compatibility(unbound.as_bytes(), &word_profile(), &Limits::default())
+            .is_err()
+    );
+}
+
+#[test]
+fn processing_replaces_each_held_wrapper_in_place() {
+    // Each pair is a body with wrappers and the body processing must
+    // produce: the selected branch's content where the wrapper stood.
+    let pairs = [
+        (
+            r#"<w:p><w:r><w:rPr><w:b/></w:rPr><mc:AlternateContent><mc:Choice Requires="w14"><w:t>C</w:t></mc:Choice><mc:Fallback><w:t>F</w:t></mc:Fallback></mc:AlternateContent><w:t>T</w:t></w:r></w:p><w:p/>"#,
+            r#"<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>C</w:t><w:t>T</w:t></w:r></w:p><w:p/>"#,
+        ),
+        (
+            r#"<w:p><w:r><mc:AlternateContent xmlns:q="urn:q"><mc:Choice Requires="q"><w:t>C</w:t></mc:Choice><mc:Fallback><w:t>F</w:t></mc:Fallback></mc:AlternateContent></w:r><w:r><w:t>2</w:t></w:r></w:p>"#,
+            r#"<w:p><w:r><w:t>F</w:t></w:r><w:r><w:t>2</w:t></w:r></w:p>"#,
+        ),
+        (
+            r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="x"><w:t>C</w:t></mc:Choice></mc:AlternateContent><w:t>T</w:t></w:r></w:p>"#,
+            r#"<w:p><w:r><w:t>T</w:t></w:r></w:p>"#,
+        ),
+    ];
+    for root in [
+        format!(r#"xmlns:mc="{MC}""#),
+        format!(r#"xmlns:mc="{MC}" mc:Ignorable="w14""#),
+        format!(r#"xmlns:mc="{MC}" mc:Ignorable="x""#),
+    ] {
+        for (body, selected) in pairs {
+            let part = document(&root, body);
+            let held = held(&part).unwrap_or_else(|refusal| panic!("{refusal:?}: {part}"));
+            assert!(held.wrappers > 0);
+            let projected =
+                process_markup_compatibility(part.as_bytes(), &word_profile(), &Limits::default())
+                    .unwrap();
+            let selected = document(&root, selected);
+            let expected = process_markup_compatibility(
+                selected.as_bytes(),
+                &word_profile(),
+                &Limits::default(),
+            )
+            .unwrap();
+            assert_eq!(
+                nodes(&projected.xml, &[]),
+                nodes(&expected.xml, &[]),
+                "{part}"
+            );
+        }
+    }
 }
