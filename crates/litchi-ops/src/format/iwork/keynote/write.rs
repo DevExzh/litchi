@@ -371,8 +371,9 @@ impl Pending {
         self.texts.insert(text, (value, index));
     }
 
-    /// Stage one character property of a run of a text box or shape: the
-    /// run's characters in its drawable's text (record 0309).
+    /// Stage one character property of a run of a text box, shape, or
+    /// title or body placeholder: the run's characters in its drawable's
+    /// text (records 0309, 0312).
     fn stage_run_style(
         &mut self,
         file: &Iwork,
@@ -382,34 +383,50 @@ impl Pending {
         index: usize,
     ) -> Result<()> {
         let [slide, container, line, drawable] = node.item().leaf().map(|value| value as usize);
-        if container != DRAWABLE {
-            return Err(refusal(
+        let unsupported = || {
+            refusal(
                 Code::UnsupportedCapability,
-                "character properties are written on runs of text boxes and shapes; placeholder and notes runs keep their layout's styles",
+                "character properties are written on runs of text boxes, shapes and title and body placeholders; speaker-notes runs keep their styles",
             )
-            .with_property(key.to_owned()));
+            .with_property(key.to_owned())
+        };
+        if container != DRAWABLE || drawable == NONE {
+            return Err(unsupported());
         }
-        let text = Text {
-            slide,
-            container: DRAWABLE,
-            drawable,
+        // The text holding the run: a shape's, or a placeholder's whose
+        // frame is the run's drawable.
+        let slide_at = file
+            .kids(super::super::At::ROOT)
+            .get(slide)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the run's slide is missing"))?;
+        let shape = file
+            .kids(slide_at)
+            .iter()
+            .find(|&child| {
+                let item = file.stand_in(child);
+                matches!(item.type_name(), "shape" | "placeholder")
+                    && item.leaf()[3] as usize == drawable
+            })
+            .ok_or_else(unsupported)?;
+        let text = match file.stand_in(shape).leaf()[1] as usize {
+            slot @ (TITLE | BODY) if file.stand_in(shape).type_name() == "placeholder" => Text {
+                slide,
+                container: slot,
+                drawable: NONE,
+            },
+            _ => Text {
+                slide,
+                container: DRAWABLE,
+                drawable,
+            },
         };
         if self.texts.contains_key(&text) {
             return Err(refusal(
                 Code::InvalidArgument,
-                "set a shape's text and its runs' character properties in separate writes",
+                "set a text and its runs' character properties in separate writes",
             )
             .with_property(key.to_owned()));
         }
-        // A placeholder's runs have no shape item: their text keeps its
-        // layout's styles.
-        let shape = text.at(file).ok_or_else(|| {
-            refusal(
-                Code::UnsupportedCapability,
-                "character properties are written on runs of text boxes and shapes; placeholder and notes runs keep their layout's styles",
-            )
-            .with_property(key.to_owned())
-        })?;
         let of_kind = |parent, kind: &str| -> Vec<super::super::At> {
             file.kids(parent)
                 .iter()

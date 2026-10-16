@@ -4744,10 +4744,10 @@ odf	element	edit	supported		ok tx.set
 odf	element	batch	supported		ok set item
 odf	element	create	supported		ok format
 odf	element	save	supported		ok format
-pages	document	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /
-pages	document	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /
 pages	document	query	n/a	query not offered for this element	-
-pages	document	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /
 pages	document	set	n/a	set not offered for this element	-
 pages	document	add	n/a	add not offered for this element	-
 pages	document	remove	n/a	remove not offered for this element	-
@@ -4757,10 +4757,10 @@ pages	document	edit	n/a	edit not offered for this element	-
 pages	document	batch	n/a	batch not offered for this element	-
 pages	document	create	supported		ok format
 pages	document	save	supported		ok format
-pages	body	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /body
-pages	body	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body
 pages	body	query	supported		ok matches in create()
-pages	body	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body
 pages	body	set	n/a	set not offered for this element	-
 pages	body	add	n/a	add not offered for this element	-
 pages	body	remove	n/a	remove not offered for this element	-
@@ -4788,8 +4788,8 @@ pages	section	find	supported		ok 8 instances, first `iwork/pages/body-sections-u
 pages	section	query	supported		ok matches in create()
 pages	section	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
 pages	section	set	supported		ok `create() + add paragraph` /section[1] {"name":"Litchi"}
-pages	section	add	n/a	add not offered for this element	-
-pages	section	remove	n/a	remove not offered for this element	-
+pages	section	add	supported		ok /section[2] on `create() + add paragraph` under / {}
+pages	section	remove	supported		ok `create() + add paragraph + add section` /section[2]
 pages	section	move	format-verb		refused invalid_argument
 pages	section	swap	format-verb		refused invalid_argument
 pages	section	edit	supported		ok tx.set
@@ -4861,10 +4861,10 @@ pages	footer	edit	supported		ok tx.set
 pages	footer	batch	supported		ok set item
 pages	footer	create	supported		ok format
 pages	footer	save	supported		ok format
-pages	footnotes	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
-pages	footnotes	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
 pages	footnotes	query	supported		ok matches in create()
-pages	footnotes	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
 pages	footnotes	set	n/a	set not offered for this element	-
 pages	footnotes	add	n/a	add not offered for this element	-
 pages	footnotes	remove	n/a	remove not offered for this element	-

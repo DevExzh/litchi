@@ -15,9 +15,11 @@
 //! refused: the object's own capability deletes or moves it.
 //!
 //! Tables are read from the leaf's body-table catalog and cell reader
-//! (`/body/tbl[N]/tr[R]/tc[C]`) and removed through its deletion
-//! transaction; cell writes are a typed gap. Section names, header and
-//! footer text, footnote text and the document properties
+//! (`/body/tbl[N]/tr[R]/tc[C]`), built the first time a read reaches a
+//! table (record 0312); their cells write through `table::values` and the
+//! tables are removed through the deletion transaction. Sections are added
+//! and removed through `section::lifecycle` (record 0312). Section names,
+//! header and footer text, footnote text and the document properties
 //! (`set("/metadata", ..)`) write through their leaf families.
 
 use std::collections::BTreeMap;
@@ -164,27 +166,7 @@ static GAPS: [GapSpec; 2] = [
     },
 ];
 
-static OPERATION_GAPS: [GapSpec; 6] = [
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "section",
-            context: "a new section",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 11",
-        reason: "the Pages leaf has no section lifecycle transaction (a section break plus a new native section object)",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "section",
-            context: "a section",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 11",
-        reason: "the Pages leaf has no section lifecycle transaction",
-    },
+static OPERATION_GAPS: [GapSpec; 4] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -350,8 +332,8 @@ impl Flavor for Pages {
 /// The elements `set` writes, `add` creates and `remove` deletes.
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["p", "section", "tc", "header", "footer", "footnote"],
-    addable: &["p", "footnote"],
-    removable: &["p", "tbl", "footnote"],
+    addable: &["p", "footnote", "section"],
+    removable: &["p", "tbl", "footnote", "section"],
     movable: &["p"],
     gaps: &OPERATION_GAPS,
 };
@@ -382,6 +364,7 @@ pub(crate) enum Patch {
     Metadata(litchi_pages::metadata::Patch),
     TextStyle(litchi_pages::section::text_style::Patch),
     TableValues(litchi_pages::table::values::Patch),
+    SectionLifecycle(litchi_pages::section::lifecycle::Patch),
     TableDeletion(
         #[allow(
             dead_code,
@@ -403,6 +386,7 @@ impl Patch {
             Self::Metadata(patch) => patch.is_noop(),
             Self::TextStyle(patch) => patch.is_noop(),
             Self::TableValues(patch) => patch.is_noop(),
+            Self::SectionLifecycle(patch) => patch.is_noop(),
             Self::TableDeletion(_) => false,
         }
     }
@@ -1147,13 +1131,13 @@ pub(crate) fn add(
     if kind == "footnote" {
         return add_footnote(file, package, &parent_node, node, limits);
     }
+    if kind == "section" {
+        return add_section(file, package, &parent_node, node, limits);
+    }
     if !matches!(kind.as_str(), "p" | "paragraph") {
         return Err(refusal(
             Code::UnsupportedCapability,
             match kind.as_str() {
-                "section" => {
-                    "adding a Pages section needs a leaf section lifecycle transaction (IWORK_API_REQUESTS.md request 11)"
-                },
                 "tbl" | "table" => {
                     "adding a Pages body table needs a leaf table-creation transaction (record 0299 follow-up)"
                 },
@@ -1215,6 +1199,85 @@ pub(crate) fn add(
         _ => return Err(element_refusal("add", &parent_node)),
     };
     add_at(file, package, section, line, &value, limits)
+}
+
+/// Add a section (record 0312): a section break and a new section copying
+/// the page masters, headers and footers of the section it follows. The
+/// placement names where it goes among the sections (the end by default);
+/// the first section always begins the body, so a new one cannot precede
+/// it. `name` is the only property: the new section starts empty.
+fn add_section(
+    file: &Iwork,
+    package: &Package,
+    parent: &Node<'_>,
+    node: &NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    use crate::Placement;
+    if parent.item().type_name() != "document" {
+        return Err(element_refusal("add", parent));
+    }
+    let mut name = None;
+    for (key, prop) in node.props().iter() {
+        if key.as_str() == "name" {
+            name = super::write::text(prop, "name")?;
+        } else {
+            return Err(super::write::unwritable("section", key.as_str()));
+        }
+    }
+    let count = package.sections().len();
+    let section_at = |path: &PathArg<'_>| -> Result<usize> {
+        let anchor = super::write::node_at::<Pages>(file, path)?;
+        if anchor.item().type_name() != "section" {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "a section is placed before or after another section",
+            ));
+        }
+        Ok(anchor.item().leaf()[SECTION] as usize)
+    };
+    // The new section's final position among the sections.
+    let index = match node.placement() {
+        None | Some(Placement::End | Placement::Into(_, None)) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position) | Placement::Into(_, Some(position))) => position.get(),
+        Some(Placement::Before(path)) => section_at(path)?,
+        Some(Placement::After(path)) => section_at(path)? + 1,
+    };
+    if index == 0 {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "the first section begins the body; a new section follows another one",
+        ));
+    }
+    if index > count {
+        return Err(refusal(
+            Code::OutOfRange,
+            "the insertion position is outside the document's sections",
+        ));
+    }
+    let error = |error| failure(LeafError::PagesSectionLifecycle(error));
+    let commit = package
+        .edit_section_lifecycle()
+        .add(index - 1, name.as_deref())
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let (next, patch) = commit.into_parts();
+    let mut chain = Chain::new(package.clone());
+    push(&mut chain, next, Patch::SectionLifecycle(patch));
+    let commit = finish(
+        file,
+        chain.changed,
+        Owner::Pages(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )?;
+    let path = Path::parse(&format!("/section[{}]", index + 1))
+        .map_err(|_error| refusal(Code::InternalError, "the new section's path"))?
+        .into_owned();
+    Ok((commit, path))
 }
 
 /// Insert a paragraph at `(section, line)` and name its new path.
@@ -1344,6 +1407,7 @@ pub(crate) fn remove(
     let nodes = resolve::<Pages>(file, target, limits.max_expanded_targets())?;
     let mut tables = Vec::new();
     let mut footnotes = Vec::new();
+    let mut sections = Vec::new();
     let mut lines: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for node in &nodes {
         let leaf = node.item().leaf().map(|value| value as usize);
@@ -1351,6 +1415,7 @@ pub(crate) fn remove(
             "paragraph" => lines.entry(leaf[SECTION]).or_default().push(leaf[LINE]),
             "table" => tables.push(leaf[0]),
             "footnote" => footnotes.push(leaf[0]),
+            "section" => sections.push(leaf[SECTION]),
             _ => return Err(element_refusal("remove", node)),
         }
     }
@@ -1428,6 +1493,22 @@ pub(crate) fn remove(
         let commit = edit.commit().map_err(error)?;
         let (next, patch) = commit.into_parts();
         push(&mut chain, next, Patch::Paragraphs(patch));
+    }
+    // Sections last, from the last (record 0312): each removal keeps its
+    // text in the preceding section and the earlier sections' positions.
+    sections.sort_unstable();
+    sections.dedup();
+    for section in sections.iter().rev() {
+        let error = |error| failure(LeafError::PagesSectionLifecycle(error));
+        let commit = chain
+            .package
+            .edit_section_lifecycle()
+            .remove(*section)
+            .map_err(error)?
+            .commit()
+            .map_err(error)?;
+        let (next, patch) = commit.into_parts();
+        push(&mut chain, next, Patch::SectionLifecycle(patch));
     }
     finish(
         file,

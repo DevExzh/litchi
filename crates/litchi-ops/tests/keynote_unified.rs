@@ -484,13 +484,6 @@ fn create_builds_a_presentation() {
 fn unsupported_writes_are_typed_refusals() {
     let file = read("multi-slide.key");
     let error = file
-        .set(
-            "/slide[1]/placeholder[title]/p[1]/run[1]",
-            props! { "bold" => true },
-        )
-        .unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
-    let error = file
         .set(&format!("{BODY}/p[1]"), props! { "text" => "two\nlines" })
         .unwrap_err();
     assert_eq!(error.code(), Code::InvalidValue);
@@ -802,4 +795,48 @@ fn placeholders_are_hidden_and_shown() {
             .expect("read"),
         Some(State::Visible)
     );
+    // The unified `hidden` reads the per-slide state (record 0312).
+    assert_eq!(prop(&file, BODY, "hidden").as_deref(), Some("false"));
+    assert_eq!(
+        prop(&reopen(&removed), BODY, "hidden").as_deref(),
+        Some("true")
+    );
+    assert_eq!(
+        prop(&reopen(&shown), BODY, "hidden").as_deref(),
+        Some("false")
+    );
+}
+
+#[test]
+fn placeholder_runs_take_character_properties() {
+    // Record 0312: title and body placeholders style their slide's own
+    // storage, as text boxes do.
+    let file = read("multi-slide.key");
+    let run = "/slide[1]/placeholder[title]/p[1]/run[1]";
+    let before = text(&file, run);
+    let styled = file
+        .set(run, props! { "bold" => true, "size" => "40pt" })
+        .expect("style a placeholder run");
+    let reopened = reopen(&styled);
+    assert_eq!(prop(&reopened, run, "bold").as_deref(), Some("true"));
+    assert_eq!(prop(&reopened, run, "size").as_deref(), Some("40pt"));
+    assert_eq!(text(&reopened, run), before);
+    assert_eq!(
+        text(&reopened, "/slide[1]/placeholder[title]"),
+        text(&file, "/slide[1]/placeholder[title]")
+    );
+    // In a batch, the run addresses the text the earlier item wrote.
+    let commit = file
+        .edit(|tx| {
+            tx.set(
+                "/slide[1]/placeholder[title]",
+                props! { "text" => "Changed" },
+            )?;
+            tx.set(run, props! { "italic" => true })?;
+            Ok(())
+        })
+        .expect("batch");
+    let reopened = reopen(&commit.file);
+    assert_eq!(text(&reopened, run).as_deref(), Some("Changed"));
+    assert_eq!(prop(&reopened, run, "italic").as_deref(), Some("true"));
 }

@@ -105,15 +105,7 @@ pub(crate) const PLACEHOLDER_PROPS: &[PropSpec] = &[
     writable("height", EXTENT),
     writable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
-    {
-        let mut spec = PropSpec::new("hidden", ValueType::Bool);
-        spec.access = crate::node::spec::Access {
-            get: false,
-            set: true,
-            add: false,
-        };
-        spec
-    },
+    writable("hidden", ValueType::Bool),
 ];
 
 const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
@@ -218,9 +210,9 @@ static OPERATION_GAPS: [GapSpec; 9] = [
     operation_gap(
         "set",
         "run",
-        "placeholder and notes runs",
-        "record 0309 follow-ups",
-        "character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles",
+        "speaker-notes runs",
+        "record 0312 follow-ups",
+        "character properties are written on runs of text boxes, shapes and title and body placeholders (record 0312); speaker notes list no runs and keep their styles",
     ),
     operation_gap(
         "add",
@@ -853,10 +845,22 @@ pub(crate) fn build_slide(
             .iter()
             .position(|drawable| drawable.kind() == kind);
         let drawable = position.and_then(|position| drawables.get(position));
+        // A hidden placeholder keeps its text on its slide (record 0312).
+        let hidden = package
+            .slide_placeholder_visibility(selector, role)
+            .ok()
+            .flatten()
+            .map(|state| {
+                Value::Bool(matches!(
+                    state,
+                    litchi_keynote::slide::placeholder::State::Hidden
+                ))
+            });
         let placeholder = frame(
             tree.push(item, Kind::Placeholder)
                 .prop("type", text(Some(name)))
-                .prop("text", text(Some(&value))),
+                .prop("text", text(Some(&value)))
+                .prop("hidden", hidden),
             drawable,
         )
         .label(Some(name))
