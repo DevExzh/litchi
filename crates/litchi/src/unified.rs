@@ -3,25 +3,12 @@
 //! `litchi-ops` owns [`File`](crate::File) and its single-pass openers, and
 //! since record 0296 (owner decision D1) it opens Apple Pages, Keynote and
 //! Numbers packages itself, as `File::Pages`, `File::Keynote` and
-//! `File::Numbers`. These openers are `litchi_ops::open` with one facade
-//! refinement: an iWork input the unified `File` cannot hold (an
-//! app-authored package directory) is refused with a suggestion that names
-//! the facade's read-only `litchi::iwork::Document`, or the `iwork` cargo
-//! feature that builds it.
+//! `File::Numbers`, package directories included (record 0306). These
+//! openers are `litchi_ops::open` and its variants.
 
 use std::path::Path;
 
-#[cfg(all(
-    any(feature = "pages", feature = "keynote", feature = "numbers"),
-    not(feature = "iwork")
-))]
-use litchi_core::FileFormat;
-#[cfg(all(
-    any(feature = "pages", feature = "keynote", feature = "numbers"),
-    not(feature = "iwork")
-))]
-use litchi_ops::Code;
-use litchi_ops::{Error, File, OpenOptions, Result};
+use litchi_ops::{File, OpenOptions, Result};
 
 /// Open the file at `path`, detecting its format from the content.
 ///
@@ -35,9 +22,8 @@ use litchi_ops::{Error, File, OpenOptions, Result};
 /// Returns [`Code::FileNotFound`](crate::Code::FileNotFound) when the path
 /// does not exist, [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat)
 /// for an input that is not an Office file (with no
-/// [`detected`](Error::detected) format), for an Apple iWork package
-/// directory (with the iWork format and a suggestion), and for a format
-/// whose cargo feature is off (with the format and a suggestion),
+/// [`detected`](crate::Error::detected) format) and for a format whose cargo
+/// feature is off (with the format and a suggestion),
 /// [`Code::LimitExceeded`](crate::Code::LimitExceeded) when the input
 /// exceeds a read limit, and the format's typed error when its container
 /// cannot be read.
@@ -78,7 +64,7 @@ pub fn open(path: impl AsRef<Path>) -> Result<File> {
 /// # Ok::<(), litchi::Error>(())
 /// ```
 pub fn open_with(path: impl AsRef<Path>, options: &OpenOptions) -> Result<File> {
-    litchi_ops::open_with(path, options).map_err(refuse)
+    litchi_ops::open_with(path, options)
 }
 
 /// Open an in-memory input, detecting its format from the content.
@@ -114,29 +100,5 @@ pub fn open_bytes(bytes: impl Into<Vec<u8>>) -> Result<File> {
 /// assert_eq!(error.code(), Code::LimitExceeded);
 /// ```
 pub fn open_bytes_with(bytes: impl Into<Vec<u8>>, options: &OpenOptions) -> Result<File> {
-    litchi_ops::open_bytes_with(bytes, options).map_err(refuse)
-}
-
-/// Finish a refusal: the suggestion for an iWork package directory names
-/// `litchi::iwork`, which only the aggregate `iwork` feature builds, so a
-/// build without it says so.
-fn refuse(error: Error) -> Error {
-    #[cfg(all(
-        any(feature = "pages", feature = "keynote", feature = "numbers"),
-        not(feature = "iwork")
-    ))]
-    if error.code() == Code::UnsupportedFormat
-        && matches!(
-            error.detected(),
-            Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
-        )
-        && error
-            .suggestion()
-            .is_some_and(|suggestion| suggestion.contains("litchi::iwork"))
-    {
-        return error.with_suggestion(
-            "enable the `iwork` cargo feature and open the file with `litchi::iwork::Document::open`",
-        );
-    }
-    error
+    litchi_ops::open_bytes_with(bytes, options)
 }

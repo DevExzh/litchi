@@ -19,10 +19,10 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// What a `Presentation` reads: a unified file of the presentation family,
-/// or a Keynote document, which `litchi::File` opens without a family view.
+/// or a Keynote `File`, which has no family view (its leaf package is read).
 enum Source {
     File(litchi::File),
-    Keynote(litchi::keynote::semantic::Presentation),
+    Keynote(litchi::File),
 }
 
 /// Unified PowerPoint presentation interface
@@ -61,18 +61,13 @@ pub struct Presentation {
 impl Presentation {
     fn read(path: &std::path::Path) -> Result<Source, Failure> {
         match litchi::open(path) {
-            // `litchi::File` opens iWork packages (record 0296), but its
-            // family views do not cover them; this reader keeps the
-            // semantic document's projection.
-            Ok(file) if file.format() == Some(CoreFormat::Keynote) => {
-                iwork::open_keynote(path).map(Source::Keynote)
-            },
+            // `litchi::File` opens Keynote packages and package directories
+            // (records 0296 and 0306), but its family views do not cover
+            // them; this reader projects the package the file retains.
+            Ok(file) if file.format() == Some(CoreFormat::Keynote) => Ok(Source::Keynote(file)),
             Ok(file) => match file.presentation() {
                 Ok(_) => Ok(Source::File(file)),
                 Err(error) => Err(Failure::open(&error, Opener::Presentation)),
-            },
-            Err(error) if iwork::is_refused(&error, CoreFormat::Keynote) => {
-                iwork::open_keynote(path).map(Source::Keynote)
             },
             Err(error) => Err(Failure::open(&error, Opener::Presentation)),
         }
@@ -84,7 +79,10 @@ impl Presentation {
                 .presentation()
                 .and_then(|presentation| presentation.slide_count())
                 .map_err(|error| Failure::read(&error)),
-            Source::Keynote(document) => Ok(document.slides().len()),
+            Source::Keynote(file) => iwork::keynote(file)?
+                .slides()
+                .map(<[_]>::len)
+                .map_err(|error| iwork::keynote_failure(&error)),
         }
     }
 }
@@ -125,7 +123,7 @@ impl Presentation {
     fn text(&self, py: Python<'_>) -> PyResult<String> {
         py.detach(|| match &self.source {
             Source::File(file) => file.text().map_err(|error| Failure::read(&error)),
-            Source::Keynote(document) => document.text().map_err(iwork::keynote_failure),
+            Source::Keynote(file) => file.text().map_err(|error| Failure::read(&error)),
         })
         .map_err(PyErr::from)
     }
@@ -149,11 +147,15 @@ impl Presentation {
                 .and_then(|presentation| presentation.slides())
                 .map(|slides| slides.into_iter().map(SlideInner::Compat).collect())
                 .map_err(|error| Failure::read(&error)),
-            Source::Keynote(document) => Ok(document
+            Source::Keynote(file) => iwork::keynote(file)?
                 .slides()
-                .iter()
-                .map(|slide| SlideInner::Keynote(slide.plain_text()))
-                .collect::<Vec<_>>()),
+                .map(|slides| {
+                    slides
+                        .iter()
+                        .map(|slide| SlideInner::Keynote(slide.plain_text()))
+                        .collect::<Vec<_>>()
+                })
+                .map_err(|error| iwork::keynote_failure(&error)),
         })?;
         Ok(slides.into_iter().map(|inner| Slide { inner }).collect())
     }

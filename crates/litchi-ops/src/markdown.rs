@@ -14,6 +14,8 @@
 mod document;
 #[cfg(feature = "docx")]
 mod docx;
+#[cfg(any(feature = "pages", feature = "keynote"))]
+mod iwork;
 #[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]
 mod presentation;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
@@ -34,7 +36,8 @@ use crate::{Code, Error, File, Result};
 impl ToMarkdown for File {
     type Error = Error;
 
-    /// Convert a document or presentation to Markdown; a [`File::Signed`]
+    /// Convert a document or presentation to Markdown (a Pages document or a
+    /// Keynote presentation included, record 0306); a [`File::Signed`]
     /// converts the file it wraps.
     ///
     /// # Errors
@@ -50,7 +53,9 @@ impl ToMarkdown for File {
             feature = "odt",
             feature = "ppt",
             feature = "pptx",
-            feature = "odp"
+            feature = "odp",
+            feature = "pages",
+            feature = "keynote"
         )),
         allow(
             clippy::only_used_in_recursion,
@@ -75,6 +80,12 @@ impl ToMarkdown for File {
             Self::Ppt(handle) => PresentationView::ppt(handle).to_markdown_with_options(options),
             #[cfg(feature = "odp")]
             Self::Odp(handle) => PresentationView::odp(handle).to_markdown_with_options(options),
+            #[cfg(feature = "pages")]
+            Self::Pages(handle) => iwork::convert(self, handle, options)
+                .map_err(|error| in_format(error, FileFormat::Pages)),
+            #[cfg(feature = "keynote")]
+            Self::Keynote(handle) => iwork::convert(self, handle, options)
+                .map_err(|error| in_format(error, FileFormat::Keynote)),
             Self::Locked(locked) => Err(locked.read_error()),
             Self::Signed(signed) => signed.file().to_markdown_with_options(options),
             #[allow(
@@ -207,7 +218,9 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
             feature = "odt",
             feature = "ppt",
             feature = "pptx",
-            feature = "odp"
+            feature = "odp",
+            feature = "pages",
+            feature = "keynote"
         )
     )
 ))]
@@ -229,7 +242,9 @@ fn feature_required(what: &str, feature: &'static str) -> Error {
         feature = "odt",
         feature = "ppt",
         feature = "pptx",
-        feature = "odp"
+        feature = "odp",
+        feature = "pages",
+        feature = "keynote"
     )
 ))]
 fn yaml_required() -> Error {
@@ -246,7 +261,9 @@ fn yaml_required() -> Error {
         feature = "odt",
         feature = "ppt",
         feature = "pptx",
-        feature = "odp"
+        feature = "odp",
+        feature = "pages",
+        feature = "keynote"
     )
 ))]
 fn yaml_front_matter(metadata: &litchi_core::Metadata) -> Result<String> {
@@ -276,7 +293,9 @@ fn odt_error(error: litchi_core::Error) -> Error {
     feature = "odt",
     feature = "ppt",
     feature = "pptx",
-    feature = "odp"
+    feature = "odp",
+    feature = "pages",
+    feature = "keynote"
 ))]
 fn in_format(error: Error, format: FileFormat) -> Error {
     if error.format().is_some() {

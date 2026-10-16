@@ -649,42 +649,44 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
     Ok(())
 }
 
-#[cfg(feature = "iwork")]
+/// A focused leaf edit never mutates an opened unified `File` (record 0306
+/// carries this over from the deleted read-only `litchi::iwork` snapshot).
 #[test]
-fn focused_slide_text_edit_does_not_mutate_the_read_only_iwork_snapshot()
--> Result<(), Box<dyn std::error::Error>> {
+fn focused_slide_text_edit_does_not_mutate_an_opened_file() -> Result<(), Box<dyn std::error::Error>>
+{
     let package = Package::open(fixture_path())?;
-    let document = litchi::iwork::Document::from_bytes(package.exact_bytes())?;
-    let snapshot = document.snapshot();
-    let original_slide = snapshot
-        .slide(0)
-        .ok_or_else(|| io::Error::other("root iWork snapshot has no slide"))?;
-    let original_title = original_slide
-        .title()
-        .ok_or_else(|| io::Error::other("root iWork snapshot has no slide title"))?
-        .to_owned();
-    assert_eq!(original_title, "Litchi native Keynote fixture");
+    let file = litchi::open_bytes(package.exact_bytes().to_vec())?;
+    let title = "/slide[1]/placeholder[title]";
+    let original = file
+        .get(title)?
+        .view()
+        .text()?
+        .map(|text| text.into_owned());
+    assert_eq!(original.as_deref(), Some("Litchi native Keynote fixture"));
 
     let replacement = "Focused Keynote edit, immutable iWork view";
     let mut edit = package.edit_slide_title(SlideSelector::index(0))?;
     edit.set(replacement)?;
     let changed = edit.commit()?;
 
-    let unchanged_slide = snapshot
-        .slide(0)
-        .ok_or_else(|| io::Error::other("retained iWork snapshot lost its slide"))?;
-    assert_eq!(unchanged_slide.title(), Some(original_title.as_str()));
-    let fresh_original_snapshot = document.snapshot();
-    let fresh_original_slide = fresh_original_snapshot
-        .slide(0)
-        .ok_or_else(|| io::Error::other("fresh iWork snapshot lost its slide"))?;
-    assert_eq!(fresh_original_slide.title(), Some(original_title.as_str()));
-
-    let candidate = litchi::iwork::Document::from_bytes(changed.package().exact_bytes())?;
-    let candidate_snapshot = candidate.snapshot();
-    let candidate_slide = candidate_snapshot
-        .slide(0)
-        .ok_or_else(|| io::Error::other("edited iWork snapshot has no slide"))?;
-    assert_eq!(candidate_slide.title(), Some(replacement));
+    assert_eq!(
+        file.get(title)?.view().text()?.as_deref(),
+        original.as_deref()
+    );
+    let candidate = litchi::open_bytes(changed.package().exact_bytes().to_vec())?;
+    assert_eq!(
+        candidate.get(title)?.view().text()?.as_deref(),
+        Some(replacement)
+    );
+    // The unified write is immutable too: the source handle is unchanged.
+    let edited = file.set(title, litchi::props! { "text" => replacement })?;
+    assert_eq!(
+        edited.get(title)?.view().text()?.as_deref(),
+        Some(replacement)
+    );
+    assert_eq!(
+        file.get(title)?.view().text()?.as_deref(),
+        original.as_deref()
+    );
     Ok(())
 }

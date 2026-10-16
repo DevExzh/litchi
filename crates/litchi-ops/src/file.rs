@@ -115,7 +115,8 @@ impl Family {
 /// metadata writes (record 0277); ODT and ODP remain read-only for now.
 /// The Apple iWork variants (`Pages`, `Keynote`, `Numbers`, record 0296)
 /// retain the leaf `Package` and write through its focused transactions;
-/// an iWork package directory is refused (see [`crate::open`]).
+/// an iWork package directory opens as its single-file form and saves back
+/// as a directory (records 0301 and 0306, see [`crate::open`]).
 /// The enum is `#[non_exhaustive]`: further formats join as variants. Each
 /// variant exists only when its cargo feature is enabled.
 ///

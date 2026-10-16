@@ -601,6 +601,16 @@ impl SemanticBudget {
 impl Package {
     /// Open a Numbers package from a filesystem path using default limits.
     ///
+    /// The path is a regular file or an app-authored package directory. A
+    /// package directory (the bundle form Numbers writes when "Save as
+    /// package" is selected) is captured once and converted into its
+    /// single-file form ([`litchi_iwa_archive::bundle::capture`], record
+    /// 0306): the `Index.zip` members followed by every other file of the
+    /// bundle in byte order of its relative name. The result is an ordinary
+    /// exact-source package: it edits like a single-file package,
+    /// [`Self::save`] and [`Self::write_to`] publish the single-file form,
+    /// and [`Self::save_directory`] writes the bundle form back.
+    ///
     /// # Errors
     ///
     /// Returns a typed error when the path cannot be read, the package exceeds
@@ -617,7 +627,21 @@ impl Package {
     /// the package cannot become a strict rooted semantic document.
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
         let options = Profile::from_options(options)?;
-        let bytes = read_source(path.as_ref(), options.archive())?;
+        let path = path.as_ref();
+        if litchi_iwa_archive::bundle::is_directory(path) {
+            let archive = options.archive();
+            let bytes = litchi_iwa_archive::bundle::capture(path, archive.into(), archive)
+                .map_err(litchi_iwa_archive::Error::from)?;
+            // The bundle's files were bounded while they were captured; the
+            // converted package adds only ZIP framing, so its own input bound
+            // is its length.
+            let archive = litchi_iwa_archive::bundle::converted_limits(archive, bytes.len())?;
+            return Self::from_shared_profile(
+                bytes.into(),
+                Profile::new(archive, options.semantic()),
+            );
+        }
+        let bytes = read_source(path, options.archive())?;
         Self::from_shared_profile(bytes.into(), options)
     }
 
@@ -864,6 +888,39 @@ impl Package {
     /// replacement already committed through [`SaveError::was_committed`].
     pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), SaveError> {
         save::save(self, path)
+    }
+
+    /// Save this package as an app-style package directory at `path`
+    /// (`IWORK_API_REQUESTS.md` request 16, record 0306): `Index.zip` holds
+    /// the `Index/` members with their records unchanged, and every other
+    /// member (metadata sidecars, previews, `Data/` media) is a plain file.
+    /// Opening the directory again gives back this package's exact bytes.
+    ///
+    /// The bundle is written into a sibling staging directory; an existing
+    /// destination directory is swapped out only after the new one is
+    /// complete and synchronized.
+    ///
+    /// # Errors
+    ///
+    /// [`SaveError::Publication`] when the destination exists and is not a
+    /// directory or the staging, synchronization or swap fails;
+    /// [`SaveError::Bundling`] when a staged file cannot be written;
+    /// [`SaveError::Bundle`] when the package or its index archive cannot be
+    /// assembled or a member name cannot be a file.
+    pub fn save_directory(&self, path: impl AsRef<Path>) -> std::result::Result<(), SaveError> {
+        let limits = self.state.options.archive();
+        let package = litchi_iwa_archive::package::Catalog::from_bytes_with_limits(
+            self.source_bytes(),
+            limits,
+        )
+        .map_err(SaveError::Bundle)?;
+        litchi_iwa_archive::bundle::save(
+            &package,
+            limits,
+            path.as_ref(),
+            SaveError::Bundle,
+            SaveError::Bundling,
+        )
     }
 
     /// Borrow decoded semantic sheets in stable source order.
