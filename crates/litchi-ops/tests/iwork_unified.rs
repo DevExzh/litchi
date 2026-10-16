@@ -151,13 +151,17 @@ mod pages {
     }
 
     #[test]
-    fn section_lifecycle_is_a_typed_gap() {
-        // Record 0299: creation and paragraph structure are supported; the
-        // section lifecycle (request 11) stays a typed gap.
+    fn section_lifecycle_and_capabilities() {
+        // Record 0299: creation and paragraph structure are supported;
+        // record 0312: so is the section lifecycle (request 11).
         assert!(create(FileFormat::Pages).is_ok());
         let file = read("pages/basic.pages");
-        let error = file
+        let added = file
             .add("/", litchi_ops::NewNode::new("section"))
+            .expect("add a section");
+        assert_eq!(added.path.to_string(), "/section[2]");
+        let error = file
+            .add("/", litchi_ops::NewNode::new("tbl"))
             .unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);
         let capabilities = Capabilities::of(FileFormat::Pages);
