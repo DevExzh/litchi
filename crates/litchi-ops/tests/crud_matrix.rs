@@ -1021,6 +1021,29 @@ fn add_attempts(element: &Element) -> Vec<Vec<(String, String)>> {
     attempts
 }
 
+/// The properties of an `add`, as a JSON object in insertion order, so the
+/// Python mirror (`crates/pyo3-litchi/tests/test_crud_mirror.py`) can
+/// replay it. Data URIs are abbreviated to `<PNG>`, which stands for
+/// [`PNG`].
+fn props_json(props: &[(String, String)]) -> String {
+    let fields: Vec<String> = props
+        .iter()
+        .map(|(key, value)| {
+            let value = if value == PNG {
+                "<PNG>"
+            } else {
+                value.as_str()
+            };
+            format!(
+                "{}:{}",
+                serde_json::Value::from(key.as_str()),
+                serde_json::Value::from(value)
+            )
+        })
+        .collect();
+    format!("{{{}}}", fields.join(","))
+}
+
 /// One added element: the fixture it went into, the new file and path.
 struct AddedNode {
     from: usize,
@@ -1081,12 +1104,15 @@ fn try_add(
         match guarded(|| file.add(parent.as_str(), node.clone())) {
             Ok(added) => match republish(&added.file) {
                 Ok(_) => {
-                    let keys: Vec<&str> = props.iter().map(|(key, _)| key.as_str()).collect();
                     return Some(AddedNode {
                         from: index,
                         path: added.path.to_string(),
                         file: added.file,
-                        how: format!("under {parent} [{}]", keys.join(",")),
+                        how: format!(
+                            "under {parent} {}{}",
+                            props_json(&props),
+                            if start { " at start" } else { "" }
+                        ),
                         parent,
                         node,
                     });
@@ -1384,8 +1410,9 @@ fn run_format(spec: &Spec) -> Report {
             }
             match &replay {
                 Some((fixture, path, key, value)) => Observed::Ok(format!(
-                    "`{}` {path} {key}={value}{}",
+                    "`{}` {path} {}{}",
                     fixtures[*fixture].label,
+                    props_json(&[(key.clone(), value.clone())]),
                     if unchanged {
                         " (value unchanged: no-op only)"
                     } else {
@@ -1671,7 +1698,12 @@ fn crud_checklist_per_format() {
                     "{}\t{element}\t{verb}\t{claim}\t{}\t{}",
                     spec.name,
                     clean(&follow_up),
-                    clean(&detail(&cell.observed))
+                    match &cell.observed {
+                        // Successful evidence is replayed by the Python
+                        // mirror, so it is never shortened.
+                        Observed::Ok(_) => detail(&cell.observed).replace(['\t', '\n', '|'], " "),
+                        observed => clean(&detail(observed)),
+                    }
                 );
                 match (&cell.claim, &cell.observed) {
                     (Claim::Supported, observed) => {
