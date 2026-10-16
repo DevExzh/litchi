@@ -119,8 +119,17 @@ const TABLE_PROPS: &[PropSpec] = &[
 const ROW_PROPS: &[PropSpec] = &[PropSpec::new("cellCount", ValueType::Int)];
 
 const CELL_PROPS: &[PropSpec] = &[
-    PropSpec::new("text", ValueType::Text),
+    writable("text", ValueType::Text),
     PropSpec::new("type", ValueType::Text),
+    {
+        let mut spec = PropSpec::new("value", ValueType::Scalar);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: true,
+            add: false,
+        };
+        spec
+    },
 ];
 
 const REGION_PROPS: &[PropSpec] = &[
@@ -180,11 +189,11 @@ static OPERATION_GAPS: [GapSpec; 6] = [
         subject: Subject::Operation {
             verb: "set",
             element: "tc",
-            context: "a body-table cell",
+            context: "cells in a formula graph",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0299 follow-up: Pages body-table cell writes",
-        reason: "the Pages leaf reads body-table cells but has no cell-write transaction (the Numbers cell writer is not shared with Pages)",
+        follow_up: "record 0309 follow-ups",
+        reason: "body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -340,7 +349,7 @@ impl Flavor for Pages {
 
 /// The elements `set` writes, `add` creates and `remove` deletes.
 pub(crate) static WRITES: super::Writes = super::Writes {
-    settable: &["p", "section", "header", "footer", "footnote"],
+    settable: &["p", "section", "tc", "header", "footer", "footnote"],
     addable: &["p", "footnote"],
     removable: &["p", "tbl", "footnote"],
     movable: &["p"],
@@ -372,6 +381,7 @@ pub(crate) enum Patch {
     Footnotes(litchi_pages::footnote::body::transaction::Patch),
     Metadata(litchi_pages::metadata::Patch),
     TextStyle(litchi_pages::section::text_style::Patch),
+    TableValues(litchi_pages::table::values::Patch),
     TableDeletion(
         #[allow(
             dead_code,
@@ -392,6 +402,7 @@ impl Patch {
             Self::Footnotes(patch) => patch.is_noop(),
             Self::Metadata(patch) => patch.is_noop(),
             Self::TextStyle(patch) => patch.is_noop(),
+            Self::TableValues(patch) => patch.is_noop(),
             Self::TableDeletion(_) => false,
         }
     }
@@ -696,6 +707,8 @@ pub(crate) fn set(
     let mut chain = Chain::new(package.clone());
     let mut pending = Pending::default();
     let mut operations = 0_usize;
+    let mut cells: BTreeMap<usize, Vec<(u32, u32, litchi_pages::table::values::Value)>> =
+        BTreeMap::new();
     for node in &nodes {
         for (key, value) in props.iter() {
             operations += 1;
@@ -779,14 +792,25 @@ pub(crate) fn set(
                     let patch = commit.patch().clone();
                     push(&mut chain, commit.into_package(), Patch::Footnote(patch));
                 },
-                ("cell", _) => {
-                    return Err(refusal(
-                        Code::UnsupportedCapability,
-                        "the Pages leaf reads body-table cells but has no cell-write transaction",
-                    )
-                    .with_property(key.to_owned())
-                    .with_suggestion("follow-up: Pages body-table cell writes (record 0299)"));
+                ("cell", "text" | "value") => {
+                    use super::write::CellScalar;
+                    let value = match super::write::cell_scalar(key, value)? {
+                        CellScalar::Text(text) => litchi_pages::table::values::Value::Text(text),
+                        CellScalar::Number(number) => {
+                            litchi_pages::table::values::Value::Number(number)
+                        },
+                        CellScalar::Boolean(flag) => {
+                            litchi_pages::table::values::Value::Boolean(flag)
+                        },
+                        CellScalar::Empty => litchi_pages::table::values::Value::Empty,
+                    };
+                    cells.entry(leaf[0]).or_default().push((
+                        u32::try_from(leaf[1]).unwrap_or(u32::MAX),
+                        u32::try_from(leaf[2]).unwrap_or(u32::MAX),
+                        value,
+                    ));
                 },
+                ("cell", _) => return Err(key_refusal(node, key)),
                 ("paragraph" | "section" | "header" | "footer" | "footnote", _) => {
                     return Err(key_refusal(node, key));
                 },
@@ -795,6 +819,19 @@ pub(crate) fn set(
         }
     }
     pending.flush(&mut chain)?;
+    for (table, values) in cells {
+        let error = |error| failure(LeafError::PagesTableValues(error));
+        let mut edit = chain
+            .package
+            .edit_body_table_values(BodyTableSelector::index(table))
+            .map_err(error)?;
+        for (row, column, value) in values {
+            edit.set(row, column, value).map_err(error)?;
+        }
+        let commit = edit.commit().map_err(error)?;
+        let (package, patch) = commit.into_parts();
+        push(&mut chain, package, Patch::TableValues(patch));
+    }
     finish(
         file,
         chain.changed,

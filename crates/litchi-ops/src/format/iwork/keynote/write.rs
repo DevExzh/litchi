@@ -14,7 +14,9 @@ use std::sync::Arc;
 use litchi_core::selector::Path;
 use litchi_core::{FileFormat, Position};
 use litchi_keynote::slide::creation::LayoutSelector;
-use litchi_keynote::slide::drawable::{Created, Geometry, Preset, Style, TextSpan as DrawableSpan};
+use litchi_keynote::slide::drawable::{
+    Created, Geometry, Preset, Style, TableCellValue, TextSpan as DrawableSpan,
+};
 use litchi_keynote::slide::placeholder::Kind as Role;
 use litchi_keynote::{DrawableSelector, Package, SlideSelector, TextPosition, TextSpan};
 
@@ -135,6 +137,8 @@ pub(super) struct Pending {
     /// Character styles: (slide, drawable, first char, end char) → (style,
     /// item) (record 0309).
     styles: BTreeMap<(usize, usize, usize, usize), (Style, usize)>,
+    /// Table cells: (slide, drawable, row, column) → (value, item).
+    cells: BTreeMap<(usize, usize, u32, u32), (TableCellValue, usize)>,
 }
 
 /// What publishing a pending set made.
@@ -336,6 +340,7 @@ impl Pending {
             && self.adds.is_empty()
             && self.hidden.is_empty()
             && self.styles.is_empty()
+            && self.cells.is_empty()
     }
 
     /// The new drawables staged on `slide` so far.
@@ -442,6 +447,62 @@ impl Pending {
         Ok(())
     }
 
+    /// Stage one slide-table cell value (record 0309).
+    fn stage_cell(
+        &mut self,
+        file: &Iwork,
+        node: &Node<'_>,
+        key: &str,
+        value: &PropValue<'_>,
+        index: usize,
+    ) -> Result<()> {
+        use super::super::write::CellScalar;
+        let [slide, _, row, drawable] = node.item().leaf().map(|value| value as usize);
+        let tree = file.tree();
+        let slide_item = tree
+            .item(super::ROOT)
+            .children()
+            .get(slide)
+            .map(|child| tree.item(*child))
+            .ok_or_else(|| refusal(Code::PathNotFound, "the cell's slide is missing"))?;
+        let table = slide_item
+            .children()
+            .iter()
+            .map(|child| tree.item(*child))
+            .find(|item| item.type_name() == "table" && item.leaf()[3] as usize == drawable)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the cell's table is missing"))?;
+        let row_item = table
+            .children()
+            .iter()
+            .map(|child| tree.item(*child))
+            .filter(|item| item.type_name() == "tr")
+            .nth(row)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the cell's row is missing"))?;
+        let column = row_item
+            .children()
+            .iter()
+            .map(|child| tree.item(*child))
+            .filter(|item| item.type_name() == "tc")
+            .position(|item| std::ptr::eq(item, node.item()))
+            .ok_or_else(|| refusal(Code::InternalError, "the cell is not in its row"))?;
+        let cell = match super::super::write::cell_scalar(key, value)? {
+            CellScalar::Text(text) => TableCellValue::Text(text),
+            CellScalar::Number(number) => TableCellValue::Number(number),
+            CellScalar::Boolean(flag) => TableCellValue::Boolean(flag),
+            CellScalar::Empty => TableCellValue::Empty,
+        };
+        self.cells.insert(
+            (
+                slide,
+                drawable,
+                u32::try_from(row).unwrap_or(u32::MAX),
+                u32::try_from(column).unwrap_or(u32::MAX),
+            ),
+            (cell, index),
+        );
+        Ok(())
+    }
+
     /// Stage one `key = value` assignment on `node`.
     pub(super) fn stage_set(
         &mut self,
@@ -506,6 +567,7 @@ impl Pending {
                 self.stage_run_style(file, node, key, value, index)?;
             },
             ("run", _) => return Err(run_refusal(key)),
+            ("tc", "text" | "value") => self.stage_cell(file, node, key, value, index)?,
             (
                 "slide" | "placeholder" | "notes" | "paragraph" | "shape" | "picture" | "connector"
                 | "video" | "audio" | "table" | "tc" | "chart" | "group",
@@ -545,6 +607,7 @@ impl Pending {
             || !self.removals.is_empty()
             || !self.adds.is_empty()
             || !self.styles.is_empty()
+            || !self.cells.is_empty()
         {
             let first = drawable_texts
                 .iter()
@@ -553,6 +616,7 @@ impl Pending {
                 .chain(self.removals.values().copied())
                 .chain(self.adds.iter().map(|(_, index)| *index))
                 .chain(self.styles.values().map(|(_, index)| *index))
+                .chain(self.cells.values().map(|(_, index)| *index))
                 .min();
             let at = |index: usize| {
                 move |error| (failure(LeafError::KeynoteDrawables(error)), Some(index))
@@ -581,6 +645,16 @@ impl Pending {
                         DrawableSelector::index(*drawable),
                         DrawableSpan::new(*start, *end),
                         style.clone(),
+                    )
+                    .map_err(at(*index))?;
+                }
+                for ((slide, drawable, row, column), (value, index)) in &self.cells {
+                    edit.set_table_cell(
+                        SlideSelector::index(*slide),
+                        DrawableSelector::index(*drawable),
+                        *row,
+                        *column,
+                        value.clone(),
                     )
                     .map_err(at(*index))?;
                 }
@@ -682,6 +756,7 @@ impl Pending {
         self.frames.clear();
         self.removals.clear();
         self.styles.clear();
+        self.cells.clear();
         self.adds.clear();
         Ok(published)
     }

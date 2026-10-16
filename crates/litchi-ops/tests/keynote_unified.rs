@@ -506,9 +506,10 @@ fn unsupported_writes_are_typed_refusals() {
         .set("/slide[3]/placeholder[body]", props! { "x" => "1in" })
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
+    // A formula cell refuses a value (no recalculation).
     let tables = read("slide-table-read-native.key");
     let error = tables
-        .set("/slide[1]/table[1]/tr[1]/tc[1]", props! { "text" => "x" })
+        .set("/slide[1]/table[1]/tr[2]/tc[4]", props! { "text" => "x" })
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
     let error = file.add("/slide[1]", NewNode::new("table")).unwrap_err();
@@ -713,4 +714,35 @@ fn runs_of_shapes_take_character_properties() {
     let reopened = reopen(&both.file);
     assert_eq!(text(&reopened, &shape).as_deref(), Some("changed"));
     assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
+}
+
+#[test]
+fn slide_table_cells_take_values() {
+    let file = read("table-discovery.key");
+    let cell = file
+        .query("tc")
+        .expect("query")
+        .next()
+        .expect("a cell")
+        .expect("node")
+        .path()
+        .to_string();
+    let written = file
+        .edit(|tx| tx.set(&cell, props! { "text" => "Updated" }))
+        .expect("write a cell");
+    let reopened = reopen(&written.file);
+    assert_eq!(text(&reopened, &cell).as_deref(), Some("Updated"));
+    let restored = written
+        .patch
+        .inverse()
+        .apply(&written.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let numeric = reopened
+        .set(&cell, props! { "value" => 3 })
+        .expect("a number");
+    assert_eq!(
+        prop(&reopen(&numeric), &cell, "type").as_deref(),
+        Some("number")
+    );
 }

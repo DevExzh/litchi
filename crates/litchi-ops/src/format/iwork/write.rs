@@ -326,6 +326,41 @@ pub(crate) fn font_property(
     Ok(true)
 }
 
+/// A table-cell value of a `text` or `value` key: text, a finite number,
+/// a boolean, or `None` (clear) for `null` (record 0309).
+#[cfg(any(feature = "keynote", feature = "pages"))]
+pub(crate) enum CellScalar {
+    Text(String),
+    Number(f64),
+    Boolean(bool),
+    Empty,
+}
+
+#[cfg(any(feature = "keynote", feature = "pages"))]
+pub(crate) fn cell_scalar(key: &str, value: &PropValue<'_>) -> Result<CellScalar> {
+    if key.eq_ignore_ascii_case("text") {
+        return Ok(text(value, "text")?.map_or(CellScalar::Empty, CellScalar::Text));
+    }
+    value
+        .with_coerced(ValueType::Scalar, |scalar| {
+            Ok(match scalar {
+                None => CellScalar::Empty,
+                Some(Scalar::Text(text)) => CellScalar::Text(text.to_owned()),
+                Some(Scalar::Bool(flag)) => CellScalar::Boolean(flag),
+                #[allow(clippy::cast_precision_loss, reason = "table cells store doubles")]
+                Some(Scalar::Int(number)) => CellScalar::Number(number as f64),
+                Some(Scalar::Number(number)) if number.is_finite() => CellScalar::Number(number),
+                Some(other) => {
+                    return Err(refusal(
+                        Code::InvalidValue,
+                        format!("a table cell cannot hold `{other}`"),
+                    ));
+                },
+            })
+        })
+        .map_err(|error| error.with_property("value"))
+}
+
 /// The value of `key` coerced to a boolean; `null` is refused.
 #[cfg(any(feature = "keynote", feature = "numbers", feature = "pages"))]
 pub(crate) fn boolean(value: &PropValue<'_>, key: &'static str) -> Result<bool> {

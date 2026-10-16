@@ -33,6 +33,9 @@ pub enum LeafError {
     /// A Pages character-style transaction failed (record 0309).
     #[cfg(feature = "pages")]
     PagesTextStyle(litchi_pages::section::text_style::Error),
+    /// A Pages body-table value transaction failed (record 0309).
+    #[cfg(feature = "pages")]
+    PagesTableValues(litchi_pages::table::values::Error),
     /// A Pages header or footer text transaction failed.
     #[cfg(feature = "pages")]
     PagesHeaderFooter(litchi_pages::header_footer::text::Error),
@@ -120,6 +123,8 @@ impl fmt::Display for LeafError {
             #[cfg(feature = "pages")]
             Self::PagesTextStyle(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
+            Self::PagesTableValues(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
             Self::PagesFootnote(error) => error.fmt(formatter),
@@ -183,6 +188,8 @@ impl std::error::Error for LeafError {
             Self::PagesName(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesTextStyle(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableValues(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => Some(error),
             #[cfg(feature = "pages")]
@@ -254,6 +261,8 @@ impl LeafError {
             Self::PagesName(error) => pages_name_code(error),
             #[cfg(feature = "pages")]
             Self::PagesTextStyle(error) => pages_text_style_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableValues(error) => pages_table_values_code(error),
             #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => pages_region_code(error),
             #[cfg(feature = "pages")]
@@ -414,6 +423,19 @@ fn pages_text_style_code(error: &litchi_pages::section::text_style::Error) -> Co
         E::SectionNotFound => Code::PathNotFound,
         E::InvalidSpan | E::EmptyStyle => Code::InvalidArgument,
         E::UnsupportedDependency | E::UnsupportedSource => Code::UnsupportedCapability,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_table_values_code(error: &litchi_pages::table::values::Error) -> Code {
+    use litchi_pages::table::values::Error as E;
+    match error {
+        E::TableNotFound => Code::PathNotFound,
+        E::InvalidCell => Code::InvalidValue,
+        E::Formulas | E::UnsupportedStorage | E::UnsupportedSource => Code::UnsupportedCapability,
         E::LimitExceeded { .. } => Code::LimitExceeded,
         E::PatchConflict | E::InvalidSource => Code::InvalidInput,
         _ => Code::InternalError,

@@ -480,3 +480,41 @@ fn paragraph_fonts_are_written() {
         .unwrap_err();
     assert_eq!(error.code(), Code::InvalidValue);
 }
+
+#[test]
+fn body_table_cells_take_values() {
+    let file = read("pages/body-table-catalog-native.pages");
+    let written = file
+        .edit(|tx| {
+            tx.set("/body/tbl[1]/tr[1]/tc[1]", props! { "text" => "Header" })?;
+            tx.set("/body/tbl[1]/tr[2]/tc[2]", props! { "value" => 12.5 })?;
+            Ok(())
+        })
+        .expect("cell values");
+    let reopened = reopen(&written.file);
+    assert_eq!(
+        text(&reopened, "/body/tbl[1]/tr[1]/tc[1]").as_deref(),
+        Some("Header")
+    );
+    assert_eq!(
+        prop(&reopened, "/body/tbl[1]/tr[2]/tc[2]", "type").as_deref(),
+        Some("number")
+    );
+    let restored = written
+        .patch
+        .inverse()
+        .apply(&written.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let cleared = written
+        .file
+        .set(
+            "/body/tbl[1]/tr[1]/tc[1]",
+            props! { "value" => litchi_ops::PropValue::Null },
+        )
+        .expect("clear");
+    assert_eq!(
+        prop(&reopen(&cleared), "/body/tbl[1]/tr[1]/tc[1]", "type").as_deref(),
+        Some("empty")
+    );
+}

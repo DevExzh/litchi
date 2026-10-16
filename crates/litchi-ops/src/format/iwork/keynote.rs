@@ -170,8 +170,17 @@ const TABLE_PROPS: &[PropSpec] = &[
 const ROW_PROPS: &[PropSpec] = &[];
 
 const CELL_PROPS: &[PropSpec] = &[
-    PropSpec::new("text", ValueType::Text),
+    writable("text", ValueType::Text),
     PropSpec::new("type", ValueType::Text),
+    {
+        let mut spec = PropSpec::new("value", ValueType::Scalar);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: true,
+            add: false,
+        };
+        spec
+    },
 ];
 
 static GAPS: [GapSpec; 0] = [];
@@ -214,9 +223,9 @@ static OPERATION_GAPS: [GapSpec; 10] = [
     operation_gap(
         "set",
         "tc",
-        "table cell values",
-        "record 0298 follow-up: wire the Keynote slide-table cell transactions",
-        "the unified layer reads slide-table cells; their leaf write families are not wired yet",
+        "cells in a formula graph",
+        "record 0309 follow-ups",
+        "slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale",
     ),
     operation_gap(
         "add",
@@ -498,6 +507,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "run",
         "shape",
         "picture",
+        "tc",
     ],
     addable: &["slide", "paragraph", "shape", "picture"],
     removable: &["slide", "paragraph", "shape", "picture", "connector"],
