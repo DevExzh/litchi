@@ -171,21 +171,6 @@ fn iwork_fixtures() -> Vec<(FileFormat, PathBuf, PathBuf)> {
     fixtures
 }
 
-#[track_caller]
-fn assert_iwork_refused(error: &litchi::Error, format: FileFormat) {
-    assert_eq!(error.code(), Code::UnsupportedFormat, "{error:?}");
-    assert_eq!(error.detected(), Some(format), "{error:?}");
-    let suggestion = error
-        .suggestion()
-        .expect("an iWork refusal suggests the reader");
-    assert!(
-        suggestion.contains("litchi::iwork::Document::open"),
-        "{suggestion}"
-    );
-    #[cfg(not(feature = "iwork"))]
-    assert!(suggestion.contains("`iwork` cargo feature"), "{suggestion}");
-}
-
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 #[test]
 fn iwork_packages_open_as_file_variants_on_every_route() {
@@ -215,23 +200,17 @@ fn iwork_packages_open_as_file_variants_on_every_route() {
 
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 #[test]
-fn iwork_package_directories_are_refused_with_their_format() {
+fn iwork_package_directories_open_as_their_single_file_form() {
     for (format, package, directory) in iwork_fixtures() {
         assert!(directory.is_dir(), "{}", directory.display());
-        if format == FileFormat::Pages {
-            // Record 0299: a Pages directory opens as its single-file form.
-            let file = litchi::open(&directory).expect("a Pages directory opens");
-            assert_eq!(file.format(), Some(FileFormat::Pages));
-            assert_eq!(
-                file.text().unwrap(),
-                litchi::open(&package).unwrap().text().unwrap()
-            );
-            continue;
-        }
-        let error = litchi::open(&directory).unwrap_err();
-        assert_iwork_refused(&error, format);
-        #[cfg(feature = "iwork")]
-        litchi::iwork::Document::open(&directory).expect("the iWork reader opens the directory");
+        // Records 0299 and 0306: a package directory opens as its
+        // single-file form and reads like the packaged fixture.
+        let file = litchi::open(&directory).expect("a package directory opens");
+        assert_eq!(file.format(), Some(format));
+        assert_eq!(
+            file.text().unwrap(),
+            litchi::open(&package).unwrap().text().unwrap()
+        );
     }
 }
 

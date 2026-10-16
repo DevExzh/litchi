@@ -9351,6 +9351,29 @@
       "families": []
     },
     {
+      "id": "facade-iwork",
+      "package": "litchi",
+      "default_features": false,
+      "features": [
+        "iwork"
+      ],
+      "banned_names": [
+        {
+          "name": "iwork",
+          "scope": "litchi",
+          "replacement": "open Pages, Keynote and Numbers packages and package directories with `litchi::open` (`File::Pages`, `File::Keynote`, `File::Numbers`; record 0306)",
+          "recursive": false
+        }
+      ],
+      "families": [],
+      "delegated_globs": [
+        "litchi_core",
+        "litchi_keynote",
+        "litchi_pages",
+        "litchi_sheet"
+      ]
+    },
+    {
       "id": "pages",
       "package": "litchi-pages",
       "default_features": true,

@@ -357,22 +357,6 @@ impl Failure {
         failure
     }
 
-    /// A refusal of `litchi_py.open` or `open_bytes`. `litchi::File` holds
-    /// Apple iWork packages (record 0296) but not an app-authored package
-    /// directory, so that refusal names the opener of the family that reads
-    /// it instead of a Rust API.
-    pub(crate) fn open_file(error: &litchi::Error) -> Self {
-        let mut failure = Self::read(error);
-        if error.code() == Code::UnsupportedFormat
-            && let Some(detected @ (FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)) =
-                error.detected()
-            && let Some(opener) = Opener::of(detected)
-        {
-            failure.suggestion = Some(format!("open it with {}", opener.name()).into());
-        }
-        failure
-    }
-
     /// A call on a `File` after its `close()`.
     pub(crate) fn closed() -> Self {
         Self::new(Code::FileRequired, "the file is closed")

@@ -41,7 +41,10 @@ def load_rows():
     with open(TSV, encoding="utf-8") as handle:
         lines = handle.read().splitlines()
     header = lines[0].split("\t")
-    return [dict(zip(header, line.split("\t"))) for line in lines[1:] if line]
+    rows = [dict(zip(header, line.split("\t"))) for line in lines[1:] if line]
+    # Package directories (record 0306) are saved in place by the Rust test;
+    # this mirror replays single files only.
+    return [row for row in rows if not (TEST_DATA / row["file"]).is_dir()]
 
 
 def sample(rows):

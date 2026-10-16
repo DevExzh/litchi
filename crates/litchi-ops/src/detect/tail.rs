@@ -2,11 +2,11 @@
 //!
 //! iWork is the last ZIP candidate every detector tries: OOXML first (unless
 //! the input is a validated ordinary ODF package), then ODF, then iWork.
-//! `litchi-ops` must not depend on an iWork crate (`tools/non_iwork_gate.py`),
-//! so the iWork arms live in the `litchi` facade and reach detection through
-//! [`ZipTail`]. A detector invokes the tail at exactly the point where the
-//! iWork arm belongs: after every other ZIP candidate has declined the input,
-//! and never after a hard OPC policy error or a failed cursor restore.
+//! The openers classify iWork themselves since record 0296; the facade's
+//! detection functions still reach their iWork arm through [`ZipTail`]. A
+//! detector invokes the tail at exactly the point where the iWork arm
+//! belongs: after every other ZIP candidate has declined the input, and
+//! never after a hard OPC policy error or a failed cursor restore.
 //!
 //! The `_with_tail` detectors of [`crate::detect`] and
 //! [`open_with_tail`](crate::open_with_tail) /

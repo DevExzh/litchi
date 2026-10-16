@@ -23,10 +23,10 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// What a `Document` reads: a unified file of the word-processing family,
-/// or a Pages document, which `litchi::File` opens without a family view.
+/// or a Pages `File`, which has no family view (its leaf package is read).
 enum Source {
     File(litchi::File),
-    Pages(litchi::pages::semantic::Document),
+    Pages(litchi::File),
 }
 
 /// Unified Word document interface
@@ -62,18 +62,13 @@ pub struct Document {
 impl Document {
     fn read(path: &std::path::Path) -> Result<Source, Failure> {
         match litchi::open(path) {
-            // `litchi::File` opens iWork packages (record 0296), but its
-            // family views do not cover them; this reader keeps the
-            // semantic document's projection.
-            Ok(file) if file.format() == Some(CoreFormat::Pages) => {
-                iwork::open_pages(path).map(Source::Pages)
-            },
+            // `litchi::File` opens Pages packages and package directories
+            // (records 0296 and 0306), but its family views do not cover
+            // them; this reader projects the package the file retains.
+            Ok(file) if file.format() == Some(CoreFormat::Pages) => Ok(Source::Pages(file)),
             Ok(file) => match file.document() {
                 Ok(_) => Ok(Source::File(file)),
                 Err(error) => Err(Failure::open(&error, Opener::Document)),
-            },
-            Err(error) if iwork::is_refused(&error, CoreFormat::Pages) => {
-                iwork::open_pages(path).map(Source::Pages)
             },
             Err(error) => Err(Failure::open(&error, Opener::Document)),
         }
@@ -115,8 +110,9 @@ impl Document {
     ///     IoError: (an OSError) If the file changed after it was opened
     fn text(&self, py: Python<'_>) -> PyResult<String> {
         py.detach(|| match &self.source {
-            Source::File(file) => file.text().map_err(|error| Failure::read(&error)),
-            Source::Pages(document) => Ok(document.plain_text()),
+            Source::File(file) | Source::Pages(file) => {
+                file.text().map_err(|error| Failure::read(&error))
+            },
         })
         .map_err(PyErr::from)
     }
@@ -132,7 +128,7 @@ impl Document {
                 .and_then(|document| document.paragraphs())
                 .map(|paragraphs| paragraphs.into_iter().map(ParagraphInner::Word).collect())
                 .map_err(|error| Failure::read(&error)),
-            Source::Pages(document) => Ok(iwork::pages_paragraphs(document)
+            Source::Pages(file) => Ok(iwork::pages_paragraphs(iwork::pages(file)?)
                 .into_iter()
                 .map(ParagraphInner::Pages)
                 .collect::<Vec<_>>()),

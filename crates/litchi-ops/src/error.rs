@@ -617,11 +617,10 @@ impl Error {
         error
     }
 
-    /// Reports an iWork input (Pages, Keynote or Numbers) the unified `File`
-    /// cannot hold: an app-authored package directory, which the leaves
-    /// neither edit nor save, or a package a caller's ZIP tail named. The
-    /// suggestion names the read-only `litchi::iwork::Document`, which reads
-    /// both.
+    /// Reports an iWork input (Pages, Keynote or Numbers) that a caller's ZIP
+    /// tail named but this build does not open: the iWork arm of detection
+    /// declined it, or its cargo feature is off. The suggestion names the
+    /// features.
     #[must_use]
     pub fn iwork_unsupported(detected: FileFormat) -> Self {
         Self::unsupported_format(Some(detected)).with_suggestion(IWORK_SUGGESTION)
@@ -933,7 +932,7 @@ const LOCKED_SUGGESTION: &str =
 const WRONG_PASSWORD_SUGGESTION: &str = "check the password and try again";
 const SIGNED_SUGGESTION: &str = "remove the signature explicitly with `Signed::unsign()` before editing; the first write then publishes the document without it";
 const IWORK_SUGGESTION: &str =
-    "open Pages, Keynote and Numbers files with `litchi::iwork::Document::open`";
+    "open Apple iWork packages in a build with the `pages`, `keynote` and `numbers` cargo features";
 
 /// The outcome of classifying one leaf error.
 struct Class {

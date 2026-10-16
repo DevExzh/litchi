@@ -15,7 +15,7 @@ This package is intentionally unpublished (`publish = false`); use it only as
 a workspace or source-checkout dependency while migrating existing callers.
 
 New semantic code belongs in `litchi-pages`, `litchi-numbers`, or
-`litchi-keynote`; use `litchi::iwork` for a supported cross-format snapshot.
+`litchi-keynote`; use `litchi::open` for a supported cross-format API.
 In particular, ordinary Keynote slide title, body, and speaker-notes reads or
 edits must use `litchi-keynote::Package` and `SlideSelector`. Presentation-wide
 dimensions and show playback flags use `litchi_keynote::show`; playback mode

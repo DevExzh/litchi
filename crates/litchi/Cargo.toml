@@ -107,15 +107,7 @@ numbers = [
     "dep:litchi-ops",
     "litchi-ops/numbers",
 ]
-iwork = [
-    "pages",
-    "keynote",
-    "numbers",
-    "dep:litchi-iwa-structured",
-    "litchi-pages/internal-iwork-source",
-    "litchi-keynote/internal-iwork-source",
-    "litchi-numbers/internal-iwork-source",
-]
+iwork = ["pages", "keynote", "numbers"]
 
 # Low-level and opt-in capabilities
 cfb = ["dep:litchi-cfb"]
@@ -232,7 +224,6 @@ litchi-fonts = { workspace = true, optional = true } # Font support
 litchi-formula = { workspace = true, optional = true } # Formula parsing and conversion
 litchi-imgconv = { workspace = true, optional = true } # Legacy image conversion
 litchi-iwa-detect = { workspace = true, optional = true } # Bounded iWork package detection
-litchi-iwa-structured = { workspace = true, optional = true } # Archive-free iWork semantic aggregation
 litchi-keynote = { workspace = true, optional = true } # Apple Keynote support
 litchi-markdown = { workspace = true, optional = true } # Markdown emission
 litchi-numbers = { workspace = true, optional = true } # Apple Numbers support

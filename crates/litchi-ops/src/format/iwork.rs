@@ -14,10 +14,10 @@
 //! recorded, and adopt the committed package as a new handle whose tree is
 //! built on its first read.
 //!
-//! Package directories (the app-authored bundle form) open for Pages: the
-//! leaf converts the bundle to its single-file form (record 0299). Keynote
-//! and Numbers directories are still refused; the facade's read-only
-//! `litchi::iwork::Document` reads them.
+//! Package directories (the app-authored bundle form) open for every format:
+//! the leaf converts the bundle to its single-file form (records 0299 and
+//! 0306), and `save()` writes the bundle form back in place (records 0301
+//! and 0306).
 
 /// Declares a field-less kind enum with its vocabulary mapping.
 macro_rules! kinds {
@@ -175,6 +175,20 @@ impl Owner {
         .map_err(|error| leaf_error(error, format))
     }
 
+    /// Save the package as an app-style package directory at `path`.
+    fn save_directory(&self, path: &Path) -> Result<()> {
+        let format = self.format();
+        match self {
+            #[cfg(feature = "pages")]
+            Self::Pages(package) => package.save_directory(path).map_err(LeafError::PagesSave),
+            #[cfg(feature = "keynote")]
+            Self::Keynote(package) => package.save_directory(path).map_err(LeafError::KeynoteSave),
+            #[cfg(feature = "numbers")]
+            Self::Numbers(package) => package.save_directory(path).map_err(LeafError::NumbersSave),
+        }
+        .map_err(|error| leaf_error(error, format))
+    }
+
     /// The exact package bytes, for snapshot comparisons and size charges.
     fn bytes(&self) -> Result<Vec<u8>> {
         let mut bytes = Vec::new();
@@ -202,8 +216,15 @@ impl Iwork {
     /// Classify and open an in-memory ZIP package: the last ZIP candidate,
     /// after OOXML and ODF declined it. Detection prepares the container
     /// once and the leaf owner adopts it (no second ZIP pass).
+    ///
+    /// A caller's leaf options ([`OpenOptions::pages_options`],
+    /// [`OpenOptions::keynote_options`], [`OpenOptions::numbers_options`])
+    /// apply to the detected format: semantic limits are passed to the
+    /// prepared-source ingress; non-default source limits make the leaf parse
+    /// the input again under them (detection prepares under the hard
+    /// ceilings), which costs a second container pass on that opt-in route
+    /// only.
     pub(crate) fn detect_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Detected> {
-        let _ = options;
         let shared: Arc<[u8]> = Arc::from(bytes);
         let prepared =
             match litchi_iwa_detect::PreparedSource::from_shared_bytes(Arc::clone(&shared)) {
@@ -212,29 +233,55 @@ impl Iwork {
                 // input is reported as unrecognized, as before iWork joined.
                 Ok(None) | Err(_) => return Ok(Detected::Declined(shared.to_vec())),
             };
-        drop(shared);
         let owner = match prepared.format() {
             #[cfg(feature = "pages")]
-            litchi_iwa_detect::Format::Pages => Owner::Pages(
-                litchi_pages::Package::__from_prepared_source(prepared)
-                    .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?,
-            ),
+            litchi_iwa_detect::Format::Pages => {
+                let leaf = options.pages_options.unwrap_or_default();
+                if leaf.source_limits_value() == litchi_pages::SourceLimits::default() {
+                    drop(shared);
+                    litchi_pages::Package::__from_prepared_source_with_semantic_limits(
+                        prepared,
+                        leaf.semantic_limits_value(),
+                    )
+                } else {
+                    drop(prepared);
+                    litchi_pages::Package::from_shared_bytes_with_options(shared, leaf)
+                }
+                .map(Owner::Pages)
+                .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?
+            },
             #[cfg(feature = "keynote")]
-            litchi_iwa_detect::Format::Keynote => Owner::Keynote(
-                litchi_keynote::Package::__from_prepared_source(
-                    prepared,
-                    litchi_keynote::SemanticLimits::default(),
-                )
-                .map_err(|error| leaf_error(LeafError::Keynote(error), FileFormat::Keynote))?,
-            ),
+            litchi_iwa_detect::Format::Keynote => {
+                let leaf = options.keynote_options.unwrap_or_default();
+                if leaf.source_limits_value() == litchi_keynote::SourceLimits::default() {
+                    drop(shared);
+                    litchi_keynote::Package::__from_prepared_source(
+                        prepared,
+                        leaf.semantic_limits_value(),
+                    )
+                } else {
+                    drop(prepared);
+                    litchi_keynote::Package::__from_shared_source_with_options(shared, leaf)
+                }
+                .map(Owner::Keynote)
+                .map_err(|error| leaf_error(LeafError::Keynote(error), FileFormat::Keynote))?
+            },
             #[cfg(feature = "numbers")]
-            litchi_iwa_detect::Format::Numbers => Owner::Numbers(
-                litchi_numbers::Package::__from_prepared_source(
-                    prepared,
-                    litchi_numbers::SemanticLimits::DEFAULT,
-                )
-                .map_err(|error| leaf_error(LeafError::Numbers(error), FileFormat::Numbers))?,
-            ),
+            litchi_iwa_detect::Format::Numbers => {
+                let leaf = options.numbers_options.unwrap_or_default();
+                if leaf.source_limits_value() == litchi_numbers::SourceLimits::default() {
+                    drop(shared);
+                    litchi_numbers::Package::__from_prepared_source(
+                        prepared,
+                        leaf.semantic_limits_value(),
+                    )
+                } else {
+                    drop(prepared);
+                    litchi_numbers::Package::from_shared_bytes_with_options(shared, leaf)
+                }
+                .map(Owner::Numbers)
+                .map_err(|error| leaf_error(LeafError::Numbers(error), FileFormat::Numbers))?
+            },
             #[allow(
                 unreachable_patterns,
                 reason = "the format arms depend on the enabled features"
@@ -503,21 +550,17 @@ impl Iwork {
     /// Atomically save the package to `path`: the leaf's exact bytes,
     /// staged in a sibling temporary file.
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
-        // A Pages package saved over a package directory (its origin when it
-        // was opened from one) is written back as a directory (record 0301).
-        #[cfg(feature = "pages")]
-        if let Owner::Pages(package) = &self.0.owner
-            && std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir())
-        {
+        // A package saved over a package directory (its origin when it was
+        // opened from one) is written back as a directory (records 0301 and
+        // 0306).
+        if std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
             if options.overwrite == crate::Overwrite::Refuse {
                 return Err(Error::new(
                     crate::Code::FileExists,
                     "the destination package directory exists",
                 ));
             }
-            package
-                .save_directory(path)
-                .map_err(|error| leaf_error(LeafError::PagesSave(error), FileFormat::Pages))?;
+            self.0.owner.save_directory(path)?;
             let mut sink = std::io::sink();
             let mut written = 0_u64;
             self.0.owner.write_to(&mut Counter {
@@ -576,19 +619,89 @@ impl Iwork {
         .with_suggestion("open an existing package and edit it"))
     }
 
-    /// Open an app-authored Pages package directory: the leaf captures the
-    /// bundle once and converts it to its single-file form (record 0299).
-    /// The directory is the handle's origin, so `save()` writes the bundle
-    /// back in place (record 0301); `save_as` to a file path writes the
-    /// single-file package.
-    #[cfg(feature = "pages")]
-    pub(crate) fn open_pages_directory(path: &Path) -> Result<Self> {
-        let package = litchi_pages::Package::open(path)
-            .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?;
-        Ok(Self::from_owner(
-            Owner::Pages(package),
-            Some(Arc::from(path)),
-        ))
+    /// Open an app-authored package directory on the single-pass route:
+    /// capture and convert the bundle once (`litchi_iwa_archive::bundle`,
+    /// under the hard physical ceilings detection also uses), then classify
+    /// and open the converted bytes like any in-memory package, so the
+    /// container is indexed once and the leaf adopts it. `Ok(None)` when the
+    /// route does not apply: a caller's leaf source limits are set (the leaf
+    /// then captures under them, [`Self::open_directory`]), a legacy
+    /// application marker is present, the capture fails, or detection
+    /// declines; the caller then classifies the
+    /// directory and lets the leaf report the precise error.
+    pub(crate) fn capture_directory(path: &Path, options: &OpenOptions) -> Result<Option<Self>> {
+        // A pre-2013 application marker can contradict the index: the
+        // classifier arbitrates those bundles.
+        if leaf_source_limits_set(options)
+            || ["index.xml", "index.apxl", "index.numbers"]
+                .iter()
+                .any(|marker| std::fs::symlink_metadata(path.join(marker)).is_ok())
+        {
+            return Ok(None);
+        }
+        let limits = litchi_iwa_archive::Limits::default();
+        let Ok(bytes) = litchi_iwa_archive::bundle::capture(path, limits.into(), limits) else {
+            return Ok(None);
+        };
+        if let Some(limit) = options.max_input_bytes {
+            crate::open::check_input_len(u64::try_from(bytes.len()).unwrap_or(u64::MAX), limit)?;
+        }
+        Ok(match Self::detect_bytes(bytes, options)? {
+            Detected::Opened(handle) => Some(handle.with_origin(Some(Arc::from(path)))),
+            Detected::Disabled(_) | Detected::Declined(_) => None,
+        })
+    }
+
+    /// Open an app-authored package directory of `format`: the leaf
+    /// captures the bundle once, under the caller's leaf options, and
+    /// converts it to its single-file form (records 0299 and 0306). The
+    /// directory is the handle's origin, so `save()` writes the bundle back
+    /// in place (records 0301 and 0306); `save_as` to a file path writes the
+    /// single-file package. [`OpenOptions::max_input_bytes`] bounds the
+    /// converted package.
+    pub(crate) fn open_directory(
+        path: &Path,
+        format: FileFormat,
+        options: &OpenOptions,
+    ) -> Result<Self> {
+        let _ = options;
+        let owner = match format {
+            #[cfg(feature = "pages")]
+            FileFormat::Pages => Owner::Pages(
+                litchi_pages::Package::open_with_options(
+                    path,
+                    options.pages_options.unwrap_or_default(),
+                )
+                .map_err(|error| leaf_error(LeafError::Pages(error), format))?,
+            ),
+            #[cfg(feature = "keynote")]
+            FileFormat::Keynote => Owner::Keynote(
+                litchi_keynote::Package::open_with_options(
+                    path,
+                    options.keynote_options.unwrap_or_default(),
+                )
+                .map_err(|error| leaf_error(LeafError::Keynote(error), format))?,
+            ),
+            #[cfg(feature = "numbers")]
+            FileFormat::Numbers => Owner::Numbers(
+                litchi_numbers::Package::open_with_options(
+                    path,
+                    options.numbers_options.unwrap_or_default(),
+                )
+                .map_err(|error| leaf_error(LeafError::Numbers(error), format))?,
+            ),
+            _ => return Err(Error::unsupported_format(Some(format))),
+        };
+        let handle = Self::from_owner(owner, Some(Arc::from(path)));
+        if let Some(limit) = options.max_input_bytes {
+            let mut length = 0_u64;
+            handle.0.owner.write_to(&mut Counter {
+                inner: &mut std::io::sink(),
+                written: &mut length,
+            })?;
+            crate::open::check_input_len(length, limit)?;
+        }
+        Ok(handle)
     }
 
     /// Tag an error with this handle's format.
@@ -717,6 +830,35 @@ impl<W: std::io::Write> std::io::Write for Counter<'_, W> {
     }
 }
 
+/// Whether a caller selected leaf source limits other than the defaults for
+/// any iWork format: the routes that prepare under the hard ceilings then
+/// hand over to the leaf.
+fn leaf_source_limits_set(options: &OpenOptions) -> bool {
+    let _ = options;
+    #[cfg(feature = "pages")]
+    if options
+        .pages_options
+        .is_some_and(|leaf| leaf.source_limits_value() != litchi_pages::SourceLimits::default())
+    {
+        return true;
+    }
+    #[cfg(feature = "keynote")]
+    if options
+        .keynote_options
+        .is_some_and(|leaf| leaf.source_limits_value() != litchi_keynote::SourceLimits::default())
+    {
+        return true;
+    }
+    #[cfg(feature = "numbers")]
+    if options
+        .numbers_options
+        .is_some_and(|leaf| leaf.source_limits_value() != litchi_numbers::SourceLimits::default())
+    {
+        return true;
+    }
+    false
+}
+
 /// The unified format of an iWork detection result.
 const fn iwork_format(format: litchi_iwa_detect::Format) -> FileFormat {
     match format {
@@ -726,9 +868,7 @@ const fn iwork_format(format: litchi_iwa_detect::Format) -> FileFormat {
     }
 }
 
-/// Classify an iWork package directory (the app-authored bundle form),
-/// which the unified handle cannot hold: the leaves edit and save only
-/// single-file packages.
+/// Classify an iWork package directory (the app-authored bundle form).
 pub(crate) fn classify_directory(path: &Path) -> Option<FileFormat> {
     match litchi_iwa_detect::path(path) {
         Ok(Some(format)) => Some(iwork_format(format)),
