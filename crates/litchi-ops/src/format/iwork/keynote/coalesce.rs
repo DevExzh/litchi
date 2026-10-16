@@ -65,6 +65,9 @@ fn evolving_slide(path: &str) -> Option<usize> {
 pub(crate) struct Run {
     base: Iwork,
     pending: Pending,
+    /// Paths the run resolved against its base, with the item and its type
+    /// (record 0314): a batch often sets the same few elements again.
+    resolved: Vec<(Path<'static>, At, &'static str)>,
     /// New slides: source, destination among the evolving slides, item.
     slides: Vec<(SlideSource, usize, usize)>,
     /// The evolving slide list: each slide's base position, `None` for a
@@ -82,6 +85,7 @@ impl Run {
         Self {
             base: base.clone(),
             pending: Pending::default(),
+            resolved: Vec::new(),
             slides: Vec::new(),
             order: (0..slides).map(Some).collect(),
             limits: *limits,
@@ -111,6 +115,44 @@ impl Run {
         self.operations = operations;
         self.first_index.get_or_insert(index);
         Ok(())
+    }
+
+    /// [`plan_set`] against the run's base, through its memo of resolved
+    /// paths.
+    pub(crate) fn plan_set(&mut self, target: &TargetArg<'_>, props: &Props<'_>) -> Option<At> {
+        /// Paths the memo keeps.
+        const RESOLVED: usize = 16;
+        let path = target.path()?;
+        let held = self
+            .resolved
+            .iter()
+            .find(|(held, _, _)| held == path.path())
+            .map(|(_, at, kind)| (*at, *kind));
+        let (at, kind) = match held {
+            Some(found) => found,
+            None => {
+                self.base.checked_tree().ok()?;
+                let node =
+                    crate::path::resolve::get(&Nav::<Keynote>::new(&self.base), path).ok()?;
+                let found = (node.at(), node.item().type_name());
+                if self.resolved.len() < RESOLVED {
+                    self.resolved
+                        .push((path.path().clone().into_owned(), found.0, found.1));
+                }
+                found
+            },
+        };
+        (!props.is_empty() && props.iter().all(|(key, _)| coalescible(kind, key.as_str())))
+            .then_some(at)
+    }
+
+    /// Whether a set of `props` on tree item `node` must wait for the run to
+    /// publish: joined to the run it would not publish what it publishes
+    /// after the run's items, one at a time (record 0314).
+    pub(crate) fn requires_barrier(&mut self, node: At, props: &Props<'_>) -> bool {
+        let Self { base, pending, .. } = self;
+        let node = Node::new(base, node);
+        !pending.joins(base, &node, props)
     }
 
     /// Stage the set planned by [`plan_set`] on tree item `node`.
