@@ -15,7 +15,7 @@ use core::ops::Range;
 use std::sync::Arc;
 
 use xml_minifier::audit::{
-    Limits, ReplacementError, ReplacementProof, VerifiedSource, verify_source,
+    IndexDepth, Limits, ReplacementError, ReplacementProof, VerifiedSource, verify_source,
     verify_source_replacement,
 };
 
@@ -62,7 +62,12 @@ fn checked(base: &VerifiedSource, replacement: &[u8], limits: Limits) -> Option<
 }
 
 fn indexed(text: &str) -> VerifiedSource {
-    VerifiedSource::verify_indexed(shared(text.as_bytes()), Limits::default()).unwrap()
+    VerifiedSource::verify_indexed(
+        shared(text.as_bytes()),
+        Limits::default(),
+        IndexDepth::default(),
+    )
+    .unwrap()
 }
 
 fn splice(original: Range<usize>, replacement: Range<usize>) -> ReplacementProof {
@@ -86,7 +91,9 @@ fn insert_before(document: &str, index: usize, fragment: &str) -> String {
 fn indexed_proofs_have_the_source_verdict() {
     let limits = Limits::default();
     let valid = document(3);
-    let proof = VerifiedSource::verify_indexed(shared(valid.as_bytes()), limits).unwrap();
+    let proof =
+        VerifiedSource::verify_indexed(shared(valid.as_bytes()), limits, IndexDepth::default())
+            .unwrap();
     assert!(proof.covers(proof.bytes().as_slice(), limits));
     assert!(format!("{proof:?}").contains("boundaries: Some("));
     for invalid in [
@@ -97,7 +104,12 @@ fn indexed_proofs_have_the_source_verdict() {
         "<a b=\"<\"/>",
     ] {
         assert_eq!(
-            VerifiedSource::verify_indexed(shared(invalid.as_bytes()), limits).unwrap_err(),
+            VerifiedSource::verify_indexed(
+                shared(invalid.as_bytes()),
+                limits,
+                IndexDepth::default()
+            )
+            .unwrap_err(),
             verify_source(invalid.as_bytes(), limits).unwrap_err(),
             "{invalid}"
         );
@@ -428,7 +440,12 @@ fn every_budget_is_re_totalled_for_the_whole_replacement() {
         ),
         ("depth", limits(&|b| b.depth(report.max_depth()).unwrap())),
     ] {
-        let base = VerifiedSource::verify_indexed(shared(original.as_bytes()), tight).unwrap();
+        let base = VerifiedSource::verify_indexed(
+            shared(original.as_bytes()),
+            tight,
+            IndexDepth::default(),
+        )
+        .unwrap();
         assert_eq!(
             checked(&base, replacement.as_bytes(), tight),
             None,
@@ -448,7 +465,9 @@ fn every_budget_is_re_totalled_for_the_whole_replacement() {
         .depth(after.max_depth())
         .unwrap()
         .build();
-    let base = VerifiedSource::verify_indexed(shared(original.as_bytes()), exact).unwrap();
+    let base =
+        VerifiedSource::verify_indexed(shared(original.as_bytes()), exact, IndexDepth::default())
+            .unwrap();
     assert!(matches!(
         checked(&base, replacement.as_bytes(), exact),
         Some(ReplacementProof::Splice { .. })
@@ -476,8 +495,13 @@ fn proofs_without_boundaries_or_under_other_limits_audit_completely() {
         checked(&base, replacement.as_bytes(), other),
         Some(ReplacementProof::Complete)
     );
-    // A successor proof keeps no boundaries of its own.
+    // A successor of an indexed proof keeps boundaries of its own (record
+    // 0317); one of a plain proof keeps none.
     let (successor, _how) = base
+        .verify_successor(shared(replacement.as_bytes()), Limits::default())
+        .unwrap();
+    assert!(format!("{successor:?}").contains("boundaries: Some("));
+    let (successor, _how) = plain
         .verify_successor(shared(replacement.as_bytes()), Limits::default())
         .unwrap();
     assert!(format!("{successor:?}").contains("boundaries: None"));
@@ -537,6 +561,7 @@ fn the_indexed_pair_audit_has_the_pair_verdict() {
             shared(original.as_bytes()),
             shared(replacement.as_bytes()),
             limits,
+            IndexDepth::default(),
         );
         let expected =
             verify_source_replacement(original.as_bytes(), replacement.as_bytes(), limits);
@@ -582,7 +607,8 @@ fn the_indexed_pair_audit_has_the_pair_verdict() {
         VerifiedSource::verify_indexed_replacement(
             shared(b"<w:p>"),
             shared(original.as_bytes()),
-            limits
+            limits,
+            IndexDepth::default(),
         ),
         Err(ReplacementError::Original(_))
     ));
