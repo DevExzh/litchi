@@ -1,4 +1,4 @@
-//! Strict dependency-free admission against an effective structural catalog.
+//! Strict removal admission against an effective structural catalog.
 use super::Package;
 use crate::presentation::order::StableSlideKey;
 use crate::{Error, Result, SlideRemovalRefusal};
@@ -83,6 +83,17 @@ fn validate_inner(
     }
     canonical_edge(presentation_uri, selected)?;
     canonical_internal_edges(&key.part_uri, slide.rels())?;
+    let owned = if crate::presentation::owned_parts::may_own(slide.rels()) {
+        let graph = crate::presentation::owned_parts::Graph::from_prepared(
+            prepared,
+            crate::presentation::source_removal::relationship_scan_limit(package.owner.limits)?,
+        )?;
+        let owned = graph.owned_by(&key.part_uri)?;
+        graph.require_restorable(&key.part_uri, &owned)?;
+        owned
+    } else {
+        crate::presentation::owned_parts::Owned::none()
+    };
     let layout_uri = layout.target_partname()?;
     if !layout_uri.as_str().starts_with("/ppt/slideLayouts/")
         || prepared.part(&layout_uri)?.content_type() != ct::PML_SLIDE_LAYOUT
@@ -94,7 +105,7 @@ fn validate_inner(
     }
     // Structural recipes change only slide Parts and presentation bindings;
     // the master's registered layout graph remains the physical source graph.
-    crate::presentation::source_cross_copy::validate_registered_source_layout(
+    crate::presentation::source_cross_copy::validate_registered_removal_layout(
         source,
         &source.part(presentation_uri)?,
         package.owner._presentation.source_data().as_bytes(),
@@ -164,6 +175,10 @@ fn validate_inner(
     };
     visit(None, prepared.rels())?;
     for owner in prepared.iter_parts()? {
+        // Parts the slide owns leave with it (record 0303).
+        if owned.contains(owner.partname()) {
+            continue;
+        }
         visit(Some(owner.partname()), owner.rels())?;
     }
     if incoming != 1 {
@@ -185,15 +200,39 @@ fn refuse<T>(kind: SlideRemovalRefusal, detail: &str) -> Result<T> {
 }
 
 /// Add the typed edges of a restored slide before installing its exact XML
-/// image: its one layout edge, its slide jumps and its external edges (the
-/// edges [`crate::opened::removal_layout_edge`] admits for removal). OPC's
-/// raw-image guard subsequently validates the complete manifest grammar and
-/// proves that the image describes these typed edges and no others.
+/// image: its one layout edge, its slide jumps, its external edges and its
+/// edges to the Parts it owns (the edges
+/// [`crate::opened::removal_layout_edge`] admits for
+/// removal). OPC's raw-image guard subsequently validates the complete
+/// manifest grammar and proves that the image describes these typed edges
+/// and no others. Which Parts a restored slide owns is proven again on the
+/// prepared candidate.
 pub(super) fn stage_layout(
     package: &Package,
     plan: &mut litchi_opc::SourceTopologyPlan,
     owner: &PackURI,
     xml: &[u8],
+) -> Result<()> {
+    stage_edges(package, plan, owner, xml, true)
+}
+
+/// Add the typed edges of a restored dependent Part (record 0303) before
+/// installing its exact relationship image.
+pub(super) fn stage_dependent_edges(
+    package: &Package,
+    plan: &mut litchi_opc::SourceTopologyPlan,
+    owner: &PackURI,
+    xml: &[u8],
+) -> Result<()> {
+    stage_edges(package, plan, owner, xml, false)
+}
+
+fn stage_edges(
+    package: &Package,
+    plan: &mut litchi_opc::SourceTopologyPlan,
+    owner: &PackURI,
+    xml: &[u8],
+    slide: bool,
 ) -> Result<()> {
     use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
     use quick_xml::events::Event;
@@ -270,10 +309,9 @@ pub(super) fn stage_layout(
                     edges.push((id, kind, None, target));
                     continue;
                 }
-                let is_layout =
-                    crate::parts::is_relationship_type(&kind, rt::SLIDE_LAYOUT, "slideLayout");
-                if (!is_layout && !crate::parts::is_relationship_type(&kind, rt::SLIDE, "slide"))
-                    || target.contains(['?', '#'])
+                let is_layout = slide
+                    && crate::parts::is_relationship_type(&kind, rt::SLIDE_LAYOUT, "slideLayout");
+                if target.contains(['?', '#'])
                     || (is_layout && std::mem::replace(&mut layout, true))
                 {
                     return refuse(
@@ -289,7 +327,7 @@ pub(super) fn stage_layout(
             _ => {},
         }
     }
-    if !layout {
+    if slide && !layout {
         return Err(Error::PatchConflict);
     }
     for (id, kind, part, target) in edges {
@@ -317,7 +355,16 @@ pub(super) fn validate_physical_roundtrip(package: &Package, key: &StableSlideKe
     )?;
     let slide = source.part(&key.part_uri)?;
     crate::opened::removal_layout_edge(slide.rels())?;
-    canonical_internal_edges(&key.part_uri, slide.rels())
+    canonical_internal_edges(&key.part_uri, slide.rels())?;
+    if !crate::presentation::owned_parts::may_own(slide.rels()) {
+        return Ok(());
+    }
+    let graph = crate::presentation::owned_parts::Graph::from_source(
+        source,
+        crate::presentation::source_removal::relationship_scan_limit(package.owner.limits)?,
+    )?;
+    let owned = graph.owned_by(&key.part_uri)?;
+    graph.require_restorable(&key.part_uri, &owned)
 }
 
 /// Every internal edge of a removed slide is restored as a typed

@@ -40,7 +40,7 @@ fn is_plain(content: &str) -> bool {
 }
 
 /// Whether the element `ns:local` is left out of the text of a `root` node.
-fn skipped(root: Kind, ns: Ns, local: &[u8]) -> bool {
+pub(super) fn skipped(root: Kind, ns: Ns, local: &[u8]) -> bool {
     match (ns, local) {
         (Ns::Text, b"tracked-changes" | b"ruby-text" | b"note-citation") => true,
         (Ns::Text, b"note") => !matches!(root, Kind::Footnote | Kind::Endnote),
@@ -187,7 +187,7 @@ fn tag_text<'c>(reader: &Reader<&[u8]>, content: &'c str) -> &'c str {
 
 /// ODF white-space processing: every run of white space becomes one space,
 /// and a space after a space is dropped.
-fn collapse(raw: &str, mut last_space: bool) -> String {
+pub(super) fn collapse(raw: &str, mut last_space: bool) -> String {
     let mut out = String::with_capacity(raw.len());
     for character in raw.chars() {
         if matches!(character, ' ' | '\t' | '\n' | '\r') {

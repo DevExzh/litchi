@@ -35,6 +35,7 @@
 mod edit;
 mod fields;
 mod index;
+mod kept;
 mod properties;
 mod text;
 pub(crate) mod xml;

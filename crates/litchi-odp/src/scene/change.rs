@@ -322,6 +322,15 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
+/// The refusal of a text set that would replace `element`, content that
+/// is not text (record 0304).
+fn dropped(element: &str) -> Error {
+    unsupported(format!(
+        "an ODP text set would replace {element}, which is not text: set the text of the runs \
+         around it, or remove it first"
+    ))
+}
+
 fn unsupported(message: impl Into<String>) -> Error {
     Error::Unsupported(message.into())
 }
@@ -530,6 +539,9 @@ impl<'a> Planner<'a> {
         if story.text() == text {
             return Ok(());
         }
+        if let Some(paragraph) = story.paragraphs.iter().find(|p| !p.objects.is_empty()) {
+            return Err(dropped(&paragraph.objects[0].1));
+        }
         let markup = self.story_markup(story, text)?;
         if let Some(empty) = &story.empty {
             return self.expand(empty.clone(), &markup);
@@ -547,6 +559,9 @@ impl<'a> Planner<'a> {
         let paragraph = self.paragraph(story, index)?;
         if paragraph.text == text {
             return Ok(());
+        }
+        if let Some((_, name)) = paragraph.objects.first() {
+            return Err(dropped(name));
         }
         let prefix = self.text_prefix()?;
         let encoded = encode(prefix, text)?;
@@ -615,6 +630,13 @@ impl<'a> Planner<'a> {
         let selected = paragraph.runs.get(run).ok_or_else(|| missing("run"))?;
         if selected.text == text {
             return Ok(());
+        }
+        if let Some((_, name)) = paragraph
+            .objects
+            .iter()
+            .find(|(start, _)| selected.content.contains(start))
+        {
+            return Err(dropped(name));
         }
         let prefix = self.text_prefix()?;
         let encoded = encode(prefix, text)?;

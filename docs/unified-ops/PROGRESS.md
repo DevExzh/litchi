@@ -708,6 +708,20 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - Finding: ODT-family paragraph text sets drop inline frames (fix in 0304).
 - With 0296–0301, all 21 claimed formats read and write through the single `File` enum. `litchi::iwork::Document` remains until Keynote package directories open.
 
+- Merged `pptx-gaps` (0303):
+  - PPTX slides leave with their exclusively owned parts (notes, comments, pictures, diagrams, VML, OLE), reversibly, with durable patch wire v5;
+  - `p14` sections stay consistent on slide remove/move/swap/add;
+  - F3 closed (OLE frames under enclosed markup compatibility removed on the source bytes); the Phase G known-failure list is empty;
+  - corpus PPTX removals 1/3 → 9/9; new paths ≤1.009×.
+  - Open: DOCX run-level markup compatibility (0307).
+
+- Merged `text-loss` (0304):
+  - ODT/OTH/ODM text sets keep zero-text elements (frames, notes, bookmarks, marks) at their offset and refuse fields, inner links, rubies and nested blocks;
+  - silent drops fixed (now kept or refused): DOCX cell text, PPTX fields, PPT metacharacter fields, ODP inline objects, ODS hyperlinks;
+  - a format × content × behaviour audit test for every format;
+  - `Leaf::{Pptx, Xlsx}` boxed (combined-feature clippy clean).
+  - Open: ODT plain-paragraph sets are 3.4–4.7% slower in wall time with +0.22% instructions (unexplained, under the 5% trigger), and the F1/F3–F6 notes in the record.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.

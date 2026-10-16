@@ -18,6 +18,7 @@ use litchi_core::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
+use super::kept::Kept;
 use super::properties::{ParagraphPropertyEdit, TextPropertyEdit, check_length};
 use super::xml::{self, Ns, Prefixes};
 use super::{Attribute, AutomaticInsert, Body, Kind, Node, NodeId, Style};
@@ -207,6 +208,9 @@ pub const fn admits(parent: Kind, child: Kind) -> bool {
 struct NodeEdit {
     attributes: Vec<(Ns, &'static str, Option<String>)>,
     text: Option<String>,
+    /// What a text set keeps (record 0304): elements of the old content
+    /// that add no text, at their character offsets.
+    kept: Vec<Kept>,
     text_properties: Option<TextPropertyEdit>,
     paragraph_properties: Option<ParagraphPropertyEdit>,
     /// Raw replacement of the whole element (move source, swap).
@@ -432,8 +436,11 @@ impl BodyEdits {
                 "ODT body edits overlap: a node that received an insertion cannot have its text replaced",
             ));
         }
+        let kept = super::kept::plan(target)?;
         self.claim(body, id, target.range(), Claim::Whole)?;
-        self.edit_mut(id).text = Some(text);
+        let edit = self.edit_mut(id);
+        edit.text = Some(text);
+        edit.kept = kept;
         Ok(())
     }
 
@@ -1305,6 +1312,25 @@ fn render_paragraph(out: &mut String, prefixes: &Prefixes, style: Option<&str>, 
     });
 }
 
+/// [`render_paragraph`] with the elements a text set keeps (record 0304).
+fn render_kept_paragraph(
+    out: &mut String,
+    prefixes: &Prefixes,
+    style: Option<&str>,
+    content: &str,
+    text: &str,
+    kept: &[Kept],
+) {
+    out.push('<');
+    prefixes.push_name(out, Ns::Text, "p");
+    if let Some(style) = style {
+        push_attribute(out, prefixes, Ns::Text, "style-name", style);
+    }
+    close_element(out, prefixes, Ns::Text, "p", |out| {
+        super::kept::encode(out, prefixes, content, text, kept);
+    });
+}
+
 fn render_item(out: &mut String, prefixes: &Prefixes, text: &str) {
     out.push('<');
     prefixes.push_name(out, Ns::Text, "list-item");
@@ -1977,7 +2003,7 @@ fn node_splices(
     // A whole replacement: start tag, new content, end tag.
     let mut bytes = open_form(&tag);
     if let Some(text) = &edit.text {
-        whole_content(target, text, &mut bytes)?;
+        whole_content(target, text, &edit.kept, &mut bytes)?;
     } else if let Some(fragments) = expansion {
         for fragment in fragments {
             push_fragment(&mut bytes, content, fragment);
@@ -1993,20 +2019,20 @@ fn node_splices(
 }
 
 /// The new content of an element whose text is replaced.
-fn whole_content(target: Node<'_>, text: &str, out: &mut String) -> Result<()> {
+fn whole_content(target: Node<'_>, text: &str, kept: &[Kept], out: &mut String) -> Result<()> {
     let body = target.body();
     let prefixes = body.prefixes();
     let content = body.content();
     match target.kind() {
         Kind::Paragraph | Kind::Heading | Kind::Span | Kind::Hyperlink => {
-            xml::encode_text(out, prefixes, text);
+            super::kept::encode(out, prefixes, content, text, kept);
         },
         Kind::Cell | Kind::ListItem | Kind::TextBox => {
             let style = target
                 .children()
                 .find(|child| matches!(child.kind(), Kind::Paragraph | Kind::Heading))
                 .and_then(Node::style_name);
-            render_paragraph(out, prefixes, style.as_deref(), text);
+            render_kept_paragraph(out, prefixes, style.as_deref(), content, text, kept);
         },
         Kind::Footnote | Kind::Endnote => {
             let range = target.content_range();
@@ -2020,7 +2046,7 @@ fn whole_content(target: Node<'_>, text: &str, out: &mut String) -> Result<()> {
             prefixes.push_name(out, Ns::Text, "note-body");
             out.push('>');
             let style = target.children().next().and_then(Node::style_name);
-            render_paragraph(out, prefixes, style.as_deref(), text);
+            render_kept_paragraph(out, prefixes, style.as_deref(), content, text, kept);
             out.push_str("</");
             prefixes.push_name(out, Ns::Text, "note-body");
             out.push('>');
@@ -2038,7 +2064,7 @@ fn whole_content(target: Node<'_>, text: &str, out: &mut String) -> Result<()> {
                     out.push_str(&content[child]);
                 }
             }
-            render_paragraph(out, prefixes, None, text);
+            render_kept_paragraph(out, prefixes, None, content, text, kept);
         },
         other => {
             return Err(invalid(format!(

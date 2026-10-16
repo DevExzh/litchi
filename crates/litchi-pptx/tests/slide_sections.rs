@@ -126,17 +126,20 @@ fn eager_moves_and_reorders_keep_sections_coherent() {
 }
 
 #[test]
-fn source_insertion_still_refuses_section_decks() {
-    // The source-backed root validators do not model the section extension
-    // yet (record 0252 gap); the refusal is typed and leaves nothing staged.
+fn source_insertion_places_the_new_slide_in_a_section() {
+    // The source-backed editor maintains the section list (record 0303):
+    // a slide inserted at the end joins the section of the slide before it.
     let bytes = deck();
     let layout = blank_layout(&Package::from_bytes(&bytes).unwrap());
     let source =
         litchi_pptx::source::Package::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
     let mut edit = source.edit().unwrap();
-    assert!(matches!(
-        edit.insert_slide(Position::new(3), &layout),
-        Err(litchi_pptx::Error::UnsafeEdit { .. })
-    ));
-    assert!(edit.commit().unwrap().into_parts().1.is_noop());
+    edit.insert_slide(Position::new(3), &layout).unwrap();
+    let (updated, patch) = edit.commit().unwrap().into_parts();
+    let mut package = Package::from_bytes(&updated.to_bytes().unwrap()).unwrap();
+    assert_eq!(membership(&mut package), [vec![0, 1], vec![2, 3]]);
+    assert_eq!(
+        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
 }
