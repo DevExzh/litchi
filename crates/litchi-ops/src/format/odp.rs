@@ -48,6 +48,9 @@ struct OdpState {
     odf_options: litchi_odf_common::OpenOptions,
     /// The scene index of the owner's `content.xml`, built on first use.
     scene: OnceLock<Scene>,
+    /// The automatic styles of `content.xml`, indexed on first use (record
+    /// 0308).
+    styles: OnceLock<litchi_odp::scene::AutomaticStyles>,
     /// Master pages, layouts and annotations, each parsed on first use.
     masters: OnceLock<Vec<litchi_odp::master::Summary>>,
     layouts: OnceLock<Vec<litchi_odp::layout::Layout>>,
@@ -151,6 +154,7 @@ impl Odp {
             origin,
             odf_options,
             scene: OnceLock::new(),
+            styles: OnceLock::new(),
             masters: OnceLock::new(),
             layouts: OnceLock::new(),
             annotations: OnceLock::new(),
@@ -185,6 +189,7 @@ impl Odp {
                 origin,
                 odf_options: shared.odf_options,
                 scene: OnceLock::new(),
+                styles: OnceLock::new(),
                 masters: OnceLock::new(),
                 layouts: OnceLock::new(),
                 annotations: OnceLock::new(),
@@ -337,6 +342,18 @@ impl Odp {
         }
         let scene = Scene::parse(self.content_xml()?).map_err(core_error)?;
         Ok(self.0.scene.get_or_init(|| scene))
+    }
+
+    /// The automatic styles of the snapshot, indexed on first use.
+    pub(crate) fn automatic_styles(&self) -> Result<&litchi_odp::scene::AutomaticStyles> {
+        if let Some(styles) = self.0.styles.get() {
+            return Ok(styles);
+        }
+        let styles = self
+            .scene()?
+            .automatic_styles(self.content_xml()?)
+            .map_err(core_error)?;
+        Ok(self.0.styles.get_or_init(|| styles))
     }
 
     /// The master pages, listed by identity on first use.

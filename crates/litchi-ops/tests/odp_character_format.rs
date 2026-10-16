@@ -165,3 +165,32 @@ fn batches_and_refusals() {
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedProperty, "{error}");
 }
+
+#[test]
+fn a_created_deck_takes_run_formatting() {
+    let deck = litchi_ops::create(litchi_core::FileFormat::Odp).unwrap();
+    let deck = deck
+        .add("/", litchi_ops::NewNode::new("slide"))
+        .unwrap()
+        .file;
+    let deck = deck
+        .add(
+            "/slide[1]",
+            litchi_ops::NewNode::new("shape")
+                .prop("text", "Hello")
+                .prop("width", "8cm")
+                .prop("height", "2cm"),
+        )
+        .unwrap()
+        .file;
+    let path = "/slide[1]/shape[1]/paragraph[1]/run[1]";
+    let changed = deck
+        .set(path, props! { "bold" => true, "size" => "24pt" })
+        .unwrap_or_else(|error| {
+            panic!(
+                "{error}: {:?}",
+                std::error::Error::source(&error).map(ToString::to_string)
+            )
+        });
+    assert_eq!(prop(&changed, path, "bold").as_deref(), Some("true"));
+}

@@ -486,8 +486,14 @@ enum PropValues<'a> {
         number: usize,
     },
     Object(&'a Object),
-    Paragraph(&'a litchi_odp::scene::Paragraph, &'a Scene),
-    Run(&'a litchi_odp::scene::Run, &'a Scene),
+    Paragraph(
+        &'a litchi_odp::scene::Paragraph,
+        &'a litchi_odp::scene::AutomaticStyles,
+    ),
+    Run(
+        &'a litchi_odp::scene::Run,
+        &'a litchi_odp::scene::AutomaticStyles,
+    ),
     Cell(&'a litchi_odp::scene::Cell),
     Notes(Option<String>),
     Comment(&'a litchi_odp::annotation::Info),
@@ -514,14 +520,19 @@ impl<'a> Props<'a> {
             Item::Paragraph(story, index) => scene
                 .story(story)
                 .and_then(|story| story.paragraphs().get(*index))
-                .map_or(PropValues::None, |paragraph| {
-                    PropValues::Paragraph(paragraph, scene)
-                }),
+                .map_or(Ok::<_, crate::Error>(PropValues::None), |paragraph| {
+                    Ok(PropValues::Paragraph(
+                        paragraph,
+                        node.file.automatic_styles()?,
+                    ))
+                })?,
             Item::Run(story, paragraph, index) => scene
                 .story(story)
                 .and_then(|story| story.paragraphs().get(*paragraph))
                 .and_then(|paragraph| paragraph.runs().get(*index))
-                .map_or(PropValues::None, |run| PropValues::Run(run, scene)),
+                .map_or(Ok::<_, crate::Error>(PropValues::None), |run| {
+                    Ok(PropValues::Run(run, node.file.automatic_styles()?))
+                })?,
             Item::Cell(object, row, cell) => scene
                 .object(object)
                 .and_then(Object::table)
@@ -582,15 +593,15 @@ impl<'a> Props<'a> {
                 _ => None,
             },
             PropValues::Object(object) => object_value(object, key),
-            PropValues::Paragraph(paragraph, scene) => match key {
+            PropValues::Paragraph(paragraph, styles) => match key {
                 "style" => text(paragraph.style_name()),
                 "level" => Some(Value::Int(i64::from(paragraph.level()))),
-                key => character(scene.paragraph_text_properties(paragraph)?, key),
+                key => character(styles.paragraph_text_properties(paragraph)?, key),
             },
-            PropValues::Run(run, scene) => match key {
+            PropValues::Run(run, styles) => match key {
                 "style" => text(run.style_name()),
                 "link" => text(run.href()),
-                key => character(scene.run_text_properties(run)?, key),
+                key => character(styles.run_text_properties(run)?, key),
             },
             PropValues::Cell(cell) => match key {
                 "colSpan" => Some(Value::Int(i64::from(cell.column_span()))),
