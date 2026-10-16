@@ -7173,19 +7173,13 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// returned exactly where it was. A candidate whose bytes cannot be shared
 /// (a managed projection) takes the historical gate and carries no proof.
 ///
-/// Only [`crate::Package::apply`] consumes the proof, and it
-/// publishes only patches whose source snapshot carries no source identity
-/// (`Package::document_snapshot`'s). A snapshot with a source identity is
-/// published by the source-backed writer, which audits its own pair, so for
-/// such a source the historical gate runs alone and no proof is built.
+/// Two writers consume the proof: [`crate::Package::apply`], for patches
+/// whose source snapshot carries no source identity
+/// (`Package::document_snapshot`'s), and the source-backed writer
+/// ([`crate::source_backed::Package::apply`]), for the snapshots bound to a
+/// source identity, which hands it to the OPC overlay in place of that
+/// overlay's own audit of the replacement (record 0311).
 fn commit_preserving_unmodified(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
-    if base.xml.identity().is_some() {
-        return if publication_accepts_preserved_xml(base.xml_bytes()) {
-            compact_changed_paragraphs(base, projected)
-        } else {
-            compact_whole_document(projected)
-        };
-    }
     let compacted = compact_changed_paragraphs(base, projected);
     let replacement = compacted
         .as_ref()
