@@ -78,10 +78,10 @@ The unified reader covers .docx, .xlsx, .pptx, .xlsb, .doc, .xls, .ppt and
 `capabilities()`, while their `get`, `find`, `query` and `view` raise
 `UnsupportedError` (`unsupported_capability`) until their readers land, as
 `capabilities()` reports. Apple Pages, Keynote and Numbers packages open as
-`File` too (record 0296). An app-authored Pages package directory opens as a
-`File` holding its single-file form (record 0299; it has no origin, so save it
-with `save_as`); a Keynote or Numbers package directory is read by the family
-classes below.
+`File` too (record 0296), and so does an app-authored package directory of
+any of the three: the `File` holds its single-file form, and `save()` writes
+it back as a directory (records 0299, 0301 and 0306). The family classes
+below read iWork inputs through the same `File`.
 
 ### Editing
 
@@ -407,7 +407,7 @@ pyo3-litchi/
 │   ├── props.rs        # Property dicts as litchi Props
 │   ├── pyde.rs         # Python objects read as batch items (serde)
 │   ├── pyser.rs        # serde values (views, capabilities) as Python objects
-│   ├── iwork.rs        # Pages, Keynote and Numbers readers
+│   ├── iwork.rs        # Pages, Keynote and Numbers projections of a File
 │   ├── document.rs     # Document API bindings
 │   ├── presentation.rs # Presentation API bindings
 │   └── sheet.rs        # Workbook API bindings

@@ -52,7 +52,7 @@
 //! - Media extraction and statistics
 //!
 //! ### Format-owned semantic data
-//! - Use `litchi::iwork` for a supported cross-format snapshot API
+//! - Use `litchi::open` (`File::Pages`, `File::Keynote`, `File::Numbers`) for a supported cross-format API
 //! - Use `litchi-numbers`, `litchi-keynote`, or `litchi-pages` for concrete
 //!   format semantics
 //!

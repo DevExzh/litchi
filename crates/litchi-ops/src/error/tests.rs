@@ -377,7 +377,7 @@ fn row_disabled_feature_and_iwork_are_unsupported_format_with_suggestion() {
     assert!(
         error
             .suggestion()
-            .is_some_and(|suggestion| suggestion.contains("litchi::iwork::Document::open"))
+            .is_some_and(|suggestion| suggestion.contains("`pages`, `keynote` and `numbers`"))
     );
 }
 

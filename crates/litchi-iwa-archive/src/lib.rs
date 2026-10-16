@@ -13,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bundle;
 mod catalog;
 mod directory;
 mod error;

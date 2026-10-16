@@ -1,10 +1,11 @@
 # Root iWork fuzzing
 
 `parse_iwork` is the bounded root-coordinator replacement for the retired
-`litchi-iwa` host fuzz target. It owns fuzz coverage for the supported
-`litchi::iwork` byte coordinator, exercising bounded package admission, format
-dispatch, all three semantic projections, and the archive-free snapshot
-facade. This root target does not claim generic host media-asset coverage; any
+`litchi-iwa` host fuzz target. It owns fuzz coverage of the iWork arm of
+`litchi::open_bytes` (record 0306: the `litchi::iwork` snapshot facade is
+deleted), exercising bounded package admission, format dispatch, the unified
+object trees of all three formats (text, outline, stats, queries and their
+paths), and the exact no-op publication. This root target does not claim generic host media-asset coverage; any
 media behavior belongs to an explicit focused owner target. The fuzz package
 must not acquire a dependency on the legacy `litchi-iwa` migration host.
 `parse_iwork` itself exercises only the root `litchi` facade; the shared fuzz

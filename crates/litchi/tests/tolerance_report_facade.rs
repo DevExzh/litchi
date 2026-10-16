@@ -248,13 +248,23 @@ fn odt_repairs_are_reported_through_the_document_facade() {
     assert_clean(&open(&source).tolerance_report().expect("report"));
 }
 
-/// Pages has no `File` variant (`litchi::open` refuses it in favour of
-/// `litchi::iwork`), so it keeps no repair report: the untracked report
-/// names the format.
+/// The Pages leaf keeps no repair report (records 0296 and 0306): a
+/// `File::Pages` reports an untracked report that names the format.
 #[cfg(feature = "pages")]
 #[test]
 fn pages_reports_are_untracked() {
-    let report = litchi::ToleranceReport::Untracked(litchi::FileFormat::Pages);
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/iwork/pages/basic.pages"
+    );
+    let report = litchi::open(path)
+        .unwrap()
+        .tolerance_report()
+        .expect("report");
+    assert_eq!(
+        report,
+        litchi::ToleranceReport::Untracked(litchi::FileFormat::Pages)
+    );
     assert!(!report.is_tracked());
     assert!(!report.is_clean());
     assert_eq!(report.total(), 0);

@@ -313,3 +313,197 @@ mod numbers {
         assert_eq!(error.code(), Code::PathNotFound);
     }
 }
+
+/// Package directories and iWork open options (record 0306).
+#[cfg(all(feature = "pages", feature = "keynote", feature = "numbers"))]
+mod directories {
+    use std::collections::BTreeMap;
+    use std::path::Path;
+
+    use litchi_ops::OpenOptions;
+
+    use super::*;
+
+    /// The bundle fixtures, with a path whose text each edit replaces.
+    const BUNDLES: [(&str, &str, &str, &str); 3] = [
+        (
+            "directory/pages/basic.pages",
+            "pages/basic.pages",
+            "/body/p[1]",
+            "text",
+        ),
+        (
+            "directory/keynote/basic.key",
+            "keynote/basic.key",
+            "/slide[1]/placeholder[title]",
+            "text",
+        ),
+        (
+            "directory/numbers/basic.numbers",
+            "numbers/basic.numbers",
+            "/sheet[1]/table[1]/B2",
+            "value",
+        ),
+    ];
+
+    fn copy_tree(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).expect("mkdir");
+        for entry in std::fs::read_dir(from).expect("read dir") {
+            let entry = entry.expect("entry");
+            let target = to.join(entry.file_name());
+            if entry.file_type().expect("type").is_dir() {
+                copy_tree(&entry.path(), &target);
+            } else {
+                std::fs::copy(entry.path(), target).expect("copy");
+            }
+        }
+    }
+
+    /// Every file below `root`, by `/`-separated relative name.
+    fn files(root: &Path) -> BTreeMap<String, Vec<u8>> {
+        fn walk(directory: &Path, prefix: &str, files: &mut BTreeMap<String, Vec<u8>>) {
+            for entry in std::fs::read_dir(directory).expect("read dir") {
+                let entry = entry.expect("entry");
+                let name = entry.file_name().to_string_lossy().into_owned();
+                let name = if prefix.is_empty() {
+                    name
+                } else {
+                    format!("{prefix}/{name}")
+                };
+                if entry.file_type().expect("type").is_dir() {
+                    walk(&entry.path(), &name, files);
+                } else {
+                    files.insert(name, std::fs::read(entry.path()).expect("read"));
+                }
+            }
+        }
+        let mut files = BTreeMap::new();
+        walk(root, "", &mut files);
+        files
+    }
+
+    #[test]
+    fn every_format_opens_a_package_directory_and_saves_it_back_in_place() {
+        for (bundle, single, path, key) in BUNDLES {
+            let file = open(fixture(bundle)).expect(bundle);
+            assert_eq!(
+                file.format(),
+                read(single).format(),
+                "{bundle}: same format as the single-file fixture"
+            );
+            assert!(!file.text().expect("text").is_empty(), "{bundle}");
+
+            // A no-op save writes every bundle file back byte for byte.
+            let temp = tempfile::tempdir().expect("tempdir");
+            let copy = temp.path().join(Path::new(bundle).file_name().unwrap());
+            copy_tree(&fixture(bundle), &copy);
+            let file = open(&copy).expect("open copy");
+            file.save().expect("no-op save");
+            assert_eq!(files(&copy), files(&fixture(bundle)), "{bundle}");
+            assert_eq!(std::fs::read_dir(temp.path()).unwrap().count(), 1);
+
+            // An edit saves back in place as a directory and reopens.
+            let edited = file
+                .set(path, props! { key => "Saved in place" })
+                .expect("set");
+            edited.save().expect("save in place");
+            assert!(copy.join("Index.zip").is_file(), "{bundle}");
+            let reopened = open(&copy).expect("reopen bundle");
+            assert_eq!(
+                text(&reopened, path).as_deref(),
+                Some("Saved in place"),
+                "{bundle}"
+            );
+            assert_eq!(reopened.to_bytes().unwrap(), edited.to_bytes().unwrap());
+            // Untouched members keep their bytes.
+            let before = files(&fixture(bundle));
+            for (name, data) in files(&copy) {
+                if name != "Index.zip" && !name.starts_with("preview") {
+                    assert_eq!(before.get(&name), Some(&data), "{bundle}: {name}");
+                }
+            }
+
+            // `save_as` to a file path writes the single-file package.
+            let single_path = temp.path().join("single");
+            edited.save_as(&single_path).expect("save as");
+            assert!(single_path.is_file());
+            assert_eq!(
+                text(&open(&single_path).expect("reopen file"), path).as_deref(),
+                Some("Saved in place")
+            );
+        }
+    }
+
+    #[test]
+    fn iwork_open_options_reach_the_leaves_on_every_route() {
+        let pages = OpenOptions::new().pages_options(
+            litchi_pages::OpenOptions::new().semantic_limits(
+                litchi_pages::SemanticLimits::builder()
+                    .max_text_bytes(1)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        );
+        let keynote = OpenOptions::new().keynote_options(
+            litchi_keynote::OpenOptions::new().semantic_limits(
+                litchi_keynote::SemanticLimits::builder()
+                    .max_objects(1)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        );
+        let numbers = OpenOptions::new().numbers_options(
+            litchi_numbers::OpenOptions::new().source_limits(
+                litchi_numbers::SourceLimits::builder()
+                    .max_input_bytes(1024)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        );
+        for (options, single, bundle) in [
+            (&pages, "pages/basic.pages", "directory/pages/basic.pages"),
+            (&keynote, "keynote/basic.key", "directory/keynote/basic.key"),
+            (
+                &numbers,
+                "numbers/basic.numbers",
+                "directory/numbers/basic.numbers",
+            ),
+        ] {
+            let bytes = std::fs::read(fixture(single)).unwrap();
+            let routes = [
+                litchi_ops::open_bytes_with(bytes, options),
+                litchi_ops::open_with(fixture(single), options),
+                litchi_ops::open_with(fixture(bundle), options),
+            ];
+            for route in routes {
+                assert_eq!(
+                    route.map(|file| file.format()).unwrap_err().code(),
+                    Code::LimitExceeded,
+                    "{single}"
+                );
+            }
+            // The defaults of one format do not constrain another.
+            assert!(litchi_ops::open_with(fixture("pages/basic.pages"), &numbers).is_ok());
+        }
+        // The common input ceiling bounds a converted package directory.
+        let capped = OpenOptions::new().max_input_bytes(1024);
+        assert_eq!(
+            litchi_ops::open_with(fixture("directory/numbers/basic.numbers"), &capped)
+                .unwrap_err()
+                .code(),
+            Code::LimitExceeded
+        );
+        // Default leaf options keep the single detection pass and its result.
+        let defaults = OpenOptions::new()
+            .pages_options(litchi_pages::OpenOptions::new())
+            .numbers_options(litchi_numbers::OpenOptions::new());
+        let file = litchi_ops::open_with(fixture("numbers/basic.numbers"), &defaults).unwrap();
+        assert_eq!(
+            file.to_bytes().unwrap(),
+            read("numbers/basic.numbers").to_bytes().unwrap()
+        );
+    }
+}

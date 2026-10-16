@@ -682,12 +682,13 @@ this operation does not sanitize the file.
 | `File::Doc`, `File::Docx`, `File::Rtf`, `File::Odt` | Word-processing documents |
 | `File::Ppt`, `File::Pptx`, `File::Odp` | Presentations |
 | `File::Xls`, `File::Xlsx`, `File::Xlsb`, `File::Ods` | Workbooks |
+| `File::Pages`, `File::Keynote`, `File::Numbers` | Apple iWork packages and package directories |
 | `File::Locked` | An encrypted DOC, XLS, PPT, or OOXML package |
 | `File::Signed` | A signed OOXML or legacy binary file |
 
-Each variant exists only when its cargo feature is enabled. Apple iWork files
-are not opened yet: `litchi::open` refuses them with `unsupported_format` and
-a suggestion to read them with `litchi::iwork::Document`.
+Each variant exists only when its cargo feature is enabled. An app-authored
+iWork package directory opens as its single-file form, and `save()` writes
+it back as a directory (record 0306).
 
 The examples in this section run inside a function that returns
 `litchi::Result<()>`.
@@ -887,9 +888,9 @@ use litchi::{Code, OpenOptions};
 match litchi::open("notes.pages") {
     Ok(file) => println!("{}", file.text()?),
     Err(error) if error.code() == Code::UnsupportedFormat => {
-        // Some(Pages): the format was recognized but is not opened here.
+        // Some(Pages) in a build without the `pages` feature.
         println!("{:?}", error.detected());
-        // "open Pages, Keynote and Numbers files with `litchi::iwork::Document::open`"
+        // "enable the `pages` cargo feature"
         println!("{:?}", error.suggestion());
     },
     Err(error) => return Err(error),

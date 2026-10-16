@@ -179,9 +179,10 @@ use litchi::Code;
 match litchi::open("notes.pages") {
     Ok(file) => println!("{}", file.text()?),
     Err(error) if error.code() == Code::UnsupportedFormat => {
-        // `detected` names the format that was recognized: Some(Pages) here.
+        // `detected` names the format that was recognized: Some(Pages) in a
+        // build without the `pages` feature.
         println!("{:?}", error.detected());
-        // "open Pages, Keynote and Numbers files with `litchi::iwork::Document::open`"
+        // "enable the `pages` cargo feature"
         if let Some(suggestion) = error.suggestion() {
             println!("{suggestion}");
         }
@@ -210,10 +211,11 @@ The codes that opening and reading report most often:
   (`set`, `add`, `remove`, batches, `save`, `create`) and path queries are
   planned for later releases. Until then, write documents through the
   per-format modules shown below.
-- **Apple iWork.** `litchi::open` recognizes Pages, Keynote, and Numbers files
-  but does not open them: it returns `unsupported_format` with a suggestion.
-  Read them through `litchi::iwork` (below) or the `litchi::pages`,
-  `litchi::keynote`, and `litchi::numbers` modules.
+- **Apple iWork.** `litchi::open` opens Pages, Keynote, and Numbers packages
+  and app-authored package directories as `File::Pages`, `File::Keynote`, and
+  `File::Numbers`; a directory saves back as a directory. The
+  `litchi::pages`, `litchi::keynote`, and `litchi::numbers` modules expose the
+  leaf owners.
 - **Other OpenDocument formats.** Drawings, charts, images, databases,
   templates, masters, and formulas (`.odg`, `.odc`, `.odi`, `.odb`, `.oth`,
   `.odm`, `.odf`) are not opened by `litchi::open` yet.
@@ -255,17 +257,13 @@ pkg.save("output.pptx")?;
 ### Additional Format Support
 
 ```rust
-// Pages, Keynote, and Numbers documents, read once (requires "iwork")
+// Pages, Keynote, and Numbers documents (requires "iwork")
 #[cfg(feature = "iwork")]
 {
-    use litchi::iwork::Document;
-
-    let document = Document::open("budget.numbers")?; // or .pages, .key, or a package directory
-    let snapshot = document.snapshot();
-    println!("{}: {}", document.format(), snapshot.summary());
-    for text in snapshot.iter_text() {
-        println!("{:?}: {}", text.role(), text.value());
-    }
+    let file = litchi::open("budget.numbers")?; // or .pages, .key, or a package directory
+    println!("{}", file.view(litchi::view::Mode::Outline)?);
+    let file = file.set("/sheet[1]/table[1]/B2", litchi::props! { "value" => 42 })?;
+    file.save()?; // a package directory is written back as a directory
 }
 
 // Formula conversion (requires the "formula" feature)
@@ -345,12 +343,12 @@ and `litchi-xls`. Their canonical umbrella modules are `litchi::doc`,
 OLE vocabulary; it is not a legacy format owner or compatibility facade.
 
 iWork follows the same ownership rule: `litchi::pages`, `litchi::keynote`, and
-`litchi::numbers` expose the concrete format owners. `litchi::open` does not
-open iWork files yet; with the aggregate `iwork` feature,
-`litchi::iwork::Document` provides one bounded, format-neutral reader for
-immutable packaged Pages, Keynote, and Numbers bytes and app-authored package
-directories. It exposes only root-owned semantic handles and never native
-object identifiers or Protocol Buffer values.
+`litchi::numbers` expose the concrete format owners. `litchi::open` opens
+iWork packages and app-authored package directories as `File` variants
+(the aggregate `iwork` feature enables all three); `OpenOptions::{pages_options,
+keynote_options, numbers_options}` pass the leaves' source and semantic
+limits. The unified `File` exposes no native object identifiers or Protocol
+Buffer values.
 
 ## Documentation
 
@@ -377,7 +375,7 @@ object identifiers or Protocol Buffer values.
 
 **In Progress:**
 - 🟡 Unified editing: `set`, `add`, `remove`, batches, and `save` on `File`, with path queries
-- 🟡 Apple iWork and the remaining OpenDocument formats through `litchi::open`
+- 🟡 The remaining OpenDocument formats through `litchi::open`
 - 🟡 Advanced formatting (cell styles, conditional formatting)
 - 🟡 Charts and embedded objects
 - 🟡 Headers, footers, comments

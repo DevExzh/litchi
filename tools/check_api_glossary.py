@@ -45,8 +45,16 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
     seen = set()
     for profile in value["profiles"]:
         fields = {"id", "package", "default_features", "features", "banned_names", "families"}
-        if not isinstance(profile, dict) or set(profile) != fields:
-            raise ValueError("profile requires exactly " + ", ".join(sorted(fields)))
+        optional = {"delegated_globs"}
+        if (not isinstance(profile, dict) or not fields <= set(profile)
+                or set(profile) - (fields | optional)):
+            raise ValueError("profile requires exactly " + ", ".join(sorted(fields))
+                             + ", with optional delegated_globs")
+        delegated = profile.get("delegated_globs", [])
+        if not isinstance(delegated, list) or any(
+            not isinstance(c, str) or not IDENTIFIER.fullmatch(c) for c in delegated
+        ) or len(set(delegated)) != len(delegated):
+            raise ValueError("delegated_globs must be unique crate names")
         for key in ("id", "package"):
             if not isinstance(profile[key], str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", profile[key]):
                 raise ValueError(f"invalid profile {key}")
@@ -127,13 +135,14 @@ def field_ids(value: Any):
 class Surface:
     """Exported paths plus reachable types; no private-module name scanning."""
 
-    def __init__(self, document: Any, crate: str):
+    def __init__(self, document: Any, crate: str, delegated_globs: frozenset[str] = frozenset()):
         if (
             not isinstance(document, dict)
             or not isinstance(document.get("index"), dict)
             or not isinstance(document.get("paths"), dict)
         ):
             raise ValueError("invalid rustdoc JSON: expected index and paths objects")
+        self.delegated_globs = delegated_globs
         self.index = {str(k): v for k, v in document["index"].items()}
         self.paths = {str(k): v for k, v in document["paths"].items()}
         for entry in self.paths.values():
@@ -215,7 +224,16 @@ class Surface:
                 target_item = self.index.get(str(target), {})
                 module = target_item.get("inner", {}).get("module")
                 if module is None:
-                    raise ValueError("glob target requires module rustdoc data")
+                    # A glob over another crate a profile explicitly
+                    # delegates (the facade's `pub use litchi_pages::*`) is
+                    # that crate's own profile's to check; any other glob
+                    # without module data is refused, not skipped.
+                    entry = self.paths.get(str(target))
+                    if (isinstance(entry, dict) and entry.get("crate_id") != self.crate_id
+                            and entry.get("path") and entry["path"][0] in self.delegated_globs):
+                        return
+                    raise ValueError("glob target requires module rustdoc data: "
+                                     + "::".join((entry or {}).get("path") or [str(target)]))
                 self.children(module["items"], path[:-1], ancestors, exported=exported)
             else:
                 alias = path[:-1] + (data["name"],)
@@ -284,7 +302,8 @@ class Surface:
 
 def violations(document: Any, profile: dict[str, Any]) -> list[str]:
     try:
-        surface = Surface(document, profile["package"].replace("-", "_"))
+        surface = Surface(document, profile["package"].replace("-", "_"),
+                          frozenset(profile.get("delegated_globs", [])))
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError(f"invalid rustdoc graph structure: {error}") from error
     failures = set()

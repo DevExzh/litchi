@@ -63,14 +63,13 @@ const _: () = assert!(DEFAULT_MAX_NODES == 100_000);
 ///
 /// Raises:
 ///     IoError: (an OSError) If the file cannot be read
-///     UnsupportedError: (a ValueError) If the file is not an Office file,
-///         or is a Keynote or Numbers package directory, which File does not
-///         hold (open it with Presentation.open or Workbook.open); a Pages
-///         package directory opens as its single-file form
+///     UnsupportedError: (a ValueError) If the file is not an Office file
+///         (an Apple iWork package directory opens as its single-file form,
+///         and save() writes it back as a directory)
 ///     CorruptFileError: (a ValueError) If the file is malformed
 #[pyfunction]
 fn open(py: Python<'_>, path: PathBuf) -> PyResult<File> {
-    let file = py.detach(|| litchi::open(&path).map_err(|error| Failure::open_file(&error)))?;
+    let file = py.detach(|| litchi::open(&path).map_err(|error| Failure::read(&error)))?;
     Ok(File::new(file))
 }
 
@@ -91,8 +90,7 @@ fn open(py: Python<'_>, path: PathBuf) -> PyResult<File> {
 ///     CorruptFileError: (a ValueError) If the file is malformed
 #[pyfunction]
 fn open_bytes(py: Python<'_>, data: &[u8]) -> PyResult<File> {
-    let file =
-        py.detach(|| litchi::open_bytes(data).map_err(|error| Failure::open_file(&error)))?;
+    let file = py.detach(|| litchi::open_bytes(data).map_err(|error| Failure::read(&error)))?;
     Ok(File::new(file))
 }
 

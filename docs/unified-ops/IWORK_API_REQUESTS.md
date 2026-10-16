@@ -362,3 +362,20 @@ Record 0301 adds structural leaf transactions and wires them into
 - **11, 13, Pages table cells/creation: open.** Section add/remove (the host
   clones the section's page-master graph and inserts a U+0004 break through
   its text editor), text runs, and a Pages cell writer were not ported.
+
+## 2026-10-16 package directories and the facade reader (record 0306)
+
+- **16 (Keynote, Numbers): done.** `Package::open[_with_options]` accepts an
+  app-authored package directory and converts it to its single-file form;
+  `Package::save_directory` writes the bundle form back
+  (`SaveError::{Bundling, Bundle}`). The capture, conversion and bundle
+  publication are shared by the three leaves in
+  `litchi_iwa_archive::bundle`; the Pages directory module now delegates to
+  it. A bundle whose components sit loose in an `Index/` folder converts too
+  (and saves back in the `Index.zip` layout).
+- `File` opens, edits and saves package directories of all three formats in
+  place; `litchi::iwork::Document` is deleted (plan step 28).
+- Still open: the Numbers object tree refuses a source whose table-merge
+  storage is not native (the synthetic compatibility fixture: text reads,
+  `query` is `invalid_input`); a merge-reader tolerance request for the
+  Numbers owner.
