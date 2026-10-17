@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         mut leaf: impl FnMut(),
         mut unified: impl FnMut(),
     ) -> (Vec<f64>, Vec<f64>) {
-        let mut time = |run: &mut dyn FnMut()| {
+        let time = |run: &mut dyn FnMut()| {
             let started = Instant::now();
             for _ in 0..repeat {
                 run();

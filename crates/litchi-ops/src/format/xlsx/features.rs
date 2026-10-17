@@ -253,7 +253,7 @@ impl SheetHandle {
         })
     }
 
-    fn hyperlinks(&self) -> Result<Vec<xlsx::hyperlinks::Hyperlink>> {
+    pub(super) fn hyperlinks(&self) -> Result<Vec<xlsx::hyperlinks::Hyperlink>> {
         Ok(match self {
             Self::Eager { sheet, .. } => sheet.hyperlinks()?,
             Self::Source { sheet } => sheet.hyperlinks()?,
@@ -317,7 +317,7 @@ fn differential_formats(file: &Xlsx) -> Result<Vec<xlsx::conditional_formatting:
 }
 
 /// The cell of an A1 reference as `(row, column)`, for ordering notes.
-fn row_major(reference: &str) -> (u32, u32) {
+pub(super) fn row_major(reference: &str) -> (u32, u32) {
     litchi_core::selector::CellRef::parse(reference)
         .map_or((u32::MAX, u32::MAX), |cell| (cell.row(), cell.column()))
 }

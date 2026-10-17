@@ -415,15 +415,6 @@ fn check_cell(key: &'static str, reference: &str) -> Result<String> {
 }
 
 impl Xlsx {
-    fn note_position(&self, sheet: usize, reference: &str) -> Result<usize> {
-        self.features_of(sheet, Kind::Comment)?
-            .iter()
-            .position(|feature| {
-                matches!(&feature.data, Data::Comment(note) if note.reference == reference)
-            })
-            .ok_or_else(|| error(Code::InternalError, "the added note did not read back"))
-    }
-
     fn add_comment(&self, parent: &Parent, props: &Props<'_>) -> Result<(Commit, Path<'static>)> {
         let mut reference = None;
         let mut author = None;
@@ -447,24 +438,22 @@ impl Xlsx {
         };
         let source = self.editor()?;
         let mut edit = source.edit_comments()?;
-        if edit
-            .comments(parent.sheet)?
-            .is_some_and(|comments| comments.get(&reference).is_some())
-        {
+        let index = edit
+            .add(
+                parent.sheet,
+                &reference,
+                author.as_deref().unwrap_or("Author"),
+                text.as_deref().unwrap_or(""),
+            )
+            .map_err(authored)?;
+        // Notes are numbered row-major, as `features::list` numbers them.
+        let Some(index) = index else {
             return Err(error(Code::InvalidArgument, "the cell already has a note")
                 .with_property("ref")
                 .with_suggestion("set the existing comment instead"));
-        }
-        edit.set(
-            parent.sheet,
-            &reference,
-            author.as_deref().unwrap_or("Author"),
-            text.as_deref().unwrap_or(""),
-        )
-        .map_err(authored)?;
+        };
         let (target, changed) = split(edit.commit()?);
         let commit = self.publish(source, target, changed);
-        let index = commit_file(&commit).note_position(parent.sheet, &reference)?;
         Ok((commit, feature_path(parent.sheet, "comment", Some(index))))
     }
 
@@ -689,38 +678,36 @@ impl Xlsx {
         change: &CellLink,
     ) -> Result<()> {
         let reference = at.a1();
-        let existing = self
-            .features_of(sheet, Kind::Hyperlink)?
-            .into_iter()
-            .find_map(|feature| match feature.data {
-                Data::Hyperlink(link) if link.reference().as_str() == reference => Some(link),
-                _ => None,
-            });
-        let (mut location, mut url) = existing.as_ref().map_or((None, None), |link| {
-            (
-                link.location().map(str::to_owned),
-                link.external_target().map(str::to_owned),
-            )
-        });
-        let mut display = existing
-            .as_ref()
-            .and_then(|link| link.display().map(str::to_owned));
-        let mut tooltip = existing
-            .as_ref()
-            .and_then(|link| link.tooltip().map(str::to_owned));
-        match &change.link {
-            Some(Some(value)) => (location, url) = link_target("link", value)?,
+        let link_reference = xlsx::hyperlinks::HyperlinkReference::new(&reference)?;
+        // As OfficeCLI: a new link replaces the cell's hyperlink, taking its
+        // tooltip and display text from the same command only; removing one
+        // needs no read either. Only a tooltip or display change alone reads
+        // the existing hyperlink.
+        let (location, url, mut display, mut tooltip) = match &change.link {
+            Some(Some(value)) => {
+                let (location, url) = link_target("link", value)?;
+                (location, url, None, None)
+            },
             Some(None) => {
-                if existing.is_some() {
-                    edit.remove_hyperlink(
-                        sheet,
-                        xlsx::hyperlinks::HyperlinkReference::new(&reference)?,
-                    )?;
-                }
+                edit.remove_hyperlink(sheet, link_reference)?;
                 return Ok(());
             },
-            None => {},
-        }
+            None => {
+                let existing = super::node::SheetHandle::at(self, sheet)?
+                    .ok_or_else(|| error(Code::PathNotFound, "the worksheet is missing"))?
+                    .hyperlinks()?
+                    .into_iter()
+                    .find(|link| link.reference().as_str() == reference);
+                existing.map_or((None, None, None, None), |link| {
+                    (
+                        link.location().map(str::to_owned),
+                        link.external_target().map(str::to_owned),
+                        link.display().map(str::to_owned),
+                        link.tooltip().map(str::to_owned),
+                    )
+                })
+            },
+        };
         if location.is_none() && url.is_none() {
             return Err(error(
                 Code::UnsupportedProperty,
@@ -739,14 +726,9 @@ impl Xlsx {
         if let Some(value) = &change.display {
             display.clone_from(value);
         }
-        let link = xlsx::hyperlinks::Hyperlink::new(
-            xlsx::hyperlinks::HyperlinkReference::new(&reference)?,
-            location,
-            url,
-            display,
-            tooltip,
-        )
-        .map_err(|error| authored(error).with_property("link"))?;
+        let link =
+            xlsx::hyperlinks::Hyperlink::new(link_reference, location, url, display, tooltip)
+                .map_err(|error| authored(error).with_property("link"))?;
         edit.put_hyperlink(sheet, link)?;
         Ok(())
     }

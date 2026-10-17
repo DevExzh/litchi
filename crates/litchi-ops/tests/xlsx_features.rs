@@ -657,3 +657,40 @@ fn features_compose_with_cell_writes() {
         );
     }
 }
+
+#[test]
+fn a_new_cell_link_replaces_the_hyperlink_and_none_is_a_no_op_without_one() {
+    let file = workbook()
+        .set(
+            "/Sheet1/A1",
+            props! { "link" => "https://a.test/", "tooltip" => "A" },
+        )
+        .unwrap()
+        .set("/Sheet1/A1", props! { "display" => "Shown" })
+        .unwrap();
+    assert_eq!(
+        prop(&file, "/Sheet1/hyperlink[1]", "tooltip").as_deref(),
+        Some("A")
+    );
+    assert_eq!(
+        prop(&file, "/Sheet1/hyperlink[1]", "display").as_deref(),
+        Some("Shown")
+    );
+    let file = file
+        .set("/Sheet1/A1", props! { "link" => "#Sheet1!B2" })
+        .unwrap();
+    assert_eq!(
+        prop(&file, "/Sheet1/hyperlink[1]", "location").as_deref(),
+        Some("Sheet1!B2")
+    );
+    assert_eq!(prop(&file, "/Sheet1/hyperlink[1]", "tooltip"), None);
+    let empty = workbook();
+    let unchanged = empty
+        .set("/Sheet1/B5", props! { "link" => "none" })
+        .unwrap();
+    assert_eq!(unchanged.to_bytes().unwrap(), empty.to_bytes().unwrap());
+    let error = empty
+        .set("/Sheet1/B5", props! { "tooltip" => "x" })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedProperty);
+}

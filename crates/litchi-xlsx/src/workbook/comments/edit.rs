@@ -120,6 +120,63 @@ impl Edit<'_> {
     /// author or text, too many notes, a VML drawing this editor cannot read,
     /// or a changed edit of a signed workbook.
     pub fn set(&mut self, sheet: usize, cell_ref: &str, author: &str, text: &str) -> Result<bool> {
+        self.write(sheet, cell_ref, author, text, false)
+    }
+
+    /// Add a note to `cell` (A1) when the cell has none. Returns the new
+    /// note's position among the worksheet's notes in row-major order of
+    /// their cells; `None` leaves a cell that already has a note unchanged.
+    ///
+    /// # Errors
+    ///
+    /// As [`Edit::set`].
+    pub fn add(
+        &mut self,
+        sheet: usize,
+        cell_ref: &str,
+        author: &str,
+        text: &str,
+    ) -> Result<Option<usize>> {
+        let (_, row, column) = cell(cell_ref)?;
+        let worksheet = self.staged.worksheet(sheet)?;
+        let before = load_from_worksheet(self.staged.opc(), &worksheet)?;
+        let position = before.as_ref().map_or(0, |part| {
+            part.comments
+                .iter()
+                .filter(|(other, _)| {
+                    litchi_sheet::Cell::from_a1(other).is_ok_and(|other| {
+                        (other.row().get(), other.column().get()) < (row, column)
+                    })
+                })
+                .count()
+        });
+        Ok(self
+            .write_loaded(sheet, cell_ref, author, text, true, before)?
+            .then_some(position))
+    }
+
+    fn write(
+        &mut self,
+        sheet: usize,
+        cell_ref: &str,
+        author: &str,
+        text: &str,
+        insert_only: bool,
+    ) -> Result<bool> {
+        let worksheet = self.staged.worksheet(sheet)?;
+        let existing = load_from_worksheet(self.staged.opc(), &worksheet)?;
+        self.write_loaded(sheet, cell_ref, author, text, insert_only, existing)
+    }
+
+    fn write_loaded(
+        &mut self,
+        sheet: usize,
+        cell_ref: &str,
+        author: &str,
+        text: &str,
+        insert_only: bool,
+        existing: Option<super::model::Part>,
+    ) -> Result<bool> {
         let (reference, row, column) = cell(cell_ref)?;
         for (value, what) in [(author, "author"), (text, "text")] {
             if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
@@ -129,10 +186,9 @@ impl Edit<'_> {
             }
         }
         let worksheet = self.staged.worksheet(sheet)?;
-        let existing = load_from_worksheet(self.staged.opc(), &worksheet)?;
         if let Some(part) = &existing {
             if let Some(comment) = part.comments.get(&reference) {
-                if comment.author == author && comment.text == text {
+                if insert_only || (comment.author == author && comment.text == text) {
                     return Ok(false);
                 }
             } else if part.comments.len() >= MAX_COMMENTS {
