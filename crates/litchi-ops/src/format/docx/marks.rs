@@ -495,6 +495,12 @@ pub(crate) enum MarkSetter {
     FieldText,
     FieldName,
     FieldFormat,
+    /// A `REF`-family field's `\\h` switch and an `IF` field's expression
+    /// and texts (record 0325).
+    FieldHyperlink,
+    FieldExpression,
+    FieldTrueText,
+    FieldFalseText,
     /// A table of contents' levels and switches, and its title on add
     /// (record 0325).
     TocLevels,
@@ -618,7 +624,12 @@ crate::registry::registry! {
     read("evaluated", ValueType::Bool),
     write_only("text", ValueType::Text, MarkSetter::FieldText),
     add_only("name", ValueType::Text, MarkSetter::FieldName),
+    add_only("bookmarkName", ValueType::Text, MarkSetter::FieldName),
     add_only("format", ValueType::Text, MarkSetter::FieldFormat),
+    add_only("hyperlink", ValueType::Bool, MarkSetter::FieldHyperlink),
+    add_only("expression", ValueType::Text, MarkSetter::FieldExpression),
+    add_only("trueText", ValueType::Text, MarkSetter::FieldTrueText),
+    add_only("falseText", ValueType::Text, MarkSetter::FieldFalseText),
     }
 }
 

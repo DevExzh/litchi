@@ -89,6 +89,7 @@ const FIELD_TYPES: &[(&str, &str)] = &[
     ("seq", "SEQ"),
     ("styleref", "STYLEREF"),
     ("docproperty", "DOCPROPERTY"),
+    ("if", "IF"),
 ];
 
 /// The instruction word of field type `kind`.
@@ -102,11 +103,9 @@ fn field_word(kind: &str) -> Option<&'static str> {
 /// The instruction and cached result OfficeCLI writes for a typed field;
 /// a field of the date family gets no result (Litchi never reads the
 /// clock), which `refresh` computes.
-fn typed_field(
-    kind: &str,
-    name: Option<&str>,
-    format: Option<&str>,
-) -> Result<(String, Option<String>)> {
+fn typed_field(values: &MarkValues, kind: &str) -> Result<(String, Option<String>)> {
+    let name = values.field_name.as_deref();
+    let format = values.format.as_deref();
     let word = field_word(kind).ok_or_else(|| {
         error(Code::InvalidValue, "unknown field type")
             .with_property("fieldType")
@@ -133,12 +132,45 @@ fn typed_field(
         "PAGE" | "NUMPAGES" | "SECTION" | "SECTIONPAGES" => {
             (format!(" {word} "), Some("1".to_owned()))
         },
-        "MERGEFIELD" | "REF" | "NOTEREF" => {
+        "MERGEFIELD" => {
             let name = named(false)?;
             let shown = format!("\u{ab}{}\u{bb}", name.trim_matches('"'));
             (format!(" {word} {name} "), Some(shown))
         },
-        "PAGEREF" => (format!(" {word} {} ", named(false)?), Some("1".to_owned())),
+        "REF" | "NOTEREF" | "PAGEREF" => {
+            let name = named(false)?;
+            let shown = if word == "PAGEREF" {
+                "1".to_owned()
+            } else {
+                format!("\u{ab}{}\u{bb}", name.trim_matches('"'))
+            };
+            let switch = if values.hyperlink == Some(true) {
+                " \\h"
+            } else {
+                ""
+            };
+            (format!(" {word} {name}{switch} "), Some(shown))
+        },
+        "IF" => {
+            let expression = values
+                .expression
+                .as_deref()
+                .filter(|expression| !expression.trim().is_empty())
+                .ok_or_else(|| {
+                    error(Code::MissingProperty, "an IF field needs its expression")
+                        .with_property("expression")
+                })?;
+            let quote =
+                |text: Option<&str>| format!("\"{}\"", text.unwrap_or("").replace('"', "'"));
+            (
+                format!(
+                    " IF {expression} {} {} ",
+                    quote(values.true_text.as_deref()),
+                    quote(values.false_text.as_deref())
+                ),
+                None,
+            )
+        },
         "SEQ" => (format!(" {word} {} ", named(false)?), None),
         "STYLEREF" | "DOCPROPERTY" => {
             let name = named(true)?;
@@ -317,6 +349,10 @@ struct MarkValues {
     hyperlinks: Option<bool>,
     page_numbers: Option<bool>,
     title: Option<String>,
+    hyperlink: Option<bool>,
+    expression: Option<String>,
+    true_text: Option<String>,
+    false_text: Option<String>,
 }
 
 /// Admit `props` through `table` for `operation`.
@@ -347,6 +383,10 @@ fn admit_mark<const N: usize, const A: usize>(
                     MarkSetter::TocHyperlinks => values.hyperlinks = bool_of(value),
                     MarkSetter::TocPageNumbers => values.page_numbers = bool_of(value),
                     MarkSetter::TocTitle => values.title = text_of(value),
+                    MarkSetter::FieldHyperlink => values.hyperlink = bool_of(value),
+                    MarkSetter::FieldExpression => values.expression = text_of(value),
+                    MarkSetter::FieldTrueText => values.true_text = text_of(value),
+                    MarkSetter::FieldFalseText => values.false_text = text_of(value),
                     MarkSetter::TabPosition
                     | MarkSetter::TabKind
                     | MarkSetter::TabLeader
@@ -393,8 +433,10 @@ impl NewMark {
         } else if name.eq_ignore_ascii_case("toc") || name.eq_ignore_ascii_case("tableofcontents") {
             Some(Self::Toc)
         } else {
+            // `section` adds a section break (OfficeCLI), not a field.
             FIELD_TYPES
                 .iter()
+                .filter(|(known, _)| *known != "section")
                 .find(|(known, _)| name.eq_ignore_ascii_case(known))
                 .map(|(known, _)| Self::Field(Some(*known)))
         }
@@ -805,6 +847,21 @@ impl Docx {
             );
         }
         let text = values.text.filter(|text| !text.is_empty());
+        // A bookmark in a header, footer or note paragraph (record 0325).
+        if parent.element_kind() == Kind::Paragraph
+            && let Some((key, path)) = super::super::element::story_path(parent)?
+        {
+            let at = self.mark_run_position(parent, node)?;
+            let mut edit = self.eager_work(editor)?;
+            let WorkEdit::Eager(eager) = &mut edit else {
+                return Err(refusal("bookmarks need the owning package editor"));
+            };
+            eager.edit_story(super::super::story::target(&key), |story| -> Result<i64> {
+                Ok(story.insert_bookmark_at(&path, at, &name, text.as_deref())?)
+            })?;
+            let commit = edit.commit(self)?;
+            return Ok((commit, path_with(parent, None)));
+        }
         let mut edit;
         match parent.element_kind() {
             Kind::Paragraph => {
@@ -868,9 +925,7 @@ impl Docx {
         let (instruction, result) = match (&values.instruction, kind) {
             // A raw instruction overrides the typed one (OfficeCLI).
             (Some(instruction), _) => (spaced(instruction), None),
-            (None, Some(kind)) => {
-                typed_field(kind, values.field_name.as_deref(), values.format.as_deref())?
-            },
+            (None, Some(kind)) => typed_field(&values, kind)?,
             (None, None) => {
                 return Err(error(
                     Code::MissingProperty,
@@ -879,7 +934,39 @@ impl Docx {
                 .with_property("fieldType"));
             },
         };
-        let result = values.text.or(result);
+        let result = values.text.clone().or(result);
+        // A field in a header, footer or note paragraph (record 0325): its
+        // path is its begin run's.
+        if parent.element_kind() == Kind::Paragraph
+            && let Some((key, path)) = super::super::element::story_path(parent)?
+        {
+            let at = self.mark_run_position(parent, node)?;
+            let Value::Paragraph { paragraph, .. } = &parent.value else {
+                return Err(refusal("the field parent holds no paragraph"));
+            };
+            let ordinal = match at {
+                None => run_locations(self, paragraph)?.len(),
+                Some(run) => run_locations(self, paragraph)?
+                    .iter()
+                    .position(|location| location.as_slice() == [ElementStep::Run(run)])
+                    .unwrap_or(0),
+            };
+            let mut edit = self.eager_work(editor)?;
+            let WorkEdit::Eager(eager) = &mut edit else {
+                return Err(refusal("fields need the owning package editor"));
+            };
+            eager.edit_story(
+                super::super::story::target(&key),
+                |story| -> Result<Position> {
+                    Ok(story.insert_field_at(&path, at, &instruction, result.as_deref())?)
+                },
+            )?;
+            let commit = edit.commit(self)?;
+            return Ok((
+                commit,
+                path_with(parent, Some((Kind::Run, Position::new(ordinal)))),
+            ));
+        }
         let before = super::fields(self)?;
         let mut edit;
         match parent.element_kind() {
@@ -1193,12 +1280,23 @@ impl Docx {
                     .ok_or_else(|| error(Code::PathNotFound, "the table of contents is gone"))?;
                 let (first, last) = index.fields()[position].paragraphs();
                 let paragraphs = index.paragraphs();
+                // Word's own TOC lives in one block content control
+                // (`docPartGallery` "Table of Contents"): it goes whole.
+                let control = index.body_block(first);
+                if let Some(step @ ElementStep::ContentControl(_)) = control
+                    && (first..=last).all(|paragraph| index.body_block(paragraph) == control)
+                {
+                    eager
+                        .remove_element_at(&ElementPath::new([step]))
+                        .map_err(Error::from)?;
+                    return edit.commit(self);
+                }
                 let mut body: Vec<Position> = Vec::new();
                 for paragraph in &paragraphs[first..=last] {
                     let Some(at) = paragraph.body_position() else {
                         return Err(error(
                             Code::UnsupportedCapability,
-                            "a table of contents outside the body's own paragraphs is not removed",
+                            "a table of contents outside the body's own paragraphs and content controls is not removed",
                         ));
                     };
                     body.push(Position::new(at));

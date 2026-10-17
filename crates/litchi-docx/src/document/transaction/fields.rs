@@ -314,6 +314,15 @@ impl Fields {
         &self.bookmarks
     }
 
+    /// The direct body child holding paragraph `paragraph` (the paragraph
+    /// itself, a table or a block content control), for a paragraph that
+    /// is not nested (record 0325).
+    #[must_use]
+    pub fn body_block(&self, paragraph: usize) -> Option<ElementStep> {
+        let block = self.paragraphs.get(paragraph)?.block?;
+        self.children.get(block)?.step
+    }
+
     /// The text width of the body's final section in twips (page width
     /// less the left and right margins), when it declares both.
     #[must_use]
@@ -1420,12 +1429,7 @@ fn entry_paragraph(prefix: &str, entry: &TocEntry) -> std::result::Result<String
 
 /// The markup of a new bookmark around optional `text`: its start marker,
 /// a plain run, and its end marker (record 0325).
-pub(crate) fn bookmark_markup(
-    prefix: &str,
-    id: i64,
-    name: &str,
-    text: Option<&str>,
-) -> Result<Vec<u8>> {
+fn bookmark_markup(prefix: &str, id: i64, name: &str, text: Option<&str>) -> Result<Vec<u8>> {
     check_text(name).map_err(|reason| refused(0, reason))?;
     if name.is_empty() || name.chars().count() > 40 {
         return Err(refused(0, Refusal::InvalidPropertyValue));
@@ -1443,7 +1447,7 @@ pub(crate) fn bookmark_markup(
 
 /// The markup of a new complex field: its begin, instruction, separate,
 /// result and end runs, each carrying `properties` (record 0325).
-pub(crate) fn field_markup(
+fn field_markup(
     prefix: &str,
     properties: &[u8],
     instruction: &str,
@@ -1472,6 +1476,15 @@ pub(crate) fn field_markup(
     }
     out.push_str(&marker("end"));
     Ok(out.into_bytes())
+}
+
+/// A namespace prefix as the markup builders take it: `w:`, or empty.
+fn qualifier(prefix: &[u8]) -> String {
+    if prefix.is_empty() {
+        String::new()
+    } else {
+        format!("{}:", String::from_utf8_lossy(prefix))
+    }
 }
 
 /// A start tag (or empty element) with attribute `local` (in the tag's
@@ -1552,6 +1565,61 @@ impl Edit {
     /// 262,144 fields.
     pub fn fields(&self) -> Result<Fields> {
         scan(Arc::new(self.projected.xml_bytes().to_vec()))
+    }
+
+    /// Insert a bookmark into the paragraph at `paragraph`, before its
+    /// direct run `at` (after its last child for `None`): its start marker,
+    /// a plain run of `text` when given, and its end marker (record 0325).
+    /// The bookmark takes the identifier after the largest this document
+    /// uses, which it returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an empty name or one longer than 40
+    /// characters, text a document cannot hold, a missing paragraph or run,
+    /// or a position inside a field, and an XML error for malformed markup.
+    /// The edit is unchanged on failure.
+    pub fn insert_bookmark_at(
+        &mut self,
+        paragraph: &ElementPath,
+        at: Option<Position>,
+        name: &str,
+        text: Option<&str>,
+    ) -> Result<i64> {
+        let id = self
+            .fields()?
+            .bookmarks
+            .iter()
+            .filter_map(Bookmark::id)
+            .max()
+            .map_or(0, |id| id.saturating_add(1).max(0));
+        self.insert_run_markup_at(paragraph, at, |prefix| {
+            bookmark_markup(&qualifier(prefix), id, name, text)
+        })?;
+        Ok(id)
+    }
+
+    /// Insert a complex field (`begin`, `instrText`, `separate`, the result
+    /// and `end` runs) into the paragraph at `paragraph`, before its direct
+    /// run `at` (after its last child for `None`), and return the position
+    /// of its begin run among the paragraph's direct runs (record 0325).
+    /// `result` is the cached result; the instruction is written as given.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an empty instruction, text a document
+    /// cannot hold, a missing paragraph or run, or a position inside a
+    /// field. The edit is unchanged on failure.
+    pub fn insert_field_at(
+        &mut self,
+        paragraph: &ElementPath,
+        at: Option<Position>,
+        instruction: &str,
+        result: Option<&str>,
+    ) -> Result<Position> {
+        self.insert_run_markup_at(paragraph, at, |prefix| {
+            field_markup(&qualifier(prefix), &[], instruction, result)
+        })
     }
 
     /// Apply `updates` planned over [`Self::fields`] of this edit. See

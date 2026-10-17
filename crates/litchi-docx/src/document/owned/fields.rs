@@ -3,7 +3,7 @@
 use litchi_core::Position;
 
 use super::super::Result;
-use super::super::transaction::fields::{Fields, Outcome, Update, bookmark_markup, field_markup};
+use super::super::transaction::fields::{Fields, Outcome, Update};
 use super::Edit;
 
 impl<P: Clone> Edit<P> {
@@ -39,11 +39,8 @@ impl<P: Clone> Edit<P> {
         self.inner.refresh_fields(fields, updates)
     }
 
-    /// Insert a bookmark into the paragraph at `paragraph`, before its
-    /// direct run `at` (after its last child for `None`): its start marker,
-    /// a plain run of `text` when given, and its end marker (record 0325).
-    /// The bookmark takes the identifier after the largest the main story
-    /// uses, which it returns.
+    /// Insert a bookmark into the paragraph at `paragraph`; see
+    /// [`super::super::snapshot::Edit::insert_bookmark_at`] (record 0325).
     ///
     /// ```
     /// use litchi_core::Position;
@@ -61,10 +58,7 @@ impl<P: Clone> Edit<P> {
     ///
     /// # Errors
     ///
-    /// Returns a typed refusal for an empty name or one longer than 40
-    /// characters, text a document cannot hold, a missing paragraph or run,
-    /// or a position inside a field, and an XML error for malformed markup.
-    /// The edit is unchanged on failure.
+    /// As [`super::super::snapshot::Edit::insert_bookmark_at`].
     pub fn insert_bookmark_at(
         &mut self,
         paragraph: &super::super::ElementPath,
@@ -72,30 +66,15 @@ impl<P: Clone> Edit<P> {
         name: &str,
         text: Option<&str>,
     ) -> Result<i64> {
-        let id = self
-            .fields()?
-            .bookmarks()
-            .iter()
-            .filter_map(super::super::fields::Bookmark::id)
-            .max()
-            .map_or(0, |id| id.saturating_add(1).max(0));
-        self.inner.insert_run_markup_at(paragraph, at, |prefix| {
-            bookmark_markup(&qualifier(prefix), id, name, text)
-        })?;
-        Ok(id)
+        self.inner.insert_bookmark_at(paragraph, at, name, text)
     }
 
-    /// Insert a complex field (`begin`, `instrText`, `separate`, the result
-    /// and `end` runs) into the paragraph at `paragraph`, before its direct
-    /// run `at` (after its last child for `None`), and return the position
-    /// of its begin run among the paragraph's direct runs (record 0325).
-    /// `result` is the cached result; the instruction is written as given.
+    /// Insert a complex field into the paragraph at `paragraph`; see
+    /// [`super::super::snapshot::Edit::insert_field_at`] (record 0325).
     ///
     /// # Errors
     ///
-    /// Returns a typed refusal for an empty instruction, text a document
-    /// cannot hold, a missing paragraph or run, or a position inside a
-    /// field. The edit is unchanged on failure.
+    /// As [`super::super::snapshot::Edit::insert_field_at`].
     pub fn insert_field_at(
         &mut self,
         paragraph: &super::super::ElementPath,
@@ -103,17 +82,7 @@ impl<P: Clone> Edit<P> {
         instruction: &str,
         result: Option<&str>,
     ) -> Result<Position> {
-        self.inner.insert_run_markup_at(paragraph, at, |prefix| {
-            field_markup(&qualifier(prefix), &[], instruction, result)
-        })
-    }
-}
-
-/// A namespace prefix as the markup builders take it: `w:`, or empty.
-fn qualifier(prefix: &[u8]) -> String {
-    if prefix.is_empty() {
-        String::new()
-    } else {
-        format!("{}:", String::from_utf8_lossy(prefix))
+        self.inner
+            .insert_field_at(paragraph, at, instruction, result)
     }
 }

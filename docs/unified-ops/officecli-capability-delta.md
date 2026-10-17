@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `c5333a58f1117b0e630f0aeda04682bf8c2026e1cd43663d25692afbf6935b6a` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6e7b3b171bcde2e86d226994d60e8b8bf47ebcf867752a8a80afbe2057213120` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `9eb31b777528bbbac652faab27251b654d1dea259cd0aa73453e320d9a7be9bb` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `7759f0cd63b8e1ffdc73e6fac6d070adccf1adaceec3bbf3a7c3e198486773b6` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
@@ -107,7 +107,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 289 | 2 | 58 | 0 | 237 | 2 | 373 | 268 |
+| docx | 289 | 2 | 58 | 0 | 237 | 2 | 373 | 269 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 559 |
@@ -133,7 +133,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 250 | 34 | 512 | 0 | 241 | 192 |
+| docx | 250 | 38 | 508 | 0 | 242 | 192 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
@@ -619,15 +619,16 @@ Property writes:
 | field | `fieldType` | enum | asg | a-g | supported | partial |  |
 | field | `name` | string | asg | a-- | write-only | partial |  |
 | field | `id` | string | asg |  | missing | gap |  |
-| field | `expression` | string | as- |  | write-only | gap |  |
-| field | `trueText` | string | as- |  | write-only | gap |  |
-| field | `falseText` | string | as- |  | write-only | gap |  |
-| field | `hyperlink` | bool | as- |  | write-only | gap |  |
+| field | `expression` | string | as- | a-- | write-only | partial |  |
+| field | `trueText` | string | as- | a-- | write-only | partial |  |
+| field | `falseText` | string | as- | a-- | write-only | partial |  |
+| field | `hyperlink` | bool | as- | a-- | write-only | partial |  |
 | field | `format` | string | asg | a-- | write-only | partial |  |
 | field | `instruction` | string | asg | asg | supported | supported |  |
 | field | `vertAlign` | enum | a-- |  | write-only | gap |  |
 | field | `fldLock` | bool | a-g | --g | supported | gap |  |
 | field | `text` | string |  | as- | litchi-only | litchi-only |  |
+| field | `bookmarkName` | string |  | a-- | litchi-only | litchi-only |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
 | footer | `type` | enum | asg | asg | supported | supported |  |
 | footer | `text` | string | asg | asg | supported | supported |  |

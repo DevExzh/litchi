@@ -358,3 +358,56 @@ fn bookmarks_fields_and_tables_of_contents_are_written() {
         assert!(text(&removed, "/body/p[1]").contains("here"));
     }
 }
+
+#[test]
+fn fields_go_into_story_paragraphs_and_take_officecli_types() {
+    // Record 0325: fields.sh's footer page numbers, REF \h and IF fields.
+    let file = litchi_ops::create(litchi_core::FileFormat::Docx)
+        .unwrap()
+        .add("/body", NewNode::new("paragraph").prop("text", "Body"))
+        .unwrap()
+        .file
+        .add("/", NewNode::new("footer").prop("text", "Page "))
+        .unwrap()
+        .file;
+    let added = file
+        .add(
+            "/footer[1]/p[1]",
+            NewNode::new("field").prop("fieldType", "page"),
+        )
+        .unwrap();
+    assert_eq!(added.path.to_string(), "/footer[1]/p[1]/r[2]");
+    let file = added
+        .file
+        .add(
+            "/body",
+            NewNode::new("field")
+                .prop("fieldType", "ref")
+                .prop("bookmarkName", "Intro")
+                .prop("hyperlink", true),
+        )
+        .unwrap()
+        .file
+        .add(
+            "/body",
+            NewNode::new("field")
+                .prop("fieldType", "if")
+                .prop("expression", "1 = 1")
+                .prop("trueText", "Yes")
+                .prop("falseText", "No"),
+        )
+        .unwrap()
+        .file;
+    for eager in [false, true] {
+        let file = reopen(&file, eager);
+        assert_eq!(text(&file, "/footer[1]"), "Page 1");
+        assert_eq!(
+            property(&file, "/field[1]", "instruction").as_deref(),
+            Some("REF Intro \\h")
+        );
+        assert_eq!(
+            property(&file, "/field[2]", "instruction").as_deref(),
+            Some("IF 1 = 1 \"Yes\" \"No\"")
+        );
+    }
+}

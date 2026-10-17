@@ -72,15 +72,11 @@ impl Docx {
         if paragraph && is_story(parent.element_kind()) {
             return self.add_story_paragraph(editor, parent, node).map(Ok);
         }
-        if parent.element_kind() == Kind::Paragraph
+        // Fields and bookmarks in a story paragraph take the mark route.
+        if run
+            && parent.element_kind() == Kind::Paragraph
             && let Some((key, path)) = story_path(parent)?
         {
-            if !run {
-                return Err(error(
-                    Code::UnsupportedCapability,
-                    "a header, footer or note paragraph takes runs",
-                ));
-            }
             return self
                 .add_story_run(editor, parent, &key, &path, node)
                 .map(Ok);

@@ -6190,7 +6190,37 @@
           "set": false,
           "get": false
         },
+        "bookmarkName": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
         "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "hyperlink": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "expression": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "trueText": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "falseText": {
           "type": "string",
           "add": true,
           "set": false,
