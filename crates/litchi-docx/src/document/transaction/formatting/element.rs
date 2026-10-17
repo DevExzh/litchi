@@ -1464,6 +1464,135 @@ impl Edit {
         Ok(true)
     }
 
+    /// Rewrite (`Some`) or remove (`None`) the picture at `ordinal` among
+    /// the paragraph's inline pictures (the order of
+    /// [`crate::Paragraph::images`], record 0335). A removed picture takes
+    /// its run with it when the run holds nothing else. Returns whether
+    /// anything changed.
+    pub(crate) fn rewrite_picture_at(
+        &mut self,
+        paragraph: &ElementPath,
+        ordinal: Position,
+        rewrite: Option<&PictureRewrite<'_>>,
+    ) -> Result<bool> {
+        self.ensure_unmanaged("rewrite_picture_at")?;
+        if paragraph.steps().last().map(|step| step.local()) != Some(b"p".as_slice()) {
+            return Err(not_found());
+        }
+        let located = locate(&self.projected, paragraph.steps())?;
+        let before = self.element_bytes(located)?;
+        let spans = crate::picture_spans::picture_spans(&before).map_err(Error::Document)?;
+        let span = spans
+            .get(ordinal.get())
+            .ok_or_else(|| refusal(Refusal::RunNotFound))?;
+        let mut edits: Vec<(std::ops::Range<usize>, Vec<u8>)> = Vec::new();
+        match rewrite {
+            None => {
+                let range = span
+                    .sole_run
+                    .clone()
+                    .unwrap_or_else(|| span.drawing.clone());
+                edits.push((range, Vec::new()));
+            },
+            Some(rewrite) => {
+                let tag = |range: &Option<std::ops::Range<usize>>,
+                           changes: &[(&str, &str)],
+                           edits: &mut Vec<(std::ops::Range<usize>, Vec<u8>)>|
+                 -> Result<()> {
+                    let Some(range) = range.clone() else {
+                        return Err(invalid("the picture drawing lacks an element to rewrite"));
+                    };
+                    let mut bytes = before[range.clone()].to_vec();
+                    for (key, value) in changes {
+                        bytes = crate::picture_spans::with_attribute(&bytes, key, value)
+                            .ok_or_else(|| invalid("the picture drawing has an unreadable tag"))?;
+                    }
+                    edits.push((range, bytes));
+                    Ok(())
+                };
+                if let Some((width, height)) = rewrite.extent {
+                    let (width, height) = (width.to_string(), height.to_string());
+                    let changes = [("cx", width.as_str()), ("cy", height.as_str())];
+                    tag(&span.extent, &changes, &mut edits)?;
+                    if span.shape_extent.is_some() {
+                        tag(&span.shape_extent, &changes, &mut edits)?;
+                    }
+                }
+                let mut properties: Vec<(&str, &str)> = Vec::new();
+                if let Some(name) = rewrite.name {
+                    properties.push(("name", name));
+                }
+                if let Some(description) = rewrite.description {
+                    properties.push(("descr", description));
+                }
+                if !properties.is_empty() {
+                    tag(&span.properties, &properties, &mut edits)?;
+                }
+                if let Some(embed) = rewrite.embed {
+                    let range = span
+                        .blip
+                        .clone()
+                        .ok_or_else(|| invalid("the picture names no image"))?;
+                    let key = crate::picture_spans::attribute_named(&before[range], "embed")
+                        .ok_or_else(|| invalid("the picture names no image"))?;
+                    tag(&span.blip, &[(key.as_str(), embed)], &mut edits)?;
+                }
+            },
+        }
+        edits.sort_by_key(|(range, _)| std::cmp::Reverse(range.start));
+        let mut after = before.as_ref().clone();
+        for (range, bytes) in edits {
+            after.splice(range, bytes);
+        }
+        if after.as_slice() == before.as_slice() {
+            return Ok(false);
+        }
+        self.replace_element(paragraph, &before, &Arc::new(after))?;
+        Ok(true)
+    }
+
+    /// Remove every SmartArt drawing of the main story whose `dgm:relIds`
+    /// names the data relationship `data_relationship_id` (record 0335),
+    /// with its run when the run holds nothing else. Returns how many were
+    /// removed.
+    pub(crate) fn remove_smartart_drawings(&mut self, data_relationship_id: &str) -> Result<usize> {
+        self.ensure_unmanaged("remove_smartart")?;
+        let mut removed = 0;
+        let families: [(usize, fn(Position) -> ElementStep); 3] = [
+            (self.projected.paragraphs.len(), ElementStep::Paragraph),
+            (self.projected.tables.len(), ElementStep::Table),
+            (
+                self.projected.block_controls.len(),
+                ElementStep::ContentControl,
+            ),
+        ];
+        for (count, step) in families {
+            for index in 0..count {
+                let path = ElementPath::new([step(Position::new(index))]);
+                let located = locate(&self.projected, path.steps())?;
+                let before = self.element_bytes(located)?;
+                let spans =
+                    crate::picture_spans::diagram_spans(&before).map_err(Error::Document)?;
+                let mut ranges: Vec<std::ops::Range<usize>> = spans
+                    .into_iter()
+                    .filter(|span| span.data_relationship_id == data_relationship_id)
+                    .map(|span| span.sole_run.unwrap_or(span.drawing))
+                    .collect();
+                if ranges.is_empty() {
+                    continue;
+                }
+                removed += ranges.len();
+                ranges.sort_by_key(|range| std::cmp::Reverse(range.start));
+                let mut after = before.as_ref().clone();
+                for range in ranges {
+                    after.drain(range);
+                }
+                self.replace_element(&path, &before, &Arc::new(after))?;
+            }
+        }
+        Ok(removed)
+    }
+
     /// The largest drawing object identifier (`wp:docPr/@id`) of the main
     /// document, if any.
     pub(crate) fn max_drawing_id(&self) -> Result<Option<u32>> {
@@ -2424,6 +2553,17 @@ const RELATIONSHIPS_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_RELATIONSHIPS_NAMESPACE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+/// The rewrite of an existing picture (record 0335): each field, when
+/// present, replaces the drawing's extent (in EMUs, also the shape's own
+/// extent), its name, its description or the relationship of its image.
+#[derive(Default)]
+pub(crate) struct PictureRewrite<'a> {
+    pub(crate) extent: Option<(i64, i64)>,
+    pub(crate) name: Option<&'a str>,
+    pub(crate) description: Option<&'a str>,
+    pub(crate) embed: Option<&'a str>,
+}
 
 /// The drawing of a new inline picture: its extent in EMUs, its drawing
 /// object identifier, and its name and description.

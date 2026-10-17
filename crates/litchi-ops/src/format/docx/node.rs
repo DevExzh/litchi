@@ -91,6 +91,11 @@ pub(super) enum Value {
     Chart(Arc<super::chart::ChartValue>),
     /// A SmartArt graphic (record 0295).
     SmartArt(Arc<super::smartart::SmartArtValue>),
+    /// A series or an axis of a chart, by its position among the chart's
+    /// series or axes (record 0335); the node's kind says which.
+    ChartChild(Arc<super::chart::ChartValue>, u32),
+    /// A content node of a SmartArt graphic (record 0335).
+    DiagramNode(Arc<super::smartart::DiagramNodeValue>),
     /// A styles, numbering, story or note element (record 0319).
     Part(super::parts::PartValue),
     /// A tab stop, break, bookmark, field, table of contents, watermark or

@@ -144,6 +144,9 @@ impl Docx {
                 super::chart::placement_run(placement)?;
                 self.add_smartart(editor, parent, node)
             },
+            (NewKind::Node, Kind::SmartArt | Kind::Node) => {
+                self.add_smartart_node(editor, parent, node)
+            },
             (NewKind::Comment, Kind::Paragraph | Kind::Run) => {
                 // A paragraph parent comments the whole paragraph; a run
                 // parent comments that direct run.
@@ -221,6 +224,21 @@ impl Docx {
     pub(super) fn remove_nested(&self, editor: DocxEditor, nodes: &[Node<'_>]) -> Result<Commit> {
         if !nodes.is_empty() && nodes.iter().all(|node| node.element_kind() == Kind::Chart) {
             return self.remove_charts(editor, nodes);
+        }
+        // Pictures, SmartArt graphics and their nodes (record 0335).
+        if !nodes.is_empty()
+            && nodes
+                .iter()
+                .all(|node| node.element_kind() == Kind::Picture)
+        {
+            return self.remove_pictures(editor, nodes);
+        }
+        if !nodes.is_empty()
+            && nodes
+                .iter()
+                .all(|node| matches!(node.element_kind(), Kind::SmartArt | Kind::Node))
+        {
+            return self.remove_smartarts(editor, nodes);
         }
         // Styles, numbering, headers, footers and notes (record 0319).
         if !nodes.is_empty()
@@ -363,7 +381,7 @@ fn container_path(node: &Node<'_>) -> Result<ElementPath> {
 }
 
 /// The parent node of `node`, resolved from its canonical path.
-fn parent_node<'f>(docx: &'f Docx, node: &Node<'_>) -> Result<Node<'f>> {
+pub(super) fn parent_node<'f>(docx: &'f Docx, node: &Node<'_>) -> Result<Node<'f>> {
     let path = path_with(node, None);
     let steps = path.steps();
     let parent = Path::from_steps(steps[..steps.len().saturating_sub(1)].to_vec());
@@ -800,6 +818,7 @@ fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
     let mut date = None::<String>;
     let mut text = String::new();
     for (key, value) in props.iter() {
+        refuse_reply(key.as_str())?;
         let (_, entry) = super::spec::COMMENT_REGISTRY
             .resolve(key.as_str())
             .map_err(|error| error.with_property(key.as_str().to_owned()))?;
@@ -847,6 +866,103 @@ fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
         comment = comment.with_date(date);
     }
     Ok(comment)
+}
+
+/// Comment replies and resolution (OfficeCLI's `parentId` and `done`)
+/// live in the modern-comment parts, which Litchi does not author yet: a
+/// call naming them is refused rather than silently writing a plain
+/// comment (record 0335).
+fn refuse_reply(key: &str) -> Result<()> {
+    let names = ["parentId", "done", "resolved"];
+    match names.iter().find(|name| name.eq_ignore_ascii_case(key)) {
+        Some(name) => Err(Error::new(
+            Code::UnsupportedCapability,
+            "comment replies and resolution are not authored yet",
+        )
+        .with_property(*name)
+        .with_format(FileFormat::Docx)
+        .with_suggestion("add the reply as its own comment, or edit it in Word")),
+        None => Ok(()),
+    }
+}
+
+impl Docx {
+    /// A `set` whose targets are comments (record 0335): `author`,
+    /// `initials`, `date` and `text`. `Err` hands the editor back for other
+    /// targets.
+    pub(super) fn try_set_comment(
+        &self,
+        editor: DocxEditor,
+        nodes: &[Node<'_>],
+        props: &Props<'_>,
+    ) -> Result<std::result::Result<Commit, DocxEditor>> {
+        use super::setters::Setter;
+        use litchi_docx::document::CommentChange;
+        if nodes.is_empty()
+            || nodes
+                .iter()
+                .any(|node| node.element_kind() != Kind::Comment)
+        {
+            return Ok(Err(editor));
+        }
+        let mut change = CommentChange::new();
+        for (key, value) in props.iter() {
+            refuse_reply(key.as_str())?;
+            let (_, entry) = super::spec::COMMENT_REGISTRY
+                .resolve(key.as_str())
+                .map_err(|error| error.with_property(key.as_str().to_owned()))?;
+            entry
+                .prepare(Operation::Set, value, |setter, value| {
+                    let value = match value {
+                        Some(
+                            crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text),
+                        ) => text.to_owned(),
+                        Some(scalar) => scalar.to_string(),
+                        None => String::new(),
+                    };
+                    let current = std::mem::take(&mut change);
+                    change = match setter {
+                        Setter::CommentAuthor => current.with_author(value),
+                        Setter::CommentInitials => current.with_initials(value),
+                        Setter::CommentDate => current.with_date(value),
+                        Setter::CommentText => current.with_text(value),
+                        _ => {
+                            return Err(Error::new(
+                                Code::UnsupportedProperty,
+                                "the property does not set a DOCX comment",
+                            ));
+                        },
+                    };
+                    Ok(())
+                })
+                .map_err(|error| {
+                    error
+                        .with_property(key.as_str().to_owned())
+                        .with_format(FileFormat::Docx)
+                })?;
+        }
+        let mut ids = Vec::with_capacity(nodes.len());
+        for node in nodes {
+            let Value::Comment(comment) = &node.value else {
+                return Err(refusal("the comment node holds no comment"));
+            };
+            ids.push(comment.id());
+        }
+        ids.sort_unstable();
+        ids.dedup();
+        self.owner().check_source()?;
+        if change.is_empty() {
+            return WorkEdit::from(editor)?.commit(self).map(Ok);
+        }
+        let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
+        let WorkEdit::Eager(eager) = &mut edit else {
+            return Err(refusal("comments need the owning package editor"));
+        };
+        for id in ids {
+            eager.set_comment(id, &change).map_err(Error::from)?;
+        }
+        edit.commit(self).map(Ok)
+    }
 }
 
 /// A new row's cell count from its add properties.

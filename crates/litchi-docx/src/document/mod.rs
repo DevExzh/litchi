@@ -75,8 +75,8 @@ pub mod fields {
 
 pub use limit::LimitKind;
 pub use owned::{
-    Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewNote, NewPicture, NewSmartArt,
-    NewStory, NoteKind, StoryTarget, chart_workbook,
+    CommentChange, Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewNote, NewPicture,
+    NewSmartArt, NewStory, NoteKind, PictureChange, SmartArtParts, StoryTarget, chart_workbook,
 };
 
 pub(crate) use owned::story_parts_of;

@@ -97,7 +97,8 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | unverified: skipped properties beyond the outcome's 48-character detail bound | 83 | `excel/charts/charts-area.sh:209`, `excel/charts/charts-area.sh:254`, `excel/charts/charts-area.sh:288` |
 | planned WP5 | 57 | `excel/cell-formatting.sh:199`, `excel/charts.sh:213`, `excel/charts.sh:214` |
 | planned WP16 | 38 | `excel/cell-formatting.sh:124`, `excel/cell-formatting.sh:126`, `excel/cell-formatting.sh:128` |
-| planned WP4 | 15 | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154`, `word/pictures.sh:81` |
+| planned WP4 | 9 | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154`, `word/tables.sh:189` |
+| planned 0335 | 6 | `word/pictures.sh:81`, `word/pictures.sh:106`, `word/pictures.sh:121` |
 
 ## Deltas
 
@@ -156,8 +157,8 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | diagram | `unsupported_element` | - | 3 | element not in the registry | `word/diagram.sh:57`, `word/diagram.sh:78` | P2 | out-of-scope (mermaid-diagram) via delta `diagram` |
 | add | paragraph | `warned` | `em` | 3 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:135`, `word/run-formatting.sh:136` | P1 | deferred-P1 0332 (corpus-docx-breadth) |
 | add | paragraph | `warned` | `shading.fill` | 3 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:55`, `word/paragraph-formatting.sh:56` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.shading.fill` |
-| add | picture | `warned` | `anchor` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` | P1 | planned WP4 (docx-p0-residue) via delta `picture.anchor` |
-| add | picture | `warned` | `wrap` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` | P1 | planned WP4 (docx-p0-residue) via delta `picture.wrap` |
+| add | picture | `warned` | `anchor` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.anchor` |
+| add | picture | `warned` | `wrap` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.wrap` |
 | add | section | `unsupported_element` | - | 3 | registry: no add on section | `word/sections.sh:60`, `word/sections.sh:87` | P1 | deferred-P1 0332 (corpus-docx-breadth) |
 | add | chart | `warned` | `axisNumFmt` | 2 | not in the registry; OfficeCLI documents it | `word/charts.sh:50`, `word/charts.sh:215` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.axisnumfmt` |
 | add | paragraph | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:108`, `word/paragraph-formatting.sh:117` |  | unverified (detail bound) |
@@ -168,8 +169,8 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | paragraph | `warned` | `revision.date` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:115`, `word/revisions.sh:244` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | paragraph | `warned` | `textAlignment` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:133`, `word/paragraph-formatting.sh:134` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.textAlignment` |
 | add | picture | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `word/pictures.sh:106`, `word/pictures.sh:135` |  | unverified (detail bound) |
-| add | picture | `warned` | `hAlign` | 2 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` | P1 | planned WP4 (docx-p0-residue) via delta `picture.hAlign` |
-| add | picture | `warned` | `hRelative` | 2 | not in the registry; OfficeCLI documents it | `word/pictures.sh:121`, `word/pictures.sh:135` | P1 | planned WP4 (docx-p0-residue) via delta `picture.hRelative` |
+| add | picture | `warned` | `hAlign` | 2 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.hAlign` |
+| add | picture | `warned` | `hRelative` | 2 | not in the registry; OfficeCLI documents it | `word/pictures.sh:121`, `word/pictures.sh:135` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.hRelative` |
 | add | run | `warned` | `bdr` | 2 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:125`, `word/run-formatting.sh:126` | P1 | deferred-P1 0332 (docx-breadth) via delta `run.bdr` |
 | set | revision | `unsupported_capability` | - | 2 | registry gap R4x | `word/revisions.sh:398`, `word/revisions.sh:431` | P2 | deferred-P2 0332 (docx-breadth) via delta `revision` |
 | set | row | `unsupported_element` | - | 2 | registry: no set on row | `word/revisions.sh:183`, `word/tables.sh:197` | P0 | planned WP4 (docx-structure-writes) |
@@ -229,14 +230,14 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | paragraph | `warned` | `w14shadow` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:115` | P1 | deferred-P1 0332 (corpus-docx-breadth) |
 | add | paragraph | `warned` | `webHidden` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:139` | P1 | deferred-P1 0332 (corpus-docx-breadth) |
 | add | paragraph | `warned` | `wordWrap` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:80` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.wordWrap` |
-| add | picture | `warned` | `behindText` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106` | P1 | planned WP4 (docx-p0-residue) via delta `picture.behindText` |
-| add | picture | `warned` | `crop` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:81` | P1 | planned WP4 (docx-p0-residue) via delta `picture.crop` |
-| add | picture | `warned` | `decorative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:165` | P1 | planned WP4 (docx-p0-residue) via delta `picture.decorative` |
-| add | picture | `warned` | `hPosition` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:135` | P1 | planned WP4 (docx-p0-residue) via delta `picture.hPosition` |
-| add | picture | `warned` | `link` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:151` | P1 | planned WP4 (docx-p0-residue) via delta `picture.link` |
-| add | picture | `warned` | `vAlign` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106` | P1 | planned WP4 (docx-p0-residue) via delta `picture.vAlign` |
-| add | picture | `warned` | `vPosition` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:135` | P1 | planned WP4 (docx-p0-residue) via delta `picture.vPosition` |
-| add | picture | `warned` | `vRelative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:121` | P1 | planned WP4 (docx-p0-residue) via delta `picture.vRelative` |
+| add | picture | `warned` | `behindText` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.behindText` |
+| add | picture | `warned` | `crop` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:81` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.crop` |
+| add | picture | `warned` | `decorative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:165` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.decorative` |
+| add | picture | `warned` | `hPosition` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:135` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.hPosition` |
+| add | picture | `warned` | `link` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:151` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.link` |
+| add | picture | `warned` | `vAlign` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.vAlign` |
+| add | picture | `warned` | `vPosition` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:135` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.vPosition` |
+| add | picture | `warned` | `vRelative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:121` | P1 | planned 0335 (docx-picture-comment-follow-ups) via delta `picture.vRelative` |
 | add | row | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:207` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | row | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:207` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | run | `warned` | `snapToGrid` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:144` | P1 | deferred-P1 0332 (docx-breadth) via delta `run.snapToGrid` |
