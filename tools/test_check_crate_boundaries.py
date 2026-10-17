@@ -10075,21 +10075,20 @@ class BoundaryPolicyTests(unittest.TestCase):
             facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
             facade.parent.mkdir(parents=True)
             original = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
-            self.assertIn("litchi_pages::Package::open(path)", original)
+            # Record 0334 removed the facade's own reader; the namespace now
+            # holds types only, and `litchi::open` is the Pages ingress.
+            self.assertNotIn("litchi_pages::Package::open(path)", original)
+            self.assertIn("pub mod semantic", original)
             facade.write_text(original, encoding="utf-8")
             self.assertEqual(
                 boundaries.audit_litchi_semantic_facade_source_topology(root), []
             )
 
-            # A package return type or a retired W1 ingress name is rejected
-            # even though the delegating reader call is accepted.
+            # A package type or a retired W1 ingress name in the semantic
+            # re-exports is rejected.
             source = original.replace(
-                "pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {",
-                "pub fn from_bytes(bytes: &[u8]) -> ReadResult<litchi_pages::Package> {",
-                1,
-            ).replace(
                 "Error, LimitKind, OpenOptions, PackageError",
-                "Error, LimitKind, OpenOptions, PackageError, ReadError, PackageResult",
+                "Error, LimitKind, OpenOptions, Package, PackageError, ReadError, PackageResult",
                 1,
             )
             self.assertNotEqual(source, original)

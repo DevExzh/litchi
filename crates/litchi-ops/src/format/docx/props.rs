@@ -55,7 +55,8 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         Value::SmartArt(smartart) => Some(Cow::Owned(super::smartart::smartart_text(smartart))),
         Value::Part(value) => super::parts::text(node.docx, *value)?.map(Cow::Owned),
         Value::Mark(mark) => super::marks::text(mark).map(Cow::Owned),
-        Value::Picture(_) | Value::Chart(_) => None,
+        Value::DiagramNode(node) => super::smartart::node_text(node).map(Cow::Owned),
+        Value::Picture(_) | Value::Chart(_) | Value::ChartChild(..) => None,
         Value::Document
         | Value::Body(_)
         | Value::Table(_)
@@ -156,14 +157,17 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         },
         Value::Row(row) => row.cell_count()?,
         Value::Paragraph { paragraph, .. } => paragraph.addressable_runs()?.len(),
+        Value::Chart(chart) => super::chart::child_count(node.docx, chart)?,
+        Value::SmartArt(_) | Value::DiagramNode(_) => {
+            super::smartart::node_count(node.docx, &node.value)?
+        },
         Value::Run(_)
         | Value::Hyperlink(_)
         | Value::Equation(_)
         | Value::Section(_)
         | Value::Comment(_)
         | Value::Picture(_)
-        | Value::Chart(_)
-        | Value::SmartArt(_) => 0,
+        | Value::ChartChild(..) => 0,
     };
     Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
 }
@@ -245,6 +249,10 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         Value::Picture(picture) => Props::Picture(Arc::clone(picture)),
         Value::Chart(chart) => Props::Chart(node.docx, Arc::clone(chart)),
         Value::SmartArt(smartart) => Props::SmartArt(Arc::clone(smartart)),
+        Value::ChartChild(chart, child) => {
+            Props::ChartChild(node.docx, Arc::clone(chart), node.kind, *child)
+        },
+        Value::DiagramNode(value) => Props::DiagramNode(Arc::clone(value)),
         Value::Part(value) => Props::Part(super::parts::props(node.docx, *value)?),
         Value::Mark(mark) => Props::Mark(Arc::clone(mark)),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
@@ -287,7 +295,13 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         );
     }
     let table = node.kind.spec().props;
-    Ok(Format::new(table, Source::Docx(props)).without(node.kind.spec().identities))
+    // An axis's `role` is semantic: it selects and is shown (record 0335).
+    let hidden = if node.kind == Kind::Axis {
+        &[]
+    } else {
+        node.kind.spec().identities
+    };
+    Ok(Format::new(table, Source::Docx(props)).without(hidden))
 }
 
 /// Refuse malformed typed direct properties instead of reporting them as absent.
@@ -357,6 +371,10 @@ pub(crate) enum Props<'a> {
     Chart(&'a super::Docx, Arc<super::chart::ChartValue>),
     /// A SmartArt graphic (record 0295).
     SmartArt(Arc<super::smartart::SmartArtValue>),
+    /// A chart's series or axis (record 0335).
+    ChartChild(&'a super::Docx, Arc<super::chart::ChartValue>, Kind, u32),
+    /// A graphic's content node (record 0335).
+    DiagramNode(Arc<super::smartart::DiagramNodeValue>),
     /// A styles, numbering, story or note element (record 0319).
     Part(super::parts::PartProps<'a>),
     /// A tab stop, break, bookmark, field, table of contents, watermark or
@@ -387,6 +405,13 @@ impl<'a> Props<'a> {
             Self::Picture(picture) => picture_value(picture, index),
             Self::Chart(docx, chart) => super::chart::chart_value(docx, chart, index),
             Self::SmartArt(smartart) => super::smartart::smartart_value(smartart, index),
+            Self::ChartChild(docx, chart, Kind::Series, child) => {
+                super::chart::series_value(docx, chart, *child, index)
+            },
+            Self::ChartChild(docx, chart, _, child) => {
+                super::chart::axis_value(docx, chart, *child, index)
+            },
+            Self::DiagramNode(node) => super::smartart::node_value(node, index),
             Self::Part(part) => part.get(index),
             Self::Mark(mark) => super::marks::value(mark, index),
         }
@@ -410,6 +435,8 @@ impl std::fmt::Debug for Props<'_> {
             Self::Picture(_) => "Props::Picture",
             Self::Chart(..) => "Props::Chart",
             Self::SmartArt(_) => "Props::SmartArt",
+            Self::ChartChild(..) => "Props::ChartChild",
+            Self::DiagramNode(_) => "Props::DiagramNode",
             Self::Part(_) => "Props::Part",
             Self::Mark(_) => "Props::Mark",
         })

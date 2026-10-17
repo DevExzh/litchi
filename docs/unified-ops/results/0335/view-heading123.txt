@@ -1,0 +1,36 @@
+== heading123 B
+source_paragraph_format	3434
+source_query_paragraphs_format	46421
+source_view_text	21087
+source_root_children	77129
+eager_paragraph_format	3002
+eager_query_paragraphs_format	49467
+eager_view_text	20569
+eager_root_children	76955
+== heading123 A
+source_paragraph_format	3419
+source_query_paragraphs_format	46406
+source_view_text	21590
+source_root_children	460
+eager_paragraph_format	3025
+eager_query_paragraphs_format	46196
+eager_view_text	20650
+eager_root_children	255
+== heading123 A
+source_paragraph_format	3392
+source_query_paragraphs_format	47053
+source_view_text	21428
+source_root_children	458
+eager_paragraph_format	3062
+eager_query_paragraphs_format	47352
+eager_view_text	20820
+eager_root_children	252
+== heading123 B
+source_paragraph_format	3454
+source_query_paragraphs_format	46500
+source_view_text	21290
+source_root_children	77094
+eager_paragraph_format	2993
+eager_query_paragraphs_format	46626
+eager_view_text	20917
+eager_root_children	76685

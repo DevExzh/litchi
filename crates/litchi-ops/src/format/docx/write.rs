@@ -233,6 +233,20 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
+        // Pictures, comments, SmartArt graphics and their nodes (record
+        // 0335).
+        let editor = match self.try_set_picture(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
+        let editor = match self.try_set_comment(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
+        let editor = match self.try_set_smartart(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
         // Styles, numbering, headers, footers and notes (record 0319).
         let editor = match self.try_set_parts(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),

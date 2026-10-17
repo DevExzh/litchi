@@ -25,8 +25,8 @@ row has no disposition.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `9c9015925758c2332b68a118d51bfb7a9f153d475af94fb233b723f78ed821f7` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `1b5404fded785036e25222c15438482644b478e39f9e6ba653e2c67e0498c39e` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `dbae971f8735d0dead114eece2c3da25d7cefbc727eba52ec2292e6fcfae8190` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `ee70421edb33f37a4bde7e46ee5434d666cf6ff3419ac17b53ac559455e87d30` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
@@ -86,7 +86,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | unlisted | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 31 | 4 | 0 | 0 | 0 | 9 | 2 | 6 |
+| docx | 33 | 4 | 0 | 0 | 0 | 7 | 2 | 7 |
 | doc | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
 | rtf | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
 | xlsx | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
@@ -112,7 +112,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | unlisted | litchi-only |
 |---|---|---|---|---|---|---|---|---|---|
-| docx | 289 | 2 | 58 | 0 | 237 | 2 | 0 | 373 | 269 |
+| docx | 296 | 4 | 58 | 0 | 237 | 2 | 0 | 364 | 270 |
 | doc | 157 | 0 | 59 | 0 | 237 | 1 | 0 | 507 | 59 |
 | rtf | 109 | 0 | 59 | 0 | 241 | 1 | 0 | 551 | 36 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 0 | 145 | 559 |
@@ -138,7 +138,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 249 | 39 | 508 | 0 | 242 | 192 |
+| docx | 260 | 34 | 502 | 0 | 242 | 193 |
 | doc | 10 | 29 | 757 | 0 | 27 | 197 |
 | rtf | 15 | 35 | 746 | 0 | 23 | 178 |
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
@@ -179,7 +179,7 @@ Element gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 4 | 5 | 2 | 0 | 4 | 0 |
+| docx | 2 | 5 | 2 | 0 | 4 | 0 |
 | doc | 1 | 11 | 1 | 0 | 4 | 0 |
 | rtf | 1 | 11 | 1 | 0 | 4 | 0 |
 | xlsx | 2 | 2 | 4 | 0 | 0 | 0 |
@@ -205,7 +205,7 @@ Property gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 96 | 533 | 35 | 0 | 19 | 0 |
+| docx | 85 | 533 | 35 | 0 | 19 | 0 |
 | doc | 0 | 882 | 35 | 0 | 19 | 0 |
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
 | xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
@@ -231,9 +231,8 @@ All gap rows by tier:
 
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| P0 | 89 | 0 | 0 | 0 | 4 | 0 |
-| v1 | 39 | 0 | 0 | 0 | 0 | 0 |
-| P1 | 453 | 6044 | 0 | 0 | 44 | 0 |
+| P0 | 81 | 0 | 0 | 0 | 4 | 0 |
+| P1 | 487 | 6044 | 0 | 0 | 44 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -258,7 +257,8 @@ properties share its entry unless an entry names the property):
 | raw-layer | planned | WP5 | 11 | `delta:*:raw` | the raw XML layer (`raw`, `raw-set`, `add-part`, `validate`): design §12, audit WP5 |
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
-| docx-p0-residue | planned | WP4 | 82 | `delta:docx:chart-axis`, `delta:docx:chart-series`, `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:comment.*`, `delta:docx:hyperlink.*`, `delta:docx:picture.*`, `delta:docx:table.style` | DOCX P0/v1 residue: chart series and axes, table columns, table and row writes, comment set, picture set/remove, style and list application |
+| docx-p0-residue | planned | WP4 | 8 | `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:hyperlink.*`, `delta:docx:table.style` | DOCX P0/v1 residue: table columns, table and row writes, style and list application (chart series and axes, comment set and picture set/remove closed in record 0335) |
+| docx-picture-comment-follow-ups | planned | 0335 | 61 | `delta:docx:comment.*`, `delta:docx:picture.*`, `delta:docx:chart-series.*`, `delta:docx:chart-axis.*` | record 0335 follow-ups: floating pictures (anchor, wrap, positions), crop and effects, click links and part facts; comment replies and resolution (commentsExtended) and anchor controls; series formatting and axis formatting keys beyond name/values/color and title/min/max |
 | pptx-p0-residue | planned | WP3 | 44 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:paragraph.text`, `delta:pptx:run.text`, `delta:pptx:picture.*`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text`, `delta:pptx:table.style` | PPTX P0/v1 residue: paragraph/run add and remove, comment remove, picture set, slide text and layout writes |
 | xlsx-p0-residue | planned | WP16 | 13 | `delta:xlsx:run`, `delta:xlsx:cell.value`, `delta:xlsx:cell.formula`, `delta:xlsx:cell.type`, `delta:xlsx:picture.src` | XLSX P0/v1 residue (WP16, proposed in record 0332): rich-text runs, `add` of a cell, the cell type, picture source replacement |
 | mermaid-diagram | out-of-scope |  | 83 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
@@ -277,8 +277,8 @@ properties share its entry unless an entry names the property):
 | body | body | supported |  |  |  |
 | bookmark | bookmark | supported |  |  |  |
 | bookmarkEnd |  | unlisted | P1 | deferred-P1 0332 (docx-breadth) |  |
-| chart-axis |  | unlisted | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series |  | unlisted | v1 | planned WP4 (docx-p0-residue) |  |
+| chart-axis | axis | supported |  |  |  |
+| chart-series | series | supported |  |  |  |
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
@@ -325,8 +325,9 @@ properties share its entry unless an entry names the property):
 |  | settings | litchi-only |  |  | L-DOCX-R6 (R4x) |
 |  | theme | litchi-only |  |  | L-DOCX-R6 (R4x) |
 |  | smartart | litchi-only |  |  |  |
+|  | node | litchi-only |  |  |  |
 
-Properties: 1230 rows, 683 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
+Properties: 1231 rows, 672 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
 
 ### Contextual operation gaps
 

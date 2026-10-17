@@ -1,0 +1,36 @@
+== strict B
+source_paragraph_format	13555
+source_query_paragraphs_format	31379
+source_view_text	10522
+source_root_children	286301
+eager_paragraph_format	13048
+eager_query_paragraphs_format	30930
+eager_view_text	9937
+eager_root_children	288508
+== strict A
+source_paragraph_format	13456
+source_query_paragraphs_format	31194
+source_view_text	10867
+source_root_children	587
+eager_paragraph_format	13068
+eager_query_paragraphs_format	30975
+eager_view_text	10110
+eager_root_children	375
+== strict A
+source_paragraph_format	13578
+source_query_paragraphs_format	31673
+source_view_text	10816
+source_root_children	588
+eager_paragraph_format	13153
+eager_query_paragraphs_format	31114
+eager_view_text	10263
+eager_root_children	375
+== strict B
+source_paragraph_format	13280
+source_query_paragraphs_format	31295
+source_view_text	10527
+source_root_children	286858
+eager_paragraph_format	13334
+eager_query_paragraphs_format	31505
+eager_view_text	10012
+eager_root_children	287422
