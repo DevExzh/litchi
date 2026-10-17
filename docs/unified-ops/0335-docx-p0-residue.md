@@ -234,4 +234,4 @@ Every command exited 0.
 - `crates/pyo3-litchi/tests/run_tests.sh` (285 tests).
 - `cd tools/perf-baseline && cargo check --locked --all-targets`.
 - Goldens: `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test capabilities --test registry` and the same with every litchi-ops feature but `encryption`; after the trunk merge both sets pass unblessed. `python3 tools/officecli_capability_delta.py --officecli <OfficeCLI>` and `--check`; `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test officecli_corpus`, `python3 tools/officecli_corpus.py` and `--check`; the CRUD checklist and the fidelity report pass unblessed on the merged tree.
-- Target directory 9 GB after the gates.
+- Target directory 17 GB after the gates, test executables and docs pruned.
