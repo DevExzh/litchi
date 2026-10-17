@@ -289,7 +289,8 @@ fn formulas(package: &Package, sheet: usize, table: usize) -> Vec<(u32, u32, Str
 }
 
 /// Record 0318: row and column edits move the formulas' references with
-/// their targets, and refuse removing a row a surviving formula reads.
+/// their targets; record 0329: removing a row a surviving formula reads
+/// turns the reference into `#REF!`.
 #[test]
 fn formula_references_follow_row_and_column_edits() -> TestResult {
     let base = Package::new();
@@ -339,16 +340,61 @@ fn formula_references_follow_row_and_column_edits() -> TestResult {
         .remove_row(RowDeletion::body(1))?
         .commit()?;
     assert_eq!(formulas(removed.package(), 0, 0), formulas(&package, 0, 0));
-    // Row 3 is read by every formula.
-    assert!(matches!(
-        package
-            .edit_table_topology(0, 0)?
-            .remove_row(RowDeletion::body(1))?
-            .commit(),
-        Err(Error::Unsupported {
-            reason: Unsupported::DeletedReference
-        })
-    ));
+    // Row 3 is read by every formula (record 0329): its references read
+    // `#REF!`, the range shrinks, and the inverse restores the source.
+    let removed = package
+        .edit_table_topology(0, 0)?
+        .remove_row(RowDeletion::body(1))?
+        .commit()?;
+    assert_eq!(
+        formulas(removed.package(), 0, 0),
+        [
+            (1, 4, "=(B2+#REF!)".to_owned()),
+            (2, 4, "=(#REF!*#REF!)".to_owned()),
+        ]
+    );
+    let restored = removed
+        .package()
+        .apply_table_topology(&removed.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
+    Ok(())
+}
+
+/// Record 0329: one formula-list entry shared by cells whose formulas
+/// diverge after the edit is split; the inverse restores the source.
+#[test]
+fn shared_formulas_split_when_their_cells_diverge() -> TestResult {
+    let base = Package::new();
+    let mut edit = base.edit_table_cells(0, 0)?;
+    for (address, value) in [("B2", 1.0), ("B3", 2.0), ("B4", 3.0)] {
+        edit = edit.set_a1(address, Input::number(value)?)?;
+    }
+    // The writer interns the two relative formulas into one entry.
+    for (address, text) in [("E7", "B2"), ("E8", "B3")] {
+        edit = edit.set_formula_a1(address, Expression::parse(text)?)?;
+    }
+    let package = edit.commit()?.into_package();
+    let source = bytes(&package)?;
+    // A body row between rows 2 and 3: E7's target stays, E8's moves.
+    let commit = package
+        .edit_table_topology(0, 0)?
+        .insert_row(RowInsertion::body(1))?
+        .commit()?;
+    assert_eq!(
+        formulas(commit.package(), 0, 0),
+        [(7, 4, "=B2".to_owned()), (8, 4, "=B4".to_owned())]
+    );
+    let restored = commit
+        .package()
+        .apply_table_topology(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
+    // The split entries edit on.
+    let again = commit
+        .package()
+        .edit_table_topology(0, 0)?
+        .remove_row(RowDeletion::body(1))?
+        .commit()?;
+    assert_eq!(formulas(again.package(), 0, 0), formulas(&package, 0, 0));
     Ok(())
 }
 

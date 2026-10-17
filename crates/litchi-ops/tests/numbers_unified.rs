@@ -261,6 +261,17 @@ fn cell_comments_are_read_set_added_and_removed() {
         .remove(&format!("{commented}/comment"))
         .expect("remove the comment");
     assert_eq!(prop(&reopen(&removed), &commented, "comment"), None);
+    // Record 0329: an empty cell in a row its tile does not store takes a
+    // comment too.
+    let basic = read("basic.numbers");
+    let last = "/sheet[1]/table[1]/G22";
+    let commented_empty = basic
+        .set(last, props! { "comment" => "on an empty cell" })
+        .expect("comment an empty cell");
+    assert_eq!(
+        prop(&reopen(&commented_empty), last, "comment").as_deref(),
+        Some("on an empty cell")
+    );
 
     for file in [
         read("basic.numbers"),
@@ -795,10 +806,15 @@ fn rows_and_columns_move_formula_references() {
         .expect("append a row");
     let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
-    let error = file
+    // Record 0329: removing row 3, which the formula reads, shrinks its
+    // range and turns the reference to C3 into #REF!.
+    let removed = file
         .remove("/sheet[1]/table[1]/row[3]")
-        .expect_err("row 3 is read");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+        .expect("remove a read row");
+    assert_eq!(
+        prop(&reopen(&removed), "/sheet[1]/table[1]/D2", "formula").as_deref(),
+        Some("=(SUM($B$2:B2)+#REF!)")
+    );
 }
 
 #[test]

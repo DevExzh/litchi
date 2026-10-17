@@ -361,6 +361,96 @@ pub(crate) fn cell_scalar(key: &str, value: &PropValue<'_>) -> Result<CellScalar
         .map_err(|error| error.with_property("value"))
 }
 
+/// The size, name and seeded text of a new Keynote or Pages table (record
+/// 0329), from the OfficeCLI table keys: `rows`, `cols` (or `columns`),
+/// `name`, and `data` (rows separated by `;`, cells by `,`). A missing size
+/// is taken from `data`.
+#[cfg(any(feature = "keynote", feature = "pages"))]
+#[derive(Debug, Default)]
+pub(crate) struct TableRequest {
+    rows: Option<u32>,
+    columns: Option<u32>,
+    pub(crate) name: Option<String>,
+    data: Vec<Vec<String>>,
+}
+
+#[cfg(any(feature = "keynote", feature = "pages"))]
+impl TableRequest {
+    /// Fold one key into the request; `false` for keys it does not own.
+    pub(crate) fn key(&mut self, key: &str, value: &PropValue<'_>) -> Result<bool> {
+        let size = |key: &'static str| -> Result<u32> {
+            value
+                .with_coerced(ValueType::Int, |scalar| {
+                    Ok(scalar.and_then(|scalar| match scalar {
+                        Scalar::Int(number) => u32::try_from(number).ok(),
+                        _ => None,
+                    }))
+                })
+                .map_err(|error| error.with_property(key))?
+                .filter(|count| *count >= 1)
+                .ok_or_else(|| {
+                    refusal(Code::OutOfRange, "table dimensions are positive")
+                        .with_property(key.to_owned())
+                })
+        };
+        match key {
+            "rows" => self.rows = Some(size("rows")?),
+            "cols" | "columns" => self.columns = Some(size("cols")?),
+            "name" => self.name = text(value, "name")?,
+            "data" => {
+                self.data = text(value, "data")?
+                    .unwrap_or_default()
+                    .split(';')
+                    .map(|row| row.split(',').map(str::to_owned).collect())
+                    .collect();
+            },
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
+    /// The rows, columns and non-empty seeded cells (zero-based).
+    pub(crate) fn shape(&self) -> Result<(u32, u32, Vec<(u32, u32, String)>)> {
+        let missing = |key: &'static str| {
+            refusal(
+                Code::MissingProperty,
+                "a new table needs `rows` and `cols`, or `data`",
+            )
+            .with_property(key.to_owned())
+        };
+        let data_rows = u32::try_from(self.data.len()).ok().filter(|rows| *rows > 0);
+        let data_columns = self
+            .data
+            .iter()
+            .map(Vec::len)
+            .max()
+            .and_then(|columns| u32::try_from(columns).ok())
+            .filter(|columns| *columns > 0);
+        let rows = self.rows.or(data_rows).ok_or_else(|| missing("rows"))?;
+        let columns = self
+            .columns
+            .or(data_columns)
+            .ok_or_else(|| missing("cols"))?;
+        let mut cells = Vec::new();
+        for (row, values) in self.data.iter().enumerate() {
+            for (column, value) in values.iter().enumerate() {
+                if value.is_empty() {
+                    continue;
+                }
+                let (Ok(row), Ok(column)) = (u32::try_from(row), u32::try_from(column)) else {
+                    return Err(refusal(Code::OutOfRange, "table data is outside the table"));
+                };
+                if row >= rows || column >= columns {
+                    return Err(refusal(Code::OutOfRange, "table data is outside the table")
+                        .with_property("data".to_owned()));
+                }
+                cells.push((row, column, value.clone()));
+            }
+        }
+        Ok((rows, columns, cells))
+    }
+}
+
 /// The value of `key` coerced to a boolean; `null` is refused.
 #[cfg(any(feature = "keynote", feature = "numbers", feature = "pages"))]
 pub(crate) fn boolean(value: &PropValue<'_>, key: &'static str) -> Result<bool> {

@@ -22,6 +22,11 @@
 //!   first cell of `body-table-catalog-native.pages`; leaf
 //!   `edit_body_table_values`; unified `set` of `text`). Their outputs are
 //!   compared byte for byte before timing.
+//! - record 0329: `table_add`, a 3 x 3 table at the end of
+//!   `body-table-catalog-native.pages` (leaf: `edit_section_paragraphs`
+//!   inserting an empty last paragraph, then `insert_body_table` at its
+//!   start; unified `File::add("/body", tbl)` with `rows` and `cols`);
+//!   outputs compared byte for byte before timing.
 //!
 //! Inputs (opened packages and files) are prepared outside the timed
 //! region; the unified legs include building the object tree on their first
@@ -323,6 +328,67 @@ fn main() {
                 n,
                 || litchi_ops::open_bytes(tables_ref.clone()).unwrap(),
                 |file| drop(black_box(unified_cell(&file))),
+            )
+        }),
+    });
+    // Record 0329: a new table in a new last paragraph.
+    let table_anchor = {
+        let package = Package::from_bytes(tables_ref).unwrap();
+        let sections = package.sections().len();
+        let total: usize = (0..sections)
+            .map(|index| package.section_text(index).unwrap().encode_utf16().count())
+            .sum::<usize>()
+            + sections
+            - 1;
+        let lines = package
+            .section_text(sections - 1)
+            .unwrap()
+            .split('\n')
+            .count();
+        (sections - 1, lines, total + 1)
+    };
+    let leaf_table = move |package: &Package| {
+        let (section, line, anchor) = table_anchor;
+        let mut edit = package.edit_section_paragraphs(section).unwrap();
+        edit.insert(Position::new(line), "").unwrap();
+        let with_paragraph = edit.commit().unwrap().into_package();
+        with_paragraph
+            .insert_body_table(
+                Position::new(anchor),
+                litchi_pages::table::creation::NewTable::new(3, 3),
+            )
+            .unwrap()
+            .into_package()
+    };
+    let unified_table = |file: &litchi_ops::File| {
+        file.add("/body", NewNode::new("tbl").prop("rows", 3).prop("cols", 3))
+            .unwrap()
+            .file
+    };
+    assert!(
+        leaf_table(&Package::from_bytes(tables_ref).unwrap())
+            .to_bytes()
+            .unwrap()
+            == unified_table(&litchi_ops::open_bytes(tables.clone()).unwrap())
+                .to_bytes()
+                .unwrap(),
+        "table_add outputs differ"
+    );
+    scenarios.push(Scenario {
+        name: "table_add".to_owned(),
+        iterations,
+        leaf: Box::new(move |n| {
+            leg(
+                n,
+                || Package::from_bytes(tables_ref).unwrap(),
+                |package| drop(black_box(leaf_table(&package))),
+            )
+        }),
+        unified: Box::new(move |n| {
+            leg(
+                n,
+                || litchi_ops::open_bytes(tables_ref.clone()).unwrap(),
+                |file| drop(black_box(unified_table(&file))),
             )
         }),
     });

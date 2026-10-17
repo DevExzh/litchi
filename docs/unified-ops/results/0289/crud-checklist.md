@@ -33,8 +33,8 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | oth | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
 | odm | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
-| pages | 11 | 90 | 90 | 0 | 0 | 0 | 31 | 2 | 14 |
-| keynote | 16 | 131 | 122 | 0 | 9 | 0 | 45 | 14 | 4 |
+| pages | 11 | 91 | 91 | 0 | 0 | 0 | 30 | 2 | 14 |
+| keynote | 16 | 132 | 123 | 0 | 9 | 0 | 44 | 16 | 4 |
 | numbers | 7 | 61 | 61 | 0 | 0 | 7 | 16 | 2 | 3 |
 
 ## docx
@@ -605,7 +605,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## pages
 
-- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-name-focused.pages`, `create() + add paragraph`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`
+- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-name-focused.pages`, `create() + add paragraph`, `create() + add paragraph + add section`, `iwork/pages/body-table-read-native.pages + add table`, `create() + add paragraph + add footnote`
 - document views on `iwork/pages/body-sections-unicode.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -614,7 +614,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | body | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | section | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| table | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 | row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
@@ -624,7 +624,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## keynote
 
-- fixtures: `create()`, `seed`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`
+- fixtures: `create()`, `seed`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`, `iwork/keynote/slide-table-read-native.key + add table`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -640,7 +640,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | connector | unreached | unreached | unreached | unreached | n/a | n/a | unreached | no pair | no pair | n/a | n/a | ok | ok |
 | video | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
 | audio | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
-| table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | n/a | ok | n/a | ok | ok | n/a | n/a | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |

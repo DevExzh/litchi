@@ -551,3 +551,54 @@ removal and stale thumbnail records; a readable placeholder `hidden`.
 - **Keynote and Pages table creation: not started** (plan in record 0318
   §5).
 - **Keynote speaker-notes run styles: not started.**
+
+## 2026-10-17 table creation, deleted references and the remaining gaps (record 0329)
+
+- **Keynote and Pages table creation: done, with a typed gap.**
+  `litchi_numbers_wire::table_create` holds the payload half of
+  `litchi-numbers`' table creation (record 0301) for the Keynote and Pages
+  owners. Keynote: `slide::drawable::Edit::add_table(slide, NewTable)`
+  (`NewTable::{new(rows, columns, Geometry), with_name, with_cell}`) clones
+  the deck's first slide table (drawable, model, emptied storage, its own
+  formula owner, registry UUIDs and cross-member references), appends it to
+  the slide's drawables and z-order, writes seeded cells with the shared
+  cell writer and reads the table back through `slide_table_cells`. Pages:
+  `Package::insert_body_table(anchor, table::creation::NewTable)` clones the
+  first body table and its drawable attachment, anchors it with a `U+FFFC`
+  and an attachment-table entry at a UTF-16 body position, and writes
+  seeded cells through `table::values`; `apply_body_table_creation` replays
+  a patch. The Pages structural toolkit's registry transition gained
+  external-reference additions. Unified `add` of `table`/`tbl` (Keynote,
+  under a slide: `rows`, `cols`, `name`, `data`, frame) and of `tbl` (Pages,
+  under `/body`: an empty paragraph at the placement, then the table).
+  **Open:** a deck or document without a table to copy refuses
+  (`Unsupported::TableTemplate`, `table::creation::Error::NoTemplate`): a
+  built-in template (the theme's table style preset with a storage
+  skeleton) is the follow-up.
+- **6 (Numbers): `#REF!` and shared-formula splits done.** Removing a row or
+  column a surviving formula reads writes `REFERENCE_ERROR_NODE` (`#REF!`)
+  for a reference to it, or for a range wholly on it, caches an error
+  result (`BncCell::set_formula_cached_error`), shrinks a range that loses
+  it (mixed absolute/relative tract endpoints included) and drops the
+  precedent edges and range dependencies into it. A formula-list entry
+  whose cells diverge is split, one entry per formula
+  (`BncCell::set_formula_identifier`). Still refused: several ranges of one
+  tract with one removed, merge-range endpoints (`DeletedReference`), a
+  split in a segmented formula list (`SharedFormulas`).
+- **Topology clears: done.** Comments on a removed axis go through the
+  comment transaction; where the cell writer cannot clear the removed
+  cells (`HeaderNameIndex`, `FormulaCache`, `InvalidSource`, the created
+  workbook's reference budget), the structural pass drops them with their
+  strings, formulas and dependency records (an emptied dependency tile
+  goes too), refusing (`Formulas`) a range over them whose cache would go
+  stale. Every removal the retired host editor publishes over the
+  differential corpus, the leaf now publishes.
+- **19 (Numbers comments): two of three edge cases done.** A comment on an
+  empty cell in a row its tile does not store materialises the row (31
+  corpus tables); with several commenting authors a new comment is the
+  generated author's (reused, or appended to the author storage).
+  **Open:** a new comment list in a member of its own needs a component
+  registration; `litchi_iwa_protos::package_metadata_codec` edits existing
+  components only (follow-up: a `ComponentAddition` in its batches).
+- **10 (Keynote notes runs): done.** `slide::drawable::Edit::set_notes_text_style`
+  and `Package::slide_notes_text_runs`; unified notes runs.

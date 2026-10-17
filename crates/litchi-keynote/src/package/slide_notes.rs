@@ -679,6 +679,22 @@ fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     }
 }
 
+/// The note object, its text storage and the text of the notes of the
+/// slide at `position`, when it has notes (record 0329: the slide-drawable
+/// family styles the notes' runs).
+pub(in crate::package) fn notes_identity(
+    package: &Package,
+    position: Position,
+) -> Result<Option<(u64, u64, String)>, Error> {
+    Ok(notes_snapshot_at(package, position)?.map(|snapshot| {
+        (
+            snapshot.note_identifier,
+            snapshot.storage_identifier,
+            snapshot.text,
+        )
+    }))
+}
+
 fn notes_snapshot_at(
     package: &Package,
     position: Position,

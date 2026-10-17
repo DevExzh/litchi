@@ -2479,6 +2479,21 @@ Both profiles now register 30 families.
 | --- | --- | --- |
 | `litchi_pages::section::lifecycle::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | Registered family in `pages` (request 11); `Package::{edit_section_lifecycle, apply_section_lifecycle}`; `Edit::{add(after, Option<&str>), remove(section)}`, one operation per edit; `Error::{InitialSection, EmptySection, UnsupportedContent, UnsupportedDependency}` | ✅ 0312 |
 
+## iWork table creation, `#REF!` and notes runs (record 0329)
+
+Table creation is one verb on the owner (as `insert` is elsewhere), not a
+staged family: `litchi_pages::table::creation` carries `{Commit, Patch,
+Diagnostics, Error, LimitKind, NewTable}` without an `Edit`, so it is not
+registered in the `pages` profile.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_numbers_wire::table_create::{Shape, Role, TableUuid, Frame, OwnerGeometry, admits_size, model_payload, info_payload, empty_storage, owner_payload, engine_payload, …}` | The payload half of Numbers table creation (0301), shared by the Keynote and Pages owners | ✅ 0329 |
+| `litchi_keynote::slide::drawable::{NewTable, Edit::add_table, Unsupported::TableTemplate, Error::InvalidTableSize}` | A slide table cloned from the deck's first slide table, in the slide-drawable commit | ✅ 0329 |
+| `litchi_pages::Package::{insert_body_table, apply_body_table_creation}`, `litchi_pages::table::creation::{NewTable, Commit, Patch, Diagnostics, Error, LimitKind}` | A body table cloned from the document's first body table, anchored at a UTF-16 body `Position`; `Error::NoTemplate` without one | ✅ 0329 |
+| `litchi_numbers_wire::BncCell::{set_formula_cached_error, set_formula_identifier}` | `#REF!` result caches and shared-formula splits of the topology shift | ✅ 0329 |
+| `litchi_keynote::slide::drawable::Edit::set_notes_text_style`, `litchi_keynote::Package::slide_notes_text_runs` | Speaker-notes character styles (request 10) | ✅ 0329 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |

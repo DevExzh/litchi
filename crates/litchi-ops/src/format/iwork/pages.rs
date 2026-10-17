@@ -112,10 +112,26 @@ pub(crate) const SECTION_PROPS: &[PropSpec] = &[
     PropSpec::new("paragraphCount", ValueType::Int),
 ];
 
+/// A readable property `add` also accepts.
+const fn readable_add(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.add = true;
+    spec
+}
+
 const TABLE_PROPS: &[PropSpec] = &[
-    PropSpec::new("name", ValueType::Text),
-    PropSpec::new("rows", ValueType::Int),
-    PropSpec::new("columns", ValueType::Int),
+    readable_add("name", ValueType::Text),
+    readable_add("rows", ValueType::Int),
+    readable_add("columns", ValueType::Int),
+    {
+        let mut spec = PropSpec::new("data", ValueType::Text);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: false,
+            add: true,
+        };
+        spec
+    },
 ];
 
 const ROW_PROPS: &[PropSpec] = &[PropSpec::new("cellCount", ValueType::Int)];
@@ -181,11 +197,11 @@ static OPERATION_GAPS: [GapSpec; 4] = [
         subject: Subject::Operation {
             verb: "add",
             element: "tbl",
-            context: "a new body table",
+            context: "a document without a body table",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0299 follow-up: Pages body-table creation",
-        reason: "the Pages leaf deletes body tables but has no table-creation transaction",
+        follow_up: "record 0329 follow-up: a built-in table template",
+        reason: "a new body table copies the structure (styles, header counts, storage layout) of the document's first body table; a document without one has none to copy",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -332,7 +348,7 @@ impl Flavor for Pages {
 /// The elements `set` writes, `add` creates and `remove` deletes.
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["p", "section", "tc", "header", "footer", "footnote"],
-    addable: &["p", "footnote", "section"],
+    addable: &["p", "footnote", "section", "tbl"],
     removable: &["p", "tbl", "footnote", "section"],
     movable: &["p"],
     gaps: &OPERATION_GAPS,
@@ -372,6 +388,8 @@ pub(crate) enum Patch {
         )]
         litchi_pages::table::deletion::Patch,
     ),
+    /// A body-table creation (record 0329).
+    TableCreation(litchi_pages::table::creation::Patch),
 }
 
 impl Patch {
@@ -388,6 +406,7 @@ impl Patch {
             Self::TableValues(patch) => patch.is_noop(),
             Self::SectionLifecycle(patch) => patch.is_noop(),
             Self::TableDeletion(_) => false,
+            Self::TableCreation(patch) => patch.is_noop(),
         }
     }
 }
@@ -1129,15 +1148,13 @@ pub(crate) fn add(
     if kind == "section" {
         return add_section(file, package, &parent_node, node, limits);
     }
+    if matches!(kind.as_str(), "tbl" | "table") {
+        return add_table(file, package, &parent_node, node, limits);
+    }
     if !matches!(kind.as_str(), "p" | "paragraph") {
         return Err(refusal(
             Code::UnsupportedCapability,
-            match kind.as_str() {
-                "tbl" | "table" => {
-                    "adding a Pages body table needs a leaf table-creation transaction (record 0299 follow-up)"
-                },
-                _ => "a Pages body accepts only paragraphs",
-            },
+            "a Pages body accepts paragraphs, tables and sections",
         ));
     }
     let mut value = String::new();
@@ -1304,6 +1321,88 @@ fn add_at(
         .position(|position| *position == (section, line))
         .ok_or_else(|| refusal(Code::InternalError, "the added paragraph is missing"))?;
     let path = Path::parse(&format!("/body/p[{}]", index + 1))?.into_owned();
+    Ok((commit, path))
+}
+
+/// Add a body table (record 0329): a new empty paragraph at the placement
+/// (among the body's paragraphs; the end by default), then a table cloned
+/// from the document's first body table anchored in it, with `rows`,
+/// `cols` (or `columns`), `name` and `data` (rows separated by `;`, cells by
+/// `,`).
+fn add_table(
+    file: &Iwork,
+    package: &Package,
+    parent: &Node<'_>,
+    node: &NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    use crate::Placement;
+    if parent.item().type_name() != "body" {
+        return Err(
+            refusal(Code::InvalidArgument, "a Pages table is added to the body")
+                .with_suggestion("add(\"/body\", tbl)"),
+        );
+    }
+    let mut request = super::write::TableRequest::default();
+    for (key, prop) in node.props().iter() {
+        if !request.key(key.as_str(), prop)? {
+            return Err(super::write::unwritable("table", key.as_str()));
+        }
+    }
+    let (rows, columns, cells) = request.shape()?;
+    let positions = paragraph_positions(file);
+    let global = |path: &PathArg<'_>| -> Result<usize> {
+        let anchor = paragraph_at(file, path)?;
+        let leaf = anchor.item().leaf();
+        let at = (leaf[SECTION] as usize, leaf[LINE] as usize);
+        positions
+            .iter()
+            .position(|position| *position == at)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the anchor paragraph is missing"))
+    };
+    let index = match node.placement() {
+        None | Some(Placement::End | Placement::Into(_, None)) => positions.len(),
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position) | Placement::Into(_, Some(position))) => position.get(),
+        Some(Placement::Before(path)) => global(path)?,
+        Some(Placement::After(path)) => global(path)? + 1,
+    };
+    let (section, line) = insertion_point(&positions, index)?;
+    // The table's own (empty) paragraph.
+    let error = |error| failure(LeafError::PagesParagraphs(error));
+    let mut edit = package.edit_section_paragraphs(section).map_err(error)?;
+    edit.insert(Position::new(line), "").map_err(error)?;
+    let (with_paragraph, paragraph_patch) = edit.commit().map_err(error)?.into_parts();
+    let anchor = paragraph_end(&with_paragraph, section, line)?;
+    let mut table = litchi_pages::table::creation::NewTable::new(rows, columns);
+    if let Some(name) = request.name.take() {
+        table = table.with_name(name);
+    }
+    for (row, column, value) in cells {
+        table = table.with_cell(row, column, litchi_pages::table::values::Value::Text(value));
+    }
+    let error = |error| failure(LeafError::PagesTableCreation(error));
+    let commit = with_paragraph
+        .insert_body_table(Position::new(anchor), table)
+        .map_err(error)?;
+    let ordinal = commit.table().get();
+    let (next, table_patch) = commit.into_parts();
+    let mut chain = Chain::new(package.clone());
+    push(
+        &mut chain,
+        with_paragraph,
+        Patch::Paragraphs(paragraph_patch),
+    );
+    push(&mut chain, next, Patch::TableCreation(table_patch));
+    let commit = finish(
+        file,
+        chain.changed,
+        Owner::Pages(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )?;
+    let path = Path::parse(&format!("/body/tbl[{}]", ordinal + 1))?.into_owned();
     Ok((commit, path))
 }
 
