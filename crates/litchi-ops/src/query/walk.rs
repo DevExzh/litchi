@@ -35,7 +35,9 @@ use std::sync::Arc;
 use litchi_core::selector::{Combinator, Path, Position, Step};
 
 use super::inspect::{HeaderBinding, HeaderKey, Inspect};
-use super::plan::{Chain, ExprNode, Plan, Positional, ScopePlan, Shortcut, Structural, Target};
+use super::plan::{
+    Chain, ExprNode, FastPlan, Plan, Positional, ScopePlan, Shortcut, Structural, Target,
+};
 use crate::error::{Code, Error, Result};
 use crate::node::{Format, Value};
 use crate::path::PathArg;
@@ -149,6 +151,10 @@ where
     /// then matches exactly when it is of one of them, and the visit skips
     /// the per-alternative bookkeeping (record 0291).
     kind_only: Option<u128>,
+    /// Tests only: walk on the general step even when the plan has a
+    /// [`FastPlan`] (record 0315).
+    #[cfg(test)]
+    general: bool,
 }
 
 struct Frame<'f, N>
@@ -348,6 +354,8 @@ where
                 visited: 0,
                 early,
                 kind_only,
+                #[cfg(test)]
+                general: false,
             },
         })
     }
@@ -368,6 +376,23 @@ where
     /// The plan the walk runs.
     pub(crate) fn plan(&self) -> &Plan<'q> {
         &self.plan
+    }
+
+    /// The same walk on the general step, without its [`FastPlan`] path: the
+    /// reference the fast path is tested against (record 0315).
+    #[cfg(test)]
+    pub(crate) fn general(mut self) -> Self {
+        self.state.general = true;
+        self
+    }
+
+    /// Whether the walk takes the [`FastPlan`] path.
+    pub(crate) fn is_fast(&self) -> bool {
+        #[cfg(test)]
+        if self.state.general {
+            return false;
+        }
+        self.plan.fast.is_some()
     }
 
     /// The nodes the adapter has produced for this walk so far: children
@@ -504,6 +529,87 @@ where
             Ok(Some(_)) => self.state.out.take().map(|node| Ok(wrap(node))),
             Ok(None) => None,
             Err(error) => Some(Err(error)),
+        }
+    }
+}
+
+impl<'f, N> Walk<'_, 'f, N>
+where
+    N: Inspect<'f>,
+    N::Node: Clone,
+{
+    /// [`Self::next_map`] on the [`FastPlan`] path: [`Self::advance`] with the
+    /// match handed straight to `wrap` instead of through the walk's slot
+    /// (record 0315). The bracket, the limit, the fusing and the error
+    /// handling are [`Self::advance`]'s.
+    ///
+    /// The caller takes this route only for a walk whose
+    /// [`Self::is_fast`] holds, decided once when the walk starts
+    /// ([`super::Matches`]), so the general route's code is not touched.
+    #[inline(never)]
+    pub(crate) fn next_fast_map<T>(
+        &mut self,
+        wrap: impl FnOnce(N::Node) -> T,
+    ) -> Option<Result<T>> {
+        // Only a walk with a fast plan comes here; calling the general route
+        // instead would give it a second call site and change how it is
+        // compiled.
+        let fast = self.plan.fast?;
+        if matches!(self.state.phase, Phase::Done) || self.state.yielded >= self.state.limit {
+            self.finish();
+            return None;
+        }
+        let result = {
+            let _scope = Scope::enter(self.nav.fence_key());
+            self.fast_checked(fast)
+        };
+        let result = match self.nav.check_source() {
+            Ok(()) => result,
+            Err(error) => Err(error),
+        };
+        match result {
+            Ok(Some(node)) => Some(Ok(wrap(node))),
+            Ok(None) => None,
+            Err(error) => {
+                self.finish();
+                self.state.out = None;
+                self.state.pending_path.clear();
+                Some(Err(error))
+            },
+        }
+    }
+
+    /// [`Self::advance_checked`] on the [`FastPlan`] path, which has no pending
+    /// `[last()]` match.
+    #[inline(always)]
+    fn fast_checked(&mut self, fast: FastPlan) -> Result<Option<N::Node>> {
+        match self.state.phase {
+            Phase::Done => return Ok(None),
+            Phase::Start => {
+                self.state.phase = Phase::Done;
+                self.engine().start()?;
+                self.state.phase = Phase::Walk;
+            },
+            Phase::Walk => {},
+        }
+        if self.state.yielded >= self.state.limit {
+            self.finish();
+            return Ok(None);
+        }
+        match self.engine().next_fast(fast) {
+            Ok(Some(matched)) => {
+                self.state.yielded += 1;
+                Ok(Some(matched.node))
+            },
+            Ok(None) => {
+                self.finish();
+                Ok(None)
+            },
+            Err(error) => {
+                self.finish();
+                self.state.pending_path.clear();
+                Err(error)
+            },
         }
     }
 }
@@ -762,6 +868,74 @@ where
         }
     }
 
+    /// [`Self::next_found`] for a plan with a [`FastPlan`], on the route
+    /// [`Walk::next_fast_map`] takes (`Matches`; a [`Hit`] walk keeps the
+    /// general step): the same visits, reads and matches without the
+    /// per-alternative bookkeeping, whose outcome the plan fixes (record
+    /// 0315). The match is returned rather than left in the walk's slot.
+    #[inline(always)]
+    fn next_fast(&mut self, fast: FastPlan) -> Result<Option<Matched<'f, N>>> {
+        loop {
+            if self.state.frames.is_empty() {
+                return Ok(None);
+            }
+            let Some(item) = self.next_child_inline() else {
+                self.pop();
+                continue;
+            };
+            let node = item?;
+            self.charge_visit()?;
+            let kind = self.nav.kind(&node);
+            let ordinal = self.bump(kind);
+            let depth = self.state.frames.len();
+            let kind_bit = bit(kind);
+            let matched = fast.kinds & kind_bit != 0 && {
+                let candidate = Candidate {
+                    node: &node,
+                    kind,
+                    ordinal,
+                    parent: depth.checked_sub(1),
+                };
+                let mut probe = Probe::new();
+                match fast.test {
+                    Shortcut::KindOnly => true,
+                    Shortcut::Expr(expr) => self.expr(expr, &candidate, &mut probe)?,
+                    Shortcut::Content(compound) => {
+                        self.content_matches(compound, &candidate, &mut probe)?
+                    },
+                    Shortcut::None => {
+                        return Err(Error::new(
+                            Code::InternalError,
+                            "a query fast path lost its shortcut",
+                        ));
+                    },
+                }
+            };
+            let descend = fast.enter & kind_bit != 0
+                && !self.nav.childless(&node, KindSet::from_bits(fast.ask));
+            if matched {
+                let node = if descend {
+                    let yielded = node.clone();
+                    self.push(node, kind, ordinal, fast.ask, Source::Lazy)?;
+                    yielded
+                } else {
+                    node
+                };
+                return Ok(Some(Matched {
+                    node,
+                    found: Found {
+                        kind,
+                        ordinal,
+                        ancestors: Ancestors::Frames(depth),
+                    },
+                }));
+            }
+            if descend {
+                self.push(node, kind, ordinal, fast.ask, Source::Lazy)?;
+            }
+        }
+    }
+
     /// Whether the main walk enters a visited node of `kind`: a wanted kind
     /// can occur below it, and, for a lone `*`, it may lead to a top-level
     /// container (`*` never matches deeper).
@@ -787,6 +961,13 @@ where
 
     /// The next child of the top frame, or `None` when it has no more.
     fn next_child(&mut self) -> Option<Result<N::Node>> {
+        self.next_child_inline()
+    }
+
+    /// [`Self::next_child`], inlined into the fast step (record 0315): the
+    /// general step keeps its out-of-line call.
+    #[inline(always)]
+    fn next_child_inline(&mut self) -> Option<Result<N::Node>> {
         let nav = self.nav;
         let early = self.state.early;
         loop {

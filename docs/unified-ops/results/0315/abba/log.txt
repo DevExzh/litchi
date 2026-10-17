@@ -1,0 +1,89 @@
+== query-base-1 xlsx_1000_bytes 01:45:34 load 4.85
+== query-base-1 xlsx_1000_file 01:45:52 load 4.76
+== query-base-1 xlsx_50000_bytes 01:46:16 load 4.99
+== query-base-1 xlsx_50000_file 01:46:56 load 4.12
+== query-base-1 xlsb_1000_bytes 01:47:39 load 3.89
+== query-base-1 xlsb_1000_file 01:47:44 load 3.74
+== query-base-1 pptx_small_bytes 01:47:56 load 3.54
+== query-base-1 pptx_small_file 01:47:57 load 3.42
+== query-base-1 pptx_large_bytes 01:48:00 load 3.42
+== query-base-1 pptx_large_file 01:48:04 load 3.55
+== query-base-1 docx_drawing_bytes 01:48:08 load 3.50
+== query-base-1 docx_drawing_file 01:48:11 load 3.50
+== query-base-1 docx_saut_bytes 01:48:14 load 3.86
+== query-base-1 docx_saut_file 01:48:15 load 3.86
+== query-all-base-1 xlsx_1000_bytes 01:48:16 load 4.52
+== query-all-base-1 pptx_large_bytes 01:48:35 load 4.32
+== xls_read-base-1.json 01:48:38 load 4.13
+== ods-base-1.json 01:48:40 load 4.13
+== odt-base-1.txt 01:48:41 load 4.13
+== rtf_destination-base-1.json 01:48:42 load 4.04
+== unified-rtf-layout-base-1.json 01:48:43 load 4.04
+== unified-rtf-batch-set-base-1.json 01:48:49 load 3.96
+== query-after-1 xlsx_1000_bytes 01:48:49 load 3.96
+== query-after-1 xlsx_1000_file 01:49:08 load 3.78
+== query-after-1 xlsx_50000_bytes 01:49:31 load 4.98
+== query-after-1 xlsx_50000_file 01:50:12 load 5.66
+== query-after-1 xlsb_1000_bytes 01:50:56 load 7.13
+== query-after-1 xlsb_1000_file 01:51:01 load 7.36
+== query-after-1 pptx_small_bytes 01:51:13 load 7.77
+== query-after-1 pptx_small_file 01:51:15 load 7.77
+== query-after-1 pptx_large_bytes 01:51:18 load 8.11
+== query-after-1 pptx_large_file 01:51:22 load 8.18
+== query-after-1 docx_drawing_bytes 01:51:26 load 8.16
+== query-after-1 docx_drawing_file 01:51:29 load 8.16
+== query-after-1 docx_saut_bytes 01:51:31 load 7.99
+== query-after-1 docx_saut_file 01:51:33 load 7.99
+== query-all-after-1 xlsx_1000_bytes 01:51:34 load 7.99
+== query-all-after-1 pptx_large_bytes 01:51:52 load 7.91
+== xls_read-after-1.json 01:51:56 load 7.52
+== ods-after-1.json 01:51:58 load 7.52
+== odt-after-1.txt 01:51:59 load 7.52
+== rtf_destination-after-1.json 01:51:59 load 7.52
+== unified-rtf-layout-after-1.json 01:52:01 load 7.32
+== unified-rtf-batch-set-after-1.json 01:52:07 load 7.05
+== query-after-2 xlsx_1000_bytes 01:52:07 load 7.05
+== query-after-2 xlsx_1000_file 01:52:26 load 7.63
+== query-after-2 xlsx_50000_bytes 01:52:50 load 8.40
+== query-after-2 xlsx_50000_file 01:53:31 load 7.75
+== query-after-2 xlsb_1000_bytes 01:54:15 load 7.04
+== query-after-2 xlsb_1000_file 01:54:19 load 6.96
+== query-after-2 pptx_small_bytes 01:54:32 load 6.24
+== query-after-2 pptx_small_file 01:54:33 load 6.24
+== query-after-2 pptx_large_bytes 01:54:36 load 6.14
+== query-after-2 pptx_large_file 01:54:40 load 6.14
+== query-after-2 docx_drawing_bytes 01:54:44 load 5.97
+== query-after-2 docx_drawing_file 01:54:47 load 5.97
+== query-after-2 docx_saut_bytes 01:54:50 load 5.97
+== query-after-2 docx_saut_file 01:54:51 load 5.97
+== query-all-after-2 xlsx_1000_bytes 01:54:52 load 5.89
+== query-all-after-2 pptx_large_bytes 01:55:11 load 6.32
+== xls_read-after-2.json 01:55:14 load 6.05
+== ods-after-2.json 01:55:16 load 5.89
+== odt-after-2.txt 01:55:17 load 5.89
+== rtf_destination-after-2.json 01:55:18 load 5.89
+== unified-rtf-layout-after-2.json 01:55:20 load 5.89
+== unified-rtf-batch-set-after-2.json 01:55:26 load 5.66
+== query-base-2 xlsx_1000_bytes 01:55:26 load 5.66
+== query-base-2 xlsx_1000_file 01:55:44 load 5.43
+== query-base-2 xlsx_50000_bytes 01:56:08 load 5.87
+== query-base-2 xlsx_50000_file 01:56:47 load 7.04
+== query-base-2 xlsb_1000_bytes 01:57:31 load 6.62
+== query-base-2 xlsb_1000_file 01:57:35 load 6.57
+== query-base-2 pptx_small_bytes 01:57:48 load 6.73
+== query-base-2 pptx_small_file 01:57:49 load 6.73
+== query-base-2 pptx_large_bytes 01:57:52 load 6.43
+== query-base-2 pptx_large_file 01:57:56 load 6.43
+== query-base-2 docx_drawing_bytes 01:58:00 load 6.23
+== query-base-2 docx_drawing_file 01:58:03 load 6.21
+== query-base-2 docx_saut_bytes 01:58:06 load 6.21
+== query-base-2 docx_saut_file 01:58:07 load 6.04
+== query-all-base-2 xlsx_1000_bytes 01:58:08 load 6.04
+== query-all-base-2 pptx_large_bytes 01:58:26 load 6.10
+== xls_read-base-2.json 01:58:30 load 6.10
+== ods-base-2.json 01:58:32 load 5.93
+== odt-base-2.txt 01:58:33 load 5.93
+== rtf_destination-base-2.json 01:58:33 load 5.93
+== unified-rtf-layout-base-2.json 01:58:35 load 5.93
+== unified-rtf-batch-set-base-2.json 01:58:42 load 7.88
+done

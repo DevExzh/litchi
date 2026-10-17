@@ -10,6 +10,10 @@
 //! - `query_warm` and `query_cold` (record 0280): the same enumeration with
 //!   both legs warm, and with both legs building their index on a freshly
 //!   opened handle inside the clock;
+//! - `query_warm_owned` (record 0315): the warm query against a leaf leg
+//!   that expands repeated rows and cells as the walk does and keeps each
+//!   content cell as an owned handle (the shared workbook and its
+//!   coordinates) while reading its text;
 //! - `set`: one cell value (leaf `Package::edit` + one `set_cells` + commit;
 //!   unified `File::set`);
 //! - `batch_N`: N distinct cell values in one edit (leaf: one `set_cells`
@@ -152,6 +156,38 @@ mod enabled {
                     .map_or(0, |text| text.len())
             })
             .sum::<usize>()
+    }
+
+    /// Record 0315's fair leaf leg of `query_warm`, as record 0280's owned
+    /// legs are for XLSX and PPTX: every content cell instance in document
+    /// order (repeated rows and cells expanded, as the unified walk yields
+    /// them), each kept as an owned, retainable handle (the shared workbook
+    /// projection and the cell's coordinates, which is what a unified node
+    /// holds), and its text read. A byte source has no source to re-check,
+    /// so there is no fenced variant.
+    #[inline(never)]
+    fn leaf_owned(package: &Package) -> usize {
+        let workbook = package.workbook().expect("projection");
+        let mut total = 0_usize;
+        for (sheet, data) in workbook.sheets().iter().enumerate() {
+            let mut row_index = 0_usize;
+            for row in &data.rows {
+                for _ in 0..row.repeat() {
+                    let mut column = 0_usize;
+                    for cell in &row.cells {
+                        for _ in 0..cell.repeat() {
+                            if !cell.text.is_empty() {
+                                black_box((workbook.clone(), sheet, row_index, column));
+                                total += black_box(cell.text.as_str()).len();
+                            }
+                            column += 1;
+                        }
+                    }
+                    row_index += 1;
+                }
+            }
+        }
+        total
     }
 
     fn cell(index: usize) -> (usize, usize, String) {
@@ -304,6 +340,21 @@ mod enabled {
                     total
                 })
             },
+            || time(|| unified_query(&warm)),
+        ));
+        // Record 0315: the same warm query against the fair leaf leg, under
+        // a new scenario name; both legs read the same text, checked once
+        // outside the clock.
+        assert_eq!(
+            leaf_owned(&package),
+            unified_query(&warm),
+            "owned leaf text"
+        );
+        scenarios.extend(abba(
+            "query_warm_owned",
+            rounds,
+            None,
+            || time(|| leaf_owned(&package)),
             || time(|| unified_query(&warm)),
         ));
         scenarios.extend(abba(

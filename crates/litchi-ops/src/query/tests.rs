@@ -1797,3 +1797,111 @@ fn odt_queries_match_an_unpruned_walk() {
     }
     assert!(opened >= 5, "only {opened} ODT fixtures opened");
 }
+
+// ---------------------------------------------------------------------------
+// The single-subject fast path (record 0315)
+// ---------------------------------------------------------------------------
+
+/// The identity of a fake node: its element (by address) and worksheet, or
+/// its row.
+fn identity<K>(node: &Node<'_, K>) -> String {
+    match node {
+        Node::Item { item, sheet } => {
+            format!("item {:p} {:?}", *item, sheet.map(std::ptr::from_ref))
+        },
+        Node::Row { sheet, number } => format!("row {:p} {number}", *sheet),
+    }
+}
+
+/// Every match the walk yields as an iterator (the route `File::query`
+/// takes), the visit count, and the error that ended the walk, if any.
+fn trace<'d, K: FakeKind>(mut walk: Walk<'_, 'd, &Nav<'d, K>>) -> (Vec<String>, u64, Option<Code>) {
+    let mut out = Vec::new();
+    let mut failed = None;
+    // The route `Matches` takes: the fast step when the walk has one.
+    while let Some(item) = if walk.is_fast() {
+        walk.next_fast_map(|node| node)
+    } else {
+        walk.next()
+    } {
+        match item {
+            Ok(node) => out.push(identity(&node)),
+            Err(error) => {
+                failed = Some(error.code());
+                break;
+            },
+        }
+    }
+    (out, walk.visited(), failed)
+}
+
+/// `text` on `doc` yields the same nodes, visits and error on the fast path
+/// as on the general step, also with a limit, and the general step's hits
+/// are those nodes; returns whether the plan takes the fast path.
+fn same_as_general<K: FakeKind>(doc: &Doc<K>, text: &str) -> bool {
+    let nav = Nav::new(doc);
+    let fast = run(&nav, text).unwrap_or_else(|error| panic!("{text:?}: {error}"));
+    let is_fast = fast.is_fast();
+    let general = run(&nav, text).unwrap().general();
+    assert!(!general.is_fast());
+    let expected = trace(general);
+    assert_eq!(trace(fast), expected, "{text}");
+    let mut hits = run(&nav, text).unwrap();
+    let mut nodes = Vec::new();
+    while let Some(Ok(hit)) = hits.next_hit() {
+        nodes.push(identity(hit.node()));
+    }
+    assert_eq!(
+        nodes, expected.0,
+        "{text}: the hits are the iterator's nodes"
+    );
+    for limit in [1, 2] {
+        let fast = run(&nav, text).unwrap().limit(limit);
+        let general = run(&nav, text).unwrap().general().limit(limit);
+        assert_eq!(trace(fast), trace(general), "{text} limit {limit}");
+    }
+    is_fast
+}
+
+#[test]
+fn fast_path_matches_the_general_step() {
+    let doc = report();
+    for text in [
+        "p",
+        "r",
+        "paragraph",
+        "r:contains(report)",
+        "p:empty",
+        "tbl",
+        "/header[1]/p",
+        "p:has(r)",
+        "p:contains(Nothing)",
+        "r[bold=true]",
+        "p[style=Heading1]",
+        "p[style=Nothing]",
+    ] {
+        assert!(same_as_general(&doc, text), "{text} takes the fast path");
+    }
+    for text in ["p, r", "p[2]", "p[last()]", "tbl > tr", "*", "body p"] {
+        assert!(
+            !same_as_general(&doc, text),
+            "{text} takes the general step"
+        );
+    }
+    let deck = deck();
+    for text in [
+        "shape",
+        "shape:contains(Revenue)",
+        "picture",
+        "shape[width>=10cm]",
+    ] {
+        assert!(same_as_general(&deck, text), "{text}");
+    }
+    let book = book();
+    for text in ["cell", "row", "/Notes/cell", "cell[value>1000]"] {
+        assert!(same_as_general(&book, text), "{text}");
+    }
+    for text in ["B", "row[Sales>1000]"] {
+        assert!(!same_as_general(&book, text), "{text}");
+    }
+}

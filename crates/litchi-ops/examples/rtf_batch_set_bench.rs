@@ -8,6 +8,12 @@
 //!
 //! `RTF_BATCH_SET_COUNT` (record 0310) keeps only the cases of one target
 //! count.
+//!
+//! Record 0315 adds the typed-props routes `paragraph_layout_alignment_typed`
+//! and `run_compound_format_typed`: the same targets, native work and output,
+//! with every length passed as a typed [`litchi_ops::value::Length`] instead
+//! of the text `"6pt"`, so the run separates the cost of the text form of a
+//! length from the rest of the write.
 
 #[cfg(feature = "rtf")]
 use litchi_core::Position;
@@ -15,6 +21,8 @@ use litchi_core::Position;
 use litchi_core::selector::Path;
 #[cfg(feature = "rtf")]
 use litchi_ops::transaction::{Commit, SemanticLimits};
+#[cfg(feature = "rtf")]
+use litchi_ops::value::Length;
 #[cfg(feature = "rtf")]
 use litchi_ops::{File, Props, open_bytes};
 #[cfg(feature = "rtf")]
@@ -48,7 +56,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if only_count.is_some_and(|only| only != count) {
                     continue;
                 }
-                let case = Prepared::new(family, shape, count)?;
+                let case = Prepared::new(family, shape, count, false)?;
+                cases.push(run_case(&case)?);
+                assert_eq!(case.native.to_bytes()?, case.bytes);
+                assert_eq!(case.unified.to_bytes()?, case.bytes);
+            }
+        }
+    }
+    // Record 0315: the typed-props routes, after every text route so the
+    // earlier routes run as before.
+    for family in [Family::ParagraphLayoutAlignment, Family::RunCompoundFormat] {
+        for &shape in family.shapes() {
+            for count in COUNTS {
+                if only_count.is_some_and(|only| only != count) {
+                    continue;
+                }
+                let case = Prepared::new(family, shape, count, true)?;
                 cases.push(run_case(&case)?);
                 assert_eq!(case.native.to_bytes()?, case.bytes);
                 assert_eq!(case.unified.to_bytes()?, case.bytes);
@@ -67,7 +90,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "paragraph_text",
                 "paragraph_layout_alignment",
                 "run_text",
-                "run_compound_format"
+                "run_compound_format",
+                "paragraph_layout_alignment_typed",
+                "run_compound_format_typed"
             ],
             "timing": "warmed immutable owners; ordered native updates, direct unified paths and properties prepared outside timing; staging and commit timed; serialization, reopening, semantic validation and source immutability excluded",
             "limits": {
@@ -154,6 +179,8 @@ enum NativeWork {
 #[cfg(feature = "rtf")]
 struct Prepared {
     family: Family,
+    /// Lengths are typed values (record 0315's typed-props routes).
+    typed: bool,
     shape: Shape,
     count: usize,
     bytes: Vec<u8>,
@@ -169,11 +196,26 @@ struct Prepared {
 
 #[cfg(feature = "rtf")]
 impl Prepared {
-    fn new(family: Family, shape: Shape, count: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    fn new(
+        family: Family,
+        shape: Shape,
+        count: usize,
+        typed: bool,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let bytes = source(family, shape, count).into_bytes();
         let native = litchi_rtf::Package::from_bytes(&bytes)?;
         let unified = open_bytes(bytes.as_slice())?;
-        let (paths, props, native_work, target_count) = prepare_work(family, shape, count)?;
+        let (paths, mut props, native_work, target_count) = prepare_work(family, shape, count)?;
+        if typed {
+            let typed_props = match family {
+                Family::ParagraphLayoutAlignment => typed_paragraph_layout_props(),
+                Family::RunCompoundFormat => typed_run_format_props(),
+                Family::ParagraphText | Family::RunText => {
+                    return Err("typed-props routes set lengths".into());
+                },
+            };
+            props = vec![typed_props; props.len()];
+        }
 
         // Both adapters receive the same finite operation/payload profile. The
         // native operation ceiling also admits the two native leaves in a
@@ -195,6 +237,7 @@ impl Prepared {
         };
         Ok(Self {
             family,
+            typed,
             shape,
             count,
             bytes,
@@ -389,6 +432,21 @@ fn paragraph_layout_props() -> Props<'static> {
         .with("pageBreakBefore", true)
 }
 
+/// [`paragraph_layout_props`] with typed lengths (record 0315).
+#[cfg(feature = "rtf")]
+fn typed_paragraph_layout_props() -> Props<'static> {
+    Props::new()
+        .with("align", "center")
+        .with("spaceBefore", Length::from_points(6))
+        .with("spaceAfter", Length::from_points(3))
+        .with("indent", Length::from_points(12))
+        .with("rightIndent", Length::from_points(4))
+        .with("firstLineIndent", Length::from_points(-2))
+        .with("keepNext", true)
+        .with("keepLines", true)
+        .with("pageBreakBefore", true)
+}
+
 #[cfg(feature = "rtf")]
 fn run_format_patch() -> RunFormatPatch {
     RunFormatPatch::new()
@@ -411,6 +469,22 @@ fn run_format_props() -> Props<'static> {
         .with("italic", true)
         .with("underline", "double")
         .with("size", "14pt")
+        .with("strike", true)
+        .with("dstrike", true)
+        .with("vanish", true)
+        .with("caps", true)
+        .with("smallcaps", true)
+        .with("outline", true)
+}
+
+/// [`run_format_props`] with a typed size (record 0315).
+#[cfg(feature = "rtf")]
+fn typed_run_format_props() -> Props<'static> {
+    Props::new()
+        .with("bold", true)
+        .with("italic", true)
+        .with("underline", "double")
+        .with("size", Length::from_points(14))
         .with("strike", true)
         .with("dstrike", true)
         .with("vanish", true)
@@ -499,7 +573,11 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
     let native_median_ns = median(&native_ns);
     let unified_median_ns = median(&unified_ns);
     Ok(json!({
-        "family": case.family.name(),
+        "family": if case.typed {
+            format!("{}_typed", case.family.name())
+        } else {
+            case.family.name().to_owned()
+        },
         "shape": case.shape.name(),
         "count": case.count,
         "targets": case.paths.len(),

@@ -29,6 +29,9 @@
 //! call and stop at the first or tenth match (the cold first-match cost of
 //! a worksheet no earlier read has decoded), and warm XLSB routes.
 //!
+//! Record 0315 adds `xlsb_*_all_cell_owned` and `xlsb_*_all_cell_fenced`,
+//! the fair leaf legs record 0280 added for XLSX and PPTX.
+//!
 //! Each sample times `reps` calls of each leg, unified then leaf for samples
 //! 0 and 3 (mod 4), leaf then unified otherwise. Every route checks before
 //! timing that both legs return the same match count.
@@ -550,6 +553,28 @@ fn xlsb_leaf_cells(
     matches
 }
 
+/// Record 0315's fair leaf equivalent of a full XLSB `cell` query, as
+/// record 0280's `xlsx_leaf_owned` is for XLSX: every stored cell of every
+/// worksheet, each kept as an owned, retainable handle (the worksheet
+/// position, a shared grid handle and the coordinate, which is what a
+/// unified node holds), and with `fenced`, one source-freshness check per
+/// match, the guarantee a unified query gives on every pull.
+fn xlsb_leaf_owned(leaf: &litchi_xlsb::SourceBackedWorkbook, fenced: bool) -> usize {
+    use litchi_core::sheet::Cell as _;
+    let mut matches = 0;
+    for (position, sheet) in leaf.worksheets().expect("reads").into_iter().enumerate() {
+        let grid = sheet.grid().expect("a grid");
+        for cell in grid.cells_in(litchi_xlsb::sheet::Rect::ALL).expect("cells") {
+            if fenced {
+                black_box(leaf.source_version().expect("current"));
+            }
+            black_box((position, grid.clone(), cell.row(), cell.column()));
+            matches += 1;
+        }
+    }
+    matches
+}
+
 /// The same work through a freshly opened XLS leaf: the eager reader's
 /// cells from memory, the positional scanner from a file (stopped by its
 /// visitor's error once `limit` cells matched).
@@ -715,6 +740,20 @@ fn xlsb_routes(context: &XlsbContext) -> Vec<Route<'_>> {
             full_reps,
             move || count_matches(file, all),
             move || xlsb_leaf_cells(leaf, usize::MAX, |_| true),
+        ),
+        // Record 0315: fair leaf legs for the same unified query, as record
+        // 0280 added for XLSX and PPTX.
+        Route::new(
+            format!("xlsb_{tag}_all_cell_owned_v1"),
+            full_reps,
+            move || count_matches(file, all),
+            move || xlsb_leaf_owned(leaf, false),
+        ),
+        Route::new(
+            format!("xlsb_{tag}_all_cell_fenced_v1"),
+            full_reps,
+            move || count_matches(file, all),
+            move || xlsb_leaf_owned(leaf, true),
         ),
     ]
 }
