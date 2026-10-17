@@ -724,7 +724,9 @@ fn gap_subjects_are_unique() {
 #[test]
 fn doc_enumerates_its_unprojected_element_gaps() {
     let capabilities = Capabilities::of(FileFormat::Doc);
-    for element in ["hyperlink", "section", "style", "field", "picture", "shape"] {
+    // Record 0324 projects styles, numbering, hyperlinks, bookmarks,
+    // fields, sections, tab stops, text boxes and shapes.
+    for element in ["equation", "formfield", "picture", "ole", "revision"] {
         assert!(
             capabilities
                 .gaps()

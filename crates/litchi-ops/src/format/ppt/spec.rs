@@ -12,7 +12,7 @@ use crate::node::spec::{
 };
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
-use crate::value::{LengthSpec, ValueType};
+use crate::value::{ColorContext, LengthSpec, Tokens, ValueType};
 
 /// A node kind in a legacy PowerPoint presentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -292,6 +292,115 @@ const SHAPE_IDS: &[&str] = &["id", "name"];
 /// Speaker notes: the text of the notes page's body placeholder.
 const NOTES_PROPS: &[PropSpec] = &[PropSpec::new("text", ValueType::Text)];
 
+/// A slide comment (`Comment10Container`, record 0323), in the PPTX comment
+/// vocabulary: the anchor is in master units, read as a length.
+pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
+    PropSpec::new("text", ValueType::Text),
+    PropSpec::new("author", ValueType::Text),
+    PropSpec::new("initials", ValueType::Text),
+    PropSpec::new("index", ValueType::Int),
+    PropSpec::new("date", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+];
+
+/// Run underline (record 0323): the binary format's `CFStyle` underline is
+/// single or none, printed as the PPTX `underline` tokens.
+pub(crate) static UNDERLINE: Tokens = Tokens::new("underline", &["single", "none"], &[("sng", 0)]);
+
+/// A text run (record 0323): one `StyleTextPropAtom` character run's piece
+/// of a paragraph, in the PPTX run vocabulary. `font.latin` is the
+/// `FontCollection` typeface; `color` reads an sRGB color only.
+pub(crate) const RUN_PROPS: &[PropSpec] = &[
+    PropSpec::new("font.latin", ValueType::Text),
+    PropSpec::new("size", ValueType::Length(LengthSpec::FONT_SIZE)),
+    PropSpec::new("bold", ValueType::Bool),
+    PropSpec::new("italic", ValueType::Bool),
+    PropSpec::new("underline", ValueType::Token(&UNDERLINE)),
+    PropSpec::new("color", ValueType::Color(ColorContext::Drawing)),
+];
+
+/// An OLE object frame (record 0323): a picture frame showing an embedded or
+/// linked object, with the object's `ProgID`.
+const OLE_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("progId", ValueType::Text),
+    PropSpec::new("linked", ValueType::Bool),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+];
+
+/// A media frame (record 0323): a picture frame playing a movie (`video`) or
+/// a sound (`audio`); `media` names both.
+const MEDIA_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+];
+
+/// An embedded chart (record 0323): a Microsoft Graph or Excel chart object
+/// shown by an OLE picture frame, read through its MS-OGRAPH chart. The
+/// frame keys are the picture's; `chartType` uses the PPTX chart names.
+const CHART_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+    PropSpec::new("chartType", ValueType::Text),
+    PropSpec::new("title", ValueType::Text),
+];
+
+/// The presentation theme (record 0323): the `PowerPoint` 2007 theme part a
+/// `RoundTripThemeAtom` carries, read with the PPTX theme vocabulary.
+pub(crate) const THEME_PROPS: &[PropSpec] = &[
+    PropSpec::new("dk1", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("lt1", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("dk2", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("lt2", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent1", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent2", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent3", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent4", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent5", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent6", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("hyperlink", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("followedhyperlink", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("headingFont", ValueType::Text),
+    PropSpec::new("bodyFont", ValueType::Text),
+    PropSpec::new("headingFont.ea", ValueType::Text),
+    PropSpec::new("bodyFont.ea", ValueType::Text),
+    PropSpec::new("headingFont.cs", ValueType::Text),
+    PropSpec::new("bodyFont.cs", ValueType::Text),
+    PropSpec::new("name", ValueType::Text),
+];
+
+/// A click hyperlink (record 0323), in the PPTX vocabulary: `link` is a URL,
+/// `slide[N]`, or `firstslide`, `lastslide`, `nextslide`, `previousslide`,
+/// `endshow`; `tooltip` is the screen tip.
+pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
+    PropSpec::new("link", ValueType::Text),
+    PropSpec::new("tooltip", ValueType::Text),
+];
+
+/// A table row (record 0323): a band of the table group's cell shapes; its
+/// height is the distance to the next row's top.
+const ROW_PROPS: &[PropSpec] = &[length("height", LengthSpec::EXTENT)];
+
+/// A table cell (record 0323): one cell shape; its text is the node's text
+/// member and `text` a write-only registry key, as for paragraphs.
+const CELL_PROPS: &[PropSpec] = &[];
+
+/// A table column (record 0323): its width.
+const COLUMN_PROPS: &[PropSpec] = &[length("width", LengthSpec::EXTENT)];
+
 /// A paragraph of a shape's text body: the text between paragraph marks. Its
 /// text is the node's text member, as for PPTX paragraphs; `text` is a
 /// write-only registry key.
@@ -369,75 +478,25 @@ const fn property_gap(
     }
 }
 
-static ROW_GAP: GapSpec = element_gap(
-    "tr",
-    "M1-extended",
-    "the legacy PPT table projection exposes dimensions and cell text but no row nodes",
-);
-static CELL_GAP: GapSpec = element_gap(
-    "tc",
-    "M1-extended",
-    "the legacy PPT table projection exposes cell text through the table node only",
-);
-static CHART_GAP: GapSpec = element_gap(
-    "chart",
-    "M1-extended",
-    "legacy PPT chart frames have no chart-part projection",
-);
 static SMARTART_GAP: GapSpec = element_gap(
     "smartart",
     "M1-extended",
     "legacy PPT diagram frames have no semantic diagram projection",
 );
-static OLE_GAP: GapSpec = element_gap(
-    "ole",
-    "M1-extended",
-    "legacy PPT object frames are retained as picture metadata only",
-);
-static RUN_GAP: GapSpec = element_gap(
-    "run",
-    "M1-extended",
-    "legacy PPT exposes aggregate shape text, not text-run nodes",
-);
-static LINEBREAK_GAP: GapSpec = element_gap(
-    "linebreak",
-    "M1-extended",
-    "legacy PPT exposes normalized shape text, not line-break nodes",
-);
-static COMMENT_GAP: GapSpec = element_gap(
-    "comment",
-    "M1-extended",
-    "legacy PPT comments are parsed by the presentation leaf but not navigable nodes",
-);
-static VIDEO_GAP: GapSpec = element_gap(
-    "video",
-    "M1-extended",
-    "media frames are retained as native picture metadata only",
-);
-static AUDIO_GAP: GapSpec = element_gap(
-    "audio",
-    "M1-extended",
-    "media frames are retained as native picture metadata only",
-);
-static MEDIA_GAP: GapSpec = element_gap(
-    "media",
-    "M1-extended",
-    "media frames are retained as native picture metadata only",
-);
 static EQUATION_GAP: GapSpec = element_gap(
     "equation",
-    "M1-extended",
-    "legacy PPT has no equation semantic model",
+    "0323-F6 PPT Equation Editor objects",
+    "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element",
 );
 static ZOOM_GAP: GapSpec = element_gap(
     "zoom",
-    "M1-extended",
-    "legacy PPT has no zoom semantic model",
+    "wontfix: PPTX-only (record 0323)",
+    "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record",
 );
 static MODEL3D_GAP: GapSpec = element_gap(
     "model3d",
-    "M1-extended",
-    "legacy PPT has no 3D-model semantic model",
+    "wontfix: PPTX-only (record 0323)",
+    "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record",
 );
 static MASTER_GAP: GapSpec = element_gap(
     "slideMaster",
@@ -449,45 +508,30 @@ static LAYOUT_GAP: GapSpec = element_gap(
     "M1-extended",
     "legacy PPT layout records are not exposed as navigable nodes",
 );
-static THEME_GAP: GapSpec = element_gap(
-    "theme",
-    "M1-extended",
-    "legacy PPT has no theme semantic projection",
-);
 static MODERN_COMMENT_GAP: GapSpec = element_gap(
     "modernComment",
-    "M1-extended",
-    "legacy PPT has no threaded-comment semantic projection",
+    "wontfix: PPTX-only (record 0323)",
+    "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements",
 );
 static REPLY_GAP: GapSpec = element_gap(
     "reply",
-    "M1-extended",
-    "legacy PPT has no threaded-comment semantic projection",
-);
-static HYPERLINK_GAP: GapSpec = element_gap(
-    "hyperlink",
-    "M1-extended",
-    "legacy PPT hyperlink targets require relationship resolution",
+    "wontfix: PPTX-only (record 0323)",
+    "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies",
 );
 static ANIMATION_GAP: GapSpec = element_gap(
     "animation",
-    "M1-extended",
-    "legacy PPT timing records are not exposed as nodes",
+    "0323-F5 PPT animation nodes",
+    "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes",
 );
 static SERIES_GAP: GapSpec = element_gap(
     "series",
-    "M1-extended",
-    "legacy PPT chart series are not exposed as nodes",
+    "0323-F7 PPT chart series and axes",
+    "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)",
 );
 static AXIS_GAP: GapSpec = element_gap(
     "axis",
-    "M1-extended",
-    "legacy PPT chart axes are not exposed as nodes",
-);
-static COL_GAP: GapSpec = element_gap(
-    "col",
-    "M1-extended",
-    "legacy PPT table columns have no separate node projection",
+    "0323-F7 PPT chart series and axes",
+    "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)",
 );
 static NOTE_SLIDE_GAP: GapSpec = element_gap(
     "noteSlide",
@@ -505,12 +549,6 @@ static PICTURE_MEDIA_GAP: GapSpec = property_gap(
     "mediaType",
     "M1-extended",
     "legacy PPT frame classification is exposed as frameKind",
-);
-static CHART_TYPE_GAP: GapSpec = property_gap(
-    "chart",
-    "chartType",
-    "M1-extended",
-    "legacy PPT chart frames have no chart-part projection",
 );
 static SHAPE_FILL_GAP: GapSpec = property_gap(
     "shape",
@@ -620,32 +658,35 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/table[N]"],
             TABLE_PROPS,
         ),
-        gap(
+        element(
             Kind::Row,
             "tr",
             &["row", "tr"],
             &[Kind::Table],
             &[Kind::Cell],
+            &[],
             &["/slide[N]/table[N]/tr[N]"],
-            &ROW_GAP,
+            ROW_PROPS,
         ),
-        gap(
+        element(
             Kind::Cell,
             "tc",
             &["cell", "tc"],
             &[Kind::Row],
             &[],
+            &[],
             &["/slide[N]/table[N]/tr[N]/tc[N]"],
-            &CELL_GAP,
+            CELL_PROPS,
         ),
-        gap(
+        element(
             Kind::Chart,
             "chart",
             &["chart"],
             TREE_PARENTS,
             &[Kind::Series, Kind::Axis, Kind::Animation],
+            &[],
             &["/slide[N]/chart[N]"],
-            &CHART_GAP,
+            CHART_PROPS,
         ),
         element(
             Kind::Group,
@@ -676,14 +717,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/smartart[N]"],
             &SMARTART_GAP,
         ),
-        gap(
+        element(
             Kind::Ole,
             "ole",
             &["embed", "object", "ole", "oleobject"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/ole[N]"],
-            &OLE_GAP,
+            OLE_PROPS,
         ),
         element(
             Kind::Paragraph,
@@ -695,23 +737,25 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/shape[N]/paragraph[N]"],
             PARAGRAPH_PROPS,
         ),
-        gap(
+        element(
             Kind::Run,
             "run",
             &["r", "run"],
             &[Kind::Paragraph],
             &[Kind::Hyperlink],
-            &["/slide[N]/shape[N]/run[N]"],
-            &RUN_GAP,
+            &[],
+            &["/slide[N]/shape[N]/paragraph[N]/run[N]"],
+            RUN_PROPS,
         ),
-        gap(
+        element(
             Kind::LineBreak,
             "linebreak",
             &["br", "linebreak"],
             &[Kind::Paragraph],
             &[],
-            &["/slide[N]/shape[N]/linebreak[N]"],
-            &LINEBREAK_GAP,
+            &[],
+            &["/slide[N]/shape[N]/paragraph[N]/linebreak[N]"],
+            &[],
         ),
         element(
             Kind::Notes,
@@ -723,41 +767,45 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/notes"],
             NOTES_PROPS,
         ),
-        gap(
+        element(
             Kind::Comment,
             "comment",
             &["comment"],
             &[Kind::Slide],
             &[],
+            &[],
             &["/slide[N]/comment[N]"],
-            &COMMENT_GAP,
+            COMMENT_PROPS,
         ),
-        gap(
+        element(
             Kind::Video,
             "video",
             &["video"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/video[N]"],
-            &VIDEO_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Kind::Audio,
             "audio",
             &["audio"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/audio[N]"],
-            &AUDIO_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Kind::Media,
             "media",
             &["media"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/media[N]"],
-            &MEDIA_GAP,
+            MEDIA_PROPS,
         ),
         gap(
             Kind::Equation,
@@ -804,14 +852,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slidemaster[N]/slidelayout[N]", "/slidelayout[N]"],
             &LAYOUT_GAP,
         ),
-        gap(
+        element(
             Kind::Theme,
             "theme",
             &["theme"],
             &[Kind::Presentation],
             &[],
+            &[],
             &["/theme"],
-            &THEME_GAP,
+            THEME_PROPS,
         ),
         gap(
             Kind::ModernComment,
@@ -836,14 +885,18 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/moderncomment[N]/reply[N]"],
             &REPLY_GAP,
         ),
-        gap(
+        element(
             Kind::Hyperlink,
             "hyperlink",
             &["hlink", "hyperlink"],
             &[Kind::Shape, Kind::Run],
             &[],
-            &["/slide[N]/shape[N]/hyperlink"],
-            &HYPERLINK_GAP,
+            &[],
+            &[
+                "/slide[N]/shape[N]/hyperlink",
+                "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink",
+            ],
+            HYPERLINK_PROPS,
         ),
         gap(
             Kind::Animation,
@@ -872,14 +925,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/chart[N]/axis[@role=ROLE]"],
             &AXIS_GAP,
         ),
-        gap(
+        element(
             Kind::Col,
             "col",
             &["col", "column"],
             &[Kind::Table],
             &[],
+            &[],
             &["/slide[N]/table[N]/col[N]"],
-            &COL_GAP,
+            COLUMN_PROPS,
         ),
         gap(
             Kind::NoteSlide,
@@ -900,12 +954,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &NOTES_MASTER_GAP,
         ),
     ],
-    gaps: &[
-        PICTURE_MEDIA_GAP,
-        CHART_TYPE_GAP,
-        SHAPE_FILL_GAP,
-        STATS_CHART_GAP,
-    ],
+    gaps: &[PICTURE_MEDIA_GAP, SHAPE_FILL_GAP, STATS_CHART_GAP],
 };
 
 check_format_spec!(SPEC);
@@ -1054,3 +1103,165 @@ pub(crate) const NOTES_CAPABILITY_PROPS: &[PropSpec] = &NOTES_WRITE_TABLE.readab
 pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
     crate::registry::Table::new(text_write_entries(false), []);
 pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
+
+/// The cell registry (record 0323): the write-only `text` key.
+pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
+    crate::registry::Table::new(text_write_entries(false), []);
+pub(crate) const CELL_CAPABILITY_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
+
+const _: () = assert!(CELL_PROPS.is_empty());
+
+/// Comment assignments (record 0323), as the PPTX comment registry: `text`,
+/// `x` and `y` are settable; `author` (required), `initials` and `date` are
+/// given when the comment is added; `index` is assigned.
+#[derive(Clone, Copy)]
+pub(super) enum CommentSetter {
+    Text,
+    Author,
+    Initials,
+    Date,
+    X,
+    Y,
+}
+
+const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMMENT_PROPS.len()] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+
+    let mut entries = [Entry::read(COMMENT_PROPS[0]); COMMENT_PROPS.len()];
+    let mut index = 0;
+    while index < COMMENT_PROPS.len() {
+        let spec = COMMENT_PROPS[index];
+        let access = if same_name(spec.name, "text") {
+            Some(WriteAccess::SetAndAdd(CommentSetter::Text))
+        } else if same_name(spec.name, "author") {
+            Some(WriteAccess::Add(CommentSetter::Author))
+        } else if same_name(spec.name, "initials") {
+            Some(WriteAccess::Add(CommentSetter::Initials))
+        } else if same_name(spec.name, "date") {
+            Some(WriteAccess::Add(CommentSetter::Date))
+        } else if same_name(spec.name, "x") {
+            Some(WriteAccess::SetAndAdd(CommentSetter::X))
+        } else if same_name(spec.name, "y") {
+            Some(WriteAccess::SetAndAdd(CommentSetter::Y))
+        } else {
+            None
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if same_name(spec.name, "author") {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries
+}
+
+pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
+    CommentSetter,
+    { COMMENT_PROPS.len() },
+    0,
+> = crate::registry::Table::new(comment_write_entries(), []);
+pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
+
+/// Hyperlink assignments (record 0323): `link` (alias `url`) and `tooltip`
+/// on `add` and `set`, as the PPTX registry.
+#[derive(Clone, Copy)]
+pub(super) enum HyperlinkSetter {
+    Link,
+    Tooltip,
+}
+
+const fn hyperlink_write_entries() -> [crate::registry::Entry<HyperlinkSetter>; 2] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+    [
+        Entry {
+            spec: HYPERLINK_PROPS[0],
+            access: WriteAccess::SetAndAdd(HyperlinkSetter::Link),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: HYPERLINK_PROPS[1],
+            access: WriteAccess::SetAndAdd(HyperlinkSetter::Tooltip),
+            constraint: Constraint::None,
+            clear: true,
+        },
+    ]
+}
+
+pub(super) const HYPERLINK_WRITE_TABLE: crate::registry::Table<HyperlinkSetter, 2, 1> =
+    crate::registry::Table::new(
+        hyperlink_write_entries(),
+        [crate::registry::Alias {
+            name: "url",
+            entry: 0,
+        }],
+    );
+pub(crate) const HYPERLINK_CAPABILITY_PROPS: &[PropSpec] = &HYPERLINK_WRITE_TABLE.readable();
+
+/// Run assignments (record 0323): the write-only `text` key and the
+/// character formatting the binary `TextCFException` holds.
+#[derive(Clone, Copy)]
+pub(super) enum RunSetter {
+    Text,
+    Size,
+    Bold,
+    Italic,
+    Underline,
+    Color,
+}
+
+const RUN_WRITE_COUNT: usize = RUN_PROPS.len() + 1;
+const fn run_write_entries() -> [crate::registry::Entry<RunSetter>; RUN_WRITE_COUNT] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+
+    let mut entries = [Entry::read(RUN_PROPS[0]); RUN_WRITE_COUNT];
+    let mut index = 0;
+    while index < RUN_PROPS.len() {
+        let spec = RUN_PROPS[index];
+        let setter = if same_name(spec.name, "size") {
+            Some(RunSetter::Size)
+        } else if same_name(spec.name, "bold") {
+            Some(RunSetter::Bold)
+        } else if same_name(spec.name, "italic") {
+            Some(RunSetter::Italic)
+        } else if same_name(spec.name, "underline") {
+            Some(RunSetter::Underline)
+        } else if same_name(spec.name, "color") {
+            Some(RunSetter::Color)
+        } else {
+            None
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: WriteAccess::Set(setter),
+                constraint: Constraint::None,
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    let mut text = PropSpec::new("text", ValueType::Text);
+    text.access.get = false;
+    entries[RUN_PROPS.len()] = Entry {
+        spec: text,
+        access: WriteAccess::Set(RunSetter::Text),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    entries
+}
+
+pub(super) const RUN_WRITE_TABLE: crate::registry::Table<RunSetter, RUN_WRITE_COUNT, 0> =
+    crate::registry::Table::new(run_write_entries(), []);
+pub(crate) const RUN_CAPABILITY_PROPS: &[PropSpec] = &RUN_WRITE_TABLE.readable();

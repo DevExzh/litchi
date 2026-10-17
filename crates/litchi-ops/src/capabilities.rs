@@ -2815,7 +2815,7 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::doc::SETTABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "xlsx")]
         let settable = settable
@@ -2849,10 +2849,7 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Ppt
                 && self.retains_source != Some(false)
-                && matches!(
-                    self.data().canonical,
-                    "slide" | "shape" | "placeholder" | "notes" | "paragraph"
-                )
+                && crate::format::ppt::SETTABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "rtf")]
         let settable = settable
@@ -2951,13 +2948,13 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
-                && self.data().canonical == "p"
+                && crate::format::doc::ADDABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "ppt")]
         let add = add
             || (self.adapter == Adapter::Ppt
                 && self.retains_source != Some(false)
-                && self.data().canonical == "slide"
+                && crate::format::ppt::ADDABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "xls")]
         let add = add
@@ -3034,13 +3031,13 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Ppt
                 && self.retains_source != Some(false)
-                && self.data().canonical == "slide"
+                && crate::format::ppt::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "doc")]
         let remove = remove
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::doc::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "rtf")]
         let remove = remove
@@ -3155,15 +3152,13 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         } else { props };
         #[cfg(feature = "ppt")]
         let props = if adapter == Adapter::Ppt {
-            match crate::path::navigate::ElementKind::name(element.kind) {
-                "shape" => crate::format::ppt::SHAPE_CAPABILITY_PROPS,
-                "placeholder" => crate::format::ppt::PLACEHOLDER_CAPABILITY_PROPS,
-                "slide" => crate::format::ppt::SLIDE_CAPABILITY_PROPS,
-                "notes" => crate::format::ppt::NOTES_CAPABILITY_PROPS,
-                "paragraph" => crate::format::ppt::PARAGRAPH_CAPABILITY_PROPS,
-                _ => props,
-            }
-        } else { props };
+            crate::format::ppt::capability_props(crate::path::navigate::ElementKind::name(
+                element.kind,
+            ))
+            .unwrap_or(props)
+        } else {
+            props
+        };
         #[cfg(feature = "pptx")]
         let props = if adapter == Adapter::Pptx {
             crate::format::pptx::capability_props(crate::path::navigate::ElementKind::name(
@@ -3414,58 +3409,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
 ];
 
 #[cfg(feature = "ppt")]
-const PPT_WRITE_GAPS: &[GapSpec] = &[
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "get",
-            element: "metadata",
-            context: "path-read",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-        reason: "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "slide",
-            context: "native-slide-dependencies",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT dependency-preserving slide removal",
-        reason: "slide removal requires native closure admission; unsupported dependent records refuse atomically",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "slide",
-            context: "native-visibility-record",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT visibility atom insertion",
-        reason: "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "shape",
-            context: "native-shape-preservation",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT nested-shape and rich-text edits",
-        reason: "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "batch",
-            element: "presentation",
-            context: "native-write-coalescing",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT broader native edit runs and performance qualification",
-        reason: "distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open",
-    },
-];
+const PPT_WRITE_GAPS: &[GapSpec] = crate::format::ppt::WRITE_GAPS;
 
 /// Format-level option gaps that do not belong to the read spec table.
 fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>> {

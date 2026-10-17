@@ -80,6 +80,9 @@ use crate::node::Node;
 /// ```
 pub struct Matches<'f, 'q> {
     inner: Inner<'f, 'q>,
+    /// The walk takes its plan's fast step (record 0315), decided once
+    /// here so the general route's code stays as it was.
+    fast: bool,
 }
 
 /// One variant per format adapter (static dispatch, ADR 0004).
@@ -125,6 +128,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[cfg(feature = "doc")]
     pub(crate) fn doc(walk: Walk<'q, 'f, crate::format::doc::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Doc(walk),
         }
     }
@@ -133,6 +137,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[cfg(feature = "docx")]
     pub(crate) fn docx(walk: Walk<'q, 'f, crate::format::docx::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Docx(walk),
         }
     }
@@ -141,30 +146,35 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[cfg(feature = "xlsx")]
     pub(crate) fn xlsx(walk: Walk<'q, 'f, crate::format::xlsx::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Xlsx(walk),
         }
     }
     #[cfg(feature = "pptx")]
     pub(crate) fn pptx(walk: Walk<'q, 'f, crate::format::pptx::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Pptx(walk),
         }
     }
     #[cfg(feature = "ppt")]
     pub(crate) fn ppt(walk: Walk<'q, 'f, crate::format::ppt::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Ppt(walk),
         }
     }
     #[cfg(feature = "xlsb")]
     pub(crate) fn xlsb(walk: Walk<'q, 'f, crate::format::xlsb::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Xlsb(walk),
         }
     }
     #[cfg(feature = "xls")]
     pub(crate) fn xls(walk: Walk<'q, 'f, crate::format::xls::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Xls(walk),
         }
     }
@@ -172,6 +182,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[cfg(feature = "rtf")]
     pub(crate) fn rtf(walk: Walk<'q, 'f, crate::format::rtf::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Rtf(walk),
         }
     }
@@ -179,6 +190,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[cfg(feature = "ods")]
     pub(crate) fn ods(walk: Walk<'q, 'f, crate::format::ods::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Ods(walk),
         }
     }
@@ -187,6 +199,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[cfg(feature = "odt")]
     pub(crate) fn odt(walk: Walk<'q, 'f, crate::format::odt::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Odt(walk),
         }
     }
@@ -195,6 +208,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[cfg(feature = "odp")]
     pub(crate) fn odp(walk: Walk<'q, 'f, crate::format::odp::Nav<'f>>) -> Self {
         Self {
+            fast: walk.is_fast(),
             inner: Inner::Odp(walk),
         }
     }
@@ -204,6 +218,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     pub(crate) fn object(walks: crate::format::odf_tree::Walks<'q, 'f>) -> Self {
         Self {
             inner: Inner::Object(walks),
+            fast: false,
         }
     }
 
@@ -212,6 +227,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     pub(crate) fn iwork(walks: crate::format::iwork::Walks<'q, 'f>) -> Self {
         Self {
             inner: Inner::Iwork(walks),
+            fast: false,
         }
     }
 
@@ -224,54 +240,67 @@ impl<'f, 'q> Matches<'f, 'q> {
             #[cfg(feature = "doc")]
             Inner::Doc(walk) => Self {
                 inner: Inner::Doc(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "docx")]
             Inner::Docx(walk) => Self {
                 inner: Inner::Docx(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(walk) => Self {
                 inner: Inner::Xlsx(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "pptx")]
             Inner::Pptx(walk) => Self {
                 inner: Inner::Pptx(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "ppt")]
             Inner::Ppt(walk) => Self {
                 inner: Inner::Ppt(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(walk) => Self {
                 inner: Inner::Xlsb(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "xls")]
             Inner::Xls(walk) => Self {
                 inner: Inner::Xls(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "rtf")]
             Inner::Rtf(walk) => Self {
                 inner: Inner::Rtf(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "ods")]
             Inner::Ods(walk) => Self {
                 inner: Inner::Ods(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "odt")]
             Inner::Odt(walk) => Self {
                 inner: Inner::Odt(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => Self {
                 inner: Inner::Odp(walk.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "odf-objects")]
             Inner::Object(walks) => Self {
                 inner: Inner::Object(walks.limit(n)),
+                fast: self.fast,
             },
             #[cfg(feature = "iwork-adapter")]
             Inner::Iwork(walks) => Self {
                 inner: Inner::Iwork(walks.limit(n)),
+                fast: self.fast,
             },
             Inner::Never(never, _) => match never {},
         }
@@ -333,6 +362,9 @@ impl<'f> Iterator for Matches<'f, '_> {
     type Item = Result<Node<'f>>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.fast {
+            return self.next_fast();
+        }
         match &mut self.inner {
             #[cfg(feature = "doc")]
             Inner::Doc(walk) => walk.next_map(Node::Doc),
@@ -356,6 +388,41 @@ impl<'f> Iterator for Matches<'f, '_> {
             Inner::Ods(walk) => walk.next_map(Node::Ods),
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => walk.next_map(Node::Odp),
+            #[cfg(feature = "odf-objects")]
+            Inner::Object(walks) => walks.next(),
+            #[cfg(feature = "iwork-adapter")]
+            Inner::Iwork(walks) => walks.next(),
+            Inner::Never(never, _) => match *never {},
+        }
+    }
+}
+
+impl<'f> Matches<'f, '_> {
+    /// [`Iterator::next`] for a walk on its plan's fast step (record 0315).
+    fn next_fast(&mut self) -> Option<Result<Node<'f>>> {
+        match &mut self.inner {
+            #[cfg(feature = "doc")]
+            Inner::Doc(walk) => walk.next_fast_map(Node::Doc),
+            #[cfg(feature = "docx")]
+            Inner::Docx(walk) => walk.next_fast_map(Node::Docx),
+            #[cfg(feature = "xlsx")]
+            Inner::Xlsx(walk) => walk.next_fast_map(Node::Xlsx),
+            #[cfg(feature = "pptx")]
+            Inner::Pptx(walk) => walk.next_fast_map(Node::Pptx),
+            #[cfg(feature = "ppt")]
+            Inner::Ppt(walk) => walk.next_fast_map(Node::Ppt),
+            #[cfg(feature = "xlsb")]
+            Inner::Xlsb(walk) => walk.next_fast_map(Node::Xlsb),
+            #[cfg(feature = "xls")]
+            Inner::Xls(walk) => walk.next_fast_map(Node::Xls),
+            #[cfg(feature = "odt")]
+            Inner::Odt(walk) => walk.next_fast_map(Node::Odt),
+            #[cfg(feature = "rtf")]
+            Inner::Rtf(walk) => walk.next_fast_map(Node::Rtf),
+            #[cfg(feature = "ods")]
+            Inner::Ods(walk) => walk.next_fast_map(Node::Ods),
+            #[cfg(feature = "odp")]
+            Inner::Odp(walk) => walk.next_fast_map(Node::Odp),
             #[cfg(feature = "odf-objects")]
             Inner::Object(walks) => walks.next(),
             #[cfg(feature = "iwork-adapter")]

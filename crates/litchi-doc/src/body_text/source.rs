@@ -3243,7 +3243,8 @@ mod tests {
         let mut files = Vec::new();
         doc_files(&root, &mut files);
         files.sort();
-        assert_eq!(files.len(), 57);
+        // Record 0324 adds the generated `unified-ops/0294/marks.doc`.
+        assert_eq!(files.len(), 58);
         let mut compared = 0;
         for path in &files {
             let bytes = std::fs::read(path).expect("DOC fixture");
@@ -3261,7 +3262,7 @@ mod tests {
                 (shared, Err(error)) => panic!("{name}: shared {shared:?}, source: {error}"),
             }
         }
-        assert_eq!(compared, 49);
+        assert_eq!(compared, 50);
     }
 
     /// The change 0768 review's DOP mutations: every `DopBase` lock, the

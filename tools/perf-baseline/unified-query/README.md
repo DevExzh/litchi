@@ -35,3 +35,10 @@ before record 0287, 184 after). Routes and their names are unchanged.
 CARGO_TARGET_DIR=target/bench cargo build --release --features all-formats \
   --manifest-path tools/perf-baseline/unified-query/Cargo.toml
 ```
+
+Record 0315 adds new routes only: `xlsb_*_all_cell_owned_v1` and
+`xlsb_*_all_cell_fenced_v1`, the fair leaf legs of the full XLSB `cell`
+query that record 0280 added for XLSX and PPTX. The leaf keeps every
+stored cell as an owned handle (the worksheet position, a shared grid
+handle and the coordinate) and, in the fenced leg, reads the leaf's
+`source_version` once per match.

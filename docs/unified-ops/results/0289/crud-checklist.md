@@ -19,9 +19,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 |
 | pptx | 37 | 262 | 262 | 0 | 0 | 65 | 90 | 2 | 40 |
 | xlsb | 26 | 175 | 175 | 0 | 0 | 78 | 45 | 2 | 18 |
-| doc | 13 | 86 | 86 | 0 | 0 | 0 | 57 | 2 | 6 |
+| doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
-| ppt | 36 | 76 | 76 | 0 | 0 | 338 | 34 | 2 | 10 |
+| ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
 | rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
 | odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
 | ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
@@ -201,7 +201,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## doc
 
-- fixtures: `create()`, `ole/doc/documentProperties.doc`, `ole/doc/hyperlink.doc`, `ole/doc/table-merged-cells.doc`, `poi/test-data/hpsf/TestNon4ByteBoundary.doc`, `libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc`, `ole/doc/endingnote.doc`, `ole/doc/commented-table.doc`, `ole/doc/image-comment-at-char.doc`, `create() + add paragraph`
+- fixtures: `create()`, `ole/doc/documentProperties.doc`, `ole/doc/hyperlink.doc`, `ole/doc/table-merged-cells.doc`, `poi/test-data/hpsf/TestNon4ByteBoundary.doc`, `libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc`, `ole/doc/endingnote.doc`, `ole/doc/commented-table.doc`, `ole/doc/image-comment-at-char.doc`, `ole/doc/Lists.doc`, `ole/doc/watermark.doc`, `poi/test-data/document/Bug53453Section.doc`, `ole/doc/FloatingPictures.doc`, `unified-ops/0294/marks.doc`, `create() + add paragraph`, `ole/doc/Lists.doc + add hyperlink`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `ole/doc/documentProperties.doc`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -213,12 +213,26 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | cell | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| header | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| footer | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| header | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| footer | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | footnote | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | endnote | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | comments | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | comment | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| num | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| level | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| bookmark | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| field | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| section | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| textbox | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## xls
 
@@ -256,7 +270,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## ppt
 
-- fixtures: `create()`, `poi/test-data/slideshow/incorrect_slide_order.ppt`, `poi/test-data/slideshow/WithComments.ppt`, `ole/ppt/text_shapes.ppt`, `ole/ppt/ppt_with_png.ppt`, `poi/test-data/slideshow/headers_footers.ppt`, `poi/test-data/slideshow/basic_test_ppt_file.ppt`, `poi/test-data/slideshow/42485.ppt`, `poi/test-data/slideshow/bug61881.ppt`, `unified-ops/0294/connectors.ppt`, `create() + add slide`
+- fixtures: `create()`, `poi/test-data/slideshow/incorrect_slide_order.ppt`, `poi/test-data/slideshow/WithComments.ppt`, `ole/ppt/text_shapes.ppt`, `ole/ppt/ppt_with_png.ppt`, `poi/test-data/slideshow/headers_footers.ppt`, `poi/test-data/slideshow/basic_test_ppt_file.ppt`, `poi/test-data/slideshow/42485.ppt`, `poi/test-data/slideshow/bug61881.ppt`, `unified-ops/0294/connectors.ppt`, `unified-ops/0294/elements.ppt`, `poi/test-data/slideshow/headers_footers_2007.ppt`, `poi/test-data/slideshow/testPPT_oleWorkbook.ppt`, `poi/test-data/slideshow/sound.ppt`, `create() + add slide`, `unified-ops/0294/elements.ppt + add comment`, `unified-ops/0294/elements.ppt + add hyperlink`
 - document views on `poi/test-data/slideshow/incorrect_slide_order.ppt`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -267,34 +281,34 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | placeholder | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| tr | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| tc | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| chart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | group | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | connector | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | smartart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| ole | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
-| run | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| linebreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| run | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| linebreak | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
-| comment | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| video | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| audio | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| media | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| video | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| audio | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| media | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | equation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | zoom | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | model3d | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slideMaster | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slideLayout | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| theme | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| theme | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | modernComment | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | reply | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | animation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | series | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | axis | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| col | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| col | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | noteSlide | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | notesMaster | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 

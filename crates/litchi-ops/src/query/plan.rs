@@ -90,6 +90,9 @@ pub struct Plan<'q> {
     /// matches only direct children of the scope or of a top-level
     /// container: the walk then enters nothing below them.
     pub(crate) shallow: bool,
+    /// The single-subject fast path of the walk, when the plan has one
+    /// (record 0315).
+    pub(crate) fast: Option<FastPlan>,
     /// Findings that do not stop the query.
     pub(crate) diagnostics: Vec<Diagnostic>,
 }
@@ -226,6 +229,64 @@ pub(crate) struct Chain {
     pub(crate) position: Option<Positional>,
     /// How a node of one of `kinds` is tested against the chain.
     pub(crate) shortcut: Shortcut,
+}
+
+/// The walk of a plan with one alternative, one compound, no position, no
+/// header rows and no lone `*`, whose test is its kind and at most one
+/// shortcut test (`cell`, `cell[value>1000]`, `shape:contains(Revenue)`):
+/// its interest never changes, so which kinds match, which are entered and
+/// which are asked for are fixed for the whole walk, and computed once with
+/// the plan (record 0315). The walk's fast step makes the same reads, in
+/// the same order, as the general step: the kind test, the shortcut test,
+/// then the child test of a node it may enter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FastPlan {
+    /// The subject's kinds among the wanted ones.
+    pub(crate) kinds: u128,
+    /// The test beyond the kind: [`Shortcut::KindOnly`], [`Shortcut::Expr`]
+    /// or [`Shortcut::Content`].
+    pub(crate) test: Shortcut,
+    /// The kinds below which a wanted kind can occur (the walk's
+    /// `descend`).
+    pub(crate) enter: u128,
+    /// The kinds to ask the adapter for (the walk's `relevant`).
+    pub(crate) ask: u128,
+}
+
+impl FastPlan {
+    /// The fast path of `plan`, when it has one.
+    pub(crate) fn of(plan: &Plan<'_>) -> Option<Self> {
+        let [chain] = plan.top.as_slice() else {
+            return None;
+        };
+        let chain = plan.chains[*chain as usize];
+        let interest = plan.wanted;
+        if plan.shallow || plan.rows_mode.is_some() || interest == 0 || chain.position.is_some() {
+            return None;
+        }
+        if !matches!(
+            chain.shortcut,
+            Shortcut::KindOnly | Shortcut::Expr(_) | Shortcut::Content(_)
+        ) {
+            return None;
+        }
+        let enter = plan
+            .reach
+            .iter()
+            .enumerate()
+            .filter(|(_, reach)| *reach & interest != 0)
+            .fold(0, |bits, (ordinal, _)| {
+                bits | 1_u128
+                    .checked_shl(u32::try_from(ordinal).unwrap_or(u32::MAX))
+                    .unwrap_or(0)
+            });
+        Some(Self {
+            kinds: chain.kinds & interest,
+            test: chain.shortcut,
+            enter,
+            ask: interest | enter,
+        })
+    }
 }
 
 /// A cheaper test of a one-compound chain on a node of one of its kinds

@@ -202,19 +202,42 @@ const _: () = {
 impl DocxOwner {
     /// Prefer a source revision failure over the result of an operation that
     /// read a source-backed owner. Eager owners pass the result through.
+    ///
+    /// Inside a resolver or query step for this owner (a
+    /// [`crate::path::fence::Scope`] with [`Self::fence_key`]), whose bracket
+    /// checks the source once after the whole step, the result passes
+    /// through unchecked: the step's closing check observes a change made
+    /// before or during the read, and its error wins (records 0262, 0315).
     pub(crate) fn finish<T>(&self, result: Result<T>) -> Result<T> {
+        if crate::path::fence::is_active(self.fence_key()) {
+            return result;
+        }
+        self.ensure_current()?;
+        result
+    }
+
+    /// Validate every retained source before or after a public read; inside
+    /// a fenced step of this owner, the step's own check covers it.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        self.finish(Ok(()))
+    }
+
+    /// Validate every retained source, whether or not a fenced step is
+    /// active: the check a resolver or query bracket itself runs.
+    pub(crate) fn ensure_current(&self) -> Result<()> {
         match self {
             Self::Source(package) => {
                 package.check_source()?;
-                result
+                Ok(())
             },
-            Self::Eager(_) => result,
+            Self::Eager(_) => Ok(()),
         }
     }
 
-    /// Validate every retained source before or after a public read.
-    pub(crate) fn check_source(&self) -> Result<()> {
-        self.finish(Ok(()))
+    /// This owner's key for [`crate::path::fence::Scope`]: its address in
+    /// the handle's shared state, which every clone of the handle reads.
+    pub(crate) fn fence_key(&self) -> usize {
+        std::ptr::from_ref(self).addr()
     }
 }
 

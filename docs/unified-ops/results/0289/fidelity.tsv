@@ -139,7 +139,7 @@ libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx	xlsx	exact		value-exa
 libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb	odb	exact		value-exact	/table[1] name: 3148 -> 2777 bytes, first difference at 7	-	
 libreoffice-core/desktop/qa/data/3page.odg	odg	exact		value-exact	/page[1] name: 11175 -> 9735 bytes, first difference at 7	-	
 libreoffice-core/desktop/qa/data/BlankDrawDocument.odg	odg	exact		value-exact	/page[1] name: 8183 -> 6844 bytes, first difference at 7	-	
-libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	doc	exact		value-exact	/body/p[1] text: 22016 -> 24576 bytes, first difference at 548	-	
+libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	doc	exact		value-exact	/body/p[1] text: 22016 -> 24576 bytes, first difference at 548	value-exact	bookmark+hyperlink add+remove: 22016 -> 23552 bytes, first difference at 548
 libreoffice-core/extras/source/database/biblio.odb	odb	exact		value-exact	/table[1] name: 2892 -> 2427 bytes, first difference at 7	-	
 libreoffice-core/filter/qa/unit/data/semi-transparent-fill.odg	odg	exact		value-exact	/page[1] name: 10597 -> 8788 bytes, first difference at 7	-	
 libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	docx	exact		byte-exact	/styles/Normal name	-	
@@ -235,7 +235,7 @@ libreoffice-core/svx/qa/unit/data/FontWork.odg	odg	exact		value-exact	/page[1] n
 libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/core/data/rtf/pass/fdo80924.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 43363 -> 43377 bytes, first difference at 15239	none	
-libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	-	
+libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 66048 -> 117760 bytes, first difference at 44
 libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt	odt	exact		byte-exact	/body/tbl[1] name	-	
 libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
 libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	docx	exact		byte-exact	/styles/Normal name	-	
@@ -380,7 +380,7 @@ libreoffice-core/sw/qa/extras/uiwriter/data/tdf147006.rtf	rtf	exact		none		none
 libreoffice-core/sw/qa/extras/uiwriter/data/tdf86639.rtf	rtf	exact		value-exact	/body/p[1] text: 188 -> 188 bytes, first difference at 185	none	
 libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt	odt	exact		byte-exact	/body/tbl[1] name	-	
 libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 13312 -> 14848 bytes, first difference at 516	-	
+libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 13312 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 13312 -> 13824 bytes, first difference at 516
 libreoffice-core/sw/qa/uibase/shells/data/ole-save-preview-update.odt	odt	exact		value-exact	/metadata author: 16006 -> 14628 bytes, first difference at 7	-	
 libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:a (an element with text of its...	-	
 libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[2]/tc[2] text	none	
@@ -488,7 +488,7 @@ odfpy/xml2odf/definitionlists.xml	odt	exact		byte-exact	/metadata author	-
 office-interop/libreoffice-resaved/45543-transition-litchi.ppt	ppt	exact		none		-	
 office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx	xlsx	exact		value-exact	/sheet[1] name: 7311 -> 7314 bytes, first difference at 303	-	
 office-interop/libreoffice-resaved/document-properties-litchi.docx	docx	exact		byte-exact	/body/p[1] style	-	
-office-interop/libreoffice-resaved/noheadfoot-litchi.doc	doc	exact		value-exact	/body/p[1] text: 10240 -> 15360 bytes, first difference at 516	-	
+office-interop/libreoffice-resaved/noheadfoot-litchi.doc	doc	exact		value-exact	/body/p[1] text: 10240 -> 15360 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 10240 -> 14336 bytes, first difference at 516
 office-interop/libreoffice-resaved/relsize-litchi.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
 office-interop/libreoffice-resaved/shapes-litchi.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	byte-exact	slide move+back
 office-interop/libreoffice-resaved/tdf132924-litchi.odb	odb	exact		value-exact	/table[1] name: 3198 -> 2821 bytes, first difference at 7	-	
@@ -496,43 +496,43 @@ office-interop/libreoffice-resaved/tdf78897-litchi.xls	xls	exact		byte-exact	/sh
 office-interop/litchi-changed/45543-transition-litchi.ppt	ppt	exact		none		-	
 office-interop/litchi-changed/date-autofilter-litchi.xlsx	xlsx	exact		value-exact	/sheet[1] name: 6604 -> 6604 bytes, first difference at 4248	-	
 office-interop/litchi-changed/document-properties-litchi.docx	docx	exact		byte-exact	/styles/Normal name	-	
-office-interop/litchi-changed/noheadfoot-litchi.doc	doc	exact		refused	/body/p[1] text: corrupt_file: the file is malformed	-	
+office-interop/litchi-changed/noheadfoot-litchi.doc	doc	exact		refused	/body/p[1] text: corrupt_file: the file is malformed	refused	bookmark+hyperlink add+remove: corrupt_file: the file is malformed
 office-interop/litchi-changed/relsize-litchi.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
 office-interop/litchi-changed/shapes-litchi.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
 office-interop/litchi-changed/tdf132924-litchi.odb	odb	exact		value-exact	/table[1] name: 2897 -> 2808 bytes, first difference at 83	-	
 office-interop/litchi-changed/tdf78897-litchi.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 officecli/examples/word/revisions.docx	docx	exact		byte-exact	/body/p[1] style	-	
-ole/doc/3endnotes.doc	doc	exact		value-exact	/body/p[4] text: 35328 -> 39936 bytes, first difference at 620	-	
-ole/doc/DiffFirstPageHeadFoot.doc	doc	exact		value-exact	/body/p[3] text: 27648 -> 31232 bytes, first difference at 540	-	
-ole/doc/FancyFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 31232 bytes, first difference at 540	-	
-ole/doc/FloatingPictures.doc	doc	exact		value-exact	/body/p[1] text: 335360 -> 353280 bytes, first difference at 92	-	
-ole/doc/HeaderFooterProblematic.doc	doc	exact		none		-	
-ole/doc/HeaderFooterUnicode.doc	doc	exact		value-exact	/body/p[1] text: 28672 -> 31232 bytes, first difference at 540	-	
-ole/doc/Lists.doc	doc	exact		value-exact	/body/p[1] text: 27648 -> 29696 bytes, first difference at 540	-	
-ole/doc/NoHeadFoot.doc	doc	exact		value-exact	/body/p[1] text: 26112 -> 28672 bytes, first difference at 540	-	
+ole/doc/3endnotes.doc	doc	exact		value-exact	/body/p[4] text: 35328 -> 39936 bytes, first difference at 620	value-exact	bookmark+hyperlink add+remove: 35328 -> 39424 bytes, first difference at 620
+ole/doc/DiffFirstPageHeadFoot.doc	doc	exact		value-exact	/body/p[3] text: 27648 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27648 -> 31232 bytes, first difference at 540
+ole/doc/FancyFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 30720 bytes, first difference at 540
+ole/doc/FloatingPictures.doc	doc	exact		value-exact	/body/p[1] text: 335360 -> 353280 bytes, first difference at 92	value-exact	bookmark+hyperlink add+remove: 335360 -> 357888 bytes, first difference at 92
+ole/doc/HeaderFooterProblematic.doc	doc	exact		none		value-exact	bookmark+hyperlink add+remove: 61440 -> 68096 bytes, first difference at 44
+ole/doc/HeaderFooterUnicode.doc	doc	exact		value-exact	/body/p[1] text: 28672 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 28672 -> 31744 bytes, first difference at 540
+ole/doc/Lists.doc	doc	exact		value-exact	/body/p[1] text: 27648 -> 29696 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27648 -> 28672 bytes, first difference at 540
+ole/doc/NoHeadFoot.doc	doc	exact		value-exact	/body/p[1] text: 26112 -> 28672 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 26112 -> 28160 bytes, first difference at 540
 ole/doc/PasswordProtected.doc	doc	locked		-		-	
-ole/doc/PngPicture.doc	doc	exact		value-exact	/body/p[1] text: 14336 -> 15872 bytes, first difference at 608	-	
-ole/doc/ThreeColFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 29696 bytes, first difference at 540	-	
-ole/doc/ThreeColHead.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 29696 bytes, first difference at 540	-	
-ole/doc/ThreeColHeadFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 30208 bytes, first difference at 540	-	
-ole/doc/cfb-truncated-final-sector.doc	doc	exact		value-exact	/body/p[1]/r[2] text: 24065 -> 27648 bytes, first difference at 48	-	
-ole/doc/cjklist30.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	-	
-ole/doc/cjklist31.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	-	
-ole/doc/cjklist34.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	-	
-ole/doc/cjklist35.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	-	
-ole/doc/commented-table.doc	doc	exact		value-exact	/body/p[2]/r[1] text: 27136 -> 29184 bytes, first difference at 548	-	
-ole/doc/documentProperties.doc	doc	exact		value-exact	/body/p[1] text: 9728 -> 14848 bytes, first difference at 516	-	
-ole/doc/empty.doc	doc	exact		none		-	
-ole/doc/endingnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 9728 -> 14848 bytes, first difference at 516	-	
-ole/doc/equation.doc	doc	exact		value-exact	/body/p[1]/r[2] text: 13824 -> 18944 bytes, first difference at 516	-	
-ole/doc/first-header-footer.doc	doc	exact		value-exact	/body/p[1] text: 23552 -> 29184 bytes, first difference at 540	-	
-ole/doc/hyperlink.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 9728 -> 14848 bytes, first difference at 516	-	
-ole/doc/image-comment-at-char.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 24064 -> 26112 bytes, first difference at 552	-	
-ole/doc/inline-endnote-and-footnote.doc	doc	exact		value-exact	/body/p[1] text: 24576 -> 28160 bytes, first difference at 540	-	
-ole/doc/table-merged-cells.doc	doc	exact		none		-	
-ole/doc/tdf71749_with_footnote.doc	doc	exact		value-exact	/body/p[3] text: 20480 -> 23040 bytes, first difference at 540	-	
-ole/doc/testPictures.doc	doc	exact		value-exact	/body/p[5] text: 315904 -> 320000 bytes, first difference at 540	-	
-ole/doc/watermark.doc	doc	exact		value-exact	/body/p[1] text: 20480 -> 22016 bytes, first difference at 516	-	
+ole/doc/PngPicture.doc	doc	exact		value-exact	/body/p[1] text: 14336 -> 15872 bytes, first difference at 608	value-exact	bookmark+hyperlink add+remove: 14336 -> 15360 bytes, first difference at 608
+ole/doc/ThreeColFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 29696 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 30208 bytes, first difference at 540
+ole/doc/ThreeColHead.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 29696 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 29184 bytes, first difference at 540
+ole/doc/ThreeColHeadFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 30208 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 30208 bytes, first difference at 540
+ole/doc/cfb-truncated-final-sector.doc	doc	exact		value-exact	/body/p[1]/r[2] text: 24065 -> 27648 bytes, first difference at 48	value-exact	bookmark+hyperlink add+remove: 24065 -> 26624 bytes, first difference at 76
+ole/doc/cjklist30.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 26112 bytes, first difference at 540
+ole/doc/cjklist31.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 26112 bytes, first difference at 540
+ole/doc/cjklist34.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 26112 bytes, first difference at 540
+ole/doc/cjklist35.doc	doc	exact		value-exact	/body/p[1] text: 24064 -> 27136 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24064 -> 25600 bytes, first difference at 540
+ole/doc/commented-table.doc	doc	exact		value-exact	/body/p[2]/r[1] text: 27136 -> 29184 bytes, first difference at 548	value-exact	bookmark+hyperlink add+remove: 27136 -> 28672 bytes, first difference at 548
+ole/doc/documentProperties.doc	doc	exact		value-exact	/body/p[1] text: 9728 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 9728 -> 13824 bytes, first difference at 516
+ole/doc/empty.doc	doc	exact		none		value-exact	bookmark+hyperlink add+remove: 19456 -> 20992 bytes, first difference at 540
+ole/doc/endingnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 9728 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 9728 -> 13824 bytes, first difference at 516
+ole/doc/equation.doc	doc	exact		value-exact	/body/p[1]/r[2] text: 13824 -> 18944 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 13824 -> 18432 bytes, first difference at 516
+ole/doc/first-header-footer.doc	doc	exact		value-exact	/body/p[1] text: 23552 -> 29184 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 23552 -> 29184 bytes, first difference at 540
+ole/doc/hyperlink.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 9728 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 9728 -> 13824 bytes, first difference at 516
+ole/doc/image-comment-at-char.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 24064 -> 26112 bytes, first difference at 552	value-exact	bookmark+hyperlink add+remove: 24064 -> 25600 bytes, first difference at 552
+ole/doc/inline-endnote-and-footnote.doc	doc	exact		value-exact	/body/p[1] text: 24576 -> 28160 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 24576 -> 27136 bytes, first difference at 540
+ole/doc/table-merged-cells.doc	doc	exact		refused	/body/tbl[1]/tr[1]/tc[1]/p[1] style: not_found: the DOC stylesheet has no such style	value-exact	bookmark+hyperlink add+remove: 17408 -> 17920 bytes, first difference at 516
+ole/doc/tdf71749_with_footnote.doc	doc	exact		value-exact	/body/p[3] text: 20480 -> 23040 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 20480 -> 22528 bytes, first difference at 540
+ole/doc/testPictures.doc	doc	exact		value-exact	/body/p[5] text: 315904 -> 320000 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 315904 -> 318464 bytes, first difference at 540
+ole/doc/watermark.doc	doc	exact		value-exact	/body/p[1] text: 20480 -> 22016 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 20480 -> 23040 bytes, first difference at 516
 ole/ppt/SampleShow.ppt	ppt	exact		none		-	
 ole/ppt/empty.ppt	ppt	exact		none		-	
 ole/ppt/empty_textbox.ppt	ppt	exact		none		-	
@@ -773,27 +773,27 @@ ooxml/xlsx/tableStyle.xlsx	xlsx	exact		value-exact	/sheet[1] name: 10899 -> 1089
 ooxml/xlsx/test_conditional_formatting.xlsx	xlsx	exact		value-exact	/sheet[1] name: 10203 -> 10203 bytes, first difference at 2337	-	
 ooxml/xlsx/universal-content.xlsx	xlsx	exact		value-exact	/sheet[1] name: 7296 -> 7310 bytes, first difference at 4121	-	
 poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt	ppt	exact		none		-	
-poi/test-data/document/47950_normal.doc	doc	exact		value-exact	/body/p[1] text: 27136 -> 29184 bytes, first difference at 648	-	
+poi/test-data/document/47950_normal.doc	doc	exact		value-exact	/body/p[1] text: 27136 -> 29184 bytes, first difference at 648	value-exact	bookmark+hyperlink add+remove: 27136 -> 28672 bytes, first difference at 616
 poi/test-data/document/61745.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/document/Bug53453Section.doc	doc	exact		value-exact	/body/p[1] text: 26112 -> 28672 bytes, first difference at 540	-	
+poi/test-data/document/Bug53453Section.doc	doc	exact		value-exact	/body/p[1] text: 26112 -> 28672 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 26112 -> 27648 bytes, first difference at 540
 poi/test-data/document/Bug54849.docx	docx	exact		byte-exact	/styles/Normal name	-	
 poi/test-data/document/ComplexNumberedLists.docx	docx	exact		byte-exact	/body/p[2] style	-	
 poi/test-data/document/EmbeddedDocument.docx	docx	exact		byte-exact	/styles/Normal name	-	
 poi/test-data/document/Numbering.docx	docx	exact		byte-exact	/body/p[1] style	-	
 poi/test-data/document/NumberingWOverrides.docx	docx	exact		refused	/body/p[4] numId: invalid_value: paragraph numId must be an unsigned 32-bit integer	-	
 poi/test-data/document/NumberingWithOutOfOrderId.docx	docx	exact		byte-exact	/body/p[1] style	-	
-poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	doc	exact		value-exact	/body/p[2] text: 86528 -> 123904 bytes, first difference at 540	-	
-poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	-	
+poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	doc	exact		value-exact	/body/p[2] text: 86528 -> 123904 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 86528 -> 114688 bytes, first difference at 540
+poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 1619457 -> 1638912 bytes, first difference at 48
 poi/test-data/document/heading123.docx	docx	exact		byte-exact	/body/p[1] style	-	
 poi/test-data/document/password_password_cryptoapi.doc	doc	locked		-		-	
 poi/test-data/document/password_tika_binaryrc4.doc	doc	locked		-		-	
 poi/test-data/document/saut_page.docx	docx	exact		byte-exact	/body/p[1] style	-	
-poi/test-data/document/saved-by-table.doc	doc	exact		value-exact	/body/p[10] text: 65024 -> 79872 bytes, first difference at 44	-	
-poi/test-data/document/test.doc	doc	exact		value-exact	/body/p[7] text: 32768 -> 22016 bytes, first difference at 888	-	
+poi/test-data/document/saved-by-table.doc	doc	exact		value-exact	/body/p[10] text: 65024 -> 79872 bytes, first difference at 44	value-exact	bookmark+hyperlink add+remove: 65024 -> 80896 bytes, first difference at 44
+poi/test-data/document/test.doc	doc	exact		value-exact	/body/p[7] text: 32768 -> 22016 bytes, first difference at 888	value-exact	bookmark+hyperlink add+remove: 32768 -> 22016 bytes, first difference at 888
 poi/test-data/document/testComment.docx	docx	exact		byte-exact	/body/p[1] style	-	
-poi/test-data/document/word_with_embeded.doc	doc	exact		value-exact	/body/p[1] text: 117248 -> 119808 bytes, first difference at 540	-	
-poi/test-data/hpsf/TestGermanWord90.doc	doc	exact		value-exact	/body/p[1] text: 19456 -> 22016 bytes, first difference at 540	-	
-poi/test-data/hpsf/TestNon4ByteBoundary.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	-	
+poi/test-data/document/word_with_embeded.doc	doc	exact		value-exact	/body/p[1] text: 117248 -> 119808 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 117248 -> 119808 bytes, first difference at 540
+poi/test-data/hpsf/TestGermanWord90.doc	doc	exact		value-exact	/body/p[1] text: 19456 -> 22016 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 19456 -> 21504 bytes, first difference at 540
+poi/test-data/hpsf/TestNon4ByteBoundary.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 11776 -> 16896 bytes, first difference at 4141
 poi/test-data/hpsf/TestUnicode.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/integration/test_recursive_embedded.docx	docx	exact		byte-exact	/styles/Normal name	-	
 poi/test-data/openxml4j/50154.xlsx	xlsx	exact		value-exact	/sheet[1] name: 13583 -> 13587 bytes, first difference at 2313	-	
@@ -1001,8 +1001,10 @@ rtf/typed_hyperlinks_and_references.rtf	rtf	exact		refused	/body/p[1] text: unsu
 rtf/watermark.rtf	rtf	exact		none		none	
 unified-ops/0294/comments.odp	odp	exact		value-exact	/slide[1] name: 2157 -> 2180 bytes, first difference at 91	-	
 unified-ops/0294/connectors.ppt	ppt	exact		none		-	
+unified-ops/0294/elements.ppt	ppt	exact		none		-	
 unified-ops/0294/frames.odm	odm	exact		byte-exact	/body/p[1] text	-	
 unified-ops/0294/frames.oth	oth	exact		byte-exact	/body/p[1] text	-	
 unified-ops/0294/layers.odg	odg	exact		byte-exact	/page[1] name	-	
+unified-ops/0294/marks.doc	doc	exact		value-exact	/body/p[1] text: 15360 -> 17920 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 15360 -> 17408 bytes, first difference at 540
 unified-ops/0294/modern-comments.pptx	pptx	exact		byte-exact	/slidemaster[1] name	byte-exact	slide move+back
 unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	byte-exact	note add+remove

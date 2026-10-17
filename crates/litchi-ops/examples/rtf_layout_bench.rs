@@ -1,9 +1,14 @@
 //! Paired RTF layout timing with exact native/facade checks outside timing.
+//!
+//! Record 0315 adds the route `last_path_typed`: the `last_path` set with
+//! every length passed as a typed [`litchi_ops::value::Length`] instead of
+//! the text `"6pt"`.
 #[cfg(feature = "rtf")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::Position;
     use litchi_core::selector::{Path, Scope};
     use litchi_ops::query::Query;
+    use litchi_ops::value::Length;
     use litchi_ops::{Props, open_bytes};
 
     use litchi_rtf::edit::{ParagraphLayoutPatch, ParagraphLayoutUpdate};
@@ -23,7 +28,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .max_replacement_bytes(16 * 1024 * 1024)?
             .build()?;
         let options = litchi_rtf::EditOptions::new().semantic_limits(limits);
-        for all in [false, true] {
+        // (every paragraph, typed lengths): `last_path`, `query_all`, then
+        // record 0315's `last_path_typed`.
+        for (all, typed) in [(false, false), (true, false), (false, true)] {
             let positions: Vec<_> = if all {
                 (0..count).collect()
             } else {
@@ -52,15 +59,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut unified_ns = Vec::new();
             for round in 0..11 {
                 for route in [false, true, true, false] {
-                    let props = Props::new()
-                        .with("spaceBefore", "6pt")
-                        .with("spaceAfter", "3pt")
-                        .with("indent", "12pt")
-                        .with("rightIndent", "4pt")
-                        .with("firstLineIndent", "-2pt")
-                        .with("keepLines", true)
-                        .with("keepNext", true)
-                        .with("pageBreakBefore", true);
+                    let props = if typed {
+                        Props::new()
+                            .with("spaceBefore", Length::from_points(6))
+                            .with("spaceAfter", Length::from_points(3))
+                            .with("indent", Length::from_points(12))
+                            .with("rightIndent", Length::from_points(4))
+                            .with("firstLineIndent", Length::from_points(-2))
+                    } else {
+                        Props::new()
+                            .with("spaceBefore", "6pt")
+                            .with("spaceAfter", "3pt")
+                            .with("indent", "12pt")
+                            .with("rightIndent", "4pt")
+                            .with("firstLineIndent", "-2pt")
+                    }
+                    .with("keepLines", true)
+                    .with("keepNext", true)
+                    .with("pageBreakBefore", true);
                     let selector = query.clone();
                     let start = Instant::now();
                     let (elapsed, output) = if route {
@@ -109,7 +125,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) as f64 / 2.0
             };
             cases.push(serde_json::json!({
-                "paragraphs":count,"route":if all {"query_all"} else {"last_path"},"targets":updates.len(),
+                "paragraphs":count,"route":match (all, typed) {
+                    (true, _) => "query_all",
+                    (false, false) => "last_path",
+                    (false, true) => "last_path_typed",
+                },"targets":updates.len(),
                 "native_ns":native_ns,"unified_ns":unified_ns,
                 "native_median_ns":median(&native_ns),"unified_median_ns":median(&unified_ns),
                 "ratio":median(&unified_ns)/median(&native_ns),"exact_bytes_and_reopened_layout":true

@@ -18,7 +18,7 @@ was refused (typed), `none` nothing to move.
 
 | format | exact | differs | refused | error | signed-exact | signed-differs | signed-error | locked | revert byte-exact | revert value-exact | revert mismatch | revert one-way | revert refused | revert none | structure byte-exact | structure value-exact | structure mismatch | structure one-way | structure refused | structure none |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| doc | 44 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 37 | 0 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
+| doc | 45 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 38 | 0 | 0 | 5 | 2 | 0 | 44 | 0 | 0 | 1 | 0 |
 | docx | 75 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 60 | 4 | 0 | 0 | 10 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | keynote | 57 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 55 | 0 | 0 | 0 | 0 | 0 | 14 | 0 | 0 | 42 | 0 |
 | numbers | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 40 | 0 | 0 | 0 | 0 | 0 | 38 | 0 | 1 | 1 | 0 |
@@ -32,13 +32,13 @@ was refused (typed), `none` nothing to move.
 | odt | 70 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 32 | 29 | 0 | 0 | 8 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | oth | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 33 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 |
-| ppt | 29 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ppt | 30 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pptx | 81 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 72 | 6 | 0 | 1 | 2 | 0 | 11 | 0 | 0 | 0 | 1 | 69 |
 | rtf | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 61 | 37 | 16 | 39 | 0 | 1 | 18 | 88 |
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 112 | 3 | 0 | 0 | 4 | 0 | 92 | 5 | 0 | 0 | 22 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 986 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 328 | 460 | 0 | 5 | 115 | 75 | 149 | 117 | 0 | 2 | 84 | 157 |
+| **all** | 988 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 328 | 461 | 0 | 5 | 116 | 75 | 149 | 161 | 0 | 2 | 85 | 157 |
 
 ## Office-extension files the unified layer does not open
 

@@ -358,6 +358,23 @@ impl Presentation {
         &self.inner.slide_directory
     }
 
+    /// The theme of the first main master that carries a `PowerPoint` 2007
+    /// `RoundTripThemeAtom` (record 0323); `None` for a presentation saved
+    /// without one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a master's round-trip records or the theme part
+    /// are malformed.
+    pub fn theme(&self) -> Result<Option<crate::theme::Theme>> {
+        for metadata in self.powerpoint12_main_master_metadata()? {
+            if let Some(package) = &metadata.theme_package {
+                return crate::theme::from_package(package).map(Some);
+            }
+        }
+        Ok(None)
+    }
+
     /// Parse `PowerPoint` 12 round-trip metadata for every main master slide.
     ///
     /// The returned values follow the main-master order in the `PowerPoint` document stream.
@@ -764,6 +781,65 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn hyperlinks(&self) -> Result<Hyperlinks> {
         Hyperlinks::parse(&self.live_document_record()?)
+    }
+
+    /// Resolve a click interaction (record 0323): a URL, a slide of this
+    /// presentation or a slide-show jump, with its screen tip. `None` when
+    /// the action is not a hyperlink.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document's hyperlink records are malformed.
+    pub fn resolve_click(
+        &self,
+        interaction: &crate::hyperlink::Interaction,
+    ) -> Result<Option<crate::hyperlink::Click>> {
+        let hyperlinks = self.hyperlinks()?;
+        let slide_ids = self
+            .slide_directory()
+            .entries()
+            .iter()
+            .map(crate::SlideDirectoryEntry::slide_id)
+            .collect::<Vec<_>>();
+        Ok(crate::hyperlink::Click::resolve(
+            interaction,
+            &hyperlinks,
+            &slide_ids,
+        ))
+    }
+
+    /// The click hyperlink of the shape with `OfficeArt` ID `shape_id` on
+    /// the slide at zero-based `position`; see [`Self::resolve_click`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slide or the document's hyperlink records are
+    /// malformed.
+    pub fn shape_click(
+        &self,
+        position: usize,
+        shape_id: u32,
+    ) -> Result<Option<crate::hyperlink::Click>> {
+        let Some(slide) = self.slide_at(position)? else {
+            return Ok(None);
+        };
+        let Some(entry) = slide
+            .shape_interactions()?
+            .into_iter()
+            .find(|entry| entry.shape_id == shape_id)
+        else {
+            return Ok(None);
+        };
+        let hyperlinks = self.hyperlinks()?;
+        let slide_ids = self
+            .slide_directory()
+            .entries()
+            .iter()
+            .map(crate::SlideDirectoryEntry::slide_id)
+            .collect::<Vec<_>>();
+        Ok(entry.interactions.iter().find_map(|interaction| {
+            crate::hyperlink::Click::resolve(interaction, &hyperlinks, &slide_ids)
+        }))
     }
 
     /// Return inert embedded and linked OLE metadata without loading object storage.

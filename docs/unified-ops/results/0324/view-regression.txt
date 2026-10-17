@@ -1,0 +1,120 @@
+== round1 view-1-B.tsv
+p2_format	876
+p28_format	923
+p1_r1_format	1419
+query_p_formats	34171
+root_children	115
+body_children	1516
+view_text	1934
+paragraph_text_set	109325
+run_bold_set	112249
+== round1 view-2-A.tsv
+p2_format	944
+p28_format	998
+p1_r1_format	1442
+query_p_formats	36681
+root_children	114
+body_children	1545
+view_text	1922
+paragraph_text_set	107890
+run_bold_set	108678
+== round1 view-3-A.tsv
+p2_format	933
+p28_format	1008
+p1_r1_format	1472
+query_p_formats	36432
+root_children	119
+body_children	1535
+view_text	1907
+paragraph_text_set	108419
+run_bold_set	109581
+== round1 view-4-B.tsv
+p2_format	956
+p28_format	1006
+p1_r1_format	1474
+query_p_formats	34345
+root_children	118
+body_children	1518
+view_text	1936
+paragraph_text_set	108120
+run_bold_set	105129
+== round1 view-5-B.tsv
+p2_format	886
+p28_format	930
+p1_r1_format	1428
+query_p_formats	33709
+root_children	113
+body_children	1519
+view_text	1949
+paragraph_text_set	110017
+run_bold_set	95301
+== round1 view-6-A.tsv
+p2_format	965
+p28_format	1018
+p1_r1_format	1438
+query_p_formats	37055
+root_children	120
+body_children	1536
+view_text	1921
+paragraph_text_set	109914
+run_bold_set	111005
+== round2 view-1-A.tsv
+p2_format	960
+p28_format	1020
+p1_r1_format	1503
+query_p_formats	37258
+root_children	113
+body_children	1516
+view_text	1909
+paragraph_text_set	111056
+run_bold_set	113902
+== round2 view-2-B.tsv
+p2_format	914
+p28_format	936
+p1_r1_format	1388
+query_p_formats	34782
+root_children	112
+body_children	1545
+view_text	1917
+paragraph_text_set	111384
+run_bold_set	113476
+== round2 view-3-B.tsv
+p2_format	885
+p28_format	927
+p1_r1_format	1402
+query_p_formats	33716
+root_children	113
+body_children	1521
+view_text	1935
+paragraph_text_set	107177
+run_bold_set	110202
+== round2 view-4-A.tsv
+p2_format	968
+p28_format	1031
+p1_r1_format	1451
+query_p_formats	36508
+root_children	113
+body_children	1510
+view_text	1937
+paragraph_text_set	107094
+run_bold_set	109843
+== round2 view-5-A.tsv
+p2_format	953
+p28_format	1014
+p1_r1_format	1473
+query_p_formats	36703
+root_children	112
+body_children	1513
+view_text	1893
+paragraph_text_set	111959
+run_bold_set	113185
+== round2 view-6-B.tsv
+p2_format	892
+p28_format	943
+p1_r1_format	1432
+query_p_formats	34421
+root_children	113
+body_children	1522
+view_text	1937
+paragraph_text_set	105924
+run_bold_set	110091

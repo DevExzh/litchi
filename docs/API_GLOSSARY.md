@@ -2621,3 +2621,45 @@ Positions are complete-catalog sheet positions.
 | `litchi_spreadsheet_drawing::objects::{Color, Element, ElementKind, Placement, Marker, Image, Fill, Line, Font, Align, VerticalAlign, PictureSpec, ShapeSpec, Change, ChartFrame, Detached, LimitKind}`, `objects::{read, chart_frames, drawing_of, count, next_id, append, check_picture, picture_fragment, shape_fragment, change, detach}`; `litchi_spreadsheet_drawing::vml::{Shape, shapes, next_shape_id, note_shape, new_drawing}` | the format-neutral half of the XLSX and XLSB drawing editors and their VML note shapes; the model is generic over the format's `Color` (XLSX `Rgb`, XLSB `u32`), and each `drawing::edit` re-exports it (`Fill`, `Line`, `Font`, `Element`, `ShapeSpec` are aliases); outputs are byte-identical to the copies they replace | ✅ 0325 |
 | `litchi_xlsb::sheet::{Features, FeatureSet}`, `Workbook::{sheet_features, sheet_comments, drawing_elements, drawing_charts, differential_formats}`, `SourceBackedWorksheet::{features, comments, drawing_elements, drawing_charts}`, `SourceBackedWorkbook::differential_formats` | feature reads on both owners, without decoding cells; `FeatureSet` selects the kinds (only validations and formats render formulas) | ✅ 0322 |
 | `litchi_xlsx::{Worksheet, SourceWorksheet}::threaded_comments`, `litchi_xlsx::{Workbook, SourceBackedWorkbook}::people` | threaded-comment and people reads on both owners (record 0320 gap 3, reading only) | ✅ 0322 |
+
+## DOC styles, lists, hyperlinks, bookmarks, tabs and sections (record 0324)
+
+The primary `doc::Edit` gains the record-0324 verbs; each stages one
+MS-DOC structure (a paragraph's PAPX, the main story and its `PlcffldMom`
+markers, `SttbfBkmk`/`PlcfBkf`/`PlcfBkl`, or one section's SEPX) and keeps
+every other byte. Native indexes (`istd`, field begin CP) are the selectors
+these verbs take; the unified layer resolves style ids and names.
+
+| Name | Notes | Status |
+|---|---|---|
+| `Edit::set_paragraph_style(Position, u16)` | applies a paragraph style by `istd`; refuses a non-paragraph slot (`Refusal::StyleNotFound`) | ✅ 0324 |
+| `body_text::CharacterValue::Style(u16)`, `CharacterValueProperty::Style` | `sprmCIstd` through `set_character_value`; index 10 clears it | ✅ 0324 |
+| `Edit::{paragraph_tabs, set_paragraph_tabs}` | effective stops in, one `sprmPChgTabsPapx` out | ✅ 0324 |
+| `body_text::{HyperlinkInsert, FieldPart}`, `TextTarget::Field { start, part }` | a field's instruction or result as a text target | ✅ 0324 |
+| `Edit::{insert_hyperlink, remove_field}` | a whole `HYPERLINK` field in, a whole field (nested ones included) out | ✅ 0324 |
+| `Edit::{bookmarks, add_bookmark, rename_bookmark, remove_bookmark}` | standard bookmarks by name | ✅ 0324 |
+| `body_text::SectionValue`, `Edit::set_section_values(Position, &[SectionValue])` | typed `sprmS*` page setup | ✅ 0324 |
+| `body_text::ChangeRef::{ParagraphStyle, ParagraphTabs, Field, Bookmark, Section}` | patch change descriptors; the durable envelope refuses them | ✅ 0324 |
+| `body_text::Refusal::{StyleNotFound, InvalidProperty, FieldNotFound, BookmarkName, BookmarkNotFound, SectionNotFound}` | | ✅ 0324 |
+| `litchi_ops` DOC kinds `Styles`, `Style`, `Numbering`, `AbstractNum`, `Num`, `Level`, `Hyperlink`, `Bookmark`, `Field`, `Toc`, `Section`, `Tab`, `TextBox`, `Shape` | the DOCX element names and paths (`/styles/<id or name>`, `/numbering/abstractNum[N]/level[L]`, `/body/p[N]/hyperlink[M]`, `/bookmark[@name=X]`, `/field[N]`, `/toc[N]`, `/section[N]`, `/body/p[N]/tab[M]`, `/body/textbox[N]`, `/body/shape[N]`); a DOC style's id is its name without spaces and punctuation, each word of a built-in name capitalized | ✅ 0324 |
+
+## PPT element surface (record 0323)
+
+Element verbs live on the primary `package::edit::Edit` and the root
+`slide_order::Transaction` (no new transaction family). Each publishes
+complete replacements of the persisted records it changes and keeps every
+other record byte for byte; `slide_order::Refusal::{UnsupportedElement,
+ElementNotFound, InvalidElementValue}` name the element refusals.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_ppt::comments::{NewComment, CommentChange, DateTime}` | `DateTime::{parse, day_of_week}`; no ambient clock: an absent date is an all-zero `SYSTEMTIME` | ✅ 0323 |
+| `Edit::{add_comment, set_comment, remove_comment}` (and on `slide_order::Transaction`) | `add_comment` returns the comment's `Position`; the author's next index raises a document-level author seed | ✅ 0323 |
+| `slide_order::Refusal::{UnsupportedElement, ElementNotFound, InvalidElementValue}` | | ✅ 0323 |
+| `Edit::set_table_cell_text(target, row, column, text)` (and on `slide_order::Transaction`) | a cell's shape text under the shape-text closure rules; an empty PowerPoint cell gains its first `TextCharsAtom` | ✅ 0323 |
+| `shapes::shape_enum::TableShape::{cell_shape_id, row_heights, column_widths}` | the grid read from the table group's cell anchors, in master units | ✅ 0323 |
+| `litchi_ppt::hyperlink::{Click, Target}`; `Click::resolve`; `Presentation::shape_click` | `Target::{Url, Slide(Position), Jump(InteractionJump)}`, named after the PPTX `hyperlinks::{Click, Target}` | ✅ 0323 |
+| `Edit::set_shape_hyperlink(target, Option<&Click>)` (and on `slide_order::Transaction`) | a shape's `InteractiveInfo` click; URL and slide links append an `ExHyperlinkContainer` (and an `ExHyperlink9Container` screen tip) | ✅ 0323 |
+| `text_edit::{TextRuns, CharacterRun, TextLink, RunFormat}`; `Slide::shape_text_runs`; `Presentation::resolve_click` | a body's character runs (`TextCFException` over UTF-16 units, covering the final paragraph mark) and text hyperlinks; outline-backed placeholders read their slide-list body | ✅ 0323 |
+| `Edit::{set_run_format, set_text_hyperlink}` (and on `slide_order::Transaction`) | split the body's `StyleTextPropAtom` character runs (a body without one gains it) / write an `InteractiveInfo` + `TextInteractiveInfoAtom` pair; outline bodies are edited in the live document | ✅ 0323 |
+| `litchi_ppt::theme::{Theme, Fonts, COLOR_SLOTS, parse, from_package}`; `Presentation::theme` | the `RoundTripThemeAtom` theme part's color and font schemes, read only | ✅ 0323 |

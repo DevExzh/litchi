@@ -249,6 +249,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
                 memo_slots: 0,
                 rows_mode: None,
                 shallow: false,
+                fast: None,
                 diagnostics: Vec::new(),
             },
             all,
@@ -1116,6 +1117,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
             let chain = plan.chains[chain as usize];
             chain.len == 1 && plan.compounds[plan.links[chain.first as usize].compound as usize].any
         });
+        plan.fast = super::plan::FastPlan::of(plan);
         Ok(self.plan)
     }
 }

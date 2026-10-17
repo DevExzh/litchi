@@ -332,7 +332,11 @@ impl<'f> Navigate<'f> for Nav<'f> {
     const ABSENT: &'static [&'static str] = &["customXml"];
 
     fn check_source(&self) -> Result<()> {
-        self.docx.owner().check_source()
+        self.docx.owner().ensure_current()
+    }
+
+    fn fence_key(&self) -> usize {
+        self.docx.owner().fence_key()
     }
 
     fn root(&self) -> Result<Node<'f>> {

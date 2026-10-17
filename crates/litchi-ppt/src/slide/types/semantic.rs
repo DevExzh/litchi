@@ -540,6 +540,28 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error when the `PowerPoint` 10 programmable tag or a comment record is malformed.
+    /// The text, character runs and text hyperlinks of the shape with
+    /// `OfficeArt` ID `shape_id` (record 0323); an outline-backed placeholder
+    /// reads the slide-list body it selects. `None` for a shape without a
+    /// text body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shape's text records are malformed.
+    pub fn shape_text_runs(&self, shape_id: u32) -> Result<Option<crate::text_edit::TextRuns>> {
+        let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
+            return Ok(None);
+        };
+        match crate::text_edit::runs::read(&drawing.data, self.outline_text_bodies, shape_id) {
+            Ok(runs) => Ok(runs),
+            // A body the run model does not cover (several text atoms, an
+            // ambiguous textbox) has no run projection.
+            Err(crate::text_edit::Error::Refused(_)) => Ok(None),
+            Err(crate::text_edit::Error::Package(error)) => Err(error),
+            Err(crate::text_edit::Error::Source(error)) => Err(Error::Corrupted(error.to_string())),
+        }
+    }
+
     pub fn comments(&self) -> Result<Vec<ParsedComment>> {
         crate::comments::parse_slide_comments(&self.record)
     }

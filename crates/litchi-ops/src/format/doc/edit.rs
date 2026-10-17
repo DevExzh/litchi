@@ -38,6 +38,8 @@ enum Format {
     Size(u16),
     Color(Option<[u8; 3]>),
     Font(String),
+    /// A character style, by stylesheet index (record 0324).
+    Style(u16),
 }
 
 impl Format {
@@ -52,6 +54,12 @@ impl Format {
                 run.color().map(|(red, green, blue)| [red, green, blue]) == *value
             },
             Self::Font(value) => font == Some(value.as_str()),
+            Self::Style(istd) => {
+                run.properties()
+                    .style_index
+                    .unwrap_or(super::parts::DEFAULT_CHARACTER_STYLE)
+                    == *istd
+            },
         }
     }
 
@@ -69,6 +77,7 @@ impl Format {
             Self::Size(value) => edit.set_character_value(target, CharacterValue::Size(*value)),
             Self::Color(value) => edit.set_character_value(target, CharacterValue::Color(*value)),
             Self::Font(value) => edit.set_character_value(target, CharacterValue::Font(value)),
+            Self::Style(istd) => edit.set_character_value(target, CharacterValue::Style(*istd)),
         }
         .map_err(Error::from)
     }
@@ -79,6 +88,10 @@ impl Format {
 struct Assignment {
     text: Option<String>,
     formats: Vec<Format>,
+    /// `style`, `styleId` or `styleName`: a paragraph style, by id or name.
+    style: Option<String>,
+    /// `rStyle`: a character style, by id or name.
+    run_style: Option<String>,
 }
 
 impl Assignment {
@@ -109,6 +122,13 @@ impl Assignment {
                 assignment.formats.push(Format::Size(size(value)?));
             } else if name.eq_ignore_ascii_case("color") {
                 assignment.formats.push(Format::Color(color(value)?));
+            } else if ["style", "styleId", "styleName"]
+                .iter()
+                .any(|key| name.eq_ignore_ascii_case(key))
+            {
+                assignment.style = Some(style_value(value, "style")?);
+            } else if name.eq_ignore_ascii_case("rStyle") {
+                assignment.run_style = Some(style_value(value, "rStyle")?);
             } else if name.eq_ignore_ascii_case("font") {
                 let font = value
                     .as_text()
@@ -128,8 +148,61 @@ impl Assignment {
     }
 
     const fn len(&self) -> usize {
-        self.formats.len() + if self.text.is_some() { 1 } else { 0 }
+        self.formats.len()
+            + if self.text.is_some() { 1 } else { 0 }
+            + if self.style.is_some() { 1 } else { 0 }
+            + if self.run_style.is_some() { 1 } else { 0 }
     }
+
+    /// Resolve the style names against the document: a paragraph style
+    /// becomes its index, a character style a [`Format::Style`].
+    fn resolve_styles(&mut self, doc: &Doc) -> Result<Option<u16>> {
+        if let Some(name) = self.run_style.take() {
+            let istd = resolve_style(doc, &name, litchi_doc::parts::styles::StyleKind::Character)?;
+            self.formats.push(Format::Style(istd));
+        }
+        self.style
+            .as_deref()
+            .map(|name| resolve_style(doc, name, litchi_doc::parts::styles::StyleKind::Paragraph))
+            .transpose()
+    }
+}
+
+fn style_value(value: &PropValue<'_>, key: &'static str) -> Result<String> {
+    value
+        .as_text()
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| invalid("DOC styles are named by a non-empty id or name", key))
+}
+
+/// The index of the style of `kind` named `name` (its id, its name or an
+/// alternate name).
+fn resolve_style(doc: &Doc, name: &str, kind: litchi_doc::parts::styles::StyleKind) -> Result<u16> {
+    let not_found = || {
+        Error::new(Code::NotFound, "the DOC stylesheet has no such style")
+            .with_format(FileFormat::Doc)
+            .with_suggestion("name a style listed under `/styles` by its id or name")
+    };
+    let istd = super::parts::find_style(doc, name).ok_or_else(not_found)?;
+    let matches = doc
+        .reader()?
+        .stylesheet()
+        .and_then(|sheet| sheet.get(istd))
+        .is_some_and(|style| style.kind == kind);
+    if !matches {
+        return Err(Error::new(
+            Code::InvalidValue,
+            match kind {
+                litchi_doc::parts::styles::StyleKind::Character => {
+                    "`rStyle` names a character style"
+                },
+                _ => "a paragraph `style` names a paragraph style",
+            },
+        )
+        .with_format(FileFormat::Doc));
+    }
+    Ok(istd)
 }
 
 fn invalid(message: &'static str, key: &'static str) -> Error {
@@ -458,7 +531,10 @@ impl Doc {
             if crate::format::ole_metadata::is_target(&target) {
                 return self.set_metadata(&props, limits);
             }
-            let assignment = Assignment::parse(&props)?;
+            if let Some(commit) = self.set_mark(&target, &props, limits)? {
+                return Ok(commit);
+            }
+            let mut assignment = Assignment::parse(&props)?;
             if assignment.len() == 0 {
                 return Err(Error::new(
                     Code::InvalidArgument,
@@ -466,12 +542,25 @@ impl Doc {
                 )
                 .with_format(FileFormat::Doc));
             }
+            let paragraph_style = assignment.resolve_styles(self)?;
             let targets = resolve_targets(
                 self,
                 &target,
                 limits.max_expanded_targets(),
                 !assignment.formats.is_empty(),
             )?;
+            if paragraph_style.is_some()
+                && targets
+                    .iter()
+                    .any(|target| !matches!(target, Target::Paragraph { .. }))
+            {
+                return Err(Error::new(
+                    Code::UnsupportedCapability,
+                    "a DOC paragraph style applies to paragraphs; set `rStyle` on runs",
+                )
+                .with_property("style")
+                .with_format(FileFormat::Doc));
+            }
             limit(
                 LimitKind::Operations,
                 targets.len().saturating_mul(assignment.len()),
@@ -492,6 +581,11 @@ impl Doc {
                         continue;
                     }
                     format.stage(&mut edit, target.leaf())?;
+                    operations += 1;
+                }
+                if let (Some(istd), Target::Paragraph { position, .. }) = (paragraph_style, target)
+                {
+                    edit.set_paragraph_style(*position, istd)?;
                     operations += 1;
                 }
                 if let Some(text) = &assignment.text {
@@ -558,6 +652,9 @@ impl Doc {
         let result = (|| {
             let nav = Nav::new(self);
             let parent = crate::path::resolve::get(&nav, &parent)?;
+            if let Some(added) = self.add_mark(&parent, &node, limits)? {
+                return Ok(added);
+            }
             let kind = node.kind();
             if !kind.eq_ignore_ascii_case("p") && !kind.eq_ignore_ascii_case("paragraph") {
                 return Err(Error::new(
@@ -598,6 +695,9 @@ impl Doc {
     ) -> Result<WriteCommit> {
         self.check_source()?;
         let result = (|| {
+            if let Some(commit) = self.remove_mark(&target, limits)? {
+                return Ok(commit);
+            }
             let targets = resolve_targets(self, &target, limits.max_expanded_targets(), false)?;
             limit(
                 LimitKind::Operations,

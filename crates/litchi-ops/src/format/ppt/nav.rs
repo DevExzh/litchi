@@ -52,8 +52,117 @@ impl<'f> Nav<'f> {
 
         match (parent.item(), kind) {
             (Item::Presentation, Kind::Slide) => self.slide(step.select),
+            (Item::Presentation, Kind::Theme) => {
+                let theme = self.file.reader().theme()?;
+                Ok(match ordinal(step.select, usize::from(theme.is_some())) {
+                    Some(Some(_)) => match theme {
+                        Some(theme) => Lookup::Found(Node::element_node(
+                            self.file,
+                            parent.steps(),
+                            PathStep::new(Kind::Theme.name()),
+                            super::elements::Element::Theme(std::sync::Arc::new(theme)),
+                        )),
+                        None => Lookup::Missing,
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Item::Slide(slide), Kind::Notes) => self.notes(slide.position, step.select),
+            (Item::Slide(slide), Kind::Comment) => {
+                self.comment(parent, slide.position, step.select)
+            },
+            (Item::Slide(slide), Kind::Chart) => {
+                let charts = super::elements::slide_charts(self.file, slide.position)?;
+                Ok(match ordinal(step.select, charts.len()) {
+                    Some(Some(index)) => Lookup::Found(chart_node(
+                        parent,
+                        slide.position,
+                        index,
+                        charts
+                            .into_iter()
+                            .nth(index)
+                            .ok_or_else(|| missing_slide(slide.position))?,
+                    )),
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Item::Shape(shape), Kind::Paragraph) => self.paragraph(parent, shape, step.select),
+            (Item::Shape(shape), Kind::Row | Kind::Col) if shape.kind == Kind::Table => {
+                self.table_band(parent, shape, kind, step.select)
+            },
+            (Item::Shape(shape), Kind::Hyperlink) => {
+                let count = usize::from(super::elements::shape_click(parent)?.is_some());
+                Ok(match ordinal(step.select, count) {
+                    Some(Some(_)) => match super::elements::shape_click(parent)? {
+                        Some(click) => Lookup::Found(hyperlink_node(parent, shape, None, click)),
+                        None => Lookup::Missing,
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Item::Paragraph(paragraph), Kind::Run) => {
+                let Some(body) = super::elements::shape_runs(parent)? else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let pieces = super::elements::pieces(&body, paragraph.index);
+                Ok(match ordinal(step.select, pieces.len()) {
+                    Some(Some(index)) => Lookup::Found(run_node(
+                        parent,
+                        &paragraph.shape,
+                        paragraph.index,
+                        index,
+                        std::sync::Arc::new(body),
+                        pieces[index],
+                    )),
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Item::Paragraph(paragraph), Kind::LineBreak) => {
+                let text = parent.text_member()?.unwrap_or_default();
+                let count = super::elements::line_breaks(&text, 0);
+                Ok(match ordinal(step.select, count) {
+                    Some(Some(index)) => Lookup::Found(Node::element_node(
+                        parent.file(),
+                        parent.steps(),
+                        PathStep::at(Kind::LineBreak.name(), Position::new(index)),
+                        super::elements::Element::LineBreak {
+                            shape: paragraph.shape.clone(),
+                        },
+                    )),
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Item::Element(element), Kind::Hyperlink) => match element.as_ref() {
+                super::elements::Element::Run { shape, .. } => {
+                    let found = super::elements::run_click(parent)?;
+                    Ok(match ordinal(step.select, usize::from(found.is_some())) {
+                        Some(Some(_)) => match found {
+                            Some((range, click)) => {
+                                Lookup::Found(hyperlink_node(parent, shape, Some(range), click))
+                            },
+                            None => Lookup::Missing,
+                        },
+                        Some(None) => Lookup::Missing,
+                        None => Lookup::NotApplicable,
+                    })
+                },
+                _ => Ok(Lookup::NotApplicable),
+            },
+            (Item::Element(element), Kind::Cell) => match element.as_ref() {
+                super::elements::Element::Row { shape, row } => {
+                    self.cell(parent, shape, *row, step.select)
+                },
+                _ => Ok(Lookup::NotApplicable),
+            },
+            (
+                Item::Slide(_) | Item::Shape(_),
+                Kind::Ole | Kind::Video | Kind::Audio | Kind::Media,
+            ) => self.frame(parent, kind, step.select),
             (Item::Slide(_) | Item::Shape(_), Kind::Shape | Kind::Placeholder)
             | (
                 Item::Slide(_) | Item::Shape(_),
@@ -87,6 +196,120 @@ impl<'f> Nav<'f> {
         Ok(match slide_notes(self.file, slide)? {
             Some(text) => Lookup::Found(Node::notes_node(self.file, slide, text)),
             None => Lookup::Missing,
+        })
+    }
+
+    fn comment(
+        &self,
+        parent: &Node<'f>,
+        slide: usize,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let comments = super::elements::slide_comments(self.file, slide)?;
+        let count = comments.len();
+        let index = match select {
+            Select::None => (count > 0).then_some(0),
+            Select::Ordinal(position) => (position.get() < count).then_some(position.get()),
+            Select::Last => count.checked_sub(1),
+            _ => return Ok(Lookup::NotApplicable),
+        };
+        Ok(match index {
+            Some(index) => Lookup::Found(comment_node(
+                self.file,
+                parent.steps(),
+                slide,
+                index,
+                comments
+                    .into_iter()
+                    .nth(index)
+                    .ok_or_else(|| missing_slide(slide))?,
+            )),
+            None => Lookup::Missing,
+        })
+    }
+
+    /// An OLE or media picture frame by its ordinal among its kind.
+    fn frame(
+        &self,
+        parent: &Node<'f>,
+        kind: Kind,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let Some(source) = source_for(parent)? else {
+            return Ok(Lookup::NotApplicable);
+        };
+        let Some(direct) = source.direct() else {
+            return Ok(Lookup::NotApplicable);
+        };
+        let frames = super::elements::frames(self.file, direct, kind)?;
+        let index = match ordinal(select, frames.len()) {
+            Some(Some(index)) => index,
+            Some(None) => return Ok(Lookup::Missing),
+            None => return Ok(Lookup::NotApplicable),
+        };
+        let (position, program, linked) = frames
+            .into_iter()
+            .nth(index)
+            .ok_or_else(|| missing_slide(0))?;
+        let (Some(roots), Some(path)) = (source.roots(), source.child_path(position)) else {
+            return Ok(Lookup::NotApplicable);
+        };
+        Ok(Lookup::Found(Node::element_node(
+            self.file,
+            parent.steps(),
+            PathStep::at(kind.name(), Position::new(index)),
+            super::elements::Element::Frame {
+                shape: ShapeItem {
+                    slide: parent.slide_position().unwrap_or(0),
+                    kind: Kind::Picture,
+                    source: roots,
+                    path,
+                },
+                kind,
+                program,
+                linked,
+            },
+        )))
+    }
+
+    /// A table row or column by its ordinal.
+    fn table_band(
+        &self,
+        parent: &Node<'f>,
+        shape: &ShapeItem,
+        kind: Kind,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let table = super::elements::table(parent)?;
+        let count = if kind == Kind::Row {
+            table.rows()
+        } else {
+            table.columns()
+        };
+        Ok(match ordinal(select, count) {
+            Some(Some(index)) => {
+                Lookup::Found(band_node(self.file, parent.steps(), shape, kind, index))
+            },
+            Some(None) => Lookup::Missing,
+            None => Lookup::NotApplicable,
+        })
+    }
+
+    /// A row's cell by its ordinal.
+    fn cell(
+        &self,
+        parent: &Node<'f>,
+        shape: &ShapeItem,
+        row: usize,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let count = super::elements::table(parent)?.columns();
+        Ok(match ordinal(select, count) {
+            Some(Some(column)) => {
+                Lookup::Found(cell_node(self.file, parent.steps(), shape, row, column))
+            },
+            Some(None) => Lookup::Missing,
+            None => Lookup::NotApplicable,
         })
     }
 
@@ -204,6 +427,16 @@ impl<'f> Nav<'f> {
                 out.kind(Kind::Slide.name(), self.file.reader().slide_count());
             },
             Item::Notes(_) | Item::Paragraph(_) => {},
+            Item::Element(element) => {
+                if let super::elements::Element::Row { .. } = element.as_ref() {
+                    out.kind(Kind::Cell.name(), super::elements::table(parent)?.columns());
+                }
+            },
+            Item::Shape(shape) if shape.kind == Kind::Table => {
+                let table = super::elements::table(parent)?;
+                out.kind(Kind::Row.name(), table.rows());
+                out.kind(Kind::Col.name(), table.columns());
+            },
             Item::Shape(_) if parent.shape().is_some_and(has_text_body) => {
                 let count = parent.shape().map_or(Ok(0), paragraph_count)?;
                 out.kind(Kind::Paragraph.name(), count);
@@ -212,6 +445,9 @@ impl<'f> Nav<'f> {
                 if let Item::Slide(slide) = parent.item() {
                     let notes = usize::from(slide_notes(self.file, slide.position)?.is_some());
                     out.kind(Kind::Notes.name(), notes);
+                    let comments =
+                        super::elements::slide_comments(self.file, slide.position)?.len();
+                    out.kind(Kind::Comment.name(), comments);
                 }
                 if let Some(source) = source_for(parent)? {
                     let Some(direct) = source.direct() else {
@@ -377,6 +613,144 @@ pub(crate) fn slide_notes(file: &Ppt, slide: usize) -> Result<Option<std::sync::
         .speaker_notes()?
         .map(|notes| notes.text().map(std::sync::Arc::from))
         .transpose()?)
+}
+
+/// The node of the comment at `index` on `slide`.
+pub(crate) fn comment_node<'f>(
+    file: &'f Ppt,
+    slide_steps: &[PathStep<'static>],
+    slide: usize,
+    index: usize,
+    comment: litchi_ppt::ParsedComment,
+) -> Node<'f> {
+    Node::element_node(
+        file,
+        slide_steps,
+        PathStep::at(Kind::Comment.name(), Position::new(index)),
+        super::elements::Element::Comment {
+            slide,
+            index,
+            comment: std::sync::Arc::new(comment),
+        },
+    )
+}
+
+/// The selected zero-based index among `count` siblings: `None` for a
+/// selector kind that does not address by position, `Some(None)` when absent.
+fn ordinal(select: Select<'_>, count: usize) -> Option<Option<usize>> {
+    Some(match select {
+        Select::None => (count > 0).then_some(0),
+        Select::Ordinal(position) => (position.get() < count).then_some(position.get()),
+        Select::Last => count.checked_sub(1),
+        _ => return None,
+    })
+}
+
+/// The hyperlink node of a shape (`run: None`) or of one of its runs.
+pub(crate) fn hyperlink_node<'f>(
+    parent: &Node<'f>,
+    shape: &ShapeItem,
+    run: Option<(usize, usize)>,
+    click: litchi_ppt::hyperlink::Click,
+) -> Node<'f> {
+    Node::element_node(
+        parent.file(),
+        parent.steps(),
+        PathStep::new(Kind::Hyperlink.name()),
+        super::elements::Element::Hyperlink {
+            shape: shape.clone(),
+            run,
+            click: std::sync::Arc::new(click),
+        },
+    )
+}
+
+/// The node of one run piece of a paragraph.
+pub(crate) fn run_node<'f>(
+    paragraph_node: &Node<'f>,
+    shape: &ShapeItem,
+    paragraph: usize,
+    run: usize,
+    body: std::sync::Arc<litchi_ppt::text_edit::TextRuns>,
+    piece: super::elements::Piece,
+) -> Node<'f> {
+    Node::element_node(
+        paragraph_node.file(),
+        paragraph_node.steps(),
+        PathStep::at(Kind::Run.name(), Position::new(run)),
+        super::elements::Element::Run {
+            shape: shape.clone(),
+            paragraph,
+            run,
+            body,
+            piece,
+        },
+    )
+}
+
+/// The node of the chart at `index` on `slide`.
+pub(crate) fn chart_node<'f>(
+    slide_node: &Node<'f>,
+    slide: usize,
+    index: usize,
+    chart: super::elements::ChartSummary,
+) -> Node<'f> {
+    Node::element_node(
+        slide_node.file(),
+        slide_node.steps(),
+        PathStep::at(Kind::Chart.name(), Position::new(index)),
+        super::elements::Element::Chart {
+            slide,
+            chart: std::sync::Arc::new(chart),
+        },
+    )
+}
+
+/// The node of a table's row or column.
+pub(crate) fn band_node<'f>(
+    file: &'f Ppt,
+    table_steps: &[PathStep<'static>],
+    shape: &ShapeItem,
+    kind: Kind,
+    index: usize,
+) -> Node<'f> {
+    let element = if kind == Kind::Row {
+        super::elements::Element::Row {
+            shape: shape.clone(),
+            row: index,
+        }
+    } else {
+        super::elements::Element::Column {
+            shape: shape.clone(),
+            column: index,
+        }
+    };
+    Node::element_node(
+        file,
+        table_steps,
+        PathStep::at(kind.name(), Position::new(index)),
+        element,
+    )
+}
+
+/// The node of one table cell under its row.
+pub(crate) fn cell_node<'f>(
+    file: &'f Ppt,
+    row_steps: &[PathStep<'static>],
+    shape: &ShapeItem,
+    row: usize,
+    column: usize,
+) -> Node<'f> {
+    Node::element_node(
+        file,
+        row_steps,
+        PathStep::at(Kind::Cell.name(), Position::new(column)),
+        super::elements::Element::Cell {
+            shape: shape.clone(),
+            row,
+            column,
+        },
+    )
 }
 
 fn id_is(id: u32, wanted: &str) -> bool {

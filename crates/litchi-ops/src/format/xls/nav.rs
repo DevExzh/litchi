@@ -5,7 +5,7 @@ use std::fmt;
 
 use litchi_core::FileFormat;
 use litchi_core::Position;
-use litchi_core::selector::{CellRange, CellRef};
+use litchi_core::selector::{CellRange, CellRef, Step};
 
 use super::Xls;
 use super::children::Children;
@@ -15,7 +15,10 @@ use super::spec::{Kind, SPEC};
 use crate::error::{Code, Error, Result};
 use crate::node::spec::{FormatSpec, GapSpec};
 use crate::node::{Format, PathStep, Value};
+use crate::path::arg::{Origin, PathArg};
+use crate::path::fence::Scope;
 use crate::path::navigate::{Available, ElementKind, KindSet, Lookup, Navigate, Resolved, Select};
+use crate::path::resolve;
 use crate::query::inspect::{HeaderBinding, HeaderKey, Inspect};
 
 #[derive(Debug, Clone, Copy)]
@@ -209,6 +212,121 @@ impl<'f> Nav<'f> {
             _ => Lookup::NotApplicable,
         })
     }
+}
+
+/// The sheet step of a handle's last cell `get` and the worksheet it
+/// resolved to (record 0315, record 0310 G8).
+///
+/// A text-path `get` of a cell (`/sheet[1]/A7`, `/Data/B2`) resolves its
+/// sheet step through the vocabulary and the worksheet catalog on every
+/// call: most of its cost over the native cell read. The step's worksheet
+/// is a fact of the handle's immutable snapshot, so the handle keeps the
+/// last one; the next `get` whose sheet step is the same step (equal name
+/// and predicates) starts from that worksheet. A write publishes a new
+/// state with an empty cache ([`super::XlsState`]). The cache is a
+/// convenience only: when it is busy, empty or holds another step, `get`
+/// takes the general resolver, and every result and error is the
+/// resolver's.
+#[derive(Default)]
+pub(crate) struct SheetStep(std::sync::Mutex<Option<(Step<'static>, usize)>>);
+
+impl SheetStep {
+    /// The catalog position `step` resolved to, when it is the cached step.
+    fn position(&self, step: &Step<'_>) -> Option<usize> {
+        let held = self.0.try_lock().ok()?;
+        match &*held {
+            Some((cached, position)) if cached == step => Some(*position),
+            _ => None,
+        }
+    }
+
+    /// Caches `step` as resolving to the worksheet at `position`.
+    fn remember(&self, step: &Step<'_>, position: usize) {
+        let Ok(mut held) = self.0.try_lock() else {
+            return;
+        };
+        if !matches!(&*held, Some((cached, at)) if cached == step && *at == position) {
+            *held = Some((step.clone().into_owned(), position));
+        }
+    }
+}
+
+/// `File::get` of an XLS path: the general resolver, except that a cell
+/// path whose sheet step the handle cached (record 0315) starts from the
+/// cached worksheet. The fast route makes the resolver's reads in the
+/// resolver's order inside the same fence — the root, the worksheet by its
+/// catalog position, the cell — and closes with the same source check; on
+/// any other outcome it takes the resolver, so errors are the resolver's.
+pub(crate) fn get<'f>(file: &'f Xls, path: &PathArg<'_>) -> Result<Node<'f>> {
+    let nav = Nav::new(file);
+    let cell = cell_path(path);
+    if let Some((step, at)) = cell
+        && let Some(position) = file.sheet_step().position(step)
+        && let Some(node) = cached_get(nav, path, position, at)
+    {
+        return Ok(node);
+    }
+    let node = resolve::get(&nav, path)?;
+    if let Some((step, _)) = cell
+        && matches!(node.item(), Item::Cell(_))
+    {
+        file.sheet_step().remember(step, node.sheet_position());
+    }
+    Ok(node)
+}
+
+/// The sheet step and the cell of an absolute two-step cell path
+/// (`/<sheet step>/<cell>`, typed or text, not raw).
+fn cell_path<'a>(path: &'a PathArg<'_>) -> Option<(&'a Step<'a>, CellRef)> {
+    if !path.is_absolute() || path.raw || !matches!(path.origin(), Origin::Typed | Origin::Text(_))
+    {
+        return None;
+    }
+    let [sheet, cell] = path.path().steps() else {
+        return None;
+    };
+    if !cell.predicates().is_empty() || cell.name().contains(':') {
+        return None;
+    }
+    CellRange::parse(cell.name()).map(|range| (sheet, range.start()))
+}
+
+/// The cell at `at` of the worksheet at catalog `position`, resolved as
+/// [`resolve::get`] would: path admission, then the root, the worksheet and
+/// the cell inside one fence, then the closing source check. `None` for
+/// anything but a found cell and a current source.
+fn cached_get<'f>(
+    nav: Nav<'f>,
+    path: &PathArg<'_>,
+    position: usize,
+    at: CellRef,
+) -> Option<Node<'f>> {
+    crate::path::arg::validate(path).ok()?;
+    let found = {
+        let _scope = Scope::enter(nav.fence_key());
+        cached_steps(nav, position, at)
+    };
+    nav.check_source().ok()?;
+    found.ok().flatten()
+}
+
+fn cached_steps<'f>(nav: Nav<'f>, position: usize, at: CellRef) -> Result<Option<Node<'f>>> {
+    let root = nav.root()?;
+    let sheet = Resolved {
+        kind: Kind::Sheet,
+        select: Select::Ordinal(Position::new(position)),
+    };
+    let Lookup::Found(sheet) = nav.child(&root, &sheet)? else {
+        return Ok(None);
+    };
+    let cell = Resolved {
+        kind: Kind::Cell,
+        select: Select::Cell(at),
+    };
+    Ok(match nav.child(&sheet, &cell)? {
+        Lookup::Found(cell) => Some(cell),
+        _ => None,
+    })
 }
 
 pub(super) fn tab_count(file: &Xls) -> Result<usize> {
