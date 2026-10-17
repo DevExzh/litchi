@@ -570,12 +570,13 @@ enum PropValues<'a> {
     /// A video, audio or formula object (record 0328).
     Special {
         object: &'a Object,
-        reference: ObjectRef,
+        reference: &'a ObjectRef,
         kind: Kind,
         file: &'a Odp,
     },
-    /// A hyperlink: its `link` and `tooltip`.
-    Link(Option<String>, Option<String>),
+    /// A hyperlink: its `link` and `tooltip` (boxed, so the common
+    /// variants stay as small as they were).
+    Link(Box<(Option<String>, Option<String>)>),
     /// A declared table column's width.
     Column(Option<Length>),
     /// A chart series.
@@ -603,7 +604,7 @@ impl<'a> Props<'a> {
                 .object()
                 .map_or(PropValues::None, |object| PropValues::Special {
                     object,
-                    reference: reference.clone(),
+                    reference,
                     kind: *kind,
                     file: node.file,
                 }),
@@ -613,7 +614,7 @@ impl<'a> Props<'a> {
             }),
             Item::ShapeLink(_) | Item::RunLink(..) => {
                 let (link, tooltip) = link_values(node)?;
-                PropValues::Link(link, tooltip)
+                PropValues::Link(Box::new((link, tooltip)))
             },
             Item::Column(object, index) => {
                 let xml = node.file.content_xml()?;
@@ -782,9 +783,9 @@ impl<'a> Props<'a> {
                 kind,
                 file,
             } => special_value(file, reference, object, *kind, key),
-            PropValues::Link(link, tooltip) => match key {
-                "link" => owned(link.clone()),
-                "tooltip" => owned(tooltip.clone()),
+            PropValues::Link(link) => match key {
+                "link" => owned(link.0.clone()),
+                "tooltip" => owned(link.1.clone()),
                 _ => None,
             },
             PropValues::Column(width) => match key {
@@ -901,6 +902,7 @@ pub(crate) fn first_link_run(story: &Story) -> Option<&litchi_odp::scene::Run> {
         .find(|run| run.kind() == litchi_odp::scene::RunKind::Link)
 }
 
+#[inline]
 fn object_value<'a>(object: &'a Object, key: &str) -> Option<Value<'a>> {
     let text = |value: Option<&'a str>| value.map(|value| Value::Text(Cow::Borrowed(value)));
     match key {

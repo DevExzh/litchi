@@ -29,6 +29,8 @@ enum State<'f> {
         /// the position of its terminating mark.
         anchors: std::ops::Range<usize>,
         runs: litchi_rtf::text::Runs<'f>,
+        /// The paragraph's tab stops (record 0328).
+        tabs: &'f [litchi_rtf::TabStop],
     },
     Other(Node<'f>),
 }
@@ -85,6 +87,7 @@ impl<'f> Children<'f> {
                     position,
                     anchors: range.start..range.end.saturating_add(1),
                     runs: paragraph.runs(),
+                    tabs: paragraph.format().tab_stops(),
                 }
             },
             // Header/footer paragraphs expose text only; runs, links and
@@ -198,13 +201,13 @@ impl<'f> Children<'f> {
                 State::Paragraph {
                     doc,
                     position: paragraph,
+                    tabs,
                     ..
                 },
                 Kind::Tab,
             ) => {
                 let (doc, paragraph) = (*doc, *paragraph);
-                let native = doc.0.package.body().paragraphs().nth(paragraph.get())?;
-                let stop = *native.format().tab_stops().get(self.ordinal)?;
+                let stop = *tabs.get(self.ordinal)?;
                 return Some(Node::paragraph_child(
                     doc,
                     paragraph,

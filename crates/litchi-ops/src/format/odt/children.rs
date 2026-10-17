@@ -14,17 +14,18 @@ pub(crate) struct Children<'f> {
     odt: &'f Odt,
     parent: Address,
     kinds: KindSet<Kind>,
-    counters: [u32; Kind::COUNT],
+    /// Ordinals of the structural kinds; parts count their own.
+    counters: [u32; Kind::STRUCTURAL],
     axis: Axis<'f>,
-    /// The parts of record 0328 listed after the structural children.
-    tail: Tail<'f>,
+    /// The parts of record 0328 listed after the structural children,
+    /// boxed so a structural listing stays as small as it was.
+    tail: Option<Box<Tail<'f>>>,
 }
 
 /// The part children of a parent, listed once its structural children are.
 enum Tail<'f> {
-    None,
     /// The parent and the part kinds wanted, not listed yet.
-    Pending(Box<Node<'f>>, KindSet<Kind>),
+    Pending(Node<'f>, KindSet<Kind>),
     Open(std::vec::IntoIter<Node<'f>>),
 }
 
@@ -69,33 +70,34 @@ impl<'f> Children<'f> {
             },
             _ => Axis::Empty,
         };
-        let tail = if super::parts::has_part_children(parent.kind, parts) {
-            Tail::Pending(Box::new(parent.clone()), parts)
-        } else {
-            Tail::None
-        };
+        let tail = super::parts::has_part_children(parent.kind, parts)
+            .then(|| Box::new(Tail::Pending(parent.clone(), parts)));
         Ok(Self {
             odt: parent.odt,
             parent: parent.address().clone(),
             kinds,
-            counters: [0; Kind::COUNT],
+            counters: [0; Kind::STRUCTURAL],
             axis,
             tail,
         })
     }
 
-    /// The next part child, once the structural children are listed.
+    /// The next part child, once the structural children are listed. Kept
+    /// out of line so the structural listing's hot loop keeps its shape.
+    #[cold]
+    #[inline(never)]
     fn next_part(&mut self) -> Option<Result<Node<'f>>> {
         loop {
-            match &mut self.tail {
-                Tail::None => return None,
+            let tail = self.tail.as_deref_mut()?;
+            let listed = match tail {
                 Tail::Open(nodes) => return nodes.next().map(Ok),
-                Tail::Pending(parent, kinds) => match super::parts::children(parent, *kinds) {
-                    Ok(nodes) => self.tail = Tail::Open(nodes.into_iter()),
-                    Err(error) => {
-                        self.tail = Tail::None;
-                        return Some(Err(error));
-                    },
+                Tail::Pending(parent, kinds) => super::parts::children(parent, *kinds),
+            };
+            match listed {
+                Ok(nodes) => *tail = Tail::Open(nodes.into_iter()),
+                Err(error) => {
+                    self.tail = None;
+                    return Some(Err(error));
                 },
             }
         }

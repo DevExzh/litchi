@@ -163,6 +163,9 @@ impl Kind {
 
     /// The number of kinds, for per-kind counters.
     pub(crate) const COUNT: usize = 34;
+    /// The structural kinds, `Document` through `Metadata`; the parts
+    /// follow them.
+    pub(crate) const STRUCTURAL: usize = Self::Metadata as usize + 1;
 }
 
 impl ElementKind for Kind {
