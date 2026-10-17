@@ -4912,7 +4912,8 @@
       ],
       "families": [
         "litchi_xls::package::edit",
-        "litchi_xls::package::metadata"
+        "litchi_xls::package::metadata",
+        "litchi_xls::sheet_features::edit"
       ]
     },
     {

@@ -2659,3 +2659,22 @@ ElementNotFound, InvalidElementValue}` name the element refusals.
 | `text_edit::{TextRuns, CharacterRun, TextLink, RunFormat}`; `Slide::shape_text_runs`; `Presentation::resolve_click` | a body's character runs (`TextCFException` over UTF-16 units, covering the final paragraph mark) and text hyperlinks; outline-backed placeholders read their slide-list body | ✅ 0323 |
 | `Edit::{set_run_format, set_text_hyperlink}` (and on `slide_order::Transaction`) | split the body's `StyleTextPropAtom` character runs (a body without one gains it) / write an `InteractiveInfo` + `TextInteractiveInfoAtom` pair; outline bodies are edited in the live document | ✅ 0323 |
 | `litchi_ppt::theme::{Theme, Fonts, COLOR_SLOTS, parse, from_package}`; `Presentation::theme` | the `RoundTripThemeAtom` theme part's color and font schemes, read only | ✅ 0323 |
+
+## XLS worksheet feature family (record 0327)
+
+One scoped family edits the worksheet features of an opened BIFF8
+workbook at the record level (`litchi_xls::sheet_features`): legacy notes,
+hyperlinks, drawing pictures and shapes, conditional formats, data
+validations, the auto-filter and manual page breaks. Every record a change
+does not touch keeps its bytes; the `BoundSheet8`, `Index` and `ExtSST`
+offsets that move with a splice are repaired, and the drawing group's
+cluster table and blip store follow the shapes. `commit()` returns the
+triad `package()`, `patch()`, `diagnostics()` with `into_package()`/
+`into_parts()`; an unchanged edit returns the source package. Positions
+are complete-catalog sheet positions.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_xls::sheet_features::{Features, FeatureSet, Area, PageBreak, Note, Drawing, DrawingKind, Fill, Line, ConditionalFormat, Rule, RuleType, Style, Threshold, ColorScale, DataBar, IconSet, Validation, AutoFilter}`, `Package::sheet_features` | reads one worksheet without decoding its cells; `FeatureSet` selects the kinds (only formats and validations render formulas) | ✅ 0327 |
+| `sheet_features::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_sheet_features, apply_sheet_features}` | `Edit::{features, set_row_breaks, set_column_breaks, add_hyperlink, set_hyperlink, remove_hyperlink, add_validation, set_validation, remove_validation, add_format, set_format, set_format_ranges, remove_format, set_auto_filter, add_note, set_note, remove_note, add_picture, add_shape, set_drawing, remove_drawing, commit}` | ✅ 0327; family registered in the gate |
+| `sheet_features::edit::{Hyperlink, Validation, Style, Format, FormatRule, Threshold, Picture, Shape, ShapeGeometry, Anchor, DrawingChange}` | the authored values; formulas are BIFF8 token streams, colors palette indexes (styles) or RGB (drawings, CF12 visuals) | ✅ 0327 |

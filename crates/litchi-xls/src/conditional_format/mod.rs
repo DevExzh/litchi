@@ -10,6 +10,7 @@ mod model;
 mod tests;
 
 pub(crate) use codec::Collector as ConditionalFormatCollector;
+pub(crate) use codec::parse_cf;
 
 pub use model::{
     Alignment as ConditionalAlignment, Border as ConditionalBorder,
