@@ -183,6 +183,17 @@ fn main() -> Outcome<()> {
             )?)
         },
     )?);
+    // The open of the cold cases alone, as their control.
+    cases.push(write(
+        "open_control",
+        || Ok(litchi_docx::Package::from_bytes(&bytes)?),
+        || {
+            Ok(litchi_ops::open_bytes_with(
+                bytes.clone(),
+                &OpenOptions::new().source_mode(SourceMode::Eager),
+            )?)
+        },
+    )?);
     // Cold handles: both legs open the bytes first, so the unified leg's
     // SmartArt inventory and chart projection are read on this handle.
     cases.push(write(
