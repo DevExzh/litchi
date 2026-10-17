@@ -442,6 +442,30 @@ class PptxVerbTests(WriteAssertions):
         error = raised(lambda: self.file.add(self.first, "video", {"src": mp4}))
         self.assertError(error, L.PropertyError, "missing_property")
 
+    def test_record_0333_p0_residue(self):
+        # Record 0333: paragraph, run, table and row adds, removals, cell
+        # properties and comment removal.
+        file, shape = self.file.add(self.first, "shape", {"text": "alpha", "width": "2in", "height": "1in"})
+        file, paragraph = file.add(shape, "paragraph", {"text": "beta", "bold": True})
+        self.assertEqual(paragraph, shape + "/paragraph[2]")
+        file, run = file.add(paragraph, "run", {"text": "!", "italic": True})
+        self.assertEqual(run, paragraph + "/run[2]")
+        reopened = self.assertReopens(file)
+        self.assertEqual(reopened.get(paragraph, 0)["text"], "beta!")
+        self.assertEqual(reopened.get(run, 0)["format"]["italic"], True)
+        file = file.remove(shape + "/paragraph[1]")
+        self.assertEqual(file.get(shape, 0)["text"], "beta!")
+        file, table = file.add(self.first, "table", {"data": "a,b;c,d"})
+        file, row = file.add(table, "tr", {"c1": "e"})
+        self.assertEqual(file.get(row + "/tc[1]", 0)["text"], "e")
+        file = file.set(row + "/tc[2]", {"fill": "accent1", "valign": "center"})
+        cell = self.assertReopens(file).get(row + "/tc[2]", 0)["format"]
+        self.assertEqual((cell["fill"], cell["valign"]), ("accent1", "center"))
+        file = file.remove(table + "/tr[1]")
+        self.assertEqual(file.get(table, 0)["format"]["rows"], 2)
+        error = raised(lambda: file.remove(shape + "/paragraph[1]"))
+        self.assertError(error, L.UnsupportedError, "unsupported_capability")
+
 
 class XlsbVerbTests(WriteAssertions):
     def test_cells_and_sheets(self):
