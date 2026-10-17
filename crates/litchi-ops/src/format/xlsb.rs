@@ -50,8 +50,11 @@ use crate::options::{OpenOptions, SourceMode};
 
 #[cfg(feature = "eval")]
 pub(crate) mod calc;
+mod chart;
 mod children;
 pub(crate) mod create;
+mod feature_write;
+mod features;
 mod header;
 mod merge_write;
 mod metadata;
@@ -67,6 +70,7 @@ mod views;
 pub(crate) mod write;
 
 pub(crate) use children::Children;
+pub(crate) use features::FEATURE_ELEMENTS;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;

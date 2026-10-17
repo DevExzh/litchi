@@ -13,11 +13,12 @@
 //! Whether the reverted bytes also equal the input is reported, not
 //! required: a revert is a second edit, and the leaves may normalize what
 //! they rewrite. A structural round trip follows on XLS, PPTX and RTF
-//! (record 0293), Pages (record 0299), Keynote (record 0298) and Numbers
-//! (record 0301): a row inserted and removed, a slide or paragraph moved
-//! and moved back, a Pages paragraph added and removed, a Keynote slide
-//! duplicated and a slide added and both removed, or a Numbers table added
-//! and removed, must read back with the same node texts.
+//! (record 0293), Pages (record 0299), Keynote (record 0298), Numbers
+//! (record 0301) and XLSB (record 0322): a row inserted and removed, a slide
+//! or paragraph moved and moved back, a Pages paragraph added and removed,
+//! a Keynote slide duplicated and a slide added and both removed, a Numbers
+//! table added and removed, or an XLSB note added and removed, must read
+//! back with the same node texts.
 //!
 //! An iWork package directory (the app-authored bundle form, record 0306)
 //! is a corpus entry too: a copy of it goes through `open` → empty `edit`
@@ -549,6 +550,38 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                         file.clone()
                     };
                     file.remove("/sheet[1]/table[1]")
+                }),
+            )
+        },
+        // Record 0322: an XLSB note added on the first worksheet's last cell
+        // and removed again, through the leaf note transaction (the comments
+        // part, its VML note shape and `BrtLegacyDrawing`).
+        Some(FileFormat::Xlsb) => {
+            if count("/", "sheet") == 0 {
+                return ("none", String::new());
+            }
+            (
+                "note add+remove",
+                &["/sheet[1]/A1", "/sheet[1]/comment[1]"],
+                Box::new(|file: &File| {
+                    file.add(
+                        "/sheet[1]",
+                        NewNode::new("comment")
+                            .prop("ref", "XFD1048576")
+                            .prop("text", "Structural probe"),
+                    )
+                    .map(|added| added.file)
+                }),
+                Box::new(|file: &File| {
+                    // The probe is the last note in row-major order.
+                    let mut last = 1;
+                    while file
+                        .get(format!("/sheet[1]/comment[{}]", last + 1).as_str())
+                        .is_ok()
+                    {
+                        last += 1;
+                    }
+                    file.remove(format!("/sheet[1]/comment[{last}]").as_str())
                 }),
             )
         },

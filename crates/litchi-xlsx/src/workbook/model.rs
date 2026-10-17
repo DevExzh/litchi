@@ -1099,6 +1099,16 @@ impl Workbook {
         crate::workbook_metadata::protection::parse_workbook_protection(workbook.blob())
     }
 
+    /// The workbook's people, the authors and mentions of threaded comments
+    /// (record 0322); `None` without a persons part.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed parse error for a malformed persons part.
+    pub fn people(&self) -> Result<Option<crate::threaded_comments::People>> {
+        crate::threaded_comments::package::people(&self.inner.package)
+    }
+
     /// Parse the styles part's differential formats, the formats conditional
     /// formatting rules reference by `dxfId`; empty without a styles part.
     ///
@@ -1246,6 +1256,19 @@ impl Worksheet {
             &self.data.part_uri,
         )?
         .map(|part| part.comments))
+    }
+
+    /// Read this worksheet's threaded comments (record 0322); `None`
+    /// without a threaded-comments part. Only the worksheet's relationships
+    /// and that part are read; authors resolve through
+    /// [`crate::Workbook::people`].
+    pub fn threaded_comments(&self) -> Result<Option<crate::threaded_comments::Comments>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::threaded_comments::package::comments(&self.owner.package, &self.data.part_uri)
     }
 
     /// Read this worksheet's form controls under a caller-owned bounded

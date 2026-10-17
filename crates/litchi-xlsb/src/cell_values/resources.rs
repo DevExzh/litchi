@@ -781,7 +781,7 @@ fn transfer_number_format(source: &[u8], target: &mut Vec<u8>, xf: &mut [u8]) ->
     Ok(())
 }
 
-pub(super) fn collection(
+pub(crate) fn collection(
     source: &[u8],
     begin: Kind,
     end: Kind,
@@ -801,7 +801,7 @@ pub(super) fn collection(
     Ok(values)
 }
 
-fn append_collection_item(
+pub(crate) fn append_collection_item(
     source: &[u8],
     begin: Kind,
     end: Kind,
