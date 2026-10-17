@@ -294,15 +294,14 @@ fn comments_are_added_and_set() {
     assert_eq!(code, Some(Code::MissingProperty));
     // A date that is not an XML dateTime is a typed value refusal, not a
     // corrupt comments part (record 0330).
-    let error = file
-        .add(
-            "/slide[1]",
-            NewNode::new("comment")
-                .prop("author", "Ada")
-                .prop("date", "yesterday"),
-        )
-        .err()
-        .expect("an invalid comment date is refused");
+    let Err(error) = file.add(
+        "/slide[1]",
+        NewNode::new("comment")
+            .prop("author", "Ada")
+            .prop("date", "yesterday"),
+    ) else {
+        panic!("an invalid comment date is refused");
+    };
     assert_eq!(error.code(), Code::InvalidValue, "{error:?}");
     assert_eq!(error.property(), Some("date"));
 }
