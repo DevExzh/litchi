@@ -491,3 +491,118 @@ fn the_root_lists_its_parts_in_officecli_order() {
     let header = position("/header[").expect("headers");
     assert!(body < styles && styles < header, "{children:?}");
 }
+
+#[test]
+fn story_paragraphs_and_runs_are_read_and_written() {
+    // Record 0325: `/header[N]/p[M]`, `/footer[N]/p[M]`, `/footnote[N]/p[M]`
+    // and `/endnote[N]/p[M]` with the body paragraph machinery.
+    let base = litchi_ops::create(litchi_core::FileFormat::Docx)
+        .unwrap()
+        .add("/body", NewNode::new("paragraph").prop("text", "Body"))
+        .unwrap()
+        .file
+        .add("/", NewNode::new("header").prop("text", "Top"))
+        .unwrap()
+        .file
+        .add("/", NewNode::new("footer").prop("text", "Bottom"))
+        .unwrap()
+        .file;
+    let added = base
+        .add(
+            "/body/p[1]",
+            NewNode::new("footnote").prop("text", "Note text"),
+        )
+        .unwrap();
+    let note = added.path.to_string();
+    let base = added.file;
+    for eager in [false, true] {
+        let file = reopen(&base, eager);
+        assert_eq!(text(&file, "/header[1]/p[1]"), "Top");
+        assert_eq!(text(&file, "/header[1]/p[1]/r[1]"), "Top");
+        assert_eq!(text(&file, "/footer[1]/p[1]"), "Bottom");
+        assert!(text(&file, &format!("{note}/p[1]")).contains("Note text"));
+        // Unscoped queries stay in the main story.
+        assert_eq!(paths(&file, "paragraph").len(), 1);
+
+        // set: text and formatting of a story paragraph and run.
+        let set = file
+            .set(
+                "/header[1]/p[1]",
+                props! { "text" => "Header text", "align" => "center" },
+            )
+            .unwrap_or_else(|error| panic!("header paragraph set: {error}"))
+            .set("/footer[1]/p[1]/r[1]", props! { "bold" => true })
+            .unwrap_or_else(|error| panic!("footer run set: {error}"));
+        let set = reopen(&set, eager);
+        assert_eq!(text(&set, "/header[1]/p[1]"), "Header text");
+        assert_eq!(text(&set, "/header[1]"), "Header text");
+        assert_eq!(
+            property(&set, "/header[1]/p[1]", "align").as_deref(),
+            Some("center")
+        );
+        assert_eq!(
+            property(&set, "/footer[1]/p[1]/r[1]", "bold").as_deref(),
+            Some("true")
+        );
+        // The main document is untouched.
+        assert_eq!(text(&set, "/body/p[1]"), text(&file, "/body/p[1]"));
+
+        // add: a paragraph under a header and a note, a run under a story
+        // paragraph.
+        let added = set
+            .add(
+                "/header[1]",
+                NewNode::new("paragraph").prop("text", "Second"),
+            )
+            .unwrap_or_else(|error| panic!("header paragraph add: {error}"));
+        assert_eq!(added.path.to_string(), "/header[1]/p[2]");
+        let added = added
+            .file
+            .add("/header[1]/p[2]", NewNode::new("run").prop("text", " line"))
+            .unwrap_or_else(|error| panic!("header run add: {error}"));
+        assert_eq!(added.path.to_string(), "/header[1]/p[2]/r[2]");
+        let added = added
+            .file
+            .add(
+                note.as_str(),
+                NewNode::new("paragraph").prop("text", "More"),
+            )
+            .unwrap_or_else(|error| panic!("note paragraph add: {error}"));
+        let file = reopen(&added.file, eager);
+        assert_eq!(text(&file, "/header[1]/p[2]"), "Second line");
+        assert_eq!(text(&file, &format!("{note}/p[2]")), "More");
+
+        // remove: a run and a paragraph; a story keeps its last paragraph.
+        let removed = file
+            .remove("/header[1]/p[2]/r[2]")
+            .unwrap()
+            .remove("/header[1]/p[1]")
+            .unwrap();
+        assert_eq!(text(&removed, "/header[1]/p[1]"), "Second");
+        let error = removed.remove("/header[1]/p[1]").unwrap_err();
+        assert_eq!(error.code(), Code::InvalidArgument);
+        // A note's first paragraph keeps its reference-mark run.
+        let noted = removed
+            .set(
+                format!("{note}/p[1]").as_str(),
+                props! { "text" => "Replaced" },
+            )
+            .unwrap();
+        assert_eq!(text(&noted, &format!("{note}/p[1]")), "Replaced");
+        assert_eq!(
+            noted
+                .get(format!("{note}/p[1]").as_str())
+                .unwrap()
+                .view()
+                .children()
+                .count(),
+            2
+        );
+        // An equal set is an exact no-op.
+        let bytes = removed.to_bytes().unwrap();
+        let same = removed
+            .set("/header[1]/p[1]", props! { "text" => "Second" })
+            .unwrap();
+        assert_eq!(same.to_bytes().unwrap(), bytes);
+    }
+}

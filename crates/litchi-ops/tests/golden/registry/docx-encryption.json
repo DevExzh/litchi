@@ -206,7 +206,9 @@
         "positional": [
           "/body/p[N]",
           "/body/tbl[N]/tr[M]/tc[K]/p[J]",
-          "/body/sdt[N]/p[M]"
+          "/body/sdt[N]/p[M]",
+          "/header[N]/p[M]",
+          "/footnote[N]/p[M]"
         ]
       },
       "children": [

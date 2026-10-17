@@ -221,6 +221,70 @@ pub(super) fn notes(docx: &Docx, kind: litchi_docx::document::NoteKind) -> Resul
     Ok(lock.get_or_init(|| loaded))
 }
 
+/// The story the address step `kind[ordinal]` (a header, footer, footnote
+/// or endnote) names: its leaf key and its part value (record 0325).
+pub(super) fn story_of(
+    docx: &Docx,
+    kind: Kind,
+    ordinal: usize,
+) -> Result<(super::element::StoryKey, PartValue)> {
+    let missing = || internal("a DOCX story step is outside its story list");
+    match kind {
+        Kind::Header | Kind::Footer => {
+            let role = if kind == Kind::Header {
+                Role::Header
+            } else {
+                Role::Footer
+            };
+            let index = *role_stories(docx, role)?.get(ordinal).ok_or_else(missing)?;
+            let name = stories(docx)?
+                .get(index)
+                .ok_or_else(missing)?
+                .part()
+                .name()
+                .to_owned();
+            Ok((
+                super::element::StoryKey::Part(name),
+                PartValue::Story(ordinal_u32(index)),
+            ))
+        },
+        _ => {
+            let kind = note_kind(kind);
+            let id = notes(docx, kind)?.get(ordinal).ok_or_else(missing)?.id();
+            Ok((
+                super::element::StoryKey::Note(kind, id),
+                PartValue::Note(kind, ordinal_u32(ordinal)),
+            ))
+        },
+    }
+}
+
+fn ordinal_u32(index: usize) -> u32 {
+    u32::try_from(index).unwrap_or(u32::MAX)
+}
+
+/// The block index of a header, footer or note story (record 0325): its
+/// paragraphs and tables are addressed as `/header[N]/p[M]`, ...; `None` for
+/// other part values.
+pub(super) fn story_blocks(docx: &Docx, value: PartValue) -> Result<Option<litchi_docx::Blocks>> {
+    let blocks = match value {
+        PartValue::Story(index) => {
+            let xml = story_xml(docx, index as usize)?;
+            litchi_docx::header_footer::Story::from_shared_bytes(xml, StoryKind::Primary)
+                .and_then(|story| story.blocks())
+                .map_err(Error::from)?
+        },
+        PartValue::Note(kind, index) => notes(docx, kind)?
+            .get(index as usize)
+            .ok_or_else(|| internal("a DOCX note index is outside the note list"))?
+            .blocks()
+            .map_err(Error::from)?,
+        _ => return Ok(None),
+    };
+    docx.owner().check_source()?;
+    Ok(Some(blocks))
+}
+
 // ---------------------------------------------------------------------------
 // Node values
 // ---------------------------------------------------------------------------

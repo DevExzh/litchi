@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `453a35d4578dbbe240f45f07e65328203b889a646b77a16354904723e588a4f6` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `0b3b2a407dfc038ef7aa176ed03e7fd147efc2756bd74abbcea401fa4e3e5b4b` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `c5333a58f1117b0e630f0aeda04682bf8c2026e1cd43663d25692afbf6935b6a` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6e7b3b171bcde2e86d226994d60e8b8bf47ebcf867752a8a80afbe2057213120` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |

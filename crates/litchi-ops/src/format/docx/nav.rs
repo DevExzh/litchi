@@ -300,6 +300,8 @@ pub(super) fn container_of(node: &Node<'_>) -> Result<Option<Blocks>> {
             Some(control) => Some(control.blocks()?),
             None => None,
         },
+        // Header, footer and note stories (record 0325).
+        Value::Part(part) => super::parts::story_blocks(node.docx, *part)?,
         _ => None,
     })
 }
@@ -359,7 +361,13 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 }
                 Ok(Lookup::Found(body_node(self.docx)?))
             },
-            (Value::Body(_) | Value::Cell(_) | Value::Sdt(_), _) if kind.block_kind().is_some() => {
+            (
+                Value::Body(_)
+                | Value::Cell(_)
+                | Value::Sdt(_)
+                | Value::Part(super::parts::PartValue::Story(_) | super::parts::PartValue::Note(..)),
+                _,
+            ) if kind.block_kind().is_some() => {
                 let Some(container) = container_of(parent)? else {
                     return Ok(Lookup::Missing);
                 };
