@@ -170,6 +170,10 @@ workspace = true
 
 # Formula-evaluation parity against the corpus' cached results (record 0266).
 [[example]]
+name              = "sheet_features_bench"
+required-features = ["xls", "ods"]
+
+[[example]]
 name              = "eval_parity"
 required-features = ["xlsx", "xlsb", "xls", "eval"]
 
