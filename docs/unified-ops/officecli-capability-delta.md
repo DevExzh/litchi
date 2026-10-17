@@ -32,7 +32,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `4feb37072541ce3dc7ec1ebd0994aae5abc0facd72bf360055b72da7b3526369` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `e36b1632c9b0cbefd90979cde43b59b8134f2080134ef57479bdc10ca8d832cc` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `bcfba00773c28a5c08f4a081185dd93e258334c1e625a6e812ac48cac651beac` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `9c4afdf165334e207de69da99cdc335356d3ed7ec6ff012885c95f067bdf8398` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
@@ -8814,7 +8814,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `set` | `cell` | `cross-table formula references` | formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
 | `add` | `table` | `a workbook without a table` | a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet | record 0301 follow-ups (IWORK_API_REQUESTS.md request 5) |
-| `add` | `row` | `formulas the coordinate shift refuses, merges` | rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); refused: removing a row or column a surviving formula reads (native Numbers writes #REF!), a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a shared formula whose cells would diverge, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden, bordered or commented row or column | record 0318 follow-ups (IWORK_API_REQUESTS.md request 6) |
+| `add` | `row` | `formulas the coordinate shift refuses, merges` | rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split (record 0329); refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column | record 0329 follow-ups (IWORK_API_REQUESTS.md request 6) |
 | `set` | `row` | `height and visibility` | rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction | record 0309 follow-ups |
 
 ## odb
