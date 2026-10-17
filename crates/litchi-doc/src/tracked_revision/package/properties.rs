@@ -271,6 +271,15 @@ impl RevisionEditor {
         Ok(output)
     }
 
+    /// `SttbfBkmk.cbExtra`, 0 when the table is absent.
+    fn bookmark_extra_bytes(&self) -> Result<u16> {
+        let (offset, length) = fib_pair(&self.word, STTBF_BKMK)?;
+        if length == 0 {
+            return Ok(0);
+        }
+        u16_at(slice(&self.table, offset, length, "SttbfBkmk")?, 4)
+    }
+
     fn bookmark_names(&self) -> Result<Vec<String>> {
         let (offset, length) = fib_pair(&self.word, STTBF_BKMK)?;
         if length == 0 {
@@ -307,6 +316,11 @@ impl RevisionEditor {
     /// `SttbfBkmk`, `PlcfBkf` and `PlcfBkl`. Every bookmark keeps its
     /// `FBKF.bkc` when its name survives; a new one is a plain text range.
     pub(crate) fn set_bookmarks(&mut self, bookmarks: &[BookmarkRange]) -> Result<()> {
+        if self.bookmark_extra_bytes()? != 0 {
+            return Err(corrupted(
+                "SttbfBkmk carries per-name extra data the bookmark editor does not model",
+            ));
+        }
         if bookmarks.len() > 0x3FFB {
             return Err(corrupted("bookmark table exceeds 0x3FFB entries"));
         }
