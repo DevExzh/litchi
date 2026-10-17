@@ -900,7 +900,7 @@ pptx	shape	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/dat
 pptx	shape	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/shape[1]
 pptx	shape	query	supported		ok matches in create()
 pptx	shape	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/shape[1]
-pptx	shape	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1] {"x":"12pt"}
+pptx	shape	set	supported		ok `create() + add slide` /slidemaster[1]/shape[1] {"text":"Litchi"}
 pptx	shape	add	supported		ok /slide[1]/shape[1] on `create() + add slide` under /slide[1] {"text":"Box","width":"1in","height":"1in"}
 pptx	shape	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]
 pptx	shape	move	format-verb		refused unsupported_type
@@ -913,35 +913,35 @@ pptx	placeholder	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/un
 pptx	placeholder	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
 pptx	placeholder	query	supported		ok matches in create()
 pptx	placeholder	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
-pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx` /slide[2]/shape[2] {"font":"Litchi"}
+pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[2]/shape[2] {"font":"Litchi"}
 pptx	placeholder	add	n/a	add not offered for this element	-
-pptx	placeholder	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[2]/shape[2]
+pptx	placeholder	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[2]/shape[2]
 pptx	placeholder	move	format-verb		refused unsupported_type
 pptx	placeholder	swap	format-verb		refused unsupported_type
 pptx	placeholder	edit	supported		ok tx.set
 pptx	placeholder	batch	supported		ok set item
 pptx	placeholder	create	supported		ok format
 pptx	placeholder	save	supported		ok format
-pptx	picture	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
-pptx	picture	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx
-pptx	picture	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
+pptx	picture	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	set	n/a	set not offered for this element	-
 pptx	picture	add	n/a	add not offered for this element	-
-pptx	picture	remove	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx` /slide[1]/picture[1]
+pptx	picture	remove	supported		ok `create() + add slide + add video` /slide[1]/picture[1]
 pptx	picture	move	format-verb		refused unsupported_type
 pptx	picture	swap	format-verb		refused unsupported_type
 pptx	picture	edit	n/a	edit not offered for this element	-
 pptx	picture	batch	n/a	batch not offered for this element	-
 pptx	picture	create	supported		ok format
 pptx	picture	save	supported		ok format
-pptx	table	get	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
-pptx	table	find	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	get	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	find	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	table	view	supported		ok 4 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	view	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	set	n/a	set not offered for this element	-
 pptx	table	add	n/a	add not offered for this element	-
-pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/table[1]
 pptx	table	move	format-verb		unreached
 pptx	table	swap	format-verb		unreached
 pptx	table	edit	n/a	edit not offered for this element	-
@@ -987,13 +987,13 @@ pptx	chart	edit	supported		ok tx.set
 pptx	chart	batch	supported		ok set item
 pptx	chart	create	supported		ok format
 pptx	chart	save	supported		ok format
-pptx	group	get	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
-pptx	group	find	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	get	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	find	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
 pptx	group	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	group	view	supported		ok 6 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	view	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
 pptx	group	set	n/a	set not offered for this element	-
 pptx	group	add	n/a	add not offered for this element	-
-pptx	group	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[3]/group[1]
 pptx	group	move	format-verb		unreached
 pptx	group	swap	format-verb		unreached
 pptx	group	edit	n/a	edit not offered for this element	-
@@ -1006,7 +1006,7 @@ pptx	connector	query	supported		ok matches in ooxml/pptx/shapes.pptx
 pptx	connector	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
 pptx	connector	set	n/a	set not offered for this element	-
 pptx	connector	add	n/a	add not offered for this element	-
-pptx	connector	remove	supported		ok `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
+pptx	connector	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/connector[1]
 pptx	connector	move	format-verb		refused unsupported_type
 pptx	connector	swap	format-verb		refused unsupported_type
 pptx	connector	edit	n/a	edit not offered for this element	-
@@ -1104,58 +1104,58 @@ pptx	comment	edit	n/a	edit not offered for this element	-
 pptx	comment	batch	n/a	batch not offered for this element	-
 pptx	comment	create	supported		ok format
 pptx	comment	save	supported		ok format
-pptx	video	get	gap	L-PPTX-R11	unreached
-pptx	video	find	gap	L-PPTX-R11	unreached
-pptx	video	query	gap	L-PPTX-R11	unreached
-pptx	video	view	gap	L-PPTX-R11	unreached
-pptx	video	set	gap	L-PPTX-R11	unreached
-pptx	video	add	gap	L-PPTX-R11	-
-pptx	video	remove	gap	L-PPTX-R11	unreached
-pptx	video	move	gap	L-PPTX-R11	unreached
-pptx	video	swap	gap	L-PPTX-R11	unreached
-pptx	video	edit	gap	L-PPTX-R11	-
-pptx	video	batch	gap	L-PPTX-R11	-
-pptx	video	create	gap	L-PPTX-R11	ok format
-pptx	video	save	gap	L-PPTX-R11	ok format
-pptx	audio	get	gap	L-PPTX-R11	unreached
-pptx	audio	find	gap	L-PPTX-R11	unreached
-pptx	audio	query	gap	L-PPTX-R11	unreached
-pptx	audio	view	gap	L-PPTX-R11	unreached
-pptx	audio	set	gap	L-PPTX-R11	unreached
-pptx	audio	add	gap	L-PPTX-R11	-
-pptx	audio	remove	gap	L-PPTX-R11	unreached
-pptx	audio	move	gap	L-PPTX-R11	unreached
-pptx	audio	swap	gap	L-PPTX-R11	unreached
-pptx	audio	edit	gap	L-PPTX-R11	-
-pptx	audio	batch	gap	L-PPTX-R11	-
-pptx	audio	create	gap	L-PPTX-R11	ok format
-pptx	audio	save	gap	L-PPTX-R11	ok format
-pptx	media	get	gap	L-PPTX-R11	unreached
-pptx	media	find	gap	L-PPTX-R11	unreached
-pptx	media	query	gap	L-PPTX-R11	unreached
-pptx	media	view	gap	L-PPTX-R11	unreached
-pptx	media	set	gap	L-PPTX-R11	unreached
-pptx	media	add	gap	L-PPTX-R11	-
-pptx	media	remove	gap	L-PPTX-R11	unreached
-pptx	media	move	gap	L-PPTX-R11	unreached
-pptx	media	swap	gap	L-PPTX-R11	unreached
-pptx	media	edit	gap	L-PPTX-R11	-
-pptx	media	batch	gap	L-PPTX-R11	-
-pptx	media	create	gap	L-PPTX-R11	ok format
-pptx	media	save	gap	L-PPTX-R11	ok format
-pptx	equation	get	gap	L-PPTX-R11	unreached
-pptx	equation	find	gap	L-PPTX-R11	unreached
-pptx	equation	query	gap	L-PPTX-R11	unreached
-pptx	equation	view	gap	L-PPTX-R11	unreached
-pptx	equation	set	gap	L-PPTX-R11	unreached
-pptx	equation	add	gap	L-PPTX-R11	-
-pptx	equation	remove	gap	L-PPTX-R11	unreached
-pptx	equation	move	gap	L-PPTX-R11	unreached
-pptx	equation	swap	gap	L-PPTX-R11	unreached
-pptx	equation	edit	gap	L-PPTX-R11	-
-pptx	equation	batch	gap	L-PPTX-R11	-
-pptx	equation	create	gap	L-PPTX-R11	ok format
-pptx	equation	save	gap	L-PPTX-R11	ok format
+pptx	video	get	supported		ok 5 instances, first `poi/test-data/slideshow/EmbeddedVideo.pptx` /slide[1]/video[1]
+pptx	video	find	supported		ok 5 instances, first `poi/test-data/slideshow/EmbeddedVideo.pptx` /slide[1]/video[1]
+pptx	video	query	supported		ok matches in poi/test-data/slideshow/EmbeddedVideo.pptx
+pptx	video	view	supported		ok 5 instances, first `poi/test-data/slideshow/EmbeddedVideo.pptx` /slide[1]/video[1]
+pptx	video	set	n/a	set not offered for this element	-
+pptx	video	add	supported		ok /slide[1]/video[1] on `create() + add slide` under /slide[1] {"src":"data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t","poster":"<PNG>"}
+pptx	video	remove	supported		ok `create() + add slide + add video` /slide[1]/video[1]
+pptx	video	move	format-verb		refused unsupported_type
+pptx	video	swap	format-verb		refused unsupported_type
+pptx	video	edit	n/a	edit not offered for this element	-
+pptx	video	batch	n/a	batch not offered for this element	-
+pptx	video	create	supported		ok format
+pptx	video	save	supported		ok format
+pptx	audio	get	supported		ok 3 instances, first `poi/test-data/slideshow/EmbeddedAudio.pptx` /slide[1]/audio[1]
+pptx	audio	find	supported		ok 3 instances, first `poi/test-data/slideshow/EmbeddedAudio.pptx` /slide[1]/audio[1]
+pptx	audio	query	supported		ok matches in poi/test-data/slideshow/EmbeddedAudio.pptx
+pptx	audio	view	supported		ok 3 instances, first `poi/test-data/slideshow/EmbeddedAudio.pptx` /slide[1]/audio[1]
+pptx	audio	set	n/a	set not offered for this element	-
+pptx	audio	add	supported		ok /slide[1]/audio[1] on `create() + add slide` under /slide[1] {"src":"data:audio/mpeg;base64,SUQzAwAAAAAAAA==","poster":"<PNG>"}
+pptx	audio	remove	supported		ok `create() + add slide + add audio` /slide[1]/audio[1]
+pptx	audio	move	format-verb		refused unsupported_type
+pptx	audio	swap	format-verb		refused unsupported_type
+pptx	audio	edit	n/a	edit not offered for this element	-
+pptx	audio	batch	n/a	batch not offered for this element	-
+pptx	audio	create	supported		ok format
+pptx	audio	save	supported		ok format
+pptx	media	get	supported		ok 8 instances, first `poi/test-data/slideshow/EmbeddedAudio.pptx` /slide[1]/media[1]
+pptx	media	find	supported		ok 8 instances, first `poi/test-data/slideshow/EmbeddedAudio.pptx` /slide[1]/media[1]
+pptx	media	query	supported		ok matches in poi/test-data/slideshow/EmbeddedAudio.pptx
+pptx	media	view	supported		ok 8 instances, first `poi/test-data/slideshow/EmbeddedAudio.pptx` /slide[1]/media[1]
+pptx	media	set	n/a	set not offered for this element	-
+pptx	media	add	supported		ok /slide[1]/media[1] on `create() + add slide` under /slide[1] {"src":"data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t","poster":"<PNG>"}
+pptx	media	remove	supported		ok `create() + add slide + add video` /slide[1]/media[1]
+pptx	media	move	format-verb		refused unsupported_type
+pptx	media	swap	format-verb		refused unsupported_type
+pptx	media	edit	n/a	edit not offered for this element	-
+pptx	media	batch	n/a	batch not offered for this element	-
+pptx	media	create	supported		ok format
+pptx	media	save	supported		ok format
+pptx	equation	get	supported		ok 2 instances, first `libreoffice-core/oox/qa/unit/data/import-mce.pptx` /slide[1]/shape[1]/equation[1]
+pptx	equation	find	supported		ok 2 instances, first `libreoffice-core/oox/qa/unit/data/import-mce.pptx` /slide[1]/shape[1]/equation[1]
+pptx	equation	query	supported		ok matches in libreoffice-core/oox/qa/unit/data/import-mce.pptx
+pptx	equation	view	supported		ok 2 instances, first `libreoffice-core/oox/qa/unit/data/import-mce.pptx` /slide[1]/shape[1]/equation[1]
+pptx	equation	set	n/a	set not offered for this element	-
+pptx	equation	add	n/a	add not offered for this element	-
+pptx	equation	remove	n/a	remove not offered for this element	-
+pptx	equation	move	format-verb		unreached
+pptx	equation	swap	format-verb		unreached
+pptx	equation	edit	n/a	edit not offered for this element	-
+pptx	equation	batch	n/a	batch not offered for this element	-
+pptx	equation	create	supported		ok format
+pptx	equation	save	supported		ok format
 pptx	zoom	get	gap	M1-extended	unreached
 pptx	zoom	find	gap	M1-extended	unreached
 pptx	zoom	query	gap	M1-extended	unreached
@@ -1186,41 +1186,41 @@ pptx	slideMaster	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/un
 pptx	slideMaster	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]
 pptx	slideMaster	query	supported		ok matches in create()
 pptx	slideMaster	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]
-pptx	slideMaster	set	n/a	set not offered for this element	-
+pptx	slideMaster	set	supported		ok `create() + add slide` /slidemaster[1] {"name":"Litchi"}
 pptx	slideMaster	add	n/a	add not offered for this element	-
 pptx	slideMaster	remove	n/a	remove not offered for this element	-
 pptx	slideMaster	move	format-verb		unreached
 pptx	slideMaster	swap	format-verb		unreached
-pptx	slideMaster	edit	n/a	edit not offered for this element	-
-pptx	slideMaster	batch	n/a	batch not offered for this element	-
+pptx	slideMaster	edit	supported		ok tx.set
+pptx	slideMaster	batch	supported		ok set item
 pptx	slideMaster	create	supported		ok format
 pptx	slideMaster	save	supported		ok format
 pptx	slideLayout	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/slidelayout[1]
 pptx	slideLayout	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/slidelayout[1]
 pptx	slideLayout	query	supported		ok matches in create()
 pptx	slideLayout	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/slidelayout[1]
-pptx	slideLayout	set	n/a	set not offered for this element	-
+pptx	slideLayout	set	supported		ok `create() + add slide` /slidemaster[1]/slidelayout[1] {"name":"Litchi"}
 pptx	slideLayout	add	n/a	add not offered for this element	-
 pptx	slideLayout	remove	n/a	remove not offered for this element	-
 pptx	slideLayout	move	format-verb		refused unsupported_type
 pptx	slideLayout	swap	format-verb		refused unsupported_type
-pptx	slideLayout	edit	n/a	edit not offered for this element	-
-pptx	slideLayout	batch	n/a	batch not offered for this element	-
+pptx	slideLayout	edit	supported		ok tx.set
+pptx	slideLayout	batch	supported		ok set item
 pptx	slideLayout	create	supported		ok format
 pptx	slideLayout	save	supported		ok format
-pptx	theme	get	gap	L-PPTX-R4	unreached
-pptx	theme	find	gap	L-PPTX-R4	unreached
-pptx	theme	query	gap	L-PPTX-R4	unreached
-pptx	theme	view	gap	L-PPTX-R4	unreached
-pptx	theme	set	gap	L-PPTX-R4	unreached
-pptx	theme	add	gap	L-PPTX-R4	-
-pptx	theme	remove	gap	L-PPTX-R4	unreached
-pptx	theme	move	gap	L-PPTX-R4	unreached
-pptx	theme	swap	gap	L-PPTX-R4	unreached
-pptx	theme	edit	gap	L-PPTX-R4	-
-pptx	theme	batch	gap	L-PPTX-R4	-
-pptx	theme	create	gap	L-PPTX-R4	ok format
-pptx	theme	save	gap	L-PPTX-R4	ok format
+pptx	theme	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /theme
+pptx	theme	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /theme
+pptx	theme	query	supported		ok matches in create()
+pptx	theme	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /theme
+pptx	theme	set	supported		ok `create() + add slide` /theme {"dk1":"FF0000"}
+pptx	theme	add	n/a	add not offered for this element	-
+pptx	theme	remove	n/a	remove not offered for this element	-
+pptx	theme	move	format-verb		unreached
+pptx	theme	swap	format-verb		unreached
+pptx	theme	edit	supported		ok tx.set
+pptx	theme	batch	supported		ok set item
+pptx	theme	create	supported		ok format
+pptx	theme	save	supported		ok format
 pptx	modernComment	get	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
 pptx	modernComment	find	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
 pptx	modernComment	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
@@ -1247,19 +1247,19 @@ pptx	reply	edit	n/a	edit not offered for this element	-
 pptx	reply	batch	n/a	batch not offered for this element	-
 pptx	reply	create	supported		ok format
 pptx	reply	save	supported		ok format
-pptx	hyperlink	get	gap	M1-extended	unreached
-pptx	hyperlink	find	gap	M1-extended	unreached
-pptx	hyperlink	query	gap	M1-extended	unreached
-pptx	hyperlink	view	gap	M1-extended	unreached
-pptx	hyperlink	set	gap	M1-extended	unreached
-pptx	hyperlink	add	gap	M1-extended	-
-pptx	hyperlink	remove	gap	M1-extended	unreached
-pptx	hyperlink	move	gap	M1-extended	unreached
-pptx	hyperlink	swap	gap	M1-extended	unreached
-pptx	hyperlink	edit	gap	M1-extended	-
-pptx	hyperlink	batch	gap	M1-extended	-
-pptx	hyperlink	create	gap	M1-extended	ok format
-pptx	hyperlink	save	gap	M1-extended	ok format
+pptx	hyperlink	get	supported		ok 2 instances, first `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink
+pptx	hyperlink	find	supported		ok 2 instances, first `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink
+pptx	hyperlink	query	supported		ok matches in create() + add slide + add shape + add hyperlink
+pptx	hyperlink	view	supported		ok 2 instances, first `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink
+pptx	hyperlink	set	supported		ok `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink {"link":"7"}
+pptx	hyperlink	add	supported		ok /slide[1]/shape[1]/hyperlink on `create() + add slide + add shape` under /slide[1]/shape[1] {"link":"Litchi","tooltip":"Litchi"}
+pptx	hyperlink	remove	supported		ok `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink
+pptx	hyperlink	move	format-verb		unreached
+pptx	hyperlink	swap	format-verb		unreached
+pptx	hyperlink	edit	supported		ok tx.set
+pptx	hyperlink	batch	supported		ok set item
+pptx	hyperlink	create	supported		ok format
+pptx	hyperlink	save	supported		ok format
 pptx	animation	get	gap	M1-extended	unreached
 pptx	animation	find	gap	M1-extended	unreached
 pptx	animation	query	gap	M1-extended	unreached
@@ -1299,19 +1299,19 @@ pptx	axis	edit	supported		ok tx.set
 pptx	axis	batch	supported		ok set item
 pptx	axis	create	supported		ok format
 pptx	axis	save	supported		ok format
-pptx	col	get	gap	L-PPTX-R8	unreached
-pptx	col	find	gap	L-PPTX-R8	unreached
-pptx	col	query	gap	L-PPTX-R8	unreached
-pptx	col	view	gap	L-PPTX-R8	unreached
-pptx	col	set	gap	L-PPTX-R8	unreached
-pptx	col	add	gap	L-PPTX-R8	-
-pptx	col	remove	gap	L-PPTX-R8	unreached
-pptx	col	move	gap	L-PPTX-R8	unreached
-pptx	col	swap	gap	L-PPTX-R8	unreached
-pptx	col	edit	gap	L-PPTX-R8	-
-pptx	col	batch	gap	L-PPTX-R8	-
-pptx	col	create	gap	L-PPTX-R8	ok format
-pptx	col	save	gap	L-PPTX-R8	ok format
+pptx	col	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/col[1]
+pptx	col	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/col[1]
+pptx	col	query	supported		ok matches in ooxml/pptx/shapes.pptx
+pptx	col	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/col[1]
+pptx	col	set	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/table[1]/col[1] {"width":"12pt"}
+pptx	col	add	supported		ok /slide[1]/table[1]/col[4] on `ooxml/pptx/shapes.pptx` under /slide[1]/table[1] {}
+pptx	col	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/table[1]/col[1]
+pptx	col	move	format-verb		refused unsupported_type
+pptx	col	swap	format-verb		refused unsupported_type
+pptx	col	edit	supported		ok tx.set
+pptx	col	batch	supported		ok set item
+pptx	col	create	supported		ok format
+pptx	col	save	supported		ok format
 pptx	noteSlide	get	gap	M1-extended	unreached
 pptx	noteSlide	find	gap	M1-extended	unreached
 pptx	noteSlide	query	gap	M1-extended	unreached

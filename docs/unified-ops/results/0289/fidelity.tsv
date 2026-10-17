@@ -143,10 +143,10 @@ libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	doc	exact		v
 libreoffice-core/extras/source/database/biblio.odb	odb	exact		value-exact	/table[1] name: 2892 -> 2427 bytes, first difference at 7	-	
 libreoffice-core/filter/qa/unit/data/semi-transparent-fill.odg	odg	exact		value-exact	/page[1] name: 10597 -> 8788 bytes, first difference at 7	-	
 libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/oox/qa/unit/data/import-mce.pptx	pptx	exact		none		none	
-libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx	pptx	exact		refused	/slidemaster[1]/shape[1] font: unsupported_capability: master and layout text writes are not integrated	none	
-libreoffice-core/oox/qa/unit/data/tdf131082.pptx	pptx	exact		none		none	
-libreoffice-core/oox/qa/unit/data/testTdf132557_footerCustomShapes.pptx	pptx	exact		none		none	
+libreoffice-core/oox/qa/unit/data/import-mce.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/oox/qa/unit/data/tdf131082.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/oox/qa/unit/data/testTdf132557_footerCustomShapes.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb	odb	exact		value-exact	/table[1] name: 22048 -> 21693 bytes, first difference at 7	-	
 libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
@@ -220,15 +220,15 @@ libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp	odp	exact		value-exact	/
 libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	odp	exact		value-exact	/slide[1] name: 18926 -> 18925 bytes, first difference at 11904	-	
 libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp	odp	exact		value-exact	/slide[1] name: 13158 -> 13170 bytes, first difference at 5025	-	
 libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp	odp	exact		value-exact	/slide[1] name: 11416 -> 11428 bytes, first difference at 5907	-	
-libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	pptx	exact		none		none	
+libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	byte-exact	slide move+back
 libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	pptx	exact		value-exact	/slide[7]/shape[1] font: 138108 -> 138094 bytes, first difference at 74356	byte-exact	slide move+back
-libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		refused	/slide[1]/shape[5] font: unsupported_capability: unsafe PPTX edit during set_text_properties: source-backed slide edits do not support ma...	none	
-libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type	none	
-libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	none	
-libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx	pptx	exact		refused	/slidemaster[1]/shape[1] font: unsupported_capability: master and layout text writes are not integrated	none	
-libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx	pptx	exact		none		none	
-libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx	pptx	exact		refused	/slidemaster[1]/slidelayout[2]/shape[1] font: unsupported_capability: master and layout text writes are not integrated	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp	odp	exact		byte-exact	/slide[1] name	-	
 libreoffice-core/starmath/qa/extras/data/tdf151842.odf	odf	exact		value-exact	/ starmath: 6073 -> 4725 bytes, first difference at 7	-	
 libreoffice-core/svx/qa/unit/data/FontWork.odg	odg	exact		value-exact	/page[1] name: 10515 -> 9088 bytes, first difference at 7	-	
@@ -498,7 +498,7 @@ office-interop/litchi-changed/date-autofilter-litchi.xlsx	xlsx	exact		value-exac
 office-interop/litchi-changed/document-properties-litchi.docx	docx	exact		byte-exact	/styles/Normal name	-	
 office-interop/litchi-changed/noheadfoot-litchi.doc	doc	exact		refused	/body/p[1] text: corrupt_file: the file is malformed	-	
 office-interop/litchi-changed/relsize-litchi.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
-office-interop/litchi-changed/shapes-litchi.pptx	pptx	exact		none		byte-exact	slide move+back
+office-interop/litchi-changed/shapes-litchi.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
 office-interop/litchi-changed/tdf132924-litchi.odb	odb	exact		value-exact	/table[1] name: 2897 -> 2808 bytes, first difference at 83	-	
 office-interop/litchi-changed/tdf78897-litchi.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 officecli/examples/word/revisions.docx	docx	exact		byte-exact	/body/p[1] style	-	
@@ -612,62 +612,62 @@ ooxml/docx/table-alignment.docx	docx	exact		byte-exact	/styles/Normal name	-
 ooxml/docx/table-indent.docx	docx	exact		byte-exact	/body/p[1] style	-	
 ooxml/docx/table_footnotes.docx	docx	exact		byte-exact	/styles/a name	-	
 ooxml/docx/testComment.docx	docx	exact		byte-exact	/body/p[1] style	-	
-ooxml/pptx/SmartArt.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/activex/activex_checkbox.pptx	pptx	exact		none		none	
-ooxml/pptx/backgrounds.pptx	pptx	exact		none		byte-exact	slide move+back
-ooxml/pptx/connectorConnection.pptx	pptx	exact		none		none	
-ooxml/pptx/curvedConnectors.pptx	pptx	exact		none		none	
-ooxml/pptx/elbowConnectors.pptx	pptx	exact		none		none	
-ooxml/pptx/line-chart.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type	none	
-ooxml/pptx/pie-chart.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type	none	
-ooxml/pptx/radar-chart.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type	none	
-ooxml/pptx/sample.pptx	pptx	exact		none		byte-exact	slide move+back
-ooxml/pptx/scatter-chart.pptx	pptx	exact		none		none	
-ooxml/pptx/shape-blur-effect.pptx	pptx	exact		none		none	
-ooxml/pptx/shape-glow-effect.pptx	pptx	exact		none		none	
-ooxml/pptx/shape-soft-edges.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	none	
-ooxml/pptx/shape-text-glow-effect.pptx	pptx	exact		none		none	
-ooxml/pptx/shape-text-rotate.pptx	pptx	exact		none		none	
-ooxml/pptx/shapes.pptx	pptx	exact		none		byte-exact	slide move+back
-ooxml/pptx/smartart-accent-process.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-autoTxRot.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	byte-exact	slide move+back
-ooxml/pptx/smartart-autofit-sync.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-background-drawingml-fallback.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-background.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-bullet-list.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-center-cycle.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-chevron.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-children.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-cnt.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-composite-infer-right.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-continuous-block-process.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-cycle-matrix.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-cycle.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-data-follow.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-dir.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-font-size.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-interopgrabbag.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-linear-rule-vert.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-linear-rule.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-maxdepth.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-missing-bullet.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-multidirectional.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-org-chart.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-org-chart2.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
+ooxml/pptx/SmartArt.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/activex/activex_checkbox.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/backgrounds.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
+ooxml/pptx/connectorConnection.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/curvedConnectors.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/elbowConnectors.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/line-chart.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/pie-chart.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/radar-chart.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/sample.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
+ooxml/pptx/scatter-chart.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/shape-blur-effect.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/shape-glow-effect.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/shape-soft-edges.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/shape-text-glow-effect.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/shape-text-rotate.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/shapes.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
+ooxml/pptx/smartart-accent-process.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-autoTxRot.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
+ooxml/pptx/smartart-autofit-sync.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-background-drawingml-fallback.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-background.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-bullet-list.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-center-cycle.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-chevron.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-children.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-cnt.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-composite-infer-right.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-continuous-block-process.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-cycle-matrix.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-cycle.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-data-follow.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-dir.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-font-size.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-interopgrabbag.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-linear-rule-vert.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-linear-rule.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-maxdepth.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-missing-bullet.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-multidirectional.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-org-chart.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-org-chart2.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 ooxml/pptx/smartart-picture-strip.pptx	pptx	exact		value-exact	/slide[1]/shape[1] font: 52395 -> 52385 bytes, first difference at 6395	none	
-ooxml/pptx/smartart-preserve.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-pyramid-1child.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-recursion.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-rightoleftblockdiagram.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-rotation.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-rotation2.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-simple.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-snake-rows.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-tdf134221.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-text.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-vertical-block-list.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/smartart-vertical-box-list.pptx	pptx	exact		refused	/slide[1]/smartart[1] layout: invalid_value: unknown SmartArt layout	none	
-ooxml/pptx/trigger.pptx	pptx	exact		none		none	
+ooxml/pptx/smartart-preserve.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-pyramid-1child.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-recursion.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-rightoleftblockdiagram.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-rotation.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-rotation2.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-simple.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-snake-rows.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-tdf134221.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-text.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-vertical-block-list.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/smartart-vertical-box-list.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+ooxml/pptx/trigger.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 ooxml/xlsb/51519.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10897 -> 8843 bytes, first difference at 6	-	
 ooxml/xlsb/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10665 -> 8409 bytes, first difference at 6	-	
 ooxml/xlsb/Simple.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9161 -> 7317 bytes, first difference at 6	-	
@@ -812,9 +812,9 @@ poi/test-data/slideshow/42485.ppt	ppt	exact		none		-
 poi/test-data/slideshow/45543.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/45545_Comment.pptx	pptx	exact		value-exact	/slide[1]/shape[3] font: 308394 -> 308088 bytes, first difference at 13306	byte-exact	slide move+back
 poi/test-data/slideshow/54880_chinese.ppt	ppt	exact		none		-	
-poi/test-data/slideshow/ArtisticEffectSample.pptx	pptx	exact		refused	/slidemaster[1]/shape[6] font: unsupported_capability: master and layout text writes are not integrated	byte-exact	slide move+back
-poi/test-data/slideshow/EmbeddedAudio.pptx	pptx	exact		none		none	
-poi/test-data/slideshow/EmbeddedVideo.pptx	pptx	exact		none		none	
+poi/test-data/slideshow/ArtisticEffectSample.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
+poi/test-data/slideshow/EmbeddedAudio.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+poi/test-data/slideshow/EmbeddedVideo.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 poi/test-data/slideshow/Password_Protected-56-hello.ppt	ppt	locked		-		-	
 poi/test-data/slideshow/Password_Protected-hello.ppt	ppt	locked		-		-	
 poi/test-data/slideshow/Password_Protected-np-hello.ppt	ppt	locked		-		-	
@@ -824,17 +824,17 @@ poi/test-data/slideshow/basic_test_ppt_file.ppt	ppt	exact		none		-
 poi/test-data/slideshow/bug58144-headers-footers-2003.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/bug58144-headers-footers-2007.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/bug61881.ppt	ppt	exact		none		-	
-poi/test-data/slideshow/bug62513.pptx	pptx	exact		none		refused	slide move+back: unsupported_capability: PPTX OPC error: source-backed OPC Part overlay is unavailable: source ZIP archive has trailing b...
-poi/test-data/slideshow/bug65551.pptx	pptx	exact		refused	/slidemaster[1]/shape[1] font: unsupported_capability: master and layout text writes are not integrated	none	
+poi/test-data/slideshow/bug62513.pptx	pptx	exact		one-way	/slidemaster[1]/slidelayout[1] name: the set back is refused: unsupported_capability: PPTX OPC error: owned OPC source preservation is un...	refused	slide move+back: unsupported_capability: PPTX OPC error: source-backed OPC Part overlay is unavailable: source ZIP archive has trailing b...
+poi/test-data/slideshow/bug65551.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 poi/test-data/slideshow/cryptoapi-proc2356.ppt	ppt	locked		-		-	
 poi/test-data/slideshow/datetime.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/headers_footers.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/headers_footers_2007.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/incorrect_slide_order.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/ole2-embedding-2003.ppt	ppt	exact		none		-	
-poi/test-data/slideshow/placeholder-layout-color.pptx	pptx	exact		none		none	
+poi/test-data/slideshow/placeholder-layout-color.pptx	pptx	exact		byte-exact	/slidemaster[1] name	none	
 poi/test-data/slideshow/ppt_with_embeded.ppt	ppt	exact		none		-	
-poi/test-data/slideshow/prProps.pptx	pptx	exact		none		none	
+poi/test-data/slideshow/prProps.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 poi/test-data/slideshow/sound.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/testPPT_oleWorkbook.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/text-margins.ppt	ppt	exact		none		-	
@@ -1004,5 +1004,5 @@ unified-ops/0294/connectors.ppt	ppt	exact		none		-
 unified-ops/0294/frames.odm	odm	exact		byte-exact	/body/p[1] text	-	
 unified-ops/0294/frames.oth	oth	exact		byte-exact	/body/p[1] text	-	
 unified-ops/0294/layers.odg	odg	exact		byte-exact	/page[1] name	-	
-unified-ops/0294/modern-comments.pptx	pptx	exact		value-exact	/slide[1]/shape[3] font: 10725 -> 10752 bytes, first difference at 3034	byte-exact	slide move+back
+unified-ops/0294/modern-comments.pptx	pptx	exact		byte-exact	/slidemaster[1] name	byte-exact	slide move+back
 unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	-	

@@ -43,11 +43,12 @@ use super::Pptx;
 use super::children::{Children, Listing};
 use super::owner::SlideFacts;
 use super::spec::{
-    AXIS_PROPS, AxisKey, CELL_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey, FRAME_PROPS,
-    FrameKey, Kind, NODE_PROPS, NOTES_PROPS, NodeKey, NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE,
+    AXIS_PROPS, AxisKey, CELL_PROPS, COLUMN_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey,
+    EQUATION_PROPS, FRAME_PROPS, FrameKey, HYPERLINK_PROPS, Kind, MEDIA_PROPS, MediaKey,
+    NODE_PROPS, NOTES_PROPS, NodeKey, NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE,
     PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey, RunKey, SERIES_PROPS, SHAPE_PROPS,
     SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey, ShapeKey, SlideKey, SmartArtKey,
-    TABLE_PROPS, TableKey,
+    TABLE_PROPS, THEME_PROPS, TableKey,
 };
 use super::steps::{self, Builder};
 use super::text;
@@ -115,6 +116,14 @@ pub(super) enum Item {
     Comment(CommentItem),
     ModernComment(ModernCommentItem),
     Reply(ReplyItem),
+    /// The presentation theme (record 0321).
+    Theme(super::theme::ThemeItem),
+    /// A table grid column (record 0321).
+    Column(super::columns::ColumnItem),
+    /// A shape's or run's click action (record 0321).
+    Hyperlink(super::links::LinkItem),
+    /// An Office Math equation (record 0321).
+    Equation(super::equations::EquationItem),
 }
 
 /// A slide: its position, and its scene and facts once a read needed them.
@@ -337,6 +346,24 @@ impl TreeItem {
     pub(super) fn new_master(position: u32, kind: Kind, handle: Handle, ordinal: u32) -> Self {
         Self {
             container: TreeContainer::Master(position),
+            kind,
+            handle,
+            ordinal,
+            body: OnceLock::new(),
+            chart: OnceLock::new(),
+            diagram: OnceLock::new(),
+        }
+    }
+
+    /// A shape-tree element of any container.
+    pub(super) fn in_container(
+        container: TreeContainer,
+        kind: Kind,
+        handle: Handle,
+        ordinal: u32,
+    ) -> Self {
+        Self {
+            container,
             kind,
             handle,
             ordinal,
@@ -636,7 +663,7 @@ impl<'f> Node<'f> {
     #[must_use]
     pub fn slide(&self) -> Option<usize> {
         match &self.item {
-            Item::Presentation | Item::Master(_) | Item::Layout(_) => None,
+            Item::Presentation | Item::Master(_) | Item::Layout(_) | Item::Theme(_) => None,
             Item::Slide(slide) => Some(slide.position as usize),
             Item::Tree(tree) => tree.slide_position().map(|position| position as usize),
             Item::Paragraph(text) | Item::Run(text) | Item::LineBreak(text) => text
@@ -647,6 +674,14 @@ impl<'f> Node<'f> {
                 .table
                 .slide_position()
                 .map(|position| position as usize),
+            Item::Column(column) => column
+                .table
+                .slide_position()
+                .map(|position| position as usize),
+            Item::Hyperlink(item) => link_shape(item)
+                .slide_position()
+                .map(|position| position as usize),
+            Item::Equation(item) => Some(item.slide as usize),
             Item::Series(item) | Item::Axis(item) => item
                 .chart
                 .slide_position()
@@ -672,6 +707,9 @@ impl<'f> Node<'f> {
                 Some(&text.shape.handle)
             },
             Item::Row(table) | Item::Cell(table) => Some(&table.table.handle),
+            Item::Column(column) => Some(&column.table.handle),
+            Item::Hyperlink(item) => Some(&link_shape(item).handle),
+            Item::Equation(item) => item.shape.as_ref().map(|tree| &tree.handle),
             Item::Series(item) | Item::Axis(item) => Some(&item.chart.handle),
             Item::DiagramNode(item) => Some(&item.smartart.handle),
             _ => None,
@@ -717,6 +755,10 @@ impl<'f> Node<'f> {
             Item::Comment(_) => Kind::Comment,
             Item::ModernComment(_) => Kind::ModernComment,
             Item::Reply(_) => Kind::Reply,
+            Item::Theme(_) => Kind::Theme,
+            Item::Column(_) => Kind::Col,
+            Item::Hyperlink(_) => Kind::Hyperlink,
+            Item::Equation(_) => Kind::Equation,
         }
     }
 
@@ -759,6 +801,10 @@ impl<'f> Node<'f> {
             Item::Comment(_) => "comment",
             Item::ModernComment(_) => "modernComment",
             Item::Reply(_) => "reply",
+            Item::Theme(_) => "theme",
+            Item::Column(_) => "col",
+            Item::Hyperlink(_) => "hyperlink",
+            Item::Equation(_) => "equation",
         }
     }
 
@@ -863,6 +909,41 @@ impl<'f> Node<'f> {
                 out.push(at("reply", reply.index));
                 out
             },
+            Item::Theme(_) => {
+                let mut out = Builder::new();
+                out.push(PathStep::new("theme"));
+                out
+            },
+            Item::Column(column) => {
+                let mut out = column.table.steps(canonical);
+                out.push(at("col", column.index));
+                out
+            },
+            Item::Hyperlink(item) => {
+                let mut out = match &item.owner {
+                    super::links::Owner::Shape(tree) => tree.steps(canonical),
+                    super::links::Owner::Run(text) => {
+                        let mut out = text.shape.steps(canonical);
+                        out.push(at("paragraph", text.paragraph));
+                        out.push(at("run", text.ordinal));
+                        out
+                    },
+                };
+                out.push(PathStep::new("hyperlink"));
+                out
+            },
+            Item::Equation(item) => {
+                let mut out = match &item.shape {
+                    Some(tree) => tree.steps(canonical),
+                    None => {
+                        let mut out = Builder::new();
+                        out.push(steps::slide(item.slide));
+                        out
+                    },
+                };
+                out.push(at("equation", item.index));
+                out
+            },
         }
     }
 
@@ -875,7 +956,11 @@ impl<'f> Node<'f> {
             | Item::Layout(_)
             | Item::Row(_)
             | Item::Series(_)
-            | Item::Axis(_) => None,
+            | Item::Axis(_)
+            | Item::Theme(_)
+            | Item::Column(_) => None,
+            Item::Hyperlink(item) => Some(super::links::link_text(&item.link)),
+            Item::Equation(item) => Some(Cow::Borrowed(item.equation.text())),
             // OfficeCLI's `GetShapeText` is "" for a shape without text.
             Item::Tree(tree) if tree.kind == Kind::Shape => {
                 Some(Cow::Borrowed(tree.handle.view().text().unwrap_or("")))
@@ -981,7 +1066,11 @@ impl<'f> Node<'f> {
             | Item::Axis(_)
             | Item::Notes(_)
             | Item::Comment(_)
-            | Item::Reply(_) => 0,
+            | Item::Reply(_)
+            | Item::Theme(_)
+            | Item::Column(_)
+            | Item::Hyperlink(_)
+            | Item::Equation(_) => 0,
             Item::ModernComment(comment) => comment
                 .comment()
                 .map_or(0, |comment| comment.replies().len()),
@@ -1004,7 +1093,9 @@ impl<'f> Node<'f> {
                 Some(key) => TreeProps::read_for(tree, Needs::shape(tree, key))?.shape(key),
                 None => None,
             },
-            Kind::Table | Kind::Chart => self.format_member()?.get(index),
+            Kind::Table | Kind::Chart | Kind::Video | Kind::Audio | Kind::Media => {
+                self.format_member()?.get(index)
+            },
             Kind::SmartArt => match SmartArtKey::at(index) {
                 Some(SmartArtKey::Layout | SmartArtKey::LayoutId | SmartArtKey::NodeCount) => {
                     self.format_member()?.get(index)
@@ -1088,6 +1179,16 @@ impl<'f> Node<'f> {
                         })),
                     )
                 },
+                Kind::Video | Kind::Audio | Kind::Media => (
+                    MEDIA_PROPS,
+                    PropKind::Media(Box::new(MediaProps {
+                        tree: TreeProps::read(tree, false)?,
+                        trim: (
+                            super::media::trim(tree, true)?,
+                            super::media::trim(tree, false)?,
+                        ),
+                    })),
+                ),
                 Kind::SmartArt => (
                     SMARTART_PROPS,
                     PropKind::SmartArt(Box::new(SmartArtProps {
@@ -1136,8 +1237,26 @@ impl<'f> Node<'f> {
                 Some(record) => (Kind::Reply.spec().props, PropKind::Reply(record)),
                 None => (Kind::Reply.spec().props, PropKind::Empty),
             },
+            Item::Theme(item) => (THEME_PROPS, PropKind::Theme(&item.theme)),
+            Item::Column(item) => (COLUMN_PROPS, PropKind::Column(item)),
+            Item::Hyperlink(item) => (HYPERLINK_PROPS, PropKind::Hyperlink(item)),
+            Item::Equation(item) => (EQUATION_PROPS, PropKind::Equation(item)),
         };
         Ok(Format::new(table, Source::Pptx(Props { kind })))
+    }
+}
+
+/// A media picture's values: its frame's, then its playback trim.
+struct MediaProps<'a> {
+    tree: TreeProps<'a>,
+    trim: (Option<String>, Option<String>),
+}
+
+/// The shape a hyperlink belongs to.
+fn link_shape(item: &super::links::LinkItem) -> &TreeItem {
+    match &item.owner {
+        super::links::Owner::Shape(tree) => tree,
+        super::links::Owner::Run(text) => &text.shape,
     }
 }
 
@@ -1292,6 +1411,11 @@ enum PropKind<'a> {
     Comment(&'a Comment),
     ModernComment(&'a ModernComment),
     Reply(&'a ModernReply),
+    Theme(&'a litchi_drawingml::theme::Theme),
+    Column(&'a super::columns::ColumnItem),
+    Hyperlink(&'a super::links::LinkItem),
+    Media(Box<MediaProps<'a>>),
+    Equation(&'a super::equations::EquationItem),
     Empty,
 }
 
@@ -1787,6 +1911,15 @@ impl<'a> Props<'a> {
             PropKind::Layout(facts) => layout_value(facts, index),
             PropKind::ModernComment(comment) => modern_comment_value(comment, index),
             PropKind::Reply(reply) => reply_value(reply, index),
+            PropKind::Theme(theme) => super::theme::value(theme, index),
+            PropKind::Column(item) => super::columns::value(item, index),
+            PropKind::Hyperlink(item) => super::links::value(item, index),
+            PropKind::Equation(item) => super::equations::value(item, index),
+            PropKind::Media(props) => match MediaKey::at(index)? {
+                MediaKey::TrimStart => props.trim.0.clone().map(|ms| Value::Text(Cow::Owned(ms))),
+                MediaKey::TrimEnd => props.trim.1.clone().map(|ms| Value::Text(Cow::Owned(ms))),
+                _ => props.tree.frame(FrameKey::at(index)?),
+            },
             PropKind::Empty => None,
         }
     }

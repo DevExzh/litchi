@@ -102,7 +102,7 @@ pub(crate) enum Kind {
 
 impl Kind {
     /// Every kind, in ordinal order.
-    const ALL: [Self; 37] = [
+    pub(super) const ALL: [Self; 37] = [
         Self::Presentation,
         Self::Slide,
         Self::Shape,
@@ -817,6 +817,79 @@ props_values! {
     }
 }
 
+props! {
+    /// An Office Math equation of slide text (`equation.json`, record
+    /// 0321): its OMML as a LaTeX-like formula.
+    EQUATION_PROPS, EquationKey {
+        Formula = "formula": ValueType::Text,
+    }
+}
+
+props! {
+    /// A media picture (`media.json`, record 0321): the frame keys of
+    /// [`FRAME_PROPS`], in order, then the PowerPoint 2010 playback trim in
+    /// milliseconds.
+    MEDIA_PROPS, MediaKey {
+        Name = "name": ValueType::Text,
+        Id = "id": ValueType::Int; raw,
+        Alt = "alt": ValueType::Text,
+        X = "x": POSITION,
+        Y = "y": POSITION,
+        Width = "width": EXTENT,
+        Height = "height": EXTENT,
+        Rotation = "rotation": ValueType::Number,
+        FlipH = "flipH": ValueType::Bool,
+        FlipV = "flipV": ValueType::Bool,
+        Zorder = "zorder": ValueType::Int,
+        TrimStart = "trimStart": ValueType::Text,
+        TrimEnd = "trimEnd": ValueType::Text,
+    }
+}
+
+props! {
+    /// A shape's or run's click action (`PowerPointHandler.Query.cs`
+    /// hyperlink branch, record 0321).
+    HYPERLINK_PROPS, HyperlinkKey {
+        Link = "link": ValueType::Text,
+        Tooltip = "tooltip": ValueType::Text,
+    }
+}
+
+props! {
+    /// A table grid column (`PowerPointHandler.Query.cs` `col` branch,
+    /// record 0321).
+    COLUMN_PROPS, ColumnKey {
+        Width = "width": EXTENT,
+    }
+}
+
+props! {
+    /// The presentation theme (`PowerPointHandler.Theme.cs` `GetThemeNode`,
+    /// record 0321): the color scheme's twelve slots, the major and minor
+    /// fonts, and the color scheme's name.
+    THEME_PROPS, ThemeKey {
+        Dark1 = "dk1": DRAWING_COLOR,
+        Light1 = "lt1": DRAWING_COLOR,
+        Dark2 = "dk2": DRAWING_COLOR,
+        Light2 = "lt2": DRAWING_COLOR,
+        Accent1 = "accent1": DRAWING_COLOR,
+        Accent2 = "accent2": DRAWING_COLOR,
+        Accent3 = "accent3": DRAWING_COLOR,
+        Accent4 = "accent4": DRAWING_COLOR,
+        Accent5 = "accent5": DRAWING_COLOR,
+        Accent6 = "accent6": DRAWING_COLOR,
+        Hyperlink = "hyperlink": DRAWING_COLOR,
+        FollowedHyperlink = "followedhyperlink": DRAWING_COLOR,
+        HeadingFont = "headingFont": ValueType::Text,
+        BodyFont = "bodyFont": ValueType::Text,
+        HeadingFontEastAsian = "headingFont.ea": ValueType::Text,
+        BodyFontEastAsian = "bodyFont.ea": ValueType::Text,
+        HeadingFontComplexScript = "headingFont.cs": ValueType::Text,
+        BodyFontComplexScript = "bodyFont.cs": ValueType::Text,
+        Name = "name": ValueType::Text,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Gaps
 // ---------------------------------------------------------------------------
@@ -834,39 +907,17 @@ const fn element_gap(
     }
 }
 
-const MEDIA: &str =
-    "the shape scene does not classify media pictures yet, so every p:pic is a picture";
 const ALTERNATE: &str =
     "zoom and 3D-model frames sit in markup-compatibility content the scene reads as its fallback";
-const MASTERS: &str = "the presentation theme is not readable on the owner yet";
 const NOTES_PARTS: &str =
     "notes slides are read through /slide[N]/notes; their parts have no adapter node";
 
-static VIDEO_GAP: GapSpec = element_gap("video", "L-PPTX-R11", MEDIA);
-static AUDIO_GAP: GapSpec = element_gap("audio", "L-PPTX-R11", MEDIA);
-static MEDIA_GAP: GapSpec = element_gap("media", "L-PPTX-R11", MEDIA);
-static EQUATION_GAP: GapSpec = element_gap(
-    "equation",
-    "L-PPTX-R11",
-    "the text-body reader does not expose Office math yet",
-);
 static ZOOM_GAP: GapSpec = element_gap("zoom", "M1-extended", ALTERNATE);
 static MODEL3D_GAP: GapSpec = element_gap("model3d", "M1-extended", ALTERNATE);
-static THEME_GAP: GapSpec = element_gap("theme", "L-PPTX-R4", MASTERS);
-static HYPERLINK_GAP: GapSpec = element_gap(
-    "hyperlink",
-    "M1-extended",
-    "hyperlink targets need the slide's relationships, which nodes do not keep",
-);
 static ANIMATION_GAP: GapSpec = element_gap(
     "animation",
     "M1-extended",
     "the timing tree is not read per shape yet",
-);
-static COLUMN_GAP: GapSpec = element_gap(
-    "col",
-    "L-PPTX-R8",
-    "the table reader does not read the grid columns yet",
 );
 static NOTE_SLIDE_GAP: GapSpec = element_gap("noteSlide", "M1-extended", NOTES_PARTS);
 static NOTES_MASTER_GAP: GapSpec = element_gap("notesMaster", "M1-extended", NOTES_PARTS);
@@ -904,7 +955,7 @@ const fn property_gap(
 const SHAPE_FILL: &str = "the shape record keeps no spPr fill, line or geometry span";
 const BODY_PROPS: &str =
     "the text-body reader applies body-property defaults, so local values are unknown";
-const LINKS: &str = "hyperlink targets need the slide's relationships, which nodes do not keep";
+const LINKS: &str = "the shape and run tables do not carry click actions yet; read and write their hyperlink element";
 
 // ---------------------------------------------------------------------------
 // The table
@@ -1241,41 +1292,45 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/comment[N]"],
             COMMENT_PROPS,
         ),
-        gap(
+        element(
             Video,
             "video",
             &["video"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/video[N]"],
-            &VIDEO_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Audio,
             "audio",
             &["audio"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/audio[N]"],
-            &AUDIO_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Media,
             "media",
             &["media"],
             TREE_PARENTS,
             &[],
+            &[],
             &["/slide[N]/media[N]"],
-            &MEDIA_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Equation,
             "equation",
             &["equation", "formula", "math"],
             &[Slide, Shape],
             &[],
-            &["/slide[N]/shape[N]/equation[N]"],
-            &EQUATION_GAP,
+            &[],
+            &["/slide[N]/shape[N]/equation[N]", "/slide[N]/equation[N]"],
+            EQUATION_PROPS,
         ),
         gap(
             Zoom,
@@ -1315,14 +1370,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slidemaster[N]/slidelayout[N]", "/slidelayout[N]"],
             LAYOUT_PROPS,
         ),
-        gap(
+        element(
             Theme,
             "theme",
             &["theme"],
             &[Presentation],
             &[],
+            &[],
             &["/theme"],
-            &THEME_GAP,
+            THEME_PROPS,
         ),
         element(
             ModernComment,
@@ -1349,14 +1405,18 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/moderncomment[N]/reply[N]"],
             REPLY_PROPS,
         ),
-        gap(
+        element(
             Hyperlink,
             "hyperlink",
             &["hlink", "hyperlink"],
             &[Shape, Run],
             &[],
-            &["/slide[N]/shape[N]/hyperlink"],
-            &HYPERLINK_GAP,
+            &[],
+            &[
+                "/slide[N]/shape[N]/hyperlink",
+                "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink",
+            ],
+            HYPERLINK_PROPS,
         ),
         gap(
             Animation,
@@ -1393,14 +1453,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             ],
             AXIS_PROPS,
         ),
-        gap(
+        element(
             Col,
             "col",
             &["col", "column"],
             &[Table],
             &[],
+            &[],
             &["/slide[N]/table[N]/col[N]"],
-            &COLUMN_GAP,
+            COLUMN_PROPS,
         ),
         gap(
             NoteSlide,
@@ -1439,7 +1500,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "presentation",
             "defaultFont",
             "L-PPTX-R4",
-            "the theme is not readable on the source-backed owner yet",
+            "the root does not read the theme part; read bodyFont of /theme",
         ),
         property_gap(
             "slide",
@@ -1489,7 +1550,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "table",
             "colWidths",
             "L-PPTX-R8",
-            "the table reader does not read the grid columns yet",
+            "the table node does not list its grid widths; read /slide[N]/table[N]/col[N]",
         ),
         property_gap(
             "tr",
@@ -1513,7 +1574,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "picture",
             "mediaType",
             "L-PPTX-R11",
-            "the shape scene does not classify media pictures yet",
+            "a picture node does not report its media kind; read /slide[N]/video[N] or audio[N]",
         ),
     ],
 };
@@ -2339,3 +2400,216 @@ const fn node_write_entries() -> [crate::registry::Entry<NodeSetter>; NODE_WRITE
 pub(super) const NODE_WRITE_TABLE: crate::registry::Table<NodeSetter, NODE_WRITE_COUNT, 0> =
     crate::registry::Table::new(node_write_entries(), []);
 pub(crate) const NODE_CAPABILITY_PROPS: &[PropSpec] = &NODE_WRITE_TABLE.readable();
+
+/// Theme assignments (record 0321): every theme property is settable; the
+/// setter is the key it writes.
+const fn theme_write_entries() -> [crate::registry::Entry<ThemeKey>; THEME_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(THEME_PROPS[0]); THEME_PROPS.len()];
+    let mut index = 0;
+    while index < THEME_PROPS.len() {
+        let key = ThemeKey::ALL[index];
+        entries[index] = Entry {
+            spec: THEME_PROPS[index],
+            access: Access::Set(key),
+            constraint: if matches!(key, ThemeKey::Name) {
+                Constraint::NotEmpty
+            } else {
+                Constraint::None
+            },
+            clear: false,
+        };
+        index += 1;
+    }
+    entries
+}
+/// OfficeCLI's theme aliases (`theme.json`).
+const THEME_WRITE_ALIASES: [crate::registry::Alias; 14] = {
+    use crate::registry::Alias;
+    const fn alias(name: &'static str, key: ThemeKey) -> Alias {
+        Alias {
+            name,
+            entry: key as usize,
+        }
+    }
+    [
+        alias("dark1", ThemeKey::Dark1),
+        alias("light1", ThemeKey::Light1),
+        alias("dark2", ThemeKey::Dark2),
+        alias("light2", ThemeKey::Light2),
+        alias("hlink", ThemeKey::Hyperlink),
+        alias("folhlink", ThemeKey::FollowedHyperlink),
+        alias("majorFont", ThemeKey::HeadingFont),
+        alias("major", ThemeKey::HeadingFont),
+        alias("minorFont", ThemeKey::BodyFont),
+        alias("minor", ThemeKey::BodyFont),
+        alias("majorFont.ea", ThemeKey::HeadingFontEastAsian),
+        alias("majorFont.cs", ThemeKey::HeadingFontComplexScript),
+        alias("minorFont.ea", ThemeKey::BodyFontEastAsian),
+        alias("minorFont.cs", ThemeKey::BodyFontComplexScript),
+    ]
+};
+pub(super) const THEME_WRITE_TABLE: crate::registry::Table<ThemeKey, { THEME_PROPS.len() }, 14> =
+    crate::registry::Table::new(theme_write_entries(), THEME_WRITE_ALIASES);
+pub(crate) const THEME_CAPABILITY_PROPS: &[PropSpec] = &THEME_WRITE_TABLE.readable();
+
+/// A catalog entry's write table: `name` (index 0 of its read table) is
+/// settable (record 0321).
+const fn named_write_entries<const N: usize>(
+    props: &[PropSpec],
+) -> [crate::registry::Entry<()>; N] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(props[0]); N];
+    let mut index = 0;
+    while index < N {
+        entries[index] = Entry::read(props[index]);
+        index += 1;
+    }
+    entries[0] = Entry {
+        spec: props[0],
+        access: Access::Set(()),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    entries
+}
+pub(super) const MASTER_WRITE_TABLE: crate::registry::Table<(), { MASTER_PROPS.len() }, 0> =
+    crate::registry::Table::new(named_write_entries(MASTER_PROPS), []);
+pub(crate) const MASTER_CAPABILITY_PROPS: &[PropSpec] = &MASTER_WRITE_TABLE.readable();
+pub(super) const LAYOUT_WRITE_TABLE: crate::registry::Table<(), { LAYOUT_PROPS.len() }, 0> =
+    crate::registry::Table::new(named_write_entries(LAYOUT_PROPS), []);
+pub(crate) const LAYOUT_CAPABILITY_PROPS: &[PropSpec] = &LAYOUT_WRITE_TABLE.readable();
+
+/// Table column assignments (record 0321): `width` on `add` and `set`, seed
+/// `text` on `add` (OfficeCLI's `table-column.json`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ColumnSetter {
+    Width,
+    Text,
+}
+const fn column_write_entries() -> [crate::registry::Entry<ColumnSetter>; 2] {
+    use crate::registry::{Access, Constraint, Entry};
+    [
+        Entry {
+            spec: COLUMN_PROPS[0],
+            access: Access::SetAndAdd(ColumnSetter::Width),
+            constraint: Constraint::Length {
+                min: crate::value::Length::from_emu(0),
+                max: crate::value::Length::from_emu(27_273_042_316_900),
+            },
+            clear: false,
+        },
+        Entry {
+            spec: write_only("text", ValueType::Text),
+            access: Access::Add(ColumnSetter::Text),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ]
+}
+pub(super) const COLUMN_WRITE_TABLE: crate::registry::Table<ColumnSetter, 2, 0> =
+    crate::registry::Table::new(column_write_entries(), []);
+pub(crate) const COLUMN_CAPABILITY_PROPS: &[PropSpec] = &COLUMN_WRITE_TABLE.readable();
+
+/// Hyperlink assignments (record 0321): `link` (alias `url`) and `tooltip`
+/// on `add` and `set`.
+const fn hyperlink_write_entries() -> [crate::registry::Entry<HyperlinkKey>; 2] {
+    use crate::registry::{Access, Constraint, Entry};
+    [
+        Entry {
+            spec: HYPERLINK_PROPS[0],
+            access: Access::SetAndAdd(HyperlinkKey::Link),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: HYPERLINK_PROPS[1],
+            access: Access::SetAndAdd(HyperlinkKey::Tooltip),
+            constraint: Constraint::None,
+            clear: true,
+        },
+    ]
+}
+pub(super) const HYPERLINK_WRITE_TABLE: crate::registry::Table<HyperlinkKey, 2, 1> =
+    crate::registry::Table::new(
+        hyperlink_write_entries(),
+        [crate::registry::Alias {
+            name: "url",
+            entry: 0,
+        }],
+    );
+pub(crate) const HYPERLINK_CAPABILITY_PROPS: &[PropSpec] = &HYPERLINK_WRITE_TABLE.readable();
+
+/// Media picture assignments (record 0321): `add` embeds a file (`src`)
+/// with its poster image (`poster`), a name and a frame.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum MediaSetter {
+    Src,
+    Poster,
+    Name,
+    X,
+    Y,
+    Width,
+    Height,
+}
+const MEDIA_WRITE_COUNT: usize = MEDIA_PROPS.len() + 2;
+const fn media_write_entries() -> [crate::registry::Entry<MediaSetter>; MEDIA_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(MEDIA_PROPS[0]); MEDIA_WRITE_COUNT];
+    let mut index = 0;
+    while index < MEDIA_PROPS.len() {
+        let spec = MEDIA_PROPS[index];
+        let setter = if index == MediaKey::Name as usize {
+            Some(MediaSetter::Name)
+        } else if index == MediaKey::X as usize {
+            Some(MediaSetter::X)
+        } else if index == MediaKey::Y as usize {
+            Some(MediaSetter::Y)
+        } else if index == MediaKey::Width as usize {
+            Some(MediaSetter::Width)
+        } else if index == MediaKey::Height as usize {
+            Some(MediaSetter::Height)
+        } else {
+            None
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: Access::Add(setter),
+                constraint: if matches!(setter, MediaSetter::Width | MediaSetter::Height) {
+                    Constraint::Length {
+                        min: crate::value::Length::from_emu(1),
+                        max: crate::value::Length::from_emu(i64::MAX),
+                    }
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries[MEDIA_PROPS.len()] = Entry {
+        spec: write_only("src", ValueType::Text),
+        access: Access::Add(MediaSetter::Src),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    entries[MEDIA_PROPS.len() + 1] = Entry {
+        spec: write_only("poster", ValueType::Text),
+        access: Access::Add(MediaSetter::Poster),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    entries
+}
+pub(super) const MEDIA_WRITE_TABLE: crate::registry::Table<MediaSetter, MEDIA_WRITE_COUNT, 1> =
+    crate::registry::Table::new(
+        media_write_entries(),
+        [crate::registry::Alias {
+            name: "path",
+            entry: MEDIA_PROPS.len(),
+        }],
+    );
+pub(crate) const MEDIA_CAPABILITY_PROPS: &[PropSpec] = &MEDIA_WRITE_TABLE.readable();

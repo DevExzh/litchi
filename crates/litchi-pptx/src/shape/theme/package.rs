@@ -348,6 +348,46 @@ pub fn validate(package: &OpcPackage) -> Result<()> {
     Ok(())
 }
 
+/// The theme part a presentation's colors and fonts come from: the
+/// presentation part's own theme relationship, else the first slide
+/// master's (record 0321; OfficeCLI's `GetThemePart` order). `None` for a
+/// presentation with neither.
+///
+/// # Errors
+///
+/// Returns an error for a malformed presentation part, master list or
+/// relationship target.
+pub fn presentation_theme(package: &OpcPackage) -> Result<Option<PackURI>> {
+    let main = package.main_document_part()?;
+    if let Some(target) = theme_target(main)? {
+        return Ok(Some(target));
+    }
+    let presentation = crate::parts::PresentationPart::from_part(main)?;
+    let Some(first) = presentation.slide_master_references()?.into_iter().next() else {
+        return Ok(None);
+    };
+    let Some(relationship) = main.rels().get(&first) else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("slide-master relationship must be internal"));
+    }
+    let master = package.get_part(&relationship.target_partname()?)?;
+    theme_target(master)
+}
+
+/// The internal theme relationship target of one part, if it has one.
+pub(crate) fn theme_target(part: &dyn litchi_opc::Part) -> Result<Option<PackURI>> {
+    match part
+        .rels()
+        .iter()
+        .find(|relationship| is_theme_rel(relationship.reltype()) && !relationship.is_external())
+    {
+        Some(relationship) => Ok(Some(relationship.target_partname()?)),
+        None => Ok(None),
+    }
+}
+
 /// Allocate a deterministic free part name for theme adapters.
 ///
 /// # Errors

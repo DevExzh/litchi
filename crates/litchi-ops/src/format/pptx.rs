@@ -50,8 +50,14 @@ use crate::{opc, pptx};
 
 mod chart;
 mod children;
+mod columns;
 mod comments;
 pub(crate) mod create;
+mod elements;
+mod equations;
+mod links;
+mod masters;
+mod media;
 mod metadata;
 mod nav;
 mod node;
@@ -67,6 +73,7 @@ mod spec;
 mod steps;
 mod structure;
 mod text;
+mod theme;
 mod views;
 pub(crate) mod write;
 
@@ -81,8 +88,90 @@ pub(crate) use spec::{
     SERIES_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SHAPE_PROP_ALIASES, SLIDE_CAPABILITY_PROPS,
     SPEC,
 };
-pub(crate) use spec::{NODE_CAPABILITY_PROPS, SMARTART_CAPABILITY_PROPS};
+pub(crate) use spec::{
+    COLUMN_CAPABILITY_PROPS, HYPERLINK_CAPABILITY_PROPS, LAYOUT_CAPABILITY_PROPS,
+    MASTER_CAPABILITY_PROPS, MEDIA_CAPABILITY_PROPS, NODE_CAPABILITY_PROPS,
+    SMARTART_CAPABILITY_PROPS, THEME_CAPABILITY_PROPS,
+};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
+
+/// The elements `set` writes (the capability report's `set` flag).
+pub(crate) const SETTABLE: &[&str] = &[
+    "slide",
+    "shape",
+    "placeholder",
+    "chart",
+    "series",
+    "axis",
+    "smartart",
+    "node",
+    "theme",
+    "slideMaster",
+    "slideLayout",
+    "col",
+    "hyperlink",
+];
+
+/// The non-slide elements `add` creates when the owner admits shape adds.
+pub(crate) const SHAPE_ADDABLE: &[&str] = &[
+    "shape",
+    "chart",
+    "smartart",
+    "node",
+    "col",
+    "hyperlink",
+    "video",
+    "audio",
+    "media",
+];
+
+/// The non-slide elements `remove` deletes when the owner admits shape
+/// removal.
+pub(crate) const REMOVABLE: &[&str] = &[
+    "shape",
+    "placeholder",
+    "picture",
+    "table",
+    "chart",
+    "group",
+    "connector",
+    "smartart",
+    "node",
+    "ole",
+    "col",
+    "hyperlink",
+    "video",
+    "audio",
+    "media",
+];
+
+/// The capability property table of an element whose writable keys extend
+/// its read table; `None` keeps the spec's.
+pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::spec::PropSpec]> {
+    Some(match element {
+        "shape" => SHAPE_CAPABILITY_PROPS,
+        "placeholder" => PLACEHOLDER_CAPABILITY_PROPS,
+        "slide" => SLIDE_CAPABILITY_PROPS,
+        "paragraph" => PARAGRAPH_CAPABILITY_PROPS,
+        "run" => RUN_CAPABILITY_PROPS,
+        "tc" => CELL_CAPABILITY_PROPS,
+        "notes" => NOTES_CAPABILITY_PROPS,
+        "comment" => COMMENT_CAPABILITY_PROPS,
+        "picture" => PICTURE_CAPABILITY_PROPS,
+        "chart" => CHART_CAPABILITY_PROPS,
+        "series" => SERIES_CAPABILITY_PROPS,
+        "axis" => AXIS_CAPABILITY_PROPS,
+        "smartart" => SMARTART_CAPABILITY_PROPS,
+        "node" => NODE_CAPABILITY_PROPS,
+        "theme" => THEME_CAPABILITY_PROPS,
+        "slideMaster" => MASTER_CAPABILITY_PROPS,
+        "slideLayout" => LAYOUT_CAPABILITY_PROPS,
+        "col" => COLUMN_CAPABILITY_PROPS,
+        "hyperlink" => HYPERLINK_CAPABILITY_PROPS,
+        "video" | "audio" | "media" => MEDIA_CAPABILITY_PROPS,
+        _ => return None,
+    })
+}
 
 /// An opened PowerPoint OOXML presentation.
 ///

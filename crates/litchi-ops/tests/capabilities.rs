@@ -733,11 +733,24 @@ fn pptx_reports_selection_and_structural_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
-        // Chart (record 0270) and SmartArt (record 0284) writes have their own
-        // report tests (`tests/charts.rs`, `tests/smartart.rs`).
+        // Chart (record 0270), SmartArt (record 0284) and the record 0321
+        // elements' writes have their own report tests (`tests/charts.rs`,
+        // `tests/smartart.rs`, `tests/pptx_elements.rs`).
         if matches!(
             element.name(),
-            "chart" | "series" | "axis" | "smartart" | "node"
+            "chart"
+                | "series"
+                | "axis"
+                | "smartart"
+                | "node"
+                | "theme"
+                | "slideMaster"
+                | "slideLayout"
+                | "col"
+                | "hyperlink"
+                | "video"
+                | "audio"
+                | "media"
         ) {
             continue;
         }
@@ -1173,6 +1186,11 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "smartart"
                     | "node"
                     | "ole"
+                    | "col"
+                    | "hyperlink"
+                    | "video"
+                    | "audio"
+                    | "media"
             ),
             "{}",
             element.name()
@@ -1207,6 +1225,11 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "smartart"
                     | "node"
                     | "ole"
+                    | "col"
+                    | "hyperlink"
+                    | "video"
+                    | "audio"
+                    | "media"
             ),
             "{}",
             element.name()

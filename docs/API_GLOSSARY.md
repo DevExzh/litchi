@@ -2573,3 +2573,24 @@ staging returns the source package (an exact no-op keeps every byte).
 | `litchi_xlsx::workbook::comments::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_comments, apply_comments}` | `Edit::{comments, set, add, remove}` (`add` refuses an annotated cell and returns the row-major position); splices notes and their VML note shapes, keeping the other notes' bytes | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::drawing::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{drawing_elements, edit_drawings, apply_drawings}` | `Edit::{elements, add_picture, add_shape, set, remove}`; read model `Element`, `ElementKind`, `Placement`, `Marker`, `Image`, `Fill`, `Line`, `Font`, `Align`, `VerticalAlign`; specs `PictureSpec`, `ShapeSpec`, `Change` | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::Worksheet::comments`, `SourceWorksheet::{comments, page_breaks, drawing_elements}` | reads on both owners | ✅ 0320 |
+
+## PPTX theme, columns, hyperlinks, media, equations, masters and layouts (record 0321)
+
+New verbs live on the primary `opened::Edit` (no new transaction family);
+reads live on the owners and slide views that already answer charts and
+SmartArt. Slide hyperlink targets are semantic (`Target::{Url, Slide,
+Action}`); the authored relationship ID of a `Click` stays crate-private.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::Package::theme`, `SourceBackedPresentation::theme`, `shape::theme::presentation_theme` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{theme, set_theme_colors, set_theme_fonts}` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_master_name, set_layout_name, set_master_shape_text, set_layout_shape_text}` | adopted (0321) |
+| `litchi_pptx::table::Table::grid_columns`; `opened::Edit::{set_table_column_width, insert_table_column, remove_table_column}` | adopted (0321) |
+| `litchi_pptx::hyperlinks::{Click, Link, Target}`; `Click::{of_shape, from_text, action, tooltip}` | adopted (0321) |
+| `litchi_pptx::slide::Slide::hyperlink`, `SourceSlide::hyperlink`, `source::Slide::hyperlink` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted (0321) |
+| `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted (0321) |
+| `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
+
+See [0321](unified-ops/0321-pptx-element-gaps.md).

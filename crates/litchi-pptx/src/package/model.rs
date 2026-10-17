@@ -1013,6 +1013,27 @@ impl Package {
         Ok(&self.opc)
     }
 
+    /// The presentation theme: the presentation part's own theme, else the
+    /// first slide master's (record 0321). `None` when there is neither.
+    ///
+    /// ```
+    /// let package = litchi_pptx::Package::new()?;
+    /// let theme = package.theme()?.expect("a fresh deck has a theme");
+    /// assert!(!theme.fonts.minor().latin.is_empty());
+    /// # Ok::<(), litchi_pptx::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a malformed presentation graph or theme part.
+    pub fn theme(&self) -> Result<Option<litchi_drawingml::theme::Theme>> {
+        let opc = self.opc()?;
+        let Some(name) = crate::shape::theme::presentation_theme(opc)? else {
+            return Ok(None);
+        };
+        crate::shape::theme::load(opc, name.as_str()).map(Some)
+    }
+
     /// The number of the first slide, `p:presentation/@firstSlideNum`
     /// (1 when absent), the number slide-number fields count from
     /// (record 0279).

@@ -3141,22 +3141,109 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/video[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-PPTX-R11",
-        "reason": "the shape scene does not classify media pictures yet, so every p:pic is a picture"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "flipH": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "flipV": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "trimStart": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "trimEnd": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "poster": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3169,22 +3256,109 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/audio[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-PPTX-R11",
-        "reason": "the shape scene does not classify media pictures yet, so every p:pic is a picture"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "flipH": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "flipV": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "trimStart": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "trimEnd": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "poster": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3197,22 +3371,109 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/media[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-PPTX-R11",
-        "reason": "the shape scene does not classify media pictures yet, so every p:pic is a picture"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "flipH": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "flipV": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "trimStart": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "trimEnd": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "poster": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3229,20 +3490,30 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
         "positional": [
-          "/slide[N]/shape[N]/equation[N]"
+          "/slide[N]/shape[N]/equation[N]",
+          "/slide[N]/equation[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-PPTX-R11",
-        "reason": "the text-body reader does not expose Office math yet"
+      "properties": {
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3303,7 +3574,7 @@
       "parent": "presentation",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -3371,7 +3642,7 @@
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "preserved": {
@@ -3398,7 +3669,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -3463,7 +3734,7 @@
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "type": {
@@ -3525,9 +3796,9 @@
       "parent": "presentation",
       "operations": {
         "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
+        "set": true,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -3535,11 +3806,128 @@
           "/theme"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-PPTX-R4",
-        "reason": "the presentation theme is not readable on the owner yet"
+      "properties": {
+        "dk1": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "lt1": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "dk2": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "lt2": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "accent1": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "accent2": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "accent3": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "accent4": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "accent5": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "accent6": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "followedhyperlink": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "headingFont": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bodyFont": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "headingFont.ea": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bodyFont.ea": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "headingFont.cs": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bodyFont.cs": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3710,22 +4098,38 @@
         "hlink"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/slide[N]/shape[N]/hyperlink"
+          "/slide[N]/shape[N]/hyperlink",
+          "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "hyperlink targets need the slide's relationships, which nodes do not keep"
+      "properties": {
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3866,22 +4270,37 @@
         "column"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/table[N]/col[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-PPTX-R8",
-        "reason": "the table reader does not read the grid columns yet"
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3982,34 +4401,6 @@
   "gaps": [
     {
       "subject": "element",
-      "element": "video",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R11",
-      "reason": "the shape scene does not classify media pictures yet, so every p:pic is a picture"
-    },
-    {
-      "subject": "element",
-      "element": "audio",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R11",
-      "reason": "the shape scene does not classify media pictures yet, so every p:pic is a picture"
-    },
-    {
-      "subject": "element",
-      "element": "media",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R11",
-      "reason": "the shape scene does not classify media pictures yet, so every p:pic is a picture"
-    },
-    {
-      "subject": "element",
-      "element": "equation",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R11",
-      "reason": "the text-body reader does not expose Office math yet"
-    },
-    {
-      "subject": "element",
       "element": "zoom",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
@@ -4024,31 +4415,10 @@
     },
     {
       "subject": "element",
-      "element": "theme",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R4",
-      "reason": "the presentation theme is not readable on the owner yet"
-    },
-    {
-      "subject": "element",
-      "element": "hyperlink",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "hyperlink targets need the slide's relationships, which nodes do not keep"
-    },
-    {
-      "subject": "element",
       "element": "animation",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
       "reason": "the timing tree is not read per shape yet"
-    },
-    {
-      "subject": "element",
-      "element": "col",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R8",
-      "reason": "the table reader does not read the grid columns yet"
     },
     {
       "subject": "element",
@@ -4070,7 +4440,7 @@
       "key": "defaultFont",
       "code": "unsupported_capability",
       "followUp": "L-PPTX-R4",
-      "reason": "the theme is not readable on the source-backed owner yet"
+      "reason": "the root does not read the theme part; read bodyFont of /theme"
     },
     {
       "subject": "property",
@@ -4182,7 +4552,7 @@
       "key": "link",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
-      "reason": "hyperlink targets need the slide's relationships, which nodes do not keep"
+      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
     },
     {
       "subject": "property",
@@ -4190,7 +4560,7 @@
       "key": "tooltip",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
-      "reason": "hyperlink targets need the slide's relationships, which nodes do not keep"
+      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
     },
     {
       "subject": "property",
@@ -4214,7 +4584,7 @@
       "key": "link",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
-      "reason": "hyperlink targets need the slide's relationships, which nodes do not keep"
+      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
     },
     {
       "subject": "property",
@@ -4222,7 +4592,7 @@
       "key": "tooltip",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
-      "reason": "hyperlink targets need the slide's relationships, which nodes do not keep"
+      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
     },
     {
       "subject": "property",
@@ -4230,7 +4600,7 @@
       "key": "colWidths",
       "code": "unsupported_capability",
       "followUp": "L-PPTX-R8",
-      "reason": "the table reader does not read the grid columns yet"
+      "reason": "the table node does not list its grid widths; read /slide[N]/table[N]/col[N]"
     },
     {
       "subject": "property",
@@ -4262,7 +4632,7 @@
       "key": "mediaType",
       "code": "unsupported_capability",
       "followUp": "L-PPTX-R11",
-      "reason": "the shape scene does not classify media pictures yet"
+      "reason": "a picture node does not report its media kind; read /slide[N]/video[N] or audio[N]"
     },
     {
       "subject": "operation",

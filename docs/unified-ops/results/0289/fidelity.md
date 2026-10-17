@@ -33,12 +33,12 @@ was refused (typed), `none` nothing to move.
 | oth | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 33 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 |
 | ppt | 29 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 0 |
-| pptx | 81 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 52 | 24 | 11 | 0 | 0 | 0 | 1 | 69 |
+| pptx | 81 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 74 | 4 | 0 | 1 | 2 | 0 | 11 | 0 | 0 | 0 | 1 | 69 |
 | rtf | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 61 | 37 | 16 | 39 | 0 | 1 | 18 | 88 |
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 112 | 3 | 0 | 0 | 4 | 0 | 92 | 5 | 0 | 0 | 22 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 986 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 256 | 459 | 0 | 4 | 165 | 99 | 148 | 99 | 0 | 2 | 84 | 157 |
+| **all** | 986 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 330 | 458 | 0 | 5 | 115 | 75 | 148 | 99 | 0 | 2 | 84 | 157 |
 
 ## Office-extension files the unified layer does not open
 
@@ -60,4 +60,5 @@ was refused (typed), `none` nothing to move.
 - `libreoffice-core/sw/qa/extras/rtfexport/data/tdf158830.rtf` (rtf): exact ; structure one-way: paragraph move+back: the inverse is refused: unsupported_capability: unsupported RTF edit source: the spliced paragraph segments do not r...
 - `odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `odf/native-resave/litchi-changed/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
+- `poi/test-data/slideshow/bug62513.pptx` (pptx): exact ; revert one-way: /slidemaster[1]/slidelayout[1] name: the set back is refused: unsupported_capability: PPTX OPC error: owned OPC source preservation is un...
 - `poi/test-data/spreadsheet/49609.xlsx` (xlsx): exact ; revert one-way: /sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...

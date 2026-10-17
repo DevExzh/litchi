@@ -535,6 +535,36 @@ impl<'f> Nav<'f> {
         })
     }
 
+    /// The item an index selector picks from a list.
+    fn pick_item(self, items: Vec<Item>, select: Select<'_>) -> Lookup<Node<'f>, GapSpec> {
+        match pick_index(items.len(), select) {
+            Pick::Index(index) => match items.into_iter().nth(index as usize) {
+                Some(item) => Lookup::Found(Node::new(self.file, item)),
+                None => Lookup::Missing,
+            },
+            Pick::Missing => Lookup::Missing,
+            Pick::NotApplicable => Lookup::NotApplicable,
+        }
+    }
+
+    /// The presentation theme, a singleton (record 0321).
+    fn theme(self, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
+        match pick_index(1, select) {
+            Pick::Index(_) => {},
+            Pick::Missing => return Ok(Lookup::Missing),
+            Pick::NotApplicable => return Ok(Lookup::NotApplicable),
+        }
+        Ok(match self.file.presentation_theme()? {
+            Some(theme) => Lookup::Found(Node::new(
+                self.file,
+                Item::Theme(super::theme::ThemeItem {
+                    theme: Arc::new(theme),
+                }),
+            )),
+            None => Lookup::Missing,
+        })
+    }
+
     fn row(self, table: &TreeItem, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         let (rows, _) = text::table_shape(&table.handle)?;
         Ok(match pick_index(rows, select) {
@@ -588,6 +618,42 @@ impl<'f> Nav<'f> {
                 nav.tree(container, handles, kind, select)
             });
         }
+        if matches!(kind, Kind::Video | Kind::Audio | Kind::Media) {
+            let Some((container, handles)) = tree_container(nav, parent)? else {
+                return Ok(Lookup::NotApplicable);
+            };
+            let found = super::media::select(handles, kind)?;
+            if let Select::Identity(identities) = select {
+                let mut matching = found.into_iter().filter(|(_, handle)| {
+                    identities
+                        .iter()
+                        .all(|(identity, value)| tree_identity(handle, identity, value))
+                });
+                let first = matching.next();
+                let more = matching.count();
+                if more > 0 {
+                    return Ok(Lookup::Ambiguous(more + 1));
+                }
+                return Ok(match first {
+                    Some((ordinal, handle)) => Lookup::Found(Node::new(
+                        nav.file,
+                        Item::Tree(TreeItem::in_container(container, kind, handle, ordinal)),
+                    )),
+                    None => Lookup::Missing,
+                });
+            }
+            return Ok(match pick_index(found.len(), select) {
+                Pick::Index(index) => match found.into_iter().nth(index as usize) {
+                    Some((ordinal, handle)) => Lookup::Found(Node::new(
+                        nav.file,
+                        Item::Tree(TreeItem::in_container(container, kind, handle, ordinal)),
+                    )),
+                    None => Lookup::Missing,
+                },
+                Pick::Missing => Lookup::Missing,
+                Pick::NotApplicable => Lookup::NotApplicable,
+            });
+        }
         match (parent.item(), kind) {
             (Item::Presentation, Kind::Slide) => nav.slide(select),
             (Item::Slide(slide), Kind::Notes) => nav.notes(slide.position, select),
@@ -596,6 +662,7 @@ impl<'f> Nav<'f> {
             (Item::Master(master), Kind::SlideLayout) => nav.layout(master.position, select),
             (Item::Presentation, Kind::SlideMaster) => nav.master(select),
             (Item::Presentation, Kind::SlideLayout) => nav.root_layout(select),
+            (Item::Presentation, Kind::Theme) => nav.theme(select),
             (Item::ModernComment(comment), Kind::Reply) => nav.reply(comment, select),
             (Item::Tree(tree), Kind::Paragraph) if tree.kind == Kind::Shape => {
                 nav.paragraph(tree, select)
@@ -604,6 +671,46 @@ impl<'f> Nav<'f> {
                 nav.shape_run(tree, select)
             },
             (Item::Tree(tree), Kind::Row) if tree.kind == Kind::Table => nav.row(tree, select),
+            (Item::Tree(tree), Kind::Hyperlink) if tree.kind == Kind::Shape => {
+                Ok(match pick_index(1, select) {
+                    Pick::Index(_) => match super::links::of_shape(nav.file, tree)? {
+                        Some(item) => Lookup::Found(Node::new(nav.file, Item::Hyperlink(item))),
+                        None => Lookup::Missing,
+                    },
+                    Pick::Missing => Lookup::Missing,
+                    Pick::NotApplicable => Lookup::NotApplicable,
+                })
+            },
+            (Item::Slide(slide), Kind::Equation) => {
+                let found = super::equations::items(nav.file, slide.position, None)?;
+                Ok(nav.pick_item(found, select))
+            },
+            (Item::Tree(tree), Kind::Equation) if tree.kind == Kind::Shape => {
+                let Some(slide) = tree.container.slide() else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let found = super::equations::items(nav.file, slide, Some(tree))?;
+                Ok(nav.pick_item(found, select))
+            },
+            (Item::Run(text), Kind::Hyperlink) => Ok(match pick_index(1, select) {
+                Pick::Index(_) => match super::links::of_run(nav.file, text)? {
+                    Some(item) => Lookup::Found(Node::new(nav.file, Item::Hyperlink(item))),
+                    None => Lookup::Missing,
+                },
+                Pick::Missing => Lookup::Missing,
+                Pick::NotApplicable => Lookup::NotApplicable,
+            }),
+            (Item::Tree(tree), Kind::Col) if tree.kind == Kind::Table => {
+                let columns = super::columns::children(tree)?;
+                Ok(match pick_index(columns.len(), select) {
+                    Pick::Index(index) => match columns.into_iter().nth(index as usize) {
+                        Some(item) => Lookup::Found(Node::new(nav.file, item)),
+                        None => Lookup::Missing,
+                    },
+                    Pick::Missing => Lookup::Missing,
+                    Pick::NotApplicable => Lookup::NotApplicable,
+                })
+            },
             (Item::Tree(tree), Kind::Series | Kind::Axis) if tree.kind == Kind::Chart => {
                 nav.chart_child(tree, kind, select)
             },

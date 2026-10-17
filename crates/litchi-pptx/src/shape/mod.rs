@@ -27,6 +27,7 @@
 pub mod classification;
 pub mod designer;
 pub mod diagram;
+pub mod math;
 pub mod owned;
 pub mod raw;
 pub mod text;
