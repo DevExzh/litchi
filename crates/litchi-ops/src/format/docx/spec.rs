@@ -952,6 +952,21 @@ gaps! {
     SHAPE_GAP: "shape", "R4x", "drawing shapes have no located reader yet";
 }
 
+/// A gap for an OfficeCLI element the table has no kind for (record 0339):
+/// naming it is `unsupported_capability`.
+const fn unlisted_gap(
+    element: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Element(element),
+        code: Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
+
 /// An element spec with the fields most kinds share.
 const fn element(
     kind: Kind,
@@ -1491,6 +1506,44 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             ),
         ],
         gaps: &[
+            // OfficeCLI elements this adapter does not list as kinds
+            // (record 0339): each is a typed gap with its disposition.
+            unlisted_gap(
+                "bookmarkEnd",
+                "0339-F2 (deferred-P1)",
+                "a bookmark is one node over its start and end markers (record 0319); a standalone end marker is not addressed or added on its own",
+            ),
+            unlisted_gap(
+                "permStart",
+                "0339-F2 (deferred-P1)",
+                "editing-permission ranges (w:permStart, w:permEnd) are kept but not projected as nodes",
+            ),
+            unlisted_gap(
+                "ptab",
+                "0339-F2 (deferred-P1)",
+                "positional tabs (w:ptab) are kept in their runs but not projected as nodes",
+            ),
+            unlisted_gap(
+                "col",
+                "WP4 (record 0335 F8)",
+                "table columns are not nodes yet: the grid widths are read on the table and the widths of cells on each cell",
+            ),
+            unlisted_gap(
+                "fieldChar",
+                "none: out of scope (record 0332)",
+                "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements",
+            ),
+            unlisted_gap(
+                "instrText",
+                "none: out of scope (record 0332)",
+                "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements",
+            ),
+            GapSpec {
+                subject: Subject::Element("diagram"),
+                code: Code::UnsupportedPath,
+                follow_up: "none: out of scope (record 0332, design §10)",
+                reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
+            },
             GapSpec {
                 subject: Subject::Property {
                     element: "comment",

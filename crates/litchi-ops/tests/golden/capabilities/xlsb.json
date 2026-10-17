@@ -2770,6 +2770,13 @@
       "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
     },
     {
+      "subject": "element",
+      "element": "detectedtable",
+      "code": "unsupported_capability",
+      "followUp": "0339-F5 (deferred-P1): header-row table detection in queries",
+      "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
+    },
+    {
       "subject": "operation",
       "verb": "remove",
       "element": "namedrange",

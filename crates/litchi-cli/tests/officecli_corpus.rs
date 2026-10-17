@@ -105,12 +105,19 @@ impl Call {
     }
 }
 
-/// Replaces tabs and newlines, bounds the length and spells empty as `-`.
+/// Replaces tabs and newlines, bounds the length to 48 characters and spells
+/// empty as `-`.
 fn field(text: &str) -> String {
+    field_within(text, 48)
+}
+
+/// [`field`] with a caller's bound: a skipped-property list is recorded in
+/// full (record 0339), so the corpus report can classify every name.
+fn field_within(text: &str, bound: usize) -> String {
     let mut clean: String = text
         .chars()
         .map(|c| if c.is_control() { ' ' } else { c })
-        .take(48)
+        .take(bound)
         .collect();
     clean = clean.trim().to_owned();
     if clean.is_empty() {
@@ -442,40 +449,48 @@ fn skipped(stderr: &str) -> Vec<String> {
     properties
 }
 
-/// The skipped properties, comma-separated, within the 48-character detail
-/// bound: names that do not fit are counted as a final `+N`.
+/// The skipped properties, in full (record 0339): comma-separated, in
+/// report order, with each run of consecutive names that share a first
+/// dotted segment written once as `<head>.{<rest>,...}`
+/// (`title.font,title.size,fill` is `title.{font,size},fill`).
 fn skipped_detail(properties: &[String]) -> String {
-    skipped_within(properties, 48, String::new())
+    let mut detail = String::new();
+    let mut index = 0;
+    while index < properties.len() {
+        let property = &properties[index];
+        let head = property.split_once('.').map(|(head, _)| head);
+        let run = head.map_or(1, |head| {
+            properties[index..]
+                .iter()
+                .take_while(|name| name.split_once('.').is_some_and(|(other, _)| other == head))
+                .count()
+        });
+        if !detail.is_empty() {
+            detail.push(',');
+        }
+        match head {
+            Some(head) if run > 1 => {
+                detail.push_str(head);
+                detail.push_str(".{");
+                for (n, name) in properties[index..index + run].iter().enumerate() {
+                    if n > 0 {
+                        detail.push(',');
+                    }
+                    detail.push_str(&name[head.len() + 1..]);
+                }
+                detail.push('}');
+            },
+            _ => detail.push_str(property),
+        }
+        index += run;
+    }
+    detail
 }
 
 /// The detail of a call that failed after skipping properties: the error's
-/// own property, `;skipped:` and the skipped properties, within the same
-/// bound.
+/// own property, `;skipped:` and the skipped properties in full.
 fn failed_after_skipping_detail(property: &str, properties: &[String]) -> String {
-    skipped_within(properties, 48, format!("{property};skipped:"))
-}
-
-fn skipped_within(properties: &[String], bound: usize, prefix: String) -> String {
-    let start = prefix.len();
-    let mut detail = prefix;
-    for (index, property) in properties.iter().enumerate() {
-        let rest = properties.len() - index;
-        let separator = usize::from(detail.len() > start);
-        // Leave room for `,+N` unless this is the last name.
-        let reserve = if rest > 1 { 4 } else { 0 };
-        if detail.len() + separator + property.len() + reserve > bound {
-            if detail.len() > start {
-                detail.push(',');
-            }
-            detail.push_str(&format!("+{rest}"));
-            break;
-        }
-        if separator == 1 {
-            detail.push(',');
-        }
-        detail.push_str(property);
-    }
-    detail
+    format!("{property};skipped:{}", skipped_detail(properties))
 }
 
 fn error_code(stderr: &str) -> Option<String> {
@@ -587,13 +602,20 @@ impl Record {
                 Err(_) => ("lost".to_owned(), String::new()),
             }
         };
+        // A skipped-property list is recorded in full (record 0339).
+        let skipped_list = result == "warned" || detail.contains(";skipped:");
+        let detail = if skipped_list {
+            field_within(&detail, usize::MAX)
+        } else {
+            field(&detail)
+        };
         Call {
             line: self.line,
             verb: field(&verb),
             format: field(&format),
             kind: field(&kind),
             result: field(&result),
-            detail: field(&detail),
+            detail,
             target: field(&target),
         }
     }
@@ -609,6 +631,8 @@ const HEADER: &str = "\
 # detail (property, the skipped properties of a warned call,
 # `<property>;skipped:<properties>` for a call that failed after skipping,
 # offending argument or translated:<delta>), last path step.
+# Skipped properties are listed in full, in report order; a run of names
+# sharing a first dotted segment is written `<head>.{<rest>,...}`.
 ";
 
 fn render(outcomes: &BTreeMap<String, Vec<Call>>) -> String {
@@ -829,11 +853,28 @@ fn warned_calls_list_their_skipped_properties() {
     assert!(warned(stderr));
     assert_eq!(skipped(stderr), ["fill", "geometry"]);
     assert!(!warned("warning[x]: y\nerror[invalid_value]: z\n"));
+    // Every name is kept (record 0339); runs sharing a head are grouped.
     let long: Vec<String> = (0..20).map(|n| format!("property{n}")).collect();
     let detail = skipped_detail(&long);
-    assert!(detail.len() <= 48, "{detail}");
-    assert!(detail.starts_with("property0,property1,"));
-    assert!(detail.ends_with(",+16"), "{detail}");
+    assert_eq!(detail.split(',').count(), 20, "{detail}");
+    assert!(detail.ends_with(",property19"), "{detail}");
+    let names: Vec<String> = [
+        "title.font",
+        "title.size",
+        "fill",
+        "title.bold",
+        "plotArea.x",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    assert_eq!(
+        skipped_detail(&names),
+        "title.{font,size},fill,title.bold,plotArea.x"
+    );
+    assert_eq!(
+        skipped_detail(&["a.b.c".to_owned(), "a.d".to_owned()]),
+        "a.{b.c,d}"
+    );
 }
 
 #[test]
@@ -850,16 +891,15 @@ fn calls_that_failed_after_skipping_name_the_skipped_properties() {
     assert_eq!(skipped(stderr), ["series1.name", "series1.values"]);
     assert_eq!(
         failed_after_skipping_detail("data", &skipped(stderr)),
-        "data;skipped:series1.name,series1.values"
+        "data;skipped:series1.{name,values}"
     );
     let long: Vec<String> = (0..20).map(|n| format!("series{n}.color")).collect();
     let detail = failed_after_skipping_detail("data", &long);
-    assert!(detail.len() <= 48, "{detail}");
     assert!(
-        detail.starts_with("data;skipped:series0.color,"),
+        detail.starts_with("data;skipped:series0.color,series1.color,"),
         "{detail}"
     );
-    assert!(detail.contains(",+"), "{detail}");
+    assert!(detail.ends_with(",series19.color"), "{detail}");
 }
 
 #[test]

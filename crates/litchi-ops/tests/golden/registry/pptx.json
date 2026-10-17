@@ -5527,6 +5527,13 @@
   ],
   "gaps": [
     {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
+    },
+    {
       "subject": "operation",
       "verb": "get",
       "element": "metadata",

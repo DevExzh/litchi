@@ -8034,6 +8034,55 @@
   ],
   "gaps": [
     {
+      "subject": "element",
+      "element": "bookmarkEnd",
+      "code": "unsupported_capability",
+      "followUp": "0339-F2 (deferred-P1)",
+      "reason": "a bookmark is one node over its start and end markers (record 0319); a standalone end marker is not addressed or added on its own"
+    },
+    {
+      "subject": "element",
+      "element": "permStart",
+      "code": "unsupported_capability",
+      "followUp": "0339-F2 (deferred-P1)",
+      "reason": "editing-permission ranges (w:permStart, w:permEnd) are kept but not projected as nodes"
+    },
+    {
+      "subject": "element",
+      "element": "ptab",
+      "code": "unsupported_capability",
+      "followUp": "0339-F2 (deferred-P1)",
+      "reason": "positional tabs (w:ptab) are kept in their runs but not projected as nodes"
+    },
+    {
+      "subject": "element",
+      "element": "col",
+      "code": "unsupported_capability",
+      "followUp": "WP4 (record 0335 F8)",
+      "reason": "table columns are not nodes yet: the grid widths are read on the table and the widths of cells on each cell"
+    },
+    {
+      "subject": "element",
+      "element": "fieldChar",
+      "code": "unsupported_capability",
+      "followUp": "none: out of scope (record 0332)",
+      "reason": "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements"
+    },
+    {
+      "subject": "element",
+      "element": "instrText",
+      "code": "unsupported_capability",
+      "followUp": "none: out of scope (record 0332)",
+      "reason": "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements"
+    },
+    {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
+    },
+    {
       "subject": "operation",
       "verb": "set",
       "element": "paragraph",

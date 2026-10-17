@@ -572,11 +572,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | dateoccurring | `axisColor` | color |  | --- | litchi-only | — |  |  |  |
 | dateoccurring | `axisPosition` | string |  | --- | litchi-only | — |  |  |  |
 | dateoccurring | `direction` | string |  | --- | litchi-only | — |  |  |  |
-| detectedtable | `source` | string | --g |  | unlisted | — | P1 | planned WP10 (xls-parity) |  |
-| detectedtable | `stable` | bool | --g |  | unlisted | — | P1 | planned WP10 (xls-parity) |  |
-| detectedtable | `ref` | string | --g |  | unlisted | — | P1 | planned WP10 (xls-parity) |  |
-| detectedtable | `columns` | string | --g |  | unlisted | — | P1 | planned WP10 (xls-parity) |  |
-| detectedtable | `dataRange` | string | --g |  | unlisted | — | P1 | planned WP10 (xls-parity) |  |
+| detectedtable | `source` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `stable` | bool | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `ref` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `columns` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `dataRange` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | `ref` | string | a-g | asg | supported | supported |  |  |  |
 | duplicatevalues | `fill` | color | a-- | asg | supported | supported |  |  |  |
 | duplicatevalues | `font.color` | color | a-- | asg | supported | supported |  |  |  |

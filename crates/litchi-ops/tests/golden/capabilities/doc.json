@@ -2354,6 +2354,76 @@
       "reason": "Word 97-2003 binary documents have no structured document tags"
     },
     {
+      "subject": "element",
+      "element": "chart",
+      "code": "unsupported_capability",
+      "followUp": "record 0324 (deferred-P1): DOC charts as chart nodes",
+      "reason": "embedded charts are kept as objects; they are not projected as chart nodes"
+    },
+    {
+      "subject": "element",
+      "element": "series",
+      "code": "unsupported_capability",
+      "followUp": "record 0324 (deferred-P1): DOC charts as chart nodes",
+      "reason": "chart series follow the chart gap"
+    },
+    {
+      "subject": "element",
+      "element": "axis",
+      "code": "unsupported_capability",
+      "followUp": "record 0324 (deferred-P1): DOC charts as chart nodes",
+      "reason": "chart axes follow the chart gap"
+    },
+    {
+      "subject": "element",
+      "element": "bookmarkEnd",
+      "code": "unsupported_capability",
+      "followUp": "record 0324 (deferred-P1)",
+      "reason": "a bookmark is one node over its start and end; a standalone end marker is not addressed on its own"
+    },
+    {
+      "subject": "element",
+      "element": "permStart",
+      "code": "unsupported_capability",
+      "followUp": "record 0324 (deferred-P1)",
+      "reason": "DOC editing-permission ranges are not projected as nodes"
+    },
+    {
+      "subject": "element",
+      "element": "ptab",
+      "code": "unsupported_capability",
+      "followUp": "record 0324 (deferred-P1)",
+      "reason": "positional tabs are not projected as nodes"
+    },
+    {
+      "subject": "element",
+      "element": "col",
+      "code": "unsupported_capability",
+      "followUp": "record 0324 (deferred-P1)",
+      "reason": "table columns are not nodes; cell widths are read on each cell"
+    },
+    {
+      "subject": "element",
+      "element": "fieldChar",
+      "code": "unsupported_capability",
+      "followUp": "none: out of scope (record 0332)",
+      "reason": "a complex field is one field node; its field-character and instruction parts are not separate elements"
+    },
+    {
+      "subject": "element",
+      "element": "instrText",
+      "code": "unsupported_capability",
+      "followUp": "none: out of scope (record 0332)",
+      "reason": "a complex field is one field node; its field-character and instruction parts are not separate elements"
+    },
+    {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API"
+    },
+    {
       "subject": "operation",
       "verb": "create",
       "element": "document",
