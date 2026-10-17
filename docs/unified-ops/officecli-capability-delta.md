@@ -33,7 +33,7 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `4fddfc467504bf3bf407a791b52c03e624c16c6423615d25cd7e6c91322e5dc2` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `0dcca5a64b3b61a1f442e09dd0dbaf2d33e8ed40daf3acdbba92c04dede6b2d9` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `6769b6e588c2abedd1e298586c7c90cd0741f3bf4147db3a12cf1ff7f2abe77c` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `5f7fd859d62b6f570a465c859cfc1b26d5218386a4eb6c251a63678a71e446fc` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `1e95f801762eed48b88b78b36f5dc9eeb5481308d36784a2d66636e966fe834b` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `104f4afa7068abc7bbe1d9e51861f007ee37cb23f5ff4fad6537de7fbcecff14` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `9c4afdf165334e207de69da99cdc335356d3ed7ec6ff012885c95f067bdf8398` |
@@ -118,7 +118,7 @@ Property reads:
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 0 | 145 | 559 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 0 | 159 | 430 |
 | xls | 244 | 4 | 263 | 0 | 74 | 1 | 0 | 105 | 400 |
-| pptx | 228 | 19 | 30 | 0 | 123 | 0 | 0 | 287 | 269 |
+| pptx | 234 | 23 | 30 | 0 | 121 | 0 | 0 | 279 | 291 |
 | ppt | 93 | 3 | 86 | 0 | 127 | 0 | 0 | 378 | 49 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -144,7 +144,7 @@ Property writes:
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 157 | 24 | 363 | 0 | 359 | 188 |
-| pptx | 112 | 34 | 415 | 0 | 149 | 246 |
+| pptx | 142 | 23 | 396 | 0 | 183 | 234 |
 | ppt | 6 | 23 | 532 | 0 | 15 | 160 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -211,7 +211,7 @@ Property gap rows:
 | xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
 | xls | 189 | 219 | 79 | 0 | 1 | 0 |
-| pptx | 55 | 438 | 57 | 0 | 12 | 0 |
+| pptx | 27 | 433 | 57 | 0 | 12 | 0 |
 | ppt | 0 | 608 | 58 | 0 | 12 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -231,8 +231,8 @@ All gap rows by tier:
 
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| P0 | 81 | 0 | 0 | 0 | 4 | 0 |
-| P1 | 487 | 6044 | 0 | 0 | 44 | 0 |
+| P0 | 73 | 0 | 0 | 0 | 4 | 0 |
+| P1 | 467 | 6039 | 0 | 0 | 44 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -253,13 +253,14 @@ properties share its entry unless an entry names the property):
 | ods-breadth | deferred | 0327 | 247 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
 | docx-breadth | deferred | 0332 | 575 | `delta:docx:*` | DOCX P1/P2 surface and formatting breadth beyond §13 P0 |
 | xlsx-breadth | deferred | 0332 | 403 | `delta:xlsx:*` | XLSX P1/P2 surface and formatting breadth beyond §13 P0 |
-| pptx-breadth | deferred | 0332 | 498 | `delta:pptx:*` | PPTX P1/P2 surface and formatting breadth beyond §13 P0 |
+| pptx-breadth | deferred | 0332 | 473 | `delta:pptx:*` | PPTX P1/P2 surface and formatting breadth beyond §13 P0 |
 | raw-layer | planned | WP5 | 11 | `delta:*:raw` | the raw XML layer (`raw`, `raw-set`, `add-part`, `validate`): design §12, audit WP5 |
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
 | docx-p0-residue | planned | WP4 | 8 | `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:hyperlink.*`, `delta:docx:table.style` | DOCX P0/v1 residue: table columns, table and row writes, style and list application (chart series and axes, comment set and picture set/remove closed in record 0335) |
 | docx-picture-comment-follow-ups | planned | 0335 | 61 | `delta:docx:comment.*`, `delta:docx:picture.*`, `delta:docx:chart-series.*`, `delta:docx:chart-axis.*` | record 0335 follow-ups: floating pictures (anchor, wrap, positions), crop and effects, click links and part facts; comment replies and resolution (commentsExtended) and anchor controls; series formatting and axis formatting keys beyond name/values/color and title/min/max |
-| pptx-p0-residue | planned | WP3 | 44 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:paragraph.text`, `delta:pptx:run.text`, `delta:pptx:picture.*`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text`, `delta:pptx:table.style` | PPTX P0/v1 residue: paragraph/run add and remove, comment remove, picture set, slide text and layout writes |
+| pptx-p0-residue | planned | 0333 | 16 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text` | PPTX P0 residue left by record 0333 (follow-ups F1-F3): comment direction and modern-comment writes, placeholder and slide text, slide layout and title writes |
+| pptx-picture-table-breadth | deferred-P1 | 0333 | 20 | `delta:pptx:picture.*`, `delta:pptx:table.style` | P1 property breadth after record 0333: picture crop (the leaf does not model a:srcRect), rotation, flips and effects; table style (record 0333 follow-up F4) |
 | xlsx-p0-residue | planned | WP16 | 13 | `delta:xlsx:run`, `delta:xlsx:cell.value`, `delta:xlsx:cell.formula`, `delta:xlsx:cell.type`, `delta:xlsx:picture.src` | XLSX P0/v1 residue (WP16, proposed in record 0332): rich-text runs, `add` of a cell, the cell type, picture source replacement |
 | mermaid-diagram | out-of-scope |  | 83 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
 | complex-field-parts | out-of-scope |  | 16 | `delta:*:fieldChar`, `delta:*:instrText` | Litchi models a complex field as one `field` node (field refresh, record 0279); its `fldChar`/`instrText` runs are raw markup (design §12) |
@@ -837,7 +838,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | notesMaster | litchi-only |  |  | M1-extended |
 |  | node | litchi-only |  |  |  |
 
-Properties: 956 rows, 562 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
+Properties: 978 rows, 529 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
 
 ### Contextual operation gaps
 
