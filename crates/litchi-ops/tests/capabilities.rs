@@ -157,7 +157,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             "cell" => (true, false, true),
             // Record 0251c: comments are added and removed; record 0335:
             // set too.
-            "table" | "row" => (false, true, true),
+            // Record 0342: table borders and row height and flags are set.
+            "table" | "row" => (true, true, true),
             // Record 0251d: pictures are added; record 0295: SmartArt too;
             // record 0335: both are set and removed, as are SmartArt nodes.
             "comment" | "picture" | "smartart" | "node" => (true, true, true),
@@ -240,10 +241,11 @@ fn ordinary_reports_hide_native_selection_fields() {
                     && matches!(property.name(), "listStyle" | "start")
                 {
                     // Record 0251e sets list kinds through the numbering
-                    // part; record 0319 reads them back.
+                    // part; record 0319 reads them back; record 0342 seeds
+                    // a new paragraph's list.
                     assert!(property.get(), "{}", property.name());
                     assert!(property.set(), "{}", property.name());
-                    assert!(!property.add(), "{}", property.name());
+                    assert!(property.add(), "{}", property.name());
                 } else if element.name() == "paragraph" && property.name() == "numFmt" {
                     // Record 0319: read through the numbering part.
                     assert!(property.get(), "{}", property.name());
@@ -344,10 +346,17 @@ fn ordinary_reports_hide_native_selection_fields() {
                     property.name()
                 );
             } else if element.name() == "document" {
-                // Record 0338: every root key is a core document property,
-                // set through the metadata writer.
+                // Record 0338: every root key is a document property, set
+                // through the metadata writer; of the application keys
+                // (record 0342) the derived counts and the producer are
+                // read only.
+                let settable = !property.name().starts_with("extended.")
+                    || matches!(
+                        property.name(),
+                        "extended.company" | "extended.manager" | "extended.template"
+                    );
                 assert!(property.get(), "document {}", property.name());
-                assert!(property.set(), "document {}", property.name());
+                assert_eq!(property.set(), settable, "document {}", property.name());
                 assert!(!property.add(), "document {}", property.name());
             } else if matches!(element.name(), "series" | "axis" | "node") {
                 // Record 0335: chart series and axes read and set the PPTX
@@ -372,14 +381,45 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert!(!property.get(), "{} text", element.name());
                 assert!(property.set(), "{} text", element.name());
             } else if matches!(element.name(), "table" | "row")
-                && matches!(
-                    property.name(),
-                    "cols" | "rows" | "style" | "colWidths" | "data"
-                )
+                && matches!(property.name(), "cols" | "rows" | "colWidths" | "data")
             {
                 // Seeds of a new table or row.
                 assert!(!property.set(), "{} {}", element.name(), property.name());
                 assert!(property.add(), "{} {}", element.name(), property.name());
+            } else if element.name() == "table"
+                && (property.name().starts_with("border.") || property.name() == "style")
+            {
+                // Record 0342: the style and the write-only borders are set
+                // and seeded.
+                assert_eq!(
+                    property.get(),
+                    property.name() == "style",
+                    "table {}",
+                    property.name()
+                );
+                assert!(property.set(), "table {}", property.name());
+                assert!(property.add(), "table {}", property.name());
+            } else if element.name() == "row"
+                && matches!(
+                    property.name(),
+                    "height"
+                        | "header"
+                        | "cantSplit"
+                        | "hidden"
+                        | "height.exact"
+                        | "height.atLeast"
+                )
+            {
+                // Record 0342: the row height and flags are set; the height
+                // rules are write-only.
+                assert_eq!(
+                    property.get(),
+                    !property.name().starts_with("height."),
+                    "row {}",
+                    property.name()
+                );
+                assert!(property.set(), "row {}", property.name());
+                assert!(!property.add(), "row {}", property.name());
             } else {
                 assert!(property.get());
                 assert!(!property.set());
@@ -905,7 +945,19 @@ fn pptx_reports_selection_and_structural_writes() {
                 text_write
                     || shape_geometry_write
                     || pptx_text_format_set(element.name(), property.name())
-                    || (element.name() == "slide" && matches!(property.name(), "name" | "hidden")),
+                    || (element.name() == "slide" && matches!(property.name(), "name" | "hidden"))
+                    // Record 0342: a table-level set.
+                    || (element.name() == "table"
+                        && matches!(
+                            property.name(),
+                            "name"
+                                | "firstRow"
+                                | "lastRow"
+                                | "firstCol"
+                                | "lastCol"
+                                | "bandedRows"
+                                | "bandedCols"
+                        )),
                 "{}",
                 property.name()
             );
@@ -946,11 +998,12 @@ fn pptx_reports_selection_and_structural_writes() {
     ] {
         let operations = caps.element(kind).unwrap().operations();
         assert!(operations.remove, "{kind}");
-        // Charts (record 0270) and SmartArt (record 0284) are settable, and
-        // pictures and groups take a click action (record 0325).
+        // Charts (record 0270) and SmartArt (record 0284) are settable,
+        // pictures and groups take a click action (record 0325), and tables
+        // their name and style switches (record 0342).
         assert_eq!(
             operations.set,
-            matches!(kind, "chart" | "smartart" | "picture" | "group"),
+            matches!(kind, "chart" | "smartart" | "picture" | "group" | "table"),
             "{kind}"
         );
     }

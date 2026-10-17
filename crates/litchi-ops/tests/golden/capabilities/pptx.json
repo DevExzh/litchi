@@ -1232,7 +1232,7 @@
       ],
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -1256,7 +1256,7 @@
         "name": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rows": {
@@ -1280,37 +1280,37 @@
         "firstRow": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "lastRow": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "firstCol": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "lastCol": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "bandedRows": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "bandedCols": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "x": {
