@@ -14,6 +14,12 @@ records rollout adjustments for already-landed M0a and independently owned
 iWork crates. Acceptance specifies the target contract; it does not claim
 that the migration waves or enforcement checker have landed.
 
+This branch briefly tracked a pointer file at the draft's path,
+`docs/adr/0033-unified-api-glossary-and-default-policies.md`. It duplicated
+ADR number 0033 and collided with the untracked draft in the base checkout,
+so [record 0334](../unified-ops/0334-facade-features-and-batch-fuzz.md)
+removed it. This file is the only copy of the glossary ADR in this branch.
+
 ## Context
 
 The workspace grew format by format, and each family landed the ADR 0003 /
