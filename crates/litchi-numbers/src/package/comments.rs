@@ -1006,7 +1006,7 @@ impl Package {
                         row,
                         column,
                     },
-                    native: target.native.clone(),
+                    native: target.native,
                     row,
                     column,
                     tile_size: DEFAULT_TILE_SIZE,
