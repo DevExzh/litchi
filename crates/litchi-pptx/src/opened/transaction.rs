@@ -5,6 +5,7 @@ mod links;
 mod masters;
 mod media;
 mod notes;
+mod picture;
 mod smartart;
 mod table;
 mod text;

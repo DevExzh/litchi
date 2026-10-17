@@ -985,6 +985,7 @@ const fn property_gap(
     }
 }
 
+const CROP: &str = "the picture reader does not model the blip fill's a:srcRect yet";
 const SHAPE_FILL: &str = "the shape record keeps no spPr fill, line or geometry span";
 const BODY_PROPS: &str =
     "the text-body reader applies body-property defaults, so local values are unknown";
@@ -1596,6 +1597,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "L-PPTX-R8",
             "the table reader does not read cell properties yet",
         ),
+        property_gap("picture", "crop", "0333-F4", CROP),
+        property_gap("picture", "cropLeft", "0333-F4", CROP),
+        property_gap("picture", "cropTop", "0333-F4", CROP),
+        property_gap("picture", "cropRight", "0333-F4", CROP),
+        property_gap("picture", "cropBottom", "0333-F4", CROP),
         property_gap(
             "picture",
             "mediaType",
@@ -2176,6 +2182,8 @@ pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.re
 pub(super) enum PictureSetter {
     Src,
     Name,
+    /// The alternative text (`cNvPr@descr`, record 0333).
+    Alt,
     X,
     Y,
     Width,
@@ -2192,6 +2200,8 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
         let spec = LINKED_FRAME_PROPS[index];
         let setter = if index == LinkedFrameKey::Name as usize {
             Some(PictureSetter::Name)
+        } else if index == LinkedFrameKey::Alt as usize {
+            Some(PictureSetter::Alt)
         } else if index == LinkedFrameKey::X as usize {
             Some(PictureSetter::X)
         } else if index == LinkedFrameKey::Y as usize {
@@ -2211,7 +2221,14 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
             match setter {
                 Some(setter) => Entry {
                     spec,
-                    access: Access::Add(setter),
+                    // Pictures are named at creation only, as in OfficeCLI;
+                    // their frame, alternative text and image are also set
+                    // (record 0333).
+                    access: if matches!(setter, PictureSetter::Name) {
+                        Access::Add(setter)
+                    } else {
+                        Access::SetAndAdd(setter)
+                    },
                     constraint: if matches!(setter, PictureSetter::Width | PictureSetter::Height) {
                         Constraint::Length {
                             min: crate::value::Length::from_emu(1),
@@ -2220,7 +2237,7 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
                     } else {
                         Constraint::None
                     },
-                    clear: false,
+                    clear: matches!(setter, PictureSetter::Alt),
                 },
                 None => Entry::read(spec),
             }
@@ -2229,7 +2246,7 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
     }
     entries[LINKED_FRAME_PROPS.len()] = Entry {
         spec: write_only("src", ValueType::Text),
-        access: Access::Add(PictureSetter::Src),
+        access: Access::SetAndAdd(PictureSetter::Src),
         constraint: Constraint::NotEmpty,
         clear: false,
     };
@@ -2238,13 +2255,23 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
 pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
     PictureSetter,
     PICTURE_WRITE_COUNT,
-    1,
+    3,
 > = crate::registry::Table::new(
     picture_write_entries(),
-    [crate::registry::Alias {
-        name: "path",
-        entry: LINKED_FRAME_PROPS.len(),
-    }],
+    [
+        crate::registry::Alias {
+            name: "path",
+            entry: LINKED_FRAME_PROPS.len(),
+        },
+        crate::registry::Alias {
+            name: "altText",
+            entry: LinkedFrameKey::Alt as usize,
+        },
+        crate::registry::Alias {
+            name: "description",
+            entry: LinkedFrameKey::Alt as usize,
+        },
+    ],
 );
 pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
 

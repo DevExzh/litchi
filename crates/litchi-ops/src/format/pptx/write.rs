@@ -239,6 +239,9 @@ impl Pptx {
         if let Some(commit) = self.try_set_click(&target, &props, limits)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_set_picture(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_chart(&target, &props, limits)? {
             return Ok(commit);
         }

@@ -711,8 +711,13 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "underline"
                 | "strike"
         ),
-        // The click action (record 0325).
-        "picture" | "group" => matches!(property, "link" | "tooltip"),
+        // The click action (record 0325); a picture's frame, alternative
+        // text and image (record 0333).
+        "picture" => matches!(
+            property,
+            "link" | "tooltip" | "x" | "y" | "width" | "height" | "alt" | "src"
+        ),
+        "group" => matches!(property, "link" | "tooltip"),
         "tc" => matches!(
             property,
             "fill"
@@ -853,7 +858,7 @@ fn pptx_reports_selection_and_structural_writes() {
             let picture_add = element.name() == "picture"
                 && matches!(
                     property.name(),
-                    "src" | "name" | "x" | "y" | "width" | "height" | "link" | "tooltip"
+                    "src" | "name" | "alt" | "x" | "y" | "width" | "height" | "link" | "tooltip"
                 );
             let comment_add = element.name() == "comment"
                 && matches!(

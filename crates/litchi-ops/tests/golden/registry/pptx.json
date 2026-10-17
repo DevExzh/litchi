@@ -1318,22 +1318,23 @@
         },
         "alt": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "x": {
           "type": "length",
           "unit": "emu",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
           "unit": "emu",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "width": {
@@ -1344,7 +1345,7 @@
             "maxEmu": 9223372036854775807
           },
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
@@ -1355,7 +1356,7 @@
             "maxEmu": 9223372036854775807
           },
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rotation": {
@@ -1402,11 +1403,36 @@
             "notEmpty": true
           },
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         }
       },
       "propertyGaps": {
+        "crop": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropLeft": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropTop": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropRight": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropBottom": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
         "mediaType": {
           "code": "unsupported_capability",
           "followUp": "L-PPTX-R11",

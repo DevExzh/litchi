@@ -114,6 +114,7 @@ impl Pptx {
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let mut src = None;
         let mut name = None;
+        let mut alt = None;
         let mut geometry = [None; 4];
         let mut assigned = 0_u32;
         let mut click = super::links::ClickInput::default();
@@ -140,13 +141,20 @@ impl Pptx {
                         validate_text(value)?;
                         name = Some(value.to_owned());
                     },
+                    (PictureSetter::Alt, Some(Scalar::Text(value))) => {
+                        validate_text(value).map_err(|e| e.with_property("alt"))?;
+                        alt = Some(value.to_owned());
+                    },
                     (setter, Some(Scalar::Length(value))) => {
                         let index = match setter {
                             PictureSetter::X => 0,
                             PictureSetter::Y => 1,
                             PictureSetter::Width => 2,
                             PictureSetter::Height => 3,
-                            PictureSetter::Src | PictureSetter::Name | PictureSetter::Click(_) => {
+                            PictureSetter::Src
+                            | PictureSetter::Name
+                            | PictureSetter::Alt
+                            | PictureSetter::Click(_) => {
                                 unreachable!("text picture setters")
                             },
                         };
@@ -198,6 +206,10 @@ impl Pptx {
         let link = click.for_add(self.slides_in_catalog()?)?;
         let mut edit = base.edit()?;
         edit.add_picture(slide, &name, &resource, bounds)?;
+        if let Some(alt) = alt.as_deref() {
+            // The new picture is the last shape of the slide in pre-order.
+            edit.set_shape_description(slide, scene.len(), Some(alt))?;
+        }
         if let Some(link) = &link {
             // The new picture is the last shape of the slide in pre-order.
             let _ = edit.set_shape_hyperlink(slide, scene.len(), Some(link))?;
@@ -219,5 +231,160 @@ impl Pptx {
             },
             path,
         ))
+    }
+}
+
+impl Pptx {
+    /// A `set` of a picture's frame (`x`, `y`, `width`, `height`),
+    /// alternative text (`alt`) or image (`src`), in one native edit
+    /// (record 0333); `None` for other targets. Click actions are split off
+    /// before (`try_set_click`).
+    pub(super) fn try_set_picture(
+        &self,
+        target: &crate::target::TargetArg<'_>,
+        props: &crate::Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
+        let Some(path) = target.path() else {
+            return Ok(None);
+        };
+        if !path.path().steps().last().is_some_and(|step| {
+            ["picture", "image", "img", "pic"]
+                .iter()
+                .any(|name| step.name().eq_ignore_ascii_case(name))
+        }) {
+            return Ok(None);
+        }
+        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        let Item::Tree(tree) = node.item() else {
+            return Ok(None);
+        };
+        if tree.kind != Kind::Picture {
+            return Ok(None);
+        }
+        let Some(slide) = tree.container.slide() else {
+            return Err(error(
+                Code::UnsupportedCapability,
+                "master and layout pictures are not editable",
+            ));
+        };
+        let tree = tree.clone();
+        drop(node);
+        bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+        let mut geometry = [None; 4];
+        let mut alt: Option<Option<String>> = None;
+        let mut src = None;
+        let mut assigned = 0_u32;
+        for (key, value) in props.iter() {
+            let (index, entry) = PICTURE_WRITE_TABLE
+                .resolve(key.as_str())
+                .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+            let bit = 1_u32 << index;
+            if assigned & bit != 0 {
+                return Err(error(
+                    Code::InvalidArgument,
+                    "a picture property was assigned more than once",
+                )
+                .with_property(entry.spec.name));
+            }
+            assigned |= bit;
+            entry.prepare(Operation::Set, value, |setter, scalar| {
+                match (setter, scalar) {
+                    (PictureSetter::Src, Some(Scalar::Text(value))) => src = Some(value.to_owned()),
+                    (PictureSetter::Alt, Some(Scalar::Text(value))) => {
+                        validate_text(value).map_err(|e| e.with_property("alt"))?;
+                        alt = Some(Some(value.to_owned()));
+                    },
+                    (PictureSetter::Alt, None) => alt = Some(None),
+                    (setter, Some(Scalar::Length(value))) => {
+                        let index = match setter {
+                            PictureSetter::X => 0,
+                            PictureSetter::Y => 1,
+                            PictureSetter::Width => 2,
+                            _ => 3,
+                        };
+                        geometry[index] = Some(value.emu());
+                    },
+                    _ => {},
+                }
+                Ok(())
+            })?;
+        }
+        if geometry.iter().all(Option::is_none) && alt.is_none() && src.is_none() {
+            return Err(error(
+                Code::InvalidArgument,
+                "no picture property was assigned",
+            ));
+        }
+        let bounds = if geometry.iter().any(Option::is_some) {
+            let current = tree.handle.view().bounds().ok_or_else(|| {
+                error(
+                    Code::MissingProperty,
+                    "picture geometry requires a complete local transform",
+                )
+                .with_property("x")
+            })?;
+            Some((
+                geometry[0].unwrap_or(current.x()),
+                geometry[1].unwrap_or(current.y()),
+                geometry[2].unwrap_or(current.width()),
+                geometry[3].unwrap_or(current.height()),
+            ))
+        } else {
+            None
+        };
+        let resource = match &src {
+            Some(src) => {
+                let data = read_source(src, limits.max_staged_bytes())?;
+                let (content_type, extension) = classify(&data).ok_or_else(|| {
+                    error(
+                        Code::UnsupportedCapability,
+                        "the picture is not a PNG, JPEG, GIF, BMP or TIFF image",
+                    )
+                    .with_property("src")
+                })?;
+                Some(litchi_pptx::media_parts::Resource::new(
+                    format!("/ppt/media/image1.{extension}"),
+                    content_type,
+                    data,
+                ))
+            },
+            None => None,
+        };
+        let slide = slide as usize;
+        let shape = tree.handle.position().get();
+        let source = self.editable_owner()?;
+        let base = super::smartart::eager(&source)?;
+        let mut edit = base.edit()?;
+        let mut operations = 0;
+        if let Some(bounds) = bounds {
+            operations += edit.set_shape_properties(
+                slide,
+                &[
+                    litchi_pptx::opened::ShapePropertiesReplacement::new(Position::new(shape))
+                        .with_bounds(bounds),
+                ],
+            )?;
+        }
+        if let Some(alt) = &alt {
+            operations += usize::from(edit.set_shape_description(slide, shape, alt.as_deref())?);
+        }
+        if let Some(resource) = &resource {
+            operations += usize::from(edit.set_picture_image(slide, shape, resource)?);
+        }
+        let (target, patch) = edit.commit()?.into_parts();
+        let target = Arc::new(target);
+        let after = if patch.is_noop() {
+            self.clone()
+        } else {
+            self.adopt_eager(Arc::clone(&target))
+        };
+        Ok(Some(Commit {
+            after,
+            source,
+            target: Editable::Eager(target),
+            proof: Proof::Eager(patch),
+            operations,
+        }))
     }
 }

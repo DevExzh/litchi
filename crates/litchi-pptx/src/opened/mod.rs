@@ -29,6 +29,8 @@ mod xml;
 #[cfg(test)]
 mod mce_retention_tests;
 #[cfg(test)]
+mod picture_edit_tests;
+#[cfg(test)]
 mod slide_root_memo_tests;
 #[cfg(test)]
 mod tests;
