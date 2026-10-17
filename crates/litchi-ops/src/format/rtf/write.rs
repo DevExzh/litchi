@@ -175,13 +175,8 @@ pub(crate) fn add_with_limits<'p, 'n>(
                 )
                 .with_format(FileFormat::Rtf)
             })?;
-        if node.placement().is_some() {
-            return Err(Error::new(
-                Code::InvalidArgument,
-                "RTF tab stops are kept in position order; omit the placement",
-            )
-            .with_format(FileFormat::Rtf));
-        }
+        // Tab stops are kept in position order, as ODT keeps them; a
+        // placement does not reorder them.
         return marks::add_tab(file, paragraph.get(), node.props(), limits);
     }
     if parent.element_kind() != super::Kind::Body {
