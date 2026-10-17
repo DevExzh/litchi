@@ -843,6 +843,18 @@ const fn with_props(
     }
 }
 
+/// A chart axis resolves by its role, like the XLSX axis (record 0322).
+const XLSB_AXIS: ElementSpec<Kind> = ElementSpec {
+    props: super::chart::AXIS_PROPS,
+    identities: &["role"],
+    gap: None,
+    paths: &[
+        "/<sheet>/chart[N]/axis[@role=<role>]",
+        "/<sheet>/chart[N]/axis[N]",
+    ],
+    ..workbook::SPEC.elements[11]
+};
+
 const fn with_gap(
     element: &'static ElementSpec<Kind>,
     gap: Option<&'static GapSpec>,
@@ -873,7 +885,7 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
         super::chart::SERIES_PROPS,
         None,
     ),
-    with_props(&workbook::SPEC.elements[11], super::chart::AXIS_PROPS, None),
+    XLSB_AXIS,
     with_gap(&workbook::SPEC.elements[12], Some(&PIVOT_GAP)),
     with_gap(&workbook::SPEC.elements[13], Some(&SLICER_GAP)),
     with_gap(&workbook::SPEC.elements[14], Some(&SPARKLINE_GAP)),

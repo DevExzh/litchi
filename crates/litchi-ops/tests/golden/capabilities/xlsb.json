@@ -1563,7 +1563,8 @@
       },
       "paths": {
         "positional": [
-          "/<sheet>/chart[N]/axis[@role=<role>]"
+          "/<sheet>/chart[N]/axis[@role=<role>]",
+          "/<sheet>/chart[N]/axis[N]"
         ]
       },
       "properties": {

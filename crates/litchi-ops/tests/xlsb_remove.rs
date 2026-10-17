@@ -613,5 +613,21 @@ fn xlsb_capabilities_advertise_removal_for_cells_and_sheets() {
         .filter(|element| element.operations().remove)
         .map(|element| element.name())
         .collect::<Vec<_>>();
-    assert_eq!(removable, ["sheet", "cell"]);
+    // Record 0322 adds the worksheet feature nodes.
+    assert_eq!(
+        removable,
+        [
+            "sheet",
+            "cell",
+            "comment",
+            "dataValidation",
+            "conditionalFormatting",
+            "autofilter",
+            "hyperlink",
+            "picture",
+            "shape",
+            "rowbreak",
+            "colbreak"
+        ]
+    );
 }
