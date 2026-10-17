@@ -27,7 +27,7 @@ pub(crate) fn to_bytes(package: &OpcPackage) -> Result<Vec<u8>> {
 
 /// Stream a validated XLSX package into a sequential sink.
 pub(crate) fn write_to(package: &OpcPackage, writer: impl Write) -> Result<()> {
-    Ok(PackageWriter::write_to_stream(writer, package)?)
+    Ok(PackageWriter::write_to(writer, package)?)
 }
 
 /// Atomically publish a validated XLSX package to a filesystem path at a

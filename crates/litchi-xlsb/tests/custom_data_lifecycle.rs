@@ -250,7 +250,7 @@ fn synthetic_fixture(
 
     let mut package_bytes = Vec::new();
     package
-        .to_stream(&mut package_bytes)
+        .write_to(&mut package_bytes)
         .expect("synthetic source package serializes");
     let package = Package::from_bytes(&package_bytes)
         .expect("synthetic XLSB custom-data graph reopens with source provenance");

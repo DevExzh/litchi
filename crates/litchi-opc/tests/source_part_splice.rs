@@ -613,7 +613,7 @@ fn store_and_deflate_splices_preserve_opaque_members_without_caching_target() {
         );
         let mut output = Vec::new();
         let publication = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect("bounded decoded splice must publish");
 
         assert_eq!(target_bytes(&output), expected);
@@ -646,7 +646,7 @@ fn accounting_reports_two_fresh_decoded_reader_passes() {
         );
         let mut output = Vec::new();
         let mut accounting = OpcOperationAccounting::default();
-        plan.write_to_stream_with_accounting(&mut output, &mut accounting)
+        plan.write_to_with_accounting(&mut output, &mut accounting)
             .expect("accounted decoded splice must publish");
 
         let expected_decoded_reads = (VALID_SOURCE.len() as u64) * 2;
@@ -694,7 +694,7 @@ fn binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs() {
             )
             .expect("binary Part must not be forced through XML audit");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("binary decoded splice must publish");
         assert_eq!(target_bytes_for(&output, BINARY_URI), candidate);
     }
@@ -717,7 +717,7 @@ fn exact_noop_copies_malformed_and_signed_source_byte_for_byte() {
         assert!(plan.is_noop());
         let mut output = Vec::new();
         let publication = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect("exact no-op must bypass XML and signature policy");
         assert!(publication.is_noop());
         assert_eq!(output, source_archive);
@@ -775,7 +775,7 @@ fn exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit() {
         .expect("valid no-op proof must prepare");
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("physical archive limit must apply to an exact no-op");
     assert!(matches!(
         error,
@@ -929,7 +929,7 @@ fn source_mutation_after_the_first_sink_write_wins_over_publication() {
     );
     let mut sink = MutatingSink::new(Arc::clone(&source), source_archive);
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("source mutation during output must invalidate publication");
     assert!(
         contains_source_change(&error),
@@ -1087,7 +1087,7 @@ fn cancellation_is_observed_before_plan_and_write() {
     cancellation.cancel();
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("cancellation must stop publication");
     assert!(matches!(error, OpcError::Cancelled));
     assert!(output.is_empty());
@@ -1105,7 +1105,7 @@ fn partial_and_flush_sink_failures_preserve_typed_progress() {
     );
     let mut partial = PrefixFailSink::after(17);
     let error = plan
-        .write_to_stream(&mut partial)
+        .write_to(&mut partial)
         .expect_err("partial sink must fail publication");
     assert_eq!(partial.bytes.len(), 17);
     assert_sink_failure_count(&error, 17);
@@ -1126,11 +1126,11 @@ fn partial_and_flush_sink_failures_preserve_typed_progress() {
         FRAGMENT,
         SourcePartSpliceLimits::default(),
     )
-    .write_to_stream(&mut expected_output)
+    .write_to(&mut expected_output)
     .expect("reference publication must succeed");
     let mut flush_failure = PrefixFailSink::flush_fails();
     let error = plan
-        .write_to_stream(&mut flush_failure)
+        .write_to(&mut flush_failure)
         .expect_err("flush failure must fail publication");
     assert_eq!(flush_failure.bytes.len(), expected_output.len());
     assert_sink_failure_count(&error, expected_output.len());
@@ -1148,7 +1148,7 @@ fn publication_inverse_requires_the_authenticated_candidate_artifact() {
     );
     let mut candidate_archive = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate_archive)
+        .write_to(&mut candidate_archive)
         .expect("candidate publication must succeed");
     let candidate = SourceBackedPackage::from_vec(candidate_archive.clone())
         .expect("candidate package must reopen");
@@ -1168,7 +1168,7 @@ fn publication_inverse_requires_the_authenticated_candidate_artifact() {
     );
     let mut other_archive = Vec::new();
     other_plan
-        .write_to_stream(&mut other_archive)
+        .write_to(&mut other_archive)
         .expect("second candidate publication must succeed");
     let other_candidate =
         SourceBackedPackage::from_vec(other_archive).expect("second candidate package must reopen");
@@ -1197,7 +1197,7 @@ fn published_candidate() -> (litchi_opc::SourcePartSplicePublication, Vec<u8>, V
     );
     let mut candidate_archive = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate_archive)
+        .write_to(&mut candidate_archive)
         .expect("candidate publication must succeed");
     (publication, candidate_archive, source_archive)
 }
@@ -1322,7 +1322,7 @@ fn publication_inverse_shared_context_charges_retained_archive_once() {
         .expect("managed source splice must prepare");
     let mut candidate_archive = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate_archive)
+        .write_to(&mut candidate_archive)
         .expect("managed candidate publication must succeed");
     let before_inverse = budget.used(Resource::OutputBytes);
 
@@ -1417,7 +1417,7 @@ fn splice_memory_quotas_are_typed_and_release_after_success_or_failure() {
         .expect("preservation quota is checked during writing");
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("preservation quota must be typed");
     assert!(matches!(
         error,
@@ -1439,7 +1439,7 @@ fn splice_memory_quotas_are_typed_and_release_after_success_or_failure() {
         .expect("replay quota is checked during writing");
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("replay quota must be typed");
     assert!(matches!(
         error,
@@ -1486,9 +1486,7 @@ fn authored_fragment_transfers_one_reservation_and_publishes_reversibly() {
             "preparation must retain exactly one fragment charge"
         );
         let mut output = Vec::new();
-        let publication = plan
-            .write_to_stream(&mut output)
-            .expect("splice must publish");
+        let publication = plan.write_to(&mut output).expect("splice must publish");
         assert_eq!(budget.used(Resource::Memory), baseline);
         let candidate = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(output)))
             .expect("candidate must reopen");
@@ -1565,7 +1563,7 @@ fn authored_fragment_transfers_between_clones_of_one_package() {
             limits,
         )
         .expect("own fragment must transfer")
-        .write_to_stream(&mut expected)
+        .write_to(&mut expected)
         .expect("splice must publish");
     assert_eq!(budget.used(Resource::Memory), baseline);
 
@@ -1591,8 +1589,7 @@ fn authored_fragment_transfers_between_clones_of_one_package() {
             "the transfer keeps exactly one fragment charge"
         );
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
-            .expect("splice must publish");
+        plan.write_to(&mut output).expect("splice must publish");
         assert_eq!(output, expected);
         assert_eq!(budget.used(Resource::Memory), baseline);
     }

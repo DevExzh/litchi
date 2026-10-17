@@ -1073,7 +1073,7 @@ fn serialize_package(package: &Package, maximum: usize) -> Result<Vec<u8>> {
 
 fn serialize_opc_package(package: &OpcPackage, maximum: usize) -> Result<Vec<u8>> {
     let mut writer = BoundedWriter::new(maximum);
-    let result = PackageWriter::write_to_stream(&mut writer, package);
+    let result = PackageWriter::write_to(&mut writer, package);
     if writer.exceeded {
         return Err(Error::Limit {
             kind: super::LimitKind::PatchBytes,

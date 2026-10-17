@@ -1026,7 +1026,7 @@ impl Workbook {
 
     /// Workbook style table loaded from `xl/styles.bin`.
     pub fn save<W: Write + Seek>(&self, writer: W) -> Result<()> {
-        self.package.to_stream(writer)?;
+        self.package.write_to(writer)?;
         Ok(())
     }
 

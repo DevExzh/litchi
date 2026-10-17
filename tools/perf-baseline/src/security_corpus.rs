@@ -379,7 +379,7 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
     )?;
     let artifact = package.source_artifact();
     let mut output = Vec::new();
-    let error = artifact.write_to_stream(&mut output).unwrap_err();
+    let error = artifact.write_to(&mut output).unwrap_err();
     assert!(matches!(
         error,
         OpcError::Execution(ExecutionError::ResourceLimit(ref limit))

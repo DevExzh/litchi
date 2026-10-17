@@ -81,7 +81,7 @@ fn rewrite_first_sheet(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Ve
     let changed = transform(package.get_part(&uri).unwrap().blob());
     package.get_part_mut(&uri).unwrap().set_blob(changed);
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 

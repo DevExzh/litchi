@@ -774,7 +774,7 @@ fn source_backed_family_projection_does_not_materialize_theme_media() {
         .expect("Theme image edge");
     let mut bytes = Vec::new();
     package
-        .to_stream(&mut bytes)
+        .write_to(&mut bytes)
         .expect("serialized source package");
     let source = Arc::new(CountingSource {
         bytes,

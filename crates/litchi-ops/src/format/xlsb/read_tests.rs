@@ -166,7 +166,7 @@ fn malformed_second_sheet() -> Vec<u8> {
         .set_blob(vec![0xff; 8]);
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("write malformed package");
     output
 }
@@ -190,7 +190,7 @@ fn indexed_pivot_workbook() -> Vec<u8> {
         );
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("write indexed pivot package");
     output
 }
@@ -204,7 +204,7 @@ fn corrupt_index_workbook() -> Vec<u8> {
         .set_blob(vec![0xff; 8]);
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("write corrupt indexed package");
     output
 }

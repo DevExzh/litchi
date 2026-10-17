@@ -452,7 +452,7 @@ impl Pptx {
                 PptxOwner::Source(source) => Ok(source
                     .source_backed_package()
                     .source_artifact()
-                    .write_to_stream(writer)?),
+                    .write_to(writer)?),
                 PptxOwner::Eager(package) => Ok(package.write_to(writer)?),
             }
         })

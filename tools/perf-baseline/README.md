@@ -1385,7 +1385,7 @@ The opt-in `pptx_cross_copy_plain_lifecycle` and
 ingress-to-publication guard over the corresponding corpus. Each retained
 sample times owned `Package::from_vec` ingress for both packages, opened
 snapshots, cross-slide planning, atomic `apply_cross_slide_copy_plan`, and
-final `OpcPackage::to_stream` publication into a pre-reserved bounded sink.
+final `OpcPackage::write_to` publication into a pre-reserved bounded sink.
 The corpus clones and sink reservation occur before the timer; reopen,
 semantic/package/closure/refusal/source-immutability checks, and package/sink
 teardown occur afterward. Their `source.pptx_cross_copy.lifecycle_ns` vector
@@ -2184,7 +2184,7 @@ position 1 without media; the media-rich selector adds eight deterministic 2
 MiB PNG resources to the source and destination packages so the copied
 dependency closure exercises deterministic collision-avoidance remapping. Both selectors use the public
 `Snapshot::plan_cross_slide_copy`, `Package::apply_cross_slide_copy_plan`, and
-`OpcPackage::to_stream` APIs. The timer reports plan, commit, and sequential
+`OpcPackage::write_to` APIs. The timer reports plan, commit, and sequential
 publication phases separately; setup, reopen, semantic/package/closure,
 source-immutability, collision, durable-patch, stale/foreign/refusal, and
 output-hash checks remain untimed. This is correctness/evidence only and makes
@@ -3261,7 +3261,7 @@ The route is the documented one: `Package::open(path)` →
   private workspace is prepared, and the readback, digest and cleanup happen,
   outside the clock.
 * `counting_publish` times the documented sequential serialization into a
-  bounded counting sink (`Package::to_stream`, `Workbook::write_to`, and
+  bounded counting sink (`Package::write_to`, `Workbook::write_to`, and
   `Package::to_bytes` for PPTX, which has no sequential-sink entry point).
 
 The private workspace lives under the caller's `--filesystem-root` when one is
@@ -3938,7 +3938,7 @@ always truthful.
 | `large` | 10,000 | 100 × 100 | 100 | 100 |
 
 The DOCX cases use `Package::from_reader`, `document().paragraph(index)`,
-paragraph enumeration/text extraction, document transactions, and `to_stream`.
+paragraph enumeration/text extraction, document transactions, and `write_to`.
 The one-percent case uses the canonical
 `Edit::replace_body_paragraph_texts` transaction whenever the selection has
 more than one paragraph, so validation, XML emission, candidate parsing, and
@@ -3952,7 +3952,7 @@ seekable counter implementation in both binaries.
 PPTX semantic save controls use `Package::from_bytes`/`from_vec`, presentation
 slide/text views, opened-presentation transactions, and `to_bytes`; those
 legacy controls intentionally leave `sink` as `null`. The cross-presentation
-slide-copy evidence selectors use the public `OpcPackage::to_stream` writer
+slide-copy evidence selectors use the public `OpcPackage::write_to` writer
 through a bounded sequential sink and report its counters explicitly, without
 extending the claim to the other PPTX save paths.
 

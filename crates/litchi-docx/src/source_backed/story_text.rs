@@ -1235,7 +1235,7 @@ impl Package {
                 writer: &mut output,
                 execution: execution.as_ref(),
             };
-            original_artifact.write_to_stream(&mut cancellation_writer)?;
+            original_artifact.write_to(&mut cancellation_writer)?;
             check_execution_context(execution.as_ref())?;
         } else {
             self.physical_package()?
@@ -1290,7 +1290,7 @@ impl Package {
         };
         publication
             .original_artifact
-            .write_to_stream(&mut cancellation_writer)?;
+            .write_to(&mut cancellation_writer)?;
         check_execution_context(execution.as_ref())?;
         Ok(publication.original_snapshot.clone())
     }
@@ -5118,7 +5118,7 @@ impl Package {
                 writer: &mut output,
                 execution: execution.as_ref(),
             };
-            original_artifact.write_to_stream(&mut cancellation_writer)?;
+            original_artifact.write_to(&mut cancellation_writer)?;
             check_execution_context(execution.as_ref())?;
         } else {
             self.physical_package()?
@@ -5173,7 +5173,7 @@ impl Package {
         };
         publication
             .original_artifact
-            .write_to_stream(&mut cancellation_writer)?;
+            .write_to(&mut cancellation_writer)?;
         check_execution_context(execution.as_ref())?;
         Ok(publication.original_snapshot.clone())
     }

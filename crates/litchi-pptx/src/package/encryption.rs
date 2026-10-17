@@ -246,7 +246,7 @@ impl Package {
             limit: limits.max_plaintext_bytes,
             failure: None,
         };
-        let staged = PackageWriter::write_to_stream(&mut clear, &self.opc);
+        let staged = PackageWriter::write_to(&mut clear, &self.opc);
         if let Some(error) = clear.failure.take() {
             return Err(error);
         }

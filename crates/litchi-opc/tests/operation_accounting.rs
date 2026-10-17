@@ -114,7 +114,7 @@ fn exact_source_publication_reports_actual_raw_and_output_acceptance() {
     let mut output = Vec::new();
     let mut accounting = OpcOperationAccounting::default();
     artifact
-        .write_to_stream_with_accounting(&mut output, &mut accounting)
+        .write_to_with_accounting(&mut output, &mut accounting)
         .unwrap();
     assert_eq!(output, source);
     assert_eq!(
@@ -183,7 +183,7 @@ fn exact_source_partial_sink_preserves_checked_progress() {
     };
     let mut accounting = OpcOperationAccounting::default();
     let error = artifact
-        .write_to_stream_with_accounting(&mut sink, &mut accounting)
+        .write_to_with_accounting(&mut sink, &mut accounting)
         .unwrap_err();
     assert!(matches!(
         error,

@@ -145,7 +145,7 @@ fn malformed_unselected_worksheet_does_not_block_theme_access() {
         .unwrap()
         .set_blob(vec![0xff]);
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
     assert!(workbook.theme().unwrap().is_some());
     assert!(
@@ -235,7 +235,7 @@ fn theme_image_relationships_do_not_materialize_image_payloads() {
         )
         .unwrap();
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     let source = Arc::new(Source {
         bytes,
         reads: AtomicUsize::new(0),

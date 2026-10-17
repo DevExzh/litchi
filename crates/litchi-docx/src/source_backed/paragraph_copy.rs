@@ -1039,7 +1039,7 @@ impl Package {
         let mut output = FingerprintingWriter::new(writer);
         if patch.is_noop() {
             original_artifact
-                .write_to_stream(&mut output)
+                .write_to(&mut output)
                 .map_err(crate::Error::from)?;
         } else {
             let replacement = Arc::clone(&target.xml);
@@ -1074,7 +1074,7 @@ impl Package {
         }
         publication
             .original_artifact
-            .write_to_stream(writer)
+            .write_to(writer)
             .map_err(crate::Error::from)?;
         Ok(publication.original_snapshot.clone())
     }
@@ -1109,7 +1109,7 @@ impl Package {
         let mut output = FingerprintingWriter::new(writer);
         if patch.is_noop() {
             original_artifact
-                .write_to_stream(&mut output)
+                .write_to(&mut output)
                 .map_err(crate::Error::from)?;
         } else {
             let replacement = checked_clone(target.xml_bytes(), "removal publication replacement")?;
@@ -1144,7 +1144,7 @@ impl Package {
         }
         publication
             .original_artifact
-            .write_to_stream(writer)
+            .write_to(writer)
             .map_err(crate::Error::from)?;
         Ok(publication.original_snapshot.clone())
     }
@@ -1934,9 +1934,7 @@ impl Write for HashWriter {
 
 fn fingerprint_artifact(artifact: &SourceArtifact) -> Result<[u8; 32]> {
     let mut writer = HashWriter(Sha256::new());
-    artifact
-        .write_to_stream(&mut writer)
-        .map_err(crate::Error::from)?;
+    artifact.write_to(&mut writer).map_err(crate::Error::from)?;
     Ok(writer.0.finalize().into())
 }
 

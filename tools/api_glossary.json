@@ -724,6 +724,26 @@
           "name": "XmlEvents",
           "scope": "litchi_opc::SourceLimitKind",
           "replacement": "use Events"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_accounting",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_expected_artifact",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
         }
       ],
       "families": []
@@ -851,6 +871,26 @@
           "name": "XmlEvents",
           "scope": "litchi_opc::SourceLimitKind",
           "replacement": "use Events"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_accounting",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_expected_artifact",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
         }
       ],
       "families": []

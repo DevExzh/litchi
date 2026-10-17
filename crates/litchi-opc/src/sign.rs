@@ -1560,7 +1560,7 @@ mod tests {
         let mut package = package();
         package.sign(&signer(7)).expect("sign");
         let mut output = std::io::Cursor::new(Vec::new());
-        package.to_stream(&mut output).expect("serialize");
+        package.write_to(&mut output).expect("serialize");
         let reopened = OpcPackage::from_bytes(output.get_ref()).expect("reopen");
         let reports = reopened.signatures().expect("verify");
         assert_eq!(reports.len(), 1);

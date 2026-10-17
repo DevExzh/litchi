@@ -146,9 +146,7 @@ fn package_bytes(malformed_delimiter: bool) -> Vec<u8> {
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(sheet_part));
     let mut bytes = Cursor::new(Vec::new());
-    package
-        .to_stream(&mut bytes)
-        .expect("serialize fixture OPC");
+    package.write_to(&mut bytes).expect("serialize fixture OPC");
     bytes.into_inner()
 }
 

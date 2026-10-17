@@ -1467,7 +1467,7 @@ impl Package {
         {
             return Err(Error::DocumentVariablesConflict);
         }
-        publication.original_artifact.write_to_stream(writer)?;
+        publication.original_artifact.write_to(writer)?;
         Ok(publication.original_snapshot.clone())
     }
 
@@ -1525,7 +1525,7 @@ impl Package {
             hasher: Sha256::new(),
         };
         if patch.is_noop() {
-            original_artifact.write_to_stream(&mut output)?;
+            original_artifact.write_to(&mut output)?;
         } else {
             self.physical_package()?
                 .clone()
@@ -1563,7 +1563,7 @@ impl Package {
         publication.inverse_patch().apply(&current)?;
         publication
             .original_artifact()
-            .write_to_stream(writer)
+            .write_to(writer)
             .map_err(Error::from)?;
         Ok(publication.original_snapshot().clone())
     }
@@ -1975,7 +1975,7 @@ impl Package {
         if report.is_noop() {
             self.physical_package()?
                 .source_artifact()
-                .write_to_stream(writer)?;
+                .write_to(writer)?;
             return Ok(report);
         }
         let (replacement, removed_ids) = redact::publication_parts(commit);
@@ -2057,7 +2057,7 @@ impl Package {
         if report.effect().is_noop() {
             self.physical_package()?
                 .source_artifact()
-                .write_to_stream(writer)?;
+                .write_to(writer)?;
             return Ok(report);
         }
         let parts = crate::story_hyperlinks::publication_parts(commit)?;

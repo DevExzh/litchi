@@ -166,7 +166,7 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
         .set_blob(rewritten);
 
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -211,7 +211,7 @@ fn malformed_second_sheet() -> Vec<u8> {
         .unwrap()
         .set_blob(vec![0xff; 8]);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 

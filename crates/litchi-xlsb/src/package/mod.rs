@@ -598,7 +598,7 @@ impl Package {
 
     /// Stream the validated package into a sequential sink.
     pub fn write_to(&self, writer: impl Write) -> Result<()> {
-        Ok(PackageWriter::write_to_stream(writer, &self.0)?)
+        Ok(PackageWriter::write_to(writer, &self.0)?)
     }
 
     /// Atomically save the validated package to a filesystem path.
