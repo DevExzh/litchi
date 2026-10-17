@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `137339ca055080024cbcc80287ca72cd2eaf31d4c0d1a533c75b59784aabf8cb` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6036228da65ef4bd4889a861832909bfaf95d6fa316df17f2fd703ad232846e1` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `c3b6c7d4fecf9cb0e88c5f6ad010b1482c2d736093fb4ac521d4692482b3b996` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `16a115edabad9f9078692e6f6ba341f3fe64d40003623650fbc77b4ca97f8d78` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
@@ -107,7 +107,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 291 | 2 | 58 | 0 | 232 | 2 | 376 | 165 |
+| docx | 290 | 2 | 58 | 0 | 233 | 2 | 376 | 267 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 559 |
@@ -133,7 +133,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 227 | 30 | 539 | 0 | 138 | 192 |
+| docx | 244 | 30 | 522 | 0 | 240 | 192 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
@@ -227,18 +227,18 @@ Property writes:
 | abstractNum | `text` | string | a-- | a-- | write-only | supported |  |
 | abstractNum | `start` | int | a-- | a-- | write-only | supported |  |
 | abstractNum | `indent` | int | a-- | a-- | write-only | supported |  |
-| abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.text` | string | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.start` | int | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.indent` | int | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.hanging` | int | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.justification` | enum | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.suff` | enum | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.font` | string | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.size` | font-size | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.color` | color | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.format` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.text` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.start` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.indent` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.hanging` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.justification` | enum | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.suff` | enum | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.font` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.size` | font-size | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.color` | color | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.bold` | bool | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.italic` | bool | a-- | a-- | write-only | supported |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
 | bookmark | `name` | string | asg | --g | supported | gap |  |
 | bookmark | `text` | string | a-- |  | supported | gap | the node's text |
@@ -708,23 +708,125 @@ Property writes:
 | level | `italic` | bool | as- | asg | supported | supported |  |
 | num | `id` | int | a-g |  | missing | gap |  |
 | num | `abstractNumId` | int | asg | asg | supported | supported |  |
-| num | `format` | string | a-- |  | write-only | gap |  |
-| num | `text` | string | a-- |  | supported | gap | the node's text |
-| num | `indent` | int | a-- |  | write-only | gap |  |
-| num | `type` | enum | a-- |  | supported | gap | the node's text |
+| num | `format` | string | a-- | a-- | write-only | supported |  |
+| num | `text` | string | a-- | a-- | write-only | supported |  |
+| num | `indent` | int | a-- | a-- | write-only | supported |  |
+| num | `type` | enum | a-- | a-- | write-only | supported |  |
 | num | `start` | int | a-- | a-- | write-only | supported |  |
-| num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
+| num | `startOverride.<N>` | int | a-- | a-g | supported | supported |  |
 | num | `continue` | bool | a-- | a-- | write-only | supported |  |
 | num | `numId` | int | --g |  | missing | — |  |
-| num | `startOverride.0` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.1` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.2` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.3` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.4` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.5` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.6` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.7` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.8` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `name` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `styleLink` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `numStyleLink` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.italic` | bool |  | a-- | litchi-only | litchi-only |  |
 | numbering | `abstractNumCount` | number | --g | --g | supported | — |  |
 | numbering | `abstractNumId` | number | --g |  | missing | — |  |
 | numbering | `numCount` | int |  | --g | litchi-only | — |  |

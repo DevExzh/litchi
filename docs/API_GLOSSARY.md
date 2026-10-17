@@ -2545,7 +2545,7 @@ does.
 | `styles::catalog::{NewStyle, StyleChange}` | `with_*` builders; an inner `None` removes an element | ✅ 0319 |
 | `Edit::{style_catalog, add_style, set_style, remove_style}` | | ✅ 0319 |
 | `numbering::catalog::{Catalog, AbstractNum, Num, Lvl}` | `Catalog::{abstract_nums, nums, abstract_num, num, level_of, format_of, level_paragraph_properties, level_run_properties, next_abstract_num_id, next_num_id}`; `Lvl` is named after `w:lvl` (the typed `numbering::Level` stays the parsed model) | ✅ 0319 |
-| `numbering::catalog::{LevelChange, AbstractNumChange, NewNum, NewLevel, NewAbstractNum}` | | ✅ 0319 |
+| `numbering::catalog::{LevelChange, AbstractNumChange, NewNum, NewLevel, NewAbstractNum}` | `NewLevel::{start, paragraph}` read a template level back (0325) | ✅ 0319, 0325 |
 | `Edit::{numbering_catalog, set_level, set_abstract_num, set_num_definition, add_num, add_abstract_num, add_level, remove_num, remove_abstract_num, remove_level}` | | ✅ 0319 |
 | `header_footer::catalog::Entry` | role, relationship identifier and part name, in relationship order | ✅ 0319 |
 | `header_footer::Story::from_shared_bytes` | | ✅ 0319 |
