@@ -664,6 +664,12 @@
           "add": true,
           "set": true,
           "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
         }
       },
       "predicates": {
@@ -833,22 +839,109 @@
         "validation"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/dataValidation[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS content validations are read by the leaf but not projected into unified nodes yet"
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula1": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "allowBlank": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showError": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showInput": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "promptTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "prompt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "inCellDropdown": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -859,22 +952,271 @@
         "cf"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/cf[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS conditional formats are read by the leaf but not projected into unified nodes yet"
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "priority": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "stopIfTrue": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "dxfId": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rank": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "percent": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bottom": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "aboveAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "equalAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "stdDev": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "period": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showValue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midpoint": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "iconset": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "reverse": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "fill": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "negativeColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisColor": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisPosition": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -882,22 +1224,37 @@
       "element": "autofilter",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "stable": [
           "/<sheet>/autofilter"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS auto-filters live on database ranges, which are not projected yet"
+      "properties": {
+        "range": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "criteria0": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -905,22 +1262,55 @@
       "element": "hyperlink",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/hyperlink[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS cell hyperlinks are reported as the cell `link` property, not as nodes"
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "url": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "location": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -968,22 +1358,175 @@
         "media"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/picture[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS drawing frames are read by the leaf but not projected into unified nodes yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "decorative": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchorMode": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flip": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "contentType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fileSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "anchor": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "crop": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -991,22 +1534,211 @@
       "element": "shape",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/shape[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS drawing shapes are read by the leaf but not projected into unified nodes yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "line": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "underline": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "align": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "valign": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "rotation": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flip": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "margin": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "gradientFill": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1042,22 +1774,49 @@
       "element": "rowbreak",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/rowbreak[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS manual row breaks live in row styles, which are not projected yet"
+      "properties": {
+        "row": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "max": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1065,22 +1824,49 @@
       "element": "colbreak",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/colbreak[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
-        "reason": "ODS manual column breaks live in column styles, which are not projected yet"
+      "properties": {
+        "col": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        },
+        "max": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1159,66 +1945,10 @@
     },
     {
       "subject": "element",
-      "element": "dataValidation",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS content validations are read by the leaf but not projected into unified nodes yet"
-    },
-    {
-      "subject": "element",
-      "element": "conditionalFormatting",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS conditional formats are read by the leaf but not projected into unified nodes yet"
-    },
-    {
-      "subject": "element",
-      "element": "autofilter",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS auto-filters live on database ranges, which are not projected yet"
-    },
-    {
-      "subject": "element",
-      "element": "hyperlink",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS cell hyperlinks are reported as the cell `link` property, not as nodes"
-    },
-    {
-      "subject": "element",
-      "element": "picture",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS drawing frames are read by the leaf but not projected into unified nodes yet"
-    },
-    {
-      "subject": "element",
-      "element": "shape",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS drawing shapes are read by the leaf but not projected into unified nodes yet"
-    },
-    {
-      "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
       "followUp": "ODS adapter follow-up (record 0277)",
       "reason": "ODS embedded objects are read by the leaf but not projected into unified nodes yet"
-    },
-    {
-      "subject": "element",
-      "element": "rowbreak",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS manual row breaks live in row styles, which are not projected yet"
-    },
-    {
-      "subject": "element",
-      "element": "colbreak",
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "ODS manual column breaks live in column styles, which are not projected yet"
     },
     {
       "subject": "element",

@@ -24,7 +24,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
 | rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
 | odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
-| ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
+| ods | 26 | 166 | 166 | 0 | 0 | 117 | 21 | 2 | 14 |
 | odp | 30 | 170 | 170 | 0 | 0 | 143 | 39 | 6 | 12 |
 | odg | 4 | 33 | 33 | 0 | 0 | 0 | 11 | 4 | 2 |
 | odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 |
@@ -373,7 +373,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## ods
 
-- fixtures: `create()`, `seed`, `odf/corpus/calc-formulas.ods`, `odf/corpus/calc-two-sheets.ods`, `odfdo/tests/samples/simple_table_named_range.ods`, `odf/ods/grid-padding-package.ods`, `seed + add sheet`, `create() + add row`, `odf/corpus/calc-two-sheets.ods + add namedrange`, `odf/corpus/calc-two-sheets.ods + add comment`
+- fixtures: `create()`, `seed`, `odf/corpus/calc-formulas.ods`, `odf/corpus/calc-two-sheets.ods`, `odfdo/tests/samples/simple_table_named_range.ods`, `odf/ods/grid-padding-package.ods`, `seed + add sheet`, `create() + add row`, `odf/corpus/calc-two-sheets.ods + add namedrange`, `odf/corpus/calc-two-sheets.ods + add comment`, `odf/corpus/calc-two-sheets.ods + add dataValidation`, `odf/corpus/calc-two-sheets.ods + add conditionalFormatting`, `odf/corpus/calc-two-sheets.ods + add autofilter`, `odf/corpus/calc-two-sheets.ods + add hyperlink`, `odf/corpus/calc-two-sheets.ods + add picture`, `odf/corpus/calc-two-sheets.ods + add shape`, `odf/corpus/calc-two-sheets.ods + add rowbreak`, `odf/corpus/calc-two-sheets.ods + add colbreak`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -393,16 +393,16 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | pivottable | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slicer | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | sparkline | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| dataValidation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| conditionalFormatting | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| autofilter | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| dataValidation | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| conditionalFormatting | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| autofilter | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | mergeCell | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
-| picture | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| shape | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| rowbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| colbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| rowbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| colbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | run | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 
 ## odp

@@ -277,7 +277,15 @@ pub(crate) struct Cache {
     sheets: OnceLock<Box<[OnceLock<std::result::Result<SheetIndex, Error>>]>>,
     rows: OnceLock<Box<[OnceLock<RowEnds>]>>,
     annotations: OnceLock<std::result::Result<litchi_ods::annotations::Snapshot, Error>>,
+    /// Per-sheet worksheet features of `content.xml` (record 0327).
+    features: OnceLock<Box<[OnceLock<FeatureSlot>]>>,
+    /// The named cell styles conditional formats apply (record 0327).
+    format_styles: OnceLock<std::result::Result<FormatStyles, Error>>,
 }
+
+type FeatureSlot = std::result::Result<litchi_ods::advanced::sheet_features::Features, Error>;
+type FormatStyles =
+    std::collections::BTreeMap<String, litchi_ods::advanced::sheet_features::FormatStyle>;
 
 impl Cache {
     /// The row-run ends of the worksheet at `position` of `sheets`.
@@ -314,6 +322,49 @@ impl Cache {
             .with_format(FileFormat::Ods));
         };
         slot.get_or_init(|| SheetIndex::build(sheet))
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    /// The worksheet features of the sheet at `position` of `count`
+    /// sheets, read by `read` once.
+    pub(crate) fn features(
+        &self,
+        count: usize,
+        position: usize,
+        read: impl FnOnce() -> Result<litchi_ods::advanced::sheet_features::Features>,
+    ) -> Result<&litchi_ods::advanced::sheet_features::Features> {
+        let slots = self.features.get_or_init(|| {
+            (0..count)
+                .map(|_| OnceLock::new())
+                .collect::<Vec<_>>()
+                .into_boxed_slice()
+        });
+        let slot = slots.get(position).ok_or_else(|| {
+            Error::new(
+                Code::PathNotFound,
+                "the worksheet position is outside the workbook",
+            )
+            .with_format(FileFormat::Ods)
+        })?;
+        if let Some(result) = slot.get() {
+            return result.as_ref().map_err(Clone::clone);
+        }
+        let read = read();
+        slot.get_or_init(|| read).as_ref().map_err(Clone::clone)
+    }
+
+    /// The named cell styles of `styles.xml`, read by `read` once.
+    pub(crate) fn format_styles(
+        &self,
+        read: impl FnOnce() -> Result<FormatStyles>,
+    ) -> Result<&FormatStyles> {
+        if let Some(result) = self.format_styles.get() {
+            return result.as_ref().map_err(Clone::clone);
+        }
+        let read = read();
+        self.format_styles
+            .get_or_init(|| read)
             .as_ref()
             .map_err(Clone::clone)
     }

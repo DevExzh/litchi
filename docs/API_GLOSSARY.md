@@ -2679,3 +2679,18 @@ are complete-catalog sheet positions.
 | `sheet_features::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_sheet_features, apply_sheet_features}` | `Edit::{features, set_row_breaks, set_column_breaks, add_hyperlink, set_hyperlink, remove_hyperlink, add_validation, set_validation, remove_validation, add_format, set_format, set_format_ranges, remove_format, set_auto_filter, add_note, set_note, remove_note, add_picture, add_shape, set_drawing, remove_drawing, commit}` | ✅ 0327; family registered in the gate |
 | `sheet_features::edit::{Hyperlink, Validation, Style, Format, FormatRule, Threshold, Picture, Shape, ShapeGeometry, Anchor, DrawingChange}` | the authored values; formulas are BIFF8 token streams, colors palette indexes (styles) or RGB (drawings, CF12 visuals) | ✅ 0327 |
 | `sheet_features::edit::compile_formula`, `Package::palette` | formula text to BIFF8 tokens with every built-in worksheet function (not `CALL`, `REGISTER.ID`, `EXEC`); the workbook palette a style's indexes name | ✅ 0327 |
+
+## ODS worksheet feature family (record 0327)
+
+The worksheet features of an ODS sheet (`litchi_ods::advanced::sheet_features`)
+are read from `content.xml` without decoding cells and edited through the
+existing `document::Edit` transaction as provenance splices of `content.xml`
+(and `styles.xml` for a conditional format's named cell style): every
+element an edit does not touch keeps its bytes. No new transaction family:
+the verbs extend `Edit`, and `commit()` keeps its triad.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `sheet_features::{read, Features, Drawing, DrawingKind, Validation, AutoFilter, Rect, format_styles, FormatStyle}` | `calcext:conditional-format`, `table:content-validation` bound by `table:content-validation-name`, `table:database-range` with filter buttons, `fo:break-before` row/column styles, `draw:frame`/`draw:custom-shape` | ✅ 0327 |
+| `sheet_features::{ValidationSpec, DrawingSpec, DrawingChange, parse_address, address, column_letters, to_odff, from_odff}` | authored values and ODF address / OpenFormula reference conversion | ✅ 0327 |
+| `Edit::{add_sheet_format, set_sheet_format, remove_sheet_format, add_sheet_validation, set_sheet_validation, remove_sheet_validation, set_sheet_auto_filter, set_sheet_breaks, add_sheet_drawing, set_sheet_drawing, remove_sheet_drawing}` | sheet-scoped verbs of the document transaction; drawings by kind and position | ✅ 0327 |

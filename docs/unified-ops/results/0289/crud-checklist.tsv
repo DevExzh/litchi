@@ -3600,58 +3600,58 @@ ods	sparkline	edit	gap	ODS adapter follow-up (record 0277)	-
 ods	sparkline	batch	gap	ODS adapter follow-up (record 0277)	-
 ods	sparkline	create	gap	ODS adapter follow-up (record 0277)	ok format
 ods	sparkline	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	dataValidation	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	add	gap	ODS adapter follow-up (record 0277)	-
-ods	dataValidation	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	dataValidation	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	dataValidation	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	dataValidation	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	conditionalFormatting	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	add	gap	ODS adapter follow-up (record 0277)	-
-ods	conditionalFormatting	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	conditionalFormatting	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	conditionalFormatting	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	conditionalFormatting	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	autofilter	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	add	gap	ODS adapter follow-up (record 0277)	-
-ods	autofilter	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	autofilter	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	autofilter	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	autofilter	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	hyperlink	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	add	gap	ODS adapter follow-up (record 0277)	-
-ods	hyperlink	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	hyperlink	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	hyperlink	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	hyperlink	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	dataValidation	get	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
+ods	dataValidation	find	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
+ods	dataValidation	query	supported		ok matches in odf/ods/grid-padding-package.ods
+ods	dataValidation	view	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
+ods	dataValidation	set	supported		ok `odf/corpus/calc-two-sheets.ods + add dataValidation` /sheet[1]/dataValidation[1] {"formula1":"Litchi"}
+ods	dataValidation	add	supported		ok /sheet[1]/dataValidation[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"type":"list","ref":"A1:A2","formula1":"a,b"}
+ods	dataValidation	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add dataValidation` /sheet[1]/dataValidation[1]
+ods	dataValidation	move	format-verb		unreached
+ods	dataValidation	swap	format-verb		unreached
+ods	dataValidation	edit	supported		ok tx.set
+ods	dataValidation	batch	supported		ok set item
+ods	dataValidation	create	supported		ok format
+ods	dataValidation	save	supported		ok format
+ods	conditionalFormatting	get	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	find	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add conditionalFormatting
+ods	conditionalFormatting	view	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	set	supported		ok `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1] {"value":"Litchi"}
+ods	conditionalFormatting	add	supported		ok /sheet[1]/cf[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"type":"cellIs","ref":"A1:A9","value":"5","fill":"FF0000"}
+ods	conditionalFormatting	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	move	format-verb		refused unsupported_element
+ods	conditionalFormatting	swap	format-verb		refused unsupported_element
+ods	conditionalFormatting	edit	supported		ok tx.set
+ods	conditionalFormatting	batch	supported		ok set item
+ods	conditionalFormatting	create	supported		ok format
+ods	conditionalFormatting	save	supported		ok format
+ods	autofilter	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add autofilter
+ods	autofilter	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	set	supported		ok `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter {"range":"A1:C3"} (value unchanged: no-op only)
+ods	autofilter	add	supported		ok /sheet[1]/autofilter on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"range":"A1:C3"}
+ods	autofilter	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	move	format-verb		unreached
+ods	autofilter	swap	format-verb		unreached
+ods	autofilter	edit	supported		ok tx.set
+ods	autofilter	batch	supported		ok set item
+ods	autofilter	create	supported		ok format
+ods	autofilter	save	supported		ok format
+ods	hyperlink	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add hyperlink
+ods	hyperlink	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	set	supported		ok `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1] {"url":"Litchi"}
+ods	hyperlink	add	supported		ok /sheet[1]/hyperlink[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"ref":"A1","url":"https://example.test/"}
+ods	hyperlink	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	move	format-verb		unreached
+ods	hyperlink	swap	format-verb		unreached
+ods	hyperlink	edit	supported		ok tx.set
+ods	hyperlink	batch	supported		ok set item
+ods	hyperlink	create	supported		ok format
+ods	hyperlink	save	supported		ok format
 ods	mergeCell	get	supported		ok 3 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/mergeCell[1]
 ods	mergeCell	find	supported		ok 3 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/mergeCell[1]
 ods	mergeCell	query	supported		ok matches in seed
@@ -3665,32 +3665,32 @@ ods	mergeCell	edit	n/a	edit not offered for this element	-
 ods	mergeCell	batch	n/a	batch not offered for this element	-
 ods	mergeCell	create	supported		ok format
 ods	mergeCell	save	supported		ok format
-ods	picture	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	add	gap	ODS adapter follow-up (record 0277)	-
-ods	picture	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	picture	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	picture	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	picture	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	shape	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	add	gap	ODS adapter follow-up (record 0277)	-
-ods	shape	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	shape	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	shape	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	shape	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	picture	get	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	find	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add picture
+ods	picture	view	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	set	supported		ok `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1] {"name":"Litchi"}
+ods	picture	add	supported		ok /sheet[1]/picture[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"src":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="}
+ods	picture	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	move	format-verb		refused unsupported_element
+ods	picture	swap	format-verb		refused unsupported_element
+ods	picture	edit	supported		ok tx.set
+ods	picture	batch	supported		ok set item
+ods	picture	create	supported		ok format
+ods	picture	save	supported		ok format
+ods	shape	get	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	find	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add shape
+ods	shape	view	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	set	supported		ok `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1] {"name":"Litchi"}
+ods	shape	add	supported		ok /sheet[1]/shape[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"geometry":"rect","text":"box"}
+ods	shape	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	move	format-verb		refused unsupported_element
+ods	shape	swap	format-verb		refused unsupported_element
+ods	shape	edit	supported		ok tx.set
+ods	shape	batch	supported		ok set item
+ods	shape	create	supported		ok format
+ods	shape	save	supported		ok format
 ods	ole	get	gap	ODS adapter follow-up (record 0277)	unreached
 ods	ole	find	gap	ODS adapter follow-up (record 0277)	unreached
 ods	ole	query	gap	ODS adapter follow-up (record 0277)	unreached
@@ -3704,32 +3704,32 @@ ods	ole	edit	gap	ODS adapter follow-up (record 0277)	-
 ods	ole	batch	gap	ODS adapter follow-up (record 0277)	-
 ods	ole	create	gap	ODS adapter follow-up (record 0277)	ok format
 ods	ole	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	rowbreak	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	add	gap	ODS adapter follow-up (record 0277)	-
-ods	rowbreak	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	rowbreak	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	rowbreak	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	rowbreak	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	colbreak	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	add	gap	ODS adapter follow-up (record 0277)	-
-ods	colbreak	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	colbreak	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	colbreak	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	colbreak	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	rowbreak	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add rowbreak
+ods	rowbreak	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	set	supported		ok `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1] {"row":"1"}
+ods	rowbreak	add	supported		ok /sheet[1]/rowbreak[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"row":"2"}
+ods	rowbreak	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	move	format-verb		unreached
+ods	rowbreak	swap	format-verb		unreached
+ods	rowbreak	edit	supported		ok tx.set
+ods	rowbreak	batch	supported		ok set item
+ods	rowbreak	create	supported		ok format
+ods	rowbreak	save	supported		ok format
+ods	colbreak	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add colbreak
+ods	colbreak	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	set	supported		ok `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1] {"col":"7"}
+ods	colbreak	add	supported		ok /sheet[1]/colbreak[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"col":"2"}
+ods	colbreak	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	move	format-verb		unreached
+ods	colbreak	swap	format-verb		unreached
+ods	colbreak	edit	supported		ok tx.set
+ods	colbreak	batch	supported		ok set item
+ods	colbreak	create	supported		ok format
+ods	colbreak	save	supported		ok format
 ods	run	get	gap	ODS adapter follow-up (record 0277)	unreached
 ods	run	find	gap	ODS adapter follow-up (record 0277)	unreached
 ods	run	query	gap	ODS adapter follow-up (record 0277)	unreached
