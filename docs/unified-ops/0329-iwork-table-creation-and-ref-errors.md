@@ -2,7 +2,8 @@
 
 - Status: implemented on `uo2/iwork-tables2`, cut from trunk
   `feat/unified-ops-api` at `fc274041da`; trunk merged at `fc2c1a29e1`
-  (trunk head `d761892de3`, record 0330).
+  (`d761892de3`, record 0330), `2fce2b639d` (`3bec513e6a`, records 0327
+  and 0328) and `99d6560eef` (`0056b9cccd`, record 0332).
 - Date: 2026-10-17
 - Inputs: records 0298, 0299, 0301, 0309, 0312 and 0318 and
   `IWORK_API_REQUESTS.md` requests 6, 10 and 19. The work list: Keynote and
@@ -282,6 +283,18 @@ shim, test executables pruned between chunks).
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target/glossary` (40 profiles, 2,313 bans, 252 families) | 0 |
 | `crates/pyo3-litchi/tests/run_tests.sh` (283) | 0 |
 | `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+
+After the last two merges (records 0327, 0328, 0332): `cargo fmt --all
+--check`, the all-features clippy above, the capability and registry
+goldens in both feature sets, `crud_matrix`, `corpus_fidelity`,
+`query_corpus_differential`, `acceptance_fixtures` and the iWork unified
+targets (12 targets, 88 tests), the OfficeCLI corpus re-recorded
+(`LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test
+officecli_corpus`, unchanged), and the regenerated delta table and corpus
+report with `tools/officecli_dispositions.json`:
+`python3 tools/officecli_capability_delta.py --officecli … --check` and
+`python3 tools/officecli_corpus.py --check` — all exit 0, with no
+dispositions change (iWork formats have no OfficeCLI vocabulary).
 
 Goldens: capabilities and registry (both feature sets), the CRUD
 checklist, the query-corpus digests and the delta table were re-blessed in
