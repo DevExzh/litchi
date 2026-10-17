@@ -302,6 +302,24 @@ RULES: list[Rule] = [
         lambda c, e: c.script == "word/revisions.sh" and c.result == "missing_argument",
     ),
     When(
+        "D1b", "delta", "Created numbering-instance path captured by the script",
+        "`add --type num` prints `/numbering/num[@id=N]`, which the script greps for "
+        "the new `numId`",
+        "`add` prints the positional path `/numbering/num[K]`: a numbering identifier "
+        "is a native identity, addressed only by raw paths (record 0319), so the "
+        "capture is empty and the dependent `numId=` is `invalid_value`",
+        lambda c, e: c.script == "word/numbering.sh" and c.detail == "numId"
+        and c.result == "invalid_value" and not failed_add(e, {"num", "abstractnum"}),
+    ),
+    When(
+        "D11", "delta", "Re-adding a built-in style",
+        "`add --type style` with the id of a built-in style the document already has "
+        "(`Heading1`, `Normal`, ...) replaces that definition (upsert)",
+        "an existing style id is refused (`duplicate_name`, record 0319): `add` never "
+        "drops an existing definition; `set /styles/<id>` changes it",
+        lambda c, e: c.verb == "add" and c.kind == "style" and c.result == "duplicate_name",
+    ),
+    When(
         "D4", "delta", "Bare slide insertion",
         "`add / --type slide` picks the deck's first layout; layout-type words "
         "(`blank`, `title`) also select a layout",
