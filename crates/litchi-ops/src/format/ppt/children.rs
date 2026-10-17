@@ -290,6 +290,48 @@ impl<'f> Children<'f> {
                 Err(error) => failed = Some(error.into()),
             }
         }
+        if let Item::Shape(shape) = parent.item()
+            && shape.kind == Kind::Table
+            && kinds.contains(Kind::Col)
+        {
+            match super::elements::table(parent) {
+                Ok(table) => {
+                    for column in 0..table.columns() {
+                        extra.push(super::nav::band_node(
+                            parent.file(),
+                            parent.steps(),
+                            shape,
+                            Kind::Col,
+                            column,
+                        ));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
+        if let Item::Paragraph(paragraph) = parent.item()
+            && kinds.contains(Kind::LineBreak)
+        {
+            match parent.text_member() {
+                Ok(text) => {
+                    let count = super::elements::line_breaks(&text.unwrap_or_default(), 0);
+                    for index in 0..count {
+                        extra.push(Node::element_node(
+                            parent.file(),
+                            parent.steps(),
+                            crate::node::PathStep::at(
+                                Kind::LineBreak.name(),
+                                litchi_core::Position::new(index),
+                            ),
+                            super::elements::Element::LineBreak {
+                                shape: paragraph.shape.clone(),
+                            },
+                        ));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
         if let Item::Paragraph(paragraph) = parent.item()
             && (kinds.contains(Kind::Run) || kinds.contains(Kind::LineBreak))
         {

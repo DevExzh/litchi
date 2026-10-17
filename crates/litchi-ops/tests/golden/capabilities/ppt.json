@@ -678,8 +678,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -693,11 +693,20 @@
           "pathSegment": "tc"
         }
       ],
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "the legacy PPT table projection exposes dimensions and cell text but no row nodes"
+      "properties": {
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -709,9 +718,9 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
+        "set": true,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -719,11 +728,20 @@
           "/slide[N]/table[N]/tr[N]/tc[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "the legacy PPT table projection exposes cell text through the table node only"
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -738,8 +756,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -761,11 +779,56 @@
           "pathSegment": "animation"
         }
       ],
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT chart frames have no chart-part projection"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "chartType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -988,8 +1051,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -997,11 +1060,56 @@
           "/slide[N]/ole[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT object frames are retained as picture metadata only"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "progId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "linked": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1061,14 +1169,14 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
+        "set": true,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
         "positional": [
-          "/slide[N]/shape[N]/run[N]"
+          "/slide[N]/shape[N]/paragraph[N]/run[N]"
         ]
       },
       "children": [
@@ -1077,11 +1185,60 @@
           "pathSegment": "hyperlink"
         }
       ],
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT exposes aggregate shape text, not text-run nodes"
+      "properties": {
+        "font.latin": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1094,20 +1251,22 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
         "positional": [
-          "/slide[N]/shape[N]/linebreak[N]"
+          "/slide[N]/shape[N]/paragraph[N]/linebreak[N]"
         ]
       },
       "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT exposes normalized shape text, not line-break nodes"
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1147,22 +1306,67 @@
       "element": "comment",
       "parent": "slide",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/comment[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT comments are parsed by the presentation leaf but not navigable nodes"
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "index": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1177,8 +1381,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1186,11 +1390,44 @@
           "/slide[N]/video[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "media frames are retained as native picture metadata only"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1205,8 +1442,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1214,11 +1451,44 @@
           "/slide[N]/audio[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "media frames are retained as native picture metadata only"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1233,8 +1503,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1242,11 +1512,44 @@
           "/slide[N]/media[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "media frames are retained as native picture metadata only"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1275,8 +1578,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT has no equation semantic model"
+        "followUp": "0323-F6 PPT Equation Editor objects",
+        "reason": "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element"
       }
     },
     {
@@ -1301,8 +1604,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT has no zoom semantic model"
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record"
       }
     },
     {
@@ -1327,8 +1630,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT has no 3D-model semantic model"
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record"
       }
     },
     {
@@ -1488,8 +1791,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1497,11 +1800,128 @@
           "/theme"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT has no theme semantic projection"
+      "properties": {
+        "dk1": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lt1": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "dk2": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lt2": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent1": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent2": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent3": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent4": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent5": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "accent6": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "followedhyperlink": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headingFont": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bodyFont": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headingFont.ea": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bodyFont.ea": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headingFont.cs": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bodyFont.cs": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1534,8 +1954,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT has no threaded-comment semantic projection"
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements"
       }
     },
     {
@@ -1557,8 +1977,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT has no threaded-comment semantic projection"
+        "followUp": "wontfix: PPTX-only (record 0323)",
+        "reason": "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies"
       }
     },
     {
@@ -1572,22 +1992,38 @@
         "hlink"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/slide[N]/shape[N]/hyperlink"
+          "/slide[N]/shape[N]/hyperlink",
+          "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT hyperlink targets require relationship resolution"
+      "properties": {
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1615,8 +2051,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT timing records are not exposed as nodes"
+        "followUp": "0323-F5 PPT animation nodes",
+        "reason": "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes"
       }
     },
     {
@@ -1638,8 +2074,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT chart series are not exposed as nodes"
+        "followUp": "0323-F7 PPT chart series and axes",
+        "reason": "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)"
       }
     },
     {
@@ -1661,8 +2097,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT chart axes are not exposed as nodes"
+        "followUp": "0323-F7 PPT chart series and axes",
+        "reason": "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)"
       }
     },
     {
@@ -1675,8 +2111,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1684,11 +2120,20 @@
           "/slide[N]/table[N]/col[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT table columns have no separate node projection"
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1768,27 +2213,6 @@
     },
     {
       "subject": "element",
-      "element": "tr",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "the legacy PPT table projection exposes dimensions and cell text but no row nodes"
-    },
-    {
-      "subject": "element",
-      "element": "tc",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "the legacy PPT table projection exposes cell text through the table node only"
-    },
-    {
-      "subject": "element",
-      "element": "chart",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT chart frames have no chart-part projection"
-    },
-    {
-      "subject": "element",
       "element": "smartart",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
@@ -1796,73 +2220,24 @@
     },
     {
       "subject": "element",
-      "element": "ole",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT object frames are retained as picture metadata only"
-    },
-    {
-      "subject": "element",
-      "element": "run",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT exposes aggregate shape text, not text-run nodes"
-    },
-    {
-      "subject": "element",
-      "element": "linebreak",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT exposes normalized shape text, not line-break nodes"
-    },
-    {
-      "subject": "element",
-      "element": "comment",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT comments are parsed by the presentation leaf but not navigable nodes"
-    },
-    {
-      "subject": "element",
-      "element": "video",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "media frames are retained as native picture metadata only"
-    },
-    {
-      "subject": "element",
-      "element": "audio",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "media frames are retained as native picture metadata only"
-    },
-    {
-      "subject": "element",
-      "element": "media",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "media frames are retained as native picture metadata only"
-    },
-    {
-      "subject": "element",
       "element": "equation",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT has no equation semantic model"
+      "followUp": "0323-F6 PPT Equation Editor objects",
+      "reason": "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element"
     },
     {
       "subject": "element",
       "element": "zoom",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT has no zoom semantic model"
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record"
     },
     {
       "subject": "element",
       "element": "model3d",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT has no 3D-model semantic model"
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record"
     },
     {
       "subject": "element",
@@ -1880,59 +2255,38 @@
     },
     {
       "subject": "element",
-      "element": "theme",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT has no theme semantic projection"
-    },
-    {
-      "subject": "element",
       "element": "modernComment",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT has no threaded-comment semantic projection"
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements"
     },
     {
       "subject": "element",
       "element": "reply",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT has no threaded-comment semantic projection"
-    },
-    {
-      "subject": "element",
-      "element": "hyperlink",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT hyperlink targets require relationship resolution"
+      "followUp": "wontfix: PPTX-only (record 0323)",
+      "reason": "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies"
     },
     {
       "subject": "element",
       "element": "animation",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT timing records are not exposed as nodes"
+      "followUp": "0323-F5 PPT animation nodes",
+      "reason": "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes"
     },
     {
       "subject": "element",
       "element": "series",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT chart series are not exposed as nodes"
+      "followUp": "0323-F7 PPT chart series and axes",
+      "reason": "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)"
     },
     {
       "subject": "element",
       "element": "axis",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT chart axes are not exposed as nodes"
-    },
-    {
-      "subject": "element",
-      "element": "col",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT table columns have no separate node projection"
+      "followUp": "0323-F7 PPT chart series and axes",
+      "reason": "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)"
     },
     {
       "subject": "element",
@@ -1958,19 +2312,137 @@
     },
     {
       "subject": "property",
-      "element": "chart",
-      "key": "chartType",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT chart frames have no chart-part projection"
-    },
-    {
-      "subject": "property",
       "element": "shape",
       "key": "fill",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
       "reason": "legacy PPT exposes only common geometry in the unified node view"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "ole",
+      "context": "object-storage",
+      "code": "unsupported_capability",
+      "followUp": "0323-F8 PPT OLE object writes",
+      "reason": "embedding an OLE object needs a new ExOleObjStg storage, an ExOleEmbedContainer and a picture frame with its preview; OLE frames are read (progId, linked, frame) only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "ole",
+      "context": "object-storage",
+      "code": "unsupported_capability",
+      "followUp": "0323-F8 PPT OLE object writes",
+      "reason": "OLE frame geometry and object replacement are not written; the frame is read only"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "media",
+      "context": "media-objects",
+      "code": "unsupported_capability",
+      "followUp": "0323-F9 PPT media writes",
+      "reason": "a movie or sound needs an external-media object, its sound collection entry and a media picture frame; media frames are read only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "media",
+      "context": "media-objects",
+      "code": "unsupported_capability",
+      "followUp": "0323-F9 PPT media writes",
+      "reason": "media frame geometry and playback are not written through the media element; the frame is read only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "theme",
+      "context": "theme-package",
+      "code": "unsupported_capability",
+      "followUp": "0323-F10 PPT theme writes",
+      "reason": "the theme is an OPC package inside each master's RoundTripThemeAtom; re-encoding it (and the masters' legacy color schemes that PowerPoint 97-2003 reads) is not modeled"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "chart",
+      "context": "graph-object",
+      "code": "unsupported_capability",
+      "followUp": "0323-F7 PPT chart series and axes",
+      "reason": "the embedded Graph object's chart stream is read through MS-OGRAPH; chart, series and axis writes are not integrated"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "run",
+      "context": "text-positions",
+      "code": "unsupported_capability",
+      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "reason": "inserting or removing a run or line break changes the text length, which every position-dependent record (style, special-information and interaction runs, fields) of the body would have to follow; runs are formatted and their text replaced in place"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "run",
+      "context": "text-positions",
+      "code": "unsupported_capability",
+      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "reason": "removing a run changes the text length that the body's position-dependent records hold"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "linebreak",
+      "context": "text-positions",
+      "code": "unsupported_capability",
+      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "reason": "a line break is a vertical-tab character of the text atom; inserting one changes the text length that the body's position-dependent records hold"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "tr",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "a legacy table is a group of positioned cell shapes and border lines; inserting a row would re-lay out every later cell, line and the group anchor, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "col",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "a legacy table is a group of positioned cell shapes and border lines; inserting a column would re-lay out every later cell, line and the group anchor, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "tr",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "removing a row would re-lay out the table group's later cells and border lines, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "col",
+      "context": "table-layout",
+      "code": "unsupported_capability",
+      "followUp": "0323-F1 PPT table re-layout",
+      "reason": "removing a column would re-lay out the table group's later cells and border lines, which the leaf does not model"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "tc",
+      "context": "native-cell-text",
+      "code": "unsupported_capability",
+      "followUp": "0323-F2 PPT nested tables and rich cell text",
+      "reason": "cell text follows the shape-text closure rules (a changed length refuses over several formatting runs or position-dependent records); tables inside groups and merged-away cells are refused"
     },
     {
       "subject": "operation",

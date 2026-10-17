@@ -2226,7 +2226,7 @@ ppt	shape	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrec
 ppt	shape	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]
 ppt	shape	query	supported		ok matches in ole/ppt/text_shapes.ppt
 ppt	shape	view	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]
-ppt	shape	set	supported		ok `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1] {"x":"12pt"}
+ppt	shape	set	supported		ok `unified-ops/0294/elements.ppt + add comment` /slide[1]/shape[1] {"x":"12pt"}
 ppt	shape	add	n/a	add not offered for this element	-
 ppt	shape	remove	n/a	remove not offered for this element	-
 ppt	shape	move	format-verb		refused unsupported_type
@@ -2248,10 +2248,10 @@ ppt	placeholder	edit	supported		ok tx.set
 ppt	placeholder	batch	supported		ok set item
 ppt	placeholder	create	supported		ok format
 ppt	placeholder	save	supported		ok format
-ppt	picture	get	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
-ppt	picture	find	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	get	supported		ok 7 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	find	supported		ok 7 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	query	supported		ok matches in ole/ppt/ppt_with_png.ppt
-ppt	picture	view	supported		ok 2 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	view	supported		ok 7 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	set	n/a	set not offered for this element	-
 ppt	picture	add	n/a	add not offered for this element	-
 ppt	picture	remove	n/a	remove not offered for this element	-
@@ -2261,10 +2261,10 @@ ppt	picture	edit	n/a	edit not offered for this element	-
 ppt	picture	batch	n/a	batch not offered for this element	-
 ppt	picture	create	supported		ok format
 ppt	picture	save	supported		ok format
-ppt	table	get	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
-ppt	table	find	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	get	supported		ok 4 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	find	supported		ok 4 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
 ppt	table	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
-ppt	table	view	supported		ok 1 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
+ppt	table	view	supported		ok 4 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]
 ppt	table	set	n/a	set not offered for this element	-
 ppt	table	add	n/a	add not offered for this element	-
 ppt	table	remove	n/a	remove not offered for this element	-
@@ -2274,45 +2274,45 @@ ppt	table	edit	n/a	edit not offered for this element	-
 ppt	table	batch	n/a	batch not offered for this element	-
 ppt	table	create	supported		ok format
 ppt	table	save	supported		ok format
-ppt	tr	get	gap	M1-extended	unreached
-ppt	tr	find	gap	M1-extended	unreached
-ppt	tr	query	gap	M1-extended	unreached
-ppt	tr	view	gap	M1-extended	unreached
-ppt	tr	set	gap	M1-extended	unreached
-ppt	tr	add	gap	M1-extended	-
-ppt	tr	remove	gap	M1-extended	unreached
-ppt	tr	move	gap	M1-extended	unreached
-ppt	tr	swap	gap	M1-extended	unreached
-ppt	tr	edit	gap	M1-extended	-
-ppt	tr	batch	gap	M1-extended	-
-ppt	tr	create	gap	M1-extended	ok format
-ppt	tr	save	gap	M1-extended	ok format
-ppt	tc	get	gap	M1-extended	unreached
-ppt	tc	find	gap	M1-extended	unreached
-ppt	tc	query	gap	M1-extended	unreached
-ppt	tc	view	gap	M1-extended	unreached
-ppt	tc	set	gap	M1-extended	unreached
-ppt	tc	add	gap	M1-extended	-
-ppt	tc	remove	gap	M1-extended	unreached
-ppt	tc	move	gap	M1-extended	unreached
-ppt	tc	swap	gap	M1-extended	unreached
-ppt	tc	edit	gap	M1-extended	-
-ppt	tc	batch	gap	M1-extended	-
-ppt	tc	create	gap	M1-extended	ok format
-ppt	tc	save	gap	M1-extended	ok format
-ppt	chart	get	gap	M1-extended	unreached
-ppt	chart	find	gap	M1-extended	unreached
-ppt	chart	query	gap	M1-extended	unreached
-ppt	chart	view	gap	M1-extended	unreached
-ppt	chart	set	gap	M1-extended	unreached
-ppt	chart	add	gap	M1-extended	-
-ppt	chart	remove	gap	M1-extended	unreached
-ppt	chart	move	gap	M1-extended	unreached
-ppt	chart	swap	gap	M1-extended	unreached
-ppt	chart	edit	gap	M1-extended	-
-ppt	chart	batch	gap	M1-extended	-
-ppt	chart	create	gap	M1-extended	ok format
-ppt	chart	save	gap	M1-extended	ok format
+ppt	tr	get	supported		ok 8 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/tr[1]
+ppt	tr	find	supported		ok 8 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/tr[1]
+ppt	tr	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
+ppt	tr	view	supported		ok 8 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/tr[1]
+ppt	tr	set	n/a	set not offered for this element	-
+ppt	tr	add	n/a	add not offered for this element	-
+ppt	tr	remove	n/a	remove not offered for this element	-
+ppt	tr	move	format-verb		refused unsupported_type
+ppt	tr	swap	format-verb		refused unsupported_type
+ppt	tr	edit	n/a	edit not offered for this element	-
+ppt	tr	batch	n/a	batch not offered for this element	-
+ppt	tr	create	supported		ok format
+ppt	tr	save	supported		ok format
+ppt	tc	get	supported		ok 8 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/tr[1]/tc[1]
+ppt	tc	find	supported		ok 8 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/tr[1]/tc[1]
+ppt	tc	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
+ppt	tc	view	supported		ok 8 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/tr[1]/tc[1]
+ppt	tc	set	supported		ok `unified-ops/0294/elements.ppt + add comment` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
+ppt	tc	add	n/a	add not offered for this element	-
+ppt	tc	remove	n/a	remove not offered for this element	-
+ppt	tc	move	format-verb		refused unsupported_type
+ppt	tc	swap	format-verb		refused unsupported_type
+ppt	tc	edit	supported		ok tx.set
+ppt	tc	batch	supported		ok set item
+ppt	tc	create	supported		ok format
+ppt	tc	save	supported		ok format
+ppt	chart	get	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/chart[1]
+ppt	chart	find	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/chart[1]
+ppt	chart	query	supported		ok matches in unified-ops/0294/elements.ppt
+ppt	chart	view	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/chart[1]
+ppt	chart	set	n/a	set not offered for this element	-
+ppt	chart	add	n/a	add not offered for this element	-
+ppt	chart	remove	n/a	remove not offered for this element	-
+ppt	chart	move	format-verb		unreached
+ppt	chart	swap	format-verb		unreached
+ppt	chart	edit	n/a	edit not offered for this element	-
+ppt	chart	batch	n/a	batch not offered for this element	-
+ppt	chart	create	supported		ok format
+ppt	chart	save	supported		ok format
 ppt	group	get	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
 ppt	group	find	supported		ok 4 instances, first `poi/test-data/slideshow/42485.ppt` /slide[1]/group[1]
 ppt	group	query	supported		ok matches in poi/test-data/slideshow/42485.ppt
@@ -2352,19 +2352,19 @@ ppt	smartart	edit	gap	M1-extended	-
 ppt	smartart	batch	gap	M1-extended	-
 ppt	smartart	create	gap	M1-extended	ok format
 ppt	smartart	save	gap	M1-extended	ok format
-ppt	ole	get	gap	M1-extended	unreached
-ppt	ole	find	gap	M1-extended	unreached
-ppt	ole	query	gap	M1-extended	unreached
-ppt	ole	view	gap	M1-extended	unreached
-ppt	ole	set	gap	M1-extended	unreached
-ppt	ole	add	gap	M1-extended	-
-ppt	ole	remove	gap	M1-extended	unreached
-ppt	ole	move	gap	M1-extended	unreached
-ppt	ole	swap	gap	M1-extended	unreached
-ppt	ole	edit	gap	M1-extended	-
-ppt	ole	batch	gap	M1-extended	-
-ppt	ole	create	gap	M1-extended	ok format
-ppt	ole	save	gap	M1-extended	ok format
+ppt	ole	get	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
+ppt	ole	find	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
+ppt	ole	query	supported		ok matches in unified-ops/0294/elements.ppt
+ppt	ole	view	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
+ppt	ole	set	n/a	set not offered for this element	-
+ppt	ole	add	n/a	add not offered for this element	-
+ppt	ole	remove	n/a	remove not offered for this element	-
+ppt	ole	move	format-verb		unreached
+ppt	ole	swap	format-verb		unreached
+ppt	ole	edit	n/a	edit not offered for this element	-
+ppt	ole	batch	n/a	batch not offered for this element	-
+ppt	ole	create	supported		ok format
+ppt	ole	save	supported		ok format
 ppt	paragraph	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1]
 ppt	paragraph	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1]
 ppt	paragraph	query	supported		ok matches in poi/test-data/slideshow/incorrect_slide_order.ppt
@@ -2378,32 +2378,32 @@ ppt	paragraph	edit	supported		ok tx.set
 ppt	paragraph	batch	supported		ok set item
 ppt	paragraph	create	supported		ok format
 ppt	paragraph	save	supported		ok format
-ppt	run	get	gap	M1-extended	unreached
-ppt	run	find	gap	M1-extended	unreached
-ppt	run	query	gap	M1-extended	unreached
-ppt	run	view	gap	M1-extended	unreached
-ppt	run	set	gap	M1-extended	unreached
-ppt	run	add	gap	M1-extended	-
-ppt	run	remove	gap	M1-extended	unreached
-ppt	run	move	gap	M1-extended	unreached
-ppt	run	swap	gap	M1-extended	unreached
-ppt	run	edit	gap	M1-extended	-
-ppt	run	batch	gap	M1-extended	-
-ppt	run	create	gap	M1-extended	ok format
-ppt	run	save	gap	M1-extended	ok format
-ppt	linebreak	get	gap	M1-extended	unreached
-ppt	linebreak	find	gap	M1-extended	unreached
-ppt	linebreak	query	gap	M1-extended	unreached
-ppt	linebreak	view	gap	M1-extended	unreached
-ppt	linebreak	set	gap	M1-extended	unreached
-ppt	linebreak	add	gap	M1-extended	-
-ppt	linebreak	remove	gap	M1-extended	unreached
-ppt	linebreak	move	gap	M1-extended	unreached
-ppt	linebreak	swap	gap	M1-extended	unreached
-ppt	linebreak	edit	gap	M1-extended	-
-ppt	linebreak	batch	gap	M1-extended	-
-ppt	linebreak	create	gap	M1-extended	ok format
-ppt	linebreak	save	gap	M1-extended	ok format
+ppt	run	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1]/run[1]
+ppt	run	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1]/run[1]
+ppt	run	query	supported		ok matches in poi/test-data/slideshow/incorrect_slide_order.ppt
+ppt	run	view	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]/paragraph[1]/run[1]
+ppt	run	set	supported		ok `unified-ops/0294/elements.ppt + add comment` /slide[1]/shape[1]/paragraph[1]/run[1] {"size":"12pt"}
+ppt	run	add	n/a	add not offered for this element	-
+ppt	run	remove	n/a	remove not offered for this element	-
+ppt	run	move	format-verb		refused unsupported_type
+ppt	run	swap	format-verb		refused unsupported_type
+ppt	run	edit	supported		ok tx.set
+ppt	run	batch	supported		ok set item
+ppt	run	create	supported		ok format
+ppt	run	save	supported		ok format
+ppt	linebreak	get	supported		ok 6 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[1]/shape[1]/paragraph[1]/linebreak[1]
+ppt	linebreak	find	supported		ok 6 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[1]/shape[1]/paragraph[1]/linebreak[1]
+ppt	linebreak	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
+ppt	linebreak	view	supported		ok 6 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[1]/shape[1]/paragraph[1]/linebreak[1]
+ppt	linebreak	set	n/a	set not offered for this element	-
+ppt	linebreak	add	n/a	add not offered for this element	-
+ppt	linebreak	remove	n/a	remove not offered for this element	-
+ppt	linebreak	move	format-verb		refused unsupported_type
+ppt	linebreak	swap	format-verb		refused unsupported_type
+ppt	linebreak	edit	n/a	edit not offered for this element	-
+ppt	linebreak	batch	n/a	batch not offered for this element	-
+ppt	linebreak	create	supported		ok format
+ppt	linebreak	save	supported		ok format
 ppt	notes	get	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
 ppt	notes	find	supported		ok 8 instances, first `poi/test-data/slideshow/headers_footers.ppt` /slide[1]/notes
 ppt	notes	query	supported		ok matches in poi/test-data/slideshow/headers_footers.ppt
@@ -2417,97 +2417,97 @@ ppt	notes	edit	supported		ok tx.set
 ppt	notes	batch	supported		ok set item
 ppt	notes	create	supported		ok format
 ppt	notes	save	supported		ok format
-ppt	comment	get	gap	M1-extended	unreached
-ppt	comment	find	gap	M1-extended	unreached
-ppt	comment	query	gap	M1-extended	unreached
-ppt	comment	view	gap	M1-extended	unreached
-ppt	comment	set	gap	M1-extended	unreached
-ppt	comment	add	gap	M1-extended	-
-ppt	comment	remove	gap	M1-extended	unreached
-ppt	comment	move	gap	M1-extended	unreached
-ppt	comment	swap	gap	M1-extended	unreached
-ppt	comment	edit	gap	M1-extended	-
-ppt	comment	batch	gap	M1-extended	-
-ppt	comment	create	gap	M1-extended	ok format
-ppt	comment	save	gap	M1-extended	ok format
-ppt	video	get	gap	M1-extended	unreached
-ppt	video	find	gap	M1-extended	unreached
-ppt	video	query	gap	M1-extended	unreached
-ppt	video	view	gap	M1-extended	unreached
-ppt	video	set	gap	M1-extended	unreached
-ppt	video	add	gap	M1-extended	-
-ppt	video	remove	gap	M1-extended	unreached
-ppt	video	move	gap	M1-extended	unreached
-ppt	video	swap	gap	M1-extended	unreached
-ppt	video	edit	gap	M1-extended	-
-ppt	video	batch	gap	M1-extended	-
-ppt	video	create	gap	M1-extended	ok format
-ppt	video	save	gap	M1-extended	ok format
-ppt	audio	get	gap	M1-extended	unreached
-ppt	audio	find	gap	M1-extended	unreached
-ppt	audio	query	gap	M1-extended	unreached
-ppt	audio	view	gap	M1-extended	unreached
-ppt	audio	set	gap	M1-extended	unreached
-ppt	audio	add	gap	M1-extended	-
-ppt	audio	remove	gap	M1-extended	unreached
-ppt	audio	move	gap	M1-extended	unreached
-ppt	audio	swap	gap	M1-extended	unreached
-ppt	audio	edit	gap	M1-extended	-
-ppt	audio	batch	gap	M1-extended	-
-ppt	audio	create	gap	M1-extended	ok format
-ppt	audio	save	gap	M1-extended	ok format
-ppt	media	get	gap	M1-extended	unreached
-ppt	media	find	gap	M1-extended	unreached
-ppt	media	query	gap	M1-extended	unreached
-ppt	media	view	gap	M1-extended	unreached
-ppt	media	set	gap	M1-extended	unreached
-ppt	media	add	gap	M1-extended	-
-ppt	media	remove	gap	M1-extended	unreached
-ppt	media	move	gap	M1-extended	unreached
-ppt	media	swap	gap	M1-extended	unreached
-ppt	media	edit	gap	M1-extended	-
-ppt	media	batch	gap	M1-extended	-
-ppt	media	create	gap	M1-extended	ok format
-ppt	media	save	gap	M1-extended	ok format
-ppt	equation	get	gap	M1-extended	unreached
-ppt	equation	find	gap	M1-extended	unreached
-ppt	equation	query	gap	M1-extended	unreached
-ppt	equation	view	gap	M1-extended	unreached
-ppt	equation	set	gap	M1-extended	unreached
-ppt	equation	add	gap	M1-extended	-
-ppt	equation	remove	gap	M1-extended	unreached
-ppt	equation	move	gap	M1-extended	unreached
-ppt	equation	swap	gap	M1-extended	unreached
-ppt	equation	edit	gap	M1-extended	-
-ppt	equation	batch	gap	M1-extended	-
-ppt	equation	create	gap	M1-extended	ok format
-ppt	equation	save	gap	M1-extended	ok format
-ppt	zoom	get	gap	M1-extended	unreached
-ppt	zoom	find	gap	M1-extended	unreached
-ppt	zoom	query	gap	M1-extended	unreached
-ppt	zoom	view	gap	M1-extended	unreached
-ppt	zoom	set	gap	M1-extended	unreached
-ppt	zoom	add	gap	M1-extended	-
-ppt	zoom	remove	gap	M1-extended	unreached
-ppt	zoom	move	gap	M1-extended	unreached
-ppt	zoom	swap	gap	M1-extended	unreached
-ppt	zoom	edit	gap	M1-extended	-
-ppt	zoom	batch	gap	M1-extended	-
-ppt	zoom	create	gap	M1-extended	ok format
-ppt	zoom	save	gap	M1-extended	ok format
-ppt	model3d	get	gap	M1-extended	unreached
-ppt	model3d	find	gap	M1-extended	unreached
-ppt	model3d	query	gap	M1-extended	unreached
-ppt	model3d	view	gap	M1-extended	unreached
-ppt	model3d	set	gap	M1-extended	unreached
-ppt	model3d	add	gap	M1-extended	-
-ppt	model3d	remove	gap	M1-extended	unreached
-ppt	model3d	move	gap	M1-extended	unreached
-ppt	model3d	swap	gap	M1-extended	unreached
-ppt	model3d	edit	gap	M1-extended	-
-ppt	model3d	batch	gap	M1-extended	-
-ppt	model3d	create	gap	M1-extended	ok format
-ppt	model3d	save	gap	M1-extended	ok format
+ppt	comment	get	supported		ok 6 instances, first `poi/test-data/slideshow/WithComments.ppt` /slide[1]/comment[1]
+ppt	comment	find	supported		ok 6 instances, first `poi/test-data/slideshow/WithComments.ppt` /slide[1]/comment[1]
+ppt	comment	query	supported		ok matches in poi/test-data/slideshow/WithComments.ppt
+ppt	comment	view	supported		ok 6 instances, first `poi/test-data/slideshow/WithComments.ppt` /slide[1]/comment[1]
+ppt	comment	set	supported		ok `unified-ops/0294/elements.ppt + add comment` /slide[1]/comment[1] {"text":"Litchi"}
+ppt	comment	add	supported		ok /slide[2]/comment[1] on `unified-ops/0294/elements.ppt` under /slide[2] {"author":"Ada","text":"Check"}
+ppt	comment	remove	supported		ok `unified-ops/0294/elements.ppt + add comment` /slide[1]/comment[1]
+ppt	comment	move	format-verb		refused unsupported_type
+ppt	comment	swap	format-verb		refused unsupported_type
+ppt	comment	edit	supported		ok tx.set
+ppt	comment	batch	supported		ok set item
+ppt	comment	create	supported		ok format
+ppt	comment	save	supported		ok format
+ppt	video	get	supported		unreached
+ppt	video	find	supported		unreached
+ppt	video	query	supported		unreached
+ppt	video	view	supported		unreached
+ppt	video	set	n/a	set not offered for this element	unreached
+ppt	video	add	n/a	add not offered for this element	-
+ppt	video	remove	n/a	remove not offered for this element	unreached
+ppt	video	move	format-verb		unreached
+ppt	video	swap	format-verb		unreached
+ppt	video	edit	n/a	edit not offered for this element	-
+ppt	video	batch	n/a	batch not offered for this element	-
+ppt	video	create	supported		ok format
+ppt	video	save	supported		ok format
+ppt	audio	get	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/audio[1]
+ppt	audio	find	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/audio[1]
+ppt	audio	query	supported		ok matches in poi/test-data/slideshow/sound.ppt
+ppt	audio	view	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/audio[1]
+ppt	audio	set	n/a	set not offered for this element	-
+ppt	audio	add	n/a	add not offered for this element	-
+ppt	audio	remove	n/a	remove not offered for this element	-
+ppt	audio	move	format-verb		unreached
+ppt	audio	swap	format-verb		unreached
+ppt	audio	edit	n/a	edit not offered for this element	-
+ppt	audio	batch	n/a	batch not offered for this element	-
+ppt	audio	create	supported		ok format
+ppt	audio	save	supported		ok format
+ppt	media	get	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
+ppt	media	find	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
+ppt	media	query	supported		ok matches in poi/test-data/slideshow/sound.ppt
+ppt	media	view	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
+ppt	media	set	n/a	set not offered for this element	-
+ppt	media	add	n/a	add not offered for this element	-
+ppt	media	remove	n/a	remove not offered for this element	-
+ppt	media	move	format-verb		unreached
+ppt	media	swap	format-verb		unreached
+ppt	media	edit	n/a	edit not offered for this element	-
+ppt	media	batch	n/a	batch not offered for this element	-
+ppt	media	create	supported		ok format
+ppt	media	save	supported		ok format
+ppt	equation	get	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	find	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	query	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	view	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	set	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	add	gap	0323-F6 PPT Equation Editor objects	-
+ppt	equation	remove	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	move	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	swap	gap	0323-F6 PPT Equation Editor objects	unreached
+ppt	equation	edit	gap	0323-F6 PPT Equation Editor objects	-
+ppt	equation	batch	gap	0323-F6 PPT Equation Editor objects	-
+ppt	equation	create	gap	0323-F6 PPT Equation Editor objects	ok format
+ppt	equation	save	gap	0323-F6 PPT Equation Editor objects	ok format
+ppt	zoom	get	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	find	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	query	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	view	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	set	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	add	gap	wontfix: PPTX-only (record 0323)	-
+ppt	zoom	remove	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	move	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	swap	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	zoom	edit	gap	wontfix: PPTX-only (record 0323)	-
+ppt	zoom	batch	gap	wontfix: PPTX-only (record 0323)	-
+ppt	zoom	create	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	zoom	save	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	model3d	get	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	find	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	query	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	view	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	set	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	add	gap	wontfix: PPTX-only (record 0323)	-
+ppt	model3d	remove	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	move	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	swap	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	model3d	edit	gap	wontfix: PPTX-only (record 0323)	-
+ppt	model3d	batch	gap	wontfix: PPTX-only (record 0323)	-
+ppt	model3d	create	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	model3d	save	gap	wontfix: PPTX-only (record 0323)	ok format
 ppt	slideMaster	get	gap	M1-extended	unreached
 ppt	slideMaster	find	gap	M1-extended	unreached
 ppt	slideMaster	query	gap	M1-extended	unreached
@@ -2534,110 +2534,110 @@ ppt	slideLayout	edit	gap	M1-extended	-
 ppt	slideLayout	batch	gap	M1-extended	-
 ppt	slideLayout	create	gap	M1-extended	ok format
 ppt	slideLayout	save	gap	M1-extended	ok format
-ppt	theme	get	gap	M1-extended	unreached
-ppt	theme	find	gap	M1-extended	unreached
-ppt	theme	query	gap	M1-extended	unreached
-ppt	theme	view	gap	M1-extended	unreached
-ppt	theme	set	gap	M1-extended	unreached
-ppt	theme	add	gap	M1-extended	-
-ppt	theme	remove	gap	M1-extended	unreached
-ppt	theme	move	gap	M1-extended	unreached
-ppt	theme	swap	gap	M1-extended	unreached
-ppt	theme	edit	gap	M1-extended	-
-ppt	theme	batch	gap	M1-extended	-
-ppt	theme	create	gap	M1-extended	ok format
-ppt	theme	save	gap	M1-extended	ok format
-ppt	modernComment	get	gap	M1-extended	unreached
-ppt	modernComment	find	gap	M1-extended	unreached
-ppt	modernComment	query	gap	M1-extended	unreached
-ppt	modernComment	view	gap	M1-extended	unreached
-ppt	modernComment	set	gap	M1-extended	unreached
-ppt	modernComment	add	gap	M1-extended	-
-ppt	modernComment	remove	gap	M1-extended	unreached
-ppt	modernComment	move	gap	M1-extended	unreached
-ppt	modernComment	swap	gap	M1-extended	unreached
-ppt	modernComment	edit	gap	M1-extended	-
-ppt	modernComment	batch	gap	M1-extended	-
-ppt	modernComment	create	gap	M1-extended	ok format
-ppt	modernComment	save	gap	M1-extended	ok format
-ppt	reply	get	gap	M1-extended	unreached
-ppt	reply	find	gap	M1-extended	unreached
-ppt	reply	query	gap	M1-extended	unreached
-ppt	reply	view	gap	M1-extended	unreached
-ppt	reply	set	gap	M1-extended	unreached
-ppt	reply	add	gap	M1-extended	-
-ppt	reply	remove	gap	M1-extended	unreached
-ppt	reply	move	gap	M1-extended	unreached
-ppt	reply	swap	gap	M1-extended	unreached
-ppt	reply	edit	gap	M1-extended	-
-ppt	reply	batch	gap	M1-extended	-
-ppt	reply	create	gap	M1-extended	ok format
-ppt	reply	save	gap	M1-extended	ok format
-ppt	hyperlink	get	gap	M1-extended	unreached
-ppt	hyperlink	find	gap	M1-extended	unreached
-ppt	hyperlink	query	gap	M1-extended	unreached
-ppt	hyperlink	view	gap	M1-extended	unreached
-ppt	hyperlink	set	gap	M1-extended	unreached
-ppt	hyperlink	add	gap	M1-extended	-
-ppt	hyperlink	remove	gap	M1-extended	unreached
-ppt	hyperlink	move	gap	M1-extended	unreached
-ppt	hyperlink	swap	gap	M1-extended	unreached
-ppt	hyperlink	edit	gap	M1-extended	-
-ppt	hyperlink	batch	gap	M1-extended	-
-ppt	hyperlink	create	gap	M1-extended	ok format
-ppt	hyperlink	save	gap	M1-extended	ok format
-ppt	animation	get	gap	M1-extended	unreached
-ppt	animation	find	gap	M1-extended	unreached
-ppt	animation	query	gap	M1-extended	unreached
-ppt	animation	view	gap	M1-extended	unreached
-ppt	animation	set	gap	M1-extended	unreached
-ppt	animation	add	gap	M1-extended	-
-ppt	animation	remove	gap	M1-extended	unreached
-ppt	animation	move	gap	M1-extended	unreached
-ppt	animation	swap	gap	M1-extended	unreached
-ppt	animation	edit	gap	M1-extended	-
-ppt	animation	batch	gap	M1-extended	-
-ppt	animation	create	gap	M1-extended	ok format
-ppt	animation	save	gap	M1-extended	ok format
-ppt	series	get	gap	M1-extended	unreached
-ppt	series	find	gap	M1-extended	unreached
-ppt	series	query	gap	M1-extended	unreached
-ppt	series	view	gap	M1-extended	unreached
-ppt	series	set	gap	M1-extended	unreached
-ppt	series	add	gap	M1-extended	-
-ppt	series	remove	gap	M1-extended	unreached
-ppt	series	move	gap	M1-extended	unreached
-ppt	series	swap	gap	M1-extended	unreached
-ppt	series	edit	gap	M1-extended	-
-ppt	series	batch	gap	M1-extended	-
-ppt	series	create	gap	M1-extended	ok format
-ppt	series	save	gap	M1-extended	ok format
-ppt	axis	get	gap	M1-extended	unreached
-ppt	axis	find	gap	M1-extended	unreached
-ppt	axis	query	gap	M1-extended	unreached
-ppt	axis	view	gap	M1-extended	unreached
-ppt	axis	set	gap	M1-extended	unreached
-ppt	axis	add	gap	M1-extended	-
-ppt	axis	remove	gap	M1-extended	unreached
-ppt	axis	move	gap	M1-extended	unreached
-ppt	axis	swap	gap	M1-extended	unreached
-ppt	axis	edit	gap	M1-extended	-
-ppt	axis	batch	gap	M1-extended	-
-ppt	axis	create	gap	M1-extended	ok format
-ppt	axis	save	gap	M1-extended	ok format
-ppt	col	get	gap	M1-extended	unreached
-ppt	col	find	gap	M1-extended	unreached
-ppt	col	query	gap	M1-extended	unreached
-ppt	col	view	gap	M1-extended	unreached
-ppt	col	set	gap	M1-extended	unreached
-ppt	col	add	gap	M1-extended	-
-ppt	col	remove	gap	M1-extended	unreached
-ppt	col	move	gap	M1-extended	unreached
-ppt	col	swap	gap	M1-extended	unreached
-ppt	col	edit	gap	M1-extended	-
-ppt	col	batch	gap	M1-extended	-
-ppt	col	create	gap	M1-extended	ok format
-ppt	col	save	gap	M1-extended	ok format
+ppt	theme	get	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
+ppt	theme	find	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
+ppt	theme	query	supported		ok matches in poi/test-data/slideshow/headers_footers_2007.ppt
+ppt	theme	view	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
+ppt	theme	set	n/a	set not offered for this element	-
+ppt	theme	add	n/a	add not offered for this element	-
+ppt	theme	remove	n/a	remove not offered for this element	-
+ppt	theme	move	format-verb		unreached
+ppt	theme	swap	format-verb		unreached
+ppt	theme	edit	n/a	edit not offered for this element	-
+ppt	theme	batch	n/a	batch not offered for this element	-
+ppt	theme	create	supported		ok format
+ppt	theme	save	supported		ok format
+ppt	modernComment	get	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	find	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	query	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	view	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	set	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	add	gap	wontfix: PPTX-only (record 0323)	-
+ppt	modernComment	remove	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	move	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	swap	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	modernComment	edit	gap	wontfix: PPTX-only (record 0323)	-
+ppt	modernComment	batch	gap	wontfix: PPTX-only (record 0323)	-
+ppt	modernComment	create	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	modernComment	save	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	reply	get	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	find	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	query	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	view	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	set	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	add	gap	wontfix: PPTX-only (record 0323)	-
+ppt	reply	remove	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	move	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	swap	gap	wontfix: PPTX-only (record 0323)	unreached
+ppt	reply	edit	gap	wontfix: PPTX-only (record 0323)	-
+ppt	reply	batch	gap	wontfix: PPTX-only (record 0323)	-
+ppt	reply	create	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	reply	save	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	hyperlink	get	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/shape[1]/hyperlink
+ppt	hyperlink	find	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/shape[1]/hyperlink
+ppt	hyperlink	query	supported		ok matches in unified-ops/0294/elements.ppt
+ppt	hyperlink	view	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/shape[1]/hyperlink
+ppt	hyperlink	set	supported		ok `unified-ops/0294/elements.ppt + add comment` /slide[1]/shape[1]/hyperlink {"link":"Litchi"}
+ppt	hyperlink	add	supported		ok /slide[1]/shape[1]/hyperlink on `unified-ops/0294/elements.ppt` under /slide[1]/shape[1] {"link":"https://example.test/added"}
+ppt	hyperlink	remove	supported		ok `unified-ops/0294/elements.ppt + add comment` /slide[1]/shape[1]/hyperlink
+ppt	hyperlink	move	format-verb		unreached
+ppt	hyperlink	swap	format-verb		unreached
+ppt	hyperlink	edit	supported		ok tx.set
+ppt	hyperlink	batch	supported		ok set item
+ppt	hyperlink	create	supported		ok format
+ppt	hyperlink	save	supported		ok format
+ppt	animation	get	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	find	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	query	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	view	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	set	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	add	gap	0323-F5 PPT animation nodes	-
+ppt	animation	remove	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	move	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	swap	gap	0323-F5 PPT animation nodes	unreached
+ppt	animation	edit	gap	0323-F5 PPT animation nodes	-
+ppt	animation	batch	gap	0323-F5 PPT animation nodes	-
+ppt	animation	create	gap	0323-F5 PPT animation nodes	ok format
+ppt	animation	save	gap	0323-F5 PPT animation nodes	ok format
+ppt	series	get	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	find	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	query	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	view	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	set	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	add	gap	0323-F7 PPT chart series and axes	-
+ppt	series	remove	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	move	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	swap	gap	0323-F7 PPT chart series and axes	unreached
+ppt	series	edit	gap	0323-F7 PPT chart series and axes	-
+ppt	series	batch	gap	0323-F7 PPT chart series and axes	-
+ppt	series	create	gap	0323-F7 PPT chart series and axes	ok format
+ppt	series	save	gap	0323-F7 PPT chart series and axes	ok format
+ppt	axis	get	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	find	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	query	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	view	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	set	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	add	gap	0323-F7 PPT chart series and axes	-
+ppt	axis	remove	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	move	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	swap	gap	0323-F7 PPT chart series and axes	unreached
+ppt	axis	edit	gap	0323-F7 PPT chart series and axes	-
+ppt	axis	batch	gap	0323-F7 PPT chart series and axes	-
+ppt	axis	create	gap	0323-F7 PPT chart series and axes	ok format
+ppt	axis	save	gap	0323-F7 PPT chart series and axes	ok format
+ppt	col	get	supported		ok 7 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/col[1]
+ppt	col	find	supported		ok 7 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/col[1]
+ppt	col	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
+ppt	col	view	supported		ok 7 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/col[1]
+ppt	col	set	n/a	set not offered for this element	-
+ppt	col	add	n/a	add not offered for this element	-
+ppt	col	remove	n/a	remove not offered for this element	-
+ppt	col	move	format-verb		refused unsupported_type
+ppt	col	swap	format-verb		refused unsupported_type
+ppt	col	edit	n/a	edit not offered for this element	-
+ppt	col	batch	n/a	batch not offered for this element	-
+ppt	col	create	supported		ok format
+ppt	col	save	supported		ok format
 ppt	noteSlide	get	gap	M1-extended	unreached
 ppt	noteSlide	find	gap	M1-extended	unreached
 ppt	noteSlide	query	gap	M1-extended	unreached

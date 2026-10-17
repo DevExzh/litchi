@@ -194,6 +194,13 @@ const SPECS: &[Spec] = &[
             "poi/test-data/slideshow/bug61881.ppt",
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/connectors.ppt",
+            // Record 0323: comments, shape and text hyperlinks, a table and a
+            // Graph chart (generated); the round-trip theme, an OLE workbook
+            // and a sound frame (Apache POI).
+            "unified-ops/0294/elements.ppt",
+            "poi/test-data/slideshow/headers_footers_2007.ppt",
+            "poi/test-data/slideshow/testPPT_oleWorkbook.ppt",
+            "poi/test-data/slideshow/sound.ppt",
         ],
     },
     Spec {
@@ -392,6 +399,23 @@ const MP4: &str = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t";
 const MP3: &str = "data:audio/mpeg;base64,SUQzAwAAAAAAAA==";
 
 const RECIPES: &[Recipe] = &[
+    // Record 0323: a PPT comment needs its author; a hyperlink its target.
+    Recipe {
+        format: "ppt",
+        element: "comment",
+        fixture: "unified-ops/0294/elements.ppt",
+        parent: "/slide[2]",
+        props: &[("author", "Ada"), ("text", "Check")],
+        start: false,
+    },
+    Recipe {
+        format: "ppt",
+        element: "hyperlink",
+        fixture: "unified-ops/0294/elements.ppt",
+        parent: "/slide[1]/shape[1]",
+        props: &[("link", "https://example.test/added")],
+        start: false,
+    },
     // Record 0297: a Numbers merged range needs an A1 `ref` of two cells or
     // more inside the table's grid.
     Recipe {
