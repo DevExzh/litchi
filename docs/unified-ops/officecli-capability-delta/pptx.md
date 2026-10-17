@@ -309,7 +309,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | connector | `rotation` | number |  | --g | litchi-only | — |  |  |  |
 | connector | `flipH` | bool |  | --g | litchi-only | — |  |  |  |
 | connector | `flipV` | bool |  | --g | litchi-only | — |  |  |  |
-| diagram | `mermaid` | string | a-- |  | supported | gap | P2 | out-of-scope (mermaid-diagram) | the node's text |
+| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `x` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `y` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
@@ -318,14 +318,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- | a-g | supported | supported |  |  |  |
+| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `background` | string | a-- |  | gap | gap | P2 | out-of-scope (mermaid-diagram) | M1-extended |
-| diagram | `layoutType` | string |  | --g | litchi-only | — |  |  |  |
-| diagram | `name` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| diagram | `hidden` | bool |  | asg | litchi-only | litchi-only |  |  |  |
-| diagram | `notes` | string |  | -s- | litchi-only | litchi-only |  |  |  |
-| diagram | `transition` | string |  | -s- | litchi-only | litchi-only |  |  |  |
+| diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | equation | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | equation | `formula` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | equation | `x` | length | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |

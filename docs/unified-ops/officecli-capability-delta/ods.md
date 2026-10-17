@@ -381,16 +381,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | namedrange | `scope` | string | asg | a-g | supported | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
 | namedrange | `comment` | string | asg |  | unlisted | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | namedrange | `volatile` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
-| ole | `anchor` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `shapeId` | number | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `contentType` | string | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `fileSize` | number | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `objectType` | string | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `preview` | string | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `progId` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `src` | string | as- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| ole | `anchor` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `shapeId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `contentType` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | pagebreak | `row` | int | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | pagebreak | `col` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | picture | `crop` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
@@ -431,45 +431,45 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `fileSize` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | picture | `relId` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | picture | `src` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `source` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `position` | string | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `name` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `style` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `rows` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `cols` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `filters` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `values` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `location` | string | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `style` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `rows` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `cols` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `filters` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `values` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `location` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | range | `merge` | bool | -sg | -sg | supported | supported |  |  |  |
 | range | `font.bold` | bool | -s- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | range | `fill` | color | -s- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
@@ -564,36 +564,36 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sheet | `sort` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | sheet | `rowBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
 | sheet | `colBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
-| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `field` | string | a-g |  | element gap | gap | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `caption` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `name` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `itemCount` | number | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| slicer | `cache` | string | --g |  | element gap | — | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
-| sparkline | `type` | enum | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `location` | string | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `color` | color | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `field` | string | a-g |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `caption` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `itemCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| slicer | `cache` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
+| sparkline | `type` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `location` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `color` | color | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
+| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | table | `ref` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | table | `displayName` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | table | `headerRow` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |

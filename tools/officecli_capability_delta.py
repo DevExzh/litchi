@@ -139,6 +139,15 @@ NODE_KEYS: dict[tuple[str, str], dict[str, str]] = {
     ("xlsx", "table"): {"showFirstColumn": "firstCol", "showLastColumn": "lastCol"},
 }
 
+# OfficeCLI elements whose aliases or path forms name a Litchi element that
+# is not the same thing: a DOCX `fieldChar`, `instrText` or `ptab` is a run
+# subtype, not a run; a PPTX `diagram` (a Mermaid rendering placed on a
+# slide, path `/slide[N]/...`) is not the slide.
+UNMATCHED: dict[str, set[str]] = {
+    "docx": {"fieldChar", "instrText", "ptab"},
+    "pptx": {"diagram"},
+}
+
 # OfficeCLI elements outside the unified read surface, with the reason.
 OUT_OF_SCOPE: dict[str, str] = {
     "raw": "the raw XML layer (`raw`/`raw-set` commands), not an element (design §3)",
@@ -844,7 +853,7 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
             reason = OUT_OF_SCOPE.get(schema.stem) or OUT_OF_SCOPE[schema.name]
             delta.elements.append((schema.name, "", "out of scope", reason))
             continue
-        if reference_format(fmt) == "docx" and schema.name in {"fieldChar", "instrText", "ptab"}:
+        if schema.name in UNMATCHED.get(reference_format(fmt), set()):
             target = None
         if target is None and schema.stem in folded:
             into, why = folded[schema.stem]

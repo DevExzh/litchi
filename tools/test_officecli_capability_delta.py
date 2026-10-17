@@ -296,6 +296,11 @@ class Comparison(unittest.TestCase):
                                report([element("run", {}, elementAliases=["r"])]))
         self.assertEqual(result.elements[0][2], "missing")
 
+    def test_a_mermaid_diagram_is_not_the_slide_it_sits_on(self) -> None:
+        result = delta.compare("pptx", [self.oc("diagram", {"mermaid": READ}, ["slide"])],
+                               report([element("slide", {"mermaid": READ})]))
+        self.assertEqual(result.elements[0][:3], ("diagram", "", "missing"))
+
     def test_pending_formats_still_exclude_raw_and_set_only_actions(self) -> None:
         result = delta.compare("xlsx", [self.oc("raw", {"xml": READ}), self.oc("sort", {})], report([], get=False))
         self.assertTrue(all(row[2] == "out of scope" for row in result.elements))

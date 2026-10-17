@@ -92,8 +92,8 @@ Elements:
 | xlsx | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
 | xls | 7 | 31 | 0 | 0 | 0 | 1 | 2 | 1 |
-| pptx | 30 | 3 | 0 | 0 | 0 | 0 | 1 | 9 |
-| ppt | 26 | 7 | 0 | 0 | 0 | 0 | 1 | 8 |
+| pptx | 29 | 3 | 0 | 0 | 0 | 1 | 1 | 9 |
+| ppt | 25 | 7 | 0 | 0 | 0 | 1 | 1 | 8 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
@@ -102,7 +102,7 @@ Elements:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
-| odp | 21 | 8 | 0 | 0 | 0 | 4 | 1 | 6 |
+| odp | 20 | 8 | 0 | 0 | 0 | 5 | 1 | 6 |
 | ods | 8 | 30 | 0 | 0 | 0 | 1 | 2 | 1 |
 | odt | 19 | 12 | 0 | 0 | 0 | 13 | 2 | 5 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
@@ -118,8 +118,8 @@ Property reads:
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 0 | 145 | 559 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 0 | 159 | 430 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 0 | 102 | 0 |
-| pptx | 230 | 20 | 30 | 0 | 120 | 0 | 0 | 287 | 274 |
-| ppt | 94 | 3 | 86 | 0 | 126 | 0 | 0 | 378 | 51 |
+| pptx | 228 | 19 | 30 | 0 | 123 | 0 | 0 | 287 | 269 |
+| ppt | 93 | 3 | 86 | 0 | 127 | 0 | 0 | 378 | 49 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -128,7 +128,7 @@ Property reads:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 97 | 2 | 80 | 0 | 118 | 0 | 0 | 390 | 92 |
+| odp | 95 | 2 | 80 | 0 | 120 | 0 | 0 | 390 | 88 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 0 | 127 | 6 |
 | odt | 63 | 0 | 199 | 0 | 168 | 1 | 0 | 530 | 45 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -144,8 +144,8 @@ Property writes:
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
-| pptx | 113 | 34 | 414 | 0 | 153 | 247 |
-| ppt | 6 | 23 | 532 | 0 | 16 | 161 |
+| pptx | 112 | 34 | 415 | 0 | 149 | 246 |
+| ppt | 6 | 23 | 532 | 0 | 15 | 160 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -154,7 +154,7 @@ Property writes:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 9 | 58 | 494 | 0 | 44 | 174 |
+| odp | 9 | 58 | 494 | 0 | 43 | 171 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
 | odt | 12 | 32 | 752 | 0 | 31 | 179 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -184,9 +184,9 @@ Element gap rows:
 | rtf | 1 | 18 | 1 | 0 | 4 | 0 |
 | xlsx | 2 | 2 | 4 | 0 | 0 | 0 |
 | xlsb | 1 | 3 | 4 | 0 | 0 | 0 |
-| xls | 34 | 0 | 0 | 0 | 0 | 0 |
-| pptx | 1 | 0 | 3 | 0 | 0 | 0 |
-| ppt | 1 | 4 | 3 | 0 | 0 | 0 |
+| xls | 30 | 0 | 4 | 0 | 0 | 0 |
+| pptx | 1 | 0 | 3 | 0 | 1 | 0 |
+| ppt | 1 | 4 | 3 | 0 | 1 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -195,8 +195,8 @@ Element gap rows:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 1 | 8 | 4 | 0 | 0 | 0 |
-| ods | 33 | 0 | 0 | 0 | 0 | 0 |
+| odp | 1 | 8 | 4 | 0 | 1 | 0 |
+| ods | 29 | 0 | 4 | 0 | 0 | 0 |
 | odt | 1 | 21 | 1 | 0 | 4 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -210,8 +210,8 @@ Property gap rows:
 | rtf | 0 | 885 | 35 | 0 | 19 | 0 |
 | xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
-| xls | 509 | 168 | 0 | 0 | 1 | 0 |
-| pptx | 55 | 438 | 57 | 0 | 11 | 0 |
+| xls | 430 | 168 | 79 | 0 | 1 | 0 |
+| pptx | 55 | 438 | 57 | 0 | 12 | 0 |
 | ppt | 0 | 608 | 58 | 0 | 12 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -222,7 +222,7 @@ Property gap rows:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 0 | 604 | 58 | 0 | 12 | 0 |
-| ods | 506 | 171 | 0 | 0 | 1 | 0 |
+| ods | 427 | 171 | 79 | 0 | 1 | 0 |
 | odt | 0 | 885 | 35 | 0 | 19 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -234,7 +234,7 @@ All gap rows by tier:
 | P0 | 89 | 0 | 0 | 0 | 4 | 0 |
 | v1 | 39 | 0 | 0 | 0 | 0 | 0 |
 | P1 | 975 | 5955 | 0 | 0 | 44 | 0 |
-| P2 | 166 | 0 | 494 | 0 | 83 | 0 |
+| P2 | 0 | 0 | 660 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
 properties share its entry unless an entry names the property):
@@ -247,8 +247,9 @@ properties share its entry unless an entry names the property):
 | odp-family | deferred | 0328 | 674 | `delta:odp:*` | ODP is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
 | ppt-family | deferred | 0323 | 673 | `delta:ppt:*` | PPT is outside the v1 boundary; record 0323 lists its element follow-ups |
 | xlsb-family | deferred | 0322 | 477 | `delta:xlsb:*` | XLSB is outside the v1 boundary; record 0322 lists its worksheet-feature follow-ups |
-| xls-parity | planned | WP10 | 542 | `delta:xls:*` | XLS element parity: the gap element families and their properties (audit WP10, record 0327) |
-| ods-parity | planned | WP11 | 538 | `delta:ods:*` | ODS element parity: the gap element families and their properties (audit WP11, record 0327) |
+| xls-parity | planned | WP10 | 459 | `delta:xls:*` | XLS element parity: the gap element families and their properties (audit WP10, record 0327) |
+| ods-parity | planned | WP11 | 455 | `delta:ods:*` | ODS element parity: the gap element families and their properties (audit WP11, record 0327) |
+| spreadsheet-p2-families | deferred | 0327 | 166 | `delta:xls:pivottable`, `delta:xls:slicer`, `delta:xls:sparkline`, `delta:xls:ole`, `delta:ods:pivottable`, `delta:ods:slicer`, `delta:ods:sparkline`, `delta:ods:ole` | §13 P2 families (pivot tables, slicers, sparklines, OLE) stay out of the XLS and ODS parity work packages |
 | xls-breadth | deferred | 0327 | 168 | `delta:xls:*.*` | XLS property breadth of supported elements; XLS is outside the v1 boundary |
 | ods-breadth | deferred | 0327 | 171 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
 | docx-breadth | deferred | 0332 | 575 | `delta:docx:*` | DOCX P1/P2 surface and formatting breadth beyond §13 P0 |
@@ -260,7 +261,7 @@ properties share its entry unless an entry names the property):
 | docx-p0-residue | planned | WP4 | 82 | `delta:docx:chart-axis`, `delta:docx:chart-series`, `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:comment.*`, `delta:docx:hyperlink.*`, `delta:docx:picture.*`, `delta:docx:table.style` | DOCX P0/v1 residue: chart series and axes, table columns, table and row writes, comment set, picture set/remove, style and list application |
 | pptx-p0-residue | planned | WP3 | 44 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:paragraph.text`, `delta:pptx:run.text`, `delta:pptx:picture.*`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text`, `delta:pptx:table.style` | PPTX P0/v1 residue: paragraph/run add and remove, comment remove, picture set, slide text and layout writes |
 | xlsx-p0-residue | planned | WP16 | 13 | `delta:xlsx:run`, `delta:xlsx:cell.value`, `delta:xlsx:cell.formula`, `delta:xlsx:cell.type`, `delta:xlsx:picture.src` | XLSX P0/v1 residue (WP16, proposed in record 0332): rich-text runs, `add` of a cell, the cell type, picture source replacement |
-| mermaid-diagram | out-of-scope |  | 79 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
+| mermaid-diagram | out-of-scope |  | 83 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
 | complex-field-parts | out-of-scope |  | 16 | `delta:*:fieldChar`, `delta:*:instrText` | Litchi models a complex field as one `field` node (field refresh, record 0279); its `fldChar`/`instrText` runs are raw markup (design §12) |
 | numbering-native-ids | out-of-scope |  | 20 | `delta:*:abstractNum.id`, `delta:*:abstractNum.abstractNumId`, `delta:*:num.id`, `delta:*:num.numId`, `delta:*:level.ilvl` | a numbering identifier is a native identity, addressed only by raw paths (ADR 0034, record 0319) |
 | metadata-root | planned | WP16 | 28 | `delta:docx:document.author`, `delta:docx:document.title`, `delta:docx:document.subject`, `delta:docx:document.keywords`, `delta:docx:document.description`, `delta:docx:document.lastModifiedBy`, `delta:xlsx:workbook.author`, `delta:xlsx:workbook.title`, `delta:xlsx:workbook.subject`, `delta:xlsx:workbook.keywords`, `delta:xlsx:workbook.description`, `delta:xlsx:workbook.category`, `delta:xlsx:workbook.lastModifiedBy`, `delta:xlsx:workbook.revisionNumber`, `delta:pptx:presentation.author`, `delta:pptx:presentation.title`, `delta:pptx:presentation.subject`, `delta:pptx:presentation.keywords`, `delta:pptx:presentation.description`, `delta:pptx:presentation.category`, `delta:pptx:presentation.lastModifiedBy`, `delta:pptx:presentation.revisionNumber`, `delta:xlsx:workbook.extended.company`, `delta:xlsx:workbook.extended.manager`, `delta:xlsx:workbook.extended.template`, `delta:pptx:presentation.extended.company`, `delta:pptx:presentation.extended.manager`, `delta:pptx:presentation.extended.template` | Litchi writes metadata through the `/metadata` node (records 0253, 0254) and reads it at the root; OfficeCLI writes it at the root (`set / title=...`), which the read-only root refuses. WP16 (proposed in record 0332) routes root-level metadata keys to `/metadata` |
@@ -738,10 +739,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | hyperlink | hyperlink | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | iconset | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | namedrange | namedrange | supported |  |  |  |
-| ole | ole | gap | P2 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| ole | ole | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | pagebreak | colbreak | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | picture | picture | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| pivottable | pivottable | gap | P2 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | range | range | supported |  |  |  |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | row | row | supported |  |  |  |
@@ -749,9 +750,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | run | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | shape | shape | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | sheet | sheet | supported |  |  |  |
-| slicer | slicer | gap | P2 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | sort |  | out of scope | P1 | planned WP10 (xls-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
-| sparkline | sparkline | gap | P2 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | table | table | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | topn | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | uniquevalues | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
@@ -797,7 +798,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | connector | connector | supported |  |  |  |
-| diagram | slide | supported |  |  |  |
+| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
 | equation | equation | supported |  |  |  |
 | group | group | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -835,7 +836,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | notesMaster | litchi-only |  |  | M1-extended |
 |  | node | litchi-only |  |  |  |
 
-Properties: 961 rows, 561 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
+Properties: 956 rows, 562 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
 
 ### Contextual operation gaps
 
@@ -871,7 +872,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | connector | connector | supported |  |  |  |
-| diagram | slide | supported |  |  |  |
+| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
 | equation | equation | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |
 | group | group | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -908,7 +909,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | noteSlide | litchi-only |  |  | M1-extended |
 |  | notesMaster | litchi-only |  |  | M1-extended |
 
-Properties: 738 rows, 678 of them gaps, in [`ppt.md`](officecli-capability-delta/ppt.md).
+Properties: 736 rows, 678 of them gaps, in [`ppt.md`](officecli-capability-delta/ppt.md).
 
 ### Contextual operation gaps
 
@@ -1173,7 +1174,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | connector | connector | supported |  |  |  |
-| diagram | slide | supported |  |  |  |
+| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
 | equation | equation | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP formula objects (litchi-odf-formula) |
 | group | group | supported |  |  |  |
 | hyperlink | hyperlink | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP hyperlink nodes |
@@ -1208,7 +1209,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | notesMaster | litchi-only |  |  | M6 ODP notes master |
 |  | noteSlide | litchi-only |  |  | M6 ODP notes pages |
 
-Properties: 779 rows, 674 of them gaps, in [`odp.md`](officecli-capability-delta/odp.md).
+Properties: 775 rows, 674 of them gaps, in [`odp.md`](officecli-capability-delta/odp.md).
 
 ### Contextual operation gaps
 
@@ -1255,10 +1256,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | hyperlink | hyperlink | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | iconset | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | namedrange | namedrange | supported |  |  |  |
-| ole | ole | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| ole | ole | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | pagebreak | colbreak | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | picture | picture | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pivottable | pivottable | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | range | range | supported |  |  |  |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | row | row | supported |  |  |  |
@@ -1266,9 +1267,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | run | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | shape | shape | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | sheet | sheet | supported |  |  |  |
-| slicer | slicer | gap | P2 | planned WP11 (ods-parity) | none: OpenDocument has no slicer element |
+| slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
 | sort |  | out of scope | P1 | planned WP11 (ods-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
-| sparkline | sparkline | gap | P2 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | table | table | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | topn | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | uniquevalues | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |

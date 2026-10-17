@@ -215,7 +215,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | connector | `alt` | string |  | --g | litchi-only | — |  |  |  |
 | connector | `shapeType` | string |  | --g | litchi-only | — |  |  |  |
 | connector | `length` | number |  | --g | litchi-only | — |  |  |  |
-| diagram | `mermaid` | string | a-- |  | supported | gap | P2 | out-of-scope (mermaid-diagram) | the node's text |
+| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `x` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `y` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
@@ -227,8 +227,6 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `slideNumber` | int |  | --g | litchi-only | — |  |  |  |
-| diagram | `hidden` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
 | equation | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |
 | equation | `formula` | string | asg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |
 | equation | `x` | length | asg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |

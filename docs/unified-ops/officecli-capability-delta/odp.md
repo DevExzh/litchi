@@ -215,7 +215,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | connector | `endIdx` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
 | connector | `zorder` | string | a-g | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | connector | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| diagram | `mermaid` | string | a-- |  | supported | gap | P2 | out-of-scope (mermaid-diagram) | the node's text |
+| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `x` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `y` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
@@ -224,13 +224,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- | --g | supported | gap | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `name` | string |  | -sg | litchi-only | litchi-only |  |  |  |
-| diagram | `slideNumber` | int |  | --g | litchi-only | — |  |  |  |
-| diagram | `title` | string |  | --g | litchi-only | — |  |  |  |
-| diagram | `master` | string |  | --g | litchi-only | — |  |  |  |
 | equation | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP formula objects (litchi-odf-formula) |
 | equation | `formula` | string | asg |  | element gap | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP formula objects (litchi-odf-formula) |
 | equation | `x` | length | asg |  | element gap | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP formula objects (litchi-odf-formula) |
