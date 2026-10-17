@@ -79,12 +79,12 @@ const EXTENT: Constraint = Constraint::Length {
     max: crate::value::Length::from_emu(22 * 914_400),
 };
 
-const fn entry(
+const fn entry<S: Copy>(
     spec: PropSpec,
-    access: Access<ChartSetter>,
+    access: Access<S>,
     constraint: Constraint,
     clear: bool,
-) -> Entry<ChartSetter> {
+) -> Entry<S> {
     Entry {
         spec,
         access,
@@ -240,6 +240,79 @@ pub(crate) const CHART_WRITE_TABLE: Table<ChartSetter, CHART_WRITE_COUNT, 4> = T
 /// is set.
 pub(crate) const CHART_PROPS: &[PropSpec] = &CHART_WRITE_TABLE.readable();
 
+#[derive(Clone, Copy)]
+pub(crate) enum SeriesSetter {
+    Name,
+    Values,
+    Color,
+}
+
+/// A chart series (`/body/p[N]/chart[M]/series[K]`, record 0335): the
+/// PPTX and XLSX series vocabulary.
+pub(crate) const SERIES_WRITE_TABLE: Table<SeriesSetter, 4, 0> = Table::new(
+    [
+        entry(
+            PropSpec::new("name", ValueType::Text),
+            Access::Set(SeriesSetter::Name),
+            Constraint::None,
+            false,
+        ),
+        entry(
+            PropSpec::new("values", ValueType::Text),
+            Access::Set(SeriesSetter::Values),
+            Constraint::NotEmpty,
+            false,
+        ),
+        Entry::read(PropSpec::new("categories", ValueType::Text)),
+        entry(
+            PropSpec::new("color", ValueType::Text),
+            Access::Set(SeriesSetter::Color),
+            Constraint::NotEmpty,
+            true,
+        ),
+    ],
+    [],
+);
+
+/// The series element's properties.
+pub(crate) const SERIES_PROPS: &[PropSpec] = &SERIES_WRITE_TABLE.readable();
+
+#[derive(Clone, Copy)]
+pub(crate) enum AxisSetter {
+    Title,
+    Min,
+    Max,
+}
+
+/// A chart axis (`/body/p[N]/chart[M]/axis[@role=ROLE]`, record 0335).
+pub(crate) const AXIS_WRITE_TABLE: Table<AxisSetter, 4, 0> = Table::new(
+    [
+        Entry::read(PropSpec::new("role", ValueType::Text)),
+        entry(
+            PropSpec::new("title", ValueType::Text),
+            Access::Set(AxisSetter::Title),
+            Constraint::None,
+            true,
+        ),
+        entry(
+            PropSpec::new("min", ValueType::Number),
+            Access::Set(AxisSetter::Min),
+            Constraint::None,
+            true,
+        ),
+        entry(
+            PropSpec::new("max", ValueType::Number),
+            Access::Set(AxisSetter::Max),
+            Constraint::None,
+            true,
+        ),
+    ],
+    [],
+);
+
+/// The axis element's properties.
+pub(crate) const AXIS_PROPS: &[PropSpec] = &AXIS_WRITE_TABLE.readable();
+
 /// One chart of a paragraph, as a node carries it.
 pub(crate) struct ChartValue {
     /// The paragraph's own node value and address, for its element path.
@@ -354,6 +427,134 @@ pub(super) fn pick_document_chart<'f>(
     )
 }
 
+/// The series and axes of a chart node, in the order PPTX and XLSX list
+/// them: the series, then the axes (record 0335).
+pub(super) fn chart_children(
+    docx: &Docx,
+    chart: &Arc<ChartValue>,
+    kinds: KindSet<Kind>,
+) -> Result<Vec<(Kind, Value, Step)>> {
+    let Some(summary) = chart.summary(docx)? else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    for (kind, count) in [
+        (Kind::Series, summary.series.len()),
+        (Kind::Axis, summary.axes.len()),
+    ] {
+        if !kinds.contains(kind) {
+            continue;
+        }
+        for index in 0..count {
+            let ordinal = u32::try_from(index).unwrap_or(u32::MAX);
+            out.push((
+                kind,
+                Value::ChartChild(Arc::clone(chart), ordinal),
+                Step::new(kind, ordinal),
+            ));
+        }
+    }
+    Ok(out)
+}
+
+/// The series (by position) or axis (by position or `@role`) a step picks
+/// under a chart.
+pub(super) fn pick_chart_child<'f>(
+    docx: &'f Docx,
+    parent: &Node<'f>,
+    chart: &Arc<ChartValue>,
+    kind: Kind,
+    select: &crate::path::navigate::Select<'_>,
+) -> Result<crate::path::navigate::Lookup<Node<'f>, crate::node::spec::GapSpec>> {
+    use crate::path::navigate::{Lookup, Select};
+    let Some(summary) = chart.summary(docx)? else {
+        return Ok(Lookup::Missing);
+    };
+    let count = if kind == Kind::Series {
+        summary.series.len()
+    } else {
+        summary.axes.len()
+    };
+    let index = match select {
+        Select::Ordinal(ordinal) => Some(ordinal.get()),
+        Select::None => Some(0),
+        Select::Last => count.checked_sub(1),
+        Select::Identity(identities) if kind == Kind::Axis => {
+            let mut found = None;
+            for (identity, value) in identities.iter() {
+                if !identity.key.eq_ignore_ascii_case("role") {
+                    return Ok(Lookup::NotApplicable);
+                }
+                found = Role::parse(value)
+                    .and_then(|role| summary.axes.iter().position(|axis| axis.role == role));
+            }
+            found
+        },
+        _ => return Ok(Lookup::NotApplicable),
+    };
+    Ok(match index.filter(|index| *index < count) {
+        Some(index) => {
+            let ordinal = u32::try_from(index).unwrap_or(u32::MAX);
+            Lookup::Found(Node::new(
+                docx,
+                kind,
+                Value::ChartChild(Arc::clone(chart), ordinal),
+                parent.child_address().with(Step::new(kind, ordinal)),
+            ))
+        },
+        None => Lookup::Missing,
+    })
+}
+
+/// The value of a series node's entry at `index` (`name`, `values`,
+/// `categories`, `color`).
+pub(super) fn series_value(
+    docx: &Docx,
+    chart: &ChartValue,
+    child: u32,
+    index: usize,
+) -> Option<NodeValue<'static>> {
+    let summary = chart.summary(docx).ok()??;
+    let series = summary.series.get(child as usize)?;
+    let text = |text: &str| NodeValue::Text(Cow::Owned(text.to_owned()));
+    match index {
+        0 => series.name.as_deref().map(text),
+        1 => Some(text(&shared::join_values(&series.values))),
+        2 => (!series.categories.is_empty()).then(|| text(&series.categories.join(","))),
+        3 => series.color.as_deref().map(text),
+        _ => None,
+    }
+}
+
+/// The value of an axis node's entry at `index` (`role`, `title`, `min`,
+/// `max`).
+pub(super) fn axis_value(
+    docx: &Docx,
+    chart: &ChartValue,
+    child: u32,
+    index: usize,
+) -> Option<NodeValue<'static>> {
+    let summary = chart.summary(docx).ok()??;
+    let axis = summary.axes.get(child as usize)?;
+    match index {
+        0 => Some(NodeValue::Text(Cow::Borrowed(axis.role.name()))),
+        1 => axis
+            .title
+            .as_deref()
+            .map(|title| NodeValue::Text(Cow::Owned(title.to_owned()))),
+        2 => axis.min.and_then(NodeValue::number),
+        3 => axis.max.and_then(NodeValue::number),
+        _ => None,
+    }
+}
+
+/// The number of a chart's series and axes.
+pub(super) fn child_count(docx: &Docx, chart: &ChartValue) -> Result<usize> {
+    Ok(chart
+        .summary(docx)?
+        .map_or(0, |summary| summary.series.len() + summary.axes.len()))
+}
+
 fn length(emu: i64) -> NodeValue<'static> {
     NodeValue::Length(crate::value::Length::from_emu(emu))
 }
@@ -401,6 +602,14 @@ pub(super) fn chart_value(
 fn text(value: Option<Scalar<'_>>) -> Option<String> {
     match value {
         Some(Scalar::Text(value) | Scalar::Token(value)) => Some(value.to_owned()),
+        _ => None,
+    }
+}
+
+fn number(value: Option<Scalar<'_>>) -> Option<f64> {
+    match value {
+        Some(Scalar::Number(number)) => Some(number),
+        Some(Scalar::Int(number)) => Some(number as f64),
         _ => None,
     }
 }
@@ -513,14 +722,24 @@ impl Docx {
         nodes: &[Node<'_>],
         props: &Props<'_>,
     ) -> Result<std::result::Result<Commit, DocxEditor>> {
-        if nodes.is_empty() || nodes.iter().any(|node| node.kind != Kind::Chart) {
+        if nodes.is_empty()
+            || nodes
+                .iter()
+                .any(|node| !matches!(node.kind, Kind::Chart | Kind::Series | Kind::Axis))
+        {
             return Ok(Err(editor));
         }
         if nodes.len() != 1 {
             return Err(error(
                 Code::UnsupportedCapability,
-                "a chart set targets one chart",
+                "a chart set targets one chart, series or axis",
             ));
+        }
+        if let Value::ChartChild(chart, child) = &nodes[0].value {
+            let edit = self.chart_child_edit(chart, nodes[0].kind, *child, props)?;
+            return self
+                .commit_chart_edit(editor, chart, edit, (None, None))
+                .map(Ok);
         }
         let Value::Chart(chart) = &nodes[0].value else {
             return Err(error(Code::InternalError, "the chart node holds no chart"));
@@ -587,6 +806,79 @@ impl Docx {
                 Ok(())
             })?;
         }
+        self.commit_chart_edit(editor, chart, edit, size).map(Ok)
+    }
+
+    /// The edit of a `set` on a chart's series or axis (record 0335).
+    fn chart_child_edit(
+        &self,
+        chart: &ChartValue,
+        kind: Kind,
+        child: u32,
+        props: &Props<'_>,
+    ) -> Result<ChartEdit> {
+        let summary = chart
+            .summary(self)?
+            .ok_or_else(|| error(Code::CorruptFile, "the chart names no chart part"))?;
+        let mut edit = ChartEdit::default();
+        for (key, value) in props.iter() {
+            if kind == Kind::Series {
+                let index = summary
+                    .series
+                    .get(child as usize)
+                    .map(|series| series.index)
+                    .ok_or_else(|| error(Code::PathNotFound, "the series is missing"))?;
+                let (_, entry) = SERIES_WRITE_TABLE
+                    .resolve(key.as_str())
+                    .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+                entry.prepare(Operation::Set, value, |setter, scalar| {
+                    match setter {
+                        SeriesSetter::Name => edit.series_names.push((index, text(scalar))),
+                        SeriesSetter::Values => edit.series_values.push((
+                            index,
+                            shared::parse_values(&text(scalar).unwrap_or_default(), "values")?,
+                        )),
+                        SeriesSetter::Color => edit.series_colors.push((
+                            index,
+                            text(scalar)
+                                .map(|color| shared::parse_color(&color, "color"))
+                                .transpose()?,
+                        )),
+                    }
+                    Ok(())
+                })?;
+            } else {
+                let axis = summary
+                    .axes
+                    .get(child as usize)
+                    .ok_or_else(|| error(Code::PathNotFound, "the axis is missing"))?;
+                let (_, entry) = AXIS_WRITE_TABLE
+                    .resolve(key.as_str())
+                    .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+                entry.prepare(Operation::Set, value, |setter, scalar| {
+                    match setter {
+                        AxisSetter::Title => edit.axis_titles.push((axis.id, text(scalar))),
+                        AxisSetter::Min | AxisSetter::Max => edit.axis_bound(
+                            axis,
+                            matches!(setter, AxisSetter::Max),
+                            number(scalar),
+                        )?,
+                    }
+                    Ok(())
+                })?;
+            }
+        }
+        Ok(edit)
+    }
+
+    /// Stage a chart edit and a frame resize, and commit them.
+    fn commit_chart_edit(
+        &self,
+        editor: DocxEditor,
+        chart: &ChartValue,
+        edit: ChartEdit,
+        size: (Option<i64>, Option<i64>),
+    ) -> Result<Commit> {
         let paragraph = element_path(&chart.paragraph_node(self))?;
         let ordinal = Position::new(chart.ordinal as usize);
         self.owner().check_source()?;
@@ -642,7 +934,7 @@ impl Docx {
                 .set_chart(id, edited.xml, workbook)
                 .map_err(Error::from)?;
         }
-        Ok(Ok(work.commit(self)?))
+        work.commit(self)
     }
 
     /// Remove charts selected by their paths.

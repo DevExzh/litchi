@@ -123,6 +123,12 @@ pub enum Kind {
     Tab,
     /// A SmartArt graphic, addressed document-wide (record 0295).
     SmartArt,
+    /// A series of a chart (record 0335).
+    Series,
+    /// An axis of a chart (record 0335).
+    Axis,
+    /// A content node of a SmartArt graphic (record 0335).
+    Node,
 }
 
 impl Kind {
@@ -264,6 +270,9 @@ names! {
     Break => "break",
     Tab => "tab",
     SmartArt => "smartart",
+    Series => "series",
+    Axis => "axis",
+    Node => "node",
 }
 
 // ---------------------------------------------------------------------------
@@ -790,29 +799,90 @@ crate::registry::registry! {
     }
 }
 
-// An inline picture of a paragraph (record 0251d): its extent, name,
-// alternative text and image relationship; `src` (a `data:` URI or a file
-// path) seeds a new one.
-crate::registry::registry! {
-    pub(crate) PICTURE_PROPS, PICTURE_REGISTRY: Setter {
-    read_add("width", ValueType::Length(LengthSpec::EXTENT), Setter::PictureWidth, Constraint::None),
-    read_add("height", ValueType::Length(LengthSpec::EXTENT), Setter::PictureHeight, Constraint::None),
-    read_add("alt", ValueType::Text, Setter::PictureAlt, Constraint::None),
-    read_add("name", ValueType::Text, Setter::PictureName, Constraint::NotEmpty),
-    crate::registry::Entry::read(PropSpec::new("relId", ValueType::Text)),
-    add_only("src", ValueType::Text, Setter::PictureSrc, Constraint::NotEmpty),
-    }
-}
+/// An inline picture of a paragraph (record 0251d): its extent, name,
+/// alternative text and image relationship; `src` (a `data:` URI or a file
+/// path) seeds a new one. Each but `relId` is also set (record 0335); a
+/// `src` set replaces the image. Aliases follow OfficeCLI's picture schema.
+pub(crate) const PICTURE_REGISTRY: crate::registry::Table<Setter, 6, 5> =
+    crate::registry::Table::new(
+        [
+            writable(
+                "width",
+                ValueType::Length(LengthSpec::EXTENT),
+                Setter::PictureWidth,
+                Constraint::None,
+                false,
+            ),
+            writable(
+                "height",
+                ValueType::Length(LengthSpec::EXTENT),
+                Setter::PictureHeight,
+                Constraint::None,
+                false,
+            ),
+            writable(
+                "alt",
+                ValueType::Text,
+                Setter::PictureAlt,
+                Constraint::None,
+                false,
+            ),
+            writable(
+                "name",
+                ValueType::Text,
+                Setter::PictureName,
+                Constraint::NotEmpty,
+                false,
+            ),
+            crate::registry::Entry::read(PropSpec::new("relId", ValueType::Text)),
+            {
+                let mut spec = PropSpec::new("src", ValueType::Text);
+                spec.access.get = false;
+                crate::registry::Entry {
+                    spec,
+                    access: crate::registry::Access::SetAndAdd(Setter::PictureSrc),
+                    constraint: Constraint::NotEmpty,
+                    clear: false,
+                }
+            },
+        ],
+        [
+            crate::registry::Alias {
+                name: "w",
+                entry: 0,
+            },
+            crate::registry::Alias {
+                name: "h",
+                entry: 1,
+            },
+            crate::registry::Alias {
+                name: "altText",
+                entry: 2,
+            },
+            crate::registry::Alias {
+                name: "description",
+                entry: 2,
+            },
+            crate::registry::Alias {
+                name: "path",
+                entry: 5,
+            },
+        ],
+    );
+
+/// The picture element's properties.
+pub(crate) const PICTURE_PROPS: &[PropSpec] = &PICTURE_REGISTRY.readable();
 
 // A comment of the comments part (record 0251c): its identity, author and
-// text; `text` and the author's details seed a new comment.
+// text; `text` and the author's details seed a new comment and are set
+// (record 0335).
 crate::registry::registry! {
     pub(crate) COMMENT_PROPS, COMMENT_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("id", ValueType::Int)),
-    read_add("author", ValueType::Text, Setter::CommentAuthor, Constraint::NotEmpty),
-    read_add("initials", ValueType::Text, Setter::CommentInitials, Constraint::NotEmpty),
-    read_add("date", ValueType::Text, Setter::CommentDate, Constraint::NotEmpty),
-    read_add("text", ValueType::Text, Setter::CommentText, Constraint::None),
+    writable("author", ValueType::Text, Setter::CommentAuthor, Constraint::NotEmpty, false),
+    writable("initials", ValueType::Text, Setter::CommentInitials, Constraint::NotEmpty, false),
+    writable("date", ValueType::Text, Setter::CommentDate, Constraint::NotEmpty, false),
+    writable("text", ValueType::Text, Setter::CommentText, Constraint::None, false),
     }
 }
 
@@ -994,7 +1064,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     "paragraph",
                     &["p", "paragraph"],
                     CONTAINERS,
-                    &[K::Run, K::Hyperlink, K::Chart, K::Tab, K::Break],
+                    &[K::Run, K::Hyperlink, K::Picture, K::Chart, K::Tab, K::Break],
                     &[
                         "/body/p[N]",
                         "/body/p[@paraId=X]",
@@ -1301,7 +1371,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "chart",
                 &["chart"],
                 &[K::Paragraph, K::Document],
-                &[],
+                &[K::Series, K::Axis],
                 &["/body/p[N]/chart[M]", "/chart[N]", "/body/chart[N]"],
                 super::chart::CHART_PROPS,
             ),
@@ -1379,12 +1449,61 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "smartart",
                 &["smartart"],
                 &[K::Document],
-                &[],
+                &[K::Node],
                 &["/smartart[N]", "/body/smartart[N]"],
                 super::smartart::SMARTART_PROPS,
             ),
+            element(
+                K::Series,
+                "series",
+                &["series"],
+                &[K::Chart],
+                &[],
+                &["/body/p[N]/chart[M]/series[K]", "/chart[N]/series[K]"],
+                super::chart::SERIES_PROPS,
+            ),
+            element(
+                K::Axis,
+                "axis",
+                &["axis"],
+                &[K::Chart],
+                &[],
+                &[
+                    "/body/p[N]/chart[M]/axis[@role=ROLE]",
+                    "/body/p[N]/chart[M]/axis[N]",
+                    "/chart[N]/axis[@role=ROLE]",
+                ],
+                super::chart::AXIS_PROPS,
+            ),
+            element(
+                K::Node,
+                "node",
+                &["node"],
+                &[K::SmartArt, K::Node],
+                &[K::Node],
+                &["/smartart[N]/node[K]", "/smartart[N]/node[K]/node[J]"],
+                super::smartart::NODE_PROPS,
+            ),
         ],
         gaps: &[
+            GapSpec {
+                subject: Subject::Property {
+                    element: "comment",
+                    key: "parentId",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "0335-F2",
+                reason: "comment replies (the commentsExtended parent link) are not read or authored; an add or set naming parentId is refused",
+            },
+            GapSpec {
+                subject: Subject::Property {
+                    element: "comment",
+                    key: "done",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "0335-F2",
+                reason: "comment resolution (commentsExtended w15:done) is not read or authored; an add or set naming done is refused",
+            },
             GapSpec {
                 subject: Subject::Property {
                     element: "sdt",

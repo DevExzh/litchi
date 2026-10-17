@@ -9,6 +9,8 @@
 //! | a table | rows |
 //! | a row | cells |
 //! | a paragraph | its addressable runs, then its direct hyperlinks, then its inline pictures, then its charts |
+//! | a chart | its series, then its axes (record 0335) |
+//! | a SmartArt graphic or node | its child nodes (record 0335) |
 //!
 //! The iterator owns what it reads (shared leaf values, an index cursor), so
 //! it borrows neither the adapter nor the parent node, and a walk that
@@ -102,6 +104,9 @@ enum Source {
         next: u32,
         charts: Option<Box<Charted>>,
     },
+    /// Children read in one go: a chart's series and axes, a graphic's
+    /// nodes (record 0335).
+    Built(vec::IntoIter<(Kind, Value, Step)>),
     /// A paragraph's charts, read when the first is needed.
     ChartList(Box<Charted>),
     Charts {
@@ -161,6 +166,18 @@ impl<'f> Children<'f> {
             Value::Row(row) if kinds.contains(Kind::Cell) => Source::Cells {
                 cells: row.cells()?.into_vec().into_iter(),
                 next: 0,
+            },
+            Value::Chart(chart) if kinds.contains(Kind::Series) || kinds.contains(Kind::Axis) => {
+                Source::Built(super::chart::chart_children(parent.docx, chart, kinds)?.into_iter())
+            },
+            Value::SmartArt(_) | Value::DiagramNode(_) if kinds.contains(Kind::Node) => {
+                Source::Built(
+                    super::smartart::node_children(parent.docx, parent)?
+                        .into_iter()
+                        .map(|(value, step)| (Kind::Node, value, step))
+                        .collect::<Vec<_>>()
+                        .into_iter(),
+                )
             },
             Value::Paragraph { paragraph, .. } => {
                 let rest = Rest {
@@ -274,6 +291,15 @@ impl<'f> Children<'f> {
                             return Some(Err(error));
                         },
                     }
+                },
+                Source::Built(items) => {
+                    let (kind, value, step) = items.next()?;
+                    return Some(Ok(Node::new(
+                        self.docx,
+                        kind,
+                        value,
+                        self.address.with(step),
+                    )));
                 },
                 Source::SmartArts { diagrams, next } => {
                     let diagram = diagrams.next()?;

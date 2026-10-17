@@ -269,6 +269,11 @@ fn with_smartart() -> (Package, String) {
 #[test]
 fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
     let (mut base, id) = with_smartart();
+    // The inventory reads the drawing's extent (the insertion default).
+    assert_eq!(
+        base.smart_arts().unwrap()[0].extent,
+        Some((5_760_000, 3_240_000))
+    );
     let mut edit = base.edit().unwrap();
     let parts = edit.smartart_parts(&id).unwrap().unwrap();
     assert!(parts.drawing.is_some());
