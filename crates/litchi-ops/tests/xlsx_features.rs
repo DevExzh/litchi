@@ -694,3 +694,63 @@ fn a_new_cell_link_replaces_the_hyperlink_and_none_is_a_no_op_without_one() {
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedProperty);
 }
+
+#[test]
+fn auto_filter_column_criteria() {
+    use litchi_xlsx::auto_filter::{Operator, Payload};
+    let file = workbook()
+        .add(
+            "/Sheet1",
+            NewNode::new("autofilter")
+                .prop("range", "A1:D20")
+                .prop("criteria0.equals", "Red")
+                .prop("criteria1.between", "10,20")
+                .prop("criteria2.top", "5")
+                .prop("criteria3.values", "a, b"),
+        )
+        .unwrap()
+        .file;
+    let package = litchi_xlsx::Package::from_bytes(&file.to_bytes().unwrap()).unwrap();
+    let filter = package
+        .workbook()
+        .sheet(0)
+        .unwrap()
+        .unwrap()
+        .auto_filter()
+        .unwrap()
+        .unwrap();
+    let columns = filter.columns();
+    assert_eq!(columns.len(), 4);
+    match columns[0].payload() {
+        Some(Payload::Custom(customs)) => {
+            assert_eq!(customs.filters()[0].operator(), Operator::Equal);
+            assert_eq!(customs.filters()[0].value(), "Red");
+        },
+        other => panic!("{other:?}"),
+    }
+    match columns[1].payload() {
+        Some(Payload::Custom(customs)) => {
+            assert!(customs.and());
+            assert_eq!(customs.filters().len(), 2);
+        },
+        other => panic!("{other:?}"),
+    }
+    assert!(matches!(columns[2].payload(), Some(Payload::Top10(_))));
+    match columns[3].payload() {
+        Some(Payload::Values(values)) => assert_eq!(values.items().len(), 2),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(
+        prop(&file, "/Sheet1/autofilter", "range").as_deref(),
+        Some("A1:D20")
+    );
+    let error = workbook()
+        .add(
+            "/Sheet1",
+            NewNode::new("autofilter")
+                .prop("range", "A1:B2")
+                .prop("criteria0.near", "x"),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), Code::InvalidValue);
+}

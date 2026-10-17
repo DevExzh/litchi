@@ -7,6 +7,7 @@
 //! or package abstractions.
 
 mod codec;
+pub mod edit;
 mod model;
 
 /// Modern threaded comments and workbook persons.  This namespace is kept

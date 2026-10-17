@@ -6,6 +6,7 @@
 pub(crate) mod cache;
 pub(crate) mod catalog;
 mod codec;
+mod features;
 mod model;
 mod package;
 mod source;

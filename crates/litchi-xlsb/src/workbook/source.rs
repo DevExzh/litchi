@@ -134,6 +134,7 @@ struct MaterializationInputs {
 }
 
 mod cursor;
+mod features;
 pub use cursor::CellCursor;
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.

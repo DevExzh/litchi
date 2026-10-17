@@ -74,7 +74,10 @@ pub(crate) fn maintain(
     Ok(())
 }
 
-fn find_index_target(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<PackURI>> {
+pub(crate) fn find_index_target(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+) -> Result<Option<PackURI>> {
     let worksheet_part = package.get_part(worksheet)?;
     let mut matches = worksheet_part
         .rels()

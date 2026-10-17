@@ -53,6 +53,9 @@ pub(crate) enum Patch {
     /// A document-metadata patch with its canonical package images (record
     /// 0253).
     Metadata(Box<super::metadata::Images>),
+    /// A worksheet-feature patch with its canonical package images (record
+    /// 0322).
+    Feature(Box<super::feature_write::Images>),
 }
 
 impl Patch {
@@ -64,6 +67,7 @@ impl Patch {
                 .expect("cell patch invariant: at least one worksheet")
                 .before(),
             Self::Metadata(images) => images.before(),
+            Self::Feature(images) => images.before(),
         }
     }
 
@@ -75,6 +79,7 @@ impl Patch {
                 .expect("cell patch invariant: at least one worksheet")
                 .after(),
             Self::Metadata(images) => images.after(),
+            Self::Feature(images) => images.after(),
         }
     }
 
@@ -84,6 +89,7 @@ impl Patch {
     pub(crate) fn snapshot_bytes(&self) -> usize {
         match self {
             Self::Metadata(images) => images.retained_bytes(),
+            Self::Feature(images) => images.retained_bytes(),
             Self::Structure { patch, .. } => {
                 patch.before().len().saturating_add(patch.after().len())
             },
@@ -101,6 +107,7 @@ impl Patch {
     pub(crate) fn retained_bytes(&self) -> usize {
         match self {
             Self::Metadata(images) => images.retained_bytes(),
+            Self::Feature(images) => images.retained_bytes(),
             Self::Structure { retained_bytes, .. } => *retained_bytes,
             Self::Cells(patches) => patches
                 .iter()
@@ -113,6 +120,7 @@ impl Patch {
     pub(crate) fn is_noop(&self) -> bool {
         match self {
             Self::Metadata(images) => images.patch.is_noop(),
+            Self::Feature(images) => images.is_noop(),
             _ => self.before() == self.after(),
         }
     }
@@ -120,6 +128,7 @@ impl Patch {
     pub(crate) fn operation_count(&self) -> usize {
         match self {
             Self::Metadata(images) => images.patch.changes().len(),
+            Self::Feature(images) => images.operation_count(),
             Self::Structure { patch, .. } => patch.operation_count(),
             Self::Cells(patches) => patches.iter().fold(0usize, |count, patch| {
                 count.saturating_add(patch.changes().len())
@@ -145,6 +154,14 @@ impl Commit {
         Self {
             after,
             patch: Patch::Metadata(Box::new(images)),
+        }
+    }
+
+    /// Adapt a worksheet-feature commit (record 0322).
+    pub(super) fn from_feature(after: Xlsb, images: super::feature_write::Images) -> Self {
+        Self {
+            after,
+            patch: Patch::Feature(Box::new(images)),
         }
     }
 
@@ -283,6 +300,9 @@ pub(crate) fn set_with_limits<'p, 'v>(
     if let Some(commit) = file.try_set_metadata(&target, &props)? {
         return Ok(commit);
     }
+    if let Some(commit) = file.try_set_feature(&target, &props)? {
+        return Ok(commit);
+    }
     if let Some(commit) = super::merge_write::set_merges_with_limits(file, &target, &props, limits)?
     {
         return Ok(commit);
@@ -310,6 +330,11 @@ pub(crate) fn add_with_limits<'p, 'n>(
 ) -> Result<(Commit, Path<'static>)> {
     file.admit_edit()?;
     let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
+    if matches!(parent.element(), Kind::Sheet | Kind::Cell | Kind::Range)
+        && let Some((kind, implied)) = super::feature_write::feature_kind(node.kind(), node.props())
+    {
+        return file.add_feature(&parent, kind, implied, &node);
+    }
     if parent.element() != Kind::Workbook {
         return Err(Error::new(
             Code::UnsupportedType,
@@ -453,6 +478,9 @@ pub(crate) fn remove_with_limits(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     file.admit_edit()?;
+    if let Some(commit) = file.try_remove_feature(&target)? {
+        return Ok(commit);
+    }
     if let Some(commit) = super::name_write::try_remove_named_range(file, &target, limits)? {
         return Ok(commit);
     }

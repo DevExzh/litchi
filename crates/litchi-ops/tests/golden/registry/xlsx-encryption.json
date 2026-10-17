@@ -4002,14 +4002,9 @@
         },
         "criteria0": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
-          "get": false,
-          "writeGap": {
-            "code": "unsupported_property",
-            "followUp": "record 0320 follow-up: auto-filter criteria",
-            "reason": "auto-filter column criteria (`criteriaN.op`) are not authored yet; the filter range is"
-          }
+          "get": false
         }
       },
       "predicates": {

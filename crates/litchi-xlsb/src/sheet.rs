@@ -23,9 +23,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Checked sparse worksheet reads over the zero-based XLSB grid.
+pub(crate) mod features;
 pub mod read;
 mod weight;
 
+pub use features::{FeatureSet, Features};
 pub use read::Cells;
 
 // Sheet metadata is shared by eager and source-backed workbook views.  Keep

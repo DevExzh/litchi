@@ -13,6 +13,15 @@
 //!   of a chart, its series and its axes print;
 //! - [`ChartEdit`], the admitted values of a chart, series or axis `set`,
 //!   applied through the source-preserving chart editor.
+//!
+//! XLSB (record 0322) reads worksheet charts through [`Summary`] only.
+#![cfg_attr(
+    not(any(feature = "pptx", feature = "xlsx", feature = "docx")),
+    allow(
+        dead_code,
+        reason = "XLSB reads charts; chart authoring serves the XML hosts"
+    )
+)]
 
 use litchi_drawingml::chart::authoring::{
     Appearance, Bins, Grouping, Kind, Labels, Line, ParentLabels, QuartileMethod, Series, Spec,
