@@ -2422,6 +2422,51 @@
    "record": "0311",
    "series": "office_gaps:doc_text_set",
    "explanation": "Record 0311 §4.2: 'Unified against the Package::edit leaf it wraps: 1.03–1.04×, inside the single-op budget. The body-text leaf's commit publishes only the next body snapshot. The package commit also parses the published file into the Document the returned package reads … This parse is the commit's validation of the output, so skipping it would weaken the commit. The wall-time gap is larger than the instruction gap because of L1i misses: 12.4 K against 10.8 K per call, from the second parser's code.'"
+  },
+  {
+   "record": "0315",
+   "series": "query(\\[all-formats\\])?:(xlsx|pptx|xlsb)_[a-z0-9]+_(bytes|file)_all_(cell|shape)(_value_gt|_contains|_width)?",
+   "explanation": "Record 0315 §2 G4 (benchmark comparison, inherent): the leaf leg is a borrowed loop that returns nothing retainable and checks nothing; the unified query builds an owned node per match and, on a file, checks the source per match (owner decision 2026-10-14). The walker fast step (§3.1) cut XLSX bytes full queries 5–10 % (callgrind −8.5 % cell, −13.6 % cell[value>1000]); PPTX rows also carry trunk records 0319–0321 (§4.2: base→trunk +15–35 %, trunk→after within noise). Fair pairs: G5 rows."
+  },
+  {
+   "record": "0315",
+   "series": "query(\\[all-formats\\])?:(xlsx|pptx|xlsb)_[a-z0-9]+_(bytes|file)_all_(cell|shape)_(owned|fenced)",
+   "explanation": "Record 0315 §2 G5: against the fair leaves (owned handle per match; fenced adds the per-match check) the residual is the adapter's node construction (XLSX ≈ 90, PPTX more, per match), the per-match source check (≈ 63 instructions on bytes, one fstat on a file) and moves of the 168–184-byte node; the walker's own share fell 13 % (§3.1). New XLSB fair legs (§3.5): bytes owned 4.8×, fenced 2.4×; file fenced meets (0.65, the leaf's source_version reads the source twice). Follow-up: smaller nodes in the XLSX/PPTX adapters (owned elsewhere)."
+  },
+  {
+   "record": "0315",
+   "series": "query:xlsx_50000_(bytes|file)_all_row_header_gt",
+   "explanation": "Record 0315 §2 G2 residual (header-row walk, general step, unchanged code): 1.38–1.97 against a leaf leg that itself varies 4.7–5.8 ms; record 0310 §3.2 explanation stands."
+  },
+  {
+   "record": "0315",
+   "series": "query:docx_.*_all_run_bold",
+   "explanation": "Record 0315 §3.2 G7: Children::next and DocxOwner::finish now share the step's check inside fenced steps (saut file 26.6 → 21.2 µs, drawing file 4.85 → 4.33 ms); the bytes residual (1.17–1.20 on saut_page, 0 matches over 17 µs) is the walk and run-property parse of a document with no match: fixed per-query work the leaf loop does not do (plan start, body index, per-run property read through the node view)."
+  },
+  {
+   "record": "0315",
+   "series": "ods_bench:query.*",
+   "explanation": "Record 0315 §2 G6: query_warm 318 → 252 µs (−21 %; callgrind −9.3 %) from the walker fast step. Against the borrowed leaf loop (≈ 1.5 ns per cell) the ratio stays 17–21× (inherent); against the new fair leaf leg query_warm_owned (owned handle and text per cell instance, §3.5) it is 2.42–2.51×: the residual is the node construction and the walk step per cell."
+  },
+  {
+   "record": "0315",
+   "series": "odt_paired:query_all.*",
+   "explanation": "Record 0315 §2 G6: 2.5–2.9× (0310: 3.3–3.7×) after the walker fast step; about 45 % of the unified cost is the leaf's Node::text, which both legs pay; the rest is the adapter's child step and node moves (ODT adapter, owned elsewhere)."
+  },
+  {
+   "record": "0315",
+   "series": "xls_read:(get|scan):(eager|positional):\\d+",
+   "explanation": "Record 0315 §3.3 G8: the per-handle sheet-step cache cut an eager get + text from 7.14 K to 5.24 K instructions (positional 15.8 K → 13.9 K); ratios eager 2.6–3.5 → 2.1–2.8, positional 1.40–1.67 → 1.33–1.57. The rest: the cell parse, path admission and the root/sheet/cell steps of the resolver, View::text's number formatting, and on the positional owner the per-call checks (owner decision). Scans: the walker step and the per-match checks."
+  },
+  {
+   "record": "0315",
+   "series": "rtf_destination:.*:1:fanout(_plan|_ref)?",
+   "explanation": "Record 0315 §2 G9: no RTF code changed; fan-out 1.09–1.26 as in 0310 (per-call plan, walk and transaction costs one target cannot amortize)."
+  },
+  {
+   "record": "0315",
+   "series": "rtf_tiny:.*",
+   "explanation": "Record 0315 §3.4 G9: the new typed-props routes pass lengths as typed Length values and read slower (layout path 1.17–1.18 vs 1.12; paragraph layout 1.29–1.30 vs 1.23), because PropValue::coerce renders a typed Length to text and parses it again (props.rs, not owned here). Follow-up: a typed Length coercion path in props/value that keeps each context's validation. Text routes unchanged within noise (no RTF code changed)."
   }
  ]
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0313 (`docs/unified-ops/02[4-9]*.md`, `03[01]*.md`)
+operations records 0249-0315 (`docs/unified-ops/02[4-9]*.md`, `03[01]*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -39,9 +39,9 @@ Conventions:
 * Before/after-build records (0250, 0263, 0268, 0289, 0290, 0293) compare
   builds, not unified with leaf: comparison "after/before", budget 1.05.
 
-Records 0285-0313 (record 0294 extended the tool to 0302; record 0306
+Records 0285-0315 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
-0305, 0309, 0310, 0311, 0312 and 0313 parsers) are collected
+0305, 0309, 0310, 0311, 0312 and 0313 parsers; record 0315 its own) are collected
 only when their record file is on this tree; the Markdown lists every
 record of that range, absent ones as "not on this tree", so the tool can
 be rerun unchanged after later merges.
@@ -982,7 +982,7 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 313)
+FOLLOW_RANGE = (285, 315)
 
 
 def record_file(record: str):
@@ -1596,6 +1596,9 @@ def rtf_tiny_runs(record, harness, paths):
             n = int(kv["paragraphs"])
             if kv["route"] == "last_path":
                 op, scen, budget = "set", "paragraph layout set, path", SINGLE
+            elif kv["route"] == "last_path_typed":
+                # Record 0315's typed-props route: the lengths as typed values.
+                op, scen, budget = "set", "paragraph layout set, path, typed lengths", SINGLE
             else:
                 op, scen = "set (query fan-out)", "paragraph layout set, query over all paragraphs"
                 budget = SINGLE if n == 1 else BATCH
@@ -1712,13 +1715,38 @@ def p0310():
     return out
 
 
+@needs("0315")
+def p0315():
+    """Record 0315: the after legs of its B A A B run (`abba/`, base 30eed270b5
+    with the record's new routes against the record's tree): the query
+    harness in both builds, xls_read_bench, the ODS and ODT queries, and the
+    RTF single-target harnesses (one target or one paragraph; no RTF code
+    changed, so only the single-target rows of G9 are taken). The base legs
+    are evidence for the record's before/after tables, not rows."""
+    base = RES / "0315" / "abba"
+    out = query_routes("0315", trials(base.glob("query-after-[0-9].jsonl")))
+    out += query_routes("0315", trials(base.glob("query-all-after-[0-9].jsonl")),
+                        build="all-formats")
+    out += xls_read("0315", trials(base.glob("xls_read-after-*.json")))
+    out += ods_rows("0315", trials(base.glob("ods-after-*.json")))
+    out += [r for r in odt_text("0315", trials(base.glob("odt-after-*.txt")))
+            if r["series"].startswith("odt_paired:query_all")]
+    out += [r for r in rtf_destination("0315", trials(base.glob("rtf_destination-after-*.json")))
+            if r["size"] == "1 targets"]
+    for harness in ("unified-rtf-layout", "unified-rtf-batch-set"):
+        out += [r for r in rtf_tiny_runs("0315", harness,
+                                         trials(base.glob(f"{harness}-after-[0-9].json")))
+                if r["size"] in ("1 paragraphs", "1 targets")]
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
            p0306, p0309, p0310, p0311, p0312,
-           p0313]
+           p0313, p0315]
 
 
 # ---------------------------------------------------------------- merge
@@ -1901,7 +1929,7 @@ def to_md(rows, conflicts, agreements, cur):
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
       "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
       "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306; "
-      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313.")
+      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; record 0315 its own.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "
