@@ -258,6 +258,7 @@ libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt	odt	exact	
 libreoffice-core/sw/qa/extras/odfimport/data/draw-image-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 908 -> 888 bytes, first difference at 581	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
 libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 901 -> 881 bytes, first difference at 584	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_LO_Standard_abc.docx	docx	locked		-		-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2007_abc.docx	docx	locked		-		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2010_abc.docx	docx	locked		-		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2013_abc.docx	docx	locked		-		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	docx	exact		byte-exact	/body/p[2] style	value-exact	picture+comment add+set+remove: 55519 -> 55087 bytes, first difference at 6

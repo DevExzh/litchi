@@ -19,7 +19,7 @@ was refused (typed), `none` nothing to move.
 | format | exact | differs | refused | error | signed-exact | signed-differs | signed-error | locked | revert byte-exact | revert value-exact | revert mismatch | revert one-way | revert refused | revert none | structure byte-exact | structure value-exact | structure mismatch | structure one-way | structure refused | structure none |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | doc | 45 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 38 | 0 | 0 | 5 | 2 | 0 | 44 | 0 | 0 | 1 | 0 |
-| docx | 75 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 60 | 4 | 0 | 0 | 10 | 1 | 0 | 56 | 0 | 6 | 13 | 0 |
+| docx | 75 | 0 | 0 | 0 | 3 | 0 | 0 | 4 | 60 | 4 | 0 | 0 | 10 | 1 | 0 | 56 | 0 | 6 | 13 | 0 |
 | keynote | 58 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 56 | 0 | 0 | 0 | 0 | 0 | 14 | 0 | 0 | 43 | 0 |
 | numbers | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 40 | 0 | 0 | 0 | 0 | 0 | 38 | 0 | 1 | 1 | 0 |
 | odb | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -38,14 +38,14 @@ was refused (typed), `none` nothing to move.
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 112 | 3 | 0 | 0 | 4 | 0 | 92 | 5 | 0 | 0 | 22 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 995 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 327 | 467 | 0 | 5 | 117 | 76 | 152 | 255 | 0 | 38 | 113 | 173 |
+| **all** | 995 | 0 | 0 | 0 | 7 | 0 | 0 | 15 | 327 | 467 | 0 | 5 | 117 | 76 | 152 | 255 | 0 | 38 | 113 | 173 |
 
 ## Office-extension files the unified layer does not open
 
 | extension | open error codes |
 |---|---|
 | doc | corrupt_file ×5, unsupported_format ×5 |
-| docx | corrupt_file ×3 |
+| docx | corrupt_file ×2 |
 | fodg | corrupt_file ×2 |
 | fodp | corrupt_file ×3 |
 | fods | corrupt_file ×2 |
