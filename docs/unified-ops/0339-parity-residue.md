@@ -1,7 +1,9 @@
 # 0339 — Parity residue: corpus detail, capability rows for unlisted elements, SmartArt decisions (record 0332 F1/F2, audit WP12)
 
 - Status: implemented on `uo2/parity-residue`, cut from `feat/unified-ops-api`
-  at `e39d0a75a4` (record 0333 merge).
+  at `e39d0a75a4` (record 0333 merge); trunk merged at `01d2284cc0`
+  (record 0337). The merge changed no golden, delta, corpus or checklist
+  output; the bench matrix was regenerated (`632b2b2628`).
 - Date: 2026-10-17
 - Input: record 0332 §5 and §7 (F1, the corpus detail bound; F2, the
   `unlisted` rows), record 0333's corpus section, and the definition-of-done
