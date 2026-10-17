@@ -223,18 +223,18 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | connector | `endIdx` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
 | connector | `zorder` | string | a-g | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | connector | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `x` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `y` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `width` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `height` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram | `mermaid` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `src` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `x` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `y` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `width` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `height` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `poster` | boolean | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `render` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `theme` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `layout` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `look` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `background` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | equation | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | equation | `formula` | string | asg | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | equation | `x` | length | asg | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |
@@ -256,22 +256,19 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | hyperlink | `tooltip` | string | asg | asg | supported | supported |  |  |  |
 | media | `src` | string | as- |  | write-only | gap | P2 | deferred-P2 0328 (odp-family) |  |
 | media | `poster` | string | as- |  | write-only | gap | P2 | deferred-P2 0328 (odp-family) |  |
-| media | `x` | length | asg | --g | supported | gap | P2 | deferred-P2 0328 (odp-family) |  |
-| media | `y` | length | asg | --g | supported | gap | P2 | deferred-P2 0328 (odp-family) |  |
-| media | `width` | length | asg | --g | supported | gap | P2 | deferred-P2 0328 (odp-family) |  |
-| media | `height` | length | asg | --g | supported | gap | P2 | deferred-P2 0328 (odp-family) |  |
+| media | `x` | length | asg | -sg | supported | partial | P2 | deferred-P2 0328 (odp-family) |  |
+| media | `y` | length | asg | -sg | supported | partial | P2 | deferred-P2 0328 (odp-family) |  |
+| media | `width` | length | asg | -sg | supported | partial | P2 | deferred-P2 0328 (odp-family) |  |
+| media | `height` | length | asg | -sg | supported | partial | P2 | deferred-P2 0328 (odp-family) |  |
 | media | `volume` | int | asg |  | unlisted | gap | P2 | deferred-P2 0328 (odp-family) |  |
 | media | `autoPlay` | bool | asg |  | unlisted | gap | P2 | deferred-P2 0328 (odp-family) |  |
-| media | `loop` | bool | asg | --g | supported | gap | P2 | deferred-P2 0328 (odp-family) |  |
+| media | `loop` | bool | asg |  | unlisted | gap | P2 | deferred-P2 0328 (odp-family) |  |
 | media | `trimStart` | string | asg |  | unlisted | gap | P2 | deferred-P2 0328 (odp-family) |  |
 | media | `trimEnd` | string | asg |  | unlisted | gap | P2 | deferred-P2 0328 (odp-family) |  |
-| media | `name` | string |  | --g | litchi-only | — |  |  |  |
+| media | `name` | string |  | -sg | litchi-only | litchi-only |  |  |  |
 | media | `alt` | string |  | --g | litchi-only | — |  |  |  |
 | media | `source` | string |  | --g | litchi-only | — |  |  |  |
 | media | `zorder` | int |  | --g | litchi-only | — |  |  |  |
-| media | `mediaType` | string |  | --g | litchi-only | — |  |  |  |
-| media | `mimeType` | string |  | --g | litchi-only | — |  |  |  |
-| media | `mute` | bool |  | --g | litchi-only | — |  |  |  |
 | model3d | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | none: a PresentationML-only concept |
 | model3d | `x` | length | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | none: a PresentationML-only concept |
 | model3d | `y` | length | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | none: a PresentationML-only concept |
@@ -599,7 +596,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | slide | `morphShapes` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
 | slide | `slideNumber` | int |  | --g | litchi-only | — |  |  |  |
 | slide | `master` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `name` | string | -sg | -sg | supported | supported |  |  |  |
+| slidelayout | `name` | string | -sg | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidelayout | `background` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidelayout | `background.alpha` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidelayout | `background.crop` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
@@ -608,24 +605,8 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | slidelayout | `background.scale` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidelayout | `direction` | string | -s- |  | write-only | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidelayout | `type` | string | --g |  | supported | — |  |  | the node's text |
-| slidelayout | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `shapeType` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `placeholderType` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `isTitle` | bool |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `x` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `y` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `width` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `height` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `zorder` | int |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `style` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `bold` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `italic` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `underline` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `size` | font-size |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `color` | color |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `font` | string |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `text` | string |  | -s- | litchi-only | litchi-only |  |  |  |
-| slidemaster | `name` | string | -sg | -sg | supported | supported |  |  |  |
+| slidelayout | `displayName` | string |  | --g | litchi-only | — |  |  |  |
+| slidemaster | `name` | string | -sg | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidemaster | `background` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidemaster | `background.alpha` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | slidemaster | `background.crop` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
@@ -636,23 +617,8 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | slidemaster | `layoutCount` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
 | slidemaster | `theme` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
 | slidemaster | `shapeCount` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odp-family) |  |
-| slidemaster | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `shapeType` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `placeholderType` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `isTitle` | bool |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `x` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `y` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `width` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `height` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `zorder` | int |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `style` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `bold` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `italic` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `underline` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `size` | font-size |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `color` | color |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `font` | string |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `text` | string |  | -s- | litchi-only | litchi-only |  |  |  |
+| slidemaster | `displayName` | string |  | --g | litchi-only | — |  |  |  |
+| slidemaster | `pageLayout` | string |  | --g | litchi-only | — |  |  |  |
 | cell | `text` | string | -sg | -s- | write-only | supported |  |  |  |
 | cell | `colspan` | number | -sg | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | cell | `rowspan` | number | -sg | --g | supported | gap | P1 | deferred-P1 0328 (odp-family) |  |

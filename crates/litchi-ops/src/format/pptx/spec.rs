@@ -1533,6 +1533,13 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         ),
     ],
     gaps: &[
+        // OfficeCLI's Mermaid `diagram` (record 0339).
+        GapSpec {
+            subject: Subject::Element("diagram"),
+            code: Code::UnsupportedPath,
+            follow_up: "none: out of scope (record 0332, design §10)",
+            reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
+        },
         property_gap(
             "presentation",
             "defaultFont",

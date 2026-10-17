@@ -1198,6 +1198,58 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 follow_up: "record 0328 follow-up: the RTF header WordArt watermark",
                 reason: "a watermark is a header shape the story reads do not project",
             },
+            // OfficeCLI elements the RTF adapter has no kind for (record 0339).
+            word_family_gap(
+                "chart",
+                "record 0328 (deferred-P1): RTF charts as chart nodes",
+                "embedded charts are kept as objects; they are not projected as chart nodes",
+            ),
+            word_family_gap(
+                "series",
+                "record 0328 (deferred-P1): RTF charts as chart nodes",
+                "chart series follow the chart gap",
+            ),
+            word_family_gap(
+                "axis",
+                "record 0328 (deferred-P1): RTF charts as chart nodes",
+                "chart axes follow the chart gap",
+            ),
+            word_family_gap(
+                "bookmarkEnd",
+                "record 0328 (deferred-P1)",
+                "a bookmark is one node over its start and end; a standalone end marker is not addressed on its own",
+            ),
+            word_family_gap(
+                "permStart",
+                "record 0328 (deferred-P1)",
+                "RTF editing-permission ranges are not projected as nodes",
+            ),
+            word_family_gap(
+                "ptab",
+                "record 0328 (deferred-P1)",
+                "positional tabs are not projected as nodes",
+            ),
+            word_family_gap(
+                "col",
+                "record 0328 (deferred-P1)",
+                "table columns are not nodes; cell widths are read on each cell",
+            ),
+            word_family_gap(
+                "fieldChar",
+                "none: out of scope (record 0332)",
+                "a complex field is one field node; its field-character and instruction parts are not separate elements",
+            ),
+            word_family_gap(
+                "instrText",
+                "none: out of scope (record 0332)",
+                "a complex field is one field node; its field-character and instruction parts are not separate elements",
+            ),
+            GapSpec {
+                subject: Subject::Element("diagram"),
+                code: crate::Code::UnsupportedPath,
+                follow_up: "none: out of scope (record 0332, design §10)",
+                reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API",
+            },
         ],
     }
 };
@@ -1208,6 +1260,21 @@ const _: () = assert!(
     SPEC.elements.len() <= 128,
     "a query kind set holds 128 kinds"
 );
+
+/// A gap for an OfficeCLI Word element the table has no kind for (record
+/// 0339): naming it is `unsupported_capability`.
+const fn word_family_gap(
+    element: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Element(element),
+        code: crate::Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
 
 const fn read_gap(element: &'static str) -> GapSpec {
     GapSpec {

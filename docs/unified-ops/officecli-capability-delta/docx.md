@@ -30,8 +30,8 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | bookmark | `name` | string | asg | asg | supported | supported |  |  |  |
 | bookmark | `text` | string | a-- | a-- | write-only | supported |  |  |  |
 | bookmark | `id` | string | --g | --g | supported | — |  |  |  |
-| bookmarkEnd | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| bookmarkEnd | `name` | string | a-- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
+| bookmarkEnd | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
+| bookmarkEnd | `name` | string | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | chart-axis | `axisFont` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
 | chart-axis | `axisMax` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
 | chart-axis | `axisMin` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
@@ -278,16 +278,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | comment | `initials` | string | asg | asg | supported | supported |  |  |  |
 | comment | `author` | string | asg | asg | supported | supported |  |  |  |
 | comment | `text` | string | asg | asg | supported | supported |  |  |  |
-| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `width` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `height` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram | `mermaid` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `src` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `width` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `height` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `render` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `poster` | boolean | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `theme` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `layout` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `look` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `background` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | document | `author` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
 | document | `title` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
 | document | `keywords` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
@@ -417,7 +417,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | field | `fldLock` | bool | a-g | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | field | `text` | string |  | as- | litchi-only | litchi-only |  |  |  |
 | field | `bookmarkName` | string |  | a-- | litchi-only | litchi-only |  |  |  |
-| fieldChar | `fieldCharType` | enum | -sg |  | unlisted | gap | P0 | out-of-scope (complex-field-parts) |  |
+| fieldChar | `fieldCharType` | enum | -sg |  | element gap | gap | P0 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | footer | `type` | enum | asg | asg | supported | supported |  |  |  |
 | footer | `text` | string | asg | asg | supported | supported |  |  |  |
 | footer | `align` | enum | asg | asg | supported | supported |  |  |  |
@@ -479,7 +479,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | hyperlink | `underline.color` | color |  | --g | litchi-only | — |  |  |  |
 | hyperlink | `strike` | bool |  | --g | litchi-only | — |  |  |  |
 | hyperlink | `highlight` | enum |  | --g | litchi-only | — |  |  |  |
-| instrText | `instruction` | string | -sg |  | unlisted | gap | P0 | out-of-scope (complex-field-parts) |  |
+| instrText | `instruction` | string | -sg |  | element gap | gap | P0 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | level | `ilvl` | int | a-g |  | unlisted | gap | P1 | out-of-scope (numbering-native-ids) |  |
 | level | `format` | string | asg | asg | supported | supported |  |  |  |
 | level | `lvlText` | string | asg | asg | supported | supported |  |  |  |
@@ -783,11 +783,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | paragraph | `lang.ea` | string |  | a-- | litchi-only | litchi-only |  |  |  |
 | paragraph | `lang.cs` | string |  | a-- | litchi-only | litchi-only |  |  |  |
 | paragraph | `position` | length |  | a-- | litchi-only | litchi-only |  |  |  |
-| permStart | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| permStart | `edGrp` | enum | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| permStart | `ed` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| permStart | `colFirst` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| permStart | `colLast` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
+| permStart | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
+| permStart | `edGrp` | enum | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
+| permStart | `ed` | string | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
+| permStart | `colFirst` | number | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
+| permStart | `colLast` | number | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | picture | `decorative` | bool | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
 | picture | `crop` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
 | picture | `cropLeft` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
@@ -816,9 +816,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `relId` | string | --g | --g | supported | — |  |  |  |
 | picture | `src` | string | as- | as- | write-only | supported |  |  |  |
 | picture | `name` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| ptab | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| ptab | `relativeTo` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| ptab | `leader` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
+| ptab | `align` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
+| ptab | `relativeTo` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
+| ptab | `leader` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | revision | `type` | enum | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
 | revision | `text` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
 | revision | `author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
@@ -1146,8 +1146,8 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `border.top` | string | -s- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `border.tr2bl` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `text` | string | asg | -s- | write-only | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| column | `width` | length | a-- |  | write-only | gap | P0 | planned WP4 (docx-p0-residue) |  |
-| column | `text` | string | a-- |  | write-only | gap | P0 | planned WP4 (docx-p0-residue) |  |
+| column | `width` | length | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
+| column | `text` | string | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
 | row | `height.exact` | length | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `header` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `cantSplit` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |

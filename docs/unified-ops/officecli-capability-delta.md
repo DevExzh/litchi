@@ -25,16 +25,16 @@ row has no disposition.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `dbae971f8735d0dead114eece2c3da25d7cefbc727eba52ec2292e6fcfae8190` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `ee70421edb33f37a4bde7e46ee5434d666cf6ff3419ac17b53ac559455e87d30` |
-| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
-| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `4fddfc467504bf3bf407a791b52c03e624c16c6423615d25cd7e6c91322e5dc2` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `0dcca5a64b3b61a1f442e09dd0dbaf2d33e8ed40daf3acdbba92c04dede6b2d9` |
-| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `6769b6e588c2abedd1e298586c7c90cd0741f3bf4147db3a12cf1ff7f2abe77c` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `1e95f801762eed48b88b78b36f5dc9eeb5481308d36784a2d66636e966fe834b` |
-| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `107fe26ec5512a54838cec4a87cb1d13246f01786cf61367b775073d7e8ea60d` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `cb1ac1ee74bfba78ab76ef6303173d01143e402da8efc9d287810fed8e29898b` |
+| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `a8794b7a359f3e62b36fdfca6c40f915341dd41d290414906c254b25da1e517e` |
+| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `8bca53917a3663c9a1ef54ab3900b3c15cd60ecaff906c886c5fd6a4410e560d` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `d816fb52d3c4d2da29af352eeb8897545fa09ba7a627a7c1a53abd06be85243f` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `2d74d4fc38c6b21312f7acd8a3e7f078d6421d7ce9018aff701a275845880c0b` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `445779ef646849678d6ce9f0258dd369b4bac75f26a5cd3fef28d5b872ea61cf` |
+| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b78029c9333c6bae834252ff9f186ea36ae8cf956c8f6f315a0b4349398c1f8d` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `2f2bc41b07845fe7aa25d4495e1f3eef11d6dde654c650f66e1630627c819f0f` |
+| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `4d17817dc9d2dfe0013cc5b0e54c36ef7fccf98a7bbc3bce3c532336e56158e8` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `104f4afa7068abc7bbe1d9e51861f007ee37cb23f5ff4fad6537de7fbcecff14` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `9c4afdf165334e207de69da99cdc335356d3ed7ec6ff012885c95f067bdf8398` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
@@ -42,11 +42,11 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
 | golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6a2731d888a494e6e9b2cdcb95c7dc3e2d6434b0872a612b4acc8d8a14f93cf` |
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `ae58459a816d8f5e9589778be23054de447115fe445e805eda0bb7ac6fee9445` |
-| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `2dbc45d7715d8f0a5d4fd1fa10b56381da186823f19872a9dc8642af7577a853` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `65dcb04b53ca5141a425e42bd1d06e974a8ecdc340f01d1914ec96043a4086c8` |
-| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `8101c13967ee6059e70011f78af45c0b7d64b0fdf8952178f901b2ceb7a57dec` |
-| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `d1c48fe2ba724c013f55f0997bb31713f35c6e178e3dfdda4f1f7d81a6490faf` |
-| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d84a027ace50689549f78d7d9d6662782f76ea58436a8dbac99da253ace7952f` |
+| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `654521a62386a06ea7f4ce7b4998581dd6c23102f79e951a0d254bafeaf8d82a` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `5ccd58884718ce91cd6fe53435748c4ce5407e339139060688a7bfdb37b5e13a` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `5c69533c73aa491c7613ee528e4819f709a707b9a4f8557f6b8b46811ef40386` |
+| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `14df833bb3645929dc63ad2acac7b19403e07d6445fc5ef20683bff5e8f1794c` |
+| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `5471ecacfea84fa49950a5ae229cf8dc6722e8b4ee76aaec5f4e0ee7e836bfe2` |
 | golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `7a0bad7630d2adadfe7131a1f00c6ced4478d93c19903a276cda45704a308dfc` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -86,14 +86,14 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | unlisted | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 33 | 4 | 0 | 0 | 0 | 7 | 2 | 7 |
-| doc | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
-| rtf | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
-| xlsx | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
-| xlsb | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
-| xls | 29 | 9 | 0 | 0 | 0 | 1 | 2 | 1 |
-| pptx | 29 | 3 | 0 | 0 | 0 | 1 | 1 | 9 |
-| ppt | 25 | 7 | 0 | 0 | 0 | 1 | 1 | 8 |
+| docx | 33 | 11 | 0 | 0 | 0 | 0 | 2 | 7 |
+| doc | 29 | 15 | 0 | 0 | 0 | 0 | 2 | 1 |
+| rtf | 29 | 15 | 0 | 0 | 0 | 0 | 2 | 1 |
+| xlsx | 33 | 6 | 0 | 0 | 0 | 0 | 2 | 1 |
+| xlsb | 33 | 6 | 0 | 0 | 0 | 0 | 2 | 1 |
+| xls | 29 | 10 | 0 | 0 | 0 | 0 | 2 | 1 |
+| pptx | 29 | 4 | 0 | 0 | 0 | 0 | 1 | 7 |
+| ppt | 23 | 10 | 0 | 0 | 0 | 0 | 1 | 6 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
@@ -102,9 +102,9 @@ Elements:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 34 |
-| odp | 27 | 5 | 0 | 0 | 0 | 1 | 1 | 6 |
-| ods | 29 | 9 | 0 | 0 | 0 | 1 | 2 | 1 |
-| odt | 31 | 5 | 0 | 0 | 0 | 8 | 2 | 5 |
+| odp | 27 | 6 | 0 | 0 | 0 | 0 | 1 | 4 |
+| ods | 29 | 10 | 0 | 0 | 0 | 0 | 2 | 1 |
+| odt | 31 | 13 | 0 | 0 | 0 | 0 | 2 | 5 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 34 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 11 |
 
@@ -112,14 +112,14 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | unlisted | litchi-only |
 |---|---|---|---|---|---|---|---|---|---|
-| docx | 296 | 4 | 58 | 0 | 237 | 2 | 0 | 364 | 270 |
-| doc | 157 | 0 | 59 | 0 | 237 | 1 | 0 | 507 | 59 |
-| rtf | 109 | 0 | 59 | 0 | 241 | 1 | 0 | 551 | 36 |
-| xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 0 | 145 | 559 |
-| xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 0 | 159 | 430 |
-| xls | 244 | 4 | 263 | 0 | 74 | 1 | 0 | 105 | 400 |
-| pptx | 234 | 23 | 30 | 0 | 121 | 0 | 0 | 279 | 291 |
-| ppt | 93 | 3 | 86 | 0 | 127 | 0 | 0 | 378 | 49 |
+| docx | 296 | 4 | 82 | 0 | 224 | 2 | 0 | 353 | 270 |
+| doc | 157 | 0 | 228 | 0 | 168 | 1 | 0 | 407 | 59 |
+| rtf | 109 | 0 | 228 | 0 | 172 | 1 | 0 | 451 | 36 |
+| xlsx | 333 | 12 | 92 | 0 | 113 | 1 | 0 | 140 | 559 |
+| xlsb | 295 | 29 | 92 | 0 | 120 | 1 | 0 | 154 | 430 |
+| xls | 244 | 4 | 268 | 0 | 74 | 1 | 0 | 100 | 400 |
+| pptx | 232 | 23 | 42 | 0 | 111 | 0 | 0 | 279 | 220 |
+| ppt | 90 | 3 | 118 | 0 | 113 | 0 | 0 | 363 | 31 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -128,9 +128,9 @@ Property reads:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 112 | 2 | 56 | 0 | 121 | 0 | 0 | 396 | 104 |
-| ods | 194 | 11 | 263 | 0 | 92 | 1 | 0 | 130 | 406 |
-| odt | 112 | 0 | 165 | 0 | 173 | 1 | 0 | 510 | 55 |
+| odp | 111 | 2 | 68 | 0 | 109 | 0 | 0 | 397 | 70 |
+| ods | 194 | 11 | 268 | 0 | 92 | 1 | 0 | 125 | 406 |
+| odt | 112 | 0 | 224 | 0 | 162 | 1 | 0 | 462 | 55 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -144,8 +144,8 @@ Property writes:
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 157 | 24 | 363 | 0 | 359 | 188 |
-| pptx | 142 | 23 | 396 | 0 | 183 | 234 |
-| ppt | 6 | 23 | 532 | 0 | 15 | 160 |
+| pptx | 144 | 23 | 394 | 0 | 147 | 199 |
+| ppt | 6 | 23 | 532 | 0 | 5 | 152 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -154,7 +154,7 @@ Property writes:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 11 | 58 | 492 | 0 | 43 | 187 |
+| odp | 9 | 62 | 490 | 0 | 22 | 174 |
 | ods | 134 | 10 | 400 | 0 | 372 | 181 |
 | odt | 15 | 34 | 747 | 0 | 31 | 189 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -186,7 +186,7 @@ Element gap rows:
 | xlsb | 1 | 3 | 4 | 0 | 0 | 0 |
 | xls | 8 | 0 | 4 | 0 | 0 | 0 |
 | pptx | 1 | 0 | 3 | 0 | 1 | 0 |
-| ppt | 1 | 4 | 3 | 0 | 1 | 0 |
+| ppt | 1 | 6 | 3 | 0 | 1 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -211,8 +211,8 @@ Property gap rows:
 | xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
 | xls | 189 | 219 | 79 | 0 | 1 | 0 |
-| pptx | 27 | 433 | 57 | 0 | 12 | 0 |
-| ppt | 0 | 608 | 58 | 0 | 12 | 0 |
+| pptx | 27 | 431 | 57 | 0 | 12 | 0 |
+| ppt | 0 | 609 | 58 | 0 | 12 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -221,7 +221,7 @@ Property gap rows:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 0 | 601 | 58 | 0 | 12 | 0 |
+| odp | 0 | 603 | 58 | 0 | 12 | 0 |
 | ods | 189 | 247 | 79 | 0 | 1 | 0 |
 | odt | 0 | 880 | 35 | 0 | 19 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -232,7 +232,7 @@ All gap rows by tier:
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
 | P0 | 73 | 0 | 0 | 0 | 4 | 0 |
-| P1 | 467 | 6039 | 0 | 0 | 44 | 0 |
+| P1 | 467 | 6042 | 0 | 0 | 44 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -243,8 +243,8 @@ properties share its entry unless an entry names the property):
 | doc-family | deferred | 0324 | 929 | `delta:doc:*` | DOC is outside the v1 boundary; record 0324 lists its element follow-ups |
 | rtf-family | deferred | 0328 | 927 | `delta:rtf:*` | RTF is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
 | odt-family | deferred | 0328 | 925 | `delta:odt:*` | ODT is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
-| odp-family | deferred | 0328 | 664 | `delta:odp:*` | ODP is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
-| ppt-family | deferred | 0323 | 673 | `delta:ppt:*` | PPT is outside the v1 boundary; record 0323 lists its element follow-ups |
+| odp-family | deferred | 0328 | 666 | `delta:odp:*` | ODP is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
+| ppt-family | deferred | 0323 | 676 | `delta:ppt:*` | PPT is outside the v1 boundary; record 0323 lists its element follow-ups |
 | xlsb-family | deferred | 0322 | 477 | `delta:xlsb:*` | XLSB is outside the v1 boundary; record 0322 lists its worksheet-feature follow-ups |
 | xls-parity | planned | WP10 | 196 | `delta:xls:*` | XLS element parity: the gap element families and their properties (audit WP10, record 0327) |
 | ods-parity | planned | WP11 | 196 | `delta:ods:*` | ODS element parity: the gap element families and their properties (audit WP11, record 0327) |
@@ -253,7 +253,7 @@ properties share its entry unless an entry names the property):
 | ods-breadth | deferred | 0327 | 247 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
 | docx-breadth | deferred | 0332 | 575 | `delta:docx:*` | DOCX P1/P2 surface and formatting breadth beyond §13 P0 |
 | xlsx-breadth | deferred | 0332 | 403 | `delta:xlsx:*` | XLSX P1/P2 surface and formatting breadth beyond §13 P0 |
-| pptx-breadth | deferred | 0332 | 473 | `delta:pptx:*` | PPTX P1/P2 surface and formatting breadth beyond §13 P0 |
+| pptx-breadth | deferred | 0332 | 471 | `delta:pptx:*` | PPTX P1/P2 surface and formatting breadth beyond §13 P0 |
 | raw-layer | planned | WP5 | 11 | `delta:*:raw` | the raw XML layer (`raw`, `raw-set`, `add-part`, `validate`): design §12, audit WP5 |
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
@@ -277,23 +277,23 @@ properties share its entry unless an entry names the property):
 | abstractNum | abstractNum | supported |  |  |  |
 | body | body | supported |  |  |  |
 | bookmark | bookmark | supported |  |  |  |
-| bookmarkEnd |  | unlisted | P1 | deferred-P1 0332 (docx-breadth) |  |
+| bookmarkEnd |  | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | chart-axis | axis | supported |  |  |  |
 | chart-series | series | supported |  |  |  |
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
-| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram |  | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | document | document | supported |  |  |  |
 | endnote | endnote | supported |  |  |  |
 | equation | equation | supported |  |  |  |
 | field | field | supported |  |  |  |
-| fieldChar |  | unlisted | P0 | out-of-scope (complex-field-parts) |  |
+| fieldChar |  | gap | P0 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | footer | footer | supported |  |  |  |
 | footnote | footnote | supported |  |  |  |
 | formfield | formfield | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
 | header | header | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
-| instrText |  | unlisted | P0 | out-of-scope (complex-field-parts) |  |
+| instrText |  | gap | P0 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | level | level | supported |  |  |  |
 | markdown |  | out of scope | P2 | out-of-scope (markdown) | an add-time import format, not an element of the document |
 | num | num | supported |  |  |  |
@@ -301,9 +301,9 @@ properties share its entry unless an entry names the property):
 | ole | ole | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
 | pagebreak | break | supported |  |  |  |
 | paragraph | paragraph | supported |  |  |  |
-| permStart |  | unlisted | P1 | deferred-P1 0332 (docx-breadth) |  |
+| permStart |  | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | picture | picture | supported |  |  |  |
-| ptab |  | unlisted | P1 | deferred-P1 0332 (docx-breadth) |  |
+| ptab |  | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | revision | revision | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
 | run | run | supported |  |  |  |
@@ -314,7 +314,7 @@ properties share its entry unless an entry names the property):
 | styles | styles | supported |  |  |  |
 | tab | tab | supported |  |  |  |
 | cell | cell | supported |  |  |  |
-| column |  | unlisted | P0 | planned WP4 (docx-p0-residue) |  |
+| column |  | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
 | row | row | supported |  |  |  |
 | table | table | supported |  |  |  |
 | textbox | textbox | supported |  |  |  |
@@ -381,23 +381,23 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | abstractNum | abstractNum | supported |  |  |  |
 | body | body | supported |  |  |  |
 | bookmark | bookmark | supported |  |  |  |
-| bookmarkEnd |  | unlisted | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis |  | unlisted | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series |  | unlisted | P1 | deferred-P1 0324 (doc-family) |  |
-| chart |  | unlisted | P1 | deferred-P1 0324 (doc-family) |  |
+| bookmarkEnd |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| chart-axis |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
 | comment | comment | supported |  |  |  |
-| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram |  | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | document | document | supported |  |  |  |
 | endnote | endnote | supported |  |  |  |
 | equation |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 follow-up 4: DOC EQ fields and MTEF equation objects as `equation` nodes |
 | field | field | supported |  |  |  |
-| fieldChar |  | unlisted | P1 | out-of-scope (complex-field-parts) |  |
+| fieldChar |  | gap | P1 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | footer | footer | supported |  |  |  |
 | footnote | footnote | supported |  |  |  |
 | formfield |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
 | header | header | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
-| instrText |  | unlisted | P1 | out-of-scope (complex-field-parts) |  |
+| instrText |  | gap | P1 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | level | level | supported |  |  |  |
 | markdown |  | out of scope | P2 | out-of-scope (markdown) | an add-time import format, not an element of the document |
 | num | num | supported |  |  |  |
@@ -405,9 +405,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ole | run | supported |  |  |  |
 | pagebreak | run | supported |  |  |  |
 | paragraph | paragraph | supported |  |  |  |
-| permStart |  | unlisted | P1 | deferred-P1 0324 (doc-family) |  |
+| permStart |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
 | picture | run | supported |  |  |  |
-| ptab |  | unlisted | P1 | deferred-P1 0324 (doc-family) |  |
+| ptab |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | revision |  | gap | P2 | deferred-P2 0324 (doc-family) | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
 | run | run | supported |  |  |  |
@@ -418,7 +418,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | styles | styles | supported |  |  |  |
 | tab | tab | supported |  |  |  |
 | cell | cell | supported |  |  |  |
-| column |  | unlisted | P1 | deferred-P1 0324 (doc-family) |  |
+| column |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
 | row | row | supported |  |  |  |
 | table | table | supported |  |  |  |
 | textbox | textbox | supported |  |  |  |
@@ -453,23 +453,23 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | abstractNum | abstractNum | supported |  |  |  |
 | body | body | supported |  |  |  |
 | bookmark | bookmark | supported |  |  |  |
-| bookmarkEnd |  | unlisted | P1 | deferred-P1 0328 (rtf-family) |  |
-| chart-axis |  | unlisted | P1 | deferred-P1 0328 (rtf-family) |  |
-| chart-series |  | unlisted | P1 | deferred-P1 0328 (rtf-family) |  |
-| chart |  | unlisted | P1 | deferred-P1 0328 (rtf-family) |  |
+| bookmarkEnd |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1) |
+| chart-axis |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1): RTF charts as chart nodes |
+| chart-series |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1): RTF charts as chart nodes |
+| chart |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1): RTF charts as chart nodes |
 | comment | comment | supported |  |  |  |
-| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram |  | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | document | document | supported |  |  |  |
 | endnote | endnote | supported |  |  |  |
 | equation |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 follow-up: RTF EQ fields and math zones as equation nodes |
 | field | field | supported |  |  |  |
-| fieldChar |  | unlisted | P1 | out-of-scope (complex-field-parts) |  |
+| fieldChar |  | gap | P1 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | footer | footer | supported |  |  |  |
 | footnote | footnote | supported |  |  |  |
 | formfield |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
 | header | header | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
-| instrText |  | unlisted | P1 | out-of-scope (complex-field-parts) |  |
+| instrText |  | gap | P1 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | level | level | supported |  |  |  |
 | markdown |  | out of scope | P2 | out-of-scope (markdown) | an add-time import format, not an element of the document |
 | num | num | supported |  |  |  |
@@ -477,9 +477,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ole | run | supported |  |  |  |
 | pagebreak | run | supported |  |  |  |
 | paragraph | paragraph | supported |  |  |  |
-| permStart |  | unlisted | P1 | deferred-P1 0328 (rtf-family) |  |
+| permStart |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1) |
 | picture | picture | supported |  |  |  |
-| ptab |  | unlisted | P1 | deferred-P1 0328 (rtf-family) |  |
+| ptab |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1) |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | revision |  | gap | P2 | deferred-P2 0328 (rtf-family) | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
 | run | run | supported |  |  |  |
@@ -490,7 +490,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | styles | styles | supported |  |  |  |
 | tab | tab | supported |  |  |  |
 | cell | cell | supported |  |  |  |
-| column |  | unlisted | P1 | deferred-P1 0328 (rtf-family) |  |
+| column |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1) |
 | row | row | supported |  |  |  |
 | table | table | supported |  |  |  |
 | textbox | textbox | supported |  |  |  |
@@ -565,7 +565,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | unlisted | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| detectedtable |  | gap | P1 | deferred-P1 0332 (xlsx-breadth) | 0339-F5 (deferred-P1): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -648,7 +648,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | unlisted | P1 | deferred-P1 0322 (xlsb-family) |  |
+| detectedtable |  | gap | P1 | deferred-P1 0322 (xlsb-family) | 0339-F5 (deferred-P1): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -735,7 +735,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | unlisted | P1 | planned WP10 (xls-parity) |  |
+| detectedtable |  | gap | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -800,12 +800,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | connector | connector | supported |  |  |  |
-| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram |  | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | equation | equation | supported |  |  |  |
 | group | group | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
 | linebreak | linebreak | supported |  |  |  |
-| media | audio | supported |  |  |  |
+| media | media | supported |  |  |  |
 | model3d | model3d | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
 | modernComment | modernComment | supported |  |  |  |
 | notes | notes | supported |  |  |  |
@@ -818,8 +818,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | slide | slide | supported |  |  |  |
-| slidelayout | shape | supported |  |  |  |
-| slidemaster | shape | supported |  |  |  |
+| slidelayout | slideLayout | supported |  |  |  |
+| slidemaster | slideMaster | supported |  |  |  |
 | cell | tc | supported |  |  |  |
 | column | col | supported |  |  |  |
 | row | tr | supported |  |  |  |
@@ -830,15 +830,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | zoom | zoom | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
 |  | smartart | litchi-only |  |  |  |
 |  | video | litchi-only |  |  |  |
-|  | media | litchi-only |  |  |  |
-|  | slideMaster | litchi-only |  |  |  |
-|  | slideLayout | litchi-only |  |  |  |
+|  | audio | litchi-only |  |  |  |
 |  | reply | litchi-only |  |  |  |
 |  | noteSlide | litchi-only |  |  | M1-extended |
 |  | notesMaster | litchi-only |  |  | M1-extended |
 |  | node | litchi-only |  |  |  |
 
-Properties: 978 rows, 529 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
+Properties: 907 rows, 527 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
 
 ### Contextual operation gaps
 
@@ -874,12 +872,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | connector | connector | supported |  |  |  |
-| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram |  | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | equation | equation | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |
 | group | group | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
 | linebreak | linebreak | supported |  |  |  |
-| media | audio | supported |  |  |  |
+| media | media | supported |  |  |  |
 | model3d | model3d | gap | P2 | deferred-P2 0323 (ppt-family) | wontfix: PPTX-only (record 0323) |
 | modernComment | modernComment | gap | P1 | deferred-P1 0323 (ppt-family) | wontfix: PPTX-only (record 0323) |
 | notes | notes | supported |  |  |  |
@@ -892,8 +890,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | slide | slide | supported |  |  |  |
-| slidelayout | shape | supported |  |  |  |
-| slidemaster | shape | supported |  |  |  |
+| slidelayout | slideLayout | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidemaster | slideMaster | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
 | cell | tc | supported |  |  |  |
 | column | col | supported |  |  |  |
 | row | tr | supported |  |  |  |
@@ -902,16 +900,14 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | theme | theme | supported |  |  |  |
 | transition | slide | supported |  |  |  |
 | zoom | zoom | gap | P2 | deferred-P2 0323 (ppt-family) | wontfix: PPTX-only (record 0323) |
-|  | smartart | litchi-only |  |  | M1-extended |
+|  | smartart | litchi-only |  |  | 0339-F3 (deferred-P1): PPT SmartArt and diagram groups |
 |  | video | litchi-only |  |  |  |
-|  | media | litchi-only |  |  |  |
-|  | slideMaster | litchi-only |  |  | M1-extended |
-|  | slideLayout | litchi-only |  |  | M1-extended |
+|  | audio | litchi-only |  |  |  |
 |  | reply | litchi-only |  |  | wontfix: PPTX-only (record 0323) |
 |  | noteSlide | litchi-only |  |  | M1-extended |
 |  | notesMaster | litchi-only |  |  | M1-extended |
 
-Properties: 736 rows, 678 of them gaps, in [`ppt.md`](officecli-capability-delta/ppt.md).
+Properties: 718 rows, 679 of them gaps, in [`ppt.md`](officecli-capability-delta/ppt.md).
 
 ### Contextual operation gaps
 
@@ -1187,12 +1183,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | connector | connector | supported |  |  |  |
-| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram |  | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | equation | equation | supported |  |  |  |
 | group | group | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
 | linebreak | linebreak | supported |  |  |  |
-| media | audio | supported |  |  |  |
+| media | media | supported |  |  |  |
 | model3d |  | gap | P2 | deferred-P2 0328 (odp-family) | none: a PresentationML-only concept |
 | modernComment |  | gap | P1 | deferred-P1 0328 (odp-family) | none: a PresentationML-only concept |
 | notes | notes | supported |  |  |  |
@@ -1205,8 +1201,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | slide | slide | supported |  |  |  |
-| slidelayout | shape | supported |  |  |  |
-| slidemaster | shape | supported |  |  |  |
+| slidelayout | slideLayout | supported |  |  |  |
+| slidemaster | slideMaster | supported |  |  |  |
 | cell | tc | supported |  |  |  |
 | column | col | supported |  |  |  |
 | row | tr | supported |  |  |  |
@@ -1215,14 +1211,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | theme |  | gap | P1 | deferred-P1 0328 (odp-family) | none: a PresentationML-only concept |
 | transition | slide | supported |  |  |  |
 | zoom |  | gap | P2 | deferred-P2 0328 (odp-family) | none: a PresentationML-only concept |
-|  | media | litchi-only |  |  |  |
 |  | video | litchi-only |  |  |  |
-|  | slideMaster | litchi-only |  |  |  |
-|  | slideLayout | litchi-only |  |  |  |
+|  | audio | litchi-only |  |  |  |
 |  | notesMaster | litchi-only |  |  | M6 ODP notes master |
 |  | noteSlide | litchi-only |  |  | M6 ODP notes pages |
 
-Properties: 791 rows, 671 of them gaps, in [`odp.md`](officecli-capability-delta/odp.md).
+Properties: 757 rows, 673 of them gaps, in [`odp.md`](officecli-capability-delta/odp.md).
 
 ### Contextual operation gaps
 
@@ -1263,7 +1257,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | unlisted | P1 | planned WP11 (ods-parity) |  |
+| detectedtable |  | gap | P1 | planned WP11 (ods-parity) | WP11 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -1322,23 +1316,23 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | abstractNum | abstractNum | supported |  |  |  |
 | body | body | supported |  |  |  |
 | bookmark | bookmark | supported |  |  |  |
-| bookmarkEnd |  | unlisted | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis |  | unlisted | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series |  | unlisted | P1 | deferred-P1 0328 (odt-family) |  |
+| bookmarkEnd |  | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| chart-axis |  | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series |  | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
 | chart |  | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276) |
 | comment | comment | supported |  |  |  |
-| diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram |  | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | document | document | supported |  |  |  |
 | endnote | endnote | supported |  |  |  |
 | equation | equation | supported |  |  |  |
 | field | field | supported |  |  |  |
-| fieldChar |  | unlisted | P1 | out-of-scope (complex-field-parts) |  |
+| fieldChar |  | gap | P1 | out-of-scope (complex-field-parts) | none: not an OpenDocument text element (record 0339) |
 | footer | footer | supported |  |  |  |
 | footnote | footnote | supported |  |  |  |
 | formfield |  | gap | P1 | deferred-P1 0328 (odt-family) | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
 | header | header | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
-| instrText |  | unlisted | P1 | out-of-scope (complex-field-parts) |  |
+| instrText |  | gap | P1 | out-of-scope (complex-field-parts) | none: not an OpenDocument text element (record 0339) |
 | level | level | supported |  |  |  |
 | markdown |  | out of scope | P2 | out-of-scope (markdown) | an add-time import format, not an element of the document |
 | num | num | supported |  |  |  |
@@ -1346,9 +1340,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ole | run | supported |  |  |  |
 | pagebreak | run | supported |  |  |  |
 | paragraph | paragraph | supported |  |  |  |
-| permStart |  | unlisted | P1 | deferred-P1 0328 (odt-family) |  |
+| permStart |  | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
 | picture | picture | supported |  |  |  |
-| ptab |  | unlisted | P1 | deferred-P1 0328 (odt-family) |  |
+| ptab |  | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | revision |  | gap | P2 | deferred-P2 0328 (odt-family) | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
 | run | run | supported |  |  |  |

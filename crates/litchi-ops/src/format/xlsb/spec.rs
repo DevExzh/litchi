@@ -938,6 +938,12 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
 // not claim a read.  The values are the same gaps as XLSX's table, but the
 // reasons describe the XLSB leaf and its deferred binary parts.
 static GAPS: &[GapSpec] = &[
+    // OfficeCLI's heuristic table node (record 0339).
+    element_gap(
+        "detectedtable",
+        "0339-F5 (deferred-P1): header-row table detection in queries",
+        "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only",
+    ),
     // Defined names are added, retargeted and removed (record 0261), but
     // only the last name can go: removing an earlier one would renumber the
     // name index every formula's name references use (record 0330).

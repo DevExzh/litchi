@@ -31,45 +31,45 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | bookmark | `name` | string | asg | asg | supported | supported |  |  |  |
 | bookmark | `text` | string | a-- |  | supported | gap | P1 | deferred-P1 0328 (odt-family) | the node's text |
 | bookmark | `id` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| bookmarkEnd | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| bookmarkEnd | `name` | string | a-- |  | write-only | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `axisFont` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `axisMax` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `axisMin` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `axisNumFmt` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `axisOrientation` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `axisTitle` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `format` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `labelOffset` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `labelRotation` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `logBase` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `majorGridlines` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `max` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `min` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `minorGridlines` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `tickLabelSkip` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `title` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-axis | `visible` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `categories` | string | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `categoriesRef` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `color` | color | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `dataLabels.numFmt` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `dataLabels.separator` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `errBars` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `invertIfNeg` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `lineDash` | enum | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `lineWidth` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `marker` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `markerSize` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `markerColor` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `name` | string | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `nameRef` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `scatterStyle` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `secondaryAxis` | bool | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `smooth` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `values` | string | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `bubbleSize` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| chart-series | `bubbleSizeRef` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
+| bookmarkEnd | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| bookmarkEnd | `name` | string | a-- |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| chart-axis | `axisFont` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `axisMax` | number | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `axisMin` | number | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `axisNumFmt` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `axisOrientation` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `axisTitle` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `format` | string | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `labelOffset` | number | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `labelRotation` | number | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `logBase` | number | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `majorGridlines` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `max` | number | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `min` | number | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `minorGridlines` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `tickLabelSkip` | number | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `title` | string | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-axis | `visible` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `categories` | string | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `categoriesRef` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `color` | color | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `dataLabels.numFmt` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `dataLabels.separator` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `errBars` | string | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `invertIfNeg` | string | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `lineDash` | enum | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `lineWidth` | number | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `marker` | string | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `markerSize` | number | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `markerColor` | string | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `name` | string | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `nameRef` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `scatterStyle` | string | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `secondaryAxis` | bool | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `smooth` | string | -sg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `values` | string | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `bubbleSize` | string | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
+| chart-series | `bubbleSizeRef` | string | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276), with the chart gap |
 | chart | `dispUnits` | string | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276) |
 | chart | `seriesCount` | number | --g |  | element gap | — | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276) |
 | chart | `radarstyle` | string | as- |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | M6 ODT body index (record 0276) |
@@ -188,16 +188,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | comment | `initials` | string | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | comment | `author` | string | asg | a-g | supported | partial | P1 | deferred-P1 0328 (odt-family) |  |
 | comment | `text` | string | asg | asg | supported | supported |  |  |  |
-| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `width` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `height` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram | `mermaid` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `src` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `width` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `height` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `render` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `poster` | boolean | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `theme` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `layout` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `look` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `background` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | document | `author` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | document | `title` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | document | `keywords` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
@@ -326,7 +326,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | field | `vertAlign` | enum | a-- |  | write-only | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | field | `fldLock` | bool | a-g | --g | supported | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | field | `element` | string |  | --g | litchi-only | — |  |  |  |
-| fieldChar | `fieldCharType` | enum | -sg |  | unlisted | gap | P1 | out-of-scope (complex-field-parts) |  |
+| fieldChar | `fieldCharType` | enum | -sg |  | element gap | gap | P1 | out-of-scope (complex-field-parts) | none: not an OpenDocument text element (record 0339) |
 | footer | `type` | enum | asg | --g | supported | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | footer | `text` | string | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odt-family) |  |
 | footer | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
@@ -381,7 +381,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | hyperlink | `italic` | bool | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | hyperlink | `docLocation` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
 | hyperlink | `tgtFrame` | string |  | -sg | litchi-only | litchi-only |  |  |  |
-| instrText | `instruction` | string | -sg |  | unlisted | gap | P1 | out-of-scope (complex-field-parts) |  |
+| instrText | `instruction` | string | -sg |  | element gap | gap | P1 | out-of-scope (complex-field-parts) | none: not an OpenDocument text element (record 0339) |
 | level | `ilvl` | int | a-g |  | unlisted | gap | P1 | out-of-scope (numbering-native-ids) |  |
 | level | `format` | string | asg | --g | supported | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | level | `lvlText` | string | asg | --g | supported | gap | P1 | deferred-P1 0328 (odt-family) |  |
@@ -593,11 +593,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | paragraph | `topLinePunct` | boolean | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | paragraph | `indent` | length | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odt-family) |  |
 | paragraph | `text` | string | asg | asg | supported | supported |  |  |  |
-| permStart | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| permStart | `edGrp` | enum | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| permStart | `ed` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| permStart | `colFirst` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| permStart | `colLast` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
+| permStart | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| permStart | `edGrp` | enum | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| permStart | `ed` | string | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| permStart | `colFirst` | number | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| permStart | `colLast` | number | a-g |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
 | picture | `decorative` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | picture | `crop` | string | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
 | picture | `cropLeft` | string | as- |  | write-only | gap | P1 | deferred-P1 0328 (odt-family) |  |
@@ -625,9 +625,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `fileSize` | number | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
 | picture | `relId` | string | --g |  | unlisted | — | P1 | deferred-P1 0328 (odt-family) |  |
 | picture | `src` | string | as- | --g | supported | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| ptab | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| ptab | `relativeTo` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
-| ptab | `leader` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odt-family) |  |
+| ptab | `align` | enum | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| ptab | `relativeTo` | enum | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
+| ptab | `leader` | enum | asg |  | element gap | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
 | revision | `type` | enum | --g |  | element gap | — | P2 | deferred-P2 0328 (odt-family) | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
 | revision | `text` | string | --g |  | element gap | — | P2 | deferred-P2 0328 (odt-family) | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
 | revision | `author` | string | --g |  | element gap | — | P2 | deferred-P2 0328 (odt-family) | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
