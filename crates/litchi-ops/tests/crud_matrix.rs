@@ -1085,6 +1085,23 @@ const RECIPES: &[Recipe] = &[
         props: &[("from", "/slide[2]")],
         start: false,
     },
+    // Record 0329: a new table copies the deck's (document's) first table.
+    Recipe {
+        format: "keynote",
+        element: "table",
+        fixture: "iwork/keynote/slide-table-read-native.key",
+        parent: "/slide[1]",
+        props: &[("rows", "2"), ("cols", "2"), ("data", "a,b;c,d")],
+        start: false,
+    },
+    Recipe {
+        format: "pages",
+        element: "tbl",
+        fixture: "iwork/pages/body-table-read-native.pages",
+        parent: "/body",
+        props: &[("rows", "2"), ("cols", "2"), ("data", "a,b;c,d")],
+        start: false,
+    },
     Recipe {
         format: "odg",
         element: "shape",

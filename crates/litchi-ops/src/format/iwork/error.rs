@@ -54,6 +54,9 @@ pub enum LeafError {
     /// A Pages body-table deletion failed.
     #[cfg(feature = "pages")]
     PagesTableDeletion(litchi_pages::table::deletion::Error),
+    /// A Pages body-table creation failed (record 0329).
+    #[cfg(feature = "pages")]
+    PagesTableCreation(litchi_pages::table::creation::Error),
     /// A Pages section add or remove failed (record 0312).
     #[cfg(feature = "pages")]
     PagesSectionLifecycle(litchi_pages::section::lifecycle::Error),
@@ -146,6 +149,8 @@ impl fmt::Display for LeafError {
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
+            Self::PagesTableCreation(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
             Self::PagesSectionLifecycle(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => error.fmt(formatter),
@@ -217,6 +222,8 @@ impl std::error::Error for LeafError {
             Self::PagesSave(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableCreation(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesSectionLifecycle(error) => Some(error),
             #[cfg(feature = "keynote")]
@@ -300,6 +307,8 @@ impl LeafError {
             },
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => pages_deletion_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableCreation(error) => pages_creation_code(error),
             #[cfg(feature = "pages")]
             Self::PagesSectionLifecycle(error) => pages_section_lifecycle_code(error),
             #[cfg(feature = "keynote")]
@@ -566,6 +575,19 @@ fn pages_deletion_code(error: &litchi_pages::table::deletion::Error) -> Code {
 }
 
 #[cfg(feature = "pages")]
+fn pages_creation_code(error: &litchi_pages::table::creation::Error) -> Code {
+    use litchi_pages::table::creation::Error as E;
+    match error {
+        E::InvalidSize { .. } | E::InvalidCell | E::PositionOutOfBounds => Code::OutOfRange,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        E::Values(error) => pages_table_values_code(error),
+        E::Verification | E::Allocation { .. } => Code::InternalError,
+        _ => Code::UnsupportedCapability,
+    }
+}
+
+#[cfg(feature = "pages")]
 fn pages_section_lifecycle_code(error: &litchi_pages::section::lifecycle::Error) -> Code {
     use litchi_pages::section::lifecycle::Error as E;
     match error {
@@ -669,6 +691,7 @@ fn keynote_drawables_code(error: &litchi_keynote::slide::drawable::Error) -> Cod
         E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
         E::ZPositionOutOfRange { .. } => Code::OutOfRange,
         E::InvalidGeometry | E::InvalidImage | E::InvalidSpan => Code::InvalidValue,
+        E::InvalidTableSize { .. } => Code::OutOfRange,
         E::DrawableRemoved => Code::InvalidArgument,
         E::UnsupportedSource | E::Unsupported { .. } => Code::UnsupportedCapability,
         E::LimitExceeded { .. } => Code::LimitExceeded,

@@ -35,6 +35,11 @@
 //!   coordinates; inserted before physical row 3) and `comment_set` (leaf
 //!   `set_table_cell_comment` on a stored cell of `basic.numbers`; unified
 //!   `set` of the cell's `comment`).
+//! - record 0329: `row_remove_ref` (the row-3 removal on the created
+//!   workbook with formulas, which every formula reads: `#REF!`, a shrunk
+//!   range; leaf `remove_row`, unified `remove` of the row) and
+//!   `comment_empty` (a comment on the last, unstored cell of
+//!   `basic.numbers`).
 //!
 //! Legs run in ABBA order per sample after a warm-up; outputs of every
 //! write scenario are compared byte for byte before timing (the merge by
@@ -833,6 +838,68 @@ mod enabled {
             Some(same),
             || time(|| leaf_comment(&comment_leaf)),
             || time(|| unified_comment(&comment_file)),
+        ));
+
+        // Record 0329: a removal formulas read, and a comment on an empty
+        // cell in a row its tile does not store.
+        let leaf_formula_remove = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .edit_table_topology(sheet, table)
+                .expect("edit")
+                .remove_row(RowDeletion::body(1))
+                .expect("remove")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_formula_remove = |file: &File| {
+            file.remove("/sheet[1]/table[1]/row[3]")
+                .expect("remove a read row")
+        };
+        let same = leaf_bytes(&leaf_formula_remove(&formula_leaf))
+            == unified_formula_remove(&formula_file)
+                .to_bytes()
+                .expect("bytes");
+        scenarios.extend(abba(
+            "row_remove_ref",
+            "created workbook with formulas",
+            rounds,
+            Some(same),
+            || time(|| leaf_formula_remove(&formula_leaf)),
+            || time(|| unified_formula_remove(&formula_file)),
+        ));
+        let empty = {
+            let table = comment_leaf.sheets()[0].tables().next().expect("table");
+            CellPosition::new(table.row_count() - 1, table.column_count() - 1)
+        };
+        let empty_path = format!(
+            "/sheet[1]/table[1]/{}{}",
+            char::from(b'A' + empty.column() as u8),
+            empty.row() + 1
+        );
+        let leaf_comment_empty = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .set_table_cell_comment(sheet, table, empty, "bench")
+                .expect("comment")
+                .into_package()
+        };
+        let unified_comment_empty = |file: &File| {
+            file.set(empty_path.as_str(), props! { "comment" => "bench" })
+                .expect("comment")
+        };
+        let same = leaf_bytes(&leaf_comment_empty(&comment_leaf))
+            == unified_comment_empty(&comment_file)
+                .to_bytes()
+                .expect("bytes");
+        scenarios.extend(abba(
+            "comment_empty",
+            FORMULAS,
+            rounds,
+            Some(same),
+            || time(|| leaf_comment_empty(&comment_leaf)),
+            || time(|| unified_comment_empty(&comment_file)),
         ));
 
         let report = Report {

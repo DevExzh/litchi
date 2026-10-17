@@ -1252,6 +1252,10 @@ impl Package {
     }
 
     /// Create or replace one selector-first table-cell comment.
+    ///
+    /// A new comment is written by the package's one commenting author, or,
+    /// among several (or none), by the generated `litchi-iwa` author; an
+    /// empty cell takes the comment as a comment-only cell (record 0329).
     pub fn set_table_cell_comment<'sheet, 'table>(
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,

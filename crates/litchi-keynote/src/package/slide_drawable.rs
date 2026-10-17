@@ -14,6 +14,7 @@
 mod author;
 mod inventory;
 mod stage;
+mod table;
 mod text;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -295,6 +296,9 @@ pub enum Unsupported {
     /// footnote or attachment marker (`U+FFFC`, `U+000E`), which the plain
     /// text write cannot keep consistent.
     InlineObjects,
+    /// The deck holds no slide table whose structure a new table can copy
+    /// ([`Edit::add_table`]).
+    TableTemplate,
 }
 
 impl fmt::Display for Unsupported {
@@ -311,6 +315,7 @@ impl fmt::Display for Unsupported {
             Self::UnmodelledContent => f.write_str("unmodelled native content with references"),
             Self::RegistryShape => f.write_str("an unmodelled package-registry shape"),
             Self::InlineObjects => f.write_str("text with inline object markers"),
+            Self::TableTemplate => f.write_str("a deck without a slide table to copy"),
         }
     }
 }
@@ -419,6 +424,15 @@ pub enum Error {
     /// The geometry is not finite or its size is not positive.
     #[error("the Keynote drawable geometry must be finite with a positive size")]
     InvalidGeometry,
+    /// A new table's size is empty or past the native row and column
+    /// identity ceiling, or a seeded cell lies outside it.
+    #[error("a new Keynote table of {rows} x {columns} cells is not supported")]
+    InvalidTableSize {
+        /// The requested rows.
+        rows: u32,
+        /// The requested columns.
+        columns: u32,
+    },
     /// The image file name has no usable stem.
     #[error("the Keynote image needs a file name with a stem")]
     InvalidImage,
@@ -505,6 +519,104 @@ enum Operation {
         column: u32,
         value: TableCellValue,
     },
+    AddTable {
+        slide: u64,
+        slide_position: Position,
+        template: u64,
+        name: Box<str>,
+        table: NewTable,
+    },
+    NotesStyle {
+        slide: u64,
+        note: u64,
+        storage: u64,
+        span: TextSpan,
+        style: Style,
+    },
+}
+
+/// A new slide table for [`Edit::add_table`]: its size, frame, optional
+/// name and seeded cell values.
+///
+/// ```
+/// use litchi_keynote::slide::drawable::{Geometry, NewTable, TableCellValue};
+///
+/// let table = NewTable::new(3, 2, Geometry::new(80.0, 120.0, 600.0, 180.0))
+///     .with_name("Forecast")
+///     .with_cell(0, 0, TableCellValue::Text("Region".into()));
+/// assert_eq!((table.rows(), table.columns()), (3, 2));
+/// assert_eq!(table.name(), Some("Forecast"));
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct NewTable {
+    rows: u32,
+    columns: u32,
+    geometry: Geometry,
+    name: Option<String>,
+    cells: Vec<(u32, u32, TableCellValue)>,
+}
+
+impl NewTable {
+    /// An empty table of `rows` × `columns` cells (header rows and columns
+    /// included, as the template's counts allow) in `geometry`; rows and
+    /// columns divide the frame evenly.
+    #[must_use]
+    pub const fn new(rows: u32, columns: u32, geometry: Geometry) -> Self {
+        Self {
+            rows,
+            columns,
+            geometry,
+            name: None,
+            cells: Vec::new(),
+        }
+    }
+
+    /// This table with a name (the default is `Table N`, after the deck's
+    /// tables).
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// This table with a value in one cell (zero-based); a later value of
+    /// the same cell replaces an earlier one.
+    #[must_use]
+    pub fn with_cell(mut self, row: u32, column: u32, value: TableCellValue) -> Self {
+        self.cells.retain(|(r, c, _)| (*r, *c) != (row, column));
+        self.cells.push((row, column, value));
+        self
+    }
+
+    /// The number of rows.
+    #[must_use]
+    pub const fn rows(&self) -> u32 {
+        self.rows
+    }
+
+    /// The number of columns.
+    #[must_use]
+    pub const fn columns(&self) -> u32 {
+        self.columns
+    }
+
+    /// The frame.
+    #[must_use]
+    pub const fn geometry(&self) -> Geometry {
+        self.geometry
+    }
+
+    /// The requested name.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// The seeded cells, in staging order.
+    #[must_use]
+    pub fn cells(&self) -> &[(u32, u32, TableCellValue)] {
+        &self.cells
+    }
 }
 
 /// A value [`Edit::set_table_cell`] stores in a table cell.
@@ -567,6 +679,8 @@ pub struct Edit<'a> {
     removed: BTreeSet<u64>,
     /// Net drawables added (positive) or removed per slide so far.
     deltas: BTreeMap<u64, isize>,
+    /// The table template and the deck's table count, once read.
+    tables: Option<(Option<u64>, usize)>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -591,6 +705,7 @@ impl<'a> Edit<'a> {
             inventories: BTreeMap::new(),
             removed: BTreeSet::new(),
             deltas: BTreeMap::new(),
+            tables: None,
         }
     }
 
@@ -800,11 +915,13 @@ impl<'a> Edit<'a> {
             Operation::Geometry { .. }
             | Operation::Text { .. }
             | Operation::TextStyle { .. }
+            | Operation::NotesStyle { .. }
             | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::AddText { slide, .. }
-            | Operation::AddImage { slide, .. } => *slide == selected.identifier,
+            | Operation::AddImage { slide, .. }
+            | Operation::AddTable { slide, .. } => *slide == selected.identifier,
         });
         let current = self
             .inventories
@@ -1004,6 +1121,130 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
+    /// The deck's first slide table (in slide and z-order) and how many
+    /// tables the deck holds, read once per edit.
+    fn table_template(&mut self) -> Result<(Option<u64>, usize), Error> {
+        if let Some(tables) = self.tables {
+            return Ok(tables);
+        }
+        let limits = read_limits(self.source)?;
+        let slides = self.source.slides().map_err(map_read_error)?.len();
+        let mut template = None;
+        let mut count = 0_usize;
+        for position in 0..slides {
+            let record = self
+                .source
+                .slide_record_at(position)
+                .map_err(map_read_error)?
+                .ok_or(Error::InvalidSource)?;
+            let inventory = read_inventory(self.source, record.slide_identifier, limits)?;
+            for identifier in &inventory.z_order {
+                if inventory
+                    .item(*identifier)
+                    .is_some_and(|item| item.kind == Kind::Table)
+                {
+                    template = template.or(Some(*identifier));
+                    count += 1;
+                }
+            }
+        }
+        self.tables = Some((template, count));
+        Ok((template, count))
+    }
+
+    /// Stage a new, empty table in front of the slide's drawables, cloned
+    /// from the structure of the deck's first slide table (record 0329):
+    /// its styles, header counts and storage layout, without its content,
+    /// sort, filter, category or summary state. Rows and columns divide the
+    /// frame evenly; seeded cells are written with [`Self::set_table_cell`]'s
+    /// writer. The table gets its own formula owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors, [`Error::InvalidGeometry`],
+    /// [`Error::InvalidTableSize`] (also for a seeded cell outside the
+    /// table or a non-finite number), [`Error::LimitExceeded`], and
+    /// [`Error::Unsupported`] with [`Unsupported::TableTemplate`] for a deck
+    /// without a slide table.
+    ///
+    /// ```no_run
+    /// use litchi_keynote::slide::drawable::{Geometry, NewTable, TableCellValue};
+    /// use litchi_keynote::{Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// let mut edit = package.edit_slide_drawables();
+    /// edit.add_table(
+    ///     SlideSelector::index(0),
+    ///     NewTable::new(3, 2, Geometry::new(80.0, 120.0, 600.0, 180.0))
+    ///         .with_cell(0, 1, TableCellValue::Text("Q3".into())),
+    /// )?;
+    /// let commit = edit.commit()?;
+    /// assert_eq!(commit.created().len(), 1);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn add_table<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        table: NewTable,
+    ) -> Result<&mut Self, Error> {
+        if !table.geometry.is_valid() {
+            return Err(Error::InvalidGeometry);
+        }
+        let size = Error::InvalidTableSize {
+            rows: table.rows,
+            columns: table.columns,
+        };
+        if !litchi_numbers_wire::table_create::admits_size(table.rows, table.columns)
+            || table.cells.iter().any(|(row, column, value)| {
+                *row >= table.rows
+                    || *column >= table.columns
+                    || matches!(value, TableCellValue::Number(number) if !number.is_finite())
+            })
+        {
+            return Err(size);
+        }
+        let maximum = self.source.semantic_limits().max_text_bytes();
+        let text_bytes = table.cells.iter().fold(0_usize, |total, (_, _, value)| {
+            total.saturating_add(match value {
+                TableCellValue::Text(text) => text.len(),
+                _ => 0,
+            })
+        }) + table.name.as_deref().map_or(0, str::len);
+        if text_bytes > maximum {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::TextBytes,
+                observed: text_bytes as u64,
+                maximum: maximum as u64,
+            });
+        }
+        let selected = self.slide(slide.into())?;
+        self.check_drawable_limit(selected.identifier)?;
+        let (template, count) = self.table_template()?;
+        let template = template.ok_or(Error::Unsupported {
+            reason: Unsupported::TableTemplate,
+        })?;
+        let staged = self
+            .operations
+            .iter()
+            .filter(|operation| matches!(operation, Operation::AddTable { .. }))
+            .count();
+        let name: Box<str> = match table.name.as_deref() {
+            Some(name) => name.into(),
+            None => format!("Table {}", count + staged + 1).into(),
+        };
+        *self.deltas.entry(selected.identifier).or_default() += 1;
+        self.operations.push(Operation::AddTable {
+            slide: selected.identifier,
+            slide_position: selected.position,
+            template,
+            name,
+            table,
+        });
+        Ok(self)
+    }
+
     /// Whether a sequence of text sets of one text box or shape, each a
     /// splice within `hull` (UTF-16 code units of the drawable's text in
     /// the source package, both ends inclusive), publishes exactly what one
@@ -1197,6 +1438,70 @@ impl<'a> Edit<'a> {
         self.operations.push(Operation::TextStyle {
             slide: selected.identifier,
             drawable: item.identifier,
+            storage,
+            span,
+            style,
+        });
+        Ok(self)
+    }
+
+    /// Stage character styling of one span (characters) of a slide's
+    /// speaker notes (record 0329), as [`Self::set_text_style`] styles a
+    /// text box: each character-style run inside the span gets a new
+    /// variation of its style carrying the set properties, registered in
+    /// the notes storage's stylesheet. Notes text is written by
+    /// [`Package::edit_slide_notes`], never by this edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors, [`Error::InvalidSpan`],
+    /// [`Error::Unsupported`] with [`Unsupported::Kind`] for a slide
+    /// without notes and [`Unsupported::TextStyling`] for a style that sets
+    /// nothing; notes stored outside their slide's component, or a storage
+    /// other objects reference, are refused by [`Self::commit`].
+    ///
+    /// ```no_run
+    /// use litchi_keynote::slide::drawable::{Style, TextSpan};
+    /// use litchi_keynote::{Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// let mut edit = package.edit_slide_drawables();
+    /// edit.set_notes_text_style(
+    ///     SlideSelector::index(0),
+    ///     TextSpan::new(0, 4),
+    ///     Style::new().with_italic(true),
+    /// )?;
+    /// let commit = edit.commit()?;
+    /// let runs = commit.package().slide_notes_text_runs(SlideSelector::index(0))?;
+    /// assert_eq!(runs[0].style().italic, Some(true));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_notes_text_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        span: TextSpan,
+        style: Style,
+    ) -> Result<&mut Self, Error> {
+        let selected = self.slide(slide.into())?;
+        let (note, storage, text) =
+            super::slide_notes::notes_identity(self.source, selected.position)
+                .map_err(|_error| Error::InvalidSource)?
+                .ok_or(Error::Unsupported {
+                    reason: Unsupported::Kind { kind: Kind::Other },
+                })?;
+        if span.start() >= span.end() || span.end() > text.chars().count() {
+            return Err(Error::InvalidSpan);
+        }
+        if style == Style::new() {
+            return Err(Error::Unsupported {
+                reason: Unsupported::TextStyling,
+            });
+        }
+        self.operations.push(Operation::NotesStyle {
+            slide: selected.identifier,
+            note,
             storage,
             span,
             style,
@@ -1549,6 +1854,41 @@ impl Package {
         text::runs(self, storage, text_value, wire).map_err(lift)
     }
 
+    /// Read the character-style runs of one slide's speaker notes (record
+    /// 0329), as [`Self::slide_drawable_text_runs`] reads a text box's.
+    ///
+    /// ```no_run
+    /// use litchi_keynote::{Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// for run in package.slide_notes_text_runs(SlideSelector::index(0))?.iter() {
+    ///     println!("{:?} italic={:?}", run.span(), run.style().italic);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Error::Unsupported`] for a slide
+    /// without notes.
+    pub fn slide_notes_text_runs<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+    ) -> Result<Box<[TextRun]>, Error> {
+        let selected = select_slide(self, slide.into())?;
+        let (_, storage, text_value) = super::slide_notes::notes_identity(self, selected.position)
+            .map_err(|_error| Error::InvalidSource)?
+            .ok_or(Error::Unsupported {
+                reason: Unsupported::Kind { kind: Kind::Other },
+            })?;
+        let wire = self
+            .semantic_wire_limits()
+            .map_err(|_error| Error::InvalidSource)?;
+        text::runs(self, storage, &text_value, wire).map_err(lift)
+    }
+
     /// Start one slide-drawable edit.
     ///
     /// ```no_run
@@ -1695,6 +2035,8 @@ fn commit_operations(
     let mut workspace = Workspace::new(source).map_err(lift)?;
     let mut context = None;
     let mut created = Vec::new();
+    let mut tables = Vec::new();
+    let mut notes: Vec<(u64, String)> = Vec::new();
     let mut touched: HashMap<u64, HashSet<u64>> = HashMap::new();
     let mut diagnostics = Diagnostics {
         operations: operations.len(),
@@ -1819,6 +2161,63 @@ fn commit_operations(
                 stage::set_table_cell(&mut workspace, *drawable, *row, *column, value)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
+            Operation::NotesStyle {
+                slide,
+                note,
+                storage,
+                span,
+                style,
+            } => {
+                let wire = workspace.wire;
+                let before = inventory::storage_text(&workspace, *storage, wire).map_err(lift)?;
+                stage::set_text_style(&mut workspace, *slide, *note, *storage, *span, style)?;
+                let after = inventory::storage_text(&workspace, *storage, wire).map_err(lift)?;
+                if before != after {
+                    return Err(Error::Verification);
+                }
+                notes.push((*slide, before));
+                touched.entry(*slide).or_default();
+            },
+            Operation::AddTable {
+                slide,
+                slide_position,
+                template,
+                name,
+                table,
+            } => {
+                let drawable = table::add_table(
+                    &mut workspace,
+                    &table::Request {
+                        slide: *slide,
+                        template: *template,
+                        name,
+                        rows: table.rows,
+                        columns: table.columns,
+                        geometry: table.geometry,
+                    },
+                )?;
+                for (row, column, value) in &table.cells {
+                    stage::set_table_cell(&mut workspace, drawable, *row, *column, value)?;
+                }
+                let staged = read_inventory(&workspace, *slide, limits)?;
+                let item = staged.item(drawable).ok_or(Error::Verification)?;
+                if item.kind != Kind::Table
+                    || item
+                        .geometry
+                        .map(|frame| (frame.x, frame.y, frame.width, frame.height))
+                        != Some((
+                            table.geometry.x,
+                            table.geometry.y,
+                            table.geometry.width,
+                            table.geometry.height,
+                        ))
+                {
+                    return Err(Error::Verification);
+                }
+                tables.push((*slide_position, drawable, name.clone(), table.clone()));
+                created.push((*slide_position, *slide, drawable));
+                touched.entry(*slide).or_default().insert(drawable);
+            },
             Operation::AddImage {
                 slide,
                 slide_position,
@@ -1881,6 +2280,37 @@ fn commit_operations(
             return Err(Error::Verification);
         }
     }
+    for (slide_position, drawable, name, table) in &tables {
+        verify_table(
+            &candidate,
+            &expected,
+            *slide_position,
+            *drawable,
+            name,
+            table,
+        )?;
+    }
+    // Styled notes keep their text.
+    for (slide, text) in &notes {
+        let mut position = None;
+        for index in 0.. {
+            match candidate.slide_record_at(index).map_err(map_read_error)? {
+                Some(record) if record.slide_identifier == *slide => {
+                    position = Some(Position::new(index));
+                    break;
+                },
+                Some(_) => {},
+                None => break,
+            }
+        }
+        let position = position.ok_or(Error::Verification)?;
+        let read = super::slide_notes::notes_identity(&candidate, position)
+            .map_err(|_error| Error::Verification)?
+            .ok_or(Error::Verification)?;
+        if read.2 != *text {
+            return Err(Error::Verification);
+        }
+    }
     let mut public_created = Vec::with_capacity(created.len());
     for (slide_position, slide, drawable) in created {
         let inventory = expected
@@ -1911,6 +2341,62 @@ fn commit_operations(
         diagnostics,
         created: public_created.into_boxed_slice(),
     })
+}
+
+/// Read a created table back through the slide-table reader: its name,
+/// size and seeded values.
+fn verify_table(
+    candidate: &Package,
+    expected: &[SlideDrawables],
+    slide: Position,
+    drawable: u64,
+    name: &str,
+    table: &NewTable,
+) -> Result<(), Error> {
+    use crate::slide::table::cells::{CellPosition, Value};
+    let inventory = expected
+        .iter()
+        .find(|inventory| inventory.item(drawable).is_some())
+        .ok_or(Error::Verification)?;
+    let ordinal = inventory
+        .z_order
+        .iter()
+        .take_while(|identifier| **identifier != drawable)
+        .filter(|identifier| {
+            inventory
+                .item(**identifier)
+                .is_some_and(|item| item.kind == Kind::Table)
+        })
+        .count();
+    let read = candidate
+        .slide_table_cells(
+            SlideSelector::position(slide),
+            crate::TableSelector::index(ordinal),
+        )
+        .map_err(|_error| Error::Verification)?;
+    let read = read.table();
+    let dimensions = read.dimensions();
+    if read.name() != name
+        || (dimensions.rows(), dimensions.columns()) != (table.rows, table.columns)
+    {
+        return Err(Error::Verification);
+    }
+    for (row, column, value) in &table.cells {
+        let stored = read.get(CellPosition::new(*row, *column));
+        let matches = match (value, stored) {
+            (TableCellValue::Text(text), Some(Value::Text(stored))) => stored == text,
+            (TableCellValue::Number(number), Some(Value::Number(stored))) => {
+                stored.get() == *number
+            },
+            (TableCellValue::Boolean(flag), Some(Value::Boolean(stored))) => stored == flag,
+            (TableCellValue::Empty, None | Some(Value::Empty)) => true,
+            _ => false,
+        };
+        if !matches {
+            return Err(Error::Verification);
+        }
+    }
+    Ok(())
 }
 
 /// Whether replacing `before` with `after` would consume or introduce an
