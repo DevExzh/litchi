@@ -796,7 +796,9 @@ fn part_validation_reports_dangling_targets_and_malformed_xml() {
     assert!(report.issues().is_empty());
 
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
-    writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
     writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
     writer
         .write_stored("word/document.xml", b"<document><p></document>")
@@ -811,7 +813,10 @@ fn part_validation_reports_dangling_targets_and_malformed_xml() {
     let package = litchi_opc::OpcPackage::from_bytes(&broken).unwrap();
     let report = litchi_opc::validate_parts(&package, ValidationLimits::default()).unwrap();
     let codes: Vec<&str> = report.issues().iter().map(|issue| issue.code()).collect();
-    assert!(codes.contains(&"opc.relationship.target_missing"), "{codes:?}");
+    assert!(
+        codes.contains(&"opc.relationship.target_missing"),
+        "{codes:?}"
+    );
     assert!(codes.contains(&"opc.xml.malformed"), "{codes:?}");
     assert!(report.has_errors());
     let dangling = report

@@ -488,8 +488,12 @@ const PART_XML: &str = "opc.package.xml_well_formed";
 ///
 /// # Errors
 /// Returns payload decode, allocation and report-construction failures.
-pub fn validate_parts(package: &crate::OpcPackage, limits: ValidationLimits) -> Result<ValidateReport> {
-    let mut names: Vec<&crate::PackURI> = package.iter_parts().map(|part| part.partname()).collect();
+pub fn validate_parts(
+    package: &crate::OpcPackage,
+    limits: ValidationLimits,
+) -> Result<ValidateReport> {
+    let mut names: Vec<&crate::PackURI> =
+        package.iter_parts().map(|part| part.partname()).collect();
     names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
     let max_issues = limits.max_issues();
     let mut issues = Vec::new();
@@ -498,11 +502,11 @@ pub fn validate_parts(package: &crate::OpcPackage, limits: ValidationLimits) -> 
 
     // Package-level relationships first, then each part's own.
     let package_rels = package.rels();
-    let sources = std::iter::once((None, package_rels)).chain(
-        names
-            .iter()
-            .filter_map(|name| package.part_metadata(name).map(|part| (Some(*name), part.rels()))),
-    );
+    let sources = std::iter::once((None, package_rels)).chain(names.iter().filter_map(|name| {
+        package
+            .part_metadata(name)
+            .map(|part| (Some(*name), part.rels()))
+    }));
     'sources: for (source, rels) in sources {
         let mut relationships: Vec<&crate::Relationship> = rels.iter().collect();
         relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
