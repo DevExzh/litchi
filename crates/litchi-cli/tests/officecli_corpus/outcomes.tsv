@@ -118,7 +118,7 @@
 195	get	xlsx	-	ok	-	B11
 196	get	xlsx	-	ok	-	B6
 197	get	xlsx	-	ok	-	B9
-199	validate	xlsx	-	usage	validate	-
+199	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts.sh
@@ -435,14 +435,14 @@
 172	add	xlsx	chart	ok	-	-
 183	add	xlsx	chart	warned	trendline	-
 196	add	xlsx	chart	ok	-	-
-213	add-part	xlsx	chart	usage	add-part	-
-214	raw-set	xlsx	-	usage	raw-set	-
-257	raw-set	xlsx	-	usage	raw-set	-
+213	add-part	xlsx	chart	ok	-	-
+214	raw-set	xlsx	-	ok	-	-
+257	raw-set	xlsx	-	ok	-	-
 271	add	xlsx	chart	warned	hilowlines,updownbars	-
 282	add	xlsx	chart	ok	-	-
 293	add	xlsx	chart	ok	-	-
 307	close	xlsx	-	skip	-	-
-313	validate	xlsx	-	usage	validate	-
+313	validate	xlsx	-	ok	-	-
 314	view	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
@@ -465,7 +465,7 @@
 210	add	xlsx	chart	warned	transparency	-
 227	add	xlsx	chart	warned	bubbleScale	-
 238	close	xlsx	-	skip	-	-
-240	validate	xlsx	-	usage	validate	-
+240	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-area.sh
@@ -562,7 +562,7 @@
 364	add	xlsx	chart	warned	dispUnits,transparency	-
 380	add	xlsx	chart	warned	colorRule,referenceLine,title.glow,+2	-
 392	close	xlsx	-	skip	-	-
-394	validate	xlsx	-	usage	validate	-
+394	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-bar.sh
@@ -649,7 +649,7 @@
 473	add	xlsx	chart	warned	axisposition,serlines	-
 486	add	xlsx	chart	warned	markercolor	-
 498	close	xlsx	-	skip	-	-
-499	validate	xlsx	-	usage	validate	-
+499	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-basic.sh
@@ -756,7 +756,7 @@
 418	add	xlsx	chart	warned	colorRule	-
 429	add	xlsx	chart	warned	style,dataLabels.showLeaderLines	-
 438	close	xlsx	-	skip	-	-
-439	validate	xlsx	-	usage	validate	-
+439	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-boxwhisker.sh
@@ -774,7 +774,7 @@
 142	add	xlsx	chart	warned	title.color,title.size,title.bold,title.font,+17	-
 178	remove	xlsx	-	ok	-	Sheet1
 180	close	xlsx	-	skip	-	-
-182	validate	xlsx	-	usage	validate	-
+182	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-bubble.sh
@@ -803,7 +803,7 @@
 210	add	xlsx	chart	warned	series1.bubbleSize,bubbleScale	-
 220	remove	xlsx	-	ok	-	Sheet1
 222	close	xlsx	-	skip	-	-
-224	validate	xlsx	-	usage	validate	-
+224	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-column.sh
@@ -910,7 +910,7 @@
 442	add	xlsx	chart	warned	shape	-
 456	add	xlsx	chart	warned	shape	-
 468	close	xlsx	-	skip	-	-
-469	validate	xlsx	-	usage	validate	-
+469	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-combo.sh
@@ -938,7 +938,7 @@
 271	add	xlsx	chart	warned	secondaryAxis	-
 288	remove	xlsx	-	ok	-	Sheet1
 290	close	xlsx	-	skip	-	-
-292	validate	xlsx	-	usage	validate	-
+292	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-extended.sh
@@ -971,7 +971,7 @@
 291	add	xlsx	chart	warned	preset	-
 300	remove	xlsx	-	ok	-	Sheet1
 302	close	xlsx	-	skip	-	-
-303	validate	xlsx	-	usage	validate	-
+303	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-histogram.sh
@@ -1013,7 +1013,7 @@
 451	add	xlsx	chart	warned	fill,xAxisTitle,yAxisTitle,title.color,+13	-
 460	add	xlsx	chart	invalid_argument	dataLabels;skipped:fill,xAxisTitle,+15	-
 467	close	xlsx	-	skip	-	-
-468	validate	xlsx	-	usage	validate	-
+468	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-line.sh
@@ -1126,7 +1126,7 @@
 574	add	xlsx	chart	warned	dispBlanksAs,crossesAt	-
 589	add	xlsx	chart	warned	crosses	-
 599	close	xlsx	-	skip	-	-
-601	validate	xlsx	-	usage	validate	-
+601	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-pie.sh
@@ -1149,7 +1149,7 @@
 185	add	xlsx	chart	invalid_value	labelPos;skipped:title.overlay,labelFont	-
 199	remove	xlsx	-	ok	-	Sheet1
 201	close	xlsx	-	skip	-	-
-202	validate	xlsx	-	usage	validate	-
+202	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-radar.sh
@@ -1177,7 +1177,7 @@
 251	add	xlsx	chart	warned	transparency,series.outline,labelFont,+2	-
 267	remove	xlsx	-	ok	-	Sheet1
 269	close	xlsx	-	skip	-	-
-271	validate	xlsx	-	usage	validate	-
+271	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-scatter.sh
@@ -1215,7 +1215,7 @@
 391	add	xlsx	chart	warned	colorRule	-
 405	remove	xlsx	-	ok	-	Sheet1
 407	close	xlsx	-	skip	-	-
-409	validate	xlsx	-	usage	validate	-
+409	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-stock.sh
@@ -1238,7 +1238,7 @@
 201	add	xlsx	chart	warned	axisNumFmt,hiLowLines	-
 215	remove	xlsx	-	ok	-	Sheet1
 217	close	xlsx	-	skip	-	-
-218	validate	xlsx	-	usage	validate	-
+218	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/charts/charts-waterfall.sh
@@ -1266,7 +1266,7 @@
 252	add	xlsx	chart	warned	axisfont	-
 264	remove	xlsx	-	ok	-	Sheet1
 266	close	xlsx	-	skip	-	-
-267	validate	xlsx	-	usage	validate	-
+267	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/conditional-formatting.sh
@@ -1436,7 +1436,7 @@
 89	add	xlsx	conditionalformatting	ok	-	-
 90	add	xlsx	conditionalformatting	ok	-	-
 92	close	xlsx	-	skip	-	-
-93	validate	xlsx	-	usage	validate	-
+93	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/data-validation.sh
@@ -1529,7 +1529,7 @@
 154	add	xlsx	validation	ok	-	-
 159	add	xlsx	validation	ok	-	-
 163	close	xlsx	-	skip	-	-
-164	validate	xlsx	-	usage	validate	-
+164	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/pivot-tables.sh
@@ -2120,7 +2120,7 @@
 384	add	xlsx	sheet	ok	-	-
 385	add	xlsx	pivottable	unsupported_element	-	-
 397	close	xlsx	-	skip	-	-
-399	validate	xlsx	-	usage	validate	-
+399	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/shapes.sh
@@ -2187,7 +2187,7 @@
 188	get	xlsx	-	ok	-	shape
 189	get	xlsx	-	ok	-	shape
 190	get	xlsx	-	ok	-	shape
-192	validate	xlsx	-	usage	validate	-
+192	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/sheet-settings.sh
@@ -2296,7 +2296,7 @@
 138	add	xlsx	sheet	ok	-	-
 139	set	xlsx	-	ok	-	A1
 141	close	xlsx	-	skip	-	-
-142	validate	xlsx	-	usage	validate	-
+142	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/slicers.sh
@@ -2361,7 +2361,7 @@
 102	add	xlsx	slicer	unsupported_element	-	-
 113	set	xlsx	-	unsupported_capability	-	slicer
 117	close	xlsx	-	skip	-	-
-119	validate	xlsx	-	usage	validate	-
+119	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/sparklines.sh
@@ -2480,7 +2480,7 @@
 74	add	xlsx	sparkline	unsupported_element	-	-
 77	add	xlsx	sparkline	unsupported_element	-	-
 80	close	xlsx	-	skip	-	-
-81	validate	xlsx	-	usage	validate	-
+81	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ excel/workbook-settings.sh
@@ -2510,7 +2510,7 @@
 52	set	xlsx	-	unsupported_element	-	/
 59	set	xlsx	-	unsupported_element	-	/
 63	close	xlsx	-	skip	-	-
-64	validate	xlsx	-	usage	validate	-
+64	validate	xlsx	-	ok	-	-
 0	view	xlsx	-	ok	-	-
 0	get	xlsx	-	ok	-	/
 @ ppt/3d-model.sh
@@ -2550,7 +2550,7 @@
 188	add	pptx	shape	unsupported_capability	fill	-
 194	add	pptx	shape	unsupported_capability	fill	-
 203	close	pptx	-	skip	-	-
-204	validate	pptx	-	usage	validate	-
+204	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/animations.sh
@@ -2674,7 +2674,7 @@
 249	add	pptx	animation	unsupported_element	-	-
 252	set	pptx	-	ok	-	slide
 257	close	pptx	-	skip	-	-
-259	validate	pptx	-	usage	validate	-
+259	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-3d.sh
@@ -2729,7 +2729,7 @@
 98	add	pptx	chart	warned	preset	-
 99	add	pptx	chart	warned	preset	-
 101	close	pptx	-	skip	-	-
-103	validate	pptx	-	usage	validate	-
+103	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-advanced.sh
@@ -2795,7 +2795,7 @@
 299	get	pptx	-	ok	-	axis
 300	add	pptx	shape	ok	-	-
 305	close	pptx	-	skip	-	-
-306	validate	pptx	-	usage	validate	-
+306	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-area.sh
@@ -2851,7 +2851,7 @@
 92	add	pptx	chart	ok	-	-
 94	set	pptx	-	ok	-	series
 96	close	pptx	-	skip	-	-
-98	validate	pptx	-	usage	validate	-
+98	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-bar.sh
@@ -2908,7 +2908,7 @@
 95	add	pptx	chart	ok	-	-
 96	set	pptx	-	ok	-	series
 98	close	pptx	-	skip	-	-
-99	validate	pptx	-	usage	validate	-
+99	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-bubble.sh
@@ -2965,7 +2965,7 @@
 101	set	pptx	-	ok	-	series
 102	set	pptx	-	ok	-	series
 104	close	pptx	-	skip	-	-
-105	validate	pptx	-	usage	validate	-
+105	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-column.sh
@@ -3023,7 +3023,7 @@
 102	add	pptx	chart	ok	-	-
 103	set	pptx	-	ok	-	series
 105	close	pptx	-	skip	-	-
-106	validate	pptx	-	usage	validate	-
+106	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-combo.sh
@@ -3081,7 +3081,7 @@
 98	set	pptx	-	ok	-	series
 99	set	pptx	-	warned	lineWidth,marker,markerSize	series
 101	close	pptx	-	skip	-	-
-103	validate	pptx	-	usage	validate	-
+103	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-doughnut.sh
@@ -3137,7 +3137,7 @@
 94	add	pptx	chart	ok	-	-
 97	set	pptx	-	ok	-	series
 99	close	pptx	-	skip	-	-
-101	validate	pptx	-	usage	validate	-
+101	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-line.sh
@@ -3194,7 +3194,7 @@
 97	set	pptx	-	warned	lineWidth,lineDash,marker,markerSize,smooth	series
 98	set	pptx	-	warned	lineWidth,lineDash,marker,markerSize	series
 100	close	pptx	-	skip	-	-
-101	validate	pptx	-	usage	validate	-
+101	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-pie.sh
@@ -3250,7 +3250,7 @@
 91	add	pptx	chart	ok	-	-
 93	set	pptx	-	ok	-	series
 95	close	pptx	-	skip	-	-
-96	validate	pptx	-	usage	validate	-
+96	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-radar.sh
@@ -3306,7 +3306,7 @@
 92	add	pptx	chart	ok	-	-
 94	set	pptx	-	warned	marker,markerSize	series
 96	close	pptx	-	skip	-	-
-97	validate	pptx	-	usage	validate	-
+97	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-scatter.sh
@@ -3369,7 +3369,7 @@
 107	add	pptx	chart	ok	-	-
 108	add	pptx	chart	ok	-	-
 110	close	pptx	-	skip	-	-
-111	validate	pptx	-	usage	validate	-
+111	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-stock.sh
@@ -3427,7 +3427,7 @@
 96	set	pptx	-	ok	-	series
 97	set	pptx	-	ok	-	series
 99	close	pptx	-	skip	-	-
-100	validate	pptx	-	usage	validate	-
+100	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/charts/charts-waterfall.sh
@@ -3479,7 +3479,7 @@
 88	add	pptx	chart	warned	preset	-
 89	add	pptx	chart	warned	preset	-
 91	close	pptx	-	skip	-	-
-92	validate	pptx	-	usage	validate	-
+92	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/diagram.sh
@@ -3554,7 +3554,7 @@
 262	add	pptx	slide	ok	translated:D4	-
 262	add	pptx	textbox	ok	-	-
 262	add	pptx	diagram	unsupported_capability	-	-
-273	validate	pptx	-	usage	validate	-
+273	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/ole/ole-embed.sh
@@ -3589,7 +3589,7 @@
 166	query	pptx	-	ok	-	ole
 168	get	pptx	-	path_not_found	-	ole
 170	get	pptx	-	path_not_found	-	ole
-172	validate	pptx	-	usage	validate	-
+172	validate	pptx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 0	view	xlsx	-	ok	-	-
@@ -3666,7 +3666,7 @@
 295	set	pptx	-	missing_argument	-	-
 300	add	pptx	textbox	ok	-	-
 302	close	pptx	-	skip	-	-
-304	validate	pptx	-	usage	validate	-
+304	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/presentation-settings.sh
@@ -3683,62 +3683,62 @@
 49	set	pptx	-	warned	theme.color.dk1,theme.color.lt1,+10	/
 56	set	pptx	-	warned	theme.font.major.latin,+3	/
 60	close	pptx	-	skip	-	-
-61	validate	pptx	-	usage	validate	-
+61	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/presentation.sh
 9	create	pptx	-	ok	-	-
 10	open	pptx	-	skip	-	-
 18	add	pptx	slide	ok	translated:D4	-
-21	raw-set	pptx	-	usage	raw-set	-
-37	raw-set	pptx	-	usage	raw-set	-
-50	raw-set	pptx	-	usage	raw-set	-
-63	raw-set	pptx	-	usage	raw-set	-
-83	raw-set	pptx	-	usage	raw-set	-
-108	raw-set	pptx	-	usage	raw-set	-
-143	raw-set	pptx	-	usage	raw-set	-
+21	raw-set	pptx	-	ok	-	-
+37	raw-set	pptx	-	ok	-	-
+50	raw-set	pptx	-	ok	-	-
+63	raw-set	pptx	-	ok	-	-
+83	raw-set	pptx	-	ok	-	-
+108	raw-set	pptx	-	ok	-	-
+143	raw-set	pptx	-	ok	-	-
 159	add	pptx	slide	ok	translated:D4	-
-161	raw-set	pptx	-	usage	raw-set	-
-165	raw-set	pptx	-	usage	raw-set	-
-190	raw-set	pptx	-	usage	raw-set	-
-215	raw-set	pptx	-	usage	raw-set	-
-236	raw-set	pptx	-	usage	raw-set	-
-257	raw-set	pptx	-	usage	raw-set	-
+161	raw-set	pptx	-	ok	-	-
+165	raw-set	pptx	-	ok	-	-
+190	raw-set	pptx	-	ok	-	-
+215	raw-set	pptx	-	ok	-	-
+236	raw-set	pptx	-	ok	-	-
+257	raw-set	pptx	-	ok	-	-
 281	add	pptx	slide	ok	translated:D4	-
-283	raw-set	pptx	-	usage	raw-set	-
-287	raw-set	pptx	-	usage	raw-set	-
-301	raw-set	pptx	-	usage	raw-set	-
-314	raw-set	pptx	-	usage	raw-set	-
-331	raw-set	pptx	-	usage	raw-set	-
-348	raw-set	pptx	-	usage	raw-set	-
-365	raw-set	pptx	-	usage	raw-set	-
+283	raw-set	pptx	-	ok	-	-
+287	raw-set	pptx	-	ok	-	-
+301	raw-set	pptx	-	ok	-	-
+314	raw-set	pptx	-	ok	-	-
+331	raw-set	pptx	-	ok	-	-
+348	raw-set	pptx	-	ok	-	-
+365	raw-set	pptx	-	ok	-	-
 383	add	pptx	slide	ok	translated:D4	-
-385	raw-set	pptx	-	usage	raw-set	-
-389	raw-set	pptx	-	usage	raw-set	-
-403	raw-set	pptx	-	usage	raw-set	-
-418	raw-set	pptx	-	usage	raw-set	-
-432	raw-set	pptx	-	usage	raw-set	-
+385	raw-set	pptx	-	ok	-	-
+389	raw-set	pptx	-	ok	-	-
+403	raw-set	pptx	-	ok	-	-
+418	raw-set	pptx	-	ok	-	-
+432	raw-set	pptx	-	ok	-	-
 447	add	pptx	slide	ok	translated:D4	-
-449	raw-set	pptx	-	usage	raw-set	-
-453	raw-set	pptx	-	usage	raw-set	-
-467	raw-set	pptx	-	usage	raw-set	-
-491	raw-set	pptx	-	usage	raw-set	-
-506	raw-set	pptx	-	usage	raw-set	-
-491	raw-set	pptx	-	usage	raw-set	-
-506	raw-set	pptx	-	usage	raw-set	-
-491	raw-set	pptx	-	usage	raw-set	-
-506	raw-set	pptx	-	usage	raw-set	-
-491	raw-set	pptx	-	usage	raw-set	-
-506	raw-set	pptx	-	usage	raw-set	-
-521	raw-set	pptx	-	usage	raw-set	-
+449	raw-set	pptx	-	ok	-	-
+453	raw-set	pptx	-	ok	-	-
+467	raw-set	pptx	-	ok	-	-
+491	raw-set	pptx	-	ok	-	-
+506	raw-set	pptx	-	ok	-	-
+491	raw-set	pptx	-	ok	-	-
+506	raw-set	pptx	-	ok	-	-
+491	raw-set	pptx	-	ok	-	-
+506	raw-set	pptx	-	ok	-	-
+491	raw-set	pptx	-	ok	-	-
+506	raw-set	pptx	-	ok	-	-
+521	raw-set	pptx	-	ok	-	-
 538	add	pptx	slide	ok	translated:D4	-
-540	raw-set	pptx	-	usage	raw-set	-
-544	raw-set	pptx	-	usage	raw-set	-
-557	raw-set	pptx	-	usage	raw-set	-
-571	raw-set	pptx	-	usage	raw-set	-
-585	raw-set	pptx	-	usage	raw-set	-
-596	raw-set	pptx	-	usage	raw-set	-
-607	raw-set	pptx	-	usage	raw-set	-
+540	raw-set	pptx	-	ok	-	-
+544	raw-set	pptx	-	ok	-	-
+557	raw-set	pptx	-	ok	-	-
+571	raw-set	pptx	-	ok	-	-
+585	raw-set	pptx	-	ok	-	-
+596	raw-set	pptx	-	ok	-	-
+607	raw-set	pptx	-	ok	-	-
 618	close	pptx	-	skip	-	-
 624	view	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
@@ -3811,7 +3811,7 @@
 245	add	pptx	shape	warned	lineColor,lineWidth,lineAlign	-
 249	add	pptx	shape	warned	line	-
 256	close	pptx	-	skip	-	-
-257	validate	pptx	-	usage	validate	-
+257	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/shapes/shapes-connectors.sh
@@ -3871,7 +3871,7 @@
 223	add	pptx	connector	unsupported_element	-	-
 223	add	pptx	textbox	ok	-	-
 225	close	pptx	-	skip	-	-
-226	validate	pptx	-	usage	validate	-
+226	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/shapes/shapes-effects.sh
@@ -3917,7 +3917,7 @@
 233	add	pptx	shape	warned	name,zorder	-
 238	add	pptx	shape	warned	name,zorder	-
 243	close	pptx	-	skip	-	-
-244	validate	pptx	-	usage	validate	-
+244	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/shapes/shapes-typography.sh
@@ -3980,7 +3980,7 @@
 269	add	pptx	shape	warned	lineColor,lineWidth,lineOpacity	-
 276	add	pptx	shape	warned	animation	-
 282	close	pptx	-	skip	-	-
-283	validate	pptx	-	usage	validate	-
+283	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/tables/tables-basic.sh
@@ -4058,7 +4058,7 @@
 218	set	pptx	-	path_not_found	-	tc
 221	set	pptx	-	path_not_found	;skipped:bevel,border.right	tc
 226	close	pptx	-	skip	-	-
-227	validate	pptx	-	usage	validate	-
+227	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/tables/tables-borders.sh
@@ -4118,7 +4118,7 @@
 108	add	pptx	table	unsupported_element	-	-
 111	set	pptx	-	path_not_found	;skipped:border.tl2br,border.tr2bl	tc
 116	close	pptx	-	skip	-	-
-117	validate	pptx	-	usage	validate	-
+117	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/tables/tables-financial.sh
@@ -4198,7 +4198,7 @@
 113	add	pptx	shape	ok	-	-
 117	add	pptx	table	unsupported_element	-	-
 122	close	pptx	-	skip	-	-
-123	validate	pptx	-	usage	validate	-
+123	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/tables/tables-merged.sh
@@ -4266,7 +4266,7 @@
 115	set	pptx	-	path_not_found	-	tc
 116	set	pptx	-	path_not_found	-	tc
 118	close	pptx	-	skip	-	-
-119	validate	pptx	-	usage	validate	-
+119	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/tables/tables-nested.sh
@@ -4334,7 +4334,7 @@
 141	set	pptx	-	path_not_found	;skipped:spaceafter	tc
 143	set	pptx	-	path_not_found	-	tr
 146	close	pptx	-	skip	-	-
-147	validate	pptx	-	usage	validate	-
+147	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/tables/tables-rows-cols.sh
@@ -4423,7 +4423,7 @@
 198	set	pptx	-	path_not_found	;skipped:merge.down,valign	tc
 200	set	pptx	-	path_not_found	;skipped:merge.down,valign	tc
 203	close	pptx	-	skip	-	-
-204	validate	pptx	-	usage	validate	-
+204	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/tables/tables-styled.sh
@@ -4472,7 +4472,7 @@
 90	add	pptx	table	unsupported_element	-	-
 97	set	pptx	-	path_not_found	-	tc
 100	close	pptx	-	skip	-	-
-101	validate	pptx	-	usage	validate	-
+101	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/templates/styles/brand--aura-coffee-dark/build.sh
@@ -4494,7 +4494,7 @@
 130	add	pptx	(from)	unsupported_capability	-	-
 146	batch	pptx	-	path_not_found	-	-
 148	close	pptx	-	skip	-	-
-150	validate	pptx	-	usage	validate	-
+150	validate	pptx	-	ok	-	-
 151	view	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
@@ -4541,7 +4541,7 @@
 154	add	pptx	(from)	unsupported_capability	-	-
 155	batch	pptx	-	path_not_found	-	-
 175	close	pptx	-	skip	-	-
-177	validate	pptx	-	usage	validate	-
+177	validate	pptx	-	ok	-	-
 178	view	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
@@ -4681,7 +4681,7 @@
 233	set	pptx	-	path_not_found	-	shape
 234	set	pptx	-	path_not_found	-	shape
 236	close	pptx	-	skip	-	-
-238	validate	pptx	-	usage	validate	-
+238	validate	pptx	-	ok	-	-
 239	view	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
@@ -4837,7 +4837,7 @@
 285	set	pptx	-	usage	--name	slide
 287	set	pptx	-	usage	--name	slide
 290	close	pptx	-	skip	-	-
-292	validate	pptx	-	usage	validate	-
+292	validate	pptx	-	ok	-	-
 293	view	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
@@ -4945,7 +4945,7 @@
 211	add	pptx	(from)	unsupported_capability	-	-
 212	batch	pptx	-	path_not_found	-	-
 251	close	pptx	-	skip	-	-
-253	validate	pptx	-	usage	validate	-
+253	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/templates/styles/science--time-travel/build.sh
@@ -4970,7 +4970,7 @@
 280	add	pptx	(from)	unsupported_capability	-	-
 281	batch	pptx	-	corrupt_batch	-	-
 285	close	pptx	-	skip	-	-
-287	validate	pptx	-	usage	validate	-
+287	validate	pptx	-	ok	-	-
 291	view	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
@@ -5057,7 +5057,7 @@
 316	add	pptx	textbox	warned	direction,font.cs	-
 323	add	pptx	textbox	ok	-	-
 328	close	pptx	-	skip	-	-
-329	validate	pptx	-	usage	validate	-
+329	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/textboxes/textboxes-basic.sh
@@ -5113,7 +5113,7 @@
 154	add	pptx	textbox	warned	margin,valign	-
 162	add	pptx	textbox	ok	-	-
 167	close	pptx	-	skip	-	-
-168	validate	pptx	-	usage	validate	-
+168	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-bands.sh
@@ -5203,7 +5203,7 @@
 70	add	pptx	shape	ok	-	-
 70	set	pptx	-	ok	-	slide
 72	close	pptx	-	skip	-	-
-73	validate	pptx	-	usage	validate	-
+73	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-basic.sh
@@ -5234,7 +5234,7 @@
 45	set	pptx	-	ok	-	slide
 46	set	pptx	-	ok	-	slide
 48	close	pptx	-	skip	-	-
-49	validate	pptx	-	usage	validate	-
+49	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-directional.sh
@@ -5340,7 +5340,7 @@
 58	add	pptx	shape	ok	-	-
 58	set	pptx	-	ok	-	slide
 61	close	pptx	-	skip	-	-
-62	validate	pptx	-	usage	validate	-
+62	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-dynamic.sh
@@ -5446,7 +5446,7 @@
 73	add	pptx	shape	ok	-	-
 73	set	pptx	-	ok	-	slide
 76	close	pptx	-	skip	-	-
-77	validate	pptx	-	usage	validate	-
+77	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-modern.sh
@@ -5528,7 +5528,7 @@
 49	add	pptx	shape	ok	-	-
 49	set	pptx	-	ok	-	slide
 52	close	pptx	-	skip	-	-
-53	validate	pptx	-	usage	validate	-
+53	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-morph.sh
@@ -5554,7 +5554,7 @@
 67	add	pptx	shape	ok	-	-
 71	add	pptx	shape	warned	name	-
 75	close	pptx	-	skip	-	-
-76	validate	pptx	-	usage	validate	-
+76	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-random.sh
@@ -5576,7 +5576,7 @@
 38	add	pptx	shape	ok	-	-
 38	set	pptx	-	ok	-	slide
 40	close	pptx	-	skip	-	-
-41	validate	pptx	-	usage	validate	-
+41	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-shapes.sh
@@ -5638,7 +5638,7 @@
 55	add	pptx	shape	ok	-	-
 55	set	pptx	-	ok	-	slide
 58	close	pptx	-	skip	-	-
-59	validate	pptx	-	usage	validate	-
+59	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/transitions/transitions-timing.sh
@@ -5680,7 +5680,7 @@
 70	add	pptx	shape	ok	-	-
 74	set	pptx	-	warned	advanceClick	slide
 76	close	pptx	-	skip	-	-
-77	validate	pptx	-	usage	validate	-
+77	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ ppt/video.sh
@@ -5705,7 +5705,7 @@
 103	add	pptx	video	file_not_found	src;skipped:volume,autoplay,loop,trimStart,+1	-
 109	add	pptx	shape	ok	-	-
 114	close	pptx	-	skip	-	-
-117	validate	pptx	-	usage	validate	-
+117	validate	pptx	-	ok	-	-
 0	view	pptx	-	ok	-	-
 0	get	pptx	-	ok	-	/
 @ word/charts.sh
@@ -5756,7 +5756,7 @@
 256	add	docx	paragraph	ok	-	-
 258	add	docx	chart	ok	-	-
 268	close	docx	-	skip	-	-
-269	validate	docx	-	usage	validate	-
+269	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/content-controls.sh
@@ -5782,7 +5782,7 @@
 97	add	docx	sdt	unsupported_element	-	-
 104	set	docx	-	path_not_found	-	sdt
 106	close	docx	-	skip	-	-
-107	validate	docx	-	usage	validate	-
+107	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/diagram.sh
@@ -5835,7 +5835,7 @@
 218	add	docx	diagram	unsupported_capability	-	-
 224	add	docx	paragraph	ok	-	-
 224	add	docx	diagram	unsupported_capability	-	-
-229	validate	docx	-	usage	validate	-
+229	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/document-formatting.sh
@@ -5857,7 +5857,7 @@
 68	set	docx	-	unsupported_element	-	/
 71	set	docx	-	unsupported_element	-	/
 73	close	docx	-	skip	-	-
-74	validate	docx	-	usage	validate	-
+74	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/fields.sh
@@ -5899,7 +5899,7 @@
 153	add	docx	field	ok	-	-
 160	set	docx	-	warned	format	field
 162	close	docx	-	skip	-	-
-163	validate	docx	-	usage	validate	-
+163	validate	docx	-	ok	-	-
 168	query	docx	-	ok	-	field
 171	query	docx	-	ok	-	toc
 0	view	docx	-	ok	-	-
@@ -6077,7 +6077,7 @@
 291	add	docx	paragraph	ok	-	-
 292	add	docx	equation	unsupported_element	-	-
 294	close	docx	-	skip	-	-
-296	validate	docx	-	usage	validate	-
+296	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/numbering.sh
@@ -6150,7 +6150,7 @@
 324	add	docx	paragraph	ok	-	-
 325	add	docx	paragraph	ok	-	-
 329	close	docx	-	skip	-	-
-330	validate	docx	-	usage	validate	-
+330	validate	docx	-	ok	-	-
 335	query	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
@@ -6232,7 +6232,7 @@
 153	add	docx	paragraph	warned	listStyle	-
 154	add	docx	paragraph	warned	listStyle,start	-
 155	add	docx	paragraph	ok	-	-
-157	validate	docx	-	usage	validate	-
+157	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/pictures.sh
@@ -6268,7 +6268,7 @@
 163	add	docx	paragraph	ok	-	-
 165	add	docx	picture	warned	decorative	-
 170	close	docx	-	skip	-	-
-172	validate	docx	-	usage	validate	-
+172	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/revisions.sh
@@ -6346,7 +6346,7 @@
 433	query	docx	-	unsupported_capability	-	revision
 449	query	docx	-	unsupported_capability	-	revision
 462	view	docx	-	ok	-	-
-468	dump	docx	-	usage	dump	-
+468	dump	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/run-formatting.sh
@@ -6429,7 +6429,7 @@
 143	add	docx	paragraph	ok	-	-
 144	add	docx	run	warned	snapToGrid	-
 145	add	docx	run	warned	specVanish	-
-147	validate	docx	-	usage	validate	-
+147	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/sections.sh
@@ -6467,7 +6467,7 @@
 137	set	docx	-	unsupported_element	-	/
 143	close	docx	-	skip	-	-
 147	query	docx	-	ok	-	section
-150	validate	docx	-	usage	validate	-
+150	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/
 @ word/tables.sh
@@ -6640,7 +6640,7 @@
 267	set	docx	-	ok	-	tc
 268	set	docx	-	ok	-	tc
 272	add	docx	table	warned	border.all	-
-276	validate	docx	-	usage	validate	-
+276	validate	docx	-	ok	-	-
 277	close	docx	-	skip	-	-
 290	create	xlsx	-	ok	-	-
 291	open	xlsx	-	skip	-	-
@@ -6849,9 +6849,9 @@
 40	set	docx	-	unsupported_path	-	p
 41	add	docx	paragraph	missing_argument	-	-
 46	add	docx	paragraph	ok	-	-
-48	raw-set	docx	-	usage	raw-set	-
+48	raw-set	docx	-	ok	-	-
 96	add	docx	paragraph	ok	-	-
-98	raw-set	docx	-	usage	raw-set	-
+98	raw-set	docx	-	ok	-	-
 176	add	docx	paragraph	ok	-	-
 184	add	docx	textbox	unsupported_element	-	-
 185	set	docx	-	unsupported_path	-	p
@@ -6908,6 +6908,6 @@
 317	add	docx	paragraph	missing_argument	-	-
 322	close	docx	-	skip	-	-
 327	view	docx	-	ok	-	-
-329	validate	docx	-	usage	validate	-
+329	validate	docx	-	ok	-	-
 0	view	docx	-	ok	-	-
 0	get	docx	-	ok	-	/

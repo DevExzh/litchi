@@ -88,7 +88,7 @@ class ClassifyTests(unittest.TestCase):
 
     def test_missing_verb_and_stray_word(self):
         verdicts = self.classify([
-            call(verb="validate", result="usage", detail="validate"),
+            call(verb="watch", result="usage", detail="watch"),
             call(result="usage", detail="A,Product"),
         ])
         self.assertEqual([v.rule for v in verdicts], ["G1", "D7"])
@@ -206,7 +206,7 @@ def rule(id: str, disposition: str, **extra) -> dict:
 class DispositionTests(unittest.TestCase):
     def test_new_verbs_are_not_missing_verbs(self):
         verdicts = corpus.classify([call(verb="import", result="usage", detail="A,B"),
-                                    call(verb="dump", result="usage", detail="dump")],
+                                    call(verb="watch", result="usage", detail="watch")],
                                    {"docx": registry([PARAGRAPH])})
         self.assertEqual([v.rule for v in verdicts], ["D7", "G1"])
         self.assertNotIn("`import`, `merge`", corpus.RULES_BY_ID["G1"].officecli)
@@ -239,7 +239,7 @@ class DispositionTests(unittest.TestCase):
 
     def test_problems(self):
         calls = [
-            call(verb="validate", result="usage", detail="validate"),
+            call(verb="watch", result="usage", detail="watch"),
             call(verb="open", result="skip"),
             call(result="warned", detail="shade,(x)"),
             call(kind="chart", result="unsupported_element"),
@@ -267,14 +267,14 @@ class DispositionTests(unittest.TestCase):
     def test_the_v1_subset(self):
         calls = [
             call(),                                                  # passed
-            call(verb="dump", result="usage", detail="dump"),        # G1: planned, open
+            call(verb="watch", result="usage", detail="watch"),      # G1: planned, open
             call(verb="remove", result="invalid_argument"),          # G4: deferred, accounted
             call(result="warned", detail="style,+2"),                # unverified
-            call(verb="validate", result="usage", script="word/later.sh"),  # outside the subset
+            call(verb="mark", result="usage", script="word/later.sh"),  # outside the subset
             call(kind="chart", result="unsupported_element"),        # no disposition: open
             call(verb="set", result="path_not_found", target="p"),   # cascade of the chart add
         ]
-        found = classes([rule("G1|dump", "planned", ref="WP5"), rule("G1|validate", "planned", ref="WP5"),
+        found = classes([rule("G1|watch", "planned", ref="WP5"), rule("G1|mark", "planned", ref="WP5"),
                          rule("G4", "deferred"),
                          {"id": "style", "keys": ["corpus:docx|add|paragraph|warned|style"],
                           "disposition": "wontfix", "reason": "r"}])
@@ -282,7 +282,7 @@ class DispositionTests(unittest.TestCase):
         subset = corpus.v1_subset(calls, verdicts, found, found.registries)
         self.assertFalse(subset.green)
         states = [(calls[index].verb, state) for index, state, _ in subset.lines]
-        self.assertEqual(states, [("add", "passed"), ("dump", "open"), ("remove", "accounted"),
+        self.assertEqual(states, [("add", "passed"), ("watch", "open"), ("remove", "accounted"),
                                   ("add", "open"), ("add", "open"), ("set", "open")])
         blockers = [corpus.blocker(found_classes) for _, state, found_classes in subset.lines if state == "open"]
         self.assertEqual(blockers[0], "planned WP5")
