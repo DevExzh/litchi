@@ -709,6 +709,13 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - Delta PPTX elements 25/8 → 30/3 (animation, zoom, model3d deferred as P2); corpus pptx gap 416 → 410, passed unchanged.
   - Writes 1.00–1.094× (column add on a one-slide deck); equation get 1.30× (+14 µs) is a recorded miss (F6).
   - Open: F1 `link`/`tooltip` as shape/run properties; F2 equation writes; F3 media timing; F4 master/layout other props; F5 colWidths, defaultFont, mediaType.
+- Merged `xlsb-features` (0322):
+  - XLSB gains the nine 0320 worksheet feature nodes, edited at the binary record level so unedited records keep their bytes. Chart, series and axis are read-only.
+  - Delta XLSB elements supported 8 → 33 (the same 5 gaps as XLSX); property reads 78 → 295, writes 8 → 165; CRUD checklist XLSB 58 → 175 cells, all ok.
+  - XLSX: the prefixed-root validation/hyperlink conflict is fixed with a regression test; `criteriaN.op`; threaded comments and people readable in the leaf.
+  - Writes within 1.3% of the leaf; `comment_get` 1.21 (+1.3 µs) misses.
+  - Open (part to 0325): XLSX note fonts/runs, XLSB chart writes, x14 CF/DV authoring, a shared spreadsheet drawing module, cross-sheet DV formulas, a unified threaded-comment node.
+- Coordinator (2026-10-17): the query-walker agent (0315) hung for about 7 hours with no tool process; it was stopped and resumed from its transcript. Three 14-hour `pgrep -f` self-matching loops from 0310 were killed. `disk-guard.sh` now also reports any active agent whose transcript is idle for more than 60 minutes (`active-agents.txt`).
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
