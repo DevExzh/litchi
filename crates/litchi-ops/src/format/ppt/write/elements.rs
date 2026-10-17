@@ -287,3 +287,251 @@ pub(super) fn set_cells(
     file.check_source()?;
     finish_commit(file, native, limits)
 }
+
+const NAMED_JUMPS: [(&str, litchi_ppt::hyperlink::InteractionJump); 5] = [
+    (
+        "firstslide",
+        litchi_ppt::hyperlink::InteractionJump::FirstSlide,
+    ),
+    (
+        "lastslide",
+        litchi_ppt::hyperlink::InteractionJump::LastSlide,
+    ),
+    (
+        "nextslide",
+        litchi_ppt::hyperlink::InteractionJump::NextSlide,
+    ),
+    (
+        "previousslide",
+        litchi_ppt::hyperlink::InteractionJump::PreviousSlide,
+    ),
+    ("endshow", litchi_ppt::hyperlink::InteractionJump::EndShow),
+];
+
+/// Parse the PPTX `link` vocabulary; `None` removes.
+fn parse_link(value: &str, slides: usize) -> Result<Option<litchi_ppt::hyperlink::Target>> {
+    use litchi_ppt::hyperlink::Target;
+
+    let value = value.trim();
+    if value.is_empty() || value.eq_ignore_ascii_case("none") {
+        return Ok(None);
+    }
+    let lower = value.to_ascii_lowercase();
+    let named = lower
+        .strip_prefix("ppaction://hlinkshowjump?jump=")
+        .unwrap_or(&lower);
+    if let Some((_, jump)) = NAMED_JUMPS.iter().find(|(name, _)| *name == named) {
+        return Ok(Some(Target::Jump(*jump)));
+    }
+    if let Some(number) = lower
+        .strip_prefix("slide[")
+        .and_then(|rest| rest.strip_suffix(']'))
+    {
+        let number: usize = number
+            .parse()
+            .map_err(|_error| invalid("a slide jump is slide[N]").with_property("link"))?;
+        if number == 0 || number > slides {
+            return Err(Error::new(
+                Code::OutOfRange,
+                "the slide-jump target is past the last slide",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_property("link")
+            .with_suggestion("add the slide first, then set the link"));
+        }
+        return Ok(Some(Target::Slide(Position::new(number - 1))));
+    }
+    // OfficeCLI's scheme allow-list: refuse scripting and data schemes.
+    let scheme = lower.split_once(':').map(|(scheme, _)| scheme);
+    if matches!(
+        scheme,
+        Some("javascript" | "vbscript" | "data" | "file" | "jar")
+    ) {
+        return Err(invalid("the hyperlink scheme is not allowed")
+            .with_property("link")
+            .with_suggestion(
+                "use an http(s), mailto or relative target, slide[N], or a named action",
+            ));
+    }
+    if lower.starts_with("ppaction://") {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            "PPT hyperlinks support URL, slide and named slide-show jump targets",
+        )
+        .with_format(FileFormat::Ppt)
+        .with_property("link"));
+    }
+    if value.contains('\0') {
+        return Err(invalid("a hyperlink holds no NUL character").with_property("link"));
+    }
+    Ok(Some(Target::Url(value.to_owned())))
+}
+
+/// The admitted `link` and `tooltip` of a hyperlink add or set.
+struct LinkAssignment {
+    link: Option<Option<litchi_ppt::hyperlink::Target>>,
+    tooltip: Option<Option<String>>,
+}
+
+fn admit_link(
+    props: &Props<'_>,
+    operation: Operation,
+    slides: usize,
+    limits: &SemanticLimits,
+) -> Result<LinkAssignment> {
+    use super::super::spec::{HYPERLINK_WRITE_TABLE, HyperlinkSetter};
+
+    let mut out = LinkAssignment {
+        link: None,
+        tooltip: None,
+    };
+    let mut staged = 0_usize;
+    for (key, value) in props.iter() {
+        let (_, entry) = HYPERLINK_WRITE_TABLE
+            .resolve(key.as_str())
+            .map_err(|error| {
+                error
+                    .with_format(FileFormat::Ppt)
+                    .with_property(key.as_str().to_owned())
+            })?;
+        entry
+            .prepare(operation, value, |setter, scalar| {
+                let text = match scalar {
+                    Some(Scalar::Text(text)) => text,
+                    _ => "",
+                };
+                staged = staged.saturating_add(text.len());
+                bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())?;
+                let duplicate = match setter {
+                    HyperlinkSetter::Link => out.link.replace(parse_link(text, slides)?).is_some(),
+                    HyperlinkSetter::Tooltip => {
+                        if text.contains('\0') {
+                            return Err(invalid("a tooltip holds no NUL character"));
+                        }
+                        out.tooltip
+                            .replace((!text.is_empty()).then(|| text.to_owned()))
+                            .is_some()
+                    },
+                };
+                if duplicate {
+                    return Err(Error::new(
+                        Code::InvalidArgument,
+                        "a hyperlink property was assigned more than once",
+                    ));
+                }
+                Ok(())
+            })
+            .map_err(|error| error.with_format(FileFormat::Ppt))?;
+    }
+    Ok(out)
+}
+
+/// The native owner of one hyperlink node or shape parent.
+fn link_owner(node: &Node<'_>) -> Result<litchi_ppt::text_edit::Target> {
+    node.native_shape_target()
+        .ok_or_else(|| unsupported_target("nested PPT group hyperlink writes are not integrated"))
+}
+
+/// Write `click` (`None` removes) on every owner in one native edit.
+fn write_links(
+    file: &Ppt,
+    owners: Vec<(
+        litchi_ppt::text_edit::Target,
+        Option<litchi_ppt::hyperlink::Click>,
+    )>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    let native = stage_structural(file, owners.len(), limits, |edit| {
+        for (target, click) in &owners {
+            edit.set_shape_hyperlink(*target, click.as_ref())?;
+        }
+        Ok(())
+    })?;
+    file.check_source()?;
+    finish_commit(file, native, limits)
+}
+
+/// Set `link` and/or `tooltip` of every selected hyperlink: `link=none`
+/// removes, a tooltip-only set keeps the target.
+pub(super) fn set_hyperlinks(
+    file: &Ppt,
+    nodes: &[Node<'_>],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    let assignment = admit_link(props, Operation::Set, file.slide_count()?, limits)?;
+    let mut owners = Vec::with_capacity(nodes.len());
+    for node in nodes {
+        let Some(Element::Hyperlink { click, .. }) = node.element_item() else {
+            return Err(unsupported_target("hyperlink target lost its hyperlink"));
+        };
+        let click = match &assignment.link {
+            Some(None) => None,
+            Some(Some(target)) => Some(litchi_ppt::hyperlink::Click {
+                target: target.clone(),
+                tooltip: assignment
+                    .tooltip
+                    .clone()
+                    .unwrap_or_else(|| click.tooltip.clone()),
+            }),
+            None => Some(litchi_ppt::hyperlink::Click {
+                target: click.target.clone(),
+                tooltip: assignment.tooltip.clone().flatten(),
+            }),
+        };
+        owners.push((link_owner(node)?, click));
+    }
+    write_links(file, owners, limits)
+}
+
+/// Remove every selected hyperlink.
+pub(super) fn remove_hyperlinks(
+    file: &Ppt,
+    nodes: &[Node<'_>],
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    let owners = nodes
+        .iter()
+        .map(|node| link_owner(node).map(|target| (target, None)))
+        .collect::<Result<Vec<_>>>()?;
+    write_links(file, owners, limits)
+}
+
+/// `add(shape, hyperlink, {link, tooltip})`: attach a shape's click link.
+pub(super) fn add_hyperlink(
+    file: &Ppt,
+    parent: &Node<'_>,
+    node: &crate::NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(WriteCommit, crate::path::Path<'static>)> {
+    if parent.element() != Kind::Shape || parent.element_item().is_some() {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "a PPT hyperlink requires a shape parent",
+        )
+        .with_format(FileFormat::Ppt));
+    }
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    let assignment = admit_link(node.props(), Operation::Add, file.slide_count()?, limits)?;
+    let Some(Some(target)) = assignment.link else {
+        return Err(
+            Error::new(Code::MissingProperty, "a PPT hyperlink needs its target")
+                .with_format(FileFormat::Ppt)
+                .with_property("link")
+                .with_suggestion("link=https://example.com"),
+        );
+    };
+    let click = litchi_ppt::hyperlink::Click {
+        target,
+        tooltip: assignment.tooltip.flatten(),
+    };
+    let commit = write_links(file, vec![(link_owner(parent)?, Some(click))], limits)?;
+    let text = format!("{}/hyperlink", crate::node::Project::path(parent));
+    let path = crate::path::Path::parse(&text)
+        .map(crate::path::Path::into_owned)
+        .map_err(|_error| {
+            Error::new(Code::InternalError, "the hyperlink path does not parse")
+                .with_format(FileFormat::Ppt)
+        })?;
+    Ok((commit, path))
+}

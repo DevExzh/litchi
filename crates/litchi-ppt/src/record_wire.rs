@@ -6,7 +6,8 @@
 //! without decoding unrelated payloads.
 
 pub(crate) use crate::text_edit::{
-    children, drawing_payload as payload, rebuild, record_instance, record_type,
+    children, drawing_payload as payload, rebuild, record_instance, record_type, record_version,
+    shape_id_of,
 };
 
 use crate::package::{Error, Result};

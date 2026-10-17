@@ -766,6 +766,42 @@ impl Presentation {
         Hyperlinks::parse(&self.live_document_record()?)
     }
 
+    /// The click hyperlink of the shape with `OfficeArt` ID `shape_id` on
+    /// the slide at zero-based `position` (record 0323): a URL, a slide of
+    /// this presentation or a slide-show jump, with its screen tip. `None`
+    /// when the shape has no click action or its action is not a hyperlink.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slide or the document's hyperlink records are
+    /// malformed.
+    pub fn shape_click(
+        &self,
+        position: usize,
+        shape_id: u32,
+    ) -> Result<Option<crate::hyperlink::Click>> {
+        let Some(slide) = self.slide_at(position)? else {
+            return Ok(None);
+        };
+        let Some(entry) = slide
+            .shape_interactions()?
+            .into_iter()
+            .find(|entry| entry.shape_id == shape_id)
+        else {
+            return Ok(None);
+        };
+        let hyperlinks = self.hyperlinks()?;
+        let slide_ids = self
+            .slide_directory()
+            .entries()
+            .iter()
+            .map(crate::SlideDirectoryEntry::slide_id)
+            .collect::<Vec<_>>();
+        Ok(entry.interactions.iter().find_map(|interaction| {
+            crate::hyperlink::Click::resolve(interaction, &hyperlinks, &slide_ids)
+        }))
+    }
+
     /// Return inert embedded and linked OLE metadata without loading object storage.
     ///
     /// # Errors

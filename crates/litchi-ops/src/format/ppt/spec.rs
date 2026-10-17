@@ -304,6 +304,14 @@ pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
     length("y", LengthSpec::POSITION),
 ];
 
+/// A click hyperlink (record 0323), in the PPTX vocabulary: `link` is a URL,
+/// `slide[N]`, or `firstslide`, `lastslide`, `nextslide`, `previousslide`,
+/// `endshow`; `tooltip` is the screen tip.
+pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
+    PropSpec::new("link", ValueType::Text),
+    PropSpec::new("tooltip", ValueType::Text),
+];
+
 /// A table row (record 0323): a band of the table group's cell shapes; its
 /// height is the distance to the next row's top.
 const ROW_PROPS: &[PropSpec] = &[length("height", LengthSpec::EXTENT)];
@@ -471,11 +479,6 @@ static REPLY_GAP: GapSpec = element_gap(
     "reply",
     "M1-extended",
     "legacy PPT has no threaded-comment semantic projection",
-);
-static HYPERLINK_GAP: GapSpec = element_gap(
-    "hyperlink",
-    "M1-extended",
-    "legacy PPT hyperlink targets require relationship resolution",
 );
 static ANIMATION_GAP: GapSpec = element_gap(
     "animation",
@@ -842,14 +845,18 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/moderncomment[N]/reply[N]"],
             &REPLY_GAP,
         ),
-        gap(
+        element(
             Kind::Hyperlink,
             "hyperlink",
             &["hlink", "hyperlink"],
             &[Kind::Shape, Kind::Run],
             &[],
-            &["/slide[N]/shape[N]/hyperlink"],
-            &HYPERLINK_GAP,
+            &[],
+            &[
+                "/slide[N]/shape[N]/hyperlink",
+                "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink",
+            ],
+            HYPERLINK_PROPS,
         ),
         gap(
             Kind::Animation,
@@ -1128,3 +1135,39 @@ pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
     0,
 > = crate::registry::Table::new(comment_write_entries(), []);
 pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
+
+/// Hyperlink assignments (record 0323): `link` (alias `url`) and `tooltip`
+/// on `add` and `set`, as the PPTX registry.
+#[derive(Clone, Copy)]
+pub(super) enum HyperlinkSetter {
+    Link,
+    Tooltip,
+}
+
+const fn hyperlink_write_entries() -> [crate::registry::Entry<HyperlinkSetter>; 2] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+    [
+        Entry {
+            spec: HYPERLINK_PROPS[0],
+            access: WriteAccess::SetAndAdd(HyperlinkSetter::Link),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: HYPERLINK_PROPS[1],
+            access: WriteAccess::SetAndAdd(HyperlinkSetter::Tooltip),
+            constraint: Constraint::None,
+            clear: true,
+        },
+    ]
+}
+
+pub(super) const HYPERLINK_WRITE_TABLE: crate::registry::Table<HyperlinkSetter, 2, 1> =
+    crate::registry::Table::new(
+        hyperlink_write_entries(),
+        [crate::registry::Alias {
+            name: "url",
+            entry: 0,
+        }],
+    );
+pub(crate) const HYPERLINK_CAPABILITY_PROPS: &[PropSpec] = &HYPERLINK_WRITE_TABLE.readable();

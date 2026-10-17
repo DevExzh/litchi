@@ -60,6 +60,17 @@ impl<'f> Nav<'f> {
             (Item::Shape(shape), Kind::Row | Kind::Col) if shape.kind == Kind::Table => {
                 self.table_band(parent, shape, kind, step.select)
             },
+            (Item::Shape(shape), Kind::Hyperlink) => {
+                let count = usize::from(super::elements::shape_click(parent)?.is_some());
+                Ok(match ordinal(step.select, count) {
+                    Some(Some(_)) => match super::elements::shape_click(parent)? {
+                        Some(click) => Lookup::Found(hyperlink_node(parent, shape, None, click)),
+                        None => Lookup::Missing,
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Item::Element(element), Kind::Cell) => match element.as_ref() {
                 super::elements::Element::Row { shape, row } => {
                     self.cell(parent, shape, *row, step.select)
@@ -503,6 +514,25 @@ fn ordinal(select: Select<'_>, count: usize) -> Option<Option<usize>> {
         Select::Last => count.checked_sub(1),
         _ => return None,
     })
+}
+
+/// The hyperlink node of a shape (`run: None`) or of one of its runs.
+pub(crate) fn hyperlink_node<'f>(
+    parent: &Node<'f>,
+    shape: &ShapeItem,
+    run: Option<(usize, usize)>,
+    click: litchi_ppt::hyperlink::Click,
+) -> Node<'f> {
+    Node::element_node(
+        parent.file(),
+        parent.steps(),
+        PathStep::new(Kind::Hyperlink.name()),
+        super::elements::Element::Hyperlink {
+            shape: shape.clone(),
+            run,
+            click: std::sync::Arc::new(click),
+        },
+    )
 }
 
 /// The node of a table's row or column.

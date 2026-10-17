@@ -206,3 +206,168 @@ impl Transaction {
         .map(drop)
     }
 }
+
+impl Transaction {
+    /// The working artifact's slide at a projected position, its shape at a
+    /// source-order index, the shape's `OfficeArt` ID, and the shape's
+    /// current click hyperlink.
+    fn shape_click(
+        &self,
+        target: crate::text_edit::Target,
+    ) -> Result<(u32, Option<crate::hyperlink::Click>)> {
+        let presentation = self.working_presentation()?;
+        let projected = self.document.slides()?;
+        let persist_id = projected
+            .get(target.slide().get())
+            .ok_or(Error::Refused(Refusal::SlideNotFound {
+                position: target.slide(),
+            }))?
+            .persist_id();
+        let slide_ids = projected
+            .iter()
+            .map(|slide| slide.slide_id())
+            .collect::<Vec<_>>();
+        let slide = presentation
+            .slides()?
+            .into_iter()
+            .find(|slide| slide.persist_id() == persist_id)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let shapes = slide.shapes()?;
+        let shape =
+            shapes
+                .get(target.shape().get())
+                .ok_or(Error::Refused(Refusal::ElementNotFound {
+                    element: "shape",
+                }))?;
+        let shape_id = crate::text_edit::native_shape_id(shape);
+        let hyperlinks = presentation.hyperlinks()?;
+        let current = slide
+            .shape_interactions()?
+            .into_iter()
+            .find(|entry| entry.shape_id == shape_id)
+            .and_then(|entry| {
+                entry.interactions.iter().find_map(|interaction| {
+                    crate::hyperlink::Click::resolve(interaction, &hyperlinks, &slide_ids)
+                })
+            });
+        Ok((shape_id, current))
+    }
+
+    /// Set (`Some`) or remove (`None`) the click hyperlink of the top-level
+    /// shape at `target` (record 0323).
+    ///
+    /// A URL or slide link appends an `ExHyperlinkContainer` to the live
+    /// document's external-object list (raising its identifier seed) and,
+    /// with a tooltip, an `ExHyperlink9Container` screen tip to its
+    /// `___PPT9` tag; a jump needs no definition. Definitions a replaced or
+    /// removed link leaves unused are kept, as `PowerPoint` keeps them. An
+    /// equal link is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an absent slide or shape, a slide target
+    /// outside the presentation, an empty URL, ambiguous client data, or a
+    /// changed signed source.
+    pub fn set_shape_hyperlink(
+        &mut self,
+        target: crate::text_edit::Target,
+        click: Option<&crate::hyperlink::Click>,
+    ) -> Result<()> {
+        use crate::hyperlink::Target as LinkTarget;
+        use crate::hyperlink::edit::{
+            Definition, add_definition, click_atom, click_container, set_shape_click,
+        };
+
+        self.require_position(target.slide())?;
+        let (shape_id, current) = self.shape_click(target)?;
+        if current.as_ref() == click {
+            return Ok(());
+        }
+        let invalid = |reason| {
+            Error::Refused(Refusal::InvalidElementValue {
+                element: "hyperlink",
+                reason,
+            })
+        };
+        let slide_location = match click.map(|click| &click.target) {
+            Some(LinkTarget::Url(url)) if url.is_empty() || url.contains('\0') => {
+                return Err(invalid("the URL is empty or holds a NUL character"));
+            },
+            Some(LinkTarget::Slide(position)) => {
+                let slide_id = self
+                    .document
+                    .slides()?
+                    .get(position.get())
+                    .ok_or(invalid("the target slide is outside the presentation"))?
+                    .slide_id();
+                let number = position.get() + 1;
+                Some((
+                    format!("Slide {number}"),
+                    format!("{slide_id},{number},Slide {number}"),
+                ))
+            },
+            Some(LinkTarget::Jump(
+                crate::hyperlink::InteractionJump::None
+                | crate::hyperlink::InteractionJump::LastSlideViewed,
+            )) => return Err(invalid("the jump is not a hyperlink target")),
+            _ => None,
+        };
+        let needs_definition = matches!(
+            click.map(|click| &click.target),
+            Some(LinkTarget::Url(_) | LinkTarget::Slide(_))
+        );
+        if click.is_some_and(|click| click.tooltip.is_some()) && !needs_definition {
+            return Err(invalid("a slide-show jump has no screen tip"));
+        }
+        self.stage_records(Some(target.slide()), needs_definition, |view| {
+            let slide = view.slide.ok_or_else(missing_record)?;
+            let Some(click) = click else {
+                return Ok(Replacement {
+                    slide: set_shape_click(slide.bytes, shape_id, None)?,
+                    document: None,
+                });
+            };
+            let (document, id) = match (&click.target, view.document) {
+                (LinkTarget::Url(url), Some(document)) => {
+                    let (record, id) = add_definition(
+                        document,
+                        &Definition {
+                            friendly_name: url,
+                            target: Some(url),
+                            location: None,
+                            tooltip: click.tooltip.as_deref(),
+                        },
+                    )?;
+                    (Some(record), id)
+                },
+                (LinkTarget::Slide(_), Some(document)) => {
+                    let (friendly, location) =
+                        slide_location.as_ref().ok_or_else(missing_record)?;
+                    let (record, id) = add_definition(
+                        document,
+                        &Definition {
+                            friendly_name: friendly,
+                            target: None,
+                            location: Some(location),
+                            tooltip: click.tooltip.as_deref(),
+                        },
+                    )?;
+                    (Some(record), id)
+                },
+                _ => (None, 0),
+            };
+            let container = click_container(&click_atom(&click.target, id))?;
+            Ok(Replacement {
+                slide: set_shape_click(slide.bytes, shape_id, Some(&container))?,
+                document,
+            })
+        })?;
+        if self.shape_click(target)?.1.as_ref() != click {
+            return Err(PackageError::Corrupted(
+                "published PPT shape hyperlink did not read back".into(),
+            )
+            .into());
+        }
+        Ok(())
+    }
+}

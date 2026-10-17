@@ -7,6 +7,7 @@
 //! `SlideProgTagsContainer`. A slide without the tag gains one, placed after
 //! the slide records [MS-PPT] 2.5.1 orders before `slideProgTagsContainer`.
 
+use crate::binary_tag_edit::{self, Blob};
 use crate::consts::RecordType;
 use crate::package::Error;
 use crate::record_wire::{self as wire, HEADER_LEN};
@@ -25,9 +26,6 @@ fn not_found() -> EditError {
     EditError::Refused(Refusal::ElementNotFound { element: ELEMENT })
 }
 
-const PROG_TAGS: u16 = RecordType::ProgTags as u16;
-const PROG_BINARY_TAG: u16 = RecordType::ProgBinaryTag as u16;
-const BINARY_TAG_DATA: u16 = RecordType::BinaryTagData as u16;
 const CSTRING: u16 = RecordType::CString as u16;
 const COMMENT: u16 = RecordType::Comment2000 as u16;
 const COMMENT_ATOM: u16 = RecordType::Comment2000Atom as u16;
@@ -188,180 +186,6 @@ pub struct CommentChange {
     pub y: Option<i32>,
 }
 
-/// The comment records of one slide: the slide's `ProgTags` child, the one
-/// `___PPT10` binary tag in it, and that tag's blob records.
-struct Located<'a> {
-    slide_children: Vec<&'a [u8]>,
-    /// Index of `SlideProgTagsContainer` among the slide's children.
-    prog_tags: Option<usize>,
-    /// Children of `SlideProgTagsContainer`.
-    tags: Vec<&'a [u8]>,
-    /// Index of the `___PPT10` tag among `tags`.
-    tag: Option<usize>,
-    /// Children of the `___PPT10` tag.
-    tag_children: Vec<&'a [u8]>,
-    /// Index of the `BinaryTagData` child among `tag_children`.
-    blob: Option<usize>,
-    /// Records of the blob.
-    records: Vec<&'a [u8]>,
-}
-
-fn is_ppt10_tag(tag: &[u8]) -> Result<bool> {
-    if wire::record_type(tag)? != PROG_BINARY_TAG {
-        return Ok(false);
-    }
-    let name = wire::utf16("___PPT10");
-    for child in wire::children(tag)? {
-        let child = child?;
-        if wire::record_type(child)? == CSTRING {
-            return Ok(wire::payload(child)? == name.as_slice());
-        }
-    }
-    Ok(false)
-}
-
-fn locate(slide: &[u8]) -> Result<Located<'_>> {
-    locate_in(slide, RecordType::Slide as u16)
-}
-
-fn locate_in(slide: &[u8], owner: u16) -> Result<Located<'_>> {
-    if wire::record_type(slide)? != owner {
-        return Err(Error::Corrupted("comment owner has an unexpected record type".into()).into());
-    }
-    let slide_children = wire::child_list(slide)?;
-    let mut located = Located {
-        slide_children,
-        prog_tags: None,
-        tags: Vec::new(),
-        tag: None,
-        tag_children: Vec::new(),
-        blob: None,
-        records: Vec::new(),
-    };
-    for (index, child) in located.slide_children.iter().enumerate() {
-        if wire::record_type(child)? == PROG_TAGS {
-            if located.prog_tags.replace(index).is_some() {
-                return Err(unsupported(
-                    "the slide has several programmable-tag containers",
-                ));
-            }
-        }
-    }
-    let Some(prog_tags) = located.prog_tags else {
-        return Ok(located);
-    };
-    located.tags = wire::child_list(located.slide_children[prog_tags])?;
-    for (index, tag) in located.tags.iter().enumerate() {
-        if is_ppt10_tag(tag)? && located.tag.replace(index).is_some() {
-            return Err(unsupported(
-                "the slide has several ___PPT10 programmable tags",
-            ));
-        }
-    }
-    let Some(tag) = located.tag else {
-        return Ok(located);
-    };
-    located.tag_children = wire::child_list(located.tags[tag])?;
-    for (index, child) in located.tag_children.iter().enumerate() {
-        if wire::record_type(child)? == BINARY_TAG_DATA && located.blob.replace(index).is_some() {
-            return Err(Error::Corrupted(
-                "___PPT10 programmable tag has several data blobs".into(),
-            )
-            .into());
-        }
-    }
-    let blob = located.blob.ok_or_else(|| {
-        EditError::from(Error::Corrupted(
-            "___PPT10 programmable tag has no data blob".into(),
-        ))
-    })?;
-    located.records = wire::sequence(wire::payload(located.tag_children[blob])?)?;
-    Ok(located)
-}
-
-impl Located<'_> {
-    fn comment_indexes(&self) -> Result<Vec<usize>> {
-        let mut indexes = Vec::new();
-        for (index, record) in self.records.iter().enumerate() {
-            if wire::record_type(record)? == COMMENT {
-                indexes.push(index);
-            }
-        }
-        Ok(indexes)
-    }
-
-    /// Re-frame the slide around new blob records.
-    fn rebuild(&self, slide: &[u8], records: &[Vec<u8>]) -> Result<Vec<u8>> {
-        let blob_payload = records.concat();
-        let tag = match (self.tag, self.blob) {
-            (Some(tag), Some(blob)) => {
-                let mut children = Vec::with_capacity(self.tag_children.len());
-                for (index, child) in self.tag_children.iter().enumerate() {
-                    children.push(if index == blob {
-                        wire::rebuild(child, &blob_payload)?
-                    } else {
-                        child.to_vec()
-                    });
-                }
-                Some((tag, wire::rebuild(self.tags[tag], &children.concat())?))
-            },
-            _ => None,
-        };
-        let new_tag = || -> Result<Vec<u8>> {
-            Ok(wire::container(
-                PROG_BINARY_TAG,
-                0,
-                &[
-                    wire::encode(CSTRING, 0, 0, &wire::utf16("___PPT10"))?,
-                    wire::encode(BINARY_TAG_DATA, 0, 0, &blob_payload)?,
-                ],
-            )?)
-        };
-        let prog_tags = match self.prog_tags {
-            Some(index) => {
-                let mut tags = self.tags.iter().map(|tag| tag.to_vec()).collect::<Vec<_>>();
-                match tag {
-                    Some((position, rewritten)) => tags[position] = rewritten,
-                    None => tags.push(new_tag()?),
-                }
-                (
-                    index,
-                    wire::rebuild(self.slide_children[index], &tags.concat())?,
-                    false,
-                )
-            },
-            None => {
-                // After the last record 2.5.1 orders before the tags.
-                let mut position = 0;
-                for (index, child) in self.slide_children.iter().enumerate() {
-                    if BEFORE_PROG_TAGS.contains(&wire::record_type(child)?) {
-                        position = index + 1;
-                    }
-                }
-                (
-                    position,
-                    wire::container(PROG_TAGS, 0, &[new_tag()?])?,
-                    true,
-                )
-            },
-        };
-        let mut data = Vec::with_capacity(slide.len().saturating_add(64));
-        for (index, child) in self.slide_children.iter().enumerate() {
-            if index == prog_tags.0 {
-                data.extend_from_slice(&prog_tags.1);
-                if !prog_tags.2 {
-                    continue;
-                }
-            }
-            data.extend_from_slice(child);
-        }
-        if prog_tags.2 && prog_tags.0 == self.slide_children.len() {
-            data.extend_from_slice(&prog_tags.1);
-        }
-        Ok(wire::rebuild(slide, &data)?)
-    }
-}
-
 fn check_units(text: &str, maximum: usize, reason: &'static str) -> Result<()> {
     if text.encode_utf16().count() > maximum {
         return Err(EditError::Refused(Refusal::InvalidElementValue {
@@ -402,7 +226,7 @@ pub(crate) fn add(slide: &[u8], comment: &NewComment, index: i32) -> Result<(Vec
     check_units(&comment.initials, AUTHOR_MAX_UNITS, INITIALS_TOO_LONG)?;
     check_units(&comment.text, TEXT_MAX_UNITS, TEXT_TOO_LONG)?;
     let located = locate(slide)?;
-    let comments = located.comment_indexes()?;
+    let comments = comment_indexes(&located)?;
     let record = wire::container(
         COMMENT,
         0,
@@ -422,7 +246,7 @@ pub(crate) fn add(slide: &[u8], comment: &NewComment, index: i32) -> Result<(Vec
         Some(last) => last + 1,
         None => {
             let mut position = 0;
-            for (offset, record) in located.records.iter().enumerate() {
+            for (offset, record) in located.records().iter().enumerate() {
                 if wire::record_type(record)? == TEXT_MASTER_STYLE10 {
                     position = offset + 1;
                 }
@@ -431,12 +255,15 @@ pub(crate) fn add(slide: &[u8], comment: &NewComment, index: i32) -> Result<(Vec
         },
     };
     let mut records = located
-        .records
+        .records()
         .iter()
         .map(|record| record.to_vec())
         .collect::<Vec<_>>();
     records.insert(insert_at, record);
-    Ok((located.rebuild(slide, &records)?, comments.len()))
+    Ok((
+        located.rebuild(slide, &records, &BEFORE_PROG_TAGS)?,
+        comments.len(),
+    ))
 }
 
 /// Apply `change` to the comment at `position`; `None` when nothing changes.
@@ -449,9 +276,9 @@ pub(crate) fn set(
         check_units(text, TEXT_MAX_UNITS, TEXT_TOO_LONG)?;
     }
     let located = locate(slide)?;
-    let comments = located.comment_indexes()?;
+    let comments = comment_indexes(&located)?;
     let index = *comments.get(position).ok_or_else(not_found)?;
-    let comment = located.records[index];
+    let comment = located.records()[index];
     let mut changed = false;
     let mut children = Vec::new();
     let mut has_text = false;
@@ -497,27 +324,29 @@ pub(crate) fn set(
         return Ok(None);
     }
     let mut records = located
-        .records
+        .records()
         .iter()
         .map(|record| record.to_vec())
         .collect::<Vec<_>>();
     records[index] = wire::rebuild(comment, &children.concat())?;
-    located.rebuild(slide, &records).map(Some)
+    located
+        .rebuild(slide, &records, &BEFORE_PROG_TAGS)
+        .map(Some)
 }
 
 /// Remove the comment at `position`.
 pub(crate) fn remove(slide: &[u8], position: usize) -> Result<Vec<u8>> {
     let located = locate(slide)?;
-    let comments = located.comment_indexes()?;
+    let comments = comment_indexes(&located)?;
     let index = *comments.get(position).ok_or_else(not_found)?;
     let records = located
-        .records
+        .records()
         .iter()
         .enumerate()
         .filter(|(offset, _)| *offset != index)
         .map(|(_, record)| record.to_vec())
         .collect::<Vec<_>>();
-    located.rebuild(slide, &records)
+    located.rebuild(slide, &records, &BEFORE_PROG_TAGS)
 }
 
 /// Raise the `commentIndexSeed` of the document-level author named
@@ -562,12 +391,13 @@ pub(crate) fn raise_author_seed(
 }
 
 fn raise_seed_in(list: &[u8], author: &str, index: i32) -> Result<Option<Vec<u8>>> {
-    let located = locate_in(list, RecordType::DocInfoList as u16)?;
+    let located =
+        binary_tag_edit::locate(list, RecordType::DocInfoList as u16, "___PPT10", ELEMENT)?;
     let document = list;
     let name = wire::utf16(author);
-    let mut records = Vec::with_capacity(located.records.len());
+    let mut records = Vec::with_capacity(located.records().len());
     let mut changed = false;
-    for record in &located.records {
+    for record in located.records() {
         if wire::record_type(record)? != RecordType::CommentIndex10 as u16 || changed {
             records.push(record.to_vec());
             continue;
@@ -605,7 +435,21 @@ fn raise_seed_in(list: &[u8], author: &str, index: i32) -> Result<Option<Vec<u8>
     if !changed {
         return Ok(None);
     }
-    located.rebuild(document, &records).map(Some)
+    located.rebuild(document, &records, &[]).map(Some)
+}
+
+fn comment_indexes(blob: &Blob<'_>) -> Result<Vec<usize>> {
+    let mut indexes = Vec::new();
+    for (index, record) in blob.records().iter().enumerate() {
+        if wire::record_type(record)? == COMMENT {
+            indexes.push(index);
+        }
+    }
+    Ok(indexes)
+}
+
+fn locate(slide: &[u8]) -> Result<Blob<'_>> {
+    binary_tag_edit::locate(slide, RecordType::Slide as u16, "___PPT10", ELEMENT)
 }
 
 const _: () = assert!(HEADER_LEN == 8);

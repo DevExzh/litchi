@@ -37,6 +37,13 @@ pub(crate) enum Element {
     },
     /// A table column: the table shape and the zero-based column.
     Column { shape: ShapeItem, column: usize },
+    /// A click hyperlink of a shape (`run: None`) or of one text run (its
+    /// paragraph and run indexes).
+    Hyperlink {
+        shape: ShapeItem,
+        run: Option<(usize, usize)>,
+        click: Arc<litchi_ppt::hyperlink::Click>,
+    },
 }
 
 /// The values one element's `format` projection answers, in its property
@@ -58,24 +65,27 @@ impl Element {
             Self::Row { .. } => Kind::Row,
             Self::Cell { .. } => Kind::Cell,
             Self::Column { .. } => Kind::Col,
+            Self::Hyperlink { .. } => Kind::Hyperlink,
         }
     }
 
     pub(crate) const fn slide(&self) -> Option<usize> {
         match self {
             Self::Comment { slide, .. } => Some(*slide),
-            Self::Row { shape, .. } | Self::Cell { shape, .. } | Self::Column { shape, .. } => {
-                Some(shape.slide)
-            },
+            Self::Row { shape, .. }
+            | Self::Cell { shape, .. }
+            | Self::Column { shape, .. }
+            | Self::Hyperlink { shape, .. } => Some(shape.slide),
         }
     }
 
     pub(crate) const fn shape_item(&self) -> Option<&ShapeItem> {
         match self {
             Self::Comment { .. } => None,
-            Self::Row { shape, .. } | Self::Cell { shape, .. } | Self::Column { shape, .. } => {
-                Some(shape)
-            },
+            Self::Row { shape, .. }
+            | Self::Cell { shape, .. }
+            | Self::Column { shape, .. }
+            | Self::Hyperlink { shape, .. } => Some(shape),
         }
     }
 
@@ -85,7 +95,7 @@ impl Element {
             Self::Cell { row, column, .. } => table(node)?
                 .cell(*row, *column)
                 .map(|text| Cow::Owned(text.to_owned())),
-            Self::Row { .. } | Self::Column { .. } => None,
+            Self::Row { .. } | Self::Column { .. } | Self::Hyperlink { .. } => None,
         })
     }
 
@@ -96,7 +106,10 @@ impl Element {
     pub(crate) fn child_count(&self, node: &Node<'_>) -> Result<usize> {
         Ok(match self {
             Self::Row { .. } => table(node)?.columns(),
-            Self::Comment { .. } | Self::Cell { .. } | Self::Column { .. } => 0,
+            Self::Comment { .. }
+            | Self::Cell { .. }
+            | Self::Column { .. }
+            | Self::Hyperlink { .. } => 0,
         })
     }
 
@@ -128,6 +141,17 @@ impl Element {
                     .collect()
             },
             Self::Cell { .. } => Vec::new(),
+            Self::Hyperlink { click, .. } => props
+                .iter()
+                .map(|prop| match prop.name {
+                    "link" => Some(Value::Text(link_text(&click.target))),
+                    "tooltip" => click
+                        .tooltip
+                        .as_deref()
+                        .map(|tooltip| Value::Text(Cow::Borrowed(tooltip))),
+                    _ => None,
+                })
+                .collect(),
         };
         Ok(Values { values })
     }
@@ -188,4 +212,33 @@ pub(crate) fn table<'n>(
             )
             .with_format(litchi_core::FileFormat::Ppt)
         })
+}
+
+/// The PPTX `link` readback of a click target.
+pub(crate) fn link_text(target: &litchi_ppt::hyperlink::Target) -> Cow<'_, str> {
+    use litchi_ppt::hyperlink::{InteractionJump, Target};
+    match target {
+        Target::Url(url) => Cow::Borrowed(url.as_str()),
+        Target::Slide(position) => Cow::Owned(format!("slide[{}]", position.get() + 1)),
+        Target::Jump(jump) => Cow::Borrowed(match jump {
+            InteractionJump::FirstSlide => "firstslide",
+            InteractionJump::LastSlide => "lastslide",
+            InteractionJump::NextSlide => "nextslide",
+            InteractionJump::PreviousSlide => "previousslide",
+            InteractionJump::EndShow => "endshow",
+            InteractionJump::LastSlideViewed => "lastslideviewed",
+            InteractionJump::None => "none",
+        }),
+    }
+}
+
+/// The click hyperlink of a shape node, or `None`.
+pub(crate) fn shape_click(node: &Node<'_>) -> Result<Option<litchi_ppt::hyperlink::Click>> {
+    let (Some(shape), Some(item)) = (node.shape(), node.shape_item()) else {
+        return Ok(None);
+    };
+    if item.kind != Kind::Shape {
+        return Ok(None);
+    }
+    Ok(node.file().reader().shape_click(item.slide, shape.id())?)
 }

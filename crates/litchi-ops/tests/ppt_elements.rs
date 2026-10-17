@@ -297,3 +297,97 @@ fn table_cell_text_set_round_trips_and_layout_edits_are_refused() {
         "filled"
     );
 }
+
+const SAMPLE: &str = "ole/ppt/SampleShow.ppt";
+
+#[test]
+fn shape_hyperlinks_add_set_and_remove_like_pptx() {
+    each_owner(&fixture(SAMPLE), |source| {
+        let before = source.to_bytes().unwrap();
+        assert_eq!(
+            source
+                .get("/slide[1]/shape[1]/hyperlink")
+                .unwrap_err()
+                .code(),
+            Code::PathNotFound
+        );
+        let added = source
+            .add(
+                "/slide[1]/shape[1]",
+                NewNode::new("hyperlink")
+                    .prop("url", "https://example.com/")
+                    .prop("tooltip", "Example"),
+            )
+            .expect("add hyperlink");
+        assert_eq!(added.path.to_string(), "/slide[1]/shape[1]/hyperlink");
+        let read = reopen(&added.file);
+        let link = "/slide[1]/shape[1]/hyperlink";
+        assert_eq!(
+            prop(&read, link, "link").as_deref(),
+            Some("https://example.com/")
+        );
+        assert_eq!(prop(&read, link, "tooltip").as_deref(), Some("Example"));
+        assert_eq!(paths(&read, "hyperlink"), [link]);
+        assert_eq!(source.to_bytes().unwrap(), before);
+
+        // A tooltip-only set keeps the target; a slide jump; a named action.
+        let tip = reopen(&read.set(link, props! { "tooltip" => "Other" }).unwrap());
+        assert_eq!(
+            prop(&tip, link, "link").as_deref(),
+            Some("https://example.com/")
+        );
+        assert_eq!(prop(&tip, link, "tooltip").as_deref(), Some("Other"));
+        let jump = reopen(&tip.set(link, props! { "link" => "slide[2]" }).unwrap());
+        assert_eq!(prop(&jump, link, "link").as_deref(), Some("slide[2]"));
+        let named = reopen(
+            &jump
+                .add(
+                    "/slide[2]/shape[1]",
+                    NewNode::new("hyperlink").prop("link", "NextSlide"),
+                )
+                .unwrap()
+                .file,
+        );
+        assert_eq!(
+            prop(&named, "/slide[2]/shape[1]/hyperlink", "link").as_deref(),
+            Some("nextslide")
+        );
+        let cleared = reopen(&named.set(link, props! { "link" => "none" }).unwrap());
+        assert_eq!(cleared.get(link).unwrap_err().code(), Code::PathNotFound);
+        let removed = reopen(&named.remove("/slide[2]/shape[1]/hyperlink").unwrap());
+        assert_eq!(
+            removed
+                .get("/slide[2]/shape[1]/hyperlink")
+                .unwrap_err()
+                .code(),
+            Code::PathNotFound
+        );
+        assert_eq!(prop(&removed, link, "link").as_deref(), Some("slide[2]"));
+    });
+}
+
+#[test]
+fn hyperlink_refusals_are_typed() {
+    let source = eager(&fixture(SAMPLE));
+    let refused =
+        |node: NewNode<'static>| source.add("/slide[1]/shape[1]", node).unwrap_err().code();
+    assert_eq!(
+        refused(NewNode::new("hyperlink").prop("link", "javascript:alert(1)")),
+        Code::InvalidValue
+    );
+    assert_eq!(refused(NewNode::new("hyperlink")), Code::MissingProperty);
+    assert_eq!(
+        refused(NewNode::new("hyperlink").prop("link", "slide[9]")),
+        Code::OutOfRange
+    );
+    assert_eq!(
+        source
+            .add(
+                "/slide[1]",
+                NewNode::new("hyperlink").prop("link", "https://a/")
+            )
+            .unwrap_err()
+            .code(),
+        Code::UnsupportedType
+    );
+}

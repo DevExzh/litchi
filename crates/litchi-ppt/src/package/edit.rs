@@ -600,6 +600,16 @@ impl Edit {
         })
     }
 
+    /// Set or remove the click hyperlink of one top-level shape (record
+    /// 0323).
+    pub fn set_shape_hyperlink(
+        &mut self,
+        target: Target,
+        click: Option<&crate::hyperlink::Click>,
+    ) -> Result<()> {
+        self.stage(1, |inner| inner.set_shape_hyperlink(target, click))
+    }
+
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;

@@ -60,6 +60,7 @@
     reason = "modules and re-exports are grouped by functional area rather than by item kind"
 )]
 
+mod binary_tag_edit;
 mod consts;
 mod officeart_wire;
 mod record_wire;

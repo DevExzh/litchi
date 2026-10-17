@@ -119,6 +119,11 @@ enum TargetIdentity {
         row: usize,
         column: usize,
     },
+    Hyperlink {
+        slide: usize,
+        shape: usize,
+        run: Option<(usize, usize)>,
+    },
     Paragraph {
         slide: usize,
         shape: usize,
@@ -178,6 +183,17 @@ pub(crate) fn set_with_limits<'p, 'v>(
     }
     if nodes
         .first()
+        .is_some_and(|node| node.element() == Kind::Hyperlink)
+    {
+        if nodes.iter().any(|node| node.element() != Kind::Hyperlink) {
+            return Err(unsupported_target(
+                "one PPT write cannot mix hyperlinks with other targets",
+            ));
+        }
+        return elements::set_hyperlinks(file, &nodes, &props, limits);
+    }
+    if nodes
+        .first()
         .is_some_and(|node| node.element() == Kind::Cell)
     {
         if nodes.iter().any(|node| node.element() != Kind::Cell) {
@@ -219,6 +235,17 @@ pub(crate) fn remove_with_limits(
         return elements::remove_comments(file, &nodes, limits);
     }
     if nodes
+        .first()
+        .is_some_and(|node| node.element() == Kind::Hyperlink)
+    {
+        if nodes.iter().any(|node| node.element() != Kind::Hyperlink) {
+            return Err(unsupported_target(
+                "one PPT removal cannot mix hyperlinks with other targets",
+            ));
+        }
+        return elements::remove_hyperlinks(file, &nodes, limits);
+    }
+    if nodes
         .iter()
         .any(|node| matches!(node.element(), Kind::Row | Kind::Col | Kind::Cell))
     {
@@ -255,6 +282,12 @@ pub(crate) fn add_with_limits(
     let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
     if node.kind().eq_ignore_ascii_case("comment") {
         return elements::add_comment(file, &parent, &node, limits);
+    }
+    if matches!(
+        Kind::from_name(&node.kind().to_ascii_lowercase()),
+        Some(Kind::Hyperlink)
+    ) {
+        return elements::add_hyperlink(file, &parent, &node, limits);
     }
     if matches!(
         Kind::from_name(&node.kind().to_ascii_lowercase()),
@@ -649,6 +682,20 @@ fn append_node<'f>(
                 }
             },
             _ => return Err(unsupported_target("comment target has no comment")),
+        },
+        Kind::Hyperlink => match (node.native_shape_target(), node.element_item()) {
+            (Some(target), Some(super::elements::Element::Hyperlink { run, .. })) => {
+                TargetIdentity::Hyperlink {
+                    slide: target.slide().get(),
+                    shape: target.shape().get(),
+                    run: *run,
+                }
+            },
+            _ => {
+                return Err(unsupported_target(
+                    "nested PPT group hyperlink writes are not integrated",
+                ));
+            },
         },
         Kind::Cell => match (node.native_shape_target(), node.element_item()) {
             (Some(target), Some(super::elements::Element::Cell { row, column, .. })) => {

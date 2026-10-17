@@ -2610,3 +2610,5 @@ ElementNotFound, InvalidElementValue}` name the element refusals.
 | `slide_order::Refusal::{UnsupportedElement, ElementNotFound, InvalidElementValue}` | | ✅ 0323 |
 | `Edit::set_table_cell_text(target, row, column, text)` (and on `slide_order::Transaction`) | a cell's shape text under the shape-text closure rules; an empty PowerPoint cell gains its first `TextCharsAtom` | ✅ 0323 |
 | `shapes::shape_enum::TableShape::{cell_shape_id, row_heights, column_widths}` | the grid read from the table group's cell anchors, in master units | ✅ 0323 |
+| `litchi_ppt::hyperlink::{Click, Target}`; `Click::resolve`; `Presentation::shape_click` | `Target::{Url, Slide(Position), Jump(InteractionJump)}`, named after the PPTX `hyperlinks::{Click, Target}` | ✅ 0323 |
+| `Edit::set_shape_hyperlink(target, Option<&Click>)` (and on `slide_order::Transaction`) | a shape's `InteractiveInfo` click; URL and slide links append an `ExHyperlinkContainer` (and an `ExHyperlink9Container` screen tip) | ✅ 0323 |

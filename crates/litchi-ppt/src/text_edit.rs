@@ -3655,7 +3655,7 @@ pub(crate) fn add_unmodeled_text_dependency_for_test(
     editor.finish().map_err(Into::into)
 }
 
-fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
+pub(crate) fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
     match selected {
         ShapeEnum::TextBox(textbox) => textbox.source_shape_id(),
         ShapeEnum::Placeholder(placeholder) => placeholder.source_shape_id(),
