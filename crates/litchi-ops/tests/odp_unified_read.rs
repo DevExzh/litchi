@@ -188,8 +188,12 @@ fn flat_presentations_open_for_reads() {
     let file = open("libreoffice-core/sd/qa/unit/data/draw-image-link.fodp");
     assert!(file.get("/slide[1]").is_ok());
     assert!(file.view(Mode::Outline).unwrap().starts_with("1 slides"));
-    // A flat document the leaf refuses stays a typed open error.
-    let error =
-        litchi_ops::open(fixture("libreoffice-core/xmloff/qa/unit/data/theme.fodp")).unwrap_err();
+    // Record 0341: XML's predefined entities no longer make the leaf
+    // refuse a flat presentation.
+    let theme = open("libreoffice-core/xmloff/qa/unit/data/theme.fodp");
+    assert!(theme.get("/slide[1]").is_ok());
+    // A flat document the leaf refuses (an empty office:body) stays a
+    // typed open error.
+    let error = litchi_ops::open(fixture("odf/drawing/multicolor-gradient.fodp")).unwrap_err();
     assert_eq!(error.code(), Code::CorruptFile);
 }
