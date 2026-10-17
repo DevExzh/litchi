@@ -25,8 +25,8 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `f6a7361ed49a24501a09b237591b593e9ca8b6c9223b87c7a34801d414c08334` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `0a421039fbf3f008b73f71bf267c946b3cc32c27cbfb111105eb43f6ecf7ef2e` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `63e83c705bcc34b189e0709fd0e0fd9c6291d9952677152fcfd1aac067a4f8aa` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `c5dce2f2b310342025a6297ff3e415e7df028f30672ef737694dd85446a5f266` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `319c2f64b082acd6ad4fd954c975e824a682e5c568335d00f08ff5ac0ef7d2ef` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `6e2e500f95906351dcaf6e50f85efc69db44d013202a0a1e2828da8c44650d1e` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `3f9933fcc82cdb5c6974246e4eff44efd2985093eaa5302abc7b1a3c6a387faa` |
@@ -136,7 +136,7 @@ Property writes:
 | docx | 129 | 30 | 637 | 0 | 102 | 181 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
-| xlsx | 211 | 60 | 273 | 0 | 515 | 184 |
+| xlsx | 212 | 60 | 272 | 0 | 515 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 86 | 28 | 447 | 0 | 140 | 242 |
@@ -3606,7 +3606,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | aboveaverage | `axisPosition` | string |  | --- | litchi-only | — |  |
 | aboveaverage | `direction` | string |  | --- | litchi-only | — |  |
 | autofilter | `range` | string | asg | asg | supported | supported |  |
-| autofilter | `criteria0` | string | a-- | --- | write-only | gap |  |
+| autofilter | `criteria0` | string | a-- | a-- | write-only | supported |  |
 | cell | `value` | string | asg | -s- | write-only | partial |  |
 | cell | `formula` | string | asg | -sg | supported | partial |  |
 | cell | `numberformat` | string | asg | -sg | supported | partial |  |

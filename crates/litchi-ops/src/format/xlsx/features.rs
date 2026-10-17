@@ -525,15 +525,6 @@ static NEGATIVE_COLOR_GAP: GapSpec = x14_gap("conditionalFormatting", "negativeC
 static AXIS_COLOR_GAP: GapSpec = x14_gap("conditionalFormatting", "axisColor");
 static AXIS_POSITION_GAP: GapSpec = x14_gap("conditionalFormatting", "axisPosition");
 static DIRECTION_GAP: GapSpec = x14_gap("conditionalFormatting", "direction");
-static CRITERIA_GAP: GapSpec = GapSpec {
-    subject: Subject::Property {
-        element: "autofilter",
-        key: "criteria0",
-    },
-    code: Code::UnsupportedProperty,
-    follow_up: "record 0320 follow-up: auto-filter criteria",
-    reason: "auto-filter column criteria (`criteriaN.op`) are not authored yet; the filter range is",
-};
 
 const fn effect_gap(element: &'static str, key: &'static str) -> GapSpec {
     GapSpec {
@@ -1256,7 +1247,7 @@ pub(crate) enum AutofilterKey {
 
 keyed!(AutofilterKey, AutofilterKey, AUTOFILTER_TABLE, AUTOFILTER_PROPS, AUTOFILTER_KEYS, [
     entry(read("range", TEXT), Access::SetAndAdd(AutofilterKey::Range)) => Range,
-    entry(write_only("criteria0", TEXT), Access::Gap(&CRITERIA_GAP)) => Criteria,
+    entry(write_only("criteria0", TEXT), Access::Add(AutofilterKey::Criteria)) => Criteria,
 ], [alias("ref", 0)]);
 
 /// Page-break keys; row breaks name their row, column breaks their column.
