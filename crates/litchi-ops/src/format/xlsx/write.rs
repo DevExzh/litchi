@@ -87,6 +87,11 @@ impl Commit {
     pub(crate) fn into_file(self) -> Xlsx {
         self.after_xlsx
     }
+
+    /// The handle after the operation.
+    pub(super) fn file(&self) -> &Xlsx {
+        &self.after_xlsx
+    }
 }
 
 impl std::fmt::Debug for Commit {
@@ -229,6 +234,15 @@ impl Xlsx {
         if let Some(commit) = self.try_set_chart(&target, &props)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_set_feature(&target, &props)? {
+            return Ok(commit);
+        }
+        // Cell hyperlinks (`link`, `tooltip`, `display`) share the cell edit
+        // (record 0320).
+        let (link, props) = super::feature_write::split_cell_link(&props)?;
+        if let Some(link) = link {
+            return self.set_cell_link(&target, &props, &link, limits);
+        }
         if let Some(commit) = self.try_set_merge(&target, &props, limits)? {
             return Ok(commit);
         }
@@ -246,6 +260,51 @@ impl Xlsx {
         let source = self.editor()?;
         let mut edit = source.edit().map_err(native_error)?;
         cells.apply(&mut edit)?;
+        let native = edit.commit().map_err(native_error)?;
+        Commit::from_native(self, source, native)
+    }
+}
+
+impl Xlsx {
+    /// A cell `set` carrying hyperlink properties: the cell assignments, if
+    /// any, and the hyperlink change in one native edit.
+    fn set_cell_link(
+        &self,
+        target: &TargetArg<'_>,
+        props: &Props<'_>,
+        link: &super::feature_write::CellLink,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let node = match target.path() {
+            Some(path) => crate::path::resolve::get(&Nav::new(self), path)?,
+            None => {
+                return Err(Error::new(
+                    Code::UnsupportedCapability,
+                    "cell hyperlinks are set through one cell path",
+                )
+                .with_property("link")
+                .with_format(FileFormat::Xlsx));
+            },
+        };
+        let Some((sheet, at)) = node.write_cell_target() else {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "cell hyperlinks are set on one cell",
+            )
+            .with_property("link")
+            .with_format(FileFormat::Xlsx));
+        };
+        let cells = if props.is_empty() {
+            None
+        } else {
+            Some(PreparedCells::new(self, target, props, limits)?)
+        };
+        let source = self.editor()?;
+        let mut edit = source.edit().map_err(native_error)?;
+        if let Some(cells) = &cells {
+            cells.apply(&mut edit)?;
+        }
+        self.stage_cell_link(&mut edit, sheet, at, link)?;
         let native = edit.commit().map_err(native_error)?;
         Commit::from_native(self, source, native)
     }

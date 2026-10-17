@@ -93,6 +93,10 @@ impl Edit<'_> {
     pub fn set_auto_filter(&mut self, sheet: usize, value: Option<Definition>) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
         let xml = super::replace_auto_filter(self.staged.blob(&worksheet)?, value.as_ref())?;
+        let xml = crate::part_edit::WorksheetLayout::scan(&xml)?.in_root_prefix(&xml, "autoFilter");
+        if super::parse_auto_filter(&xml)? != value {
+            return Err(crate::error::invalid("the auto-filter did not read back"));
+        }
         self.staged.replace_blob(&worksheet, xml)
     }
 

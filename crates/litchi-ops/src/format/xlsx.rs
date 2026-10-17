@@ -64,6 +64,8 @@ mod chart;
 mod children;
 pub(crate) mod create;
 mod dimension_write;
+mod feature_write;
+mod features;
 mod header;
 mod merge_write;
 mod metadata;
@@ -80,6 +82,7 @@ pub(crate) mod write;
 
 pub(crate) use chart::{AXIS_CAPABILITY_PROPS, CHART_CAPABILITY_PROPS, SERIES_CAPABILITY_PROPS};
 pub(crate) use children::Children;
+pub(crate) use features::FEATURE_ELEMENTS;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;

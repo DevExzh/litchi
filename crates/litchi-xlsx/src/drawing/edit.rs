@@ -362,6 +362,38 @@ pub enum Fill {
     None,
     /// A solid RGB fill.
     Solid(Rgb),
+    /// A solid theme (scheme) color fill: one of [`SCHEME_COLORS`].
+    Scheme(&'static str),
+}
+
+/// The `DrawingML` scheme color names (`ST_SchemeColorVal`).
+pub const SCHEME_COLORS: &[&str] = &[
+    "bg1", "tx1", "bg2", "tx2", "accent1", "accent2", "accent3", "accent4", "accent5", "accent6",
+    "hlink", "folHlink", "phClr", "dk1", "lt1", "dk2", "lt2",
+];
+
+/// The `DrawingML` preset dash names (`ST_PresetLineDashVal`).
+pub const DASHES: &[&str] = &[
+    "solid",
+    "dot",
+    "dash",
+    "lgDash",
+    "dashDot",
+    "lgDashDot",
+    "lgDashDotDot",
+    "sysDash",
+    "sysDot",
+    "sysDashDot",
+    "sysDashDotDot",
+];
+
+/// The canonical spelling of a name in `names`, matched case-insensitively.
+#[must_use]
+pub fn canonical(names: &'static [&'static str], value: &str) -> Option<&'static str> {
+    names
+        .iter()
+        .copied()
+        .find(|name| name.eq_ignore_ascii_case(value))
 }
 
 /// A shape outline.
@@ -376,6 +408,8 @@ pub enum Line {
         color: Rgb,
         /// The width in EMU.
         width: Option<i64>,
+        /// A preset dash, one of [`DASHES`].
+        dash: Option<&'static str>,
     },
 }
 
@@ -442,6 +476,9 @@ pub struct Element {
     pub align: Option<Align>,
     /// The vertical text anchor.
     pub valign: Option<VerticalAlign>,
+    /// The text insets (left, top, right, bottom) in EMU, when the shape
+    /// sets any.
+    pub margin: Option<[i64; 4]>,
     /// The image of a picture.
     pub image: Option<Image>,
     span: Range<usize>,
@@ -470,6 +507,7 @@ impl Element {
             font: Font::default(),
             align: None,
             valign: None,
+            margin: None,
             image: None,
             span,
             embed: None,
@@ -526,6 +564,8 @@ pub struct ShapeSpec {
     pub align: Option<Align>,
     /// The vertical text anchor.
     pub valign: Option<VerticalAlign>,
+    /// The text insets (left, top, right, bottom) in EMU.
+    pub margin: Option<[i64; 4]>,
     /// Clockwise rotation in degrees.
     pub rotation: Option<f64>,
     /// Horizontal flip.
@@ -549,6 +589,7 @@ impl ShapeSpec {
             font: Font::default(),
             align: None,
             valign: None,
+            margin: None,
             rotation: None,
             flip_h: false,
             flip_v: false,
@@ -770,11 +811,29 @@ fn scan(xml: &[u8]) -> Result<(Vec<Element>, usize, u32)> {
                             }
                         }
                     },
+                    b"schemeClr"
+                        if depth == 5
+                            && stack.get(3).is_some_and(|n| n == b"spPr")
+                            && stack.last().is_some_and(|n| n == b"solidFill") =>
+                    {
+                        if let Some(name) = attribute(&element, b"val")
+                            .and_then(|value| canonical(SCHEME_COLORS, &value))
+                        {
+                            object.fill = Some(Fill::Scheme(name));
+                        }
+                    },
+                    b"prstDash" if depth == 5 && stack.last().is_some_and(|n| n == b"ln") => {
+                        if let Some(Line::Solid { dash, .. }) = object.line.as_mut() {
+                            *dash = attribute(&element, b"val")
+                                .and_then(|value| canonical(DASHES, &value));
+                        }
+                    },
                     b"ln" if depth == 4 => {
                         let width = attribute(&element, b"w").and_then(|w| w.parse().ok());
                         object.line = Some(Line::Solid {
                             color: Rgb::new(0, 0, 0),
                             width,
+                            dash: None,
                         });
                     },
                     b"noFill" if depth == 5 && stack.last().is_some_and(|n| n == b"ln") => {
@@ -784,6 +843,17 @@ fn scan(xml: &[u8]) -> Result<(Vec<Element>, usize, u32)> {
                     b"bodyPr" => {
                         object.valign = attribute(&element, b"anchor")
                             .and_then(|value| VerticalAlign::parse(&value));
+                        let insets = [b"lIns".as_slice(), b"tIns", b"rIns", b"bIns"].map(|key| {
+                            attribute(&element, key).and_then(|v| v.parse::<i64>().ok())
+                        });
+                        if insets.iter().any(Option::is_some) {
+                            // The schema defaults: 0.1in left and right, 0.05in
+                            // top and bottom.
+                            let defaults = [91_440, 45_720, 91_440, 45_720];
+                            object.margin = Some(
+                                [0, 1, 2, 3].map(|side| insets[side].unwrap_or(defaults[side])),
+                            );
+                        }
                     },
                     b"p" if stack.last().is_some_and(|n| n == b"txBody") => {
                         paragraphs.push(String::new());
@@ -1130,11 +1200,20 @@ fn shape_xml(spec: &ShapeSpec, id: u32) -> Result<String> {
                 rgb(color)
             );
         },
+        Some(Fill::Scheme(name)) => {
+            if canonical(SCHEME_COLORS, name).is_none() {
+                return Err(invalid("a scheme fill names a DrawingML scheme color"));
+            }
+            let _ = write!(
+                out,
+                "<a:solidFill><a:schemeClr val=\"{name}\"/></a:solidFill>"
+            );
+        },
         None => {},
     }
     match spec.line {
         Some(Line::None) => out.push_str("<a:ln><a:noFill/></a:ln>"),
-        Some(Line::Solid { color, width }) => {
+        Some(Line::Solid { color, width, dash }) => {
             out.push_str("<a:ln");
             if let Some(width) = width {
                 if !(0..=20_116_800).contains(&width) {
@@ -1144,20 +1223,41 @@ fn shape_xml(spec: &ShapeSpec, id: u32) -> Result<String> {
             }
             let _ = write!(
                 out,
-                "><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill></a:ln>",
+                "><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill>",
                 rgb(color)
             );
+            if let Some(dash) = dash {
+                if canonical(DASHES, dash).is_none() {
+                    return Err(invalid("a line dash names a DrawingML preset dash"));
+                }
+                let _ = write!(out, "<a:prstDash val=\"{dash}\"/>");
+            }
+            out.push_str("</a:ln>");
         },
         None => {},
     }
     out.push_str("</xdr:spPr>");
-    if spec.text.is_some() || !spec.font.is_empty() || spec.align.is_some() || spec.valign.is_some()
+    if spec.text.is_some()
+        || !spec.font.is_empty()
+        || spec.align.is_some()
+        || spec.valign.is_some()
+        || spec.margin.is_some()
     {
         out.push_str(
             "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\" rtlCol=\"0\"",
         );
         if let Some(valign) = spec.valign {
             let _ = write!(out, " anchor=\"{}\"", valign.token());
+        }
+        if let Some(margin) = spec.margin {
+            if margin.iter().any(|inset| !(0..=51_206_400).contains(inset)) {
+                return Err(invalid("a text margin must be 0 to 4032 points"));
+            }
+            let [left, top, right, bottom] = margin;
+            let _ = write!(
+                out,
+                " lIns=\"{left}\" tIns=\"{top}\" rIns=\"{right}\" bIns=\"{bottom}\""
+            );
         }
         out.push_str("/><a:lstStyle/>");
         let text = spec.text.as_deref().unwrap_or("");

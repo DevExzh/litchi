@@ -480,6 +480,50 @@ impl WorksheetLayout {
         Ok(out)
     }
 
+    /// Rewrite a direct child `name` written in its own `x:` prefix with a
+    /// local declaration into the root's prefix, so every worksheet writer
+    /// reads it as a direct child. Other children keep their bytes.
+    pub(crate) fn in_root_prefix(&self, xml: &[u8], name: &str) -> Vec<u8> {
+        let Some(child) = self.child(name) else {
+            return xml.to_vec();
+        };
+        let fragment = &xml[child.span.clone()];
+        let namespace = if self.strict {
+            STRICT_MAIN_NS
+        } else {
+            b"http://schemas.openxmlformats.org/spreadsheetml/2006/main".as_slice()
+        };
+        let mut declaration = b" xmlns:x=\"".to_vec();
+        declaration.extend_from_slice(namespace);
+        declaration.push(b'"');
+        if !fragment.starts_with(b"<x:") || self.prefix == "x:" {
+            return xml.to_vec();
+        }
+        let prefix = self.prefix.as_bytes();
+        let mut out = Vec::with_capacity(xml.len());
+        out.extend_from_slice(&xml[..child.span.start]);
+        let mut index = 0;
+        while index < fragment.len() {
+            let rest = &fragment[index..];
+            if rest.starts_with(&declaration) {
+                index += declaration.len();
+            } else if rest.starts_with(b"</x:") {
+                out.extend_from_slice(b"</");
+                out.extend_from_slice(prefix);
+                index += 4;
+            } else if rest.starts_with(b"<x:") {
+                out.push(b'<');
+                out.extend_from_slice(prefix);
+                index += 3;
+            } else {
+                out.push(fragment[index]);
+                index += 1;
+            }
+        }
+        out.extend_from_slice(&xml[child.span.end..]);
+        out
+    }
+
     /// Remove the first direct child named `name`; `None` when it is absent.
     pub(crate) fn remove_child(&self, xml: &[u8], name: &str) -> Option<Vec<u8>> {
         let child = self.child(name)?;

@@ -357,7 +357,7 @@ impl Edit<'_> {
         let worksheet = self.staged.worksheet(sheet)?;
         let (_, count) = self.differentials()?;
         let xml =
-            super::replace_conditional_formattings(self.staged.blob(&worksheet)?, &values, count)?;
+            super::package::replace_in_root_prefix(self.staged.blob(&worksheet)?, &values, count)?;
         self.staged.replace_blob(&worksheet, xml)
     }
 
