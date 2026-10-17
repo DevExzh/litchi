@@ -65,6 +65,9 @@ pub(super) enum Item {
     Column(ColumnItem),
     Table(TableItem),
     NamedRange(usize),
+    /// A worksheet feature: a note, hyperlink, picture, shape, conditional
+    /// format, validation, auto-filter or page break (record 0322).
+    Feature(Arc<super::features::Feature>),
 }
 
 /// One complete-catalog tab and its lazily pinned worksheet grid.
@@ -457,6 +460,11 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// An element of the worksheet at `sheet`, for a sibling module.
+    pub(super) fn in_sheet_item(file: &'f Xlsb, sheet: usize, item: Item) -> Self {
+        Self::in_sheet(file, sheet, item)
+    }
+
     fn in_sheet(file: &'f Xlsb, sheet: usize, item: Item) -> Self {
         Self {
             file,
@@ -579,6 +587,7 @@ impl<'f> Node<'f> {
             Item::Column(column) => PathStep::column("col", column.index),
             Item::Table(table) => PathStep::at("table", Position::new(table.index)),
             Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
+            Item::Feature(feature) => feature.step(),
         })
     }
 
@@ -607,6 +616,7 @@ impl<'f> Node<'f> {
             Item::Column(_) => Kind::Column,
             Item::Table(_) => Kind::Table,
             Item::NamedRange(_) => Kind::NamedRange,
+            Item::Feature(ref feature) => feature.kind,
         }
     }
 
@@ -718,6 +728,12 @@ impl<'f> Node<'f> {
                 (COLUMN_PROPS, Props::Column(info))
             },
             Item::Table(table) => (TABLE_PROPS, Props::Table(&table.part)),
+            Item::Feature(feature) => {
+                let sheet = SheetHandle::at(self.file, self.sheet_position())?
+                    .map(|handle| handle.name().to_owned())
+                    .unwrap_or_default();
+                (feature.table(), Props::Feature(feature, sheet))
+            },
             Item::NamedRange(index) => {
                 let Some(entry) = self.file.defined_name_entries()?.into_iter().nth(*index) else {
                     return Ok(Format::empty());
@@ -878,6 +894,7 @@ impl<'f> Project<'f> for Node<'f> {
                     .get(*index)
                     .cloned()
                     .map(Cow::Owned),
+                Item::Feature(feature) => feature.text(),
                 Item::Workbook | Item::Sheet(_) | Item::Range(_) | Item::Column(_) => None,
             })
         })
@@ -897,6 +914,7 @@ impl<'f> Project<'f> for Node<'f> {
                     .cloned()
                     .map(Cow::Owned)
                     .map(Preview::Text),
+                Item::Feature(feature) => feature.preview(),
             })
         })
     }
@@ -906,7 +924,7 @@ impl<'f> Project<'f> for Node<'f> {
             let count = match &self.item {
                 Item::Workbook => catalog_count(self.file)?,
                 Item::Sheet(_) if options.depth == 0 => return Ok(None),
-                Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) => 0,
+                Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) | Item::Feature(_) => 0,
                 Item::Sheet(_) | Item::Row(_) | Item::Column(_) | Item::Range(_) => {
                     Children::count(self, options)?
                 },
@@ -985,6 +1003,8 @@ pub(crate) enum Props<'a> {
     Range {
         merged: bool,
     },
+    /// A worksheet feature and its worksheet's name (record 0322).
+    Feature(&'a super::features::Feature, String),
 }
 
 pub(crate) struct CellProps<'a> {
@@ -1005,6 +1025,7 @@ impl fmt::Debug for Props<'_> {
             Self::Table(_) => "Table",
             Self::NamedRange { .. } => "NamedRange",
             Self::Range { .. } => "Range",
+            Self::Feature(..) => "Feature",
         };
         f.debug_tuple("Props").field(&name).finish()
     }
@@ -1038,6 +1059,7 @@ impl<'a> Props<'a> {
             Self::Range { merged } => {
                 (index == RANGE_MERGE_INDEX && *merged).then_some(Value::Bool(true))
             },
+            Self::Feature(feature, sheet) => feature.value(index, sheet),
             Self::NamedRange { entry, scope } => match NamedRangeKey::at(index)? {
                 NamedRangeKey::Name => Some(Value::Text(Cow::Owned(entry.name.clone()))),
                 NamedRangeKey::Ref => entry

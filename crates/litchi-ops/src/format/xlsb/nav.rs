@@ -149,6 +149,9 @@ impl<'f> Nav<'f> {
     ) -> Result<Lookup<Node<'f>, GapSpec>> {
         let file = self.file;
         let position = sheet.position;
+        if super::features::is_feature(kind) {
+            return super::features::lookup(file, sheet, kind, select);
+        }
         if !sheet.handle.is_grid()
             && matches!(kind, Kind::Cell | Kind::Range | Kind::Row | Kind::Column)
         {
@@ -461,6 +464,12 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 (Item::Sheet(sheet), Kind::Table) => {
                     out.kind("table", sheet.handle.tables()?.len())
                 },
+                (Item::Sheet(sheet), kind) if super::features::is_feature(kind) => {
+                    out.kind(
+                        super::features::step_name(kind),
+                        super::features::list(self.file, sheet, kind)?.len(),
+                    );
+                },
                 (Item::Sheet(sheet), Kind::Row | Kind::Column) => {
                     if let Some(extent) = sheet.grid()?.extents()? {
                         let (rows, columns) = extent.end();
@@ -511,6 +520,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
                 Item::NamedRange(index) => defined_names(self.file)?
                     .get(*index)
                     .map(|name| Cow::Owned(name.clone())),
+                Item::Feature(feature) => feature.text(),
                 Item::Workbook | Item::Range(_) => None,
             })
         })

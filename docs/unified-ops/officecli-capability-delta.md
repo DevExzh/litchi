@@ -27,7 +27,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `0a421039fbf3f008b73f71bf267c946b3cc32c27cbfb111105eb43f6ecf7ef2e` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `63e83c705bcc34b189e0709fd0e0fd9c6291d9952677152fcfd1aac067a4f8aa` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `17866e45cf525f14b60e55cfb5590014a980b5493350319f324adce9d5fabcf6` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `79db9e5681e5766eed8a2387d60513389290d4bbe180b9c38222828f517da461` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `3f9933fcc82cdb5c6974246e4eff44efd2985093eaa5302abc7b1a3c6a387faa` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
@@ -85,7 +85,7 @@ Elements:
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
 | rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 33 | 5 | 0 | 0 | 1 | 2 | 1 |
-| xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
+| xlsb | 30 | 8 | 0 | 0 | 1 | 2 | 1 |
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
@@ -111,7 +111,7 @@ Property reads:
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 552 |
-| xlsb | 78 | 29 | 489 | 0 | 24 | 1 | 70 | 30 |
+| xlsb | 276 | 29 | 248 | 0 | 64 | 1 | 73 | 430 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 197 | 22 | 70 | 0 | 117 | 0 | 281 | 256 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
@@ -137,7 +137,7 @@ Property writes:
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 211 | 60 | 273 | 0 | 515 | 184 |
-| xlsb | 8 | 26 | 510 | 0 | 31 | 146 |
+| xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 86 | 28 | 447 | 0 | 140 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
@@ -4846,46 +4846,46 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Follow-up |
 |---|---|---|---|
-| aboveaverage | conditionalFormatting | gap | M1-extended (R4x) |
-| autofilter | autofilter | gap | M1-extended (R4x) |
+| aboveaverage | conditionalFormatting | supported |  |
+| autofilter | autofilter | supported |  |
 | cell | cell | supported |  |
-| cellis | conditionalFormatting | gap | M1-extended (R4x) |
-| cfextended | conditionalFormatting | gap | M1-extended (R4x) |
+| cellis | conditionalFormatting | supported |  |
+| cfextended | conditionalFormatting | supported |  |
 | chart-axis | axis | gap | M1-extended (R4x) |
 | chart-series | series | gap | M1-extended (R4x) |
 | chart | chart | gap | M1-extended (R4x) |
-| colbreak | colbreak | gap | M1-extended (R4x) |
-| colorscale | conditionalFormatting | gap | M1-extended (R4x) |
+| colbreak | colbreak | supported |  |
+| colorscale | conditionalFormatting | supported |  |
 | column | column | supported |  |
-| comment | comment | gap | M1-extended (R4x) |
-| conditionalformatting | conditionalFormatting | gap | M1-extended (R4x) |
-| containstext | conditionalFormatting | gap | M1-extended (R4x) |
-| databar | conditionalFormatting | gap | M1-extended (R4x) |
-| dateoccurring | conditionalFormatting | gap | M1-extended (R4x) |
+| comment | comment | supported |  |
+| conditionalformatting | conditionalFormatting | supported |  |
+| containstext | conditionalFormatting | supported |  |
+| databar | conditionalFormatting | supported |  |
+| dateoccurring | conditionalFormatting | supported |  |
 | detectedtable |  | missing |  |
-| duplicatevalues | conditionalFormatting | gap | M1-extended (R4x) |
-| formulacf | conditionalFormatting | gap | M1-extended (R4x) |
-| hyperlink | hyperlink | gap | M1-extended (R4x) |
-| iconset | conditionalFormatting | gap | M1-extended (R4x) |
+| duplicatevalues | conditionalFormatting | supported |  |
+| formulacf | conditionalFormatting | supported |  |
+| hyperlink | hyperlink | supported |  |
+| iconset | conditionalFormatting | supported |  |
 | namedrange | namedrange | supported |  |
 | ole | ole | gap | M1-extended (R4x) |
-| pagebreak | colbreak | gap | M1-extended (R4x) |
-| picture | picture | gap | M1-extended (R4x) |
+| pagebreak | colbreak | supported |  |
+| picture | picture | supported |  |
 | pivottable | pivottable | gap | M1-extended (R4x) |
 | range | range | supported |  |
 | raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | row | row | supported |  |
-| rowbreak | rowbreak | gap | M1-extended (R4x) |
+| rowbreak | rowbreak | supported |  |
 | run | run | gap | M1-extended (R4x) |
-| shape | shape | gap | M1-extended (R4x) |
+| shape | shape | supported |  |
 | sheet | sheet | supported |  |
 | slicer | slicer | gap | M1-extended (R4x) |
 | sort |  | out of scope | a set-only action that reorders rows; M2 write surface |
 | sparkline | sparkline | gap | M1-extended (R4x) |
 | table | table | supported |  |
-| topn | conditionalFormatting | gap | M1-extended (R4x) |
-| uniquevalues | conditionalFormatting | gap | M1-extended (R4x) |
-| validation | dataValidation | gap | M1-extended (R4x) |
+| topn | conditionalFormatting | supported |  |
+| uniquevalues | conditionalFormatting | supported |  |
+| validation | dataValidation | supported |  |
 | workbook | workbook | supported |  |
 |  | mergeCell | litchi-only | M1-extended (R4x) |
 
@@ -4893,18 +4893,49 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
 |---|---|---|---|---|---|---|---|
-| aboveaverage | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `aboveAverage` | bool | a-g |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `stdDev` | number | a-- |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `equalAverage` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| aboveaverage | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| aboveaverage | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| autofilter | `range` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| autofilter | `criteria0` | string | a-- |  | element gap | gap | M1-extended (R4x) |
+| aboveaverage | `ref` | string | a-g | asg | supported | supported |  |
+| aboveaverage | `aboveAverage` | bool | a-g | asg | supported | supported |  |
+| aboveaverage | `stdDev` | number | a-- | asg | supported | supported |  |
+| aboveaverage | `equalAverage` | bool | a-- | asg | supported | supported |  |
+| aboveaverage | `fill` | color | a-- | asg | supported | supported |  |
+| aboveaverage | `font.color` | color | a-- | asg | supported | supported |  |
+| aboveaverage | `font.bold` | bool | a-- | asg | supported | supported |  |
+| aboveaverage | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| aboveaverage | `type` | string | --g | a-g | supported | litchi-only |  |
+| aboveaverage | `dxfId` | number | --g | --g | supported | — |  |
+| aboveaverage | `priority` | int |  | --g | litchi-only | — |  |
+| aboveaverage | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `value` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `text` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `period` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `color` | color |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `min` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `max` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| aboveaverage | `negativeColor` | color |  | --- | litchi-only | — |  |
+| aboveaverage | `axisColor` | color |  | --- | litchi-only | — |  |
+| aboveaverage | `axisPosition` | string |  | --- | litchi-only | — |  |
+| aboveaverage | `direction` | string |  | --- | litchi-only | — |  |
+| autofilter | `range` | string | asg | asg | supported | supported |  |
+| autofilter | `criteria0` | string | a-- | --- | write-only | gap |  |
 | cell | `value` | string | asg | -s- | write-only | partial |  |
 | cell | `formula` | string | asg | -sg | supported | partial |  |
 | cell | `numberformat` | string | asg | -sg | supported | partial |  |
@@ -4970,24 +5001,88 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `border.top.color` | color |  | -sg | litchi-only | litchi-only |  |
 | cell | `border.bottom.color` | color |  | -sg | litchi-only | litchi-only |  |
 | cell | `border.all.color` | color |  | -s- | litchi-only | litchi-only |  |
-| cellis | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| cellis | `operator` | enum | a-g |  | element gap | gap | M1-extended (R4x) |
-| cellis | `value` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| cellis | `value2` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| cellis | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| cellis | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| cellis | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| cellis | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| cellis | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| cellis | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| cfextended | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| cfextended | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| cfextended | `text` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| cfextended | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| cfextended | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| cfextended | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| cfextended | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| cfextended | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
+| cellis | `ref` | string | a-g | asg | supported | supported |  |
+| cellis | `operator` | enum | a-g | asg | supported | supported |  |
+| cellis | `value` | string | a-g | asg | supported | supported |  |
+| cellis | `value2` | string | a-g | asg | supported | supported |  |
+| cellis | `fill` | color | a-- | asg | supported | supported |  |
+| cellis | `font.color` | color | a-- | asg | supported | supported |  |
+| cellis | `font.bold` | bool | a-- | asg | supported | supported |  |
+| cellis | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| cellis | `type` | string | --g | a-g | supported | litchi-only |  |
+| cellis | `dxfId` | number | --g | --g | supported | — |  |
+| cellis | `priority` | int |  | --g | litchi-only | — |  |
+| cellis | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `text` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| cellis | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| cellis | `period` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `color` | color |  | asg | litchi-only | litchi-only |  |
+| cellis | `min` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `max` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| cellis | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| cellis | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| cellis | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| cellis | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| cellis | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| cellis | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| cellis | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| cellis | `negativeColor` | color |  | --- | litchi-only | — |  |
+| cellis | `axisColor` | color |  | --- | litchi-only | — |  |
+| cellis | `axisPosition` | string |  | --- | litchi-only | — |  |
+| cellis | `direction` | string |  | --- | litchi-only | — |  |
+| cfextended | `ref` | string | a-g | asg | supported | supported |  |
+| cfextended | `type` | string | --g | a-g | supported | litchi-only |  |
+| cfextended | `text` | string | a-g | asg | supported | supported |  |
+| cfextended | `fill` | color | a-- | asg | supported | supported |  |
+| cfextended | `font.color` | color | a-- | asg | supported | supported |  |
+| cfextended | `font.bold` | bool | a-- | asg | supported | supported |  |
+| cfextended | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| cfextended | `dxfId` | number | --g | --g | supported | — |  |
+| cfextended | `priority` | int |  | --g | litchi-only | — |  |
+| cfextended | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `value` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| cfextended | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| cfextended | `period` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `color` | color |  | asg | litchi-only | litchi-only |  |
+| cfextended | `min` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `max` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| cfextended | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| cfextended | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| cfextended | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| cfextended | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| cfextended | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| cfextended | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| cfextended | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| cfextended | `negativeColor` | color |  | --- | litchi-only | — |  |
+| cfextended | `axisColor` | color |  | --- | litchi-only | — |  |
+| cfextended | `axisPosition` | string |  | --- | litchi-only | — |  |
+| cfextended | `direction` | string |  | --- | litchi-only | — |  |
 | chart-axis | `role` | string | --g |  | element gap | — | M1-extended (R4x) |
 | chart-axis | `dispUnits` | enum | -sg |  | element gap | gap | M1-extended (R4x) |
 | chart-axis | `majorUnit` | number | -sg |  | element gap | gap | M1-extended (R4x) |
@@ -5149,18 +5244,51 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `varyColors` | string | asg |  | element gap | gap | M1-extended (R4x) |
 | chart | `view3d` | string | asg |  | element gap | gap | M1-extended (R4x) |
 | chart | `width` | length | asg |  | element gap | gap | M1-extended (R4x) |
-| colbreak | `col` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| colbreak | `manual` | bool | -s- |  | element gap | gap | M1-extended (R4x) |
-| colbreak | `min` | int | -s- |  | element gap | gap | M1-extended (R4x) |
-| colbreak | `max` | int | -s- |  | element gap | gap | M1-extended (R4x) |
-| colorscale | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| colorscale | `minColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| colorscale | `maxColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| colorscale | `midColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| colorscale | `midpoint` | number | a-- |  | element gap | gap | M1-extended (R4x) |
-| colorscale | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| colorscale | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| colorscale | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
+| colbreak | `col` | string | as- | asg | supported | supported |  |
+| colbreak | `manual` | bool | -s- | asg | supported | supported |  |
+| colbreak | `min` | int | -s- | asg | supported | supported |  |
+| colbreak | `max` | int | -s- | asg | supported | supported |  |
+| colorscale | `ref` | string | a-g | asg | supported | supported |  |
+| colorscale | `minColor` | color | a-g | asg | supported | supported |  |
+| colorscale | `maxColor` | color | a-g | asg | supported | supported |  |
+| colorscale | `midColor` | color | a-g | asg | supported | supported |  |
+| colorscale | `midpoint` | number | a-- | asg | supported | supported |  |
+| colorscale | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| colorscale | `type` | string | --g | a-g | supported | litchi-only |  |
+| colorscale | `dxfId` | number | --g | --g | supported | — |  |
+| colorscale | `priority` | int |  | --g | litchi-only | — |  |
+| colorscale | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `value` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `text` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| colorscale | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| colorscale | `period` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `color` | color |  | asg | litchi-only | litchi-only |  |
+| colorscale | `min` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `max` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| colorscale | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| colorscale | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `fill` | color |  | asg | litchi-only | litchi-only |  |
+| colorscale | `font.color` | color |  | asg | litchi-only | litchi-only |  |
+| colorscale | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| colorscale | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| colorscale | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| colorscale | `negativeColor` | color |  | --- | litchi-only | — |  |
+| colorscale | `axisColor` | color |  | --- | litchi-only | — |  |
+| colorscale | `axisPosition` | string |  | --- | litchi-only | — |  |
+| colorscale | `direction` | string |  | --- | litchi-only | — |  |
 | column | `name` | string | a-- |  | write-only | gap |  |
 | column | `width` | length | asg | --g | supported | gap |  |
 | column | `hidden` | bool | asg | --g | supported | gap |  |
@@ -5169,104 +5297,307 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | column | `numberformat` | string | -sg |  | gap | gap | M1-extended (R4x) |
 | column | `customWidth` | bool | --g | --g | supported | — |  |
 | column | `autofit` | bool | -s- |  | write-only | gap |  |
-| comment | `ref` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| comment | `author` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| comment | `text` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `type` | enum | --g |  | element gap | — | M1-extended (R4x) |
-| conditionalformatting | `ref` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `fill` | color | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `operator` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `value` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `color` | color | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `value2` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `text` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `rank` | number | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `percent` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `bottom` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `aboveAverage` | bool | a-g |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `stdDev` | number | a-- |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `equalAverage` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `period` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `min` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `max` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `showValue` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `negativeColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `axisColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `axisPosition` | enum | a-- |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `minColor` | color | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `maxColor` | color | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `midColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `midPoint` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `iconset` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `reverse` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `formula` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| conditionalformatting | `dxfId` | int | --g |  | element gap | — | M1-extended (R4x) |
-| containstext | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| containstext | `text` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| containstext | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| containstext | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| containstext | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| containstext | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| containstext | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| containstext | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| databar | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `min` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| databar | `max` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| databar | `color` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `showValue` | bool | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `negativeColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `axisColor` | color | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `axisPosition` | enum | a-- |  | element gap | gap | M1-extended (R4x) |
-| databar | `minLength` | number | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `maxLength` | number | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `direction` | enum | a-g |  | element gap | gap | M1-extended (R4x) |
-| databar | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| databar | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| databar | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| dateoccurring | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| dateoccurring | `period` | enum | a-g |  | element gap | gap | M1-extended (R4x) |
-| dateoccurring | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| dateoccurring | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| dateoccurring | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| dateoccurring | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| dateoccurring | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| dateoccurring | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
+| comment | `ref` | string | asg | asg | supported | supported |  |
+| comment | `author` | string | asg | asg | supported | supported |  |
+| comment | `text` | string | asg | asg | supported | supported |  |
+| comment | `anchoredTo` | string |  | --g | litchi-only | — |  |
+| conditionalformatting | `type` | enum | --g | a-g | supported | litchi-only |  |
+| conditionalformatting | `ref` | string | asg | asg | supported | supported |  |
+| conditionalformatting | `fill` | color | asg | asg | supported | supported |  |
+| conditionalformatting | `operator` | string | asg | asg | supported | supported |  |
+| conditionalformatting | `value` | string | asg | asg | supported | supported |  |
+| conditionalformatting | `color` | color | asg | asg | supported | supported |  |
+| conditionalformatting | `value2` | string | asg | asg | supported | supported |  |
+| conditionalformatting | `text` | string | asg | asg | supported | supported |  |
+| conditionalformatting | `rank` | number | asg | asg | supported | supported |  |
+| conditionalformatting | `percent` | bool | asg | asg | supported | supported |  |
+| conditionalformatting | `bottom` | bool | asg | asg | supported | supported |  |
+| conditionalformatting | `aboveAverage` | bool | a-g | asg | supported | supported |  |
+| conditionalformatting | `stdDev` | number | a-- | asg | supported | supported |  |
+| conditionalformatting | `equalAverage` | bool | a-- | asg | supported | supported |  |
+| conditionalformatting | `period` | string | a-g | asg | supported | supported |  |
+| conditionalformatting | `min` | string | a-g | asg | supported | supported |  |
+| conditionalformatting | `max` | string | a-g | asg | supported | supported |  |
+| conditionalformatting | `showValue` | bool | asg | asg | supported | supported |  |
+| conditionalformatting | `negativeColor` | color | a-g | --- | write-only | gap |  |
+| conditionalformatting | `axisColor` | color | a-g | --- | write-only | gap |  |
+| conditionalformatting | `axisPosition` | enum | a-- | --- | write-only | gap |  |
+| conditionalformatting | `minColor` | color | asg | asg | supported | supported |  |
+| conditionalformatting | `maxColor` | color | asg | asg | supported | supported |  |
+| conditionalformatting | `midColor` | color | a-g | asg | supported | supported |  |
+| conditionalformatting | `midPoint` | string | a-- | asg | supported | supported |  |
+| conditionalformatting | `iconset` | string | asg | asg | supported | supported |  |
+| conditionalformatting | `reverse` | bool | asg | asg | supported | supported |  |
+| conditionalformatting | `formula` | string | asg | asg | supported | supported |  |
+| conditionalformatting | `dxfId` | int | --g | --g | supported | — |  |
+| conditionalformatting | `priority` | int |  | --g | litchi-only | — |  |
+| conditionalformatting | `stopIfTrue` | bool |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `font.color` | color |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `direction` | string |  | --- | litchi-only | — |  |
+| containstext | `ref` | string | a-g | asg | supported | supported |  |
+| containstext | `text` | string | a-g | asg | supported | supported |  |
+| containstext | `fill` | color | a-- | asg | supported | supported |  |
+| containstext | `font.color` | color | a-- | asg | supported | supported |  |
+| containstext | `font.bold` | bool | a-- | asg | supported | supported |  |
+| containstext | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| containstext | `type` | string | --g | a-g | supported | litchi-only |  |
+| containstext | `dxfId` | number | --g | --g | supported | — |  |
+| containstext | `priority` | int |  | --g | litchi-only | — |  |
+| containstext | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `value` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| containstext | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| containstext | `period` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `color` | color |  | asg | litchi-only | litchi-only |  |
+| containstext | `min` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `max` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| containstext | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| containstext | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| containstext | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| containstext | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| containstext | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| containstext | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| containstext | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| containstext | `negativeColor` | color |  | --- | litchi-only | — |  |
+| containstext | `axisColor` | color |  | --- | litchi-only | — |  |
+| containstext | `axisPosition` | string |  | --- | litchi-only | — |  |
+| containstext | `direction` | string |  | --- | litchi-only | — |  |
+| databar | `ref` | string | a-g | asg | supported | supported |  |
+| databar | `min` | string | a-- | asg | supported | supported |  |
+| databar | `max` | string | a-- | asg | supported | supported |  |
+| databar | `color` | color | a-g | asg | supported | supported |  |
+| databar | `showValue` | bool | a-g | asg | supported | supported |  |
+| databar | `negativeColor` | color | a-g | --- | write-only | gap |  |
+| databar | `axisColor` | color | a-g | --- | write-only | gap |  |
+| databar | `axisPosition` | enum | a-- | --- | write-only | gap |  |
+| databar | `minLength` | number | a-g | asg | supported | supported |  |
+| databar | `maxLength` | number | a-g | asg | supported | supported |  |
+| databar | `direction` | enum | a-g | --- | write-only | gap |  |
+| databar | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| databar | `type` | string | --g | a-g | supported | litchi-only |  |
+| databar | `dxfId` | number | --g | --g | supported | — |  |
+| databar | `priority` | int |  | --g | litchi-only | — |  |
+| databar | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `value` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `text` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| databar | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| databar | `period` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| databar | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| databar | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| databar | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `fill` | color |  | asg | litchi-only | litchi-only |  |
+| databar | `font.color` | color |  | asg | litchi-only | litchi-only |  |
+| databar | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| databar | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| databar | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| databar | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `ref` | string | a-g | asg | supported | supported |  |
+| dateoccurring | `period` | enum | a-g | asg | supported | supported |  |
+| dateoccurring | `fill` | color | a-- | asg | supported | supported |  |
+| dateoccurring | `font.color` | color | a-- | asg | supported | supported |  |
+| dateoccurring | `font.bold` | bool | a-- | asg | supported | supported |  |
+| dateoccurring | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| dateoccurring | `type` | string | --g | a-g | supported | litchi-only |  |
+| dateoccurring | `dxfId` | number | --g | --g | supported | — |  |
+| dateoccurring | `priority` | int |  | --g | litchi-only | — |  |
+| dateoccurring | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `value` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `text` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `color` | color |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `min` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `max` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| dateoccurring | `negativeColor` | color |  | --- | litchi-only | — |  |
+| dateoccurring | `axisColor` | color |  | --- | litchi-only | — |  |
+| dateoccurring | `axisPosition` | string |  | --- | litchi-only | — |  |
+| dateoccurring | `direction` | string |  | --- | litchi-only | — |  |
 | detectedtable | `source` | string | --g |  | missing | — |  |
 | detectedtable | `stable` | bool | --g |  | missing | — |  |
 | detectedtable | `ref` | string | --g |  | missing | — |  |
 | detectedtable | `columns` | string | --g |  | missing | — |  |
 | detectedtable | `dataRange` | string | --g |  | missing | — |  |
-| duplicatevalues | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| duplicatevalues | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| duplicatevalues | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| duplicatevalues | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| duplicatevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| duplicatevalues | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| duplicatevalues | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| formulacf | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `formula` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `font.italic` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `font.underline` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `font.strike` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `font.size` | font-size | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `font.name` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| formulacf | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| formulacf | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| hyperlink | `url` | string | --g |  | element gap | — | M1-extended (R4x) |
-| hyperlink | `ref` | string | --g |  | element gap | — | M1-extended (R4x) |
-| hyperlink | `location` | string | --g |  | element gap | — | M1-extended (R4x) |
-| hyperlink | `display` | string | --g |  | element gap | — | M1-extended (R4x) |
-| hyperlink | `tooltip` | string | --g |  | element gap | — | M1-extended (R4x) |
-| iconset | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| iconset | `iconset` | enum | a-g |  | element gap | gap | M1-extended (R4x) |
-| iconset | `reverse` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| iconset | `showValue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| iconset | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| iconset | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
+| duplicatevalues | `ref` | string | a-g | asg | supported | supported |  |
+| duplicatevalues | `fill` | color | a-- | asg | supported | supported |  |
+| duplicatevalues | `font.color` | color | a-- | asg | supported | supported |  |
+| duplicatevalues | `font.bold` | bool | a-- | asg | supported | supported |  |
+| duplicatevalues | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| duplicatevalues | `type` | string | --g | a-g | supported | litchi-only |  |
+| duplicatevalues | `dxfId` | number | --g | --g | supported | — |  |
+| duplicatevalues | `priority` | int |  | --g | litchi-only | — |  |
+| duplicatevalues | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `value` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `text` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `period` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `color` | color |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `min` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `max` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| duplicatevalues | `negativeColor` | color |  | --- | litchi-only | — |  |
+| duplicatevalues | `axisColor` | color |  | --- | litchi-only | — |  |
+| duplicatevalues | `axisPosition` | string |  | --- | litchi-only | — |  |
+| duplicatevalues | `direction` | string |  | --- | litchi-only | — |  |
+| formulacf | `ref` | string | a-g | asg | supported | supported |  |
+| formulacf | `formula` | string | a-g | asg | supported | supported |  |
+| formulacf | `fill` | color | a-- | asg | supported | supported |  |
+| formulacf | `font.color` | color | a-- | asg | supported | supported |  |
+| formulacf | `font.bold` | bool | a-- | asg | supported | supported |  |
+| formulacf | `font.italic` | bool | a-- | asg | supported | supported |  |
+| formulacf | `font.underline` | bool | a-- | asg | supported | supported |  |
+| formulacf | `font.strike` | bool | a-- | asg | supported | supported |  |
+| formulacf | `font.size` | font-size | a-- | asg | supported | supported |  |
+| formulacf | `font.name` | string | a-- | asg | supported | supported |  |
+| formulacf | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| formulacf | `type` | string | --g | a-g | supported | litchi-only |  |
+| formulacf | `dxfId` | number | --g | --g | supported | — |  |
+| formulacf | `priority` | int |  | --g | litchi-only | — |  |
+| formulacf | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `value` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `text` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| formulacf | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| formulacf | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| formulacf | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| formulacf | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| formulacf | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| formulacf | `period` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `color` | color |  | asg | litchi-only | litchi-only |  |
+| formulacf | `min` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `max` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| formulacf | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| formulacf | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| formulacf | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| formulacf | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| formulacf | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| formulacf | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| formulacf | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| formulacf | `negativeColor` | color |  | --- | litchi-only | — |  |
+| formulacf | `axisColor` | color |  | --- | litchi-only | — |  |
+| formulacf | `axisPosition` | string |  | --- | litchi-only | — |  |
+| formulacf | `direction` | string |  | --- | litchi-only | — |  |
+| hyperlink | `url` | string | --g | asg | supported | litchi-only |  |
+| hyperlink | `ref` | string | --g | asg | supported | litchi-only |  |
+| hyperlink | `location` | string | --g | asg | supported | litchi-only |  |
+| hyperlink | `display` | string | --g | asg | supported | litchi-only |  |
+| hyperlink | `tooltip` | string | --g | asg | supported | litchi-only |  |
+| iconset | `ref` | string | a-g | asg | supported | supported |  |
+| iconset | `iconset` | enum | a-g | asg | supported | supported |  |
+| iconset | `reverse` | bool | a-- | asg | supported | supported |  |
+| iconset | `showValue` | bool | a-- | asg | supported | supported |  |
+| iconset | `type` | string | --g | a-g | supported | litchi-only |  |
+| iconset | `dxfId` | number | --g | --g | supported | — |  |
+| iconset | `priority` | int |  | --g | litchi-only | — |  |
+| iconset | `stopIfTrue` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `value` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `text` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| iconset | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| iconset | `period` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `color` | color |  | asg | litchi-only | litchi-only |  |
+| iconset | `min` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `max` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| iconset | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| iconset | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| iconset | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| iconset | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| iconset | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `fill` | color |  | asg | litchi-only | litchi-only |  |
+| iconset | `font.color` | color |  | asg | litchi-only | litchi-only |  |
+| iconset | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| iconset | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| iconset | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| iconset | `negativeColor` | color |  | --- | litchi-only | — |  |
+| iconset | `axisColor` | color |  | --- | litchi-only | — |  |
+| iconset | `axisPosition` | string |  | --- | litchi-only | — |  |
+| iconset | `direction` | string |  | --- | litchi-only | — |  |
 | namedrange | `name` | string | asg | a-g | supported | partial |  |
 | namedrange | `ref` | string | asg | asg | supported | supported |  |
 | namedrange | `scope` | string | asg | a-g | supported | partial |  |
@@ -5282,46 +5613,49 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ole | `src` | string | as- |  | element gap | gap | M1-extended (R4x) |
 | ole | `oleKind` | enum | a-- |  | element gap | gap | M1-extended (R4x) |
 | ole | `embedExt` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| pagebreak | `row` | int | a-- |  | element gap | gap | M1-extended (R4x) |
-| pagebreak | `col` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| picture | `crop` | string | --g |  | element gap | — | M1-extended (R4x) |
-| picture | `title` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| picture | `decorative` | bool | a-g |  | element gap | gap | M1-extended (R4x) |
-| picture | `rotation` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| picture | `flip` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| picture | `flipH` | bool | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `flipV` | bool | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `flipBoth` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| picture | `opacity` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| picture | `hyperlink` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| picture | `anchor` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| picture | `anchorMode` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| picture | `shadow` | string | -s- |  | element gap | gap | M1-extended (R4x) |
-| picture | `glow` | string | -s- |  | element gap | gap | M1-extended (R4x) |
-| picture | `reflection` | string | -s- |  | element gap | gap | M1-extended (R4x) |
-| picture | `softEdge` | string | -s- |  | element gap | gap | M1-extended (R4x) |
-| picture | `crop.l` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `crop.r` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `crop.t` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `crop.b` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `srcRect` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `anchoredTo` | string | --g |  | element gap | — | M1-extended (R4x) |
-| picture | `mergeAnchor` | bool | --g |  | element gap | — | M1-extended (R4x) |
-| picture | `x` | length | asg |  | element gap | gap | M1-extended (R4x) |
-| picture | `y` | length | asg |  | element gap | gap | M1-extended (R4x) |
-| picture | `width` | integer | asg |  | element gap | gap | M1-extended (R4x) |
-| picture | `height` | integer | asg |  | element gap | gap | M1-extended (R4x) |
-| picture | `cropBottom` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `cropLeft` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `cropRight` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `cropTop` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| picture | `name` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| picture | `fallback` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| picture | `alt` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| picture | `contentType` | string | --g |  | element gap | — | M1-extended (R4x) |
-| picture | `fileSize` | number | --g |  | element gap | — | M1-extended (R4x) |
-| picture | `relId` | string | --g |  | element gap | — | M1-extended (R4x) |
-| picture | `src` | string | as- |  | element gap | gap | M1-extended (R4x) |
+| pagebreak | `row` | int | a-- |  | write-only | gap |  |
+| pagebreak | `col` | string | a-- | asg | supported | supported |  |
+| pagebreak | `manual` | bool |  | asg | litchi-only | litchi-only |  |
+| pagebreak | `min` | int |  | asg | litchi-only | litchi-only |  |
+| pagebreak | `max` | int |  | asg | litchi-only | litchi-only |  |
+| picture | `crop` | string | --g | --- | write-only | — |  |
+| picture | `title` | string | a-- | a-g | supported | supported |  |
+| picture | `decorative` | bool | a-g | --g | supported | gap |  |
+| picture | `rotation` | string | asg | asg | supported | supported |  |
+| picture | `flip` | string | asg | asg | supported | supported |  |
+| picture | `flipH` | bool | as- | as- | write-only | supported |  |
+| picture | `flipV` | bool | as- | as- | write-only | supported |  |
+| picture | `flipBoth` | bool | a-- | as- | write-only | supported |  |
+| picture | `opacity` | string | a-g | --- | write-only | gap |  |
+| picture | `hyperlink` | string | a-- | --g | supported | gap |  |
+| picture | `anchor` | string | a-- | a-- | write-only | supported |  |
+| picture | `anchorMode` | string | a-- | a-g | supported | supported |  |
+| picture | `shadow` | string | -s- | --- | write-only | gap |  |
+| picture | `glow` | string | -s- | --- | write-only | gap |  |
+| picture | `reflection` | string | -s- | --- | write-only | gap |  |
+| picture | `softEdge` | string | -s- | --- | write-only | gap |  |
+| picture | `crop.l` | string | as- |  | write-only | gap |  |
+| picture | `crop.r` | string | as- |  | write-only | gap |  |
+| picture | `crop.t` | string | as- |  | write-only | gap |  |
+| picture | `crop.b` | string | as- |  | write-only | gap |  |
+| picture | `srcRect` | string | as- |  | write-only | gap |  |
+| picture | `anchoredTo` | string | --g |  | missing | — |  |
+| picture | `mergeAnchor` | bool | --g |  | missing | — |  |
+| picture | `x` | length | asg | asg | supported | supported |  |
+| picture | `y` | length | asg | asg | supported | supported |  |
+| picture | `width` | integer | asg | asg | supported | supported |  |
+| picture | `height` | integer | asg | asg | supported | supported |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap |  |
+| picture | `cropRight` | string | as- |  | write-only | gap |  |
+| picture | `cropTop` | string | as- |  | write-only | gap |  |
+| picture | `name` | string | a-g | asg | supported | supported |  |
+| picture | `fallback` | string | a-- |  | write-only | gap |  |
+| picture | `alt` | string | asg | asg | supported | supported |  |
+| picture | `contentType` | string | --g | --g | supported | — |  |
+| picture | `fileSize` | number | --g | --g | supported | — |  |
+| picture | `relId` | string | --g |  | missing | — |  |
+| picture | `src` | string | as- | a-- | write-only | partial |  |
 | pivottable | `source` | string | asg |  | element gap | gap | M1-extended (R4x) |
 | pivottable | `position` | string | a-- |  | element gap | gap | M1-extended (R4x) |
 | pivottable | `name` | string | asg |  | element gap | gap | M1-extended (R4x) |
@@ -5400,10 +5734,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | row | `outlineLevel` | number | --g | --g | supported | — |  |
 | row | `collapsed` | bool | -sg | --g | supported | gap |  |
 | row | `customHeight` | bool | --g | --g | supported | — |  |
-| rowbreak | `row` | int | as- |  | element gap | gap | M1-extended (R4x) |
-| rowbreak | `manual` | bool | -s- |  | element gap | gap | M1-extended (R4x) |
-| rowbreak | `min` | int | -s- |  | element gap | gap | M1-extended (R4x) |
-| rowbreak | `max` | int | -s- |  | element gap | gap | M1-extended (R4x) |
+| rowbreak | `row` | int | as- | asg | supported | supported |  |
+| rowbreak | `manual` | bool | -s- | asg | supported | supported |  |
+| rowbreak | `min` | int | -s- | asg | supported | supported |  |
+| rowbreak | `max` | int | -s- | asg | supported | supported |  |
 | run | `subscript` | bool | asg |  | element gap | gap | M1-extended (R4x) |
 | run | `superscript` | bool | asg |  | element gap | gap | M1-extended (R4x) |
 | run | `bold` | bool | asg |  | element gap | gap | M1-extended (R4x) |
@@ -5412,36 +5746,37 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `italic` | bool | asg |  | element gap | gap | M1-extended (R4x) |
 | run | `size` | font-size | asg |  | element gap | gap | M1-extended (R4x) |
 | run | `text` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `hyperlink` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| shape | `reflection` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `anchor` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| shape | `gradientFill` | string | a-- |  | element gap | gap | M1-extended (R4x) |
-| shape | `geometry` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `flip` | string | as- |  | element gap | gap | M1-extended (R4x) |
-| shape | `flipBoth` | bool | as- |  | element gap | gap | M1-extended (R4x) |
-| shape | `x` | length | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `y` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `width` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `height` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `align` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `bold` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `color` | color | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `fill` | color | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `flipH` | bool | as- |  | element gap | gap | M1-extended (R4x) |
-| shape | `flipV` | bool | as- |  | element gap | gap | M1-extended (R4x) |
-| shape | `font` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `glow` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `italic` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `line` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `margin` | length | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `name` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `rotation` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `shadow` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `size` | font-size | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `softEdge` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `text` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `underline` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| shape | `valign` | string | asg |  | element gap | gap | M1-extended (R4x) |
+| shape | `hyperlink` | string | a-g | --g | supported | gap |  |
+| shape | `reflection` | string | asg | --- | write-only | gap |  |
+| shape | `anchor` | string | a-- | a-- | write-only | supported |  |
+| shape | `gradientFill` | string | a-- | --- | write-only | gap |  |
+| shape | `geometry` | string | asg | a-g | supported | partial |  |
+| shape | `flip` | string | as- | asg | supported | supported |  |
+| shape | `flipBoth` | bool | as- | as- | write-only | supported |  |
+| shape | `x` | length | asg | asg | supported | supported |  |
+| shape | `y` | string | asg | asg | supported | supported |  |
+| shape | `width` | string | asg | asg | supported | supported |  |
+| shape | `height` | string | asg | asg | supported | supported |  |
+| shape | `align` | string | asg | a-g | supported | partial |  |
+| shape | `bold` | bool | asg | a-g | supported | partial |  |
+| shape | `color` | color | asg | a-g | supported | partial |  |
+| shape | `fill` | color | asg | a-g | supported | partial |  |
+| shape | `flipH` | bool | as- | as- | write-only | supported |  |
+| shape | `flipV` | bool | as- | as- | write-only | supported |  |
+| shape | `font` | string | asg | a-g | supported | partial |  |
+| shape | `glow` | string | asg | --- | write-only | gap |  |
+| shape | `italic` | bool | asg | a-g | supported | partial |  |
+| shape | `line` | string | asg | a-g | supported | partial |  |
+| shape | `margin` | length | asg | a-g | supported | partial |  |
+| shape | `name` | string | asg | asg | supported | supported |  |
+| shape | `rotation` | string | asg | asg | supported | supported |  |
+| shape | `shadow` | string | asg | --- | write-only | gap |  |
+| shape | `size` | font-size | asg | a-g | supported | partial |  |
+| shape | `softEdge` | string | asg | --- | write-only | gap |  |
+| shape | `text` | string | asg | a-g | supported | partial |  |
+| shape | `underline` | string | asg | a-g | supported | partial |  |
+| shape | `valign` | string | asg | a-g | supported | partial |  |
+| shape | `alt` | string |  | asg | litchi-only | litchi-only |  |
 | sheet | `name` | string | asg | asg | supported | supported |  |
 | sheet | `autoFilter` | string | asg |  | gap | gap | M1-extended (R4x) |
 | sheet | `tabColor` | color | asg |  | gap | gap | M1-extended (R4x) |
@@ -5521,38 +5856,103 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | table | `totalLabel` | string | --g |  | missing | — |  |
 | table | `name` | string | asg | --g | supported | gap |  |
 | table | `style` | string | asg | --g | supported | gap |  |
-| topn | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| topn | `rank` | number | a-g |  | element gap | gap | M1-extended (R4x) |
-| topn | `percent` | bool | a-g |  | element gap | gap | M1-extended (R4x) |
-| topn | `bottom` | bool | a-g |  | element gap | gap | M1-extended (R4x) |
-| topn | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| topn | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| topn | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| topn | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| topn | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| topn | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| uniquevalues | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
-| uniquevalues | `fill` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| uniquevalues | `font.color` | color | a-- |  | element gap | gap | M1-extended (R4x) |
-| uniquevalues | `font.bold` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| uniquevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
-| uniquevalues | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
-| uniquevalues | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| validation | `type` | enum | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `ref` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `allowBlank` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `showError` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `showInput` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `errorTitle` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `promptTitle` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `errorStyle` | enum | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `inCellDropdown` | bool | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `showDropDown` | bool | as- |  | element gap | gap | M1-extended (R4x) |
-| validation | `operator` | enum | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `formula1` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `formula2` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `prompt` | string | asg |  | element gap | gap | M1-extended (R4x) |
-| validation | `error` | string | asg |  | element gap | gap | M1-extended (R4x) |
+| topn | `ref` | string | a-g | asg | supported | supported |  |
+| topn | `rank` | number | a-g | asg | supported | supported |  |
+| topn | `percent` | bool | a-g | asg | supported | supported |  |
+| topn | `bottom` | bool | a-g | asg | supported | supported |  |
+| topn | `fill` | color | a-- | asg | supported | supported |  |
+| topn | `font.color` | color | a-- | asg | supported | supported |  |
+| topn | `font.bold` | bool | a-- | asg | supported | supported |  |
+| topn | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| topn | `type` | string | --g | a-g | supported | litchi-only |  |
+| topn | `dxfId` | number | --g | --g | supported | — |  |
+| topn | `priority` | int |  | --g | litchi-only | — |  |
+| topn | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `value` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `text` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| topn | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| topn | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| topn | `period` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `color` | color |  | asg | litchi-only | litchi-only |  |
+| topn | `min` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `max` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| topn | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| topn | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| topn | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| topn | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| topn | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| topn | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| topn | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| topn | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| topn | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| topn | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| topn | `negativeColor` | color |  | --- | litchi-only | — |  |
+| topn | `axisColor` | color |  | --- | litchi-only | — |  |
+| topn | `axisPosition` | string |  | --- | litchi-only | — |  |
+| topn | `direction` | string |  | --- | litchi-only | — |  |
+| uniquevalues | `ref` | string | a-g | asg | supported | supported |  |
+| uniquevalues | `fill` | color | a-- | asg | supported | supported |  |
+| uniquevalues | `font.color` | color | a-- | asg | supported | supported |  |
+| uniquevalues | `font.bold` | bool | a-- | asg | supported | supported |  |
+| uniquevalues | `stopIfTrue` | bool | a-- | asg | supported | supported |  |
+| uniquevalues | `type` | string | --g | a-g | supported | litchi-only |  |
+| uniquevalues | `dxfId` | number | --g | --g | supported | — |  |
+| uniquevalues | `priority` | int |  | --g | litchi-only | — |  |
+| uniquevalues | `operator` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `value` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `value2` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `formula` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `text` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `rank` | int |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `percent` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `bottom` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `stdDev` | int |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `period` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `color` | color |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `min` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `max` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `minLength` | int |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `maxLength` | int |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `showValue` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `minColor` | color |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `midColor` | color |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `maxColor` | color |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `midpoint` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `iconset` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `reverse` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| uniquevalues | `negativeColor` | color |  | --- | litchi-only | — |  |
+| uniquevalues | `axisColor` | color |  | --- | litchi-only | — |  |
+| uniquevalues | `axisPosition` | string |  | --- | litchi-only | — |  |
+| uniquevalues | `direction` | string |  | --- | litchi-only | — |  |
+| validation | `type` | enum | asg | asg | supported | supported |  |
+| validation | `ref` | string | asg | asg | supported | supported |  |
+| validation | `allowBlank` | bool | asg | asg | supported | supported |  |
+| validation | `showError` | bool | asg | asg | supported | supported |  |
+| validation | `showInput` | bool | asg | asg | supported | supported |  |
+| validation | `errorTitle` | string | asg | asg | supported | supported |  |
+| validation | `promptTitle` | string | asg | asg | supported | supported |  |
+| validation | `errorStyle` | enum | asg | asg | supported | supported |  |
+| validation | `inCellDropdown` | bool | asg | asg | supported | supported |  |
+| validation | `showDropDown` | bool | as- |  | write-only | gap |  |
+| validation | `operator` | enum | asg | asg | supported | supported |  |
+| validation | `formula1` | string | asg | asg | supported | supported |  |
+| validation | `formula2` | string | asg | asg | supported | supported |  |
+| validation | `prompt` | string | asg | asg | supported | supported |  |
+| validation | `error` | string | asg | asg | supported | supported |  |
 | workbook | `defaultFont` | string | --- |  | write-only | — |  |
 | workbook | `defaultFontSize` | length | --- |  | write-only | — |  |
 | workbook | `author` | string | -sg | --g | supported | gap |  |

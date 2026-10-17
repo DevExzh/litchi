@@ -1409,6 +1409,28 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
             "alignment.shrinkToFit",
             "alignment.readingOrder",
         ];
+        // Record 0322: the worksheet features use the XLSX feature tables.
+        if [
+            "comment",
+            "hyperlink",
+            "picture",
+            "shape",
+            "conditionalFormatting",
+            "dataValidation",
+            "autofilter",
+            "rowbreak",
+            "colbreak",
+        ]
+        .contains(&element.name())
+        {
+            let operations = element.operations();
+            assert!(
+                operations.get && operations.set && operations.add && operations.remove,
+                "{}",
+                element.name()
+            );
+            continue;
+        }
         for property in element.properties() {
             let name = property.name();
             let payload = matches!(element.name(), "cell" | "range")

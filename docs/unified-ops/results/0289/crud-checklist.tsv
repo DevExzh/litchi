@@ -1351,10 +1351,10 @@ pptx	node	edit	supported		ok tx.set
 pptx	node	batch	supported		ok set item
 pptx	node	create	supported		ok format
 pptx	node	save	supported		ok format
-xlsb	workbook	get	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
-xlsb	workbook	find	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	get	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	find	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /
 xlsb	workbook	query	n/a	query not offered for this element	-
-xlsb	workbook	view	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /
+xlsb	workbook	view	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /
 xlsb	workbook	set	n/a	set not offered for this element	-
 xlsb	workbook	add	n/a	add not offered for this element	-
 xlsb	workbook	remove	n/a	remove not offered for this element	-
@@ -1390,10 +1390,10 @@ xlsb	cell	edit	supported		ok tx.set
 xlsb	cell	batch	supported		ok set item
 xlsb	cell	create	supported		ok format
 xlsb	cell	save	supported		ok format
-xlsb	range	get	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
-xlsb	range	find	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	get	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	find	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
 xlsb	range	query	n/a	query not offered for this element	-
-xlsb	range	view	supported		ok 7 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
+xlsb	range	view	supported		ok 8 instances, first `ooxml/xlsb/date.xlsb` /sheet[1]/A1:B2
 xlsb	range	set	supported		ok `create() + add sheet` /sheet[1]/A1:B2 {"value":"Litchi"}
 xlsb	range	add	n/a	add not offered for this element	-
 xlsb	range	remove	n/a	remove not offered for this element	-
@@ -1455,19 +1455,19 @@ xlsb	namedrange	edit	n/a	edit not offered for this element	-
 xlsb	namedrange	batch	n/a	batch not offered for this element	-
 xlsb	namedrange	create	supported		ok format
 xlsb	namedrange	save	supported		ok format
-xlsb	comment	get	gap	M1-extended (R4x)	unreached
-xlsb	comment	find	gap	M1-extended (R4x)	unreached
-xlsb	comment	query	gap	M1-extended (R4x)	unreached
-xlsb	comment	view	gap	M1-extended (R4x)	unreached
-xlsb	comment	set	gap	M1-extended (R4x)	unreached
-xlsb	comment	add	gap	M1-extended (R4x)	-
-xlsb	comment	remove	gap	M1-extended (R4x)	unreached
-xlsb	comment	move	gap	M1-extended (R4x)	unreached
-xlsb	comment	swap	gap	M1-extended (R4x)	unreached
-xlsb	comment	edit	gap	M1-extended (R4x)	-
-xlsb	comment	batch	gap	M1-extended (R4x)	-
-xlsb	comment	create	gap	M1-extended (R4x)	ok format
-xlsb	comment	save	gap	M1-extended (R4x)	ok format
+xlsb	comment	get	supported		ok 7 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/comment[1]
+xlsb	comment	find	supported		ok 7 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/comment[1]
+xlsb	comment	query	supported		ok matches in poi/test-data/spreadsheet/testVarious.xlsb
+xlsb	comment	view	supported		ok 7 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/comment[1]
+xlsb	comment	set	supported		ok `create() + add comment` /sheet[1]/comment[1] {"author":"Litchi"}
+xlsb	comment	add	supported		ok /sheet[1]/comment[1] on `create()` under /Sheet1 {"ref":"B2","text":"note","author":"Ann"}
+xlsb	comment	remove	supported		ok `create() + add comment` /sheet[1]/comment[1]
+xlsb	comment	move	format-verb		refused unsupported_type
+xlsb	comment	swap	format-verb		refused unsupported_type
+xlsb	comment	edit	supported		ok tx.set
+xlsb	comment	batch	supported		ok set item
+xlsb	comment	create	supported		ok format
+xlsb	comment	save	supported		ok format
 xlsb	chart	get	gap	M1-extended (R4x)	unreached
 xlsb	chart	find	gap	M1-extended (R4x)	unreached
 xlsb	chart	query	gap	M1-extended (R4x)	unreached
@@ -1546,58 +1546,58 @@ xlsb	sparkline	edit	gap	M1-extended (R4x)	-
 xlsb	sparkline	batch	gap	M1-extended (R4x)	-
 xlsb	sparkline	create	gap	M1-extended (R4x)	ok format
 xlsb	sparkline	save	gap	M1-extended (R4x)	ok format
-xlsb	dataValidation	get	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	find	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	query	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	view	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	set	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	add	gap	M1-extended (R4x)	-
-xlsb	dataValidation	remove	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	move	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	swap	gap	M1-extended (R4x)	unreached
-xlsb	dataValidation	edit	gap	M1-extended (R4x)	-
-xlsb	dataValidation	batch	gap	M1-extended (R4x)	-
-xlsb	dataValidation	create	gap	M1-extended (R4x)	ok format
-xlsb	dataValidation	save	gap	M1-extended (R4x)	ok format
-xlsb	conditionalFormatting	get	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	find	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	query	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	view	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	set	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	add	gap	M1-extended (R4x)	-
-xlsb	conditionalFormatting	remove	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	move	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	swap	gap	M1-extended (R4x)	unreached
-xlsb	conditionalFormatting	edit	gap	M1-extended (R4x)	-
-xlsb	conditionalFormatting	batch	gap	M1-extended (R4x)	-
-xlsb	conditionalFormatting	create	gap	M1-extended (R4x)	ok format
-xlsb	conditionalFormatting	save	gap	M1-extended (R4x)	ok format
-xlsb	autofilter	get	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	find	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	query	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	view	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	set	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	add	gap	M1-extended (R4x)	-
-xlsb	autofilter	remove	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	move	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	swap	gap	M1-extended (R4x)	unreached
-xlsb	autofilter	edit	gap	M1-extended (R4x)	-
-xlsb	autofilter	batch	gap	M1-extended (R4x)	-
-xlsb	autofilter	create	gap	M1-extended (R4x)	ok format
-xlsb	autofilter	save	gap	M1-extended (R4x)	ok format
-xlsb	hyperlink	get	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	find	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	query	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	view	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	set	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	add	gap	M1-extended (R4x)	-
-xlsb	hyperlink	remove	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	move	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	swap	gap	M1-extended (R4x)	unreached
-xlsb	hyperlink	edit	gap	M1-extended (R4x)	-
-xlsb	hyperlink	batch	gap	M1-extended (R4x)	-
-xlsb	hyperlink	create	gap	M1-extended (R4x)	ok format
-xlsb	hyperlink	save	gap	M1-extended (R4x)	ok format
+xlsb	dataValidation	get	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xlsb	dataValidation	find	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xlsb	dataValidation	query	supported		ok matches in create() + add dataValidation
+xlsb	dataValidation	view	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xlsb	dataValidation	set	supported		ok `create() + add dataValidation` /sheet[1]/dataValidation[1] {"formula1":"Litchi"}
+xlsb	dataValidation	add	supported		ok /sheet[1]/dataValidation[1] on `create()` under /Sheet1 {"type":"list","ref":"A1:A9","formula1":"a,b"}
+xlsb	dataValidation	remove	supported		ok `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xlsb	dataValidation	move	format-verb		unreached
+xlsb	dataValidation	swap	format-verb		unreached
+xlsb	dataValidation	edit	supported		ok tx.set
+xlsb	dataValidation	batch	supported		ok set item
+xlsb	dataValidation	create	supported		ok format
+xlsb	dataValidation	save	supported		ok format
+xlsb	conditionalFormatting	get	supported		ok 2 instances, first `create() + add conditionalFormatting` /sheet[1]/cf[1]
+xlsb	conditionalFormatting	find	supported		ok 2 instances, first `create() + add conditionalFormatting` /sheet[1]/cf[1]
+xlsb	conditionalFormatting	query	supported		ok matches in create() + add conditionalFormatting
+xlsb	conditionalFormatting	view	supported		ok 2 instances, first `create() + add conditionalFormatting` /sheet[1]/cf[1]
+xlsb	conditionalFormatting	set	supported		ok `create() + add conditionalFormatting` /sheet[1]/cf[1] {"stopIfTrue":"true"}
+xlsb	conditionalFormatting	add	supported		ok /sheet[1]/cf[1] on `create()` under /Sheet1 {"type":"cellIs","ref":"A1:A9","value":"5","fill":"FFC7CE"}
+xlsb	conditionalFormatting	remove	supported		ok `create() + add conditionalFormatting` /sheet[1]/cf[1]
+xlsb	conditionalFormatting	move	format-verb		refused unsupported_type
+xlsb	conditionalFormatting	swap	format-verb		refused unsupported_type
+xlsb	conditionalFormatting	edit	supported		ok tx.set
+xlsb	conditionalFormatting	batch	supported		ok set item
+xlsb	conditionalFormatting	create	supported		ok format
+xlsb	conditionalFormatting	save	supported		ok format
+xlsb	autofilter	get	supported		ok 1 instances, first `create() + add autofilter` /sheet[1]/autofilter
+xlsb	autofilter	find	supported		ok 1 instances, first `create() + add autofilter` /sheet[1]/autofilter
+xlsb	autofilter	query	supported		ok matches in create() + add autofilter
+xlsb	autofilter	view	supported		ok 1 instances, first `create() + add autofilter` /sheet[1]/autofilter
+xlsb	autofilter	set	supported		ok `create() + add autofilter` /sheet[1]/autofilter {"range":"A1:C9"} (value unchanged: no-op only)
+xlsb	autofilter	add	supported		ok /sheet[1]/autofilter on `create()` under /Sheet1 {"range":"A1:C9"}
+xlsb	autofilter	remove	supported		ok `create() + add autofilter` /sheet[1]/autofilter
+xlsb	autofilter	move	format-verb		unreached
+xlsb	autofilter	swap	format-verb		unreached
+xlsb	autofilter	edit	supported		ok tx.set
+xlsb	autofilter	batch	supported		ok set item
+xlsb	autofilter	create	supported		ok format
+xlsb	autofilter	save	supported		ok format
+xlsb	hyperlink	get	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/hyperlink[1]
+xlsb	hyperlink	find	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/hyperlink[1]
+xlsb	hyperlink	query	supported		ok matches in poi/test-data/spreadsheet/testVarious.xlsb
+xlsb	hyperlink	view	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/hyperlink[1]
+xlsb	hyperlink	set	supported		ok `create() + add hyperlink` /sheet[1]/hyperlink[1] {"url":"Litchi"}
+xlsb	hyperlink	add	supported		ok /sheet[1]/hyperlink[1] on `create()` under /Sheet1 {"ref":"A1","url":"https://example.test/"}
+xlsb	hyperlink	remove	supported		ok `create() + add hyperlink` /sheet[1]/hyperlink[1]
+xlsb	hyperlink	move	format-verb		unreached
+xlsb	hyperlink	swap	format-verb		unreached
+xlsb	hyperlink	edit	supported		ok tx.set
+xlsb	hyperlink	batch	supported		ok set item
+xlsb	hyperlink	create	supported		ok format
+xlsb	hyperlink	save	supported		ok format
 xlsb	mergeCell	get	gap	M1-extended (R4x)	unreached
 xlsb	mergeCell	find	gap	M1-extended (R4x)	unreached
 xlsb	mergeCell	query	gap	M1-extended (R4x)	unreached
@@ -1611,32 +1611,32 @@ xlsb	mergeCell	edit	gap	M1-extended (R4x)	-
 xlsb	mergeCell	batch	gap	M1-extended (R4x)	-
 xlsb	mergeCell	create	gap	M1-extended (R4x)	ok format
 xlsb	mergeCell	save	gap	M1-extended (R4x)	ok format
-xlsb	picture	get	gap	M1-extended (R4x)	unreached
-xlsb	picture	find	gap	M1-extended (R4x)	unreached
-xlsb	picture	query	gap	M1-extended (R4x)	unreached
-xlsb	picture	view	gap	M1-extended (R4x)	unreached
-xlsb	picture	set	gap	M1-extended (R4x)	unreached
-xlsb	picture	add	gap	M1-extended (R4x)	-
-xlsb	picture	remove	gap	M1-extended (R4x)	unreached
-xlsb	picture	move	gap	M1-extended (R4x)	unreached
-xlsb	picture	swap	gap	M1-extended (R4x)	unreached
-xlsb	picture	edit	gap	M1-extended (R4x)	-
-xlsb	picture	batch	gap	M1-extended (R4x)	-
-xlsb	picture	create	gap	M1-extended (R4x)	ok format
-xlsb	picture	save	gap	M1-extended (R4x)	ok format
-xlsb	shape	get	gap	M1-extended (R4x)	unreached
-xlsb	shape	find	gap	M1-extended (R4x)	unreached
-xlsb	shape	query	gap	M1-extended (R4x)	unreached
-xlsb	shape	view	gap	M1-extended (R4x)	unreached
-xlsb	shape	set	gap	M1-extended (R4x)	unreached
-xlsb	shape	add	gap	M1-extended (R4x)	-
-xlsb	shape	remove	gap	M1-extended (R4x)	unreached
-xlsb	shape	move	gap	M1-extended (R4x)	unreached
-xlsb	shape	swap	gap	M1-extended (R4x)	unreached
-xlsb	shape	edit	gap	M1-extended (R4x)	-
-xlsb	shape	batch	gap	M1-extended (R4x)	-
-xlsb	shape	create	gap	M1-extended (R4x)	ok format
-xlsb	shape	save	gap	M1-extended (R4x)	ok format
+xlsb	picture	get	supported		ok 2 instances, first `create() + add picture` /sheet[1]/picture[1]
+xlsb	picture	find	supported		ok 2 instances, first `create() + add picture` /sheet[1]/picture[1]
+xlsb	picture	query	supported		ok matches in create() + add picture
+xlsb	picture	view	supported		ok 2 instances, first `create() + add picture` /sheet[1]/picture[1]
+xlsb	picture	set	supported		ok `create() + add picture` /sheet[1]/picture[1] {"name":"Litchi"}
+xlsb	picture	add	supported		ok /sheet[1]/picture[1] on `create()` under /Sheet1 {"src":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="}
+xlsb	picture	remove	supported		ok `create() + add picture` /sheet[1]/picture[1]
+xlsb	picture	move	format-verb		refused unsupported_type
+xlsb	picture	swap	format-verb		refused unsupported_type
+xlsb	picture	edit	supported		ok tx.set
+xlsb	picture	batch	supported		ok set item
+xlsb	picture	create	supported		ok format
+xlsb	picture	save	supported		ok format
+xlsb	shape	get	supported		ok 4 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/shape[1]
+xlsb	shape	find	supported		ok 4 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/shape[1]
+xlsb	shape	query	supported		ok matches in poi/test-data/spreadsheet/testVarious.xlsb
+xlsb	shape	view	supported		ok 4 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/shape[1]
+xlsb	shape	set	supported		ok `create() + add shape` /sheet[1]/shape[1] {"name":"Litchi"}
+xlsb	shape	add	supported		ok /sheet[1]/shape[1] on `create()` under /Sheet1 {"geometry":"rect","text":"box"}
+xlsb	shape	remove	supported		ok `create() + add shape` /sheet[1]/shape[1]
+xlsb	shape	move	format-verb		refused unsupported_type
+xlsb	shape	swap	format-verb		refused unsupported_type
+xlsb	shape	edit	supported		ok tx.set
+xlsb	shape	batch	supported		ok set item
+xlsb	shape	create	supported		ok format
+xlsb	shape	save	supported		ok format
 xlsb	ole	get	gap	M1-extended (R4x)	unreached
 xlsb	ole	find	gap	M1-extended (R4x)	unreached
 xlsb	ole	query	gap	M1-extended (R4x)	unreached
@@ -1650,32 +1650,32 @@ xlsb	ole	edit	gap	M1-extended (R4x)	-
 xlsb	ole	batch	gap	M1-extended (R4x)	-
 xlsb	ole	create	gap	M1-extended (R4x)	ok format
 xlsb	ole	save	gap	M1-extended (R4x)	ok format
-xlsb	rowbreak	get	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	find	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	query	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	view	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	set	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	add	gap	M1-extended (R4x)	-
-xlsb	rowbreak	remove	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	move	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	swap	gap	M1-extended (R4x)	unreached
-xlsb	rowbreak	edit	gap	M1-extended (R4x)	-
-xlsb	rowbreak	batch	gap	M1-extended (R4x)	-
-xlsb	rowbreak	create	gap	M1-extended (R4x)	ok format
-xlsb	rowbreak	save	gap	M1-extended (R4x)	ok format
-xlsb	colbreak	get	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	find	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	query	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	view	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	set	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	add	gap	M1-extended (R4x)	-
-xlsb	colbreak	remove	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	move	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	swap	gap	M1-extended (R4x)	unreached
-xlsb	colbreak	edit	gap	M1-extended (R4x)	-
-xlsb	colbreak	batch	gap	M1-extended (R4x)	-
-xlsb	colbreak	create	gap	M1-extended (R4x)	ok format
-xlsb	colbreak	save	gap	M1-extended (R4x)	ok format
+xlsb	rowbreak	get	supported		ok 1 instances, first `create() + add rowbreak` /sheet[1]/rowbreak[1]
+xlsb	rowbreak	find	supported		ok 1 instances, first `create() + add rowbreak` /sheet[1]/rowbreak[1]
+xlsb	rowbreak	query	supported		ok matches in create() + add rowbreak
+xlsb	rowbreak	view	supported		ok 1 instances, first `create() + add rowbreak` /sheet[1]/rowbreak[1]
+xlsb	rowbreak	set	supported		ok `create() + add rowbreak` /sheet[1]/rowbreak[1] {"row":"2"}
+xlsb	rowbreak	add	supported		ok /sheet[1]/rowbreak[1] on `create()` under /Sheet1 {"row":"10"}
+xlsb	rowbreak	remove	supported		ok `create() + add rowbreak` /sheet[1]/rowbreak[1]
+xlsb	rowbreak	move	format-verb		unreached
+xlsb	rowbreak	swap	format-verb		unreached
+xlsb	rowbreak	edit	supported		ok tx.set
+xlsb	rowbreak	batch	supported		ok set item
+xlsb	rowbreak	create	supported		ok format
+xlsb	rowbreak	save	supported		ok format
+xlsb	colbreak	get	supported		ok 1 instances, first `create() + add colbreak` /sheet[1]/colbreak[1]
+xlsb	colbreak	find	supported		ok 1 instances, first `create() + add colbreak` /sheet[1]/colbreak[1]
+xlsb	colbreak	query	supported		ok matches in create() + add colbreak
+xlsb	colbreak	view	supported		ok 1 instances, first `create() + add colbreak` /sheet[1]/colbreak[1]
+xlsb	colbreak	set	supported		ok `create() + add colbreak` /sheet[1]/colbreak[1] {"col":"7"}
+xlsb	colbreak	add	supported		ok /sheet[1]/colbreak[1] on `create()` under /Sheet1 {"col":"4"}
+xlsb	colbreak	remove	supported		ok `create() + add colbreak` /sheet[1]/colbreak[1]
+xlsb	colbreak	move	format-verb		unreached
+xlsb	colbreak	swap	format-verb		unreached
+xlsb	colbreak	edit	supported		ok tx.set
+xlsb	colbreak	batch	supported		ok set item
+xlsb	colbreak	create	supported		ok format
+xlsb	colbreak	save	supported		ok format
 xlsb	run	get	gap	M1-extended (R4x)	unreached
 xlsb	run	find	gap	M1-extended (R4x)	unreached
 xlsb	run	query	gap	M1-extended (R4x)	unreached

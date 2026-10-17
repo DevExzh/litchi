@@ -621,6 +621,27 @@ class OdfObjectTests(WriteAssertions):
         self.assertEqual(reopened.get("/Sheet1/dataValidation[1]", 0)["format"]["formula1"], '"a,b"')
         self.assertEqual(reopened.get("/Sheet1/hyperlink[1]", 0)["format"]["url"], "https://example.test/")
 
+    def test_xlsb_worksheet_features(self):
+        """Record 0322: XLSB takes the XLSX worksheet-feature vocabulary."""
+        book = L.create("xlsb")
+        book, note = book.add("/Sheet1", "comment", {"ref": "B2", "text": "Check", "author": "Ann"})
+        self.assertEqual(note, "/sheet[1]/comment[1]")
+        book, rule = book.add(
+            "/Sheet1",
+            "conditionalformatting",
+            {"type": "cellIs", "ref": "A2:A11", "operator": "greaterThan", "value": "80", "fill": "C6EFCE"},
+        )
+        self.assertEqual(rule, "/sheet[1]/cf[1]")
+        book, _ = book.add("/Sheet1", "validation", {"type": "list", "ref": "C2:C9", "formula1": "a,b"})
+        book, _ = book.add("/Sheet1/D4", "hyperlink", {"url": "https://example.test/"})
+        book, _ = book.add("/Sheet1", "rowbreak", {"row": 10})
+        reopened = self.assertReopens(book)
+        self.assertEqual(reopened.get("/Sheet1/comment[1]", 0)["format"]["author"], "Ann")
+        self.assertEqual(reopened.get("/Sheet1/cf[1]", 0)["format"]["type"], "cellIs")
+        self.assertEqual(reopened.get("/Sheet1/dataValidation[1]", 0)["format"]["formula1"], '"a,b"')
+        self.assertEqual(reopened.get("/Sheet1/hyperlink[1]", 0)["format"]["url"], "https://example.test/")
+        self.assertEqual(reopened.get("/Sheet1/rowbreak[1]", 0)["format"]["row"], 10)
+
 
 class CapabilityAgreementTests(WriteAssertions):
     """A write verb the report marks unsupported raises its code."""

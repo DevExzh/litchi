@@ -61,6 +61,11 @@ enum State {
         rect: Rect,
         next: Option<Address>,
     },
+    /// A worksheet's features (record 0322).
+    Features {
+        sheet: usize,
+        items: std::vec::IntoIter<super::features::Feature>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,7 +162,7 @@ impl<'f> Children<'f> {
                     cursor: Box::new(Cursor::new(range.rect, false)),
                 },
             },
-            Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) => State::Done,
+            Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) | Item::Feature(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
@@ -203,6 +208,27 @@ impl<'f> Children<'f> {
                 names: kinds.contains(Kind::NamedRange),
                 name: 0,
             },
+            Item::Sheet(sheet)
+                if super::features::KINDS
+                    .iter()
+                    .any(|kind| kinds.contains(*kind))
+                    && !(cells
+                        || kinds.contains(Kind::Column)
+                        || kinds.contains(Kind::Row)
+                        || kinds.contains(Kind::Table)) =>
+            {
+                // A walk scoped to worksheet features lists them (record 0322).
+                let mut items = Vec::new();
+                for kind in super::features::KINDS {
+                    if kinds.contains(kind) {
+                        items.extend(super::features::list(file, sheet, kind)?);
+                    }
+                }
+                State::Features {
+                    sheet: sheet.position,
+                    items: items.into_iter(),
+                }
+            },
             Item::Sheet(sheet) => sheet_items(
                 sheet,
                 Want {
@@ -247,6 +273,11 @@ impl<'f> Children<'f> {
         loop {
             match &mut self.state {
                 State::Done => return Ok(None),
+                State::Features { sheet, items } => {
+                    return Ok(items
+                        .next()
+                        .map(|feature| Node::new_feature(file, *sheet, feature)));
+                },
                 State::Workbook {
                     next,
                     count,
