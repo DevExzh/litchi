@@ -3701,7 +3701,14 @@
         "litchi_xlsb::metadata",
         "litchi_xlsb::cell_values",
         "litchi_xlsb::cell_values::structure",
-        "litchi_xlsb::cell_values::worksheet"
+        "litchi_xlsb::cell_values::worksheet",
+        "litchi_xlsb::page_breaks::edit",
+        "litchi_xlsb::auto_filter::edit",
+        "litchi_xlsb::hyperlinks::edit",
+        "litchi_xlsb::data_validation::edit",
+        "litchi_xlsb::conditional_formatting::edit",
+        "litchi_xlsb::comments::edit",
+        "litchi_xlsb::drawing::edit"
       ]
     },
     {
@@ -4130,7 +4137,14 @@
         "litchi_xlsb::metadata",
         "litchi_xlsb::cell_values",
         "litchi_xlsb::cell_values::structure",
-        "litchi_xlsb::cell_values::worksheet"
+        "litchi_xlsb::cell_values::worksheet",
+        "litchi_xlsb::page_breaks::edit",
+        "litchi_xlsb::auto_filter::edit",
+        "litchi_xlsb::hyperlinks::edit",
+        "litchi_xlsb::data_validation::edit",
+        "litchi_xlsb::conditional_formatting::edit",
+        "litchi_xlsb::comments::edit",
+        "litchi_xlsb::drawing::edit"
       ]
     },
     {

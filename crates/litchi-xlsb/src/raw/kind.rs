@@ -327,6 +327,38 @@ pub const PAGE_SETUP: Kind = Kind(0x01DE);
 pub const BEGIN_HEADER_FOOTER: Kind = Kind(0x01DF);
 pub const END_HEADER_FOOTER: Kind = Kind(0x01E0);
 
+// Manual page breaks ([MS-XLSB] sections 2.4.25, 2.4.197, 2.4.315, 2.4.382
+// and 2.4.550).
+pub const BEGIN_RW_BRK: Kind = Kind(392);
+pub const END_RW_BRK: Kind = Kind(393);
+pub const BEGIN_COL_BRK: Kind = Kind(394);
+pub const END_COL_BRK: Kind = Kind(395);
+pub const BRK: Kind = Kind(396);
+
+// Worksheet records after the cell table, used to place authored worksheet
+// features at their [MS-XLSB] section 2.1.7.62 stream position.
+pub const SHEET_CALC_PROP: Kind = Kind(663);
+pub const RANGE_PROTECTION_ISO: Kind = Kind(680);
+pub const BEGIN_SCEN_MAN: Kind = Kind(500);
+pub const END_SCEN_MAN: Kind = Kind(501);
+pub const BEGIN_SORT_STATE: Kind = Kind(530);
+pub const END_SORT_STATE: Kind = Kind(531);
+pub const BEGIN_D_CON: Kind = Kind(495);
+pub const END_D_CON: Kind = Kind(496);
+pub const BEGIN_USER_SH_VIEWS: Kind = Kind(422);
+pub const END_USER_SH_VIEWS: Kind = Kind(425);
+pub const BEGIN_CELL_IGNORE_ECS: Kind = Kind(648);
+pub const END_CELL_IGNORE_ECS: Kind = Kind(650);
+pub const BEGIN_SMART_TAGS: Kind = Kind(594);
+pub const END_SMART_TAGS: Kind = Kind(595);
+pub const BK_HIM: Kind = Kind(562);
+pub const BEGIN_OLE_OBJECTS: Kind = Kind(638);
+pub const END_OLE_OBJECTS: Kind = Kind(640);
+pub const BEGIN_ACTIVE_X_CONTROLS: Kind = Kind(643);
+pub const END_ACTIVE_X_CONTROLS: Kind = Kind(645);
+pub const BEGIN_WEB_PUB_ITEMS: Kind = Kind(554);
+pub const END_WEB_PUB_ITEMS: Kind = Kind(555);
+
 // Column information
 pub const BEGIN_COL_INFOS: Kind = Kind(0x0186);
 pub const END_COL_INFOS: Kind = Kind(0x0187);

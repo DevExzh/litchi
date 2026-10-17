@@ -4,6 +4,7 @@
 //! worksheet and relationship orchestration remains in the host layers.
 
 mod codec;
+pub mod edit;
 mod model;
 
 #[cfg(test)]

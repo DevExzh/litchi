@@ -2390,6 +2390,221 @@ fn filter_range(key: &'static str, value: &str) -> Result<xlsx::auto_filter::Def
     Ok(xlsx::auto_filter::Definition::new(Some(range)))
 }
 
+/// A `criteriaN.OP` key: the filter column (an offset from the range's
+/// first column) and the lowercased operator.
+fn criteria_key(key: &str) -> Option<(u32, String)> {
+    let rest = key.strip_prefix("criteria")?;
+    let (column, operator) = rest.split_once('.')?;
+    if column.is_empty()
+        || !column.bytes().all(|byte| byte.is_ascii_digit())
+        || operator.is_empty()
+        || !operator.bytes().all(|byte| byte.is_ascii_alphabetic())
+    {
+        return None;
+    }
+    Some((column.parse().ok()?, operator.to_ascii_lowercase()))
+}
+
+fn truthy(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "true" | "1" | "yes" | "on"
+    )
+}
+
+/// The OfficeCLI dynamic-filter token of a type.
+fn dynamic_type(value: &str) -> Option<xlsx::auto_filter::DynamicType> {
+    use xlsx::auto_filter::DynamicType as T;
+    Some(match value.trim() {
+        "aboveAverage" => T::AboveAverage,
+        "belowAverage" => T::BelowAverage,
+        "tomorrow" => T::Tomorrow,
+        "today" => T::Today,
+        "yesterday" => T::Yesterday,
+        "nextWeek" => T::NextWeek,
+        "thisWeek" => T::ThisWeek,
+        "lastWeek" => T::LastWeek,
+        "nextMonth" => T::NextMonth,
+        "thisMonth" => T::ThisMonth,
+        "lastMonth" => T::LastMonth,
+        "nextQuarter" => T::NextQuarter,
+        "thisQuarter" => T::ThisQuarter,
+        "lastQuarter" => T::LastQuarter,
+        "nextYear" => T::NextYear,
+        "thisYear" => T::ThisYear,
+        "lastYear" => T::LastYear,
+        "yearToDate" => T::YearToDate,
+        "Q1" => T::Q1,
+        "Q2" => T::Q2,
+        "Q3" => T::Q3,
+        "Q4" => T::Q4,
+        "M1" => T::M1,
+        "M2" => T::M2,
+        "M3" => T::M3,
+        "M4" => T::M4,
+        "M5" => T::M5,
+        "M6" => T::M6,
+        "M7" => T::M7,
+        "M8" => T::M8,
+        "M9" => T::M9,
+        "M10" => T::M10,
+        "M11" => T::M11,
+        "M12" => T::M12,
+        _ => return None,
+    })
+}
+
+/// The filter columns of an auto-filter add's `criteriaN.OP=VAL`
+/// properties (OfficeCLI's AF1): one column per distinct N, its custom
+/// filters (`equals`, `notEquals`, `contains`, `doesNotContain`,
+/// `beginsWith`, `endsWith`, `gt`, `gte`, `lt`, `lte`, `between`,
+/// `notBetween`, `nonBlanks`) unless a dedicated operator (`top`,
+/// `topPercent`, `bottom`, `bottomPercent`, `blanks`, `values`, `dynamic`)
+/// names the column's filter.
+fn filter_columns(criteria: Vec<(u32, String, String)>) -> Result<Vec<xlsx::auto_filter::Column>> {
+    use xlsx::auto_filter::{
+        Calendar, Column, Custom, Customs, Dynamic, Item, Operator, Payload, Top10, Values,
+    };
+    let mut grouped: std::collections::BTreeMap<u32, Vec<(String, String)>> =
+        std::collections::BTreeMap::new();
+    for (column, operator, value) in criteria {
+        grouped.entry(column).or_default().push((operator, value));
+    }
+    let mut columns = Vec::with_capacity(grouped.len());
+    for (column_id, entries) in grouped {
+        let key = "criteria0";
+        let mut column =
+            Column::new(column_id).map_err(|error| authored(error).with_property(key))?;
+        let mut customs: Vec<(Operator, String)> = Vec::new();
+        let mut and = false;
+        let mut dedicated: Option<Payload> = None;
+        let mut values: Option<(bool, Vec<Item>)> = None;
+        for (operator, raw) in entries {
+            match operator.as_str() {
+                "equals" => customs.push((Operator::Equal, raw)),
+                "notequals" => customs.push((Operator::NotEqual, raw)),
+                "contains" | "doesnotcontain" => {
+                    let wild = if raw.contains('*') {
+                        raw
+                    } else {
+                        format!("*{raw}*")
+                    };
+                    customs.push((
+                        if operator == "contains" {
+                            Operator::Equal
+                        } else {
+                            Operator::NotEqual
+                        },
+                        wild,
+                    ));
+                },
+                "beginswith" => {
+                    let wild = if raw.ends_with('*') {
+                        raw
+                    } else {
+                        format!("{raw}*")
+                    };
+                    customs.push((Operator::Equal, wild));
+                },
+                "endswith" => {
+                    let wild = if raw.starts_with('*') {
+                        raw
+                    } else {
+                        format!("*{raw}")
+                    };
+                    customs.push((Operator::Equal, wild));
+                },
+                "gt" => customs.push((Operator::GreaterThan, raw)),
+                "gte" => customs.push((Operator::GreaterThanOrEqual, raw)),
+                "lt" => customs.push((Operator::LessThan, raw)),
+                "lte" => customs.push((Operator::LessThanOrEqual, raw)),
+                "between" | "notbetween" => {
+                    let Some((low, high)) = raw.split_once(',') else {
+                        return Err(invalid(key, "between and notBetween need 'lo,hi'"));
+                    };
+                    let (low, high) = (low.trim().to_owned(), high.trim().to_owned());
+                    if operator == "between" {
+                        customs.push((Operator::GreaterThanOrEqual, low));
+                        customs.push((Operator::LessThanOrEqual, high));
+                        and = true;
+                    } else {
+                        customs.push((Operator::LessThan, low));
+                        customs.push((Operator::GreaterThan, high));
+                    }
+                },
+                "top" | "toppercent" | "bottom" | "bottompercent" => {
+                    let value: f64 = raw
+                        .trim()
+                        .parse()
+                        .map_err(|_| invalid(key, "a top or bottom criterion needs a number"))?;
+                    let top = operator.starts_with("top");
+                    let percent = operator.ends_with("percent");
+                    dedicated = Some(Payload::Top10(
+                        Top10::new(top, percent, value, None)
+                            .map_err(|error| authored(error).with_property(key))?,
+                    ));
+                },
+                "blanks" => {
+                    if truthy(&raw) {
+                        values.get_or_insert_with(|| (false, Vec::new())).0 = true;
+                    }
+                },
+                "nonblanks" => {
+                    if truthy(&raw) {
+                        customs.push((Operator::NotEqual, String::new()));
+                    }
+                },
+                "values" => {
+                    let items = &mut values.get_or_insert_with(|| (false, Vec::new())).1;
+                    items.extend(
+                        raw.split(',')
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .map(|value| Item::Value(value.to_owned())),
+                    );
+                },
+                "dynamic" => {
+                    let filter_type = dynamic_type(&raw).ok_or_else(|| {
+                        invalid(key, "the dynamic filter type is not one Excel knows")
+                    })?;
+                    dedicated = Some(Payload::Dynamic(
+                        Dynamic::new(filter_type, None, None)
+                            .map_err(|error| authored(error).with_property(key))?,
+                    ));
+                },
+                _ => {
+                    return Err(invalid(
+                        key,
+                        "the criterion operator is equals, notEquals, contains, doesNotContain, beginsWith, endsWith, gt, gte, lt, lte, between, notBetween, top, topPercent, bottom, bottomPercent, blanks, nonBlanks, values or dynamic",
+                    ));
+                },
+            }
+        }
+        let payload = match (dedicated, values) {
+            (Some(payload), _) => Some(payload),
+            (None, Some((blank, items))) => Some(Payload::Values(
+                Values::new(blank, Calendar::None, items)
+                    .map_err(|error| authored(error).with_property(key))?,
+            )),
+            (None, None) if !customs.is_empty() => {
+                let filters = customs
+                    .into_iter()
+                    .map(|(operator, value)| Custom::new(operator, value))
+                    .collect::<xlsx::Result<Vec<_>>>()
+                    .map_err(|error| authored(error).with_property(key))?;
+                Some(Payload::Custom(
+                    Customs::new(and, filters)
+                        .map_err(|error| authored(error).with_property(key))?,
+                ))
+            },
+            (None, None) => None,
+        };
+        column.set_payload(payload);
+        columns.push(column);
+    }
+    Ok(columns)
+}
+
 impl Xlsx {
     fn add_autofilter(
         &self,
@@ -2397,13 +2612,47 @@ impl Xlsx {
         props: &Props<'_>,
     ) -> Result<(Commit, Path<'static>)> {
         let mut range = parent.reference.clone();
-        for (key, _, arg) in admit(&features::AUTOFILTER_TABLE, Operation::Add, props)? {
-            if key == AutofilterKey::Range {
-                range = arg.text();
+        // `criteriaN.OP=VAL` keys are a family the registry names by its
+        // first member (`criteria0`); they are admitted here.
+        let mut criteria = Vec::new();
+        let mut rest = Props::with_capacity(props.len());
+        for (key, value) in props.iter() {
+            match criteria_key(key.as_str()) {
+                Some((column, operator)) => {
+                    let text = match value {
+                        crate::props::PropValue::Text(text) => text.to_string(),
+                        crate::props::PropValue::Int(number) => number.to_string(),
+                        crate::props::PropValue::Number(number) => {
+                            crate::value::DotNetDouble(*number).to_string()
+                        },
+                        crate::props::PropValue::Bool(flag) => flag.to_string(),
+                        _ => {
+                            return Err(invalid(
+                                "criteria0",
+                                "a criterion value is text or a number",
+                            ));
+                        },
+                    };
+                    criteria.push((column, operator, text));
+                },
+                None => rest.push(key.reborrow(), value.reborrow()),
+            }
+        }
+        for (key, _, arg) in admit(&features::AUTOFILTER_TABLE, Operation::Add, &rest)? {
+            match key {
+                AutofilterKey::Range => range = arg.text(),
+                AutofilterKey::Criteria => {
+                    return Err(invalid(
+                        "criteria0",
+                        "a column criterion is written criteriaN.OP=VAL",
+                    )
+                    .with_suggestion("for example criteria0.equals=Red"));
+                },
             }
         }
         let range = range.ok_or_else(|| missing("range", "an auto-filter needs a range"))?;
-        let definition = filter_range("range", &range)?;
+        let mut definition = filter_range("range", &range)?;
+        definition.columns = filter_columns(criteria)?;
         let source = self.editor()?;
         let mut edit = source.edit_auto_filter()?;
         edit.set_auto_filter(parent.sheet, Some(definition))

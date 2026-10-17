@@ -61,6 +61,16 @@ enum State {
         rect: Rect,
         next: Option<Address>,
     },
+    /// A worksheet's features (record 0322).
+    Features {
+        sheet: usize,
+        items: std::vec::IntoIter<super::features::Feature>,
+    },
+    /// A worksheet's charts, or a chart's series and axes (record 0322).
+    Charts {
+        sheet: usize,
+        items: std::vec::IntoIter<(Kind, super::chart::ChartItem)>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,7 +167,16 @@ impl<'f> Children<'f> {
                     cursor: Box::new(Cursor::new(range.rect, false)),
                 },
             },
-            Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) => State::Done,
+            Item::Chart(chart) => State::Charts {
+                sheet: node.sheet_position(),
+                items: super::chart::parts(chart, true, true)?.into_iter(),
+            },
+            Item::Cell(_)
+            | Item::Table(_)
+            | Item::NamedRange(_)
+            | Item::Feature(_)
+            | Item::Series(_)
+            | Item::Axis(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
@@ -203,6 +222,54 @@ impl<'f> Children<'f> {
                 names: kinds.contains(Kind::NamedRange),
                 name: 0,
             },
+            Item::Sheet(sheet)
+                if super::features::KINDS
+                    .iter()
+                    .any(|kind| kinds.contains(*kind))
+                    && !(cells
+                        || kinds.contains(Kind::Column)
+                        || kinds.contains(Kind::Row)
+                        || kinds.contains(Kind::Table)) =>
+            {
+                // A walk scoped to worksheet features lists them (record 0322).
+                let mut items = Vec::new();
+                for kind in super::features::KINDS {
+                    if kinds.contains(kind) {
+                        items.extend(super::features::list(file, sheet, kind)?);
+                    }
+                }
+                State::Features {
+                    sheet: sheet.position,
+                    items: items.into_iter(),
+                }
+            },
+            Item::Sheet(sheet)
+                if kinds.contains(Kind::Chart)
+                    && !(cells
+                        || kinds.contains(Kind::Column)
+                        || kinds.contains(Kind::Row)
+                        || kinds.contains(Kind::Table)) =>
+            {
+                // A walk scoped to charts lists them; a mixed walk keeps the
+                // grid phases (charts are reached by path there).
+                State::Charts {
+                    sheet: sheet.position,
+                    items: super::chart::list(sheet)?
+                        .into_iter()
+                        .map(|chart| (Kind::Chart, chart))
+                        .collect::<Vec<_>>()
+                        .into_iter(),
+                }
+            },
+            Item::Chart(chart) => State::Charts {
+                sheet: node.sheet_position(),
+                items: super::chart::parts(
+                    chart,
+                    kinds.contains(Kind::Series),
+                    kinds.contains(Kind::Axis),
+                )?
+                .into_iter(),
+            },
             Item::Sheet(sheet) => sheet_items(
                 sheet,
                 Want {
@@ -247,6 +314,16 @@ impl<'f> Children<'f> {
         loop {
             match &mut self.state {
                 State::Done => return Ok(None),
+                State::Features { sheet, items } => {
+                    return Ok(items
+                        .next()
+                        .map(|feature| Node::new_feature(file, *sheet, feature)));
+                },
+                State::Charts { sheet, items } => {
+                    return Ok(items
+                        .next()
+                        .map(|(kind, chart)| Node::new_chart(file, *sheet, kind, chart)));
+                },
                 State::Workbook {
                     next,
                     count,

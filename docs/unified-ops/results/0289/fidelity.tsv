@@ -172,10 +172,10 @@ libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	xls	exact		byte-e
 libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	xls	exact		refused	/sheet[1] name: corrupt_file: Invalid data: Font name has 0 characters; expected 1..=31	refused	row add+remove: corrupt_file: Invalid data: Font name has 0 characters; expected 1..=31
 libreoffice-core/sc/qa/unit/data/xls/validation.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-libreoffice-core/sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9702 -> 7895 bytes, first difference at 6	-	
-libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7651 -> 5717 bytes, first difference at 6	-	
-libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10911 -> 8983 bytes, first difference at 6	-	
-libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb	xlsb	exact		value-exact	/sheet[1] name: 8129 -> 6158 bytes, first difference at 6	-	
+libreoffice-core/sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9702 -> 7895 bytes, first difference at 6	value-exact	note add+remove: 9702 -> 7895 bytes, first difference at 6
+libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7651 -> 5717 bytes, first difference at 6	value-exact	note add+remove: 7651 -> 5717 bytes, first difference at 6
+libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10911 -> 8983 bytes, first difference at 6	value-exact	note add+remove: 10911 -> 8983 bytes, first difference at 6
+libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb	xlsb	exact		value-exact	/sheet[1] name: 8129 -> 6158 bytes, first difference at 6	value-exact	note add+remove: 8129 -> 6158 bytes, first difference at 6
 libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx	xlsx	exact		value-exact	/sheet[1] name: 29373 -> 29344 bytes, first difference at 1851	-	
 libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9494 -> 9493 bytes, first difference at 4606	-	
 libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9964 -> 9957 bytes, first difference at 1816	-	
@@ -668,17 +668,17 @@ ooxml/pptx/smartart-text.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout
 ooxml/pptx/smartart-vertical-block-list.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 ooxml/pptx/smartart-vertical-box-list.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 ooxml/pptx/trigger.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
-ooxml/xlsb/51519.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10897 -> 8843 bytes, first difference at 6	-	
-ooxml/xlsb/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10665 -> 8409 bytes, first difference at 6	-	
-ooxml/xlsb/Simple.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9161 -> 7317 bytes, first difference at 6	-	
-ooxml/xlsb/bug66682.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9580 -> 7625 bytes, first difference at 6	-	
-ooxml/xlsb/comments.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10796 -> 8865 bytes, first difference at 6	-	
-ooxml/xlsb/cond_format.xlsb	xlsb	exact		value-exact	/sheet[1] name: 8253 -> 6281 bytes, first difference at 6	-	
-ooxml/xlsb/date.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7566 -> 5606 bytes, first difference at 6	-	
-ooxml/xlsb/hyperlink.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7882 -> 5930 bytes, first difference at 6	-	
-ooxml/xlsb/pivot-cache-ac-prefixed.xlsb	xlsb	exact		value-exact	/sheet[1] name: 11002 -> 9057 bytes, first difference at 6	-	
-ooxml/xlsb/sample.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10843 -> 8970 bytes, first difference at 6	-	
-ooxml/xlsb/universal-content.xlsb	xlsb	exact		value-exact	/sheet[1] name: 11087 -> 9161 bytes, first difference at 6	-	
+ooxml/xlsb/51519.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10897 -> 8843 bytes, first difference at 6	value-exact	note add+remove: 10897 -> 8843 bytes, first difference at 6
+ooxml/xlsb/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10665 -> 8409 bytes, first difference at 6	value-exact	note add+remove: 10665 -> 8409 bytes, first difference at 6
+ooxml/xlsb/Simple.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9161 -> 7317 bytes, first difference at 6	value-exact	note add+remove: 9161 -> 7317 bytes, first difference at 6
+ooxml/xlsb/bug66682.xlsb	xlsb	exact		value-exact	/sheet[1] name: 9580 -> 7625 bytes, first difference at 6	value-exact	note add+remove: 9580 -> 7625 bytes, first difference at 6
+ooxml/xlsb/comments.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10796 -> 8865 bytes, first difference at 6	value-exact	note add+remove: 10796 -> 8878 bytes, first difference at 6
+ooxml/xlsb/cond_format.xlsb	xlsb	exact		value-exact	/sheet[1] name: 8253 -> 6281 bytes, first difference at 6	value-exact	note add+remove: 8253 -> 6281 bytes, first difference at 6
+ooxml/xlsb/date.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7566 -> 5606 bytes, first difference at 6	value-exact	note add+remove: 7566 -> 5606 bytes, first difference at 6
+ooxml/xlsb/hyperlink.xlsb	xlsb	exact		value-exact	/sheet[1] name: 7882 -> 5930 bytes, first difference at 6	value-exact	note add+remove: 7882 -> 5930 bytes, first difference at 6
+ooxml/xlsb/pivot-cache-ac-prefixed.xlsb	xlsb	exact		value-exact	/sheet[1] name: 11002 -> 9057 bytes, first difference at 6	value-exact	note add+remove: 11002 -> 9057 bytes, first difference at 6
+ooxml/xlsb/sample.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10843 -> 8970 bytes, first difference at 6	value-exact	note add+remove: 10843 -> 8970 bytes, first difference at 6
+ooxml/xlsb/universal-content.xlsb	xlsb	exact		value-exact	/sheet[1] name: 11087 -> 9161 bytes, first difference at 6	value-exact	note add+remove: 11087 -> 9212 bytes, first difference at 6
 ooxml/xlsx/ConditionalFormattingSamples.xlsx	xlsx	exact		value-exact	/sheet[1] name: 654688 -> 654676 bytes, first difference at 2803	-	
 ooxml/xlsx/CustomXMLMappings-complex-type.xlsx	xlsx	exact		value-exact	/sheet[1] name: 14979 -> 14980 bytes, first difference at 2386	-	
 ooxml/xlsx/CustomXMLMappings.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9906 -> 9915 bytes, first difference at 2269	-	
@@ -866,7 +866,7 @@ poi/test-data/spreadsheet/58106.xlsx	xlsx	exact		value-exact	/sheet[1] name: 911
 poi/test-data/spreadsheet/59858.xls	xls	exact		value-exact	/sheet[1] name: 1103360 -> 1103360 bytes, first difference at 974920	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement only supports coordinate-free drawing Obj records
 poi/test-data/spreadsheet/60289.xlsx	xlsx	exact		refused	/sheet[1] name: unsupported_capability: cannot rename tab at position 0 ('TABLE') while processing '/docProps/app.xml': an unmodeled or i...	-	
 poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx	xlsx	exact		value-exact	/sheet[1] name: 8224 -> 8225 bytes, first difference at 2258	-	
-poi/test-data/spreadsheet/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10665 -> 8409 bytes, first difference at 6	-	
+poi/test-data/spreadsheet/62815.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10665 -> 8409 bytes, first difference at 6	value-exact	note add+remove: 10665 -> 8409 bytes, first difference at 6
 poi/test-data/spreadsheet/62834.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9629 -> 9619 bytes, first difference at 2338	-	
 poi/test-data/spreadsheet/66365.xlsx	xlsx	exact		value-exact	/sheet[1] name: 4753 -> 4759 bytes, first difference at 2769	-	
 poi/test-data/spreadsheet/AmpersandHeader.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9480 -> 9489 bytes, first difference at 2307	-	
@@ -901,7 +901,7 @@ poi/test-data/spreadsheet/UncalcedRecord.xls	xls	exact		byte-exact	/sheet[1] nam
 poi/test-data/spreadsheet/WithChartSheet.xlsx	xlsx	exact		value-exact	/sheet[1] name: 30333 -> 30331 bytes, first difference at 2534	-	
 poi/test-data/spreadsheet/WithConditionalFormatting.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/WithEmbeded.xlsx	xlsx	exact		value-exact	/sheet[1] name: 23668 -> 23677 bytes, first difference at 2326	-	
-poi/test-data/spreadsheet/WithTextBox.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10076 -> 8128 bytes, first difference at 6	-	
+poi/test-data/spreadsheet/WithTextBox.xlsb	xlsb	exact		value-exact	/sheet[1] name: 10076 -> 8128 bytes, first difference at 6	value-exact	note add+remove: 10076 -> 8128 bytes, first difference at 6
 poi/test-data/spreadsheet/WithTwoHyperLinks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/XRefCalc.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/bug64512_embed.xlsx	xlsx	exact		value-exact	/sheet[1] name: 49746 -> 49730 bytes, first difference at 1806	-	
@@ -928,7 +928,7 @@ poi/test-data/spreadsheet/style-alternate-content.xlsx	xlsx	exact		value-exact	/
 poi/test-data/spreadsheet/testNames.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: row/column movement cannot read a workbook formula's references
 poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx	xlsx	exact		value-exact	/sheet[1] name: 12428 -> 12410 bytes, first difference at 1743	-	
 poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx	xlsx	exact		value-exact	/sheet[1] name: 8889 -> 8899 bytes, first difference at 2319	-	
-poi/test-data/spreadsheet/testVarious.xlsb	xlsb	exact		value-exact	/sheet[1] name: 22715 -> 19671 bytes, first difference at 6	-	
+poi/test-data/spreadsheet/testVarious.xlsb	xlsb	exact		value-exact	/sheet[1] name: 22715 -> 19671 bytes, first difference at 6	value-exact	note add+remove: 22715 -> 19684 bytes, first difference at 6
 poi/test-data/spreadsheet/unicodeNameRecord.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx	xlsx	exact		value-exact	/sheet[1] name: 9196 -> 9194 bytes, first difference at 2309	-	
 poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx	xlsx	exact		refused	/sheet[1] name: document_protected: cannot edit tab at position 0 ('Sheet1'): the workbook structure is protected	-	
@@ -1004,5 +1004,6 @@ unified-ops/0294/connectors.ppt	ppt	exact		none		-
 unified-ops/0294/frames.odm	odm	exact		byte-exact	/body/p[1] text	-	
 unified-ops/0294/frames.oth	oth	exact		byte-exact	/body/p[1] text	-	
 unified-ops/0294/layers.odg	odg	exact		byte-exact	/page[1] name	-	
+unified-ops/0294/marks.doc	doc	exact		value-exact	/body/p[1] text: 15360 -> 17920 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 15360 -> 17408 bytes, first difference at 540
 unified-ops/0294/modern-comments.pptx	pptx	exact		byte-exact	/slidemaster[1] name	byte-exact	slide move+back
-unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	-	
+unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	byte-exact	note add+remove
