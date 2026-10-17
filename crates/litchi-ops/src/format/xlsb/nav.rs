@@ -149,6 +149,12 @@ impl<'f> Nav<'f> {
     ) -> Result<Lookup<Node<'f>, GapSpec>> {
         let file = self.file;
         let position = sheet.position;
+        if super::features::is_feature(kind) {
+            return super::features::lookup(file, sheet, kind, select);
+        }
+        if kind == Kind::Chart {
+            return super::chart::lookup(file, sheet, select);
+        }
         if !sheet.handle.is_grid()
             && matches!(kind, Kind::Cell | Kind::Range | Kind::Row | Kind::Column)
         {
@@ -437,6 +443,9 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 (Item::Workbook, Kind::NamedRange) => self.named_range(step.select),
                 (Item::Workbook, Kind::Table) => self.workbook_table(step.select),
                 (Item::Sheet(sheet), kind) => self.in_sheet(sheet, kind, step.select),
+                (Item::Chart(chart), Kind::Series | Kind::Axis) => {
+                    super::chart::child(self.file, parent, chart, step.kind, step.select)
+                },
                 _ => Ok(Lookup::NotApplicable),
             }
         })
@@ -460,6 +469,21 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 },
                 (Item::Sheet(sheet), Kind::Table) => {
                     out.kind("table", sheet.handle.tables()?.len())
+                },
+                (Item::Sheet(sheet), Kind::Chart) => {
+                    out.kind("chart", super::chart::list(sheet)?.len());
+                },
+                (Item::Chart(chart), Kind::Series) => {
+                    out.kind("series", chart.summary()?.series.len());
+                },
+                (Item::Chart(chart), Kind::Axis) => {
+                    out.kind("axis", chart.summary()?.axes.len());
+                },
+                (Item::Sheet(sheet), kind) if super::features::is_feature(kind) => {
+                    out.kind(
+                        super::features::step_name(kind),
+                        super::features::list(self.file, sheet, kind)?.len(),
+                    );
                 },
                 (Item::Sheet(sheet), Kind::Row | Kind::Column) => {
                     if let Some(extent) = sheet.grid()?.extents()? {
@@ -511,7 +535,9 @@ impl<'f> Inspect<'f> for Nav<'f> {
                 Item::NamedRange(index) => defined_names(self.file)?
                     .get(*index)
                     .map(|name| Cow::Owned(name.clone())),
-                Item::Workbook | Item::Range(_) => None,
+                Item::Feature(feature) => feature.text(),
+                Item::Chart(chart) => chart.title()?,
+                Item::Workbook | Item::Range(_) | Item::Series(_) | Item::Axis(_) => None,
             })
         })
     }

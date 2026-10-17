@@ -34,7 +34,7 @@ mod format;
 mod formula_transfer;
 mod names;
 mod package;
-mod resources;
+pub(crate) mod resources;
 mod scalar_sst;
 pub mod structure;
 pub mod workbook;

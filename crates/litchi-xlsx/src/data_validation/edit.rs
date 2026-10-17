@@ -112,6 +112,10 @@ impl Edit<'_> {
         let worksheet = self.staged.worksheet(sheet)?;
         let xml =
             super::replace_data_validation_collections(self.staged.blob(&worksheet)?, &values)?;
+        // A prefixed root (`x:worksheet`) keeps the owner in its prefix, so
+        // every worksheet writer still reads it as a direct child.
+        let xml = crate::part_edit::WorksheetLayout::scan(&xml)?
+            .unprefixed_in_root_prefix(&xml, "dataValidations");
         self.staged.replace_blob(&worksheet, xml)
     }
 
@@ -176,5 +180,64 @@ mod tests {
         );
         let noop = package.edit_data_validations().unwrap().commit().unwrap();
         assert!(noop.patch().is_noop());
+    }
+
+    /// Record 0320 gap 7: on a worksheet whose root carries a prefix, the
+    /// validation owner is written in that prefix, so the hyperlink writer
+    /// still recognizes every direct child.
+    #[test]
+    fn a_prefixed_root_keeps_the_worksheet_writable() {
+        let package = Package::new().unwrap();
+        let mut opc = package.opc().clone();
+        let uri = litchi_opc::PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        opc.get_part_mut(&uri).unwrap().set_blob(
+            br#"<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><x:sheetData/></x:worksheet>"#
+                .to_vec(),
+        );
+        let package = Package::from_opc(opc).unwrap();
+        let mut validation = Validation::new(
+            Source::Core,
+            ValidationType::List,
+            Sqref::parse("A1:A5").unwrap(),
+        );
+        validation
+            .set_formula1(Some(ListSource::Formula(Formula::new("\"a,b\"").unwrap())))
+            .unwrap();
+        let values = vec![Collection::new(Source::Core, vec![validation]).unwrap()];
+        let mut edit = package.edit_data_validations().unwrap();
+        assert!(edit.set_validations(0, values.clone()).unwrap());
+        let package = edit.commit().unwrap().into_package();
+        let xml = String::from_utf8(package.opc().get_part(&uri).unwrap().blob().to_vec()).unwrap();
+        assert!(xml.contains("<x:dataValidations"), "{xml}");
+        assert_eq!(
+            package
+                .edit_data_validations()
+                .unwrap()
+                .validations(0)
+                .unwrap(),
+            values
+        );
+        let link = crate::hyperlinks::Hyperlink::new(
+            crate::hyperlinks::HyperlinkReference::new("B2").unwrap(),
+            None,
+            Some("https://example.test/".to_owned()),
+            None,
+            None,
+        )
+        .unwrap();
+        let mut edit = package.edit().unwrap();
+        edit.put_hyperlink(0, link).unwrap();
+        let package = edit.commit().unwrap().into_package();
+        assert_eq!(
+            package
+                .workbook()
+                .sheet(0)
+                .unwrap()
+                .unwrap()
+                .hyperlinks()
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

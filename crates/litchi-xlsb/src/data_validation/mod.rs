@@ -9,6 +9,7 @@ use std::io;
 use thiserror::Error as ThisError;
 
 mod codec;
+pub mod edit;
 mod model;
 
 #[cfg(test)]

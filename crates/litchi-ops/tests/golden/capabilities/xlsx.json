@@ -3244,7 +3244,7 @@
         },
         "criteria0": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": false
         }

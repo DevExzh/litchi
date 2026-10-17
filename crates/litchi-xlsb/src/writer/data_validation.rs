@@ -139,6 +139,22 @@ fn write_extension14_collection<W: Write>(
     Ok(())
 }
 
+/// The records of one classic validation: its optional `BrtDValList`
+/// override and its `BrtDVal` (record 0322 splices these into an existing
+/// collection).
+pub(crate) fn encode_classic_records(dv: &Validation) -> Result<Vec<u8>> {
+    validate_rule(dv)?;
+    let mut out = Vec::new();
+    let mut writer = Encoder::new(&mut out);
+    if let Some(list_formula) = &dv.list_formula {
+        let mut payload = Vec::new();
+        write_xl_wide_string(&mut payload, list_formula);
+        writer.write_record(kind::D_VAL_LIST, &payload)?;
+    }
+    writer.write_record(kind::D_VAL, &serialize_data_validation(dv)?)?;
+    Ok(out)
+}
+
 /// Serialize a single [`Validation`] into the `BrtDVal` binary payload.
 fn serialize_data_validation(dv: &Validation) -> Result<Vec<u8>> {
     let mut buf = Vec::with_capacity(128);

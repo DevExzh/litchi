@@ -524,6 +524,75 @@ impl WorksheetLayout {
         out
     }
 
+    /// Rewrite a direct child `name` written unprefixed, in a default
+    /// namespace declared on itself, into the root's prefix (declared on the
+    /// child itself instead), so a prefixed worksheet keeps every direct
+    /// child in its own prefix (record 0320 gap 7, fixed in record 0322).
+    /// Prefixed descendants and every other child keep their bytes.
+    pub(crate) fn unprefixed_in_root_prefix(&self, xml: &[u8], name: &str) -> Vec<u8> {
+        let Some(child) = self.child(name) else {
+            return xml.to_vec();
+        };
+        let fragment = &xml[child.span.clone()];
+        let open = format!("<{name}");
+        if self.prefix.is_empty()
+            || !fragment.starts_with(open.as_bytes())
+            || !matches!(
+                fragment.get(open.len()),
+                Some(b' ' | b'>' | b'/' | b'\t' | b'\r' | b'\n')
+            )
+        {
+            return xml.to_vec();
+        }
+        let namespace = if self.strict {
+            STRICT_MAIN_NS
+        } else {
+            b"http://schemas.openxmlformats.org/spreadsheetml/2006/main".as_slice()
+        };
+        let mut declaration = b" xmlns=\"".to_vec();
+        declaration.extend_from_slice(namespace);
+        declaration.push(b'"');
+        let prefix = self.prefix.as_bytes();
+        // The owner declares the root's prefix itself, so a reader that
+        // parses the owner on its own still resolves it.
+        let mut local = b" xmlns:".to_vec();
+        local.extend_from_slice(&prefix[..prefix.len() - 1]);
+        local.extend_from_slice(b"=\"");
+        local.extend_from_slice(namespace);
+        local.push(b'"');
+        let unprefixed = |rest: &[u8]| {
+            rest.first()
+                .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
+                && !rest
+                    .iter()
+                    .take_while(|byte| !matches!(byte, b' ' | b'>' | b'/' | b'\t' | b'\r' | b'\n'))
+                    .any(|byte| *byte == b':')
+        };
+        let mut out = Vec::with_capacity(xml.len() + 64);
+        out.extend_from_slice(&xml[..child.span.start]);
+        let mut index = 0;
+        while index < fragment.len() {
+            let rest = &fragment[index..];
+            if rest.starts_with(&declaration) {
+                out.extend_from_slice(&local);
+                index += declaration.len();
+            } else if rest.starts_with(b"</") && unprefixed(&rest[2..]) {
+                out.extend_from_slice(b"</");
+                out.extend_from_slice(prefix);
+                index += 2;
+            } else if rest.starts_with(b"<") && unprefixed(&rest[1..]) {
+                out.push(b'<');
+                out.extend_from_slice(prefix);
+                index += 1;
+            } else {
+                out.push(fragment[index]);
+                index += 1;
+            }
+        }
+        out.extend_from_slice(&xml[child.span.end..]);
+        out
+    }
+
     /// Remove the first direct child named `name`; `None` when it is absent.
     pub(crate) fn remove_child(&self, xml: &[u8], name: &str) -> Option<Vec<u8>> {
         let child = self.child(name)?;

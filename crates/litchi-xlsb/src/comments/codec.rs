@@ -284,24 +284,7 @@ pub fn write<W: Write>(writer: &mut Encoder<W>, comments: &[Record]) -> Result<(
         }
     }
     for author in &authors {
-        let length = author.encode_utf16().count();
-        if length > MAX_AUTHOR_UNITS {
-            return Err(Error::Encoding(
-                "comment author length must not exceed 54 characters".to_string(),
-            ));
-        }
-        let byte_length = length
-            .checked_mul(2)
-            .and_then(|value| value.checked_add(4))
-            .ok_or_else(|| Error::Encoding("comment author length overflow".to_string()))?;
-        let mut data = Vec::new();
-        data.try_reserve(byte_length)
-            .map_err(|source| allocation("comment author payload", source))?;
-        data.extend_from_slice(&(length as u32).to_le_bytes());
-        for unit in author.encode_utf16() {
-            data.extend_from_slice(&unit.to_le_bytes());
-        }
-        writer.write_record(kind::COMMENT_AUTHOR, &data)?;
+        writer.write_record(kind::COMMENT_AUTHOR, &encode_author(author)?)?;
     }
     writer.write_record(kind::END_COMMENT_AUTHORS, &[])?;
     writer.write_record(kind::BEGIN_COMMENT_LIST, &[])?;
@@ -317,31 +300,64 @@ pub fn write<W: Write>(writer: &mut Encoder<W>, comments: &[Record]) -> Result<(
             ));
         }
         let author = author_ids[comment.author.as_str()];
-        let mut begin = Vec::new();
-        begin
-            .try_reserve(36)
-            .map_err(|source| allocation("comment header", source))?;
-        begin.extend_from_slice(&author.to_le_bytes());
-        begin.extend_from_slice(&comment.row.to_le_bytes());
-        begin.extend_from_slice(&comment.row.to_le_bytes());
-        begin.extend_from_slice(&comment.col.to_le_bytes());
-        begin.extend_from_slice(&comment.col.to_le_bytes());
-        begin.extend_from_slice(&comment.guid);
-        writer.write_record(kind::BEGIN_COMMENT, &begin)?;
-        if !comment.text.is_empty() {
-            let rich = RichString {
-                text: comment.text.clone(),
-                runs: comment.runs.clone(),
-                is_rich: true,
-                is_extended: false,
-            };
-            let data = rich.to_comment_bytes()?;
-            writer.write_record(kind::COMMENT_TEXT, &data)?;
-        }
-        writer.write_record(kind::END_COMMENT, &[])?;
+        write_comment(writer, comment, author)?;
     }
     writer.write_record(kind::END_COMMENT_LIST, &[])?;
     writer.write_record(kind::END_COMMENTS, &[])?;
+    Ok(())
+}
+
+/// Encode one `BrtCommentAuthor` payload.
+pub(crate) fn encode_author(author: &str) -> Result<Vec<u8>> {
+    let length = author.encode_utf16().count();
+    if length > MAX_AUTHOR_UNITS {
+        return Err(Error::Encoding(
+            "comment author length must not exceed 54 characters".to_string(),
+        ));
+    }
+    let byte_length = length
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(4))
+        .ok_or_else(|| Error::Encoding("comment author length overflow".to_string()))?;
+    let mut data = Vec::new();
+    data.try_reserve(byte_length)
+        .map_err(|source| allocation("comment author payload", source))?;
+    data.extend_from_slice(&(length as u32).to_le_bytes());
+    for unit in author.encode_utf16() {
+        data.extend_from_slice(&unit.to_le_bytes());
+    }
+    Ok(data)
+}
+
+/// Write one comment (`BrtBeginComment`, its `BrtCommentText` when it has
+/// text, and `BrtEndComment`) naming author index `author`.
+pub(crate) fn write_comment<W: Write>(
+    writer: &mut Encoder<W>,
+    comment: &Record,
+    author: u32,
+) -> Result<()> {
+    let mut begin = Vec::new();
+    begin
+        .try_reserve(36)
+        .map_err(|source| allocation("comment header", source))?;
+    begin.extend_from_slice(&author.to_le_bytes());
+    begin.extend_from_slice(&comment.row.to_le_bytes());
+    begin.extend_from_slice(&comment.row.to_le_bytes());
+    begin.extend_from_slice(&comment.col.to_le_bytes());
+    begin.extend_from_slice(&comment.col.to_le_bytes());
+    begin.extend_from_slice(&comment.guid);
+    writer.write_record(kind::BEGIN_COMMENT, &begin)?;
+    if !comment.text.is_empty() {
+        let rich = RichString {
+            text: comment.text.clone(),
+            runs: comment.runs.clone(),
+            is_rich: true,
+            is_extended: false,
+        };
+        let data = rich.to_comment_bytes()?;
+        writer.write_record(kind::COMMENT_TEXT, &data)?;
+    }
+    writer.write_record(kind::END_COMMENT, &[])?;
     Ok(())
 }
 

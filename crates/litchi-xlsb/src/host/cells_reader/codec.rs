@@ -130,6 +130,27 @@ where
         self.dimensions
     }
 
+    /// Skip the cell table without decoding it, then read the worksheet
+    /// features after it (record 0322): the cheap read the worksheet feature
+    /// edit families and their unified nodes share with full
+    /// materialization, so both number features identically.
+    pub(crate) fn skip_to_features(&mut self) -> Result<()> {
+        loop {
+            self.buf.clear();
+            let typ = if let Some((typ, data)) = self.pending_record.take() {
+                self.buf = data;
+                typ
+            } else {
+                let typ = self.iter.read_type()?;
+                let _ = self.iter.fill_buffer(&mut self.buf)?;
+                typ
+            };
+            if typ == kind::END_SHEET_DATA {
+                return self.read_advanced_features();
+            }
+        }
+    }
+
     pub fn next_cell(&mut self) -> Result<Option<Cell>> {
         loop {
             self.buf.clear();

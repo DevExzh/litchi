@@ -217,6 +217,22 @@ impl SourceInner {
 }
 
 impl crate::workbook::source::SourceBackedWorkbook {
+    /// The workbook's people, the authors and mentions of threaded comments
+    /// (record 0322); `None` without a persons part.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed parse error for a malformed persons part, and the
+    /// source, cancellation and limit errors of every source-backed read.
+    pub fn people(&self) -> Result<Option<crate::threaded_comments::People>> {
+        let inner = &self.inner;
+        inner.execution_check()?;
+        let value = crate::threaded_comments::package::source_people(&inner.package)?;
+        inner.execution_check()?;
+        inner.package.source_version()?;
+        Ok(value)
+    }
+
     /// Parse the styles part's differential formats, the formats conditional
     /// formatting rules reference by `dxfId`; empty without a styles part.
     ///
@@ -308,6 +324,22 @@ impl SourceWorksheet {
             });
         }
         let value = crate::workbook::comments::package::load_from_source(
+            &self.owner.package,
+            &self.data.part_uri,
+        );
+        self.finish_result(value)
+    }
+
+    /// Parse this worksheet's threaded comments (record 0322); `None`
+    /// without a threaded-comments part. Only the worksheet's relationships
+    /// and that part are read.
+    pub fn threaded_comments(&self) -> Result<Option<crate::threaded_comments::Comments>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        let value = crate::threaded_comments::package::source_comments(
             &self.owner.package,
             &self.data.part_uri,
         );

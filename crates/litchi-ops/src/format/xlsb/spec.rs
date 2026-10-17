@@ -790,29 +790,10 @@ const fn property_gap(
     }
 }
 
-// The binary leaf already retains these parts, but the first XLSB adapter
-// does not project them into ordinary nodes.  Keep the reasons format-local;
-// in particular, do not inherit the XLSX follow-ups from the shared table.
-static COMMENT_GAP: GapSpec = element_gap(
-    "comment",
-    "M1-extended (R4x)",
-    "the XLSB worksheet keeps comments in the leaf part, but no unified comment node reads them yet",
-);
-static CHART_GAP: GapSpec = element_gap(
-    "chart",
-    "M1-extended (R4x)",
-    "the XLSB workbook keeps drawing and chart parts, but the unified node has no chart projection yet",
-);
-static SERIES_GAP: GapSpec = element_gap(
-    "series",
-    "M1-extended (R4x)",
-    "XLSB chart series are not projected into unified nodes yet",
-);
-static AXIS_GAP: GapSpec = element_gap(
-    "axis",
-    "M1-extended (R4x)",
-    "XLSB chart axes are not projected into unified nodes yet",
-);
+// The binary leaf already retains these parts, but the XLSB adapter does
+// not project them into ordinary nodes yet (record 0322 projects the
+// worksheet features).  Keep the reasons format-local; in particular, do not
+// inherit the XLSX follow-ups from the shared table.
 static PIVOT_GAP: GapSpec = element_gap(
     "pivottable",
     "M1-extended (R4x)",
@@ -828,55 +809,15 @@ static SPARKLINE_GAP: GapSpec = element_gap(
     "M1-extended (R4x)",
     "XLSB sparkline groups are retained by the leaf but not projected into unified nodes yet",
 );
-static VALIDATION_GAP: GapSpec = element_gap(
-    "dataValidation",
-    "M1-extended (R4x)",
-    "XLSB data validations are retained by the leaf but not projected into unified nodes yet",
-);
-static CF_GAP: GapSpec = element_gap(
-    "conditionalFormatting",
-    "M1-extended (R4x)",
-    "XLSB conditional formats are retained by the leaf but not projected into unified nodes yet",
-);
-static AUTOFILTER_GAP: GapSpec = element_gap(
-    "autofilter",
-    "M1-extended (R4x)",
-    "XLSB auto-filters are retained by the leaf but not projected into unified nodes yet",
-);
-static HYPERLINK_GAP: GapSpec = element_gap(
-    "hyperlink",
-    "M1-extended (R4x)",
-    "XLSB hyperlinks are retained by the leaf but their targets are not projected into nodes yet",
-);
 static MERGE_GAP: GapSpec = element_gap(
     "mergeCell",
     "M1-extended (R4x)",
     "XLSB merged ranges are retained by the leaf but are not listed as nodes yet",
 );
-static PICTURE_GAP: GapSpec = element_gap(
-    "picture",
-    "M1-extended (R4x)",
-    "XLSB drawings are retained by the leaf but are not projected into nodes yet",
-);
-static SHAPE_GAP: GapSpec = element_gap(
-    "shape",
-    "M1-extended (R4x)",
-    "XLSB drawing shapes are retained by the leaf but are not projected into nodes yet",
-);
 static OLE_GAP: GapSpec = element_gap(
     "ole",
     "M1-extended (R4x)",
     "XLSB OLE objects are retained by the leaf but are not projected into nodes yet",
-);
-static ROW_BREAK_GAP: GapSpec = element_gap(
-    "rowbreak",
-    "M1-extended (R4x)",
-    "XLSB row page breaks are not projected into unified nodes yet",
-);
-static COL_BREAK_GAP: GapSpec = element_gap(
-    "colbreak",
-    "M1-extended (R4x)",
-    "XLSB column page breaks are not projected into unified nodes yet",
 );
 static RUN_GAP: GapSpec = element_gap(
     "run",
@@ -902,6 +843,18 @@ const fn with_props(
     }
 }
 
+/// A chart axis resolves by its role, like the XLSX axis (record 0322).
+const XLSB_AXIS: ElementSpec<Kind> = ElementSpec {
+    props: super::chart::AXIS_PROPS,
+    identities: &["role"],
+    gap: None,
+    paths: &[
+        "/<sheet>/chart[N]/axis[@role=<role>]",
+        "/<sheet>/chart[N]/axis[N]",
+    ],
+    ..workbook::SPEC.elements[11]
+};
+
 const fn with_gap(
     element: &'static ElementSpec<Kind>,
     gap: Option<&'static GapSpec>,
@@ -921,23 +874,63 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_gap(&workbook::SPEC.elements[5], None),
     with_gap(&workbook::SPEC.elements[6], None),
     with_props(&workbook::SPEC.elements[7], NAMED_RANGE_PROPS, None),
-    with_gap(&workbook::SPEC.elements[8], Some(&COMMENT_GAP)),
-    with_gap(&workbook::SPEC.elements[9], Some(&CHART_GAP)),
-    with_gap(&workbook::SPEC.elements[10], Some(&SERIES_GAP)),
-    with_gap(&workbook::SPEC.elements[11], Some(&AXIS_GAP)),
+    with_props(
+        &workbook::SPEC.elements[8],
+        super::features::COMMENT_PROPS,
+        None,
+    ),
+    with_props(&workbook::SPEC.elements[9], super::chart::CHART_PROPS, None),
+    with_props(
+        &workbook::SPEC.elements[10],
+        super::chart::SERIES_PROPS,
+        None,
+    ),
+    XLSB_AXIS,
     with_gap(&workbook::SPEC.elements[12], Some(&PIVOT_GAP)),
     with_gap(&workbook::SPEC.elements[13], Some(&SLICER_GAP)),
     with_gap(&workbook::SPEC.elements[14], Some(&SPARKLINE_GAP)),
-    with_gap(&workbook::SPEC.elements[15], Some(&VALIDATION_GAP)),
-    with_gap(&workbook::SPEC.elements[16], Some(&CF_GAP)),
-    with_gap(&workbook::SPEC.elements[17], Some(&AUTOFILTER_GAP)),
-    with_gap(&workbook::SPEC.elements[18], Some(&HYPERLINK_GAP)),
+    with_props(
+        &workbook::SPEC.elements[15],
+        super::features::VALIDATION_PROPS,
+        None,
+    ),
+    with_props(
+        &workbook::SPEC.elements[16],
+        super::features::CF_PROPS,
+        None,
+    ),
+    with_props(
+        &workbook::SPEC.elements[17],
+        super::features::AUTOFILTER_PROPS,
+        None,
+    ),
+    with_props(
+        &workbook::SPEC.elements[18],
+        super::features::HYPERLINK_PROPS,
+        None,
+    ),
     with_gap(&workbook::SPEC.elements[19], Some(&MERGE_GAP)),
-    with_gap(&workbook::SPEC.elements[20], Some(&PICTURE_GAP)),
-    with_gap(&workbook::SPEC.elements[21], Some(&SHAPE_GAP)),
+    with_props(
+        &workbook::SPEC.elements[20],
+        super::features::PICTURE_PROPS,
+        None,
+    ),
+    with_props(
+        &workbook::SPEC.elements[21],
+        super::features::SHAPE_PROPS,
+        None,
+    ),
     with_gap(&workbook::SPEC.elements[22], Some(&OLE_GAP)),
-    with_gap(&workbook::SPEC.elements[23], Some(&ROW_BREAK_GAP)),
-    with_gap(&workbook::SPEC.elements[24], Some(&COL_BREAK_GAP)),
+    with_props(
+        &workbook::SPEC.elements[23],
+        super::features::ROW_BREAK_PROPS,
+        None,
+    ),
+    with_props(
+        &workbook::SPEC.elements[24],
+        super::features::COL_BREAK_PROPS,
+        None,
+    ),
     with_gap(&workbook::SPEC.elements[25], Some(&RUN_GAP)),
 ];
 
