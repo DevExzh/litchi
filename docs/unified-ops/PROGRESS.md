@@ -678,6 +678,13 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - Owner decision pending (not raised as blocking): the CONDFMT rule count > 3 and ShrFmla-order refusals are spec-strict and stay unless the owner relaxes them.
   - Open: 11 sheets the token reader can't decode, form-control/AutoFilter objects, anchors over mixed row heights, ODP graphic-style inheritance.
 
+## Coordinator audit (2026-10-16): P0 surface against the delta table
+Checked against design §13 and the generated `officecli-capability-delta.md`: several **P0** items are still element-level gaps on tier-1 formats. The definition of done requires docx/xlsx/pptx to cover the P0 surface, so these come before further performance work:
+- DOCX: `styles`/`style` and `numbering`/`abstractNum`/`num`/`level` (L-DOCX-R6) → record 0319, together with P1 headers/footers and footnotes/endnotes (L-DOCX-R5).
+- XLSX: `comment` (L-XLSX-R5), `hyperlink`, `picture`/`shape` (L-XLSX-R7) → record 0320, together with P1 conditional formatting, validation, autofilter and breaks.
+- PPTX gaps are P1/P2 only (theme, media, equation, animation, zoom, model3d, hyperlink as an element).
+- XLSB, XLS and ODS lag XLSX element coverage by about 30 families each; they are queued after 0320, reusing its element design.
+
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
   - `File::metadata()` reports `dc:language` for every ODF format (six Markdown golden rows updated);

@@ -1165,13 +1165,37 @@ fn export_comment_read_parity_fuzz_fixtures() -> TestResult {
 
 #[test]
 fn read_only_graphs_preserve_strict_mutation_ownership() -> TestResult {
-    for corruption in [Corruption::FieldInfoMissing, Corruption::OpaqueInbound] {
-        let source = with_corruption(FixtureMode::SingleRoot, corruption)?;
-        let package = load_package(&source)?;
-        assert_eq!(read_all(&package, 0)?, vec!["first reply".to_owned()]);
-        assert_eq!(exact_bytes(&package)?, source);
-        assert_edit_rejected_atomically(&source, &format!("{corruption:?}"))?;
-    }
+    let source = with_corruption(FixtureMode::SingleRoot, Corruption::OpaqueInbound)?;
+    let package = load_package(&source)?;
+    assert_eq!(read_all(&package, 0)?, vec!["first reply".to_owned()]);
+    assert_eq!(exact_bytes(&package)?, source);
+    assert_edit_rejected_atomically(&source, "OpaqueInbound")?;
+    Ok(())
+}
+
+/// Native Numbers keeps a comment graph's aggregate references and omits
+/// their FieldInfo mirror (record 0318): such a graph is edited like a
+/// mirrored one, and the edit is exactly reversible.
+#[test]
+fn graphs_without_field_info_mirrors_are_edited() -> TestResult {
+    let source = with_corruption(FixtureMode::SingleRoot, Corruption::FieldInfoMissing)?;
+    let package = load_package(&source)?;
+    assert_eq!(read_all(&package, 0)?, vec!["first reply".to_owned()]);
+    let commit = package.set_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(0, 0),
+        CommentReplyIndex::new(0),
+        "replacement",
+    )?;
+    assert_eq!(
+        read_all(commit.package(), 0)?,
+        vec!["replacement".to_owned()]
+    );
+    let restored = commit
+        .package()
+        .apply_table_cell_comment_reply(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
     Ok(())
 }
 
