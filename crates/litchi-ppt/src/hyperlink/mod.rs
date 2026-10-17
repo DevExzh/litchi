@@ -1,6 +1,7 @@
 //! Hyperlink definitions and `PowerPoint` 9 hyperlink extensions.
 
 mod codec;
+pub(crate) mod edit;
 mod model;
 #[cfg(test)]
 mod tests;
@@ -16,3 +17,4 @@ pub use model::{
 };
 
 pub(crate) use codec::encode_record;
+pub use edit::{Click, Target};

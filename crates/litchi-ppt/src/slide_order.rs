@@ -270,6 +270,19 @@ pub enum Refusal {
     UncommittedSlideDependency,
     /// One semantic shape target appeared more than once in one batch.
     DuplicateShapeTextTarget { target: crate::text_edit::Target },
+    /// An element edit (record 0323) would need records whose layout it does
+    /// not model losslessly.
+    UnsupportedElement {
+        element: &'static str,
+        reason: &'static str,
+    },
+    /// An element edit selected an element that does not exist.
+    ElementNotFound { element: &'static str },
+    /// An element edit was given a value its records cannot hold.
+    InvalidElementValue {
+        element: &'static str,
+        reason: &'static str,
+    },
 }
 
 impl fmt::Display for Refusal {
@@ -330,6 +343,15 @@ impl fmt::Display for Refusal {
                 target.slide().get(),
                 target.shape().get()
             ),
+            Self::UnsupportedElement { element, reason } => {
+                write!(formatter, "PPT {element} edit is not supported: {reason}")
+            },
+            Self::ElementNotFound { element } => {
+                write!(formatter, "PPT {element} was not found")
+            },
+            Self::InvalidElementValue { element, reason } => {
+                write!(formatter, "PPT {element} value is invalid: {reason}")
+            },
         }
     }
 }
@@ -586,6 +608,8 @@ mod artifact {
 use artifact::Artifact;
 
 mod blank;
+mod elements;
+pub(crate) mod records;
 
 // Snapshots memoize their artifact digest through interior mutability
 // (`OnceLock`). Keep every shareable slide-order value `Send + Sync`; this
@@ -1180,6 +1204,9 @@ impl Snapshot {
                     "presentation.external-media-playback.set" => {
                         apply_durable_media_playback(&current, &operations[index])?
                     },
+                    "presentation.element-records.set" => {
+                        records::apply_durable(&current, &operations[index], patch.blobs())?
+                    },
                     _ => unreachable!("formatting vocabulary is checked by its predicate"),
                 };
                 index += 1;
@@ -1628,6 +1655,8 @@ enum FormattingChange {
     SlideTransitionVisual(SlideTransitionVisualChange),
     MediaPath(ExternalMediaPathChange),
     MediaPlayback(ExternalMediaPlaybackChange),
+    /// Persisted records an element edit replaced (record 0323).
+    Element(records::ElementChange),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3042,6 +3071,82 @@ impl Transaction {
         Ok(())
     }
 
+    /// Stage one element edit over persisted records (record 0323).
+    ///
+    /// `slide` selects a slide by its projected position; `document` offers
+    /// the live document. The closure computes the complete replacement of
+    /// each record it changes from the exact current bytes. An empty
+    /// replacement is an exact no-op; a signed source refuses a changed
+    /// one. Returns whether anything changed.
+    pub(crate) fn stage_records(
+        &mut self,
+        slide: Option<Position>,
+        document: bool,
+        edit: impl FnOnce(records::View<'_>) -> Result<records::Replacement>,
+    ) -> Result<bool> {
+        let slide = match slide {
+            Some(position) => {
+                self.require_position(position)?;
+                let selected = self.document.slides()?[position.get()];
+                let source_position = self
+                    .source
+                    .document
+                    .slides()
+                    .iter()
+                    .position(|slide| slide.persist_id() == selected.persist_id())
+                    .map(Position::new)
+                    .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+                let bytes =
+                    records::owner_record(&self.working, records::Owner::Slide(source_position))?;
+                Some((bytes, source_position))
+            },
+            None => None,
+        };
+        let document_bytes = document.then(|| self.working.document.bytes().to_vec());
+        let replacement = edit(records::View {
+            slide: slide
+                .as_ref()
+                .map(|(bytes, _)| records::SlideRecord { bytes }),
+            document: document_bytes.as_deref(),
+        })?;
+        if replacement.is_noop() {
+            return Ok(false);
+        }
+        self.require_change_allowed()?;
+        let mut rewrites = Vec::with_capacity(2);
+        if let (Some(after), Some((before, position))) = (replacement.slide, slide) {
+            rewrites.push(records::Rewrite {
+                owner: records::Owner::Slide(position),
+                before: Arc::from(before),
+                after: Arc::from(after),
+            });
+        }
+        let document_changed = replacement.document.is_some();
+        if let (Some(after), Some(before)) = (replacement.document, document_bytes) {
+            rewrites.push(records::Rewrite {
+                owner: records::Owner::Document,
+                before: Arc::from(before),
+                after: Arc::from(after),
+            });
+        }
+        if rewrites
+            .iter()
+            .all(|rewrite| rewrite.before == rewrite.after)
+        {
+            return Ok(false);
+        }
+        self.working = records::publish(&self.working, &rewrites)?;
+        if document_changed {
+            // Staged structure is rebased over the changed live document.
+            self.live_document_changed = true;
+        }
+        self.formatting
+            .push(FormattingChange::Element(records::ElementChange {
+                rewrites,
+            }));
+        Ok(true)
+    }
+
     fn require_change_allowed(&self) -> Result<()> {
         if self.source.has_signature {
             return Err(Error::Refused(Refusal::Signed));
@@ -3402,6 +3507,9 @@ impl Patch {
                             after: media_change.before,
                         })
                     },
+                    FormattingChange::Element(element_change) => {
+                        FormattingChange::Element(element_change.inverse())
+                    },
                 })
                 .collect(),
             formatting_first: !self.formatting_first,
@@ -3560,6 +3668,14 @@ impl Patch {
                         media_change.id,
                         media_change.after,
                         media_change.before,
+                    )?,
+                ),
+                FormattingChange::Element(element_change) => ReversibleOperation::new(
+                    records::durable_operation(limits, element_change, &mut forward_blobs)?,
+                    records::durable_operation(
+                        limits,
+                        &element_change.inverse(),
+                        &mut reverse_blobs,
                     )?,
                 ),
             };
@@ -4259,6 +4375,7 @@ fn is_formatting_operation(operation: &str) -> bool {
             | "presentation.slide-transition-visual.set"
             | "presentation.external-media-path.set"
             | "presentation.external-media-playback.set"
+            | "presentation.element-records.set"
     )
 }
 

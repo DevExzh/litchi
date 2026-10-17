@@ -22,7 +22,17 @@ pub(crate) struct Children<'f> {
     state: State,
     /// A query walk also visits a slide's notes after its shape tree; a view
     /// listing does not, as in the PPTX adapter.
-    notes: Option<usize>,
+    notes: Option<u32>,
+    /// Record-0323 elements a query walk lists after the main axis: a
+    /// slide's comments, a shape's hyperlink.
+    extra: Option<Box<Extra<'f>>>,
+}
+
+/// The record-0323 elements of one query-walk step, or the error building
+/// them, reported on the first pull.
+struct Extra<'f> {
+    nodes: std::vec::IntoIter<Node<'f>>,
+    failed: Option<Error>,
 }
 
 // Only physical kinds through Connector are emitted by this iterator.
@@ -42,6 +52,8 @@ enum State {
         next: usize,
         counters: [usize; COUNTER_COUNT],
     },
+    /// A query walk's rows of one table (`row: None`) or cells of one row.
+    Bands(Box<Bands>),
     /// The paragraphs of one text shape.
     Paragraphs {
         parent: Arc<[crate::node::PathStep<'static>]>,
@@ -49,6 +61,15 @@ enum State {
         next: usize,
         end: usize,
     },
+}
+
+/// The rows of one table or the cells of one row, listed by a query walk.
+struct Bands {
+    parent: Arc<[crate::node::PathStep<'static>]>,
+    shape: ShapeItem,
+    row: Option<usize>,
+    next: usize,
+    end: usize,
 }
 
 pub(crate) enum ShapeSource {
@@ -122,10 +143,243 @@ impl<'f> Children<'f> {
     /// children, then a slide's notes.
     pub(crate) fn walk(parent: &Node<'f>, kinds: KindSet<Kind>) -> Self {
         let mut children = Self::of(parent, kinds);
+        // Record-0323 elements (comments, rows and cells, hyperlinks, runs)
+        // are walked by a query that names them, never by a view or a `*`
+        // walk, so existing views and query results keep their shape, as
+        // the PPTX walk keeps its record-0321 elements.
+        if Kind::ALL.iter().all(|kind| kinds.contains(*kind)) {
+            if let Item::Slide(slide) = parent.item()
+                && kinds.contains(Kind::Notes)
+            {
+                children.notes = u32::try_from(slide.position).ok();
+            }
+            return children;
+        }
+        match parent.item() {
+            Item::Shape(shape) if shape.kind == Kind::Table && kinds.contains(Kind::Row) => {
+                if let Ok(table) = super::elements::table(parent) {
+                    children.state = State::Bands(Box::new(Bands {
+                        parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                        shape: shape.clone(),
+                        row: None,
+                        next: 0,
+                        end: table.rows(),
+                    }));
+                }
+            },
+            Item::Element(element) if kinds.contains(Kind::Cell) => {
+                if let super::elements::Element::Row { shape, row } = element.as_ref()
+                    && let Ok(table) = super::elements::table(parent)
+                {
+                    children.state = State::Bands(Box::new(Bands {
+                        parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                        shape: shape.clone(),
+                        row: Some(*row),
+                        next: 0,
+                        end: table.columns(),
+                    }));
+                }
+            },
+            _ => {},
+        }
+        if let Item::Slide(slide) = parent.item() {
+            if kinds.contains(Kind::Notes) {
+                children.notes = u32::try_from(slide.position).ok();
+            }
+        }
+        let mut extra = Vec::new();
+        let mut failed = None;
         if let Item::Slide(slide) = parent.item()
-            && kinds.contains(Kind::Notes)
+            && kinds.contains(Kind::Comment)
         {
-            children.notes = Some(slide.position);
+            match super::elements::slide_comments(parent.file(), slide.position) {
+                Ok(comments) => {
+                    for (index, comment) in comments.into_iter().enumerate() {
+                        extra.push(super::nav::comment_node(
+                            parent.file(),
+                            parent.steps(),
+                            slide.position,
+                            index,
+                            comment,
+                        ));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
+        for kind in [Kind::Ole, Kind::Video, Kind::Audio, Kind::Media] {
+            if !kinds.contains(kind)
+                || (kind != Kind::Media && kinds.contains(Kind::Media))
+                || !matches!(parent.item(), Item::Slide(_) | Item::Shape(_))
+            {
+                continue;
+            }
+            let found = (|| -> Result<()> {
+                let Some(source) = source_for(parent)? else {
+                    return Ok(());
+                };
+                let Some(direct) = source.direct() else {
+                    return Ok(());
+                };
+                for (index, (position, program, linked)) in
+                    super::elements::frames(parent.file(), direct, kind)?
+                        .into_iter()
+                        .enumerate()
+                {
+                    let (Some(roots), Some(path)) = (source.roots(), source.child_path(position))
+                    else {
+                        continue;
+                    };
+                    extra.push(Node::element_node(
+                        parent.file(),
+                        parent.steps(),
+                        crate::node::PathStep::at(kind.name(), litchi_core::Position::new(index)),
+                        super::elements::Element::Frame {
+                            shape: ShapeItem {
+                                slide: parent.slide_position().unwrap_or(0),
+                                kind: Kind::Picture,
+                                source: roots,
+                                path,
+                            },
+                            kind,
+                            program,
+                            linked,
+                        },
+                    ));
+                }
+                Ok(())
+            })();
+            if let Err(error) = found {
+                failed = Some(error);
+            }
+        }
+        if let Item::Slide(slide) = parent.item()
+            && kinds.contains(Kind::Chart)
+        {
+            match super::elements::slide_charts(parent.file(), slide.position) {
+                Ok(charts) => {
+                    for (index, chart) in charts.into_iter().enumerate() {
+                        extra.push(super::nav::chart_node(parent, slide.position, index, chart));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
+        if let Item::Shape(shape) = parent.item()
+            && kinds.contains(Kind::Hyperlink)
+        {
+            match super::elements::shape_click(parent) {
+                Ok(Some(click)) => {
+                    extra.push(super::nav::hyperlink_node(parent, shape, None, click))
+                },
+                Ok(None) => {},
+                Err(error) => failed = Some(error),
+            }
+        }
+        if let Item::Presentation = parent.item()
+            && kinds.contains(Kind::Theme)
+        {
+            match parent.file().reader().theme() {
+                Ok(Some(theme)) => extra.push(Node::element_node(
+                    parent.file(),
+                    parent.steps(),
+                    crate::node::PathStep::new(Kind::Theme.name()),
+                    super::elements::Element::Theme(Arc::new(theme)),
+                )),
+                Ok(None) => {},
+                Err(error) => failed = Some(error.into()),
+            }
+        }
+        if let Item::Shape(shape) = parent.item()
+            && shape.kind == Kind::Table
+            && kinds.contains(Kind::Col)
+        {
+            match super::elements::table(parent) {
+                Ok(table) => {
+                    for column in 0..table.columns() {
+                        extra.push(super::nav::band_node(
+                            parent.file(),
+                            parent.steps(),
+                            shape,
+                            Kind::Col,
+                            column,
+                        ));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
+        if let Item::Paragraph(paragraph) = parent.item()
+            && kinds.contains(Kind::LineBreak)
+        {
+            match parent.text_member() {
+                Ok(text) => {
+                    let count = super::elements::line_breaks(&text.unwrap_or_default(), 0);
+                    for index in 0..count {
+                        extra.push(Node::element_node(
+                            parent.file(),
+                            parent.steps(),
+                            crate::node::PathStep::at(
+                                Kind::LineBreak.name(),
+                                litchi_core::Position::new(index),
+                            ),
+                            super::elements::Element::LineBreak {
+                                shape: paragraph.shape.clone(),
+                            },
+                        ));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
+        if let Item::Paragraph(paragraph) = parent.item()
+            && (kinds.contains(Kind::Run) || kinds.contains(Kind::LineBreak))
+        {
+            if kinds.contains(Kind::Run) {
+                match super::elements::shape_runs(parent) {
+                    Ok(Some(body)) => {
+                        let body = Arc::new(body);
+                        for (index, piece) in super::elements::pieces(&body, paragraph.index)
+                            .into_iter()
+                            .enumerate()
+                        {
+                            extra.push(super::nav::run_node(
+                                parent,
+                                &paragraph.shape,
+                                paragraph.index,
+                                index,
+                                Arc::clone(&body),
+                                piece,
+                            ));
+                        }
+                    },
+                    Ok(None) => {},
+                    Err(error) => failed = Some(error),
+                }
+            }
+        }
+        if let Item::Element(element) = parent.item()
+            && kinds.contains(Kind::Hyperlink)
+            && let super::elements::Element::Run { shape, .. } = element.as_ref()
+        {
+            match super::elements::run_click(parent) {
+                Ok(Some((range, click))) => {
+                    extra.push(super::nav::hyperlink_node(
+                        parent,
+                        shape,
+                        Some(range),
+                        click,
+                    ));
+                },
+                Ok(None) => {},
+                Err(error) => failed = Some(error),
+            }
+        }
+        if !extra.is_empty() || failed.is_some() {
+            children.extra = Some(Box::new(Extra {
+                nodes: extra.into_iter(),
+                failed,
+            }));
         }
         children
     }
@@ -154,6 +408,7 @@ impl<'f> Children<'f> {
                         kinds,
                         state: State::Done,
                         notes: None,
+                        extra: None,
                     };
                 }
                 let source = ShapeSource::tree(Arc::clone(&shape.source), Arc::clone(&shape.path));
@@ -180,13 +435,14 @@ impl<'f> Children<'f> {
                     _ => State::Done,
                 }
             },
-            Item::Shape(_) | Item::Notes(_) | Item::Paragraph(_) => State::Done,
+            Item::Shape(_) | Item::Notes(_) | Item::Paragraph(_) | Item::Element(_) => State::Done,
         };
         Self {
             file,
             kinds,
             state,
             notes: None,
+            extra: None,
         }
     }
 
@@ -195,7 +451,11 @@ impl<'f> Children<'f> {
         // In particular, do not perform another source check on a later pull:
         // a source that changes after EOF/error must not make this iterator
         // yield a second result.
-        if matches!(self.state, State::Done) && self.notes.is_none() {
+        if let Some(error) = self.extra.as_mut().and_then(|extra| extra.failed.take()) {
+            self.extra = None;
+            return Err(error);
+        }
+        if matches!(self.state, State::Done) && self.notes.is_none() && self.extra.is_none() {
             return Ok(None);
         }
         self.file.check_source()?;
@@ -210,16 +470,46 @@ impl<'f> Children<'f> {
             return Ok(next);
         }
         // The shape tree is done: a query walk then visits the slide's notes.
-        let Some(slide) = self.notes.take() else {
+        if let Some(slide) = self.notes.take().map(|slide| slide as usize)
+            && let Some(text) = super::nav::slide_notes(self.file, slide)?
+        {
+            return Ok(Some(Node::notes_node(self.file, slide, text)));
+        }
+        // Then its record-0323 elements, one per pull.
+        let Some(extra) = self.extra.as_mut() else {
             return Ok(None);
         };
-        Ok(super::nav::slide_notes(self.file, slide)?
-            .map(|text| Node::notes_node(self.file, slide, text)))
+        let next = extra.nodes.next();
+        if next.is_none() {
+            self.extra = None;
+        }
+        Ok(next)
     }
 
     fn step_state(&mut self, state: State) -> Result<Option<Node<'f>>> {
         match state {
             State::Done => Ok(None),
+            State::Bands(mut bands) => {
+                if bands.next >= bands.end {
+                    return Ok(None);
+                }
+                let next = bands.next;
+                let node = match bands.row {
+                    None => super::nav::band_node(
+                        self.file,
+                        &bands.parent,
+                        &bands.shape,
+                        Kind::Row,
+                        next,
+                    ),
+                    Some(row) => {
+                        super::nav::cell_node(self.file, &bands.parent, &bands.shape, row, next)
+                    },
+                };
+                bands.next += 1;
+                self.state = State::Bands(bands);
+                Ok(Some(node))
+            },
             State::Paragraphs {
                 parent,
                 shape,
@@ -340,6 +630,7 @@ impl<'f> Iterator for Children<'f> {
             Err(error) => {
                 self.state = State::Done;
                 self.notes = None;
+                self.extra = None;
                 Some(Err(error))
             },
         }

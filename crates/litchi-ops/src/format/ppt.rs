@@ -23,9 +23,12 @@ use litchi_ppt::{Package, SourceBackedPackage, SourceLimits};
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
+use crate::Code;
+use crate::node::spec::{GapSpec, PropSpec, Subject};
 use crate::{OpenOptions, Result};
 
 mod children;
+mod elements;
 mod metadata;
 mod nav;
 mod node;
@@ -37,10 +40,243 @@ pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::{
+pub(crate) use spec::SPEC;
+use spec::{
+    CELL_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS, HYPERLINK_CAPABILITY_PROPS,
     NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
-    SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
+    RUN_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS,
 };
+
+/// PPT elements the unified `set` verb writes.
+pub(crate) const SETTABLE: &[&str] = &[
+    "slide",
+    "shape",
+    "placeholder",
+    "notes",
+    "paragraph",
+    "comment",
+    "tc",
+    "hyperlink",
+    "run",
+];
+
+/// PPT elements the unified `add` verb creates.
+pub(crate) const ADDABLE: &[&str] = &["slide", "comment", "hyperlink"];
+
+/// PPT elements the unified `remove` verb deletes.
+pub(crate) const REMOVABLE: &[&str] = &["slide", "comment", "hyperlink"];
+
+/// The capability property table of one PPT element, where its write
+/// registry differs from its read table.
+pub(crate) fn capability_props(name: &str) -> Option<&'static [PropSpec]> {
+    Some(match name {
+        "shape" => SHAPE_CAPABILITY_PROPS,
+        "placeholder" => PLACEHOLDER_CAPABILITY_PROPS,
+        "slide" => SLIDE_CAPABILITY_PROPS,
+        "notes" => NOTES_CAPABILITY_PROPS,
+        "paragraph" => PARAGRAPH_CAPABILITY_PROPS,
+        "comment" => COMMENT_CAPABILITY_PROPS,
+        "tc" => CELL_CAPABILITY_PROPS,
+        "hyperlink" => HYPERLINK_CAPABILITY_PROPS,
+        "run" => RUN_CAPABILITY_PROPS,
+        _ => return None,
+    })
+}
+
+/// Operation gaps of the PPT write surface, listed in `capabilities()`.
+pub(crate) const WRITE_GAPS: &[GapSpec] = &[
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "ole",
+            context: "object-storage",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F8 PPT OLE object writes",
+        reason: "embedding an OLE object needs a new ExOleObjStg storage, an ExOleEmbedContainer and a picture frame with its preview; OLE frames are read (progId, linked, frame) only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "ole",
+            context: "object-storage",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F8 PPT OLE object writes",
+        reason: "OLE frame geometry and object replacement are not written; the frame is read only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "media",
+            context: "media-objects",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F9 PPT media writes",
+        reason: "a movie or sound needs an external-media object, its sound collection entry and a media picture frame; media frames are read only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "media",
+            context: "media-objects",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F9 PPT media writes",
+        reason: "media frame geometry and playback are not written through the media element; the frame is read only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "theme",
+            context: "theme-package",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F10 PPT theme writes",
+        reason: "the theme is an OPC package inside each master's RoundTripThemeAtom; re-encoding it (and the masters' legacy color schemes that PowerPoint 97-2003 reads) is not modeled",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "chart",
+            context: "graph-object",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F7 PPT chart series and axes",
+        reason: "the embedded Graph object's chart stream is read through MS-OGRAPH; chart, series and axis writes are not integrated",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "run",
+            context: "text-positions",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        reason: "inserting or removing a run or line break changes the text length, which every position-dependent record (style, special-information and interaction runs, fields) of the body would have to follow; runs are formatted and their text replaced in place",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "run",
+            context: "text-positions",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        reason: "removing a run changes the text length that the body's position-dependent records hold",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "linebreak",
+            context: "text-positions",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        reason: "a line break is a vertical-tab character of the text atom; inserting one changes the text length that the body's position-dependent records hold",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "tr",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "a legacy table is a group of positioned cell shapes and border lines; inserting a row would re-lay out every later cell, line and the group anchor, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "col",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "a legacy table is a group of positioned cell shapes and border lines; inserting a column would re-lay out every later cell, line and the group anchor, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "tr",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "removing a row would re-lay out the table group's later cells and border lines, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "col",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "removing a column would re-lay out the table group's later cells and border lines, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "tc",
+            context: "native-cell-text",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F2 PPT nested tables and rich cell text",
+        reason: "cell text follows the shape-text closure rules (a changed length refuses over several formatting runs or position-dependent records); tables inside groups and merged-away cells are refused",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "slide",
+            context: "native-slide-dependencies",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT dependency-preserving slide removal",
+        reason: "slide removal requires native closure admission; unsupported dependent records refuse atomically",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "slide",
+            context: "native-visibility-record",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT visibility atom insertion",
+        reason: "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "shape",
+            context: "native-shape-preservation",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT nested-shape and rich-text edits",
+        reason: "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "batch",
+            element: "presentation",
+            context: "native-write-coalescing",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT broader native edit runs and performance qualification",
+        reason: "distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open",
+    },
+];
+
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 pub(crate) use write::WriteCommit;
 
@@ -179,7 +415,7 @@ impl Ppt {
         }
         if !self.retains_source() {
             return Err(crate::Error::new(
-                crate::Code::UnsupportedCapability,
+                Code::UnsupportedCapability,
                 "the PPT source was released before editing",
             )
             .with_format(FileFormat::Ppt)
@@ -496,7 +732,7 @@ impl Ppt {
             PptOwner::Source(package) | PptOwner::Eager(package) => package,
             PptOwner::Released => {
                 return Err(crate::Error::new(
-                    crate::Code::UnsupportedCapability,
+                    Code::UnsupportedCapability,
                     "the PPT source was released before publication",
                 )
                 .with_format(FileFormat::Ppt)
@@ -795,7 +1031,7 @@ mod tests {
             Ok(_) => panic!("a PPT larger than the package limit opened"),
             Err(error) => error,
         };
-        assert_eq!(error.code(), crate::Code::LimitExceeded);
+        assert_eq!(error.code(), Code::LimitExceeded);
 
         #[cfg(any(unix, windows))]
         {
@@ -803,7 +1039,7 @@ mod tests {
                 Ok(_) => panic!("a PPT larger than the stream limit opened"),
                 Err(error) => error,
             };
-            assert_eq!(error.code(), crate::Code::LimitExceeded);
+            assert_eq!(error.code(), Code::LimitExceeded);
         }
     }
 
@@ -953,10 +1189,7 @@ mod tests {
         source.revision.store(1, Ordering::Relaxed);
         for handle in [&retained, &released] {
             source.probes.store(0, Ordering::Relaxed);
-            assert_eq!(
-                handle.check_source().unwrap_err().code(),
-                crate::Code::IoError
-            );
+            assert_eq!(handle.check_source().unwrap_err().code(), Code::IoError);
             assert_eq!(source.probes.load(Ordering::Relaxed), 1);
         }
     }

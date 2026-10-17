@@ -16,6 +16,7 @@ use litchi_ppt::shapes::{PictureFrameKind, ShapeEnum};
 
 use super::Ppt;
 use super::children::Children;
+use super::elements::{Element, Values};
 use super::spec::Kind;
 use crate::Code;
 use crate::error::{Error, Result};
@@ -46,6 +47,9 @@ pub(crate) enum Item {
     Notes(NotesItem),
     /// One paragraph of a text shape: the text between paragraph marks.
     Paragraph(ParagraphItem),
+    /// An element of the record-0323 surface (comments, table rows, cells
+    /// and columns, hyperlinks, runs, line breaks, the theme, charts).
+    Element(Box<Element>),
 }
 
 /// A slide's speaker notes, read once when the node is resolved.
@@ -161,6 +165,30 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// Construct a record-0323 element node under `parent_steps`.
+    pub(crate) fn element_node(
+        file: &'f Ppt,
+        parent_steps: &[PathStep<'static>],
+        step: PathStep<'static>,
+        element: Element,
+    ) -> Self {
+        let mut steps = parent_steps.to_vec();
+        steps.push(step);
+        Self {
+            file,
+            item: Item::Element(Box::new(element)),
+            steps: Arc::from(steps.into_boxed_slice()),
+        }
+    }
+
+    /// The record-0323 element carried by this node.
+    pub(crate) fn element_item(&self) -> Option<&Element> {
+        match &self.item {
+            Item::Element(element) => Some(element),
+            _ => None,
+        }
+    }
+
     pub(crate) fn file(&self) -> &'f Ppt {
         self.file
     }
@@ -186,6 +214,7 @@ impl<'f> Node<'f> {
             Item::Shape(shape) => Some(shape.slide),
             Item::Notes(notes) => Some(notes.slide),
             Item::Paragraph(paragraph) => Some(paragraph.shape.slide),
+            Item::Element(element) => element.slide(),
         }
     }
 
@@ -266,6 +295,9 @@ impl<'f> Node<'f> {
             Item::Paragraph(paragraph) => {
                 resolve_shape(&paragraph.shape.source, &paragraph.shape.path)
             },
+            Item::Element(element) => element
+                .shape_item()
+                .and_then(|shape| resolve_shape(&shape.source, &shape.path)),
             Item::Presentation | Item::Slide(_) | Item::Notes(_) => None,
         }
     }
@@ -275,6 +307,7 @@ impl<'f> Node<'f> {
         match &self.item {
             Item::Shape(shape) => Some(shape),
             Item::Paragraph(paragraph) => Some(&paragraph.shape),
+            Item::Element(element) => element.shape_item(),
             Item::Presentation | Item::Slide(_) | Item::Notes(_) => None,
         }
     }
@@ -301,6 +334,7 @@ impl<'f> Node<'f> {
             Item::Shape(shape) => shape.kind,
             Item::Notes(_) => Kind::Notes,
             Item::Paragraph(_) => Kind::Paragraph,
+            Item::Element(element) => element.kind(),
         }
     }
 
@@ -350,6 +384,7 @@ impl<'f> Node<'f> {
                         .to_owned(),
                 )))
             },
+            Item::Element(element) => element.text(self),
             _ => match self.shape() {
                 Some(shape)
                     if matches!(self.element(), Kind::Shape | Kind::Table | Kind::Group) =>
@@ -374,6 +409,7 @@ impl<'f> Node<'f> {
             Item::Shape(shape) => shape_preview(shape),
             Item::Notes(notes) => Ok(Some(Preview::Prefix(Cow::Borrowed(&notes.text)))),
             Item::Paragraph(_) => Ok(self.text_member()?.map(Preview::Prefix)),
+            Item::Element(element) => element.preview(self),
         }
     }
 
@@ -392,6 +428,7 @@ impl<'f> Node<'f> {
                 None => 0,
             },
             Item::Notes(_) | Item::Paragraph(_) => 0,
+            Item::Element(element) => element.child_count(self)?,
         };
         Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
     }
@@ -482,6 +519,8 @@ enum PropKind<'a> {
         kind: Kind,
         shape: &'a ShapeEnum<'static>,
     },
+    /// A record-0323 element's values, in its table's order.
+    Element(Values<'a>),
 }
 
 impl<'a> Props<'a> {
@@ -509,6 +548,7 @@ impl<'a> Props<'a> {
             },
             Item::Notes(_) => PropKind::Text(node.text_member()?.ok_or_else(vanished)?),
             Item::Paragraph(_) => PropKind::Paragraph,
+            Item::Element(element) => PropKind::Element(element.values(node)?),
         };
         Ok(Self { kind })
     }
@@ -539,6 +579,7 @@ impl<'a> Props<'a> {
             PropKind::Shape { kind, shape } => shape_value(*kind, shape, index),
             PropKind::Text(text) => (index == 0).then(|| Value::Text(text.clone())),
             PropKind::Paragraph => None,
+            PropKind::Element(values) => values.get(index),
         }
     }
 }
@@ -739,12 +780,12 @@ pub(crate) fn shape_name<'a>(shape: &'a ShapeEnum<'static>) -> Option<&'a str> {
     }
 }
 
-fn length(master: i32) -> Value<'static> {
+pub(crate) fn length(master: i32) -> Value<'static> {
     // Native PPT anchors use 1/576 inch; one master unit is 3175/2 EMUs.
     Value::Length(Length::from_emu(i64::from(master) * 3175 / 2))
 }
 
-fn count(value: usize) -> Value<'static> {
+pub(crate) fn count(value: usize) -> Value<'static> {
     Value::Int(i64::try_from(value).unwrap_or(i64::MAX))
 }
 

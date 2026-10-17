@@ -242,6 +242,117 @@ impl StyleTextPropAtom {
         data
     }
 
+    /// Apply `apply` to the character formatting of the UTF-16 units
+    /// `start..end` of a body of `text_length` units (record 0323).
+    ///
+    /// `record_bytes` is the body's complete `StyleTextPropAtom`, or `None`
+    /// for a body without one, which gains a default paragraph run and
+    /// character runs. Character runs are split at `start` and `end`; the
+    /// paragraph runs keep their exact bytes. `None` when no run changes.
+    pub(crate) fn rewrite_character_format(
+        record_bytes: Option<&[u8]>,
+        text_length: usize,
+        start: usize,
+        end: usize,
+        apply: impl Fn(&TextCFException) -> TextCFException,
+    ) -> Result<Option<Vec<u8>>> {
+        let coverage = text_length
+            .checked_add(1)
+            .and_then(|length| u32::try_from(length).ok())
+            .ok_or_else(|| corrupted("StyleTextPropAtom text length exceeds u32"))?;
+        let (start, end) = (
+            u32::try_from(start).map_err(|_err| corrupted("run start exceeds u32"))?,
+            u32::try_from(end).map_err(|_err| corrupted("run end exceeds u32"))?,
+        );
+        if start >= end || end > coverage {
+            return Err(corrupted("run range is outside the text body"));
+        }
+        let (header, paragraph_bytes, runs) = match record_bytes {
+            Some(bytes) => {
+                let (record, consumed) = Record::parse_strict(bytes, 0)?;
+                if consumed != bytes.len() {
+                    return Err(corrupted("StyleTextPropAtom has trailing record bytes"));
+                }
+                let parsed = Self::parse_record(&record, text_length)?;
+                let paragraph = parsed
+                    .paragraph_runs
+                    .iter()
+                    .flat_map(TextPFRun::to_payload)
+                    .collect::<Vec<_>>();
+                let character = parsed
+                    .character_runs
+                    .iter()
+                    .flat_map(TextCFRun::to_payload)
+                    .collect::<Vec<_>>();
+                // The raw record stays authoritative: refuse a payload the
+                // typed runs would not reproduce byte for byte.
+                if [paragraph.as_slice(), character.as_slice()].concat() != record.data.as_ref() {
+                    return Ok(None);
+                }
+                (bytes[..4].to_vec(), paragraph, parsed.character_runs)
+            },
+            None => {
+                let mut header = Vec::with_capacity(4);
+                header.extend_from_slice(&0u16.to_le_bytes());
+                header.extend_from_slice(&STYLE_TEXT_PROP_TYPE.to_le_bytes());
+                let mut paragraph = Vec::with_capacity(10);
+                paragraph.extend_from_slice(&coverage.to_le_bytes());
+                paragraph.extend_from_slice(&0u16.to_le_bytes());
+                paragraph.extend_from_slice(&0u32.to_le_bytes());
+                (
+                    header,
+                    paragraph,
+                    vec![TextCFRun {
+                        count: coverage,
+                        character: TextCFException::default(),
+                    }],
+                )
+            },
+        };
+        let mut split = Vec::with_capacity(runs.len() + 2);
+        let mut offset = 0u32;
+        let mut changed = record_bytes.is_none();
+        for run in runs {
+            let run_end = offset + run.count;
+            let mut cuts = vec![offset];
+            for cut in [start, end] {
+                if cut > offset && cut < run_end {
+                    cuts.push(cut);
+                }
+            }
+            cuts.push(run_end);
+            for window in cuts.windows(2) {
+                let (piece_start, piece_end) = (window[0], window[1]);
+                let inside = piece_start >= start && piece_end <= end;
+                let character = if inside {
+                    let applied = apply(&run.character);
+                    changed |= applied != run.character;
+                    applied
+                } else {
+                    run.character.clone()
+                };
+                split.push(TextCFRun {
+                    count: piece_end - piece_start,
+                    character,
+                });
+            }
+            offset = run_end;
+        }
+        if !changed {
+            return Ok(None);
+        }
+        let mut payload = paragraph_bytes;
+        for run in &split {
+            payload.extend_from_slice(&run.to_payload());
+        }
+        let length = u32::try_from(payload.len())
+            .map_err(|_err| corrupted("StyleTextPropAtom exceeds u32"))?;
+        let mut data = header;
+        data.extend_from_slice(&length.to_le_bytes());
+        data.extend_from_slice(&payload);
+        Ok(Some(data))
+    }
+
     /// Rewrites only the two coverage counts of a style atom that has one
     /// paragraph run and one character run (optionally followed by a
     /// one-character run for the paragraph mark, which stays exact).

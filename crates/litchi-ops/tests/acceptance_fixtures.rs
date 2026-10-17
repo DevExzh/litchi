@@ -153,6 +153,46 @@ fn ppt_connectors() -> Vec<u8> {
     bytes.into_inner()
 }
 
+/// Record 0323's element deck: a text box with a shape and a text
+/// hyperlink, a comment, a 2x2 table and a Microsoft Graph chart on the
+/// first slide, and a second slide the links can jump to.
+fn ppt_elements() -> Vec<u8> {
+    use litchi_ppt::writer::{Chart, ChartKind, Hyperlink, SlideComment, Table};
+    let mut writer = litchi_ppt::writer::Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer
+        .add_textbox(slide, 20, 20, 400, 60, "Hello brave new world")
+        .unwrap();
+    let link = writer.add_hyperlink(Hyperlink::url("https://example.test/shape"));
+    writer.set_last_shape_hyperlink(slide, link).unwrap();
+    let text = writer.add_hyperlink(Hyperlink::url("https://example.test/text"));
+    writer
+        .set_last_shape_text_hyperlink(slide, litchi_ppt::TextRange::new(6, 11).unwrap(), text)
+        .unwrap();
+    writer
+        .add_comment(
+            slide,
+            SlideComment::new("Ada Lovelace", "Check the figures", 10, 20),
+        )
+        .unwrap();
+    let mut table = Table::new(2, 2).unwrap();
+    for (row, texts) in [["A1", "B1"], ["A2", "B2"]].iter().enumerate() {
+        for (column, text) in texts.iter().enumerate() {
+            table.set_cell_text(row, column, *text).unwrap();
+        }
+    }
+    writer.add_table(slide, 20, 120, table).unwrap();
+    let mut chart = Chart::new(ChartKind::Bar);
+    chart.set_title("Sales");
+    chart.set_categories(["Q1", "Q2"]);
+    chart.add_series(Some("2026"), vec![1.0, 2.0]).unwrap();
+    writer.add_chart(slide, 300, 120, 200, 150, chart).unwrap();
+    writer.add_slide().unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    litchi_ppt::raw::encode(&mut writer, &mut bytes).unwrap();
+    bytes.into_inner()
+}
+
 /// A worksheet with a header row and a three-column table over it.
 fn xlsb_table() -> Vec<u8> {
     use litchi_xlsb::package::table::{Column, Range, Table, Type};
@@ -245,6 +285,7 @@ fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
         ("modern-comments.pptx", presentation::bytes()),
         ("connectors.ppt", ppt_connectors()),
         ("marks.doc", doc_marks()),
+        ("elements.ppt", ppt_elements()),
         ("table.xlsb", xlsb_table()),
         ("comments.odp", odp_comments()),
         ("layers.odg", odg_layers()),

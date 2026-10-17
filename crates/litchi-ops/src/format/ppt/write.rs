@@ -8,6 +8,7 @@
 //! streams itself.
 
 pub(crate) mod coalesce;
+mod elements;
 pub(crate) mod find;
 
 use std::collections::HashSet;
@@ -24,6 +25,7 @@ use super::spec::{
 use super::{Nav, Ppt};
 use crate::error::{Code, Error, Result};
 use crate::path::PathArg;
+use crate::path::navigate::ElementKind as _;
 use crate::placement::Placement;
 use crate::props::{IntoProps, Props};
 use crate::registry::Operation;
@@ -107,6 +109,27 @@ enum TargetIdentity {
         shape: usize,
     },
     Notes(usize),
+    Comment {
+        slide: usize,
+        index: usize,
+    },
+    Cell {
+        slide: usize,
+        shape: usize,
+        row: usize,
+        column: usize,
+    },
+    Hyperlink {
+        slide: usize,
+        shape: usize,
+        run: Option<(usize, usize)>,
+    },
+    Run {
+        slide: usize,
+        shape: usize,
+        paragraph: usize,
+        run: usize,
+    },
     Paragraph {
         slide: usize,
         shape: usize,
@@ -153,6 +176,9 @@ pub(crate) fn set_with_limits<'p, 'v>(
         return file.set_metadata(&props, limits);
     }
     let nodes = resolve_nodes(file, &target, limits)?;
+    if let Some(commit) = elements::set(file, &nodes, &props, limits) {
+        return commit;
+    }
     let plans = build_plans(nodes, &props, limits)?;
     let native = stage_plans(file, plans, limits)?;
     file.check_source()?;
@@ -172,7 +198,36 @@ pub(crate) fn remove_with_limits(
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
     file.admit_edit()?;
-    let mut positions = resolve_slide_targets(file, &target, limits)?;
+    let nodes = resolve_remove_nodes(file, &target, limits)?;
+    if nodes
+        .first()
+        .is_some_and(|node| node.element() == Kind::Comment)
+    {
+        if nodes.iter().any(|node| node.element() != Kind::Comment) {
+            return Err(unsupported_target(
+                "one PPT removal cannot mix comments with other targets",
+            ));
+        }
+        return elements::remove_comments(file, &nodes, limits);
+    }
+    if nodes
+        .first()
+        .is_some_and(|node| node.element() == Kind::Hyperlink)
+    {
+        if nodes.iter().any(|node| node.element() != Kind::Hyperlink) {
+            return Err(unsupported_target(
+                "one PPT removal cannot mix hyperlinks with other targets",
+            ));
+        }
+        return elements::remove_hyperlinks(file, &nodes, limits);
+    }
+    if nodes
+        .iter()
+        .any(|node| matches!(node.element(), Kind::Row | Kind::Col | Kind::Cell))
+    {
+        return Err(elements::table_layout_refusal("remove"));
+    }
+    let mut positions = slide_targets(nodes, limits)?;
     admit_structural_targets(positions.len(), limits)?;
     positions.sort_unstable_by(|left, right| right.cmp(left));
     let native = stage_structural(file, positions.len(), limits, move |edit| {
@@ -201,6 +256,21 @@ pub(crate) fn add_with_limits(
 ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
     file.admit_edit()?;
     let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
+    if node.kind().eq_ignore_ascii_case("comment") {
+        return elements::add_comment(file, &parent, &node, limits);
+    }
+    if matches!(
+        Kind::from_name(&node.kind().to_ascii_lowercase()),
+        Some(Kind::Hyperlink)
+    ) {
+        return elements::add_hyperlink(file, &parent, &node, limits);
+    }
+    if matches!(
+        Kind::from_name(&node.kind().to_ascii_lowercase()),
+        Some(Kind::Row | Kind::Col | Kind::Cell)
+    ) {
+        return Err(elements::table_layout_refusal("add"));
+    }
     if parent.element() != Kind::Presentation {
         return Err(Error::new(
             Code::UnsupportedType,
@@ -378,38 +448,75 @@ fn resolve_nodes<'f>(
     Ok(nodes)
 }
 
-fn resolve_slide_targets(
-    file: &Ppt,
+/// Resolve a removal target to its nodes, in selection order. Duplicates
+/// are kept; the kind-specific removal deduplicates them.
+fn resolve_remove_nodes<'f>(
+    file: &'f Ppt,
     target: &TargetArg<'_>,
     limits: &SemanticLimits,
-) -> Result<Vec<usize>> {
-    let mut positions = Vec::new();
-    let mut seen = HashSet::new();
+) -> Result<Vec<Node<'f>>> {
+    let mut nodes = Vec::new();
     let nav = Nav::new(file);
+    let mut push = |node: Node<'f>| -> Result<()> {
+        let count = nodes
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| expanded_limit(usize::MAX, limits.max_expanded_targets()))?;
+        // A selection may name one element several times; bound the raw
+        // selection at twice the expansion limit, then deduplicate.
+        if count > limits.max_expanded_targets().saturating_mul(2) {
+            return Err(expanded_limit(count, limits.max_expanded_targets()));
+        }
+        nodes
+            .try_reserve(1)
+            .map_err(|source| allocation(source, "PPT removal targets"))?;
+        nodes.push(node);
+        Ok(())
+    };
     if let Some(path) = target.path() {
-        append_slide_target(
-            &mut positions,
-            &mut seen,
-            crate::path::resolve::get(&nav, path)?,
-            limits,
-        )?;
+        push(crate::path::resolve::get(&nav, path)?)?;
     } else if let Some(query) = target.query() {
         let walk = crate::query::run(nav, query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(invalid_query());
         }
         for node in walk {
-            append_slide_target(&mut positions, &mut seen, node?, limits)?;
+            push(node?)?;
         }
     } else {
         return Err(empty_target());
     }
     file.check_source()?;
-    if positions.is_empty() {
+    if nodes.is_empty() {
         return Err(
             Error::new(Code::ZeroMatches, "mutation selector matched no slide")
                 .with_format(FileFormat::Ppt),
         );
+    }
+    if nodes
+        .first()
+        .is_some_and(|node| node.element() == Kind::Comment)
+    {
+        let mut seen = HashSet::new();
+        nodes.retain(|node| match node.element_item() {
+            Some(super::elements::Element::Comment { slide, index, .. }) => {
+                seen.insert((*slide, *index))
+            },
+            _ => true,
+        });
+        if nodes.len() > limits.max_expanded_targets() {
+            return Err(expanded_limit(nodes.len(), limits.max_expanded_targets()));
+        }
+    }
+    Ok(nodes)
+}
+
+/// The distinct slide positions of resolved removal nodes.
+fn slide_targets(nodes: Vec<Node<'_>>, limits: &SemanticLimits) -> Result<Vec<usize>> {
+    let mut positions = Vec::new();
+    let mut seen = HashSet::new();
+    for node in nodes {
+        append_slide_target(&mut positions, &mut seen, node, limits)?;
     }
     Ok(positions)
 }
@@ -543,6 +650,59 @@ fn append_node<'f>(
             node.slide_position()
                 .ok_or_else(|| unsupported_target("notes target has no slide"))?,
         ),
+        Kind::Comment => match node.element_item() {
+            Some(super::elements::Element::Comment { slide, index, .. }) => {
+                TargetIdentity::Comment {
+                    slide: *slide,
+                    index: *index,
+                }
+            },
+            _ => return Err(unsupported_target("comment target has no comment")),
+        },
+        Kind::Hyperlink => match (node.native_shape_target(), node.element_item()) {
+            (Some(target), Some(super::elements::Element::Hyperlink { run, .. })) => {
+                TargetIdentity::Hyperlink {
+                    slide: target.slide().get(),
+                    shape: target.shape().get(),
+                    run: *run,
+                }
+            },
+            _ => {
+                return Err(unsupported_target(
+                    "nested PPT group hyperlink writes are not integrated",
+                ));
+            },
+        },
+        Kind::Run => match (node.native_shape_target(), node.element_item()) {
+            (Some(target), Some(super::elements::Element::Run { paragraph, run, .. })) => {
+                TargetIdentity::Run {
+                    slide: target.slide().get(),
+                    shape: target.shape().get(),
+                    paragraph: *paragraph,
+                    run: *run,
+                }
+            },
+            _ => {
+                return Err(unsupported_target(
+                    "nested PPT group run writes are not integrated",
+                ));
+            },
+        },
+        Kind::Cell => match (node.native_shape_target(), node.element_item()) {
+            (Some(target), Some(super::elements::Element::Cell { row, column, .. })) => {
+                TargetIdentity::Cell {
+                    slide: target.slide().get(),
+                    shape: target.shape().get(),
+                    row: *row,
+                    column: *column,
+                }
+            },
+            _ => {
+                return Err(unsupported_target(
+                    "nested PPT group table writes are not integrated",
+                ));
+            },
+        },
         Kind::Paragraph => {
             let (Some(target), Some(paragraph)) =
                 (node.native_shape_target(), node.paragraph_index())
@@ -705,7 +865,7 @@ fn build_plans(
 }
 
 /// Admit the one `text` property of a notes or paragraph write.
-fn admit_text_prop<const N: usize, const A: usize>(
+pub(super) fn admit_text_prop<const N: usize, const A: usize>(
     props: &Props<'_>,
     table: &crate::registry::Table<TextSetter, N, A>,
     limits: &SemanticLimits,
@@ -1065,7 +1225,7 @@ fn build_anchor(node: &Node<'_>, geometry: &[Option<i64>; 4]) -> Result<Option<A
         .map_err(native_anchor_error)
 }
 
-fn master_from_emu(value: i64, property: &'static str) -> Result<i64> {
+pub(super) fn master_from_emu(value: i64, property: &'static str) -> Result<i64> {
     // 576 master units per inch and 914,400 EMUs per inch. Round to the
     // nearest native unit, with exact half-way values away from zero (the
     // same policy as Rust's f64::round, without an intermediate float).
@@ -1312,7 +1472,7 @@ fn invalid_query() -> Error {
     .with_format(FileFormat::Ppt)
 }
 
-fn unsupported_target(message: &'static str) -> Error {
+pub(super) fn unsupported_target(message: &'static str) -> Error {
     Error::new(Code::UnsupportedCapability, message).with_format(FileFormat::Ppt)
 }
 

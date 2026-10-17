@@ -6,10 +6,12 @@
 //! the surrounding `Record` tree and are not executed or resolved.
 
 mod codec;
+pub(crate) mod edit;
 mod model;
 
 #[cfg(test)]
 mod tests;
 
 pub(crate) use codec::parse_slide_comments;
+pub use edit::{CommentChange, DateTime, NewComment};
 pub use model::{Author, Authors, Catalog};

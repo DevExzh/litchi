@@ -561,6 +561,83 @@ impl Edit {
         self.stage(1, |inner| inner.set_external_media_playback(id, playback))
     }
 
+    /// Append a comment to the slide at a zero-based position; returns its
+    /// zero-based position among the slide's comments (record 0323).
+    pub fn add_comment(
+        &mut self,
+        position: Position,
+        comment: &crate::comments::NewComment,
+    ) -> Result<Position> {
+        self.stage(1, |inner| inner.add_comment(position, comment))
+            .map(Position::new)
+    }
+
+    /// Change the text or anchor of one slide comment (record 0323).
+    pub fn set_comment(
+        &mut self,
+        position: Position,
+        comment: Position,
+        change: &crate::comments::CommentChange,
+    ) -> Result<()> {
+        self.stage(1, |inner| inner.set_comment(position, comment, change))
+    }
+
+    /// Remove one slide comment (record 0323).
+    pub fn remove_comment(&mut self, position: Position, comment: Position) -> Result<()> {
+        self.stage(1, |inner| inner.remove_comment(position, comment))
+    }
+
+    /// Replace the text of one table cell (record 0323).
+    pub fn set_table_cell_text(
+        &mut self,
+        target: Target,
+        row: Position,
+        column: Position,
+        text: &str,
+    ) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_table_cell_text(target, row, column, text)
+        })
+    }
+
+    /// Set or remove the click hyperlink of one top-level shape (record
+    /// 0323).
+    pub fn set_shape_hyperlink(
+        &mut self,
+        target: Target,
+        click: Option<&crate::hyperlink::Click>,
+    ) -> Result<()> {
+        self.stage(1, |inner| inner.set_shape_hyperlink(target, click))
+    }
+
+    /// Apply character formatting to a UTF-16 range of one top-level
+    /// shape's text (record 0323).
+    pub fn set_run_format(
+        &mut self,
+        target: Target,
+        start: usize,
+        length: usize,
+        format: &crate::text_edit::RunFormat,
+    ) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_run_format(target, start, length, format)
+        })
+    }
+
+    /// Set or remove the click hyperlink over a UTF-16 range of one
+    /// top-level shape's text (record 0323).
+    pub fn set_text_hyperlink(
+        &mut self,
+        target: Target,
+        start: usize,
+        length: usize,
+        click: Option<&crate::hyperlink::Click>,
+    ) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_text_hyperlink(target, start, length, click)
+        })
+    }
+
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;
