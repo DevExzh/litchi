@@ -247,10 +247,11 @@ pub(crate) use iwork_tail::IworkTail as FacadeTail;
 pub(crate) use litchi_ops::detect::tail::NoZipTail as FacadeTail;
 
 // The probe counter of `litchi-ops`'s `test-support` feature, which this
-// crate's dev-dependency enables; only the OOXML detection tests read it.
+// crate's dev-dependency enables; only the DOCX, PPTX and XLSX detection
+// tests read it.
 #[cfg(all(
     test,
-    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx"),
     any(unix, windows)
 ))]
 pub(crate) use litchi_ops::detect::{opc_probe_count, reset_opc_probe_count};

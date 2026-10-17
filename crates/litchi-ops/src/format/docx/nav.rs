@@ -545,6 +545,13 @@ impl<'f> Navigate<'f> for Nav<'f> {
             (Value::Document | Value::Body(_), Kind::SmartArt) => {
                 super::smartart::pick_document_smartart(self.docx, &step.select)
             },
+            // A chart's series and axes, a graphic's nodes (record 0335).
+            (Value::Chart(chart), Kind::Series | Kind::Axis) => {
+                super::chart::pick_chart_child(self.docx, parent, chart, kind, &step.select)
+            },
+            (Value::SmartArt(_) | Value::DiagramNode(_), Kind::Node) => {
+                super::smartart::pick_node(self.docx, parent, &step.select)
+            },
             (Value::Paragraph { paragraph, .. }, Kind::Hyperlink) => {
                 let links = hyperlinks(self.docx, paragraph)?;
                 Ok(match pick_index(links.len(), &step.select) {

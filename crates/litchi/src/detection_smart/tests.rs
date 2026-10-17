@@ -21,7 +21,9 @@ fn rejected_odf_probe_preserves_the_pages_source_for_lower_precedence_detection(
 /// else claims, and loses to OOXML and ODF when a package carries both.
 #[cfg(feature = "pages")]
 mod iwork_is_classified_last {
-    use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+    #[cfg(any(feature = "docx", feature = "odt"))]
+    use std::io::Read;
+    use std::io::{Cursor, Seek, SeekFrom, Write};
 
     use litchi_core::detection::FileFormat;
 
@@ -34,6 +36,7 @@ mod iwork_is_classified_last {
 
     /// Rewrite the Pages fixture with `leading` entries before its own and
     /// `trailing` entries after them. Every entry is stored.
+    #[cfg(any(feature = "docx", feature = "odt"))]
     fn repack(leading: &[(&str, &[u8])], trailing: &[(&str, &[u8])]) -> Vec<u8> {
         let mut source = zip::ZipArchive::new(Cursor::new(PAGES)).expect("Pages fixture is a ZIP");
         let mut output = Cursor::new(Vec::new());

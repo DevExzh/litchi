@@ -155,10 +155,14 @@ fn ordinary_reports_hide_native_selection_fields() {
         let (set, add, remove) = match element.name() {
             "paragraph" | "run" | "hyperlink" => (true, true, true),
             "cell" => (true, false, true),
-            // Record 0251c: comments are added and removed.
-            "table" | "row" | "comment" => (false, true, true),
-            // Record 0251d: pictures are added; record 0295: SmartArt too.
-            "picture" | "smartart" => (false, true, false),
+            // Record 0251c: comments are added and removed; record 0335:
+            // set too.
+            "table" | "row" => (false, true, true),
+            // Record 0251d: pictures are added; record 0295: SmartArt too;
+            // record 0335: both are set and removed, as are SmartArt nodes.
+            "comment" | "picture" | "smartart" | "node" => (true, true, true),
+            // Record 0335: chart series and axes are set.
+            "series" | "axis" => (true, false, false),
             // Record 0283: charts are added, set and removed.
             "chart" => (true, true, true),
             "sdt" => (false, false, true),
@@ -269,26 +273,33 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert_eq!(property.set(), property.name() == "url");
             } else if element.name() == "picture" && property.name() != "relId" {
                 // Record 0251d: the extent, name and alternative text seed a
-                // new picture; `src` is add-only.
+                // new picture; `src` is write-only. Record 0335: each is
+                // also set.
                 assert_eq!(
                     property.get(),
                     property.name() != "src",
                     "picture {}",
                     property.name()
                 );
-                assert!(!property.set(), "picture {}", property.name());
+                assert!(property.set(), "picture {}", property.name());
                 assert!(property.add(), "picture {}", property.name());
             } else if element.name() == "comment" && property.name() != "id" {
                 // Record 0251c: author, initials, date and text seed a new
-                // comment.
+                // comment; record 0335 sets them.
                 assert!(property.get(), "comment {}", property.name());
-                assert!(!property.set(), "comment {}", property.name());
+                assert!(property.set(), "comment {}", property.name());
                 assert!(property.add(), "comment {}", property.name());
             } else if element.name() == "smartart" {
                 // Record 0295: layout, text, name, alternative text and
                 // extent seed a new graphic; the projection reads layout,
-                // its identifier, the node count and the outline.
-                assert!(!property.set(), "smartart {}", property.name());
+                // its identifier, the node count and the outline. Record
+                // 0335 sets the layout and the outline.
+                assert_eq!(
+                    property.set(),
+                    matches!(property.name(), "layout" | "text"),
+                    "smartart {}",
+                    property.name()
+                );
                 assert_eq!(
                     property.add(),
                     !matches!(property.name(), "layoutId" | "nodeCount"),
@@ -326,6 +337,16 @@ fn ordinary_reports_hide_native_selection_fields() {
                 // key.
                 assert!(
                     property.set() || property.add() || property.get(),
+                    "{} {}",
+                    element.name(),
+                    property.name()
+                );
+            } else if matches!(element.name(), "series" | "axis" | "node") {
+                // Record 0335: chart series and axes read and set the PPTX
+                // keys; a SmartArt node reads its level, and its text is
+                // write-only.
+                assert!(
+                    property.set() || property.get(),
                     "{} {}",
                     element.name(),
                     property.name()

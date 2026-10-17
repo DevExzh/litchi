@@ -15,7 +15,9 @@ use quick_xml::events::Event;
 
 use super::super::{ElementPath, Error, Refusal, Result};
 use super::Edit;
+use super::stories::text_run;
 use crate::Package;
+use crate::part_scan::{self, qualified};
 
 const COMMENTS_RELATIONSHIP: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
@@ -86,6 +88,69 @@ impl NewComment {
     #[must_use]
     pub fn text(&self) -> &str {
         &self.text
+    }
+}
+
+/// A change of an existing comment (record 0335): its author, initials,
+/// date and text. Each part left unset keeps the comment's current value.
+///
+/// ```
+/// use litchi_docx::document::CommentChange;
+///
+/// let change = CommentChange::new().with_author("Grace").with_text("Fixed");
+/// assert!(!change.is_empty());
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CommentChange {
+    author: Option<String>,
+    initials: Option<String>,
+    date: Option<String>,
+    text: Option<String>,
+}
+
+impl CommentChange {
+    /// A change that changes nothing.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The new author (`w:author`, not empty).
+    #[must_use]
+    pub fn with_author(mut self, author: impl Into<String>) -> Self {
+        self.author = Some(author.into());
+        self
+    }
+
+    /// The new initials (`w:initials`).
+    #[must_use]
+    pub fn with_initials(mut self, initials: impl Into<String>) -> Self {
+        self.initials = Some(initials.into());
+        self
+    }
+
+    /// The new date (`w:date`), an `xsd:dateTime` written as given.
+    #[must_use]
+    pub fn with_date(mut self, date: impl Into<String>) -> Self {
+        self.date = Some(date.into());
+        self
+    }
+
+    /// The new text, replacing the comment's text as a footnote's text is
+    /// replaced ([`Edit::set_note_text`]).
+    #[must_use]
+    pub fn with_text(mut self, text: impl Into<String>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    /// Whether the change sets nothing.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.author.is_none()
+            && self.initials.is_none()
+            && self.date.is_none()
+            && self.text.is_none()
     }
 }
 
@@ -210,6 +275,180 @@ impl Edit<Package> {
             self.strip_modern_entries(&paragraph_ids)?;
         }
         Ok(self)
+    }
+
+    /// Change comment `id`: its author, initials and date attributes, and
+    /// its text. The text is replaced as a note's is: the comment's first
+    /// run that is not its `w:annotationRef` mark holds the text (keeping
+    /// its properties) and its other such runs are removed; a comment
+    /// holding a field is refused rather than flattened. Its paragraphs,
+    /// their identifiers (which the modern-comment parts key on) and the
+    /// mark stay. Returns whether anything changed.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::document::{CommentChange, ElementPath, ElementStep, NewComment};
+    ///
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("Reviewed text");
+    /// let package = builder.build()?;
+    /// let mut edit = package.edit()?;
+    /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
+    /// let id = edit.add_comment_at(&paragraph, None, &NewComment::new("Ada", "Draft"))?;
+    /// let package = edit.commit()?.into_package();
+    /// let mut edit = package.edit()?;
+    /// let change = CommentChange::new().with_author("Grace").with_text("Final");
+    /// assert!(edit.set_comment(id, &change)?);
+    /// let comments = edit.commit()?.into_package().document()?.comments()?;
+    /// assert_eq!((comments[0].author(), comments[0].text()?.as_str()), ("Grace", "Final"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown comment,
+    /// [`Refusal::ComplexContent`] for a comment holding a field,
+    /// [`Refusal::InvalidPropertyValue`] for an empty author or text XML
+    /// cannot carry, or a typed error for a malformed part.
+    pub fn set_comment(&mut self, id: u32, change: &CommentChange) -> Result<bool> {
+        let invalid_value = || Error::Refused {
+            position: 0,
+            reason: Refusal::InvalidPropertyValue,
+        };
+        if change.author.as_deref().is_some_and(str::is_empty) {
+            return Err(invalid_value());
+        }
+        let controls = |text: &str| text.chars().any(char::is_control);
+        if [&change.author, &change.initials, &change.date]
+            .into_iter()
+            .flatten()
+            .any(|value| controls(value))
+        {
+            return Err(invalid_value());
+        }
+        let strict = self.inner.is_strict();
+        let not_found = || Error::Refused {
+            position: 0,
+            reason: Refusal::BlockNotFound,
+        };
+        let (name, _) = self
+            .related_part(comments_relationship(strict))?
+            .ok_or_else(not_found)?;
+        let xml = self
+            .part_payload(&name)?
+            .ok_or_else(|| crate::Error::PartNotFound(name.clone()))?;
+        let tree = part_scan::scan(&xml, 4).map_err(Error::Document)?;
+        let comment = tree
+            .children(0)
+            .find(|child| {
+                let element = &tree.elements[*child];
+                element.is(b"comment")
+                    && element
+                        .attribute(b"id")
+                        .and_then(|value| value.trim().parse::<u32>().ok())
+                        == Some(id)
+            })
+            .ok_or_else(not_found)?;
+        let element = &tree.elements[comment];
+        let mut edits: Vec<(usize, usize, Vec<u8>)> = Vec::new();
+        let mut tag = xml[element.start..element.tag_end].to_vec();
+        for (local, value) in [
+            ("author", &change.author),
+            ("initials", &change.initials),
+            ("date", &change.date),
+        ] {
+            let Some(value) = value else { continue };
+            let key = crate::picture_spans::attribute_named(&tag, local)
+                .unwrap_or_else(|| qualified(&element.prefix, local));
+            tag = crate::picture_spans::with_attribute(&tag, &key, value)
+                .ok_or_else(|| invalid("invalid comment XML"))?;
+        }
+        if tag.as_slice() != &xml[element.start..element.tag_end] {
+            edits.push((element.start, element.tag_end, tag));
+        }
+        if let Some(text) = &change.text {
+            if part_scan::holds_any(&xml[element.start..element.end], part_scan::FIELD_MARKUP)
+                .map_err(Error::Document)?
+            {
+                return Err(Error::Refused {
+                    position: 0,
+                    reason: Refusal::ComplexContent,
+                });
+            }
+            let mut first_content = true;
+            let paragraphs: Vec<usize> = tree
+                .children(comment)
+                .filter(|child| tree.elements[*child].is(b"p"))
+                .collect();
+            for paragraph in &paragraphs {
+                for run in tree
+                    .children(*paragraph)
+                    .filter(|child| tree.elements[*child].is(b"r"))
+                    .collect::<Vec<_>>()
+                {
+                    if tree.child(run, b"annotationRef").is_some() {
+                        continue;
+                    }
+                    let run_element = &tree.elements[run];
+                    if first_content {
+                        first_content = false;
+                        let properties = tree.child(run, b"rPr").map(|child| {
+                            let rpr = &tree.elements[child];
+                            xml[rpr.start..rpr.end].to_vec()
+                        });
+                        edits.push((
+                            run_element.start,
+                            run_element.end,
+                            text_run(&run_element.prefix, properties.as_deref(), text)?,
+                        ));
+                    } else {
+                        edits.push((run_element.start, run_element.end, Vec::new()));
+                    }
+                }
+            }
+            if first_content {
+                let markup = text_run(&element.prefix, None, text)?;
+                match paragraphs.first() {
+                    Some(&paragraph) => {
+                        let paragraph = &tree.elements[paragraph];
+                        if paragraph.empty {
+                            let mut replacement =
+                                xml[paragraph.start..paragraph.tag_end - 2].to_vec();
+                            replacement.push(b'>');
+                            replacement.extend_from_slice(&markup);
+                            replacement.extend_from_slice(
+                                format!("</{}>", qualified(&paragraph.prefix, "p")).as_bytes(),
+                            );
+                            edits.push((paragraph.start, paragraph.end, replacement));
+                        } else {
+                            edits.push((paragraph.close, paragraph.close, markup));
+                        }
+                    },
+                    None if element.empty => return Err(invalid("invalid comment XML")),
+                    None => {
+                        let p = qualified(&element.prefix, "p");
+                        let mut paragraph = format!("<{p}>").into_bytes();
+                        paragraph.extend_from_slice(&markup);
+                        paragraph.extend_from_slice(format!("</{p}>").as_bytes());
+                        edits.push((element.close, element.close, paragraph));
+                    },
+                }
+            }
+        }
+        edits.sort_by_key(|(start, end, _)| (*start, *end != *start));
+        let mut output = Vec::with_capacity(xml.len());
+        let mut cursor = 0usize;
+        for (start, end, bytes) in edits {
+            output.extend_from_slice(&xml[cursor..start]);
+            output.extend_from_slice(&bytes);
+            cursor = end;
+        }
+        output.extend_from_slice(&xml[cursor..]);
+        if output.as_slice() == xml.as_slice() {
+            return Ok(false);
+        }
+        self.replace_part(&name, output)?;
+        Ok(true)
     }
 
     /// Remove the `commentsExtended`, `commentsIds` and `commentsExtensible`

@@ -44,6 +44,7 @@ pub mod package;
 pub mod paragraph;
 mod part_scan;
 pub mod parts;
+mod picture_spans;
 pub mod properties;
 pub mod redact;
 pub mod revision;

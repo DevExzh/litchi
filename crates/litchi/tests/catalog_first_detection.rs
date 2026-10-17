@@ -429,21 +429,10 @@ fn smart_detection_still_returns_a_usable_eager_docx_variant() {
                 .expect("eager DOCX variant remains usable");
             assert_eq!(main.content_type(), DOCX_MAIN_CONTENT_TYPE);
         },
-        #[cfg(any(
-            feature = "doc",
-            feature = "ppt",
-            feature = "pptx",
-            feature = "xls",
-            feature = "xlsx",
-            feature = "xlsb",
-            feature = "pages",
-            feature = "keynote",
-            feature = "numbers",
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "rtf"
-        ))]
+        #[allow(
+            unreachable_patterns,
+            reason = "a DOCX-only build has no other variant"
+        )]
         Some(other) => panic!("expected eager DOCX variant, got {other:?}"),
         None => panic!("valid DOCX fixture was not smart-detected"),
     }

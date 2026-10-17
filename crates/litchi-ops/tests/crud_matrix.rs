@@ -601,6 +601,15 @@ const RECIPES: &[Recipe] = &[
         props: &[("layout", "process"), ("text", "Plan\nBuild")],
         start: false,
     },
+    // Record 0335: a node joins the graphic the SmartArt cell added.
+    Recipe {
+        format: "docx",
+        element: "node",
+        fixture: "seed + add smartart",
+        parent: "/smartart[1]",
+        props: &[("text", "Ship")],
+        start: false,
+    },
     Recipe {
         format: "xlsx",
         element: "chart",

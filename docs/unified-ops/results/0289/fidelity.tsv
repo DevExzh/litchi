@@ -1,6 +1,6 @@
 file	format	noop	detail	revert	revert_detail	structure	structure_detail
-Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14ISOStrict/Word/sectPr-Previous Section Properties-rsidSelect-004B4C75.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	-	
-Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx	docx	exact		byte-exact	/styles/Normal name	-	
+Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14ISOStrict/Word/sectPr-Previous Section Properties-rsidSelect-004B4C75.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	refused	picture+comment add+set+remove: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write prote...
+Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 74104 -> 73848 bytes, first difference at 6
 iwork/directory/keynote/basic.key	keynote	exact		-		-	
 iwork/directory/keynote/basic.key/Index.zip	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 123322 -> 123308 bytes, first difference at 14	value-exact	slide duplicate+add+remove: 123322 -> 126565 bytes, first difference at 89854
 iwork/directory/numbers/basic.numbers	numbers	exact		-		-	
@@ -142,7 +142,7 @@ libreoffice-core/desktop/qa/data/BlankDrawDocument.odg	odg	exact		value-exact	/p
 libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	doc	exact		value-exact	/body/p[1] text: 22016 -> 24576 bytes, first difference at 548	value-exact	bookmark+hyperlink add+remove: 22016 -> 23552 bytes, first difference at 548
 libreoffice-core/extras/source/database/biblio.odb	odb	exact		value-exact	/table[1] name: 2892 -> 2427 bytes, first difference at 7	-	
 libreoffice-core/filter/qa/unit/data/semi-transparent-fill.odg	odg	exact		value-exact	/page[1] name: 10597 -> 8788 bytes, first difference at 7	-	
-libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 26014 -> 25721 bytes, first difference at 6
 libreoffice-core/oox/qa/unit/data/import-mce.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/oox/qa/unit/data/tdf131082.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
@@ -238,13 +238,13 @@ libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf	rtf	exact		value-exact	/
 libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 66048 -> 117760 bytes, first difference at 44
 libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt	odt	exact		byte-exact	/body/tbl[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	value-exact	tab add+remove: 9644 -> 7737 bytes, first difference at 7
-libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 21260 -> 21013 bytes, first difference at 6
 libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf	rtf	exact		none		value-exact	paragraph move+back: 2345 -> 2653 bytes, first difference at 2330
 libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:variable-set (an element with ...	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
-libreoffice-core/sw/qa/extras/layout/data/inline-textbox-position.docx	docx	exact		byte-exact	/body/p[1] style	-	
+libreoffice-core/sw/qa/extras/layout/data/inline-textbox-position.docx	docx	exact		byte-exact	/body/p[1] style	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
 libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt	odt	exact		value-exact	/body/p[1] text: 1996 -> 1946 bytes, first difference at 1830	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt	odt	exact		value-exact	/metadata author: 4863 -> 4467 bytes, first difference at 4	value-exact	tab add+remove: 4863 -> 4517 bytes, first difference at 4
 libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt	odt	exact		byte-exact	/body/h[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
@@ -260,32 +260,32 @@ libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt	odt	exact		va
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_LO_Standard_abc.docx	docx	locked		-		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2010_abc.docx	docx	locked		-		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2013_abc.docx	docx	locked		-		-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	docx	exact		byte-exact	/body/p[2] style	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx	docx	exact		byte-exact	/body/p[1] style	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx	docx	exact		byte-exact	/body/p[1] style	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx	docx	exact		byte-exact	/body/p[1] style	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/multi-page-toc.docx	docx	exact		byte-exact	/body/p[2] style	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/n830205.docx	docx	exact		refused	/header[1] text: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or track...	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	docx	exact		byte-exact	/body/p[2] style	value-exact	picture+comment add+set+remove: 55519 -> 55087 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 14735 -> 14490 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 13517 -> 13249 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 3009 -> 3491 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 32450 -> 31596 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 17580 -> 17326 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/multi-page-toc.docx	docx	exact		byte-exact	/body/p[2] style	value-exact	picture+comment add+set+remove: 18321 -> 17988 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/n830205.docx	docx	exact		refused	/header[1] text: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or track...	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
 libreoffice-core/sw/qa/extras/ooxmlexport/data/ooo39250-1-min.rtf	rtf	exact		refused	/body/p[3] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
-libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	docx	exact		value-exact	/header[1] text: 25636 -> 25668 bytes, first difference at 7540	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf103389.docx	docx	exact		byte-exact	/styles/Norml name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	docx	exact		value-exact	/header[1] text: 25636 -> 25668 bytes, first difference at 7540	refused	picture+comment add+set+remove: unsupported_capability: the new comment is not in the comments part
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf103389.docx	docx	exact		byte-exact	/styles/Norml name	value-exact	picture+comment add+set+remove: 13983 -> 13740 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx	docx	exact		byte-exact	/styles/Normal name	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf141173_missingFrames.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	value-exact	paragraph move+back: 11123 -> 11774 bytes, first difference at 3900
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf	rtf	exact		byte-exact	/header[2] text	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: a paragraph inherits character formatting from its neighbours a...
-libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf89731.docx	docx	exact		value-exact	/footer[2] text: 44680 -> 44654 bytes, first difference at 8609	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf90153.docx	docx	exact		byte-exact	/body/p[1] style	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/testTOCFlag_u.docx	docx	exact		byte-exact	/body/p[1] style	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9954 -> 10471 bytes, first difference at 6450
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 302210 -> 301954 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf89731.docx	docx	exact		value-exact	/footer[2] text: 44680 -> 44654 bytes, first difference at 8609	value-exact	picture+comment add+set+remove: 44680 -> 44351 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf90153.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 4856 -> 5442 bytes, first difference at 264
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 25741 -> 25409 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testTOCFlag_u.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 17390 -> 17111 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 13842 -> 13595 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 17870 -> 17616 bytes, first difference at 6
 libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
-libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	docx	exact		byte-exact	/body/p[1] style	-	
-libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 4952 -> 5465 bytes, first difference at 630
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 28843 -> 28602 bytes, first difference at 6
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 13876 -> 13622 bytes, first difference at 6
 libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/rtfexport/data/4010_min.rtf	rtf	exact		refused	/body/p[2] text: document_protected: RTF document protection (forms) refuses changed publication	refused	paragraph move+back: document_protected: RTF document protection (forms) refuses changed publication
@@ -375,7 +375,7 @@ libreoffice-core/sw/qa/extras/rtfimport/data/tdf96308-tabpos.rtf	rtf	exact		byte
 libreoffice-core/sw/qa/extras/rtfimport/data/tdf96326.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	value-exact	paragraph move+back: 479 -> 479 bytes, first difference at 161
 libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm	odm	exact		value-exact	/body/p[1] text: 8336 -> 7014 bytes, first difference at 7	value-exact	tab add+remove: 8336 -> 7068 bytes, first difference at 7
 libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt	odt	exact		byte-exact	/body/section[1] name	none	
-libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 18470 -> 18225 bytes, first difference at 6
 libreoffice-core/sw/qa/extras/uiwriter/data/tdf147006.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/extras/uiwriter/data/tdf86639.rtf	rtf	exact		value-exact	/body/p[1] text: 188 -> 188 bytes, first difference at 185	none	
 libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt	odt	exact		byte-exact	/body/tbl[1] name	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
@@ -388,13 +388,13 @@ libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt	odt	exact		byte-exac
 libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt	odt	exact		byte-exact	/body/section[1] name	none	
 libreoffice-core/sw/qa/uitest/data/tdf145178.fodt	odt	exact		byte-exact	/body/section[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/writerfilter/dmapper/data/NoFirstPageHeadFooter.rtf	rtf	exact		value-exact	/header[1] text: 24644 -> 24642 bytes, first difference at 22545	value-exact	paragraph move+back: 24644 -> 27773 bytes, first difference at 24242
-libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	docx	exact		byte-exact	/numbering/abstractNum[1]/level[1] format	-	
-libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx	docx	exact		none		-	
-libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	docx	exact		byte-exact	/numbering/abstractNum[1]/level[1] format	value-exact	picture+comment add+set+remove: 77621 -> 77586 bytes, first difference at 6
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx	docx	exact		none		one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 22007 -> 22456 bytes, first difference at 6
 libreoffice-core/sw/qa/writerfilter/dmapper/data/floattable-vertical-frame-offset.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: the body's paragraphs are not delimited by root-level \par cont...
-libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	-	
-libreoffice-core/sw/qa/writerfilter/dmapper/data/redlined-shape-sdt.docx	docx	exact		refused	/body/p[2] style: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or trac...	-	
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 66189 -> 65959 bytes, first difference at 6
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redlined-shape-sdt.docx	docx	exact		refused	/body/p[2] style: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or trac...	refused	picture+comment add+set+remove: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write prote...
 libreoffice-core/sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf	rtf	exact		value-exact	/endnote[1] text: 253 -> 252 bytes, first difference at 197	none	
 libreoffice-core/sw/qa/writerfilter/rtftok/data/floating-table.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	value-exact	paragraph move+back: 410 -> 423 bytes, first difference at 88
@@ -487,7 +487,7 @@ odfpy/tests/examples/simpletable.odt	odt	exact		value-exact	/metadata author: 70
 odfpy/xml2odf/definitionlists.xml	odt	exact		byte-exact	/metadata author	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 office-interop/libreoffice-resaved/45543-transition-litchi.ppt	ppt	exact		none		-	
 office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx	xlsx	exact		value-exact	/sheet[1] name: 7311 -> 7314 bytes, first difference at 303	-	
-office-interop/libreoffice-resaved/document-properties-litchi.docx	docx	exact		byte-exact	/body/p[1] style	-	
+office-interop/libreoffice-resaved/document-properties-litchi.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 6825 -> 7344 bytes, first difference at 1404
 office-interop/libreoffice-resaved/noheadfoot-litchi.doc	doc	exact		value-exact	/body/p[1] text: 10240 -> 15360 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 10240 -> 14336 bytes, first difference at 516
 office-interop/libreoffice-resaved/relsize-litchi.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
 office-interop/libreoffice-resaved/shapes-litchi.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	byte-exact	slide move+back
@@ -495,13 +495,13 @@ office-interop/libreoffice-resaved/tdf132924-litchi.odb	odb	exact		value-exact	/
 office-interop/libreoffice-resaved/tdf78897-litchi.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 office-interop/litchi-changed/45543-transition-litchi.ppt	ppt	exact		none		-	
 office-interop/litchi-changed/date-autofilter-litchi.xlsx	xlsx	exact		value-exact	/sheet[1] name: 6604 -> 6604 bytes, first difference at 4248	-	
-office-interop/litchi-changed/document-properties-litchi.docx	docx	exact		byte-exact	/styles/Normal name	-	
+office-interop/litchi-changed/document-properties-litchi.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 11143 -> 11658 bytes, first difference at 52
 office-interop/litchi-changed/noheadfoot-litchi.doc	doc	exact		refused	/body/p[1] text: corrupt_file: the file is malformed	refused	bookmark+hyperlink add+remove: corrupt_file: the file is malformed
 office-interop/litchi-changed/relsize-litchi.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
 office-interop/litchi-changed/shapes-litchi.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
 office-interop/litchi-changed/tdf132924-litchi.odb	odb	exact		value-exact	/table[1] name: 2897 -> 2808 bytes, first difference at 83	-	
 office-interop/litchi-changed/tdf78897-litchi.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-officecli/examples/word/revisions.docx	docx	exact		byte-exact	/body/p[1] style	-	
+officecli/examples/word/revisions.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 7238 -> 7822 bytes, first difference at 5826
 ole/doc/3endnotes.doc	doc	exact		value-exact	/body/p[4] text: 35328 -> 39936 bytes, first difference at 620	value-exact	bookmark+hyperlink add+remove: 35328 -> 39424 bytes, first difference at 620
 ole/doc/DiffFirstPageHeadFoot.doc	doc	exact		value-exact	/body/p[3] text: 27648 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27648 -> 31232 bytes, first difference at 540
 ole/doc/FancyFoot.doc	doc	exact		value-exact	/body/p[3] text: 27136 -> 31232 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 27136 -> 30720 bytes, first difference at 540
@@ -593,25 +593,25 @@ ole/xls/WithTwoCharts.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row ad
 ole/xls/WithTwoHyperLinks.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/empty.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
 ole/xls/password.xls	xls	locked		-		-	
-ooxml/docx/ComplexNumberedLists.docx	docx	exact		byte-exact	/body/p[2] style	-	
-ooxml/docx/FancyFoot.docx	docx	exact		byte-exact	/body/p[3] style	-	
-ooxml/docx/Headers.docx	docx	exact		value-exact	/header[1] text: 13076 -> 13096 bytes, first difference at 4804	-	
-ooxml/docx/Hyperlink.docx	docx	exact		byte-exact	/styles/Normal name	-	
-ooxml/docx/comment.docx	docx	exact		byte-exact	/body/p[1] style	-	
-ooxml/docx/documentProperties.docx	docx	exact		byte-exact	/styles/Normal name	-	
-ooxml/docx/documentProtection_comments_no_password.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	-	
-ooxml/docx/documentProtection_forms_no_password.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	-	
-ooxml/docx/documentProtection_no_protection.docx	docx	exact		byte-exact	/styles/Normal name	-	
-ooxml/docx/documentProtection_readonly_no_password.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	-	
-ooxml/docx/drawing.docx	docx	exact		byte-exact	/body/p[1] style	-	
-ooxml/docx/endnotes.docx	docx	exact		byte-exact	/styles/a name	-	
-ooxml/docx/footnotes.docx	docx	exact		byte-exact	/styles/a name	-	
-ooxml/docx/headerFooter.docx	docx	exact		value-exact	/header[2] text: 28423 -> 28425 bytes, first difference at 4716	-	
-ooxml/docx/headerPic.docx	docx	exact		byte-exact	/styles/a name	-	
-ooxml/docx/table-alignment.docx	docx	exact		byte-exact	/styles/Normal name	-	
-ooxml/docx/table-indent.docx	docx	exact		byte-exact	/body/p[1] style	-	
-ooxml/docx/table_footnotes.docx	docx	exact		byte-exact	/styles/a name	-	
-ooxml/docx/testComment.docx	docx	exact		byte-exact	/body/p[1] style	-	
+ooxml/docx/ComplexNumberedLists.docx	docx	exact		byte-exact	/body/p[2] style	value-exact	picture+comment add+set+remove: 14458 -> 14190 bytes, first difference at 6
+ooxml/docx/FancyFoot.docx	docx	exact		byte-exact	/body/p[3] style	value-exact	picture+comment add+set+remove: 12876 -> 12607 bytes, first difference at 6
+ooxml/docx/Headers.docx	docx	exact		value-exact	/header[1] text: 13076 -> 13096 bytes, first difference at 4804	value-exact	picture+comment add+set+remove: 13076 -> 12796 bytes, first difference at 6
+ooxml/docx/Hyperlink.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 11478 -> 11237 bytes, first difference at 6
+ooxml/docx/comment.docx	docx	exact		byte-exact	/body/p[1] style	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
+ooxml/docx/documentProperties.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 23503 -> 23229 bytes, first difference at 6
+ooxml/docx/documentProtection_comments_no_password.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	refused	picture+comment add+set+remove: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write prote...
+ooxml/docx/documentProtection_forms_no_password.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	refused	picture+comment add+set+remove: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write prote...
+ooxml/docx/documentProtection_no_protection.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9884 -> 9623 bytes, first difference at 6
+ooxml/docx/documentProtection_readonly_no_password.docx	docx	exact		refused	/styles/Normal name: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or t...	refused	picture+comment add+set+remove: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write prote...
+ooxml/docx/drawing.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 95247 -> 94891 bytes, first difference at 6
+ooxml/docx/endnotes.docx	docx	exact		byte-exact	/styles/a name	value-exact	picture+comment add+set+remove: 13553 -> 13282 bytes, first difference at 6
+ooxml/docx/footnotes.docx	docx	exact		byte-exact	/styles/a name	value-exact	picture+comment add+set+remove: 12823 -> 12552 bytes, first difference at 6
+ooxml/docx/headerFooter.docx	docx	exact		value-exact	/header[2] text: 28423 -> 28425 bytes, first difference at 4716	value-exact	picture+comment add+set+remove: 28423 -> 28120 bytes, first difference at 6
+ooxml/docx/headerPic.docx	docx	exact		byte-exact	/styles/a name	value-exact	picture+comment add+set+remove: 16206 -> 15932 bytes, first difference at 6
+ooxml/docx/table-alignment.docx	docx	exact		byte-exact	/styles/Normal name	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+ooxml/docx/table-indent.docx	docx	exact		byte-exact	/body/p[1] style	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+ooxml/docx/table_footnotes.docx	docx	exact		byte-exact	/styles/a name	value-exact	picture+comment add+set+remove: 13177 -> 12866 bytes, first difference at 6
+ooxml/docx/testComment.docx	docx	exact		byte-exact	/body/p[1] style	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
 ooxml/pptx/SmartArt.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 ooxml/pptx/activex/activex_checkbox.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 ooxml/pptx/backgrounds.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
@@ -774,37 +774,37 @@ ooxml/xlsx/test_conditional_formatting.xlsx	xlsx	exact		value-exact	/sheet[1] na
 ooxml/xlsx/universal-content.xlsx	xlsx	exact		value-exact	/sheet[1] name: 7296 -> 7310 bytes, first difference at 4121	-	
 poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt	ppt	exact		none		-	
 poi/test-data/document/47950_normal.doc	doc	exact		value-exact	/body/p[1] text: 27136 -> 29184 bytes, first difference at 648	value-exact	bookmark+hyperlink add+remove: 27136 -> 28672 bytes, first difference at 616
-poi/test-data/document/61745.docx	docx	exact		byte-exact	/styles/Normal name	-	
+poi/test-data/document/61745.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 37030 -> 36817 bytes, first difference at 6
 poi/test-data/document/Bug53453Section.doc	doc	exact		value-exact	/body/p[1] text: 26112 -> 28672 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 26112 -> 27648 bytes, first difference at 540
-poi/test-data/document/Bug54849.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/document/ComplexNumberedLists.docx	docx	exact		byte-exact	/body/p[2] style	-	
-poi/test-data/document/EmbeddedDocument.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/document/Numbering.docx	docx	exact		byte-exact	/body/p[1] style	-	
-poi/test-data/document/NumberingWOverrides.docx	docx	exact		refused	/body/p[4] numId: invalid_value: paragraph numId must be an unsigned 32-bit integer	-	
-poi/test-data/document/NumberingWithOutOfOrderId.docx	docx	exact		byte-exact	/body/p[1] style	-	
+poi/test-data/document/Bug54849.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 27566 -> 27226 bytes, first difference at 6
+poi/test-data/document/ComplexNumberedLists.docx	docx	exact		byte-exact	/body/p[2] style	value-exact	picture+comment add+set+remove: 14458 -> 14190 bytes, first difference at 6
+poi/test-data/document/EmbeddedDocument.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 13268 -> 13836 bytes, first difference at 291
+poi/test-data/document/Numbering.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 13808 -> 13564 bytes, first difference at 6
+poi/test-data/document/NumberingWOverrides.docx	docx	exact		refused	/body/p[4] numId: invalid_value: paragraph numId must be an unsigned 32-bit integer	value-exact	picture+comment add+set+remove: 15190 -> 14946 bytes, first difference at 6
+poi/test-data/document/NumberingWithOutOfOrderId.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 12978 -> 12734 bytes, first difference at 6
 poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	doc	exact		value-exact	/body/p[2] text: 86528 -> 123904 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 86528 -> 114688 bytes, first difference at 540
 poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 1619457 -> 1638912 bytes, first difference at 48
-poi/test-data/document/heading123.docx	docx	exact		byte-exact	/body/p[1] style	-	
+poi/test-data/document/heading123.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 74810 -> 74536 bytes, first difference at 6
 poi/test-data/document/password_password_cryptoapi.doc	doc	locked		-		-	
 poi/test-data/document/password_tika_binaryrc4.doc	doc	locked		-		-	
-poi/test-data/document/saut_page.docx	docx	exact		byte-exact	/body/p[1] style	-	
+poi/test-data/document/saut_page.docx	docx	exact		byte-exact	/body/p[1] style	value-exact	picture+comment add+set+remove: 2959626 -> 2960076 bytes, first difference at 1688
 poi/test-data/document/saved-by-table.doc	doc	exact		value-exact	/body/p[10] text: 65024 -> 79872 bytes, first difference at 44	value-exact	bookmark+hyperlink add+remove: 65024 -> 80896 bytes, first difference at 44
 poi/test-data/document/test.doc	doc	exact		value-exact	/body/p[7] text: 32768 -> 22016 bytes, first difference at 888	value-exact	bookmark+hyperlink add+remove: 32768 -> 22016 bytes, first difference at 888
-poi/test-data/document/testComment.docx	docx	exact		byte-exact	/body/p[1] style	-	
+poi/test-data/document/testComment.docx	docx	exact		byte-exact	/body/p[1] style	refused	picture+comment add+set+remove: unsupported_capability: the paragraph's addressable runs are not all direct or hyperlink runs
 poi/test-data/document/word_with_embeded.doc	doc	exact		value-exact	/body/p[1] text: 117248 -> 119808 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 117248 -> 119808 bytes, first difference at 540
 poi/test-data/hpsf/TestGermanWord90.doc	doc	exact		value-exact	/body/p[1] text: 19456 -> 22016 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 19456 -> 21504 bytes, first difference at 540
 poi/test-data/hpsf/TestNon4ByteBoundary.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 11776 -> 16896 bytes, first difference at 4141
 poi/test-data/hpsf/TestUnicode.xls	xls	exact		byte-exact	/sheet[1] name	byte-exact	row add+remove
-poi/test-data/integration/test_recursive_embedded.docx	docx	exact		byte-exact	/styles/Normal name	-	
+poi/test-data/integration/test_recursive_embedded.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 27082 -> 26822 bytes, first difference at 6
 poi/test-data/openxml4j/50154.xlsx	xlsx	exact		value-exact	/sheet[1] name: 13583 -> 13587 bytes, first difference at 2313	-	
-poi/test-data/openxml4j/CorePropertiesHasEntities.ooxml	docx	exact		refused	/styles/Standard name: corrupt_file: shared OOXML error: invalid OOXML data: DTD is not allowed in core properties	-	
-poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx	docx	exact		refused	/styles/Normal name: corrupt_file: shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace	-	
-poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx	docx	exact		byte-exact	/styles/Normal name	-	
-poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx	docx	exact		byte-exact	/styles/Normal name	-	
+poi/test-data/openxml4j/CorePropertiesHasEntities.ooxml	docx	exact		refused	/styles/Standard name: corrupt_file: shared OOXML error: invalid OOXML data: DTD is not allowed in core properties	refused	picture+comment add+set+remove: corrupt_file: shared OOXML error: invalid OOXML data: DTD is not allowed in core properties
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx	docx	exact		byte-exact	/styles/Normal name	one-way	picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9788 -> 9535 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx	docx	exact		refused	/styles/Normal name: corrupt_file: shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace	refused	picture+comment add+set+remove: corrupt_file: shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9786 -> 9533 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9787 -> 9534 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 10058 -> 9805 bytes, first difference at 6
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx	docx	exact		byte-exact	/styles/Normal name	value-exact	picture+comment add+set+remove: 9814 -> 9561 bytes, first difference at 6
 poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx	xlsx	exact		value-exact	/sheet[1] name: 11483 -> 11453 bytes, first difference at 1386	-	
 poi/test-data/poifs/60320-protected.xlsx	xlsx	locked		-		-	
 poi/test-data/slideshow/41246-1.ppt	ppt	exact		none		-	

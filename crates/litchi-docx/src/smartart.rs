@@ -2,10 +2,6 @@
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
-#![expect(
-    clippy::struct_field_names,
-    reason = "the public model retains established field names"
-)]
 //! Bounded, inert `SmartArt` (`DrawingML` diagram) inventory owned by a DOCX main document.
 //!
 //! A Word `SmartArt` graphic is anchored in the document body as a
@@ -140,6 +136,9 @@ pub struct Diagram {
     pub quick_style: Option<DiagramDefinition>,
     /// Colors part header metadata, when referenced.
     pub colors: Option<DiagramDefinition>,
+    /// The drawing's extent in EMUs (`wp:extent` `cx`, `cy`), when the
+    /// drawing holding the graphic gives one (record 0335).
+    pub extent: Option<(i64, i64)>,
 }
 
 impl Diagram {
@@ -184,6 +183,8 @@ struct DiagramAnchor {
     layout_id: Option<String>,
     quick_style_id: Option<String>,
     colors_id: Option<String>,
+    /// The extent of the drawing the anchor's graphic sits in.
+    extent: Option<(i64, i64)>,
 }
 
 /// Load the typed `SmartArt` inventory anchored in the given main document part.
@@ -322,6 +323,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             layout,
             quick_style,
             colors,
+            extent: anchor.extent,
         });
     }
     Ok(smart_arts)
@@ -423,6 +425,9 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
     // Stack of (graphicData depth, parsed anchor) frames for diagram anchors.
     let mut frames: Vec<(usize, Option<DiagramAnchor>)> = Vec::new();
     let mut anchors = Vec::new();
+    // The last drawing extent (`wp:extent`) seen, which a diagram anchor
+    // that follows it in the same drawing takes.
+    let mut extent: Option<(i64, i64)> = None;
 
     loop {
         match reader.read_event().map_err(xml_error)? {
@@ -452,7 +457,9 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
                     if frame.1.is_some() {
                         return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
-                    frame.1 = Some(rel_ids(&reader, &element, conformance)?);
+                    let mut anchor = rel_ids(&reader, &element, conformance)?;
+                    anchor.extent = extent;
+                    frame.1 = Some(anchor);
                 }
             },
             Event::Empty(element) => {
@@ -481,7 +488,11 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
                     if frame.1.is_some() {
                         return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
-                    frame.1 = Some(rel_ids(&reader, &element, conformance)?);
+                    let mut anchor = rel_ids(&reader, &element, conformance)?;
+                    anchor.extent = extent;
+                    frame.1 = Some(anchor);
+                } else if local == "extent" && namespace.ends_with("wordprocessingDrawing") {
+                    extent = drawing_extent(&element)?;
                 }
             },
             Event::End(_) => {
@@ -507,6 +518,14 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
         return Err(invalid("missing or unterminated document root"));
     }
     Ok(anchors)
+}
+
+/// The `cx` and `cy` of a `wp:extent` element, when both are integers.
+fn drawing_extent(element: &BytesStart<'_>) -> Result<Option<(i64, i64)>> {
+    let read = |name: &str| -> Result<Option<i64>> {
+        Ok(attribute(element, name)?.and_then(|value| value.trim().parse().ok()))
+    };
+    Ok(read("cx")?.zip(read("cy")?))
 }
 
 /// Parse the relationship IDs of a `dgm:relIds` element.

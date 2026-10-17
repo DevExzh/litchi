@@ -6,7 +6,7 @@
 
 use litchi_core::Position;
 
-use super::super::transaction::PictureMarkup;
+use super::super::transaction::{PictureMarkup, PictureRewrite};
 use super::super::{ElementPath, Error, Refusal, Result};
 use super::Edit;
 use crate::Package;
@@ -182,6 +182,196 @@ impl Edit<Package> {
                 description: &picture.description,
             },
         )
+    }
+}
+
+/// A change of an existing picture (record 0335): its extent, its name and
+/// description (alternative text), and its image. Each part left unset
+/// keeps the picture's current value.
+///
+/// ```
+/// use litchi_docx::document::PictureChange;
+///
+/// let change = PictureChange::new()
+///     .with_size(914_400, 457_200)
+///     .with_description("The new logo");
+/// assert!(!change.is_empty());
+/// assert!(PictureChange::new().is_empty());
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PictureChange {
+    extent: Option<(i64, i64)>,
+    name: Option<String>,
+    description: Option<String>,
+    image: Option<Vec<u8>>,
+}
+
+impl PictureChange {
+    /// A change that changes nothing.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The new extent in EMUs (the drawing's `wp:extent` and the shape's
+    /// own `a:ext`).
+    #[must_use]
+    pub const fn with_size(mut self, width: i64, height: i64) -> Self {
+        self.extent = Some((width, height));
+        self
+    }
+
+    /// The new drawing object name (`wp:docPr/@name`).
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// The new alternative text (`wp:docPr/@descr`).
+    #[must_use]
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    /// The new image (PNG, JPEG, GIF, BMP, TIFF, EMF or WMF), staged as a
+    /// new media part the picture then names.
+    #[must_use]
+    pub fn with_image(mut self, data: Vec<u8>) -> Self {
+        self.image = Some(data);
+        self
+    }
+
+    /// Whether the change sets nothing.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.extent.is_none()
+            && self.name.is_none()
+            && self.description.is_none()
+            && self.image.is_none()
+    }
+}
+
+impl Edit<Package> {
+    /// Change the picture at `picture` among the paragraph's inline
+    /// pictures (the order of [`crate::Paragraph::images`]) and return
+    /// whether anything changed.
+    ///
+    /// A new image is staged as a new part under `media/` with an `image`
+    /// relationship, and the picture's `a:blip` names it; the previous
+    /// image part stays in the package, as a removed picture's does.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::Package;
+    /// use litchi_docx::document::{ElementPath, ElementStep, NewPicture, PictureChange};
+    ///
+    /// let png = [
+    ///     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, b'I', b'H', b'D', b'R',
+    ///     0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0x1f, 0x15, 0xc4, 0x89,
+    /// ];
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("Logo: ");
+    /// let package = builder.build()?;
+    /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
+    /// let mut edit = package.edit()?;
+    /// edit.insert_picture_at(&paragraph, None, &NewPicture::new(png.to_vec()))?;
+    /// let package = edit.commit()?.into_package();
+    /// let mut edit = package.edit()?;
+    /// let change = PictureChange::new().with_size(914_400, 914_400).with_description("Logo");
+    /// assert!(edit.set_picture_at(&paragraph, Position::new(0), &change)?);
+    /// let images = edit.commit()?.into_package().document()?.paragraphs()?[0].images()?;
+    /// assert_eq!((images[0].width_emu(), images[0].description()), (914_400, "Logo"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::InvalidPropertyValue`] for an extent outside 1 EMU
+    /// to 22 inches, a name or description holding a control character, or
+    /// an unrecognized image; [`Refusal::RunNotFound`] for a missing
+    /// picture; or a resource-limit error.
+    pub fn set_picture_at(
+        &mut self,
+        paragraph: &ElementPath,
+        picture: Position,
+        change: &PictureChange,
+    ) -> Result<bool> {
+        let invalid = || Error::Refused {
+            position: 0,
+            reason: Refusal::InvalidPropertyValue,
+        };
+        if let Some((width, height)) = change.extent
+            && (!(1..=MAX_EXTENT).contains(&width) || !(1..=MAX_EXTENT).contains(&height))
+        {
+            return Err(invalid());
+        }
+        let controls = |text: &str| text.chars().any(char::is_control);
+        if change.name.as_deref().is_some_and(controls)
+            || change.description.as_deref().is_some_and(controls)
+        {
+            return Err(invalid());
+        }
+        let format = match &change.image {
+            Some(data) => Some(ImageFormat::detect_from_bytes(data).ok_or_else(invalid)?),
+            None => None,
+        };
+        // The drawing first, so a missing picture stages no part.
+        let mut changed = false;
+        if change.extent.is_some() || change.name.is_some() || change.description.is_some() {
+            changed = self.inner.rewrite_picture_at(
+                paragraph,
+                picture,
+                Some(&PictureRewrite {
+                    extent: change.extent,
+                    name: change.name.as_deref(),
+                    description: change.description.as_deref(),
+                    embed: None,
+                }),
+            )?;
+        }
+        if let (Some(data), Some(format)) = (&change.image, format) {
+            // Probe the picture before the part is staged.
+            self.inner
+                .rewrite_picture_at(paragraph, picture, Some(&PictureRewrite::default()))?;
+            let relationship = if self.inner.is_strict() {
+                STRICT_IMAGE_RELATIONSHIP
+            } else {
+                IMAGE_RELATIONSHIP
+            };
+            let (_, relationship_id) = self.add_related_part(
+                relationship,
+                "media/",
+                "image",
+                &format!(".{}", format.extension()),
+                format.mime_type(),
+                data.clone(),
+            )?;
+            self.inner.rewrite_picture_at(
+                paragraph,
+                picture,
+                Some(&PictureRewrite {
+                    embed: Some(&relationship_id),
+                    ..PictureRewrite::default()
+                }),
+            )?;
+            changed = true;
+        }
+        Ok(changed)
+    }
+
+    /// Remove the picture at `picture` among the paragraph's inline
+    /// pictures: its drawing, and its run when the run holds nothing else.
+    /// The image part and its relationship stay in the package,
+    /// unreferenced (the policy of a removed chart).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::RunNotFound`] for a missing picture.
+    pub fn remove_picture_at(&mut self, paragraph: &ElementPath, picture: Position) -> Result<()> {
+        self.inner.rewrite_picture_at(paragraph, picture, None)?;
+        Ok(())
     }
 }
 
