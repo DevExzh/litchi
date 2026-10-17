@@ -721,3 +721,65 @@ fn the_corpus_reads_every_part_and_mark() {
     }
     assert!(opened > 40, "{opened}");
 }
+
+#[test]
+#[ignore = "writes LibreOffice probe files to DOC_WRITE_DIR"]
+fn libreoffice_probe_files() {
+    let dir = std::env::var("DOC_WRITE_DIR").unwrap();
+    let write = |name: &str, file: &File| {
+        std::fs::write(format!("{dir}/{name}.doc"), file.to_bytes().unwrap()).unwrap();
+    };
+    let equation = open("ole/doc/equation.doc");
+    let linked = equation
+        .add(
+            "/body/p[1]",
+            NewNode::new("hyperlink")
+                .prop("url", "http://example.com/")
+                .prop("text", "probe"),
+        )
+        .unwrap()
+        .file;
+    write("equation-link", &linked);
+    let toc = open("ole/doc/watermark.doc");
+    let first = paths(&toc, "hyperlink").remove(0);
+    let retitled = match toc.set(first.as_str(), props! { "text" => "Retitled entry" }) {
+        Ok(file) => file,
+        Err(error) => {
+            let mut source: Option<&dyn std::error::Error> = Some(&error);
+            while let Some(current) = source {
+                println!("error: {current}");
+                source = current.source();
+            }
+            toc.clone()
+        },
+    };
+    println!("{first} -> {}", text(&reopen(&retitled), first.as_str()));
+    write("toc-retitled", &retitled);
+    let lists = open("ole/doc/Lists.doc");
+    let edited = lists
+        .set("/body/p[2]", props! { "style" => "ListParagraph" })
+        .unwrap()
+        .add(
+            "/body/p[2]",
+            NewNode::new("tab")
+                .prop("pos", 4320)
+                .prop("val", "right")
+                .prop("leader", "dot"),
+        )
+        .unwrap()
+        .file
+        .add(
+            "/body/p[2]",
+            NewNode::new("bookmark")
+                .prop("name", "Probe")
+                .prop("text", "different"),
+        )
+        .unwrap()
+        .file
+        .set(
+            "/section[1]",
+            props! { "marginLeft" => "1in", "columns" => 2 },
+        )
+        .unwrap();
+    write("lists-edited", &edited);
+}

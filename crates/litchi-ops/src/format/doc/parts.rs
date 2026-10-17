@@ -88,7 +88,7 @@ fn base_id(style: &StyleDefinition) -> String {
 /// The index of the style a path step names: its identifier, its primary
 /// name, or one of its alternate names, each compared exactly.
 pub(super) fn find_style(doc: &Doc, name: &str) -> Option<u16> {
-    let sheet = doc.reader().ok()?.stylesheet()?;
+    let sheet = doc.parsed().stylesheet()?;
     let ids = doc.style_ids();
     let by_id = ids
         .iter()
@@ -137,9 +137,8 @@ pub(crate) struct LevelView {
 impl LevelView {
     pub(super) fn of(doc: &Doc, definition: usize, level: u8) -> Self {
         let metadata = doc
-            .reader()
-            .ok()
-            .and_then(|reader| reader.list_tables())
+            .parsed()
+            .list_tables()
             .and_then(|tables| tables.metadata().level(definition, level));
         Self {
             paragraph: metadata
@@ -232,7 +231,7 @@ const fn is_default(style: &StyleDefinition) -> bool {
 }
 
 fn font<'a>(doc: &'a Doc, ftc: Option<u16>) -> Option<Value<'a>> {
-    let name = doc.reader().ok()?.font_name(ftc?).ok()??;
+    let name = doc.parsed().font_name(ftc?).ok()??;
     Some(Value::Text(Cow::Borrowed(name)))
 }
 
@@ -343,7 +342,7 @@ pub(super) fn style_value<'a>(
     view: &StyleView,
     index: usize,
 ) -> Option<Value<'a>> {
-    let sheet = doc.reader().ok()?.stylesheet()?;
+    let sheet = doc.parsed().stylesheet()?;
     let style = sheet.get(istd)?;
     let character = |key| {
         view.character
@@ -513,7 +512,7 @@ pub(super) fn num_count(doc: &Doc) -> usize {
 
 /// The value at `index` of the definition table for definition `at`.
 pub(super) fn abstract_num_value(doc: &Doc, at: usize, index: usize) -> Option<Value<'_>> {
-    let reader = doc.reader().ok()?;
+    let reader = doc.parsed();
     let tables = reader.list_tables()?;
     let structure = tables.structures().get(at)?;
     match index {
@@ -541,7 +540,7 @@ pub(super) fn abstract_num_value(doc: &Doc, at: usize, index: usize) -> Option<V
 
 /// The value at `index` of the instance table for instance `at`.
 pub(super) fn num_value(doc: &Doc, at: usize, index: usize) -> Option<Value<'_>> {
-    let tables = doc.reader().ok()?.list_tables()?;
+    let tables = doc.parsed().list_tables()?;
     let instance = tables.overrides().get(at)?;
     match index {
         0 => i64::try_from(at + 1).ok().map(Value::Int),
@@ -572,9 +571,8 @@ pub(super) fn level_value<'a>(
     index: usize,
 ) -> Option<Value<'a>> {
     let metadata = doc
-        .reader()
-        .ok()
-        .and_then(|reader| reader.list_tables())
+        .parsed()
+        .list_tables()
         .and_then(|tables| tables.metadata().level(definition, level.level));
     let character = |key| {
         view.character
@@ -631,7 +629,7 @@ pub(super) fn paragraph_value<'a>(
     paragraph: &litchi_doc::Paragraph,
     key: ParagraphKey,
 ) -> Option<Value<'a>> {
-    let reader = doc.reader().ok()?;
+    let reader = doc.parsed();
     match key {
         ParagraphKey::StyleId => {
             let istd = paragraph

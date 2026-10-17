@@ -243,6 +243,14 @@ impl Doc {
         Ok(&self.0.reader)
     }
 
+    /// The parsed reader, without the retained-source fence: the detached
+    /// in-memory projection whose values a resolved node's `format` reads
+    /// (record 0324). Every path resolution and query still goes through
+    /// [`Self::reader`], which fences the source.
+    pub(crate) fn parsed(&self) -> &litchi_doc::Document {
+        &self.0.reader
+    }
+
     /// Borrow the ordinary main-story paragraph stream used by the unified
     /// body axis.  The generic DOC reader's `Document::paragraphs` includes
     /// headers, footnotes, comments and other subdocuments, so it must never

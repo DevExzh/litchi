@@ -200,7 +200,7 @@ pub(super) fn link_value<'a>(doc: &'a Doc, link: &'a Link, index: usize) -> Opti
         2 => text(&link.tooltip),
         3 => text(&link.frame),
         4 => run.and_then(|run| {
-            let name = doc.reader().ok()?.font_name(run.font_index()?).ok()??;
+            let name = doc.parsed().font_name(run.font_index()?).ok()??;
             Some(Value::Text(Cow::Borrowed(name)))
         }),
         5 => run
