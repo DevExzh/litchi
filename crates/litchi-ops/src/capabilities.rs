@@ -2818,10 +2818,10 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Xlsx
                 && self.retains_source != Some(false)
-                && matches!(
+                && (matches!(
                     self.data().canonical,
                     "cell" | "range" | "sheet" | "row" | "col" | "chart" | "series" | "axis"
-                )
+                ) || crate::format::xlsx::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
         let settable = settable
@@ -2911,7 +2911,8 @@ impl Element {
         let structural = structural
             || (self.adapter == Adapter::Xlsx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "sheet" | "chart")
+                && (matches!(self.data().canonical, "sheet" | "chart")
+                    || crate::format::xlsx::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "pptx")]
         let add = structural

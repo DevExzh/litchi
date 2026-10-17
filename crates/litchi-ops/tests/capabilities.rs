@@ -542,11 +542,31 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
-        // Chart writes have their own report test (`tests/charts.rs`).
-        if matches!(element.name(), "chart" | "series" | "axis") {
+        // Chart writes have their own report test (`tests/charts.rs`), and
+        // worksheet features theirs (`tests/xlsx_features.rs`, record 0320).
+        if matches!(
+            element.name(),
+            "chart"
+                | "series"
+                | "axis"
+                | "comment"
+                | "hyperlink"
+                | "picture"
+                | "shape"
+                | "conditionalFormatting"
+                | "dataValidation"
+                | "autofilter"
+                | "rowbreak"
+                | "colbreak"
+        ) {
             continue;
         }
         for property in element.properties() {
+            // Cell hyperlinks and the sheet auto-filter are write-only
+            // setters (record 0320).
+            let link_write = (element.name() == "cell"
+                && matches!(property.name(), "link" | "tooltip" | "display"))
+                || (element.name() == "sheet" && property.name() == "autoFilter");
             let cell_write = matches!(element.name(), "cell" | "range")
                 && matches!(
                     property.name(),
@@ -615,7 +635,8 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                             | "border.all.color"
                     )))
                 || (matches!(element.name(), "row" | "column") && property.name() == "outline")
-                || (element.name() == "sheet" && property.name() == "merge");
+                || (element.name() == "sheet" && property.name() == "merge")
+                || link_write;
             assert_eq!(property.get(), !write_only, "{}", property.name());
             let sheet_write =
                 element.name() == "sheet" && matches!(property.name(), "name" | "hidden");
@@ -629,6 +650,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                 cell_write
                     || sheet_write
                     || dimension_write
+                    || link_write
                     || (element.name() == "sheet" && property.name() == "merge"),
                 "{}",
                 property.name()

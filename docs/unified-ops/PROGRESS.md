@@ -678,6 +678,19 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - Owner decision pending (not raised as blocking): the CONDFMT rule count > 3 and ShrFmla-order refusals are spec-strict and stay unless the owner relaxes them.
   - Open: 11 sheets the token reader can't decode, form-control/AutoFilter objects, anchors over mixed row heights, ODP graphic-style inheritance.
 
+## Coordinator audit (2026-10-16): P0 surface against the delta table
+Checked against design §13 and the generated `officecli-capability-delta.md`: several **P0** items are still element-level gaps on tier-1 formats. The definition of done requires docx/xlsx/pptx to cover the P0 surface, so these come before further performance work:
+- DOCX: `styles`/`style` and `numbering`/`abstractNum`/`num`/`level` (L-DOCX-R6) → record 0319, together with P1 headers/footers and footnotes/endnotes (L-DOCX-R5).
+- XLSX: `comment` (L-XLSX-R5), `hyperlink`, `picture`/`shape` (L-XLSX-R7) → record 0320, together with P1 conditional formatting, validation, autofilter and breaks.
+- PPTX gaps are P1/P2 only (theme, media, equation, animation, zoom, model3d, hyperlink as an element).
+- XLSB, XLS and ODS lag XLSX element coverage by about 30 families each; they are queued after 0320, reusing its element design.
+
+- Merged `iwork-numbers2` (0318):
+  - Numbers row/column edits on tables with formulas: a wire-level port of the host editor's shift (`table_topology/shift.rs`), extended to cross-table and cross-sheet readers, packed edges and whole-row/column sentinels. It is byte-equal with the host on 48 formula cases, 318 tables without formulas and 53 packed-edge cases, and found a host-editor bug on shared formula entries.
+  - Numbers cell comments (request 19): per-table census, lists without FieldInfo, effective locators, a multi-member writer; all 35 corpus tables round trip. `File` reads, sets, adds and removes the cell `comment`.
+  - New routes `row_insert_formulas` 1.011 and `comment_set` 1.002 meet the bar; `open_get` 1.063–1.069 (+6 µs, within the 20 µs arm).
+  - Open: `#REF!` on deleted references, splitting shared formulas, cell-writer clears (21), comment edge cases (new member, `NeedSparse`, more than one author); Keynote/Pages table creation and notes run styles not started (plan in record §5).
+
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
   - `File::metadata()` reports `dc:language` for every ODF format (six Markdown golden rows updated);

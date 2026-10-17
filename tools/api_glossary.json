@@ -2733,7 +2733,12 @@
       "families": [
         "litchi_xlsx::workbook::edit",
         "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit"
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::workbook::comments::edit",
+        "litchi_xlsx::drawing::edit"
       ]
     },
     {
@@ -3265,7 +3270,12 @@
       "families": [
         "litchi_xlsx::workbook::edit",
         "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit"
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::workbook::comments::edit",
+        "litchi_xlsx::drawing::edit"
       ]
     },
     {

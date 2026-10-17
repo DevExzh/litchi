@@ -219,6 +219,10 @@ mod table_sparse_storage;
 mod table_topology;
 mod text_box_create;
 mod text_box_duplicate;
+mod topology_oracle;
+
+#[doc(hidden)]
+pub use topology_oracle::UnverifiedTopologyEdit;
 
 pub use crate::charts::Direction;
 use model::*;
