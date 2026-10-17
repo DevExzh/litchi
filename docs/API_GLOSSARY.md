@@ -2659,3 +2659,20 @@ ElementNotFound, InvalidElementValue}` name the element refusals.
 | `text_edit::{TextRuns, CharacterRun, TextLink, RunFormat}`; `Slide::shape_text_runs`; `Presentation::resolve_click` | a body's character runs (`TextCFException` over UTF-16 units, covering the final paragraph mark) and text hyperlinks; outline-backed placeholders read their slide-list body | ✅ 0323 |
 | `Edit::{set_run_format, set_text_hyperlink}` (and on `slide_order::Transaction`) | split the body's `StyleTextPropAtom` character runs (a body without one gains it) / write an `InteractiveInfo` + `TextInteractiveInfoAtom` pair; outline bodies are edited in the live document | ✅ 0323 |
 | `litchi_ppt::theme::{Theme, Fonts, COLOR_SLOTS, parse, from_package}`; `Presentation::theme` | the `RoundTripThemeAtom` theme part's color and font schemes, read only | ✅ 0323 |
+
+## ODT, ODP and RTF element parts (record 0328)
+
+`litchi-odt` gains an on-demand part index beside the body index; it keeps
+offsets only and never changes the body index, so every body read and edit
+is unaffected. The primary `Edit` gains the header and footer text set; tab
+stops ride on the existing paragraph-property edit.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_odt::body::{Parts, PartsView}` (`Parts::{build, view}`; `PartsView::{list_styles, list_style, regions, tables_of_contents, shapes, objects, columns}`) | one pass over each of `content.xml` and `styles.xml` | ✅ 0328 |
+| `litchi_odt::body::parts::{ListStyle, ListLevel, ListLevelKind, Region, RegionKind, TableOfContents, Shape, EmbeddedObject, Column, TabStop, tab_stops, formula_text}` | borrowed views; attributes and text read from the source bytes | ✅ 0328 |
+| `litchi_odt::body::fields`, `TextField::at` | every body text field (the `text_fields` set and the variable, reference, sequence, chapter, sender, template, database and conditional fields); `text_fields` keeps its set for field refresh | ✅ 0328 |
+| `litchi_odt::body::TabStopEdit`, `ParagraphPropertyEdit::tab_stops` | replaces an automatic paragraph style's `style:tab-stops` | ✅ 0328 |
+| `litchi_odt::transaction::Edit::set_region_text` | a master-page header or footer region's text as one paragraph; content a text set cannot keep is refused (`Unsupported`) | ✅ 0328 |
+| `litchi_odt::Document::member_data` | the eager counterpart of `SourceBackedDocument::member_data` | ✅ 0328 |
+| `litchi_ops` ODT kinds `Header`, `Footer`, `Numbering`, `AbstractNum`, `Num`, `Level`, `Field`, `Toc`, `Tab`, `Shape`, `Equation`, `Column` | the DOCX element names and paths (`/header[N]`, `/footer[N]`, `/numbering/abstractNum[N]/level[L]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/shape[N]`, `/body/equation[N]`, `/body/tbl[N]/col[C]`), shared by OTH and ODM | ✅ 0328 |

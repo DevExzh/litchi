@@ -487,6 +487,106 @@ pub struct ParagraphPropertyEdit {
     pub page_break_before: Option<bool>,
     /// Background colour, `#rrggbb` or `transparent`.
     pub shading: Option<String>,
+    /// The paragraph's tab stops (`style:tab-stops`), replacing the ones
+    /// its automatic style declares; an empty list declares none (record
+    /// 0328).
+    pub tab_stops: Option<Vec<TabStopEdit>>,
+}
+
+/// One tab stop a [`ParagraphPropertyEdit`] declares (`style:tab-stop`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct TabStopEdit {
+    /// `style:position`, an ODF length from the paragraph's start indent.
+    pub position: String,
+    /// `style:type`: `left` (the default), `center`, `right` or `char`.
+    pub kind: Option<String>,
+    /// `style:leader-style`: `none`, `solid`, `dotted`, `dash`,
+    /// `long-dash`, `dot-dash`, `dot-dot-dash` or `wave`.
+    pub leader_style: Option<String>,
+    /// `style:leader-text`: one leader character.
+    pub leader_text: Option<String>,
+    /// `style:char`: the alignment character of a `char` stop.
+    pub character: Option<String>,
+}
+
+impl TabStopEdit {
+    /// A left tab stop at `position` (an ODF length).
+    #[must_use]
+    pub fn new(position: impl Into<String>) -> Self {
+        Self {
+            position: position.into(),
+            ..Self::default()
+        }
+    }
+
+    fn validate(&self) -> Result<()> {
+        check_length(&self.position, "tab stop position", false)?;
+        if let Some(kind) = &self.kind {
+            if !matches!(kind.as_str(), "left" | "center" | "right" | "char") {
+                return Err(Error::InvalidFormat(
+                    "ODT tab stop type is not left, center, right or char".to_owned(),
+                ));
+            }
+        }
+        if let Some(style) = &self.leader_style {
+            if !matches!(
+                style.as_str(),
+                "none"
+                    | "solid"
+                    | "dotted"
+                    | "dash"
+                    | "long-dash"
+                    | "dot-dash"
+                    | "dot-dot-dash"
+                    | "wave"
+            ) {
+                return Err(Error::InvalidFormat(
+                    "ODT tab stop leader style is not an ODF line style".to_owned(),
+                ));
+            }
+        }
+        for (value, field) in [
+            (&self.leader_text, "leader text"),
+            (&self.character, "alignment character"),
+        ] {
+            if let Some(value) = value {
+                let mut chars = value.chars();
+                if chars.next().is_none_or(char::is_control) || chars.next().is_some() {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODT tab stop {field} is not one character"
+                    )));
+                }
+            }
+        }
+        if self.kind.as_deref() == Some("char") && self.character.is_none() {
+            return Err(Error::InvalidFormat(
+                "an ODT char tab stop needs its alignment character".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn push_xml(&self, out: &mut String, prefixes: &Prefixes) {
+        out.push('<');
+        prefixes.push_name(out, Ns::Style, "tab-stop");
+        for (local, value) in [
+            ("position", Some(&self.position)),
+            ("type", self.kind.as_ref()),
+            ("char", self.character.as_ref()),
+            ("leader-style", self.leader_style.as_ref()),
+            ("leader-text", self.leader_text.as_ref()),
+        ] {
+            if let Some(value) = value {
+                out.push(' ');
+                prefixes.push_name(out, Ns::Style, local);
+                out.push_str("=\"");
+                xml::escape_into(out, value);
+                out.push('"');
+            }
+        }
+        out.push_str("/>");
+    }
 }
 
 impl ParagraphPropertyEdit {
@@ -521,7 +621,8 @@ impl ParagraphPropertyEdit {
             line_height,
             keep_next,
             page_break_before,
-            shading
+            shading,
+            tab_stops
         );
     }
 
@@ -557,7 +658,37 @@ impl ParagraphPropertyEdit {
         if let Some(color) = &self.shading {
             check_color(color, true)?;
         }
+        if let Some(stops) = &self.tab_stops {
+            if stops.len() > 256 {
+                return Err(Error::InvalidFormat(
+                    "an ODT paragraph declares at most 256 tab stops".to_owned(),
+                ));
+            }
+            for stop in stops {
+                stop.validate()?;
+            }
+        }
         Ok(())
+    }
+
+    /// The `style:tab-stops` element the edit declares, if it sets tab
+    /// stops.
+    pub(crate) fn tab_stops_xml(&self, prefixes: &Prefixes) -> Option<String> {
+        let stops = self.tab_stops.as_ref()?;
+        let mut out = String::from("<");
+        prefixes.push_name(&mut out, Ns::Style, "tab-stops");
+        if stops.is_empty() {
+            out.push_str("/>");
+            return Some(out);
+        }
+        out.push('>');
+        for stop in stops {
+            stop.push_xml(&mut out, prefixes);
+        }
+        out.push_str("</");
+        prefixes.push_name(&mut out, Ns::Style, "tab-stops");
+        out.push('>');
+        Some(out)
     }
 
     pub(crate) fn attributes(&self) -> Vec<(Ns, &'static str, String)> {

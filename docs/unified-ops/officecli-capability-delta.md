@@ -38,11 +38,11 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
 | golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6a2731d888a494e6e9b2cdcb95c7dc3e2d6434b0872a612b4acc8d8a14f93cf` |
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `ae58459a816d8f5e9589778be23054de447115fe445e805eda0bb7ac6fee9445` |
-| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `ff30dfda02183baa2952667b60f97fc880ae89102392884fb022c2e1bb416eae` |
+| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `2dbc45d7715d8f0a5d4fd1fa10b56381da186823f19872a9dc8642af7577a853` |
 | golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `358dabe30ca61a98bec5da7ace7ba00d4a8bfb23aa7fc5ce1fef6e7d176ff439` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
-| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `adbc9fc35ffae00c3089b29ffbe50bf327f8a0f7ec11080651ed8ddda00f87ba` |
-| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d7ed0734b44bf5cec561cea44b5e7629e2c19e96ce1834aecacf776daf95b990` |
+| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `d1c48fe2ba724c013f55f0997bb31713f35c6e178e3dfdda4f1f7d81a6490faf` |
+| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d84a027ace50689549f78d7d9d6662782f76ea58436a8dbac99da253ace7952f` |
 | golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `51c51512e3c89b13c59f053cfb96cdd907747af2510db1945450c8e8fbb800dd` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -96,11 +96,11 @@ Elements:
 | odf | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
-| odm | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
+| odm | 0 | 0 | 0 | 0 | 0 | 0 | 34 |
 | odp | 21 | 8 | 0 | 0 | 4 | 1 | 6 |
 | ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
-| odt | 19 | 12 | 0 | 0 | 13 | 2 | 5 |
-| oth | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
+| odt | 31 | 5 | 0 | 0 | 8 | 2 | 5 |
+| oth | 0 | 0 | 0 | 0 | 0 | 0 | 34 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 | 11 |
 
 Property reads:
@@ -125,7 +125,7 @@ Property reads:
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 97 | 2 | 80 | 0 | 118 | 0 | 390 | 92 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
-| odt | 63 | 0 | 199 | 0 | 168 | 1 | 530 | 45 |
+| odt | 112 | 0 | 165 | 0 | 173 | 1 | 510 | 55 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -151,7 +151,7 @@ Property writes:
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 9 | 58 | 494 | 0 | 44 | 174 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
-| odt | 12 | 32 | 752 | 0 | 31 | 179 |
+| odt | 15 | 34 | 747 | 0 | 31 | 189 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -8980,6 +8980,18 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | styles | litchi-only |  |
 |  | style | litchi-only |  |
 |  | metadata | litchi-only |  |
+|  | header | litchi-only |  |
+|  | footer | litchi-only |  |
+|  | numbering | litchi-only |  |
+|  | abstractNum | litchi-only |  |
+|  | num | litchi-only |  |
+|  | level | litchi-only |  |
+|  | field | litchi-only |  |
+|  | toc | litchi-only |  |
+|  | tab | litchi-only |  |
+|  | shape | litchi-only |  |
+|  | equation | litchi-only |  |
+|  | column | litchi-only |  |
 
 ### Properties
 
@@ -10631,7 +10643,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Follow-up |
 |---|---|---|---|
-| abstractNum |  | missing |  |
+| abstractNum | abstractNum | supported |  |
 | body | body | supported |  |
 | bookmark | bookmark | supported |  |
 | bookmarkEnd |  | missing |  |
@@ -10642,19 +10654,19 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | diagram |  | missing |  |
 | document | document | supported |  |
 | endnote | endnote | supported |  |
-| equation |  | gap | M6 ODT body index (record 0276) |
-| field |  | gap | M6 ODT body index (record 0276) |
+| equation | equation | supported |  |
+| field | field | supported |  |
 | fieldChar |  | missing |  |
-| footer |  | gap | M6 ODT body index (record 0276) |
+| footer | footer | supported |  |
 | footnote | footnote | supported |  |
-| formfield |  | gap | M6 ODT body index (record 0276) |
-| header |  | gap | M6 ODT body index (record 0276) |
+| formfield |  | gap | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| header | header | supported |  |
 | hyperlink | hyperlink | supported |  |
 | instrText |  | missing |  |
-| level |  | missing |  |
+| level | level | supported |  |
 | markdown |  | out of scope | an add-time import format, not an element of the document |
-| num |  | missing |  |
-| numbering |  | gap | M6 ODT body index (record 0276) |
+| num | num | supported |  |
+| numbering | numbering | supported |  |
 | ole | run | supported |  |
 | pagebreak | run | supported |  |
 | paragraph | paragraph | supported |  |
@@ -10662,21 +10674,21 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |
 | ptab |  | missing |  |
 | raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
-| revision |  | gap | M6 ODT body index (record 0276) |
+| revision |  | gap | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
 | run | run | supported |  |
-| sdt |  | missing |  |
+| sdt |  | gap | none: content controls are DOCX-only |
 | section | section | supported |  |
-| shape |  | gap | M6 ODT body index (record 0276) |
+| shape | shape | supported |  |
 | style | style | supported |  |
 | styles | styles | supported |  |
-| tab |  | gap | M6 ODT body index (record 0276) |
+| tab | tab | supported |  |
 | cell | cell | supported |  |
-| column |  | gap | M6 ODT body index (record 0276) |
+| column | column | supported |  |
 | row | row | supported |  |
 | table | table | supported |  |
 | textbox | textbox | supported |  |
-| toc |  | gap | M6 ODT body index (record 0276) |
-| watermark |  | missing |  |
+| toc | toc | supported |  |
+| watermark |  | gap | record 0328 follow-up: the ODT header text-art watermark |
 |  | heading | litchi-only |  |
 |  | list | litchi-only |  |
 |  | listItem | litchi-only |  |
@@ -10688,12 +10700,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
 |---|---|---|---|---|---|---|---|
 | abstractNum | `id` | int | a-g |  | missing | gap |  |
-| abstractNum | `type` | enum | asg |  | missing | gap |  |
-| abstractNum | `name` | string | asg |  | missing | gap |  |
+| abstractNum | `type` | enum | asg | --g | supported | gap |  |
+| abstractNum | `name` | string | asg | --g | supported | gap |  |
 | abstractNum | `styleLink` | string | asg |  | missing | gap |  |
 | abstractNum | `numStyleLink` | string | asg |  | missing | gap |  |
 | abstractNum | `format` | string | a-- |  | write-only | gap |  |
-| abstractNum | `text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `text` | string | a-- |  | supported | gap | the node's text |
 | abstractNum | `start` | int | a-- |  | write-only | gap |  |
 | abstractNum | `indent` | int | a-- |  | write-only | gap |  |
 | abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
@@ -10709,6 +10721,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
+| abstractNum | `styleName` | string |  | --g | litchi-only | — |  |
 | bookmark | `name` | string | asg | asg | supported | supported |  |
 | bookmark | `text` | string | a-- |  | supported | gap | the node's text |
 | bookmark | `id` | string | --g |  | missing | — |  |
@@ -10989,31 +11002,36 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | endnote | `id` | number | --g |  | missing | — |  |
 | endnote | `citation` | string |  | --g | litchi-only | — |  |
 | endnote | `class` | enum |  | --g | litchi-only | — |  |
-| equation | `mode` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| equation | `formula` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `evaluated` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| field | `fieldType` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `name` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `id` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `expression` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `trueText` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `falseText` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `hyperlink` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `format` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `instruction` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `vertAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| field | `fldLock` | bool | a-g |  | element gap | gap | M6 ODT body index (record 0276) |
+| equation | `mode` | enum | asg | --g | supported | gap |  |
+| equation | `formula` | string | as- | --g | supported | gap |  |
+| equation | `name` | string |  | --g | litchi-only | — |  |
+| equation | `width` | length |  | --g | litchi-only | — |  |
+| equation | `height` | length |  | --g | litchi-only | — |  |
+| field | `evaluated` | bool | --g | --g | supported | — |  |
+| field | `fieldType` | enum | asg | --g | supported | gap |  |
+| field | `name` | string | asg | --g | supported | gap |  |
+| field | `id` | string | asg |  | missing | gap |  |
+| field | `expression` | string | as- |  | write-only | gap |  |
+| field | `trueText` | string | as- |  | write-only | gap |  |
+| field | `falseText` | string | as- |  | write-only | gap |  |
+| field | `hyperlink` | bool | as- |  | write-only | gap |  |
+| field | `format` | string | asg | --g | supported | gap |  |
+| field | `instruction` | string | asg |  | missing | gap |  |
+| field | `vertAlign` | enum | a-- |  | write-only | gap |  |
+| field | `fldLock` | bool | a-g | --g | supported | gap |  |
+| field | `element` | string |  | --g | litchi-only | — |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
-| footer | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `align` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `direction` | enum | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `bold` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `italic` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| footer | `field` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `type` | enum | asg | --g | supported | gap |  |
+| footer | `text` | string | asg | -sg | supported | partial |  |
+| footer | `align` | enum | asg |  | missing | gap |  |
+| footer | `direction` | enum | as- |  | write-only | gap |  |
+| footer | `font` | string | asg |  | missing | gap |  |
+| footer | `size` | font-size | asg |  | missing | gap |  |
+| footer | `bold` | bool | asg |  | missing | gap |  |
+| footer | `italic` | bool | asg |  | missing | gap |  |
+| footer | `color` | color | asg |  | missing | gap |  |
+| footer | `field` | enum | a-- |  | write-only | gap |  |
+| footer | `masterPage` | string |  | --g | litchi-only | — |  |
 | footnote | `text` | string | asg | asg | supported | supported |  |
 | footnote | `direction` | enum | as- |  | write-only | gap |  |
 | footnote | `align` | enum | as- |  | write-only | gap |  |
@@ -11026,23 +11044,24 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | footnote | `id` | number | --g |  | missing | — |  |
 | footnote | `citation` | string |  | --g | litchi-only | — |  |
 | footnote | `class` | enum |  | --g | litchi-only | — |  |
-| formfield | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| formfield | `name` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| formfield | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| formfield | `checked` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| formfield | `default` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| formfield | `enabled` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| header | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `align` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `direction` | enum | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `bold` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `italic` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| header | `field` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `type` | enum | asg |  | element gap | gap | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| formfield | `name` | string | asg |  | element gap | gap | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| formfield | `text` | string | asg |  | element gap | gap | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| formfield | `checked` | bool | asg |  | element gap | gap | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| formfield | `default` | string | --g |  | element gap | — | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| formfield | `enabled` | bool | --g |  | element gap | — | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | record 0328 follow-up: ODT form controls as formfield nodes and their writes |
+| header | `type` | enum | asg | --g | supported | gap |  |
+| header | `text` | string | asg | -sg | supported | partial |  |
+| header | `align` | enum | asg |  | missing | gap |  |
+| header | `direction` | enum | as- |  | write-only | gap |  |
+| header | `font` | string | asg |  | missing | gap |  |
+| header | `size` | font-size | asg |  | missing | gap |  |
+| header | `bold` | bool | asg |  | missing | gap |  |
+| header | `italic` | bool | asg |  | missing | gap |  |
+| header | `color` | color | asg |  | missing | gap |  |
+| header | `field` | enum | a-- |  | write-only | gap |  |
+| header | `masterPage` | string |  | --g | litchi-only | — |  |
 | hyperlink | `url` | string | asg | asg | supported | supported |  |
 | hyperlink | `anchor` | string | a-g |  | missing | gap |  |
 | hyperlink | `tooltip` | string | a-g | -sg | supported | gap |  |
@@ -11058,33 +11077,34 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | hyperlink | `tgtFrame` | string |  | -sg | litchi-only | litchi-only |  |
 | instrText | `instruction` | string | -sg |  | missing | gap |  |
 | level | `ilvl` | int | a-g |  | missing | gap |  |
-| level | `format` | string | asg |  | missing | gap |  |
-| level | `lvlText` | string | asg |  | missing | gap |  |
-| level | `start` | int | asg |  | missing | gap |  |
-| level | `indent` | int | asg |  | missing | gap |  |
-| level | `hanging` | int | asg |  | missing | gap |  |
-| level | `justification` | enum | asg |  | missing | gap |  |
-| level | `suff` | enum | as- |  | write-only | gap |  |
+| level | `format` | string | asg | --g | supported | gap |  |
+| level | `lvlText` | string | asg | --g | supported | gap |  |
+| level | `start` | int | asg | --g | supported | gap |  |
+| level | `indent` | int | asg | --g | supported | gap |  |
+| level | `hanging` | int | asg | --g | supported | gap |  |
+| level | `justification` | enum | asg | --g | supported | gap |  |
+| level | `suff` | enum | as- | --g | supported | gap |  |
 | level | `lvlRestart` | int | as- |  | write-only | gap |  |
 | level | `isLgl` | bool | as- |  | write-only | gap |  |
 | level | `direction` | enum | a-- |  | write-only | gap |  |
-| level | `font` | string | as- |  | write-only | gap |  |
-| level | `size` | font-size | as- |  | write-only | gap |  |
-| level | `color` | color | as- |  | write-only | gap |  |
-| level | `bold` | bool | as- |  | write-only | gap |  |
-| level | `italic` | bool | as- |  | write-only | gap |  |
+| level | `font` | string | as- | --g | supported | gap |  |
+| level | `size` | font-size | as- | --g | supported | gap |  |
+| level | `color` | color | as- | --g | supported | gap |  |
+| level | `bold` | bool | as- | --g | supported | gap |  |
+| level | `italic` | bool | as- | --g | supported | gap |  |
 | num | `id` | int | a-g |  | missing | gap |  |
-| num | `abstractNumId` | int | asg |  | missing | gap |  |
+| num | `abstractNumId` | int | asg | --g | supported | gap |  |
 | num | `format` | string | a-- |  | write-only | gap |  |
-| num | `text` | string | a-- |  | write-only | gap |  |
+| num | `text` | string | a-- |  | supported | gap | the node's text |
 | num | `indent` | int | a-- |  | write-only | gap |  |
-| num | `type` | enum | a-- |  | write-only | gap |  |
+| num | `type` | enum | a-- |  | supported | gap | the node's text |
 | num | `start` | int | a-- |  | write-only | gap |  |
 | num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
 | num | `continue` | bool | a-- |  | write-only | gap |  |
 | num | `numId` | int | --g |  | missing | — |  |
-| numbering | `abstractNumCount` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| numbering | `abstractNumId` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| numbering | `abstractNumCount` | number | --g | --g | supported | — |  |
+| numbering | `abstractNumId` | number | --g |  | missing | — |  |
+| numbering | `numCount` | int |  | --g | litchi-only | — |  |
 | ole | `objectType` | string | --g |  | missing | — |  |
 | ole | `display` | string | --g |  | missing | — |  |
 | ole | `relId` | string | --g |  | missing | — |  |
@@ -11302,29 +11322,29 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ptab | `align` | enum | asg |  | missing | gap |  |
 | ptab | `relativeTo` | enum | asg |  | missing | gap |  |
 | ptab | `leader` | enum | asg |  | missing | gap |  |
-| revision | `type` | enum | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `text` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `id` | integer | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `nativePath` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `action` | enum | -s- |  | element gap | gap | M6 ODT body index (record 0276) |
-| revision | `paraMarkIns.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `paraMarkIns.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `paraMarkIns.id` | int | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `paraMarkDel.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `paraMarkDel.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `paraMarkDel.id` | int | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `revision.beforeLost` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `sectPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `sectPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `sectPrChange.id` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `tblPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `tblPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `trPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `trPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `tcPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
-| revision | `tcPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `type` | enum | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `text` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `author` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `date` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `id` | integer | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `nativePath` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `action` | enum | -s- |  | element gap | gap | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `paraMarkIns.author` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `paraMarkIns.date` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `paraMarkIns.id` | int | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `paraMarkDel.author` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `paraMarkDel.date` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `paraMarkDel.id` | int | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `revision.beforeLost` | bool | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `sectPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `sectPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `sectPrChange.id` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `tblPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `tblPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `trPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `trPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `tcPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
+| revision | `tcPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
 | run | `highlight` | color | asg | -sg | supported | partial |  |
 | run | `strike` | bool | asg | -sg | supported | partial |  |
 | run | `dstrike` | bool | asg |  | missing | gap |  |
@@ -11404,24 +11424,24 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `size` | font-size | asg | -sg | supported | partial |  |
 | run | `text` | string | asg | asg | supported | supported |  |
 | run | `style` | string |  | --g | litchi-only | — |  |
-| sdt | `type` | enum | a-g |  | missing | gap |  |
-| sdt | `tag` | string | asg |  | missing | gap |  |
-| sdt | `alias` | string | asg |  | missing | gap |  |
-| sdt | `text` | string | asg |  | missing | gap |  |
-| sdt | `checked` | bool | asg |  | missing | gap |  |
-| sdt | `format` | string | asg |  | missing | gap |  |
-| sdt | `items` | string | asg |  | missing | gap |  |
-| sdt | `lock` | enum | asg |  | missing | gap |  |
-| sdt | `placeholder` | bool | asg |  | missing | gap |  |
-| sdt | `placeholderText` | string | asg |  | missing | gap |  |
-| sdt | `date.fullDate` | string | asg |  | missing | gap |  |
-| sdt | `date.calendar` | string | asg |  | missing | gap |  |
-| sdt | `date.lid` | string | asg |  | missing | gap |  |
-| sdt | `date.storeMappedDataAs` | string | asg |  | missing | gap |  |
-| sdt | `comboBox.lastValue` | string | asg |  | missing | gap |  |
-| sdt | `dropDown.lastValue` | string | asg |  | missing | gap |  |
-| sdt | `id` | number | --g |  | missing | — |  |
-| sdt | `editable` | bool | --g |  | missing | — |  |
+| sdt | `type` | enum | a-g |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `tag` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `alias` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `text` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `checked` | bool | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `format` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `items` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `lock` | enum | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `placeholder` | bool | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `placeholderText` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.fullDate` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.calendar` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.lid` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.storeMappedDataAs` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `comboBox.lastValue` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `dropDown.lastValue` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `id` | number | --g |  | element gap | — | none: content controls are DOCX-only |
+| sdt | `editable` | bool | --g |  | element gap | — | none: content controls are DOCX-only |
 | section | `type` | enum | asg |  | supported | gap | the node's text |
 | section | `pageWidth` | length | asg |  | missing | gap |  |
 | section | `pageHeight` | length | asg |  | missing | gap |  |
@@ -11478,22 +11498,23 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | section | `name` | string |  | asg | litchi-only | litchi-only |  |
 | section | `protected` | bool |  | -sg | litchi-only | litchi-only |  |
 | section | `hidden` | bool |  | -sg | litchi-only | litchi-only |  |
-| shape | `geometry` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `width` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `height` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `wrap` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `hAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `vAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `hRelative` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `vRelative` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `anchor.x` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `anchor.y` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `fill` | color | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `line` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `line.color` | color | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `line.width` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `line.style` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
-| shape | `alt` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `geometry` | string | as- | --g | supported | gap |  |
+| shape | `width` | length | as- | --g | supported | gap |  |
+| shape | `height` | length | as- | --g | supported | gap |  |
+| shape | `wrap` | enum | a-- | --g | supported | gap |  |
+| shape | `hAlign` | enum | a-- |  | write-only | gap |  |
+| shape | `vAlign` | enum | a-- |  | write-only | gap |  |
+| shape | `hRelative` | enum | a-- |  | write-only | gap |  |
+| shape | `vRelative` | enum | a-- |  | write-only | gap |  |
+| shape | `anchor.x` | length | a-- | --g | supported | gap |  |
+| shape | `anchor.y` | length | a-- | --g | supported | gap |  |
+| shape | `fill` | color | as- | --g | supported | gap |  |
+| shape | `line` | string | as- |  | write-only | gap |  |
+| shape | `line.color` | color | as- | --g | supported | gap |  |
+| shape | `line.width` | length | as- | --g | supported | gap |  |
+| shape | `line.style` | string | as- |  | write-only | gap |  |
+| shape | `alt` | string | a-- | --g | supported | gap |  |
+| shape | `anchor` | enum |  | --g | litchi-only | — |  |
 | style | `id` | string | a-g |  | missing | gap |  |
 | style | `name` | string | asg | --g | supported | gap |  |
 | style | `type` | enum | a-g |  | supported | gap | the node's text |
@@ -11572,9 +11593,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | style | `family` | string |  | --g | litchi-only | — |  |
 | style | `parent` | string |  | --g | litchi-only | — |  |
 | styles | `count` | number | --g |  | missing | — |  |
-| tab | `pos` | length | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| tab | `val` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| tab | `leader` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| tab | `pos` | length | asg | asg | supported | supported |  |
+| tab | `val` | enum | asg | asg | supported | supported |  |
+| tab | `leader` | enum | asg | asg | supported | supported |  |
 | cell | `width` | string | asg |  | missing | gap |  |
 | cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
 | cell | `font` | string | -sg |  | missing | gap |  |
@@ -11613,8 +11634,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `rowspan` | int |  | --g | litchi-only | — |  |
 | cell | `covered` | bool |  | --g | litchi-only | — |  |
 | cell | `valueType` | string |  | --g | litchi-only | — |  |
-| column | `width` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
-| column | `text` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| column | `width` | length | a-- | --g | supported | gap |  |
+| column | `text` | string | a-- |  | supported | gap | the node's text |
 | row | `height.exact` | length | as- |  | write-only | gap |  |
 | row | `header` | bool | asg |  | missing | gap |  |
 | row | `cantSplit` | bool | asg |  | missing | gap |  |
@@ -11680,19 +11701,20 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | textbox | `rotation` | string | a-- |  | write-only | gap |  |
 | textbox | `shadow` | string | a-- |  | write-only | gap |  |
 | textbox | `alt` | string | a-- |  | write-only | gap |  |
-| toc | `levels` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| toc | `title` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| toc | `hyperlinks` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| toc | `pageNumbers` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
-| watermark | `text` | string | asg |  | missing | gap |  |
-| watermark | `image` | string | as- |  | write-only | gap |  |
-| watermark | `color` | color | asg |  | missing | gap |  |
-| watermark | `font` | string | asg |  | missing | gap |  |
-| watermark | `rotation` | int | asg |  | missing | gap |  |
-| watermark | `opacity` | string | asg |  | missing | gap |  |
-| watermark | `size` | string | asg |  | missing | gap |  |
-| watermark | `width` | string | asg |  | missing | gap |  |
-| watermark | `height` | string | asg |  | missing | gap |  |
+| toc | `levels` | string | asg | --g | supported | gap |  |
+| toc | `title` | string | asg | --g | supported | gap |  |
+| toc | `hyperlinks` | bool | asg | --g | supported | gap |  |
+| toc | `pageNumbers` | bool | asg | --g | supported | gap |  |
+| toc | `name` | string |  | --g | litchi-only | — |  |
+| watermark | `text` | string | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `image` | string | as- |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `color` | color | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `font` | string | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `rotation` | int | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `opacity` | string | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `size` | string | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `width` | string | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
+| watermark | `height` | string | asg |  | element gap | gap | record 0328 follow-up: the ODT header text-art watermark |
 
 ### Contextual operation gaps
 
@@ -11741,6 +11763,18 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | styles | litchi-only |  |
 |  | style | litchi-only |  |
 |  | metadata | litchi-only |  |
+|  | header | litchi-only |  |
+|  | footer | litchi-only |  |
+|  | numbering | litchi-only |  |
+|  | abstractNum | litchi-only |  |
+|  | num | litchi-only |  |
+|  | level | litchi-only |  |
+|  | field | litchi-only |  |
+|  | toc | litchi-only |  |
+|  | tab | litchi-only |  |
+|  | shape | litchi-only |  |
+|  | equation | litchi-only |  |
+|  | column | litchi-only |  |
 
 ### Properties
 

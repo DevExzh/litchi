@@ -23,15 +23,15 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
 | ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
 | rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
-| odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
+| odt | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 29 | 25 |
 | ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
 | odp | 30 | 170 | 170 | 0 | 0 | 143 | 39 | 6 | 12 |
 | odg | 4 | 33 | 33 | 0 | 0 | 0 | 11 | 4 | 2 |
 | odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 |
 | odi | 3 | 24 | 24 | 0 | 0 | 2 | 7 | 0 | 0 |
 | odb | 4 | 36 | 36 | 0 | 0 | 2 | 6 | 4 | 0 |
-| oth | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
-| odm | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
+| oth | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
+| odm | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 11 | 90 | 90 | 0 | 0 | 0 | 31 | 2 | 14 |
 | keynote | 16 | 131 | 122 | 0 | 9 | 0 | 45 | 14 | 4 |
@@ -343,7 +343,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## odt
 
-- fixtures: `create()`, `odf/corpus/writer-header-footer.odt`, `odf/corpus/writer-table.odt`, `odf/corpus/writer-definition-lists.odt`, `odf/corpus/writer-images-frames.odt`, `odf/corpus/writer-table-of-contents.odt`, `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- fixtures: `create()`, `odf/corpus/writer-header-footer.odt`, `odf/corpus/writer-table.odt`, `odf/corpus/writer-definition-lists.odt`, `odf/corpus/writer-images-frames.odt`, `odf/corpus/writer-table-of-contents.odt`, `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt`, `unified-ops/0294/parts.odt`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `odf/corpus/writer-header-footer.odt`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -370,6 +370,18 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| num | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| level | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| field | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| equation | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## ods
 
@@ -492,7 +504,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## oth
 
-- fixtures: `create()`, `unified-ops/0294/frames.oth`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- fixtures: `create()`, `unified-ops/0294/frames.oth`, `unified-ops/0294/parts.oth`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `unified-ops/0294/frames.oth`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -507,7 +519,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | listItem | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | n/a | ok | ok | ok | ok | n/a | n/a | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | section | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | frame | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
@@ -519,10 +531,22 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| num | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| level | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| field | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| equation | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## odm
 
-- fixtures: `create()`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`, `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm`, `unified-ops/0294/frames.odm`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- fixtures: `create()`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`, `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm`, `unified-ops/0294/frames.odm`, `unified-ops/0294/parts.odm`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -537,7 +561,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | listItem | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | n/a | ok | ok | ok | ok | n/a | n/a | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | section | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | frame | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
@@ -549,6 +573,18 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| num | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| level | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| field | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| equation | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## odf
 

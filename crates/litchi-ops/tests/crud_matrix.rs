@@ -240,6 +240,10 @@ const SPECS: &[Spec] = &[
             "odf/corpus/writer-images-frames.odt",
             "odf/corpus/writer-table-of-contents.odt",
             "libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt",
+            // Record 0328: headers and footers, numbering, fields, a table of
+            // contents, tab stops, shapes, equations and table columns
+            // (generated, test-data/unified-ops/0294).
+            "unified-ops/0294/parts.odt",
         ],
     },
     Spec {
@@ -314,6 +318,8 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/frames.oth",
+            // Record 0328: the ODT parts fixture as a web template.
+            "unified-ops/0294/parts.oth",
         ],
     },
     Spec {
@@ -325,6 +331,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm",
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/frames.odm",
+            // Record 0328: the ODT parts fixture as a master document.
+            "unified-ops/0294/parts.odm",
         ],
     },
     Spec {

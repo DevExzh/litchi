@@ -201,6 +201,14 @@ pub(crate) fn tag_name(tag: &str) -> &str {
     &body[..end]
 }
 
+/// The local part of a qualified element name (`math` of `math:math`).
+pub(crate) fn tag_name_local(name: &[u8]) -> &[u8] {
+    match memchr::memchr(b':', name) {
+        Some(colon) => &name[colon + 1..],
+        None => name,
+    }
+}
+
 /// The raw (still escaped) attributes of one start tag, in source order.
 pub(crate) fn attributes(tag: &str) -> Attributes<'_> {
     let name = tag_name(tag);

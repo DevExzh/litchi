@@ -16,6 +16,16 @@ pub(crate) struct Children<'f> {
     kinds: KindSet<Kind>,
     counters: [u32; Kind::COUNT],
     axis: Axis<'f>,
+    /// The parts of record 0328 listed after the structural children.
+    tail: Tail<'f>,
+}
+
+/// The part children of a parent, listed once its structural children are.
+enum Tail<'f> {
+    None,
+    /// The parent and the part kinds wanted, not listed yet.
+    Pending(Box<Node<'f>>, KindSet<Kind>),
+    Open(std::vec::IntoIter<Node<'f>>),
 }
 
 enum Axis<'f> {
@@ -27,7 +37,26 @@ enum Axis<'f> {
 }
 
 impl<'f> Children<'f> {
+    /// The children of `parent` a query asks for: the structural kinds in
+    /// `kinds`, then the parts in `kinds`.
     pub(super) fn of(parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
+        Self::listing(parent, kinds, kinds)
+    }
+
+    /// The children a node view lists: every structural child, and the
+    /// parts of a part (a numbering's definitions, a definition's levels),
+    /// never the parts of a structural parent (record 0328 keeps the views
+    /// of the root, the body, paragraphs and tables as they were).
+    pub(super) fn view(parent: &Node<'f>) -> Result<Self> {
+        let parts = if parent.kind.is_part() {
+            KindSet::ALL
+        } else {
+            KindSet::EMPTY
+        };
+        Self::listing(parent, KindSet::ALL, parts)
+    }
+
+    fn listing(parent: &Node<'f>, kinds: KindSet<Kind>, parts: KindSet<Kind>) -> Result<Self> {
         let axis = match (parent.kind, parent.target) {
             (Kind::Document, _) => Axis::Root(0),
             (Kind::Styles, _) => {
@@ -40,13 +69,36 @@ impl<'f> Children<'f> {
             },
             _ => Axis::Empty,
         };
+        let tail = if super::parts::has_part_children(parent.kind, parts) {
+            Tail::Pending(Box::new(parent.clone()), parts)
+        } else {
+            Tail::None
+        };
         Ok(Self {
             odt: parent.odt,
             parent: parent.address().clone(),
             kinds,
             counters: [0; Kind::COUNT],
             axis,
+            tail,
         })
+    }
+
+    /// The next part child, once the structural children are listed.
+    fn next_part(&mut self) -> Option<Result<Node<'f>>> {
+        loop {
+            match &mut self.tail {
+                Tail::None => return None,
+                Tail::Open(nodes) => return nodes.next().map(Ok),
+                Tail::Pending(parent, kinds) => match super::parts::children(parent, *kinds) {
+                    Ok(nodes) => self.tail = Tail::Open(nodes.into_iter()),
+                    Err(error) => {
+                        self.tail = Tail::None;
+                        return Some(Err(error));
+                    },
+                },
+            }
+        }
     }
 
     fn count(&mut self, kind: Kind) -> u32 {
@@ -63,7 +115,7 @@ impl<'f> Iterator for Children<'f> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match &mut self.axis {
-                Axis::Empty => return None,
+                Axis::Empty => return self.next_part(),
                 Axis::Root(next) => {
                     let kind = match *next {
                         0 => Kind::Body,
@@ -71,7 +123,7 @@ impl<'f> Iterator for Children<'f> {
                         2 => Kind::Metadata,
                         _ => {
                             self.axis = Axis::Empty;
-                            return None;
+                            continue;
                         },
                     };
                     *next += 1;
@@ -98,7 +150,10 @@ impl<'f> Iterator for Children<'f> {
                 },
                 Axis::Body(body, children) => {
                     let body = *body;
-                    let child = children.next()?;
+                    let Some(child) = children.next() else {
+                        self.axis = Axis::Empty;
+                        continue;
+                    };
                     let Some(kind) = Kind::of(child.kind()) else {
                         continue;
                     };
@@ -115,7 +170,10 @@ impl<'f> Iterator for Children<'f> {
                     )));
                 },
                 Axis::Styles(styles) => {
-                    let style = styles.next()?;
+                    let Some(style) = styles.next() else {
+                        self.axis = Axis::Empty;
+                        continue;
+                    };
                     let ordinal = self.count(Kind::Style);
                     if !self.kinds.contains(Kind::Style) {
                         continue;

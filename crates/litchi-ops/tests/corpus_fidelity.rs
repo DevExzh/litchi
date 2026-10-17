@@ -19,7 +19,8 @@
 //! a Keynote slide duplicated and a slide added and both removed, a Numbers
 //! table added and removed, or an XLSB note added and removed, must read
 //! back with the same node texts. DOC (record 0324) adds a bookmark and a
-//! hyperlink to its first body paragraph and removes both.
+//! hyperlink to its first body paragraph and removes both; ODT, OTH and ODM
+//! (record 0328) add a tab stop to the first body paragraph and remove it.
 //!
 //! An iWork package directory (the app-authored bundle form, record 0306)
 //! is a corpus entry too: a copy of it goes through `open` → empty `edit`
@@ -508,6 +509,31 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 Box::new(|file: &File| {
                     file.remove("/body/p[1]/hyperlink[last()]")?
                         .remove("/bookmark[@name=LitchiProbe]")
+                }),
+            )
+        },
+        // Record 0328: a tab stop added to the first body paragraph and
+        // removed again, through the leaf paragraph-property edit.
+        Some(FileFormat::Odt | FileFormat::Oth | FileFormat::Odm) => {
+            if count("/body", "paragraph") == 0 {
+                return ("none", String::new());
+            }
+            (
+                "tab add+remove",
+                &["/body/p[1]"],
+                Box::new(|file: &File| {
+                    file.add("/body/p[1]", NewNode::new("tab").prop("pos", 7777))
+                        .map(|added| added.file)
+                }),
+                Box::new(|file: &File| {
+                    let tabs = file.query("/body/p[1]/tab")?.count();
+                    let probe = (1..=tabs)
+                        .find(|n| {
+                            current(file, &format!("/body/p[1]/tab[{n}]"), "pos").as_deref()
+                                == Some("7777")
+                        })
+                        .unwrap_or(tabs);
+                    file.remove(format!("/body/p[1]/tab[{probe}]").as_str())
                 }),
             )
         },
