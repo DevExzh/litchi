@@ -5,8 +5,10 @@
 //!
 //! The coordinate values describe semantic table positions only; the
 //! transaction resolves them against the table's native header, body and
-//! footer counts and rewrites storage, headers, UIDs, borders and counts in
-//! one publication.
+//! footer counts and rewrites storage, headers, UIDs, borders, counts and
+//! every formula coordinate that addresses the table (record 0318: the
+//! table's own formulas and other tables' formulas that read it) in one
+//! publication.
 
 pub use crate::package::table_topology::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Unsupported,

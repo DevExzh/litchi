@@ -517,3 +517,37 @@ removal and stale thumbnail records; a readable placeholder `hidden`.
   Prost, so the port is a rewrite. `Unsupported::{Formulas,
   ReferencedByOtherOwners}` stay.
 - **Keynote and Pages table creation: not started.**
+
+## 2026-10-16 formula-coordinate shift and cell comments (record 0318)
+
+- **6 (Numbers topology on tables with formulas): done, with typed gaps.**
+  `table::topology` now shifts every formula coordinate that addresses the
+  edited table (`package/table_topology/shift.rs`, a wire-level port of the
+  retired host editor's `formula_dependency_shift`): the table's own
+  formula ASTs (local references, colon tracts, thunks, footer ranges),
+  dependency records and tiles, range dependencies and tiles, UUID
+  coordinate sets, merge proxies, table extents; and, beyond the host
+  editor, other tables' and sheets' formulas that read the table, packed
+  edge arrays, and whole-axis sentinels. New typed reasons
+  `Unsupported::{DeletedReference, SharedFormulas}`; `Formulas` and
+  `ReferencedByOtherOwners` now name only what the shift refuses
+  (volatile/spanning/error/spill state, charts and non-table readers, UUID
+  references). Differential test against the host editor:
+  `litchi-iwa/tests/numbers_topology_formula_differential.rs` (oracle:
+  `NumbersEditor::__edit_table_topology_unverified`). **Open:** `#REF!`
+  rewriting on deletion (refused), splitting a shared formula entry whose
+  cells diverge (refused), the cell writer's clear refusals on some removed
+  axes.
+- **19 (Numbers comments): done.** Native multi-member packages: per-table
+  census, FieldInfo-free comment lists, effective component locators,
+  creation over the list, tile and author-storage members with the
+  storage's cross-member author edge registered, clear of a UUID-registered
+  storage. New `Package::table_cell_comments(sheet, table)`. Unified: cell
+  `comment` read and set (`null` clears), `add` of `comment` under a cell,
+  `remove` of `<cell>/comment`. **Open:** a new comment list for a table
+  without one goes beside the table model rather than into a member of its
+  own; a comment on an empty cell where the tile has no row (`NeedSparse`);
+  packages with several authors.
+- **Keynote and Pages table creation: not started** (plan in record 0318
+  §5).
+- **Keynote speaker-notes run styles: not started.**

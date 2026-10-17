@@ -87,6 +87,7 @@ pub use editor::{
     NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
     RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
     RemovedNumbersSheetShape, RemovedNumbersTextBox, TableCellConditionalHighlightInfo,
+    UnverifiedTopologyEdit,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

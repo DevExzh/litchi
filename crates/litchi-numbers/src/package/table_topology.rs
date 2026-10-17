@@ -17,17 +17,21 @@
 //! - the table model's row or column count and, for a header or footer
 //!   section edit, its section count;
 //! - the table drawable's layout cache, and the table formula owner's
-//!   table extents.
+//!   table extents;
+//! - every formula coordinate of the calculation engine that addresses the
+//!   table ([`shift`], record 0318): the table's own formulas and their
+//!   dependency records, and other tables' formulas that read it.
 //!
 //! A removed row or column first has its stored cells cleared through the
 //! [`crate::table::cells`] transaction (value, style and list references are
 //! released there), so the structural pass only drops empty storage.
 //!
-//! Ported from the host editor's `row_insert`, `column_insert` and
-//! `table_delete` phases. Not ported yet, and refused with a typed
-//! [`Unsupported`] reason so a failed edit never publishes: formula
-//! coordinate shifting (a table holding formulas, or one another owner such
-//! as a chart or another table's formula reads), merged cells, filters,
+//! Ported from the host editor's `row_insert`, `column_insert`,
+//! `table_delete` and `formula_dependency_shift` phases. Refused with a
+//! typed [`Unsupported`] reason so a failed edit never publishes: removing a
+//! row or column a surviving formula reads, a chart or other non-table
+//! owner reading the table, volatile, spanning, error or spill dependency
+//! state, shared formulas whose cells would diverge, merged cells, filters,
 //! categories, pivots, column edits under sort rules, removing a hidden row
 //! or column, and removing a row or column that carries a border layer.
 
@@ -38,6 +42,7 @@
 
 mod calc;
 pub(super) mod lists;
+mod shift;
 pub(super) mod storage;
 pub(super) mod wire;
 
@@ -92,10 +97,13 @@ const DEFAULT_TILE_SIZE: u64 = 256;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Unsupported {
-    /// The table holds formulas or other calculation-engine dependency
-    /// state whose coordinates would move.
+    /// Calculation-engine state the coordinate shift does not rewrite:
+    /// volatile, spanning, whole-owner, error or spill dependencies, a
+    /// category reference whose host moves, a packed coordinate, or a
+    /// dependency record that would leave its tile.
     Formulas,
-    /// Another owner (a formula in another table, a chart) reads the table.
+    /// A chart or another non-table owner reads the table, or a formula
+    /// reads it through legacy UUID ranges or UUID references.
     ReferencedByOtherOwners,
     /// The table has merged cells.
     Merges,
@@ -118,13 +126,18 @@ pub enum Unsupported {
     /// (a missing UID map, a row that would cross a storage tile, a cell
     /// the clear left behind).
     StorageLayout,
+    /// A surviving formula reads a cell of the removed row or column, or a
+    /// range starts or ends on it (native Numbers would write `#REF!`).
+    DeletedReference,
+    /// One formula shared by several cells would become different formulas.
+    SharedFormulas,
 }
 
 impl fmt::Display for Unsupported {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            Self::Formulas => "formulas or calculation dependencies in the table",
-            Self::ReferencedByOtherOwners => "formulas or charts elsewhere that read the table",
+            Self::Formulas => "calculation dependencies the coordinate shift does not rewrite",
+            Self::ReferencedByOtherOwners => "charts or other owners elsewhere that read the table",
             Self::Merges => "merged cells",
             Self::Filters => "filters",
             Self::Categories => "categories",
@@ -134,6 +147,8 @@ impl fmt::Display for Unsupported {
             Self::Borders => "a border layer on the removed row or column",
             Self::Comments => "a commented cell on the removed row or column",
             Self::StorageLayout => "this table storage layout",
+            Self::DeletedReference => "a formula that reads the removed row or column",
+            Self::SharedFormulas => "a formula shared by cells that would diverge",
         })
     }
 }
@@ -261,6 +276,9 @@ struct Step {
     row_axis: bool,
     edit: AxisEdit,
     after: Geometry,
+    /// A body-row insertion (footer ranges ending on the row before it
+    /// grow).
+    expand_footer: bool,
 }
 
 fn usize_of(value: u32) -> usize {
@@ -381,6 +399,7 @@ fn resolve(operation: Operation, geometry: Geometry) -> Result<Step, Error> {
         row_axis,
         edit,
         after,
+        expand_footer: matches!(operation, Operation::InsertRow(RowInsertion::Body { .. })),
     })
 }
 
@@ -861,12 +880,32 @@ fn plan(
     check_features(working, target, model, info, step)?;
     let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
 
-    // The calculation graph.
-    let own = match calc::check(source, target.info)? {
-        Ok(own) => own,
-        Err(calc::Refusal::OwnFormulas) => return Err(refuse(Unsupported::Formulas)),
-        Err(calc::Refusal::Incoming) => return Err(refuse(Unsupported::ReferencedByOtherOwners)),
+    // The calculation graph: the formula-coordinate shift (record 0318).
+    let (insert, position) = match step.edit {
+        AxisEdit::Insert(index) => (true, index),
+        AxisEdit::Remove(index) => (false, index),
     };
+    let calculation = shift::plan(
+        source,
+        &shift::Table {
+            info: target.info,
+            model,
+            rows: before.rows,
+            footer_rows: before.footer_rows,
+        },
+        shift::Shift {
+            row_axis: step.row_axis,
+            position,
+            insert,
+            expand_footer: step.expand_footer,
+            pending_clear: cells_pending,
+        },
+        cells_pending,
+    )
+    .map_err(|failure| match failure {
+        shift::Failure::Fault(fault) => Error::from(fault),
+        shift::Failure::Refused(reason) => refuse(reason),
+    })?;
 
     let mut replacements = Vec::new();
     let mut push =
@@ -1044,17 +1083,28 @@ fn plan(
         push(target.info, info_index, rewritten, Vec::new())?;
     }
 
-    // The table formula owner's extents.
-    if let Some(own) = own {
-        let (_, owner) = message(working, own.object, &[4_008])?;
-        let rewritten = calc::rewrite_extents(owner, before.extents(), step.after.extents())
-            .map_err(|fault| match fault {
-                Fault::Unsupported => refuse(Unsupported::Formulas),
-                other => other.into(),
-            })?;
-        if let Some(rewritten) = rewritten {
-            push(own.object, own.message, rewritten, Vec::new())?;
+    // The calculation engine: the shifted payloads, and the table formula
+    // owner's extents.
+    if let Some((object, index, payload)) = calculation.own {
+        let rewritten = calc::rewrite_extents(
+            &payload,
+            before.extents(),
+            step.after.extents(),
+            step.row_axis,
+            insert,
+        )
+        .map_err(|fault| match fault {
+            Fault::Unsupported => refuse(Unsupported::Formulas),
+            other => other.into(),
+        })?
+        .unwrap_or(payload);
+        let (_, original) = message(working, object, &[4_008])?;
+        if rewritten != original {
+            push(object, index, rewritten, Vec::new())?;
         }
+    }
+    for rewrite in calculation.rewrites {
+        push(rewrite.object, rewrite.message, rewrite.data, Vec::new())?;
     }
     Ok(replacements)
 }
@@ -1201,6 +1251,13 @@ fn verify(
     let key = |cell: &(CellPosition, crate::cell::Value)| (cell.0.row(), cell.0.column());
     expected.sort_by_key(key);
     actual.sort_by_key(key);
+    // A formula's text follows the shifted coordinates: only its presence is
+    // compared here.
+    for cell in expected.iter_mut().chain(actual.iter_mut()) {
+        if let crate::cell::Value::Formula(text) = &mut cell.1 {
+            text.clear();
+        }
+    }
     if expected != actual {
         return Err(Error::Verification);
     }
