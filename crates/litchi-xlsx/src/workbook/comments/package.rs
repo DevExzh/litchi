@@ -367,6 +367,7 @@ mod tests {
                 text: "note".into(),
                 guid: None,
                 shape_id: None,
+                runs: Vec::new(),
             },
         );
         comments

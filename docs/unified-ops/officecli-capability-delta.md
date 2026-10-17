@@ -25,8 +25,8 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6036228da65ef4bd4889a861832909bfaf95d6fa316df17f2fd703ad232846e1` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `c5dce2f2b310342025a6297ff3e415e7df028f30672ef737694dd85446a5f266` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `319c2f64b082acd6ad4fd954c975e824a682e5c568335d00f08ff5ac0ef7d2ef` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `4fddfc467504bf3bf407a791b52c03e624c16c6423615d25cd7e6c91322e5dc2` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `2e0f0a530e324122151d0c4966192b0045a219e9083fa40150cf7e8542bc0877` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `4feb37072541ce3dc7ec1ebd0994aae5abc0facd72bf360055b72da7b3526369` |
@@ -110,7 +110,7 @@ Property reads:
 | docx | 291 | 2 | 58 | 0 | 232 | 2 | 376 | 165 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
-| xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 552 |
+| xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 559 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 159 | 430 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 226 | 22 | 30 | 0 | 120 | 0 | 289 | 262 |
@@ -136,7 +136,7 @@ Property writes:
 | docx | 227 | 30 | 539 | 0 | 138 | 192 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
-| xlsx | 212 | 60 | 272 | 0 | 515 | 184 |
+| xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 109 | 34 | 418 | 0 | 141 | 247 |
@@ -4118,6 +4118,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | comment | `author` | string | asg | asg | supported | supported |  |
 | comment | `text` | string | asg | asg | supported | supported |  |
 | comment | `anchoredTo` | string |  | --g | litchi-only | — |  |
+| comment | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |
+| comment | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| comment | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| comment | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| comment | `font.color` | color |  | asg | litchi-only | litchi-only |  |
+| comment | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| comment | `runs` | string |  | asg | litchi-only | litchi-only |  |
 | conditionalformatting | `type` | enum | --g | a-g | supported | litchi-only |  |
 | conditionalformatting | `ref` | string | asg | asg | supported | supported |  |
 | conditionalformatting | `fill` | color | asg | asg | supported | supported |  |

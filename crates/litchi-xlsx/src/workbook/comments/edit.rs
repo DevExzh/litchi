@@ -40,7 +40,7 @@ use litchi_spreadsheet_drawing::vml::{
 };
 use quick_xml::events::Event;
 
-use super::model::Comments;
+use super::model::{Comments, RunColor, TextRun};
 use super::package::{COMMENTS_CONTENT_TYPE, COMMENTS_RELATIONSHIP_TYPE, load_from_worksheet};
 use crate::Package;
 use crate::error::{Result, invalid};
@@ -123,7 +123,41 @@ impl Edit<'_> {
     /// author or text, too many notes, a VML drawing this editor cannot read,
     /// or a changed edit of a signed workbook.
     pub fn set(&mut self, sheet: usize, cell_ref: &str, author: &str, text: &str) -> Result<bool> {
-        self.write(sheet, cell_ref, author, text, false)
+        self.write(sheet, cell_ref, author, Body::Text(text), false)
+    }
+
+    /// Add or replace the note of `cell` (A1) with rich-text `runs`: each
+    /// run is written as an `<r>` with the run properties its
+    /// [`RunFont`](super::RunFont) sets. Returns whether anything changed;
+    /// a note whose author and runs are equal is left as it is.
+    ///
+    /// # Errors
+    ///
+    /// As [`Edit::set`], and for no runs or an invalid run property.
+    pub fn set_runs(
+        &mut self,
+        sheet: usize,
+        cell_ref: &str,
+        author: &str,
+        runs: &[TextRun],
+    ) -> Result<bool> {
+        self.write(sheet, cell_ref, author, Body::Runs(runs), false)
+    }
+
+    /// [`Edit::add`] with rich-text `runs`, as [`Edit::set_runs`] writes
+    /// them.
+    ///
+    /// # Errors
+    ///
+    /// As [`Edit::set_runs`].
+    pub fn add_runs(
+        &mut self,
+        sheet: usize,
+        cell_ref: &str,
+        author: &str,
+        runs: &[TextRun],
+    ) -> Result<Option<usize>> {
+        self.insert(sheet, cell_ref, author, Body::Runs(runs))
     }
 
     /// Add a note to `cell` (A1) when the cell has none. Returns the new
@@ -140,6 +174,16 @@ impl Edit<'_> {
         author: &str,
         text: &str,
     ) -> Result<Option<usize>> {
+        self.insert(sheet, cell_ref, author, Body::Text(text))
+    }
+
+    fn insert(
+        &mut self,
+        sheet: usize,
+        cell_ref: &str,
+        author: &str,
+        body: Body<'_>,
+    ) -> Result<Option<usize>> {
         let (_, row, column) = cell(cell_ref)?;
         let worksheet = self.staged.worksheet(sheet)?;
         let before = load_from_worksheet(self.staged.opc(), &worksheet)?;
@@ -154,7 +198,7 @@ impl Edit<'_> {
                 .count()
         });
         Ok(self
-            .write_loaded(sheet, cell_ref, author, text, true, before)?
+            .write_loaded(sheet, cell_ref, author, body, true, before)?
             .then_some(position))
     }
 
@@ -163,12 +207,12 @@ impl Edit<'_> {
         sheet: usize,
         cell_ref: &str,
         author: &str,
-        text: &str,
+        body: Body<'_>,
         insert_only: bool,
     ) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
         let existing = load_from_worksheet(self.staged.opc(), &worksheet)?;
-        self.write_loaded(sheet, cell_ref, author, text, insert_only, existing)
+        self.write_loaded(sheet, cell_ref, author, body, insert_only, existing)
     }
 
     fn write_loaded(
@@ -176,11 +220,20 @@ impl Edit<'_> {
         sheet: usize,
         cell_ref: &str,
         author: &str,
-        text: &str,
+        body: Body<'_>,
         insert_only: bool,
         existing: Option<super::model::Part>,
     ) -> Result<bool> {
         let (reference, row, column) = cell(cell_ref)?;
+        let joined;
+        let text = match body {
+            Body::Text(text) => text,
+            Body::Runs(runs) => {
+                check_runs(runs)?;
+                joined = runs.iter().map(|run| run.text.as_str()).collect::<String>();
+                joined.as_str()
+            },
+        };
         for (value, what) in [(author, "author"), (text, "text")] {
             if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
                 return Err(invalid(format!(
@@ -191,7 +244,11 @@ impl Edit<'_> {
         let worksheet = self.staged.worksheet(sheet)?;
         if let Some(part) = &existing {
             if let Some(comment) = part.comments.get(&reference) {
-                if insert_only || (comment.author == author && comment.text == text) {
+                let same = match body {
+                    Body::Text(_) => comment.text == text,
+                    Body::Runs(runs) => comment.runs == runs,
+                };
+                if insert_only || (comment.author == author && same) {
                     return Ok(false);
                 }
             } else if part.comments.len() >= MAX_COMMENTS {
@@ -207,12 +264,12 @@ impl Edit<'_> {
             Some(part) => {
                 let name = PackURI::new(part.part_name.as_str())
                     .map_err(|error| invalid(error.to_string()))?;
-                let xml = splice_comment(self.staged.blob(&name)?, &reference, author, text)?;
+                let xml = splice_comment(self.staged.blob(&name)?, &reference, author, body)?;
                 self.staged.replace_blob(&name, xml)?;
             },
             None => {
                 let name = self.staged.free_name("/xl/comments", ".xml")?;
-                let xml = new_comments_part(&reference, author, text);
+                let xml = new_comments_part(&reference, author, body);
                 let opc = self.staged.opc_mut()?;
                 opc.add_part(Box::new(BlobPart::new(
                     name.clone(),
@@ -408,11 +465,134 @@ fn text_element(prefix: &str, text: &str) -> String {
     )
 }
 
-fn new_comments_part(reference: &str, author: &str, text: &str) -> String {
+/// The text of a note to write: plain, or rich-text runs.
+#[derive(Clone, Copy)]
+enum Body<'a> {
+    Text(&'a str),
+    Runs(&'a [TextRun]),
+}
+
+impl Body<'_> {
+    /// The note's `<text>` element in the comments part's `prefix`.
+    fn element(self, prefix: &str) -> String {
+        match self {
+            Self::Text(text) => text_element(prefix, text),
+            Self::Runs(runs) => runs_element(prefix, runs),
+        }
+    }
+}
+
+/// Refuse runs this editor cannot write: none at all, or a property
+/// outside its value space.
+fn check_runs(runs: &[TextRun]) -> Result<()> {
+    if runs.is_empty() {
+        return Err(invalid("a rich note needs at least one run"));
+    }
+    for run in runs {
+        let font = &run.font;
+        let token = |value: &Option<String>, what: &str| {
+            if value
+                .as_deref()
+                .is_some_and(|v| v.is_empty() || !v.bytes().all(|b| b.is_ascii_alphabetic()))
+            {
+                return Err(invalid(format!("a note run {what} is a token")));
+            }
+            Ok(())
+        };
+        token(&font.underline, "underline")?;
+        token(&font.vert_align, "vertical alignment")?;
+        if font
+            .size
+            .is_some_and(|size| !size.is_finite() || !(1.0..=409.0).contains(&size))
+        {
+            return Err(invalid("a note run size must be 1 to 409 points"));
+        }
+        if let Some(RunColor::Rgb(rgb)) = &font.color
+            && (rgb.len() != 8 || !rgb.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            return Err(invalid("a note run color is eight hexadecimal digits"));
+        }
+        if font
+            .name
+            .as_deref()
+            .is_some_and(|name| name.is_empty() || name.len() > 31 || name.contains('\0'))
+        {
+            return Err(invalid("a note run font name must hold 1 to 31 characters"));
+        }
+    }
+    Ok(())
+}
+
+/// A note's `<text>` of rich runs. Run properties follow the
+/// `CT_RPrElt` order Excel writes: `b`, `i`, `strike`, `u`, `vertAlign`,
+/// `sz`, `color`, `rFont`.
+fn runs_element(prefix: &str, runs: &[TextRun]) -> String {
+    let mut out = format!("<{prefix}text>");
+    for run in runs {
+        let font = &run.font;
+        let mut properties = String::new();
+        for (on, tag) in [
+            (font.bold, "b"),
+            (font.italic, "i"),
+            (font.strike, "strike"),
+        ] {
+            match on {
+                Some(true) => {
+                    let _ = write!(properties, "<{prefix}{tag}/>");
+                },
+                Some(false) => {
+                    let _ = write!(properties, "<{prefix}{tag} val=\"0\"/>");
+                },
+                None => {},
+            }
+        }
+        if let Some(underline) = &font.underline {
+            let _ = write!(properties, "<{prefix}u val=\"{underline}\"/>");
+        }
+        if let Some(align) = &font.vert_align {
+            let _ = write!(properties, "<{prefix}vertAlign val=\"{align}\"/>");
+        }
+        if let Some(size) = font.size {
+            let _ = write!(properties, "<{prefix}sz val=\"{size}\"/>");
+        }
+        match &font.color {
+            Some(RunColor::Rgb(rgb)) => {
+                let _ = write!(
+                    properties,
+                    "<{prefix}color rgb=\"{}\"/>",
+                    rgb.to_ascii_uppercase()
+                );
+            },
+            Some(RunColor::Indexed(index)) => {
+                let _ = write!(properties, "<{prefix}color indexed=\"{index}\"/>");
+            },
+            Some(RunColor::Theme(theme)) => {
+                let _ = write!(properties, "<{prefix}color theme=\"{theme}\"/>");
+            },
+            None => {},
+        }
+        if let Some(name) = &font.name {
+            let _ = write!(properties, "<{prefix}rFont val=\"{}\"/>", escape(name));
+        }
+        out.push_str(&format!("<{prefix}r>"));
+        if !properties.is_empty() {
+            let _ = write!(out, "<{prefix}rPr>{properties}</{prefix}rPr>");
+        }
+        let _ = write!(
+            out,
+            "<{prefix}t xml:space=\"preserve\">{}</{prefix}t></{prefix}r>",
+            escape(&run.text)
+        );
+    }
+    let _ = write!(out, "</{prefix}text>");
+    out
+}
+
+fn new_comments_part(reference: &str, author: &str, body: Body<'_>) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<comments xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><authors><author>{}</author></authors><commentList><comment ref=\"{reference}\" authorId=\"0\">{}</comment></commentList></comments>",
         escape(author),
-        text_element("", text)
+        body.element("")
     )
 }
 
@@ -525,7 +705,7 @@ fn scan(xml: &[u8]) -> Result<Layout> {
 }
 
 /// Replace or append the note of `reference` in a comments part.
-fn splice_comment(xml: &[u8], reference: &str, author: &str, text: &str) -> Result<Vec<u8>> {
+fn splice_comment(xml: &[u8], reference: &str, author: &str, body: Body<'_>) -> Result<Vec<u8>> {
     let layout = scan(xml)?;
     let prefix = layout.prefix.as_str();
     let mut out = xml.to_vec();
@@ -546,7 +726,7 @@ fn splice_comment(xml: &[u8], reference: &str, author: &str, text: &str) -> Resu
             layout.authors.len()
         },
     };
-    let body = text_element(prefix, text);
+    let body = body.element(prefix);
     match layout
         .comments
         .iter()
@@ -617,6 +797,72 @@ fn set_attribute(tag: &str, name: &str, value: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::Package;
+
+    #[test]
+    fn rich_runs_round_trip_and_replace_plain_text() {
+        use crate::workbook::comments::{RunColor, RunFont, TextRun};
+        let package = Package::new().unwrap();
+        let mut edit = package.edit_comments().unwrap();
+        assert!(edit.set(0, "B2", "Ann", "plain").unwrap());
+        let runs = vec![
+            TextRun {
+                text: "Alice:".into(),
+                font: RunFont {
+                    bold: Some(true),
+                    size: Some(9.0),
+                    color: Some(RunColor::Rgb("FFFF0000".into())),
+                    name: Some("Tahoma".into()),
+                    ..RunFont::default()
+                },
+            },
+            TextRun {
+                text: " check <this>".into(),
+                font: RunFont {
+                    italic: Some(true),
+                    underline: Some("double".into()),
+                    vert_align: Some("superscript".into()),
+                    strike: Some(false),
+                    color: Some(RunColor::Indexed(81)),
+                    ..RunFont::default()
+                },
+            },
+        ];
+        assert!(edit.set_runs(0, "B2", "Ann", &runs).unwrap());
+        assert!(!edit.set_runs(0, "B2", "Ann", &runs).unwrap());
+        assert_eq!(edit.add_runs(0, "A1", "Bob", &runs[..1]).unwrap(), Some(0));
+        let after = edit.commit().unwrap().into_package();
+        let reopened = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+        let comments = reopened
+            .edit_comments()
+            .unwrap()
+            .comments(0)
+            .unwrap()
+            .unwrap();
+        let note = comments.get("B2").unwrap();
+        assert_eq!(note.text, "Alice: check <this>");
+        assert_eq!(note.runs, runs);
+        assert_eq!(comments.get("A1").unwrap().runs, runs[..1]);
+        let mut edit = reopened.edit_comments().unwrap();
+        assert!(edit.set(0, "B2", "Ann", "plain again").unwrap());
+        let comments = edit.comments(0).unwrap().unwrap();
+        assert!(comments.get("B2").unwrap().runs.is_empty());
+        assert!(edit.set_runs(0, "C3", "Ann", &[]).is_err());
+        assert!(
+            edit.set_runs(
+                0,
+                "C3",
+                "Ann",
+                &[TextRun {
+                    text: "x".into(),
+                    font: RunFont {
+                        size: Some(0.0),
+                        ..RunFont::default()
+                    }
+                }]
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn notes_add_replace_remove_with_vml() {
