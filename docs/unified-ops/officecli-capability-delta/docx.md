@@ -788,31 +788,31 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | permStart | `ed` | string | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | permStart | `colFirst` | number | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | permStart | `colLast` | number | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
-| picture | `decorative` | bool | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `crop` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `cropLeft` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `cropTop` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `cropRight` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `cropBottom` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `anchor` | bool | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `wrap` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `behindText` | bool | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `relativeHeight` | integer | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `effectExtent` | string | a-- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `hPosition` | length | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `vPosition` | length | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `hRelative` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `vRelative` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `hAlign` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `vAlign` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `link` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `decorative` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `crop` | string | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `cropTop` | string | as- |  | write-only | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `cropRight` | string | as- |  | write-only | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `anchor` | bool | a-g |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `wrap` | string | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `behindText` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `relativeHeight` | integer | a-g |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `effectExtent` | string | a-- |  | write-only | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `hPosition` | length | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `vPosition` | length | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `hRelative` | string | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `vRelative` | string | asg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `hAlign` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `vAlign` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `link` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
 | picture | `width` | length | asg | asg | supported | supported |  |  |  |
 | picture | `height` | length | asg | asg | supported | supported |  |  |  |
-| picture | `fallback` | string | a-- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `id` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `fallback` | string | a-- |  | write-only | gap | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `id` | number | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
 | picture | `alt` | string | asg | asg | supported | supported |  |  |  |
-| picture | `contentType` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| picture | `fileSize` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `contentType` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
+| picture | `fileSize` | number | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-breadth) |  |
 | picture | `relId` | string | --g | --g | supported | — |  |  |  |
 | picture | `src` | string | as- | as- | write-only | supported |  |  |  |
 | picture | `name` | string |  | asg | litchi-only | litchi-only |  |  |  |

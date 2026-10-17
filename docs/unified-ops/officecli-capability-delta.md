@@ -205,7 +205,7 @@ Property gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 85 | 533 | 35 | 0 | 19 | 0 |
+| docx | 63 | 555 | 35 | 0 | 19 | 0 |
 | doc | 0 | 882 | 35 | 0 | 19 | 0 |
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
 | xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
@@ -232,7 +232,7 @@ All gap rows by tier:
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
 | P0 | 73 | 0 | 0 | 0 | 4 | 0 |
-| P1 | 467 | 6042 | 0 | 0 | 44 | 0 |
+| P1 | 445 | 6064 | 0 | 0 | 44 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -258,7 +258,8 @@ properties share its entry unless an entry names the property):
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
 | docx-p0-residue | planned | WP4 | 8 | `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:hyperlink.*`, `delta:docx:table.style` | DOCX P0/v1 residue: table columns, table and row writes, style and list application (chart series and axes, comment set and picture set/remove closed in record 0335) |
-| docx-picture-comment-follow-ups | planned | 0335 | 61 | `delta:docx:comment.*`, `delta:docx:picture.*`, `delta:docx:chart-series.*`, `delta:docx:chart-axis.*` | record 0335 follow-ups: floating pictures (anchor, wrap, positions), crop and effects, click links and part facts; comment replies and resolution (commentsExtended) and anchor controls; series formatting and axis formatting keys beyond name/values/color and title/min/max |
+| docx-picture-comment-follow-ups | planned | 0335 | 39 | `delta:docx:comment.*`, `delta:docx:chart-series.*`, `delta:docx:chart-axis.*` | record 0335 follow-ups: comment replies and resolution (commentsExtended) and anchor controls; series formatting and axis formatting keys beyond name/values/color and title/min/max |
+| docx-picture-breadth | deferred-P1 | 0335 | 22 | `delta:docx:picture.*` | P1 property breadth (record 0339): floating pictures (anchor, wrap, positions) need a typed wp:anchor model in the leaf (record 0335 follow-up F1); crop, decorative, click links and part facts follow it. The P0 picture keys (src, size, position, alt) are supported |
 | pptx-p0-residue | planned | 0333 | 16 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text` | PPTX P0 residue left by record 0333 (follow-ups F1-F3): comment direction and modern-comment writes, placeholder and slide text, slide layout and title writes |
 | pptx-picture-table-breadth | deferred-P1 | 0333 | 20 | `delta:pptx:picture.*`, `delta:pptx:table.style` | P1 property breadth after record 0333: picture crop (the leaf does not model a:srcRect), rotation, flips and effects; table style (record 0333 follow-up F4) |
 | xlsx-p0-residue | planned | WP16 | 13 | `delta:xlsx:run`, `delta:xlsx:cell.value`, `delta:xlsx:cell.formula`, `delta:xlsx:cell.type`, `delta:xlsx:picture.src` | XLSX P0/v1 residue (WP16, proposed in record 0332): rich-text runs, `add` of a cell, the cell type, picture source replacement |
