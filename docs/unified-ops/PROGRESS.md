@@ -740,6 +740,29 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - Word corpus passed 645 → 661, gap 221 → 211, bug 0; DOCX property writes 227 → 250.
   - Writes within 1.07×; XLSX note set 1.48× (an existing extra parse from 0320; a per-handle notes cache is the follow-up); a rich-note read 1.10–1.12×.
   - Open: story paragraphs in views and unscoped queries, story tables/list styles, remaining mark edits, XLSB note formatting.
+- Merged `perf-r13` (0326):
+  - The PPTX query regression came from 0321: the hyperlink item grew every query node 168 → 176 bytes and added one mispredict per match. The new items are boxed and the two lazy frame cells merged, so the node is 144 bytes (a test guards it), and the large in-memory query is back to its pre-0321 time (1,676–1,709 µs).
+  - The path fast path in `litchi-core::selector` now takes `[last()]`, `[k]`, `[@k]`, `[k=v]` and `[@k=v]`, differentially tested on 211,682 inputs. Attribute paths parse about 2× faster; `/body/p[N]` batches are unchanged in wall time (the parsed path is 616 bytes; a smaller predicate representation is a public-API follow-up).
+  - Typed lengths skip the text round trip: RTF typed routes 1.30 → 1.22, the same as the text route.
+  - Reads: PPTX equation 1.30 → 0.77 and XLSX note 1.10 → 1.02 now meet; XLSB note 1.22 → 1.15; DOCX unchanged; DOC is a ratio against a 1 ns struct copy; PPT left to its owner.
+  - Open misses 98 → 101 (three newly tracked reads, still missing).
+
+## Coordinator audit (2026-10-17): definition of done
+A read-only audit of trunk `593d1b9fcd` against the goal's definition of done (`.coord/r9/dod-audit-2026-10-17.md`, outside the repository). Verdict: not met yet.
+- Single entry point: mostly met. Bug: the facade feature lists omit odg/odc/odi/odb/odf-formula.
+- 21 formats read and write, gaps listed: partly met. There is no whole-format refusal, but 54 delta `missing` element rows and thousands of property rows have no follow-up.
+- P0: partly met. Open: PPTX paragraph/run/row/cell add and remove, comment remove; DOCX picture set/remove, comment set, SmartArt set/remove; XLSX SmartArt not recorded.
+- Registry: 11 element rows contradict their property flags.
+- Python/CLI: `dump` and the raw layer are missing.
+- Acceptance: no OfficeCLI gap carries a wontfix/deferred disposition; no v1 corpus subset is defined; the checklist lacks the ADR 0008 rows.
+- Performance: every miss is explained, 19 without a follow-up; 1k-batch evidence is missing for doc/oth/odm/odc/odi.
+- Gates: `gate.sh` now also runs `litchi-core` tests, rustdoc with warnings denied for core/ops/facade, and the bench-matrix `--check`. Facade per-feature checks and fuzz builds come with WP6.
+
+Work packages, in waves of up to four agents:
+- **Wave 1:** WP2 registry consistency (0330, running), WP1 dispositions and the v1 subset, WP6 facade/fuzz, WP7 1k-batch evidence.
+- **Wave 2:** WP3 PPTX P0 residue, WP4 DOCX P0 residue, WP5 `dump` and the raw layer, WP8 miss follow-ups.
+- **Wave 3:** WP9 ADR 0008 checklist rows, WP12 SmartArt decisions. WP10/WP11 (XLS/ODS parity) are running as 0327.
+- The owner decisions are collected in [0331](0331-owner-decision-memo.md).
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
@@ -984,6 +1007,7 @@ Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-ppt
 ## Awaiting owner decision
 
 - ~~ADR 0033 acceptance~~ — accepted 2026-10-04 (record 0006).
+- **All pending owner decisions are collected in [0331](0331-owner-decision-memo.md).**
 - **Adopted defaults, awaiting owner confirmation (2026-10-17):**
   - Record 0319: removing a DOCX `num` keeps the paragraphs' `numPr` references that point at it. OfficeCLI clears them, which edits paragraphs the caller did not name.
   - Record 0319, corpus delta D11: re-adding a built-in DOCX style id is refused (typed) instead of upserted as OfficeCLI does.
