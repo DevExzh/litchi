@@ -51,12 +51,18 @@ pub(crate) struct Cache {
     story_kinds: OnceLock<Vec<Option<StoryKind>>>,
     footnotes: OnceLock<Vec<Note>>,
     endnotes: OnceLock<Vec<Note>>,
+    /// The main story's bookmarks and fields, read on first use (record
+    /// 0325; the marks of record 0319).
+    pub(super) bookmarks: OnceLock<Vec<litchi_docx::bookmark::Bookmark>>,
+    pub(super) fields: OnceLock<Vec<litchi_docx::Field>>,
 }
 
 /// One header or footer part, with its payload read on first use.
 pub(crate) struct Story {
     part: StoryPart,
     xml: OnceLock<Arc<Vec<u8>>>,
+    /// The story's block index, built on first use (record 0325).
+    blocks: OnceLock<litchi_docx::Blocks>,
 }
 
 impl Story {
@@ -120,6 +126,7 @@ pub(super) fn stories(docx: &Docx) -> Result<&[Story]> {
         .map(|part| Story {
             part,
             xml: OnceLock::new(),
+            blocks: OnceLock::new(),
         })
         .collect();
     Ok(cache.stories.get_or_init(|| stories))
@@ -219,6 +226,79 @@ pub(super) fn notes(docx: &Docx, kind: litchi_docx::document::NoteKind) -> Resul
         },
     )?;
     Ok(lock.get_or_init(|| loaded))
+}
+
+/// The story the address step `kind[ordinal]` (a header, footer, footnote
+/// or endnote) names: its leaf key and its part value (record 0325).
+pub(super) fn story_of(
+    docx: &Docx,
+    kind: Kind,
+    ordinal: usize,
+) -> Result<(super::element::StoryKey, PartValue)> {
+    let missing = || internal("a DOCX story step is outside its story list");
+    match kind {
+        Kind::Header | Kind::Footer => {
+            let role = if kind == Kind::Header {
+                Role::Header
+            } else {
+                Role::Footer
+            };
+            let index = *role_stories(docx, role)?.get(ordinal).ok_or_else(missing)?;
+            let name = stories(docx)?
+                .get(index)
+                .ok_or_else(missing)?
+                .part()
+                .name()
+                .to_owned();
+            Ok((
+                super::element::StoryKey::Part(name),
+                PartValue::Story(ordinal_u32(index)),
+            ))
+        },
+        _ => {
+            let kind = note_kind(kind);
+            let id = notes(docx, kind)?.get(ordinal).ok_or_else(missing)?.id();
+            Ok((
+                super::element::StoryKey::Note(kind, id),
+                PartValue::Note(kind, ordinal_u32(ordinal)),
+            ))
+        },
+    }
+}
+
+fn ordinal_u32(index: usize) -> u32 {
+    u32::try_from(index).unwrap_or(u32::MAX)
+}
+
+/// The block index of a header, footer or note story (record 0325): its
+/// paragraphs and tables are addressed as `/header[N]/p[M]`, ...; `None` for
+/// other part values.
+pub(super) fn story_blocks(docx: &Docx, value: PartValue) -> Result<Option<litchi_docx::Blocks>> {
+    let blocks = match value {
+        PartValue::Story(index) => {
+            let story = stories(docx)?
+                .get(index as usize)
+                .ok_or_else(|| internal("a DOCX story index is outside the story list"))?;
+            if let Some(blocks) = story.blocks.get() {
+                docx.owner().check_source()?;
+                return Ok(Some(blocks.clone()));
+            }
+            let xml = story_xml(docx, index as usize)?;
+            let blocks =
+                litchi_docx::header_footer::Story::from_shared_bytes(xml, StoryKind::Primary)
+                    .and_then(|story| story.blocks())
+                    .map_err(Error::from)?;
+            story.blocks.get_or_init(|| blocks).clone()
+        },
+        PartValue::Note(kind, index) => notes(docx, kind)?
+            .get(index as usize)
+            .ok_or_else(|| internal("a DOCX note index is outside the note list"))?
+            .blocks()
+            .map_err(Error::from)?,
+        _ => return Ok(None),
+    };
+    docx.owner().check_source()?;
+    Ok(Some(blocks))
 }
 
 // ---------------------------------------------------------------------------
@@ -855,6 +935,9 @@ pub(crate) enum PartSetter {
     AbstractNum(AbstractKey),
     /// An instance value.
     Num(NumKey),
+    /// A `level<N>.*` key of a new definition (OfficeCLI's "Mode A",
+    /// record 0325): the value of level `level` (0–8).
+    LevelSeed { level: u8, key: SeedKey },
     /// A story's or note's text.
     Text,
     /// A story's section kind.
@@ -913,6 +996,20 @@ pub(crate) enum NumKey {
     /// `startOverride.N`, or `start` for level 0.
     StartOverride(u8),
     Continue,
+    /// A key of the definition a new instance creates without an
+    /// `abstractNumId` (OfficeCLI's "Mode A", record 0325).
+    Template(AbstractKey),
+}
+
+/// What a `level<N>.*` key sets on its level (record 0325).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SeedKey {
+    /// A level value (`format`, `text`, `start`, `indent`, `hanging`,
+    /// `justification`, `suff`).
+    Level(LevelKey),
+    /// A run property of the level's marker (`font`, `size`, `color`,
+    /// `bold`, `italic`).
+    Run(super::setters::Setter),
 }
 
 /// A style's `type`: `ST_StyleType`.
@@ -1052,6 +1149,81 @@ const fn run(
 
 use super::setters::Setter as S;
 
+/// A `level<N>.*` level value of a new definition: add only.
+const fn seed(
+    name: &'static str,
+    level: u8,
+    key: LevelKey,
+    ty: ValueType,
+    constraint: Constraint,
+) -> Entry<PartSetter> {
+    add_only(
+        name,
+        ty,
+        PartSetter::LevelSeed {
+            level,
+            key: SeedKey::Level(key),
+        },
+        constraint,
+    )
+}
+
+/// A `level<N>.*` marker run property of a new definition: add only.
+const fn seed_run(
+    name: &'static str,
+    level: u8,
+    from: &'static str,
+    setter: S,
+) -> Entry<PartSetter> {
+    let spec = RUN_PROPS[index_of(RUN_PROPS, from)];
+    let mut spec = PropSpec::new(name, spec.ty);
+    spec.access.get = false;
+    Entry {
+        spec,
+        access: Access::Add(PartSetter::LevelSeed {
+            level,
+            key: SeedKey::Run(setter),
+        }),
+        constraint: RUN_PROPS[index_of(RUN_PROPS, from)].admission.constraint,
+        clear: false,
+    }
+}
+
+/// A numbering table whose entries are followed by OfficeCLI's
+/// `level<N>.*` keys for levels 0–8 (record 0325).
+macro_rules! seeded_registry {
+    ($vis:vis $name:ident, $table:ident { $($entry:expr),* $(,)? }) => {
+        seeded_registry!(@build $vis $name, $table [$($entry),*] [0 1 2 3 4 5 6 7 8]);
+    };
+    (@build $vis:vis $name:ident, $table:ident [$($entry:expr),*] [$($n:literal)*]) => {
+        $vis const $table: crate::registry::Table<
+            PartSetter,
+            { [$(stringify!($entry)),*].len() + 12 * [$(stringify!($n)),*].len() },
+            0,
+        > = crate::registry::Table::new(
+            [
+                $($entry,)*
+                $(
+                    seed(concat!("level", $n, ".format"), $n, LevelKey::Format, ValueType::Text, Constraint::NotEmpty),
+                    seed(concat!("level", $n, ".text"), $n, LevelKey::Text, ValueType::Text, Constraint::None),
+                    seed(concat!("level", $n, ".start"), $n, LevelKey::Start, ValueType::Int, Constraint::Int { min: 0, max: 32_767 }),
+                    seed(concat!("level", $n, ".indent"), $n, LevelKey::Indent, ValueType::Int, Constraint::Int { min: -31_680, max: 31_680 }),
+                    seed(concat!("level", $n, ".hanging"), $n, LevelKey::Hanging, ValueType::Int, Constraint::Int { min: 0, max: 31_680 }),
+                    seed(concat!("level", $n, ".justification"), $n, LevelKey::Justification, ValueType::Token(&LEVEL_JUSTIFICATION), Constraint::None),
+                    seed(concat!("level", $n, ".suff"), $n, LevelKey::Suffix, ValueType::Token(&LEVEL_SUFFIX), Constraint::None),
+                    seed_run(concat!("level", $n, ".font"), $n, "font.latin", S::RunFontLatin),
+                    seed_run(concat!("level", $n, ".size"), $n, "size", S::RunSize),
+                    seed_run(concat!("level", $n, ".color"), $n, "color", S::RunColor),
+                    seed_run(concat!("level", $n, ".bold"), $n, "bold", S::RunBold),
+                    seed_run(concat!("level", $n, ".italic"), $n, "italic", S::RunItalic),
+                )*
+            ],
+            [],
+        );
+        $vis const $name: &[crate::node::spec::PropSpec] = &$table.readable();
+    };
+}
+
 // The style node, in `WordHandler.Query` `/styles/<id>` order: identity
 // and UI flags, then the run properties, then the paragraph properties.
 crate::registry::registry! {
@@ -1147,9 +1319,10 @@ crate::registry::registry! {
 }
 
 // `/numbering/abstractNum[@id=N]`, in its order; the level-0 seeds are
-// add-only, as OfficeCLI's bare `format`, `text`, `start` and `indent`.
-crate::registry::registry! {
-    pub(crate) ABSTRACT_NUM_PROPS, ABSTRACT_NUM_REGISTRY: PartSetter {
+// add-only, as OfficeCLI's bare `format`, `text`, `start` and `indent`, and
+// so are its `level<N>.*` keys (record 0325).
+seeded_registry! {
+    pub(crate) ABSTRACT_NUM_PROPS, ABSTRACT_NUM_REGISTRY {
     ra("id", ValueType::Int, PartSetter::AbstractNum(AbstractKey::Id), Constraint::Int { min: 0, max: i32::MAX as i64 }),
     rsa("type", ValueType::Token(&MULTI_LEVEL_TYPE), PartSetter::AbstractNum(AbstractKey::Type), Constraint::None),
     rsa("name", ValueType::Text, PartSetter::AbstractNum(AbstractKey::Name), Constraint::NotEmpty),
@@ -1162,9 +1335,11 @@ crate::registry::registry! {
     }
 }
 
-// `/numbering/num[@id=N]`.
-crate::registry::registry! {
-    pub(crate) NUM_PROPS, NUM_REGISTRY: PartSetter {
+// `/numbering/num[@id=N]`. Without an `abstractNumId`, the definition keys
+// and `level<N>.*` create the definition too (OfficeCLI's "Mode A", record
+// 0325).
+seeded_registry! {
+    pub(crate) NUM_PROPS, NUM_REGISTRY {
     ra("id", ValueType::Int, PartSetter::Num(NumKey::Id), Constraint::Int { min: 1, max: i32::MAX as i64 }),
     rsa("abstractNumId", ValueType::Int, PartSetter::Num(NumKey::AbstractNumId), Constraint::Int { min: 0, max: i32::MAX as i64 }),
     ra("startOverride.0", ValueType::Int, PartSetter::Num(NumKey::StartOverride(0)), Constraint::Int { min: 0, max: 32_767 }),
@@ -1178,6 +1353,13 @@ crate::registry::registry! {
     ra("startOverride.8", ValueType::Int, PartSetter::Num(NumKey::StartOverride(8)), Constraint::Int { min: 0, max: 32_767 }),
     add_only("start", ValueType::Int, PartSetter::Num(NumKey::StartOverride(0)), Constraint::Int { min: 0, max: 32_767 }),
     add_only("continue", ValueType::Bool, PartSetter::Num(NumKey::Continue), Constraint::None),
+    add_only("type", ValueType::Token(&MULTI_LEVEL_TYPE), PartSetter::Num(NumKey::Template(AbstractKey::Type)), Constraint::None),
+    add_only("name", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::Name)), Constraint::NotEmpty),
+    add_only("styleLink", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::StyleLink)), Constraint::NotEmpty),
+    add_only("numStyleLink", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::NumStyleLink)), Constraint::NotEmpty),
+    add_only("format", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::Seed(LevelKey::Format))), Constraint::NotEmpty),
+    add_only("text", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::Seed(LevelKey::Text))), Constraint::None),
+    add_only("indent", ValueType::Int, PartSetter::Num(NumKey::Template(AbstractKey::Seed(LevelKey::Indent))), Constraint::Int { min: -31_680, max: 31_680 }),
     }
 }
 
@@ -1423,7 +1605,9 @@ fn int_text(text: Option<&str>) -> Option<NodeValue<'static>> {
 /// time so a `format` read does no name lookup.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum From {
-    Own,
+    /// The node's own key, by its position in the kind's own-key list
+    /// (record 0326: a read matches the position, not the name).
+    Own(u8),
     /// A run key; `font` falls back to the ASCII slot.
     Run(usize),
     Font,
@@ -1456,6 +1640,25 @@ const fn find(props: &[PropSpec], name: &str) -> Option<usize> {
     None
 }
 
+/// The run table's `font.latin`, which a part's `font` reads first.
+const FONT_LATIN: usize = match find(RUN_PROPS, "font.latin") {
+    Some(at) => at,
+    None => panic!("font.latin is a run key"),
+};
+
+/// The position of `name` in an own-key list, checked at compile time.
+const fn own_at(names: &[&str], name: &str) -> u8 {
+    let mut index = 0;
+    while index < names.len() {
+        if same(names[index], name) {
+            #[allow(clippy::cast_possible_truncation, reason = "own-key lists are short")]
+            return index as u8;
+        }
+        index += 1;
+    }
+    panic!("not an own key")
+}
+
 const fn listed(names: &[&str], name: &str) -> bool {
     let mut index = 0;
     while index < names.len() {
@@ -1472,23 +1675,23 @@ const fn listed(names: &[&str], name: &str) -> bool {
 /// paragraph table (`leftIndent` is `indent`; `direction` and `align` are
 /// paragraph keys).
 const fn sources<const N: usize>(table: &[PropSpec], own: &[&str]) -> [From; N] {
-    let mut sources = [From::Own; N];
+    let mut sources = [From::Own(u8::MAX); N];
     let mut index = 0;
     while index < N {
         let name = table[index].name;
         sources[index] = if listed(own, name) {
-            From::Own
+            From::Own(own_at(own, name))
         } else if same(name, "font") {
             From::Font
         } else if same(name, "direction") || same(name, "align") {
             match find(PARAGRAPH_PROPS, name) {
                 Some(at) => From::Paragraph(at),
-                None => From::Own,
+                None => From::Own(u8::MAX),
             }
         } else if same(name, "leftIndent") {
             match find(PARAGRAPH_PROPS, "indent") {
                 Some(at) => From::Paragraph(at),
-                None => From::Own,
+                None => From::Own(u8::MAX),
             }
         } else {
             let run_name = if same(name, "smallCaps") {
@@ -1500,7 +1703,7 @@ const fn sources<const N: usize>(table: &[PropSpec], own: &[&str]) -> [From; N] 
                 Some(at) => From::Run(at),
                 None => match find(PARAGRAPH_PROPS, name) {
                     Some(at) => From::Paragraph(at),
-                    None => From::Own,
+                    None => From::Own(u8::MAX),
                 },
             }
         };
@@ -1509,42 +1712,38 @@ const fn sources<const N: usize>(table: &[PropSpec], own: &[&str]) -> [From; N] 
     sources
 }
 
-const STYLE_SOURCES: [From; STYLE_PROPS.len()] = sources(
-    STYLE_PROPS,
-    &[
-        "id",
-        "name",
-        "type",
-        "default",
-        "basedOn",
-        "basedOn.path",
-        "next",
-        "linked",
-        "autoRedefine",
-        "hidden",
-        "qFormat",
-        "uiPriority",
-        "semiHidden",
-        "unhideWhenUsed",
-        "locked",
-        "customStyle",
-    ],
-);
-const LEVEL_SOURCES: [From; LEVEL_PROPS.len()] = sources(
-    LEVEL_PROPS,
-    &[
-        "ilvl",
-        "start",
-        "format",
-        "lvlText",
-        "justification",
-        "suff",
-        "lvlRestart",
-        "isLgl",
-        "indent",
-        "hanging",
-    ],
-);
+const STYLE_OWN: &[&str] = &[
+    "id",
+    "name",
+    "type",
+    "default",
+    "basedOn",
+    "basedOn.path",
+    "next",
+    "linked",
+    "autoRedefine",
+    "hidden",
+    "qFormat",
+    "uiPriority",
+    "semiHidden",
+    "unhideWhenUsed",
+    "locked",
+    "customStyle",
+];
+const STYLE_SOURCES: [From; STYLE_PROPS.len()] = sources(STYLE_PROPS, STYLE_OWN);
+const LEVEL_OWN: &[&str] = &[
+    "ilvl",
+    "start",
+    "format",
+    "lvlText",
+    "justification",
+    "suff",
+    "lvlRestart",
+    "isLgl",
+    "indent",
+    "hanging",
+];
+const LEVEL_SOURCES: [From; LEVEL_PROPS.len()] = sources(LEVEL_PROPS, LEVEL_OWN);
 const STORY_SOURCES: [From; STORY_PROPS.len()] = sources(STORY_PROPS, &["type", "text", "field"]);
 const NOTE_SOURCES: [From; NOTE_PROPS.len()] = sources(NOTE_PROPS, &["id", "text"]);
 
@@ -1555,13 +1754,12 @@ fn sourced<'a>(
     run: Option<&direct::Run>,
 ) -> Option<NodeValue<'a>> {
     match from {
-        From::Own => None,
+        From::Own(_) => None,
         From::Run(at) => super::props::run(run?, at),
         From::Paragraph(at) => super::props::paragraph_value(paragraph?, None, at),
         From::Font => {
             let run = run?;
-            let latin = find(RUN_PROPS, "font.latin")?;
-            super::props::run(run, latin).or_else(|| {
+            super::props::run(run, FONT_LATIN).or_else(|| {
                 // The ASCII slot when the ASCII and high-ANSI slots differ.
                 let fonts = run.fonts.as_ref()?;
                 fonts
@@ -1607,7 +1805,7 @@ impl<'a> PartProps<'a> {
                 run,
             } => story_value(*kind, text, paragraph.as_deref(), run.as_deref(), index),
             Self::Note { id, text, run } => match NOTE_SOURCES.get(index)? {
-                From::Own => match NOTE_PROPS.get(index)?.name {
+                From::Own(_) => match NOTE_PROPS.get(index)?.name {
                     "id" => Some(NodeValue::Int(i64::from(*id))),
                     "text" => Some(text_value(text)),
                     _ => None,
@@ -1625,34 +1823,48 @@ fn style_value<'a>(
     run: &direct::Run,
     index: usize,
 ) -> Option<NodeValue<'a>> {
-    let from = *STYLE_SOURCES.get(index)?;
-    if from != From::Own {
-        return sourced(from, Some(paragraph), Some(run));
-    }
+    let From::Own(own) = *STYLE_SOURCES.get(index)? else {
+        return sourced(*STYLE_SOURCES.get(index)?, Some(paragraph), Some(run));
+    };
     let catalog = docx.parts().styles.get()?.as_ref()?;
     let entry = catalog.entries().get(style)?;
-    let spec = STYLE_PROPS.get(index)?;
     let flag = |flag: Flag| entry.flag(flag).map(NodeValue::Bool);
-    match spec.name {
-        "id" => Some(text_value(entry.id())),
-        "name" => entry.name().map(text_value),
-        "type" => entry.kind().map(|kind| NodeValue::Token(kind.to_xml())),
-        "default" => entry.is_default().then_some(NodeValue::Bool(true)),
-        "basedOn" => entry.based_on().map(text_value),
-        "basedOn.path" => entry
+    const ID: u8 = own_at(STYLE_OWN, "id");
+    const NAME: u8 = own_at(STYLE_OWN, "name");
+    const TYPE: u8 = own_at(STYLE_OWN, "type");
+    const DEFAULT: u8 = own_at(STYLE_OWN, "default");
+    const BASED_ON: u8 = own_at(STYLE_OWN, "basedOn");
+    const BASED_ON_PATH: u8 = own_at(STYLE_OWN, "basedOn.path");
+    const NEXT: u8 = own_at(STYLE_OWN, "next");
+    const LINKED: u8 = own_at(STYLE_OWN, "linked");
+    const AUTO_REDEFINE: u8 = own_at(STYLE_OWN, "autoRedefine");
+    const HIDDEN: u8 = own_at(STYLE_OWN, "hidden");
+    const Q_FORMAT: u8 = own_at(STYLE_OWN, "qFormat");
+    const UI_PRIORITY: u8 = own_at(STYLE_OWN, "uiPriority");
+    const SEMI_HIDDEN: u8 = own_at(STYLE_OWN, "semiHidden");
+    const UNHIDE_WHEN_USED: u8 = own_at(STYLE_OWN, "unhideWhenUsed");
+    const LOCKED: u8 = own_at(STYLE_OWN, "locked");
+    const CUSTOM_STYLE: u8 = own_at(STYLE_OWN, "customStyle");
+    match own {
+        ID => Some(text_value(entry.id())),
+        NAME => entry.name().map(text_value),
+        TYPE => entry.kind().map(|kind| NodeValue::Token(kind.to_xml())),
+        DEFAULT => entry.is_default().then_some(NodeValue::Bool(true)),
+        BASED_ON => entry.based_on().map(text_value),
+        BASED_ON_PATH => entry
             .based_on()
             .map(|parent| NodeValue::Text(Cow::Owned(format!("/styles/{parent}")))),
-        "next" => entry.next().map(text_value),
-        "linked" => entry.link().map(text_value),
-        "autoRedefine" => flag(Flag::AutoRedefine),
-        "hidden" => flag(Flag::Hidden),
-        "qFormat" => flag(Flag::QuickFormat),
-        "uiPriority" => entry.ui_priority().map(NodeValue::Int),
-        "semiHidden" => flag(Flag::SemiHidden),
-        "unhideWhenUsed" => flag(Flag::UnhideWhenUsed),
-        "locked" => flag(Flag::Locked),
+        NEXT => entry.next().map(text_value),
+        LINKED => entry.link().map(text_value),
+        AUTO_REDEFINE => flag(Flag::AutoRedefine),
+        HIDDEN => flag(Flag::Hidden),
+        Q_FORMAT => flag(Flag::QuickFormat),
+        UI_PRIORITY => entry.ui_priority().map(NodeValue::Int),
+        SEMI_HIDDEN => flag(Flag::SemiHidden),
+        UNHIDE_WHEN_USED => flag(Flag::UnhideWhenUsed),
+        LOCKED => flag(Flag::Locked),
         // OfficeCLI always emits `customStyle`.
-        "customStyle" => Some(NodeValue::Bool(entry.custom().unwrap_or(false))),
+        CUSTOM_STYLE => Some(NodeValue::Bool(entry.custom().unwrap_or(false))),
         _ => None,
     }
 }
@@ -1703,24 +1915,37 @@ fn level_value<'a>(
     let catalog = docx.parts().numbering.get()?.as_ref()?;
     let level = catalog.abstract_nums().get(definition)?.levels().get(at)?;
     let indentation = paragraph.indentation.as_ref();
-    match LEVEL_PROPS.get(index)?.name {
-        "ilvl" => Some(NodeValue::Int(i64::from(level.ilvl()))),
-        "start" => int_text(level.start()),
-        "format" => level.format().map(text_value),
-        "lvlText" => level.text().map(text_value),
-        "justification" => level
+    let From::Own(own) = *LEVEL_SOURCES.get(index)? else {
+        return sourced(*LEVEL_SOURCES.get(index)?, None, Some(run));
+    };
+    const ILVL: u8 = own_at(LEVEL_OWN, "ilvl");
+    const START: u8 = own_at(LEVEL_OWN, "start");
+    const FORMAT: u8 = own_at(LEVEL_OWN, "format");
+    const LVL_TEXT: u8 = own_at(LEVEL_OWN, "lvlText");
+    const JUSTIFICATION: u8 = own_at(LEVEL_OWN, "justification");
+    const SUFF: u8 = own_at(LEVEL_OWN, "suff");
+    const LVL_RESTART: u8 = own_at(LEVEL_OWN, "lvlRestart");
+    const IS_LGL: u8 = own_at(LEVEL_OWN, "isLgl");
+    const INDENT: u8 = own_at(LEVEL_OWN, "indent");
+    const HANGING: u8 = own_at(LEVEL_OWN, "hanging");
+    match own {
+        ILVL => Some(NodeValue::Int(i64::from(level.ilvl()))),
+        START => int_text(level.start()),
+        FORMAT => level.format().map(text_value),
+        LVL_TEXT => level.text().map(text_value),
+        JUSTIFICATION => level
             .justification()
             .and_then(|value| LEVEL_JUSTIFICATION.get(value))
             .map(NodeValue::Token),
-        "suff" => level
+        SUFF => level
             .suffix()
             .and_then(|value| LEVEL_SUFFIX.get(value))
             .map(NodeValue::Token),
-        "lvlRestart" => int_text(level.restart()),
-        "isLgl" => level.legal().filter(|legal| *legal).map(NodeValue::Bool),
-        "indent" => indentation?.leading().map(|value| NodeValue::Int(value.0)),
-        "hanging" => indentation?.hanging.map(|value| NodeValue::Int(value.0)),
-        _ => sourced(*LEVEL_SOURCES.get(index)?, None, Some(run)),
+        LVL_RESTART => int_text(level.restart()),
+        IS_LGL => level.legal().filter(|legal| *legal).map(NodeValue::Bool),
+        INDENT => indentation?.leading().map(|value| NodeValue::Int(value.0)),
+        HANGING => indentation?.hanging.map(|value| NodeValue::Int(value.0)),
+        _ => None,
     }
 }
 

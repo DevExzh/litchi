@@ -16,7 +16,8 @@
   "[0306] Parsers added for 0298 (keynote_bench summary), 0301 (numbers structure bench) and 0302 (after legs of its docx, odt, pages, numbers and rtf harnesses; the base legs re-measure states earlier records carry). 0303–0305 are listed as 'not on this tree' until their records merge; rerun the tool after those merges.",
   "[0306] Parsers added for 0303 (pptx_gaps_bench: unified/native in the after build, after/before on the plain paths the base accepts), 0304 (text_set_bench: each after run against the median of the before runs, and ODT unified/leaf) and 0306 (iwork_directory_bench). 0305 is listed as 'not on this tree' until it merges.",
   "[0310] Record 0310 re-measured every open miss's harness on trunk 0f3d8158cb (results/0310/trunk/) and the routes it changes in B A A B order (results/0310/abba/, after legs parsed). Its §2 groups the open misses by root cause (G1–G12); every open miss cites that grouping. Rows it cannot re-measure (before/after builds of 0263 and 0290) carry its note in their explanation.",
-  "[0310] Parsers added for 0305 (after legs of its keynote, numbers, docx, rtf — with its route G, the fan-out passing &Query — pages and docx_large harnesses) and 0309 (its element-write scenarios, against its stated 5 % or 20 µs bar). Records with no paired measurement: 0308 ('performance_claim: none; §7 shows the touched paths'). Record 0310 also added the 0311 (docx_large_bench with its committed-handle legs, the office_gaps_bench DOC scenarios) and 0312 (its keynote, pages and numbers runs) parsers after merging them."
+  "[0310] Parsers added for 0305 (after legs of its keynote, numbers, docx, rtf — with its route G, the fan-out passing &Query — pages and docx_large harnesses) and 0309 (its element-write scenarios, against its stated 5 % or 20 µs bar). Records with no paired measurement: 0308 ('performance_claim: none; §7 shows the touched paths'). Record 0310 also added the 0311 (docx_large_bench with its committed-handle legs, the office_gaps_bench DOC scenarios) and 0312 (its keynote, pages and numbers runs) parsers after merging them.",
+  "[0326] Parser added for 0326 (after legs of its B A A B run: PPTX query routes, record 0314's iWork batch legs including the _parsed and _owned routes, the RTF single-target routes, and the element reads it re-measures). Curated rows added for the read misses of records 0319, 0320, 0321 and 0322 that 0326 re-measures, so they are superseded there; the read misses of records 0323 and 0324 are not curated (0326 does not re-measure them)."
  ],
  "rows": [
   {
@@ -2079,6 +2080,111 @@
    "budget_kind": "batch",
    "series": "iwork:pages:batch_1000",
    "cite": "0299-pages-parity.md §8 table: '**batch 1 000** | 2.22–2.23 ms | 3.96–3.97 ms | **1.784 / 1.781 / 1.789**'"
+  },
+  {
+   "stage": "",
+   "stage_rank": 1,
+   "comparison": "unified/leaf",
+   "unit": "µs",
+   "size": "",
+   "record": "0319",
+   "format": "docx",
+   "operation": "get",
+   "scenario": "style get + format (/styles/Heading1)",
+   "ratio": 1.228,
+   "ratio_min": 1.211,
+   "leaf": 4.75,
+   "unified": 5.8,
+   "budget_value": 1.1,
+   "budget": "1.10 (point read; records 0319-0322 counted a read above 10 % as a miss)",
+   "budget_kind": "read",
+   "series": "docx_parts:style_get_format",
+   "cite": "0319-docx-p0-p1-elements.md §6 table: '`style_get_format` (read) | 4.7–4.8 | 5.8 | **1.211–1.228**'",
+   "explanation": "Record 0319 §6: the unified leg resolves the path and projects every key (a style has ~40) into NodeValues; 1.1 µs a call. Follow-up 6."
+  },
+  {
+   "stage": "",
+   "stage_rank": 1,
+   "comparison": "unified/leaf",
+   "unit": "µs",
+   "size": "",
+   "record": "0319",
+   "format": "docx",
+   "operation": "get",
+   "scenario": "list paragraph get + format (/body/p[3])",
+   "ratio": 1.138,
+   "ratio_min": 1.114,
+   "leaf": 2.0,
+   "unified": 2.25,
+   "budget_value": 1.1,
+   "budget": "1.10 (point read; records 0319-0322 counted a read above 10 % as a miss)",
+   "budget_kind": "read",
+   "series": "docx_parts:paragraph_list_format",
+   "cite": "0319-docx-p0-p1-elements.md §6 table: '`paragraph_list_format` (read) | 2.0 | 2.2–2.3 | **1.114–1.138**'",
+   "explanation": "Record 0319 §6: a list paragraph adds styleName, numFmt, listStyle and start, each a catalog lookup; 0.25 µs a call. Follow-up 6."
+  },
+  {
+   "stage": "",
+   "stage_rank": 1,
+   "comparison": "unified/leaf",
+   "unit": "µs",
+   "size": "",
+   "record": "0320",
+   "format": "xlsx",
+   "operation": "get",
+   "scenario": "note get + first format entry (comment[20] of 40)",
+   "ratio": 1.109,
+   "ratio_min": 1.097,
+   "leaf": 38.4,
+   "unified": 42.6,
+   "budget_value": 1.1,
+   "budget": "1.10 (point read; records 0319-0322 counted a read above 10 % as a miss)",
+   "budget_kind": "read",
+   "series": "xlsx_features:comment_get",
+   "cite": "0320-xlsx-worksheet-features.md §6 table: '`comment_get` (comment[20]) | 38.4 | 42.6 | 1.097, 1.109, 1.104'",
+   "explanation": "Record 0320 §6: the adapter numbers notes row-major, which sorts and clones the 40 notes (+4 µs)."
+  },
+  {
+   "stage": "",
+   "stage_rank": 1,
+   "comparison": "unified/leaf",
+   "unit": "µs",
+   "size": "",
+   "record": "0322",
+   "format": "xlsb",
+   "operation": "get",
+   "scenario": "note get + first format entry (comment[20] of 40)",
+   "ratio": 1.216,
+   "ratio_min": 1.206,
+   "leaf": 5.9,
+   "unified": 7.2,
+   "budget_value": 1.1,
+   "budget": "1.10 (point read; records 0319-0322 counted a read above 10 % as a miss)",
+   "budget_kind": "read",
+   "series": "xlsb_features:comment_get",
+   "cite": "0322-xlsb-worksheet-features.md §5 table: '`comment_get` | 5.9 | 7.2 | 1.207, 1.206, 1.216'",
+   "explanation": "Record 0322 §5: the adapter numbers notes row-major and builds the node's label (+1.3 µs)."
+  },
+  {
+   "stage": "",
+   "stage_rank": 1,
+   "comparison": "unified/leaf",
+   "unit": "µs",
+   "size": "",
+   "record": "0321",
+   "format": "pptx",
+   "operation": "get",
+   "scenario": "equation get + format (/slide[1]/shape[1]/equation[1])",
+   "ratio": 1.304,
+   "ratio_min": 1.295,
+   "leaf": 47.3,
+   "unified": 61.5,
+   "budget_value": 1.1,
+   "budget": "1.10 (point read; records 0319-0322 counted a read above 10 % as a miss)",
+   "budget_kind": "read",
+   "series": "pptx_elements:pptx_equation_get_v1",
+   "cite": "0321-pptx-element-gaps.md §5 table: '`pptx_equation_get_v1` | 1 | 47.8 / 46.8 µs | 62.4 / 60.6 µs | 1.304 / 1.295'",
+   "explanation": "Record 0321 §5: the unified path also resolves /slide[1]/shape[1] (the slide's scene) and matches the shape's ID (~14 µs). Follow-up 0321-F6."
   }
  ],
  "annotations": [
@@ -2467,6 +2573,26 @@
    "record": "0315",
    "series": "rtf_tiny:.*",
    "explanation": "Record 0315 §3.4 G9: the new typed-props routes pass lengths as typed Length values and read slower (layout path 1.17–1.18 vs 1.12; paragraph layout 1.29–1.30 vs 1.23), because PropValue::coerce renders a typed Length to text and parses it again (props.rs, not owned here). Follow-up: a typed Length coercion path in props/value that keeps each context's validation. Text routes unchanged within noise (no RTF code changed)."
+  },
+  {
+   "record": "0326",
+   "series": "query:pptx_.*_all_shape.*",
+   "explanation": "Record 0326 §2: the record 0321 slowdown is fixed (boxed column, hyperlink and equation items, one lazy frame-part cell; the PPTX node 176 -> 144 bytes); pptx_large_bytes_all_shape 1,676-1,709 µs against 1,910-2,404 on trunk and 1,636-1,806 at record 0315's base. The remaining ratios are the borrowed leaf comparison and, against the fair leaves (owned 2.10-2.14, file fenced 1.21-1.32), the owned node and the per-match source check kept by owner decision (records 0280 G1-G2, 0315 §6)."
+  },
+  {
+   "record": "0326",
+   "series": "rtf_tiny:.*",
+   "explanation": "Record 0326 §4: typed lengths are coerced without their text, so the typed routes now read as the text routes (paragraph layout typed 1.219-1.224 against 1.221-1.236; layout path typed 1.118-1.124 against 1.121-1.125). The remaining cost of the RTF single sets is the RTF adapter's (records 0310, 0315), not coercion; no RTF code changed."
+  },
+  {
+   "record": "0326",
+   "series": "docx_parts:.*",
+   "explanation": "Record 0326 §5.4: own keys are matched by position, which did not move the reads; the unified leg adds ~3 K instructions of path and ~12 K of format iteration (72 entries, owned strings for present text keys) to the leaf's ~97 K. Follow-up: a borrowed property set cached on the node and a presence mask for sourced keys."
+  },
+  {
+   "record": "0326",
+   "series": "xlsb_features:comment_get",
+   "explanation": "Record 0326 §5.3: one note is labelled instead of all (1.21-1.22 -> 1.14-1.16); the remaining 0.8 µs is path resolution and the node."
   }
  ]
 }

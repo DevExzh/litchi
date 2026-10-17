@@ -47,6 +47,8 @@ impl Pptx {
         let mut geometry = [None; 4];
         // Run and paragraph formatting of the new body (`size`, `bold`, ...).
         let mut format = TextValues::default();
+        // The click action (record 0325), written in the same native edit.
+        let mut click = super::links::ClickInput::default();
         for (key, value) in node.props().iter() {
             let (_, entry) = SHAPE_WRITE_TABLE
                 .resolve(key.as_str())
@@ -89,14 +91,15 @@ impl Pptx {
                         }
                         format.stage(setter, scalar, limits)?;
                     },
+                    ShapeSetter::Click(key) => click.stage(key, scalar, limits)?,
                     setter => {
                         let (index, name) = match setter {
                             ShapeSetter::X => (0, "x"),
                             ShapeSetter::Y => (1, "y"),
                             ShapeSetter::Width => (2, "width"),
                             ShapeSetter::Height => (3, "height"),
-                            ShapeSetter::Text | ShapeSetter::Format(_) => {
-                                unreachable!("text and formatting are matched above")
+                            ShapeSetter::Text | ShapeSetter::Format(_) | ShapeSetter::Click(_) => {
+                                unreachable!("text, formatting and clicks are matched above")
                             },
                         };
                         if geometry[index].is_some() {
@@ -150,8 +153,10 @@ impl Pptx {
         )];
         let body: &[litchi_pptx::opened::TextEdit<'_>] =
             if format.is_empty() { &[] } else { &body };
+        let link = click.for_add(self.slides_in_catalog()?)?;
         let (target, proof, after) = match &source {
-            Editable::Source(package) => {
+            // A click action needs the eager editor's hyperlink verbs.
+            Editable::Source(package) if link.is_none() => {
                 let mut edit = package.edit()?;
                 // The source editor returns the native non-visual shape ID.
                 // The unified path is ordinal, so the detached scene above
@@ -165,12 +170,16 @@ impl Pptx {
                 let after = self.adopt_source(target.clone())?;
                 (Editable::Source(target), Proof::Source(patch), after)
             },
-            Editable::Eager(package) => {
+            Editable::Eager(_) | Editable::Source(_) => {
+                let package = super::smartart::eager(&source)?;
                 let mut edit = package.edit()?;
                 let _ =
                     edit.add_text_box(Position::new(slide), text.as_deref().unwrap_or(""), bounds)?;
                 if !body.is_empty() {
                     let _ = edit.set_text_properties(Position::new(slide), body)?;
+                }
+                if let Some(link) = &link {
+                    let _ = edit.set_shape_hyperlink(slide, scene_index.get(), Some(link))?;
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let target = Arc::new(target);
@@ -188,7 +197,7 @@ impl Pptx {
                 source,
                 target,
                 proof,
-                operations: 1 + usize::from(!body.is_empty()),
+                operations: 1 + usize::from(!body.is_empty()) + usize::from(link.is_some()),
             },
             path,
         ))

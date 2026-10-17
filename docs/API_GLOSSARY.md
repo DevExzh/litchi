@@ -2097,7 +2097,8 @@ the main story's paragraphs, simple and complex fields (instruction, cached
 result, nesting, lock and dirty state) and bookmarks, and rewrites field
 results without evaluating anything: `document::Edit::{fields,
 refresh_fields}` over the `document::fields` module (`Fields`, `Paragraph`,
-`Field`, `Bookmark`, `Update::{Text, Toc, Bookmark}`, `TocEntry`, `Outcome`).
+`Field`, `Bookmark`, `Update::{Text, Toc, Bookmark, Instruction, RenameBookmark,
+RemoveBookmark}` (the last three record 0325), `TocEntry`, `Outcome`).
 The XLSX worksheet edit stores a formula's cached result while keeping its
 formula markup (`WorksheetEdit::set_cached`). PPTX run-text edits accept a
 field run (`a:fld`) as their target, writing its cached result.
@@ -2545,7 +2546,7 @@ does.
 | `styles::catalog::{NewStyle, StyleChange}` | `with_*` builders; an inner `None` removes an element | ✅ 0319 |
 | `Edit::{style_catalog, add_style, set_style, remove_style}` | | ✅ 0319 |
 | `numbering::catalog::{Catalog, AbstractNum, Num, Lvl}` | `Catalog::{abstract_nums, nums, abstract_num, num, level_of, format_of, level_paragraph_properties, level_run_properties, next_abstract_num_id, next_num_id}`; `Lvl` is named after `w:lvl` (the typed `numbering::Level` stays the parsed model) | ✅ 0319 |
-| `numbering::catalog::{LevelChange, AbstractNumChange, NewNum, NewLevel, NewAbstractNum}` | | ✅ 0319 |
+| `numbering::catalog::{LevelChange, AbstractNumChange, NewNum, NewLevel, NewAbstractNum}` | `NewLevel::{start, paragraph}` read a template level back (0325) | ✅ 0319, 0325 |
 | `Edit::{numbering_catalog, set_level, set_abstract_num, set_num_definition, add_num, add_abstract_num, add_level, remove_num, remove_abstract_num, remove_level}` | | ✅ 0319 |
 | `header_footer::catalog::Entry` | role, relationship identifier and part name, in relationship order | ✅ 0319 |
 | `header_footer::Story::from_shared_bytes` | | ✅ 0319 |
@@ -2555,6 +2556,8 @@ does.
 | `Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml}` and `source_backed::Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml, footnotes, endnotes}` | both owners | ✅ 0319 |
 | `document::ElementStep::SectionProperties` | the body-final `w:sectPr`, position 0, first step only | ✅ 0319 |
 | `Edit::insert_break_at(paragraph, at, RunBreakType) -> Position` | a new run holding one `w:br`, before direct run `at` or appended; returns the new run's position (record 0319, P1 marks) | ✅ 0319 |
+| `Edit::{insert_bookmark_at(paragraph, at, name, text) -> i64, insert_field_at(paragraph, at, instruction, result) -> Position}` (snapshot and package edits); `document::fields::Update::{Instruction, RenameBookmark, RemoveBookmark}` | a bookmark around optional text (the identifier after the largest), a complex field with its cached result, before direct run `at` or appended; field instruction sets mark the field `w:dirty`; bookmark renames and marker-only removals, spliced through `refresh_fields` (record 0325) | ✅ 0325 |
+| `Edit::edit_story(StoryTarget, FnOnce(&mut snapshot::Edit) -> Result<T, E>)`, `document::StoryTarget::{Part, Note}` | runs the main document's element-path verbs on a header, footer or note story wrapped as a document body, and splices the result back into the part; an unchanged story stages nothing (record 0325) | ✅ 0325 |
 | `source_backed::Document::{bookmarks, text_boxes}` | the main story's bookmarks and text boxes, as the eager `Document` reads them | ✅ 0319 |
 
 ## XLSX worksheet feature families (record 0320)
@@ -2570,7 +2573,7 @@ staging returns the source package (an exact no-op keeps every byte).
 | `litchi_xlsx::conditional_formatting::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_conditional_formats, apply_conditional_formats}` | `Edit::{formats, set_formats, add_differential}`; `DifferentialStyle::{read, is_empty}`, `Underline` | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::data_validation::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_data_validations, apply_data_validations}` | `Edit::{validations, set_validations}` | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::auto_filter::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_auto_filter, apply_auto_filter}` | `Edit::{auto_filter, set_auto_filter}` | ✅ 0320; family registered in the gate |
-| `litchi_xlsx::workbook::comments::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_comments, apply_comments}` | `Edit::{comments, set, add, remove}` (`add` refuses an annotated cell and returns the row-major position); splices notes and their VML note shapes, keeping the other notes' bytes | ✅ 0320; family registered in the gate |
+| `litchi_xlsx::workbook::comments::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_comments, apply_comments}` | `Edit::{comments, set, add, remove, set_runs, add_runs}` (`add` refuses an annotated cell and returns the row-major position); splices notes and their VML note shapes, keeping the other notes' bytes; rich notes as `TextRun` with `RunFont` and `RunColor` (`Comment::runs` reads them, record 0325) | ✅ 0320, 0325; family registered in the gate |
 | `litchi_xlsx::drawing::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{drawing_elements, edit_drawings, apply_drawings}` | `Edit::{elements, add_picture, add_shape, set, remove}`; read model `Element`, `ElementKind`, `Placement`, `Marker`, `Image`, `Fill`, `Line`, `Font`, `Align`, `VerticalAlign`; specs `PictureSpec`, `ShapeSpec`, `Change` | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::Worksheet::comments`, `SourceWorksheet::{comments, page_breaks, drawing_elements}` | reads on both owners | ✅ 0320 |
 
@@ -2589,7 +2592,7 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 | `litchi_pptx::table::Table::grid_columns`; `opened::Edit::{set_table_column_width, insert_table_column, remove_table_column}` | adopted (0321) |
 | `litchi_pptx::hyperlinks::{Click, Link, Target}`; `Click::{of_shape, from_text, action, tooltip}` | adopted (0321) |
 | `litchi_pptx::slide::Slide::hyperlink`, `SourceSlide::hyperlink`, `source::Slide::hyperlink` | adopted (0321) |
-| `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted (0321); `set_shape_hyperlink` also writes a picture's or a group's `p:cNvPr` click; `hyperlinks::mentions_click` is the cheap no-click pre-check of `Click::of_shape` (0325) |
 | `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted (0321) |
 | `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
 
@@ -2615,6 +2618,7 @@ Positions are complete-catalog sheet positions.
 | `litchi_xlsb::conditional_formatting::edit::{…}`, `{Package, Workbook}::edit_conditional_formats`, `Package::apply_conditional_formats` | `Edit::{formats, add, set, remove, differential_formats, add_differential}`; `DifferentialStyle::{parse, encode}`, `Underline` | ✅ 0322; family registered in the gate |
 | `litchi_xlsb::comments::edit::{…}`, `{Package, Workbook}::edit_comments`, `Package::apply_comments` | `Edit::{comments, add, set, remove}` with VML note shapes | ✅ 0322; family registered in the gate |
 | `litchi_xlsb::drawing::edit::{…}`, `{Package, Workbook}::edit_drawings`, `Package::apply_drawings` | `Edit::{elements, add_picture, add_shape, set, remove}`; the XLSX drawing vocabulary with `Rgb = u32`; `ChartPart` (a frame's placement, name and chart markup) | ✅ 0322; family registered in the gate |
+| `litchi_spreadsheet_drawing::objects::{Color, Element, ElementKind, Placement, Marker, Image, Fill, Line, Font, Align, VerticalAlign, PictureSpec, ShapeSpec, Change, ChartFrame, Detached, LimitKind}`, `objects::{read, chart_frames, drawing_of, count, next_id, append, check_picture, picture_fragment, shape_fragment, change, detach}`; `litchi_spreadsheet_drawing::vml::{Shape, shapes, next_shape_id, note_shape, new_drawing}` | the format-neutral half of the XLSX and XLSB drawing editors and their VML note shapes; the model is generic over the format's `Color` (XLSX `Rgb`, XLSB `u32`), and each `drawing::edit` re-exports it (`Fill`, `Line`, `Font`, `Element`, `ShapeSpec` are aliases); outputs are byte-identical to the copies they replace | ✅ 0325 |
 | `litchi_xlsb::sheet::{Features, FeatureSet}`, `Workbook::{sheet_features, sheet_comments, drawing_elements, drawing_charts, differential_formats}`, `SourceBackedWorksheet::{features, comments, drawing_elements, drawing_charts}`, `SourceBackedWorkbook::differential_formats` | feature reads on both owners, without decoding cells; `FeatureSet` selects the kinds (only validations and formats render formulas) | ✅ 0322 |
 | `litchi_xlsx::{Worksheet, SourceWorksheet}::threaded_comments`, `litchi_xlsx::{Workbook, SourceBackedWorkbook}::people` | threaded-comment and people reads on both owners (record 0320 gap 3, reading only) | ✅ 0322 |
 

@@ -18,7 +18,7 @@ pub mod transaction;
 pub mod validation;
 
 pub use codec::{parse_comments, validate_comments, write_comments};
-pub use model::{Comment, Comments, Part};
+pub use model::{Comment, Comments, Part, RunColor, RunFont, TextRun};
 pub use package::{
     COMMENTS_CONTENT_TYPE, COMMENTS_RELATIONSHIP_TYPE, STRICT_COMMENTS_RELATIONSHIP_TYPE,
     load_from_worksheet, remove_from_worksheet, replace_on_worksheet, store_on_worksheet,

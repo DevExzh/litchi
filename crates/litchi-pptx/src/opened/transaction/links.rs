@@ -77,8 +77,9 @@ fn expand(tag: &[u8], element: &Element, content: &[u8]) -> Result<Vec<u8>> {
 impl Edit {
     /// Set (`Some`) or remove (`None`) the click action of a shape (`p:sp`)
     /// at a depth-first position of a slide: on its `p:cNvPr` and on every
-    /// text run of its text body. Returns whether the slide changed; an
-    /// equal action is an exact no-op.
+    /// text run of its text body. A picture (`p:pic`) or a group
+    /// (`p:grpSp`) carries it on its `p:cNvPr` only (record 0325). Returns
+    /// whether the slide changed; an equal action is an exact no-op.
     ///
     /// ```
     /// use litchi_core::Position;
@@ -97,7 +98,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing slide or shape, a shape that is not a
-    /// `p:sp`, a slide target past the last slide, text XML cannot carry,
+    /// `p:sp`, `p:pic` or `p:grpSp`, a slide target past the last slide, text XML cannot carry,
     /// or markup-compatibility content.
     pub fn set_shape_hyperlink<'s, 'k>(
         &mut self,
@@ -166,8 +167,16 @@ impl Edit {
             });
         }
         let shape = scene.shape(key)?;
-        if !matches!(shape, crate::shape::Shape::Auto(_)) {
-            return Err(invalid("hyperlinks are written on p:sp shapes"));
+        // A picture's and a group's click lives on its `p:cNvPr` alone: a
+        // picture has no text body, and a group's runs belong to its members.
+        match (shape, scope) {
+            (crate::shape::Shape::Auto(_), _)
+            | (crate::shape::Shape::Picture(_) | crate::shape::Shape::Group(_), Scope::Shape) => {},
+            _ => {
+                return Err(invalid(
+                    "hyperlinks are written on p:sp shapes, and on p:pic and p:grpSp non-visual properties",
+                ));
+            },
         }
         let span = shape.common().span()?.range(xml.len())?;
         let fragment = shape.common().self_contained_xml()?;

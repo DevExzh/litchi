@@ -139,6 +139,7 @@ impl<'p> PathArg<'p> {
     /// assert_eq!(error.code().as_str(), "invalid_path");
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
+    #[inline]
     pub fn parse(text: &'p str) -> Result<Self> {
         if text.len() > limits::MAX_INPUT_BYTES {
             Path::parse(text)?;
@@ -159,6 +160,7 @@ impl<'p> PathArg<'p> {
         ))
     }
 
+    #[inline]
     fn parsed(path: Path<'p>, origin: Origin<'p>) -> Self {
         Self {
             held: Held::Owned(path),

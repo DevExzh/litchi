@@ -321,6 +321,31 @@ class DocxVerbTests(WriteAssertions):
         self.assertError(error, L.PathError, "invalid_path")
 
 
+class OoxmlFollowUpTests(WriteAssertions):
+    def test_record_0325_follow_ups(self):
+        """Record 0325: story paragraphs, marks, level keys, links, note runs."""
+        doc = L.create("docx")
+        doc, _ = doc.add("/body", "paragraph", {"text": "Body"})
+        doc, _ = doc.add("/", "header", {"text": "Top"})
+        doc, second = doc.add("/header[1]", "paragraph", {"text": "Second"})
+        self.assertEqual(second, "/header[1]/p[2]")
+        doc = doc.set(second, {"align": "center"})
+        doc, mark = doc.add("/body/p[1]", "bookmark", {"name": "Mark", "text": "here"})
+        doc, _ = doc.add("/body/p[1]", "page", {})
+        doc, _ = doc.add("/numbering", "abstractNum", {"level0.format": "upperRoman"})
+        reopened = self.assertReopens(doc)
+        self.assertEqual(reopened.get(second, 0)["format"]["align"], "center")
+        self.assertEqual(reopened.get(mark, 0)["format"]["name"], "Mark")
+        self.assertEqual(reopened.get("/field[1]", 0)["format"]["instruction"], "PAGE")
+        deck = L.create("pptx")
+        deck, _ = deck.add("/", "slide", {"layout": "Blank"})
+        deck, shape = deck.add("/slide[1]", "shape", {"text": "Go", "width": "1in", "height": "1in", "link": "https://example.com/"})
+        self.assertEqual(self.assertReopens(deck).get(shape, 0)["format"]["link"], "https://example.com/")
+        book = L.create("xlsx")
+        book, note = book.add("/Sheet1", "comment", {"ref": "B2", "text": "Bold", "font.bold": True})
+        self.assertEqual(self.assertReopens(book).get(note, 0)["format"]["font.bold"], True)
+
+
 class XlsxVerbTests(WriteAssertions):
     def test_cells(self):
         file = L.create("xlsx")

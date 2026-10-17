@@ -97,23 +97,37 @@ fn source_or<T>(
     docx.owner().finish(result)
 }
 
-fn bookmarks(docx: &Docx) -> Result<Vec<Bookmark>> {
-    source_or(
+/// The main story's bookmarks, read once per handle.
+pub(super) fn bookmarks(docx: &Docx) -> Result<&[Bookmark]> {
+    let cache = &docx.parts().bookmarks;
+    if let Some(bookmarks) = cache.get() {
+        docx.owner().check_source()?;
+        return Ok(bookmarks);
+    }
+    let loaded = source_or(
         docx,
         |package| package.document()?.bookmarks(),
         |package| package.document()?.bookmarks(),
-    )
+    )?;
+    Ok(cache.get_or_init(|| loaded))
 }
 
-fn fields(docx: &Docx) -> Result<Vec<Field>> {
-    source_or(
+/// The main story's fields, read once per handle.
+pub(super) fn fields(docx: &Docx) -> Result<&[Field]> {
+    let cache = &docx.parts().fields;
+    if let Some(fields) = cache.get() {
+        docx.owner().check_source()?;
+        return Ok(fields);
+    }
+    let loaded = source_or(
         docx,
         |package| package.document()?.fields(),
         |package| package.document()?.fields(),
-    )
+    )?;
+    Ok(cache.get_or_init(|| loaded))
 }
 
-fn is_toc(field: &Field) -> bool {
+pub(super) fn is_toc(field: &Field) -> bool {
     field.field_type().eq_ignore_ascii_case("TOC")
 }
 
@@ -258,8 +272,8 @@ pub(super) fn child<'f>(
         },
         (Value::Document, Kind::Field | Kind::Toc) => {
             let toc = kind == Kind::Toc;
-            let all: Vec<Field> = fields(docx)?
-                .into_iter()
+            let all: Vec<&Field> = fields(docx)?
+                .iter()
                 .filter(|field| !toc || is_toc(field))
                 .collect();
             found(pick(all.len(), select).map(|index| {
@@ -409,10 +423,10 @@ impl Children {
             },
             Pending::Document { address, kinds } => {
                 if kinds.contains(Kind::Bookmark) {
-                    for (index, mark) in bookmarks(docx)?.into_iter().enumerate() {
+                    for (index, mark) in bookmarks(docx)?.iter().enumerate() {
                         nodes.push((
                             Kind::Bookmark,
-                            MarkValue::Bookmark(mark),
+                            MarkValue::Bookmark(mark.clone()),
                             address.with(Step::new(Kind::Bookmark, ordinal(index))),
                         ));
                     }
@@ -429,10 +443,10 @@ impl Children {
                         }
                     }
                     if kinds.contains(Kind::Toc) {
-                        for (index, field) in all.into_iter().filter(is_toc).enumerate() {
+                        for (index, field) in all.iter().filter(|field| is_toc(field)).enumerate() {
                             nodes.push((
                                 Kind::Toc,
-                                MarkValue::Toc(field),
+                                MarkValue::Toc(field.clone()),
                                 address.with(Step::new(Kind::Toc, ordinal(index))),
                             ));
                         }
@@ -485,6 +499,28 @@ pub(crate) enum MarkSetter {
     TabKind,
     TabLeader,
     BreakType,
+    /// A bookmark's name, and its text on add (record 0325).
+    BookmarkName,
+    BookmarkText,
+    /// A field's type on add, its instruction, its cached result text, and
+    /// the name and format a typed field's instruction takes (record 0325).
+    FieldType,
+    FieldInstruction,
+    FieldText,
+    FieldName,
+    FieldFormat,
+    /// A `REF`-family field's `\\h` switch and an `IF` field's expression
+    /// and texts (record 0325).
+    FieldHyperlink,
+    FieldExpression,
+    FieldTrueText,
+    FieldFalseText,
+    /// A table of contents' levels and switches, and its title on add
+    /// (record 0325).
+    TocLevels,
+    TocHyperlinks,
+    TocPageNumbers,
+    TocTitle,
 }
 
 /// A tab stop's `val` (`ST_TabJc`).
@@ -529,6 +565,28 @@ const fn read(name: &'static str, ty: ValueType) -> Entry<MarkSetter> {
     Entry::read(PropSpec::new(name, ty))
 }
 
+/// A key `get` reads and only `add` writes.
+const fn read_add(name: &'static str, ty: ValueType, setter: MarkSetter) -> Entry<MarkSetter> {
+    Entry {
+        spec: PropSpec::new(name, ty),
+        access: Access::Add(setter),
+        constraint: Constraint::None,
+        clear: false,
+    }
+}
+
+/// A key `set` and `add` write and `get` does not read.
+const fn write_only(name: &'static str, ty: ValueType, setter: MarkSetter) -> Entry<MarkSetter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    Entry {
+        spec,
+        access: Access::SetAndAdd(setter),
+        constraint: Constraint::None,
+        clear: false,
+    }
+}
+
 const fn add_only(name: &'static str, ty: ValueType, setter: MarkSetter) -> Entry<MarkSetter> {
     let mut spec = PropSpec::new(name, ty);
     spec.access.get = false;
@@ -558,30 +616,45 @@ crate::registry::registry! {
     }
 }
 
-// A bookmark: its name and native identifier.
+// A bookmark: its name and native identifier; `name` is renamed on set
+// and, with `text`, seeds a new one (record 0325).
 crate::registry::registry! {
     pub(crate) BOOKMARK_PROPS, BOOKMARK_REGISTRY: MarkSetter {
-    read("name", ValueType::Text),
+    rsa("name", ValueType::Text, MarkSetter::BookmarkName, Constraint::NotEmpty),
     read("id", ValueType::Text),
+    add_only("text", ValueType::Text, MarkSetter::BookmarkText),
     }
 }
 
-// A field: its type, instruction, lock and whether it has a result.
+// A field: its type, instruction, lock and whether it has a result. A new
+// field takes OfficeCLI's `fieldType` (with `name` and `format`) or a raw
+// `instruction`; `set` replaces the instruction or the result `text`
+// (record 0325).
 crate::registry::registry! {
     pub(crate) FIELD_PROPS, FIELD_REGISTRY: MarkSetter {
-    read("fieldType", ValueType::Text),
-    read("instruction", ValueType::Text),
+    read_add("fieldType", ValueType::Text, MarkSetter::FieldType),
+    rsa("instruction", ValueType::Text, MarkSetter::FieldInstruction, Constraint::NotEmpty),
     read("fldLock", ValueType::Bool),
     read("evaluated", ValueType::Bool),
+    write_only("text", ValueType::Text, MarkSetter::FieldText),
+    add_only("name", ValueType::Text, MarkSetter::FieldName),
+    add_only("bookmarkName", ValueType::Text, MarkSetter::FieldName),
+    add_only("format", ValueType::Text, MarkSetter::FieldFormat),
+    add_only("hyperlink", ValueType::Bool, MarkSetter::FieldHyperlink),
+    add_only("expression", ValueType::Text, MarkSetter::FieldExpression),
+    add_only("trueText", ValueType::Text, MarkSetter::FieldTrueText),
+    add_only("falseText", ValueType::Text, MarkSetter::FieldFalseText),
     }
 }
 
-// A table of contents, from its `TOC` field's switches.
+// A table of contents, from its `TOC` field's switches; written on add and
+// set, with a `title` heading on add (record 0325).
 crate::registry::registry! {
     pub(crate) TOC_PROPS, TOC_REGISTRY: MarkSetter {
-    read("levels", ValueType::Text),
-    read("hyperlinks", ValueType::Bool),
-    read("pageNumbers", ValueType::Bool),
+    rsa("levels", ValueType::Text, MarkSetter::TocLevels, Constraint::NotEmpty),
+    rsa("hyperlinks", ValueType::Bool, MarkSetter::TocHyperlinks, Constraint::None),
+    rsa("pageNumbers", ValueType::Bool, MarkSetter::TocPageNumbers, Constraint::None),
+    add_only("title", ValueType::Text, MarkSetter::TocTitle),
     }
 }
 

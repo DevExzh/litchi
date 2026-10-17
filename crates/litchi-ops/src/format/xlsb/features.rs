@@ -324,18 +324,19 @@ fn differential_formats(file: &Xlsb) -> Result<Vec<DifferentialStyle>> {
 
 /// The notes of a worksheet in row-major order of their cells.
 pub(super) fn notes(records: Vec<xlsb::comments::Record>) -> Vec<Note> {
-    let mut notes: Vec<Note> = records
-        .into_iter()
-        .map(|record| Note {
-            row: record.row,
-            col: record.col,
-            reference: crate::format::workbook::Label::cell(record.col, record.row),
-            author: record.author,
-            text: record.text,
-        })
-        .collect();
+    let mut notes: Vec<Note> = records.into_iter().map(note).collect();
     notes.sort_by_key(|note| (note.row, note.col));
     notes
+}
+
+fn note(record: xlsb::comments::Record) -> Note {
+    Note {
+        row: record.row,
+        col: record.col,
+        reference: crate::format::workbook::Label::cell(record.col, record.row),
+        author: record.author,
+        text: record.text,
+    }
 }
 
 /// The features of `kind` on a worksheet, in position order.
@@ -443,6 +444,29 @@ pub(super) fn lookup<'f>(
         Select::Last => None,
         _ => return Ok(Lookup::NotApplicable),
     };
+    if kind == Kind::Comment {
+        // One note is labelled, not all of them (record 0326); the stable
+        // sort gives `notes`' row-major order.
+        let mut records = if sheet.handle.is_grid() {
+            sheet.handle.comments()?
+        } else {
+            Vec::new()
+        };
+        records.sort_by_key(|record| (record.row, record.col));
+        let index = index.or_else(|| records.len().checked_sub(1));
+        return Ok(match index.filter(|index| *index < records.len()) {
+            Some(index) => Lookup::Found(Node::new_feature(
+                file,
+                sheet.position,
+                Feature {
+                    kind,
+                    index: u32::try_from(index).unwrap_or(u32::MAX),
+                    data: Data::Comment(note(records.swap_remove(index))),
+                },
+            )),
+            None => Lookup::Missing,
+        });
+    }
     let mut features = list(file, sheet, kind)?;
     let index = index.or_else(|| features.len().checked_sub(1));
     Ok(match index.filter(|index| *index < features.len()) {

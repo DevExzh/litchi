@@ -1054,6 +1054,18 @@ impl NewLevel {
         self.ilvl
     }
 
+    /// The level's start value.
+    #[must_use]
+    pub const fn start(&self) -> i64 {
+        self.start
+    }
+
+    /// The level's paragraph properties (its indentation).
+    #[must_use]
+    pub const fn paragraph(&self) -> &properties::Paragraph {
+        &self.paragraph
+    }
+
     /// Start at `start`.
     #[must_use]
     pub const fn with_start(mut self, start: i64) -> Self {

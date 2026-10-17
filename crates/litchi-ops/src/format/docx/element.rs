@@ -92,7 +92,54 @@ fn element_path_inner(node: &Node<'_>) -> Result<ElementPath> {
             "only elements below the main-document body have element paths",
         ));
     }
-    let mut state = State::Blocks(nav::load_body(node.docx)?);
+    walk(node, State::Blocks(nav::load_body(node.docx)?), rest, false)
+}
+
+/// Where a story element lives: its header or footer part, or its note.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum StoryKey {
+    Part(String),
+    Note(litchi_docx::document::NoteKind, u32),
+}
+
+/// The story of a node under `/header[N]`, `/footer[N]`, `/footnote[N]`
+/// or `/endnote[N]`, and the node's element path inside the story's
+/// synthetic body (record 0325); `None` for any other node.
+pub(super) fn story_path(node: &Node<'_>) -> Result<Option<(StoryKey, ElementPath)>> {
+    let steps = node.address.steps();
+    let skip = usize::from(
+        steps
+            .first()
+            .is_some_and(|step| matches!(step.kind, Kind::Footnotes | Kind::Endnotes)),
+    );
+    let Some((story, rest)) = steps.get(skip..).and_then(<[_]>::split_first) else {
+        return Ok(None);
+    };
+    if !matches!(
+        story.kind,
+        Kind::Header | Kind::Footer | Kind::Footnote | Kind::Endnote
+    ) || rest.is_empty()
+    {
+        return Ok(None);
+    }
+    let docx = node.docx;
+    let (key, value) = super::parts::story_of(docx, story.kind, story.ordinal as usize)?;
+    let blocks = super::parts::story_blocks(docx, value)?
+        .ok_or_else(|| refusal("the DOCX story holds no blocks"))?;
+    let path = walk(node, State::Blocks(blocks), rest, true)?;
+    docx.owner().check_source()?;
+    Ok(Some((key, path)))
+}
+
+/// The element path of `rest`, the address steps below the container whose
+/// blocks `state` holds. A story's block positions are its direct
+/// positions.
+fn walk(
+    node: &Node<'_>,
+    mut state: State,
+    rest: &[super::node::Step],
+    story: bool,
+) -> Result<ElementPath> {
     let mut path = Vec::with_capacity(rest.len() + 1);
     let last = rest.len() - 1;
     for (index, step) in rest.iter().enumerate() {
@@ -117,7 +164,13 @@ fn element_path_inner(node: &Node<'_>) -> Result<ElementPath> {
                             .ok_or_else(|| refusal("the DOCX block is outside its container"))?
                     },
                 };
-                let position = raw_position(node.docx, &indexed)?;
+                let position = if story {
+                    indexed
+                        .direct_position()
+                        .ok_or_else(|| refusal("the DOCX story block has no direct position"))?
+                } else {
+                    raw_position(node.docx, &indexed)?
+                };
                 match step.kind {
                     Kind::Paragraph => {
                         path.push(ElementStep::Paragraph(position));

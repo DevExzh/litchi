@@ -591,6 +591,8 @@ props! {
         MarginLeft = "marginLeft": ValueType::Length(INDENT),
         MarginRight = "marginRight": ValueType::Length(INDENT),
         Direction = "direction": ValueType::Token(&DIRECTION),
+        Link = "link": ValueType::Text,
+        Tooltip = "tooltip": ValueType::Text,
     }
 }
 
@@ -662,6 +664,29 @@ props! {
 }
 
 const _: () = assert!(ChartKey::Zorder as usize + 1 == FRAME_PROPS.len());
+
+props! {
+    /// A picture or a group (`PictureToNode`, `BuildGroupNode`): the frame
+    /// properties, then its click action (record 0325). The keys up to
+    /// `zorder` are [`FRAME_PROPS`] in the same order.
+    LINKED_FRAME_PROPS, LinkedFrameKey {
+        Name = "name": ValueType::Text,
+        Id = "id": ValueType::Int; raw,
+        Alt = "alt": ValueType::Text,
+        X = "x": POSITION,
+        Y = "y": POSITION,
+        Width = "width": EXTENT,
+        Height = "height": EXTENT,
+        Rotation = "rotation": ValueType::Number,
+        FlipH = "flipH": ValueType::Bool,
+        FlipV = "flipV": ValueType::Bool,
+        Zorder = "zorder": ValueType::Int,
+        Link = "link": ValueType::Text,
+        Tooltip = "tooltip": ValueType::Text,
+    }
+}
+
+const _: () = assert!(LinkedFrameKey::Zorder as usize + 1 == FRAME_PROPS.len());
 
 props! {
     /// A table (`TableToNode`), whose geometry OfficeCLI prints lossily.
@@ -745,6 +770,8 @@ props! {
         Cap = "cap": ValueType::Token(&CAPS),
         Kern = "kern": ValueType::Int,
         Lang = "lang": ValueType::Text,
+        Link = "link": ValueType::Text,
+        Tooltip = "tooltip": ValueType::Text,
     }
 }
 
@@ -955,7 +982,6 @@ const fn property_gap(
 const SHAPE_FILL: &str = "the shape record keeps no spPr fill, line or geometry span";
 const BODY_PROPS: &str =
     "the text-body reader applies body-property defaults, so local values are unknown";
-const LINKS: &str = "the shape and run tables do not carry click actions yet; read and write their hyperlink element";
 
 // ---------------------------------------------------------------------------
 // The table
@@ -1157,7 +1183,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[],
             SHAPE_IDS,
             &["/slide[N]/picture[@id=ID]", "/slide[N]/picture[N]"],
-            FRAME_PROPS,
+            LINKED_FRAME_PROPS,
         ),
         element(
             Table,
@@ -1207,7 +1233,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             TREE,
             SHAPE_IDS,
             &["/slide[N]/group[@id=ID]", "/slide[N]/group[N]"],
-            FRAME_PROPS,
+            LINKED_FRAME_PROPS,
         ),
         element(
             Connector,
@@ -1530,8 +1556,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         property_gap("shape", "wrap", "L-PPTX-R7b", BODY_PROPS),
         property_gap("shape", "autoFit", "L-PPTX-R7b", BODY_PROPS),
         property_gap("shape", "textDirection", "L-PPTX-R7b", BODY_PROPS),
-        property_gap("shape", "link", "M1-extended", LINKS),
-        property_gap("shape", "tooltip", "M1-extended", LINKS),
         property_gap(
             "shape",
             "list",
@@ -1544,8 +1568,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "M1-extended",
             "bullets are read but not yet named in OfficeCLI's list vocabulary",
         ),
-        property_gap("run", "link", "M1-extended", LINKS),
-        property_gap("run", "tooltip", "M1-extended", LINKS),
         property_gap(
             "table",
             "colWidths",
@@ -1590,6 +1612,16 @@ pub(super) enum ShapeSetter {
     Height,
     /// Rich formatting applied to every paragraph and run of the text body.
     Format(TextSetter),
+    /// The click action (`link`, `tooltip`; record 0325), written through the
+    /// hyperlink verbs rather than the text edit.
+    Click(ClickKey),
+}
+
+/// The click-action keys of shapes, runs, pictures and groups (record 0325).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum ClickKey {
+    Link,
+    Tooltip,
 }
 
 /// Rich text assignments for shapes, paragraphs, runs and table cells
@@ -1609,6 +1641,9 @@ pub(super) enum TextSetter {
     ShapeFill,
     /// A shape's preset geometry (`a:prstGeom`).
     Geometry,
+    /// A run's click action (record 0325), written through the hyperlink
+    /// verbs rather than the text edit.
+    Click(ClickKey),
 }
 
 /// A write entry for `spec` with a text setter; `get` keeps the spec's
@@ -1624,6 +1659,29 @@ const fn text_entry(spec: PropSpec, setter: TextSetter) -> crate::registry::Entr
             Constraint::None
         },
         clear: !matches!(setter, TextSetter::Text),
+    }
+}
+
+/// A `link` or `tooltip` write entry: settable, and given at creation where
+/// the element is added; an empty `link` (or `none`) removes the action.
+const fn click_entry<S: Copy>(spec: PropSpec, setter: S) -> crate::registry::Entry<S> {
+    use crate::registry::{Access, Constraint, Entry};
+    Entry {
+        spec,
+        access: Access::SetAndAdd(setter),
+        constraint: Constraint::None,
+        clear: true,
+    }
+}
+
+/// A run's `link` or `tooltip`: settable only, as runs are not added.
+const fn run_click_entry(spec: PropSpec, setter: TextSetter) -> crate::registry::Entry<TextSetter> {
+    use crate::registry::{Access, Constraint, Entry};
+    Entry {
+        spec,
+        access: Access::Set(setter),
+        constraint: Constraint::None,
+        clear: true,
     }
 }
 
@@ -1650,6 +1708,10 @@ const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_C
             text_entry(spec, TextSetter::Italic)
         } else if index == RunKey::Color as usize {
             text_entry(spec, TextSetter::Color)
+        } else if index == RunKey::Link as usize {
+            run_click_entry(spec, TextSetter::Click(ClickKey::Link))
+        } else if index == RunKey::Tooltip as usize {
+            run_click_entry(spec, TextSetter::Click(ClickKey::Tooltip))
         } else {
             Entry::read(spec)
         };
@@ -1795,6 +1857,10 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
             Some(ShapeSetter::Format(TextSetter::Color))
         } else if index == ShapeKey::Align as usize {
             Some(ShapeSetter::Format(TextSetter::Align))
+        } else if index == ShapeKey::Link as usize {
+            Some(ShapeSetter::Click(ClickKey::Link))
+        } else if index == ShapeKey::Tooltip as usize {
+            Some(ShapeSetter::Click(ClickKey::Tooltip))
         } else {
             None
         };
@@ -2020,46 +2086,54 @@ pub(super) enum PictureSetter {
     Y,
     Width,
     Height,
+    /// The click action (record 0325).
+    Click(ClickKey),
 }
-const PICTURE_WRITE_COUNT: usize = FRAME_PROPS.len() + 1;
+const PICTURE_WRITE_COUNT: usize = LINKED_FRAME_PROPS.len() + 1;
 const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICTURE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
-    let mut entries = [Entry::read(FRAME_PROPS[0]); PICTURE_WRITE_COUNT];
+    let mut entries = [Entry::read(LINKED_FRAME_PROPS[0]); PICTURE_WRITE_COUNT];
     let mut index = 0;
-    while index < FRAME_PROPS.len() {
-        let spec = FRAME_PROPS[index];
-        let setter = if index == FrameKey::Name as usize {
+    while index < LINKED_FRAME_PROPS.len() {
+        let spec = LINKED_FRAME_PROPS[index];
+        let setter = if index == LinkedFrameKey::Name as usize {
             Some(PictureSetter::Name)
-        } else if index == FrameKey::X as usize {
+        } else if index == LinkedFrameKey::X as usize {
             Some(PictureSetter::X)
-        } else if index == FrameKey::Y as usize {
+        } else if index == LinkedFrameKey::Y as usize {
             Some(PictureSetter::Y)
-        } else if index == FrameKey::Width as usize {
+        } else if index == LinkedFrameKey::Width as usize {
             Some(PictureSetter::Width)
-        } else if index == FrameKey::Height as usize {
+        } else if index == LinkedFrameKey::Height as usize {
             Some(PictureSetter::Height)
         } else {
             None
         };
-        entries[index] = match setter {
-            Some(setter) => Entry {
-                spec,
-                access: Access::Add(setter),
-                constraint: if matches!(setter, PictureSetter::Width | PictureSetter::Height) {
-                    Constraint::Length {
-                        min: crate::value::Length::from_emu(1),
-                        max: crate::value::Length::from_emu(i64::MAX),
-                    }
-                } else {
-                    Constraint::None
+        entries[index] = if index == LinkedFrameKey::Link as usize {
+            click_entry(spec, PictureSetter::Click(ClickKey::Link))
+        } else if index == LinkedFrameKey::Tooltip as usize {
+            click_entry(spec, PictureSetter::Click(ClickKey::Tooltip))
+        } else {
+            match setter {
+                Some(setter) => Entry {
+                    spec,
+                    access: Access::Add(setter),
+                    constraint: if matches!(setter, PictureSetter::Width | PictureSetter::Height) {
+                        Constraint::Length {
+                            min: crate::value::Length::from_emu(1),
+                            max: crate::value::Length::from_emu(i64::MAX),
+                        }
+                    } else {
+                        Constraint::None
+                    },
+                    clear: false,
                 },
-                clear: false,
-            },
-            None => Entry::read(spec),
+                None => Entry::read(spec),
+            }
         };
         index += 1;
     }
-    entries[FRAME_PROPS.len()] = Entry {
+    entries[LINKED_FRAME_PROPS.len()] = Entry {
         spec: write_only("src", ValueType::Text),
         access: Access::Add(PictureSetter::Src),
         constraint: Constraint::NotEmpty,
@@ -2075,10 +2149,45 @@ pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
     picture_write_entries(),
     [crate::registry::Alias {
         name: "path",
-        entry: FRAME_PROPS.len(),
+        entry: LINKED_FRAME_PROPS.len(),
     }],
 );
 pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
+
+/// Group assignments: its click action (record 0325).
+const fn group_write_entries() -> [crate::registry::Entry<ClickKey>; LINKED_FRAME_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(LINKED_FRAME_PROPS[0]); LINKED_FRAME_PROPS.len()];
+    let mut index = 0;
+    while index < LINKED_FRAME_PROPS.len() {
+        let spec = LINKED_FRAME_PROPS[index];
+        entries[index] = if index == LinkedFrameKey::Link as usize {
+            Entry {
+                spec,
+                access: Access::Set(ClickKey::Link),
+                constraint: Constraint::None,
+                clear: true,
+            }
+        } else if index == LinkedFrameKey::Tooltip as usize {
+            Entry {
+                spec,
+                access: Access::Set(ClickKey::Tooltip),
+                constraint: Constraint::None,
+                clear: true,
+            }
+        } else {
+            Entry::read(spec)
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const GROUP_WRITE_TABLE: crate::registry::Table<
+    ClickKey,
+    { LINKED_FRAME_PROPS.len() },
+    0,
+> = crate::registry::Table::new(group_write_entries(), []);
+pub(crate) const GROUP_CAPABILITY_PROPS: &[PropSpec] = &GROUP_WRITE_TABLE.readable();
 pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();
 
 /// Chart assignments (record 0270): `add` builds a chart, `set` edits the

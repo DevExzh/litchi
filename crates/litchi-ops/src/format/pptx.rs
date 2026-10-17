@@ -83,10 +83,10 @@ pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
     AXIS_CAPABILITY_PROPS, CELL_CAPABILITY_PROPS, CHART_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS,
-    NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS, PARAGRAPH_PROP_ALIASES,
-    PICTURE_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS, RUN_CAPABILITY_PROPS, RUN_PROP_ALIASES,
-    SERIES_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SHAPE_PROP_ALIASES, SLIDE_CAPABILITY_PROPS,
-    SPEC,
+    GROUP_CAPABILITY_PROPS, NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS,
+    PARAGRAPH_PROP_ALIASES, PICTURE_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
+    RUN_CAPABILITY_PROPS, RUN_PROP_ALIASES, SERIES_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS,
+    SHAPE_PROP_ALIASES, SLIDE_CAPABILITY_PROPS, SPEC,
 };
 pub(crate) use spec::{
     COLUMN_CAPABILITY_PROPS, HYPERLINK_CAPABILITY_PROPS, LAYOUT_CAPABILITY_PROPS,
@@ -110,6 +110,9 @@ pub(crate) const SETTABLE: &[&str] = &[
     "slideLayout",
     "col",
     "hyperlink",
+    // Their click action (record 0325).
+    "picture",
+    "group",
 ];
 
 /// The non-slide elements `add` creates when the owner admits shape adds.
@@ -158,6 +161,7 @@ pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::s
         "notes" => NOTES_CAPABILITY_PROPS,
         "comment" => COMMENT_CAPABILITY_PROPS,
         "picture" => PICTURE_CAPABILITY_PROPS,
+        "group" => GROUP_CAPABILITY_PROPS,
         "chart" => CHART_CAPABILITY_PROPS,
         "series" => SERIES_CAPABILITY_PROPS,
         "axis" => AXIS_CAPABILITY_PROPS,
@@ -1009,17 +1013,38 @@ fn eager_slide<'a>(
     package: &'a pptx::Package,
     position: usize,
 ) -> Result<Option<pptx::slide::Slide<'a>>> {
-    Ok(eager_slide_with_payload(owner, package, position)?.map(|(slide, _)| slide))
+    let Some(part) = eager_slide_part(owner, package, position)? else {
+        return Ok(None);
+    };
+    part.slide().map(Some)
 }
 
-/// [`eager_slide`] with the slide part's decoded payload, whose identity
-/// keys the eager scene cache; `None` for a payload that is not decoded and
-/// shared (the slide is then read as before, without the cache).
-fn eager_slide_with_payload<'a>(
+/// The slide part at `position` of an eager package, not yet read as a
+/// slide: its decoded payload, whose identity keys the eager scene cache,
+/// is known first, so a cached scene is found without reading the part
+/// (record 0326).
+pub(super) struct EagerSlidePart<'a> {
+    opc: &'a litchi_opc::OpcPackage,
+    part: &'a dyn litchi_opc::part::Part,
+    /// `None` for a payload that is not decoded and shared (the slide is
+    /// then read as before, without the cache).
+    pub(super) payload: Option<Arc<Vec<u8>>>,
+}
+
+impl<'a> EagerSlidePart<'a> {
+    /// Reads the part as a slide.
+    pub(super) fn slide(self) -> Result<pptx::slide::Slide<'a>> {
+        let part = pptx::parts::SlidePart::from_part(self.part)?;
+        Ok(pptx::slide::Slide::new(self.opc, part))
+    }
+}
+
+/// The slide part at `position`, or `None` past the catalog end.
+fn eager_slide_part<'a>(
     owner: &Pptx,
     package: &'a pptx::Package,
     position: usize,
-) -> Result<Option<(pptx::slide::Slide<'a>, Option<Arc<Vec<u8>>>)>> {
+) -> Result<Option<EagerSlidePart<'a>>> {
     let Some(target) = owner
         .eager_catalog(package)?
         .get(position)
@@ -1033,8 +1058,7 @@ fn eager_slide_with_payload<'a>(
         let payload = part.blob_arc();
         std::ptr::eq(payload.as_slice(), part.blob()).then_some(payload)
     });
-    let part = pptx::parts::SlidePart::from_part(part)?;
-    Ok(Some((pptx::slide::Slide::new(opc, part), payload)))
+    Ok(Some(EagerSlidePart { opc, part, payload }))
 }
 
 fn reserve_slide_catalog(capacity: usize) -> Result<Vec<SlideDescriptor>> {
