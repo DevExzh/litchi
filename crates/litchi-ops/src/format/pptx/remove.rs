@@ -58,6 +58,9 @@ impl Pptx {
         if let Some(commit) = self.try_remove_column(&target, limits)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_remove_row(&target, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_remove_hyperlink(&target, limits)? {
             return Ok(commit);
         }

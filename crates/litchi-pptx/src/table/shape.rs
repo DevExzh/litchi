@@ -272,6 +272,44 @@ impl<'a> Row<'a> {
             .map_or(0, |spans| spans.len())
     }
 
+    /// The row's height (`a:tr@h`) in EMU; `None` when the attribute is
+    /// absent (record 0333).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed row XML or a height that is not a
+    /// non-negative integer.
+    pub fn height(self) -> Result<Option<i64>> {
+        let xml = self.xml()?;
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        loop {
+            match reader
+                .read_event()
+                .map_err(|_| invalid("malformed table row XML"))?
+            {
+                Event::Start(start) | Event::Empty(start) => {
+                    for attribute in start.checked_attributes() {
+                        let attribute =
+                            attribute.map_err(|_| invalid("malformed table row XML"))?;
+                        if attribute.key.as_ref() == b"h" {
+                            return std::str::from_utf8(&attribute.value)
+                                .ok()
+                                .and_then(|value| value.trim().parse::<i64>().ok())
+                                .filter(|value| *value >= 0)
+                                .map(Some)
+                                .ok_or_else(|| {
+                                    invalid("a table row height is not a non-negative integer")
+                                });
+                        }
+                    }
+                    return Ok(None);
+                },
+                Event::Eof => return Ok(None),
+                _ => {},
+            }
+        }
+    }
+
     /// # Errors
     ///
     /// Returns an error if the operation fails.

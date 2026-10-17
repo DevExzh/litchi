@@ -1360,11 +1360,11 @@
         "row"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1377,7 +1377,140 @@
           "pathSegment": "tc"
         }
       ],
-      "properties": {},
+      "properties": {
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c1": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c2": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c3": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c4": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c5": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c6": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c7": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c8": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c9": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c10": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c11": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c12": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c13": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c14": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c15": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c16": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c17": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c18": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c19": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c20": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
       "predicates": {
         "keys": [
           "style",
@@ -4651,14 +4784,6 @@
       "code": "unsupported_capability",
       "followUp": "L-PPTX-R8",
       "reason": "the table node does not list its grid widths; read /slide[N]/table[N]/col[N]"
-    },
-    {
-      "subject": "property",
-      "element": "tr",
-      "key": "height",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R8",
-      "reason": "the table reader does not read row properties yet"
     },
     {
       "subject": "property",

@@ -84,6 +84,15 @@ pub(crate) fn cell_text(item: &TableItem) -> Result<String> {
     }
 }
 
+/// A table row's height (`a:tr@h`, record 0333).
+pub(crate) fn row_height(item: &TableItem) -> Result<Option<i64>> {
+    let table = table(&item.table.handle)?;
+    match table.rows()?.get(item.row as usize) {
+        Some(row) => Ok(row.height()?),
+        None => Ok(None),
+    }
+}
+
 /// A table cell's text body with its local properties (record 0333);
 /// `None` for a missing cell or a cell without a body.
 pub(crate) fn cell_body(item: &TableItem) -> Result<Option<Body>> {

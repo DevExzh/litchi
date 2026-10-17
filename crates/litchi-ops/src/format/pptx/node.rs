@@ -46,9 +46,9 @@ use super::spec::{
     AXIS_PROPS, AxisKey, CELL_PROPS, COLUMN_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey,
     EQUATION_PROPS, FRAME_PROPS, FrameKey, HYPERLINK_PROPS, Kind, LINKED_FRAME_PROPS,
     LinkedFrameKey, MEDIA_PROPS, MediaKey, NODE_PROPS, NOTES_PROPS, NodeKey, NotesKey,
-    PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey,
-    RunKey, SERIES_PROPS, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey,
-    ShapeKey, SlideKey, SmartArtKey, TABLE_PROPS, THEME_PROPS, TableKey,
+    PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, ROW_PROPS, RUN_PROPS,
+    RootKey, RowKey, RunKey, SERIES_PROPS, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS,
+    SeriesKey, ShapeKey, SlideKey, SmartArtKey, TABLE_PROPS, THEME_PROPS, TableKey,
 };
 use super::steps::{self, Builder};
 use super::text;
@@ -1339,7 +1339,8 @@ impl<'f> Node<'f> {
                 None => (RUN_PROPS, PropKind::Empty),
             },
             Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_fill(cell)?)),
-            Item::LineBreak(_) | Item::Row(_) => (&[][..], PropKind::Empty),
+            Item::Row(row) => (ROW_PROPS, PropKind::Row(text::row_height(row)?)),
+            Item::LineBreak(_) => (&[][..], PropKind::Empty),
             Item::Series(item) => (SERIES_PROPS, PropKind::Series(item)),
             Item::DiagramNode(item) => (NODE_PROPS, PropKind::DiagramNode(item)),
             Item::Axis(item) => (AXIS_PROPS, PropKind::Axis(item)),
@@ -1535,6 +1536,8 @@ enum PropKind<'a> {
     ),
     Notes(&'a str),
     Cell(Option<[u8; 3]>),
+    /// A table row's height (record 0333).
+    Row(Option<i64>),
     Comment(&'a Comment),
     ModernComment(&'a ModernComment),
     Reply(&'a ModernReply),
@@ -2036,6 +2039,9 @@ impl<'a> Props<'a> {
                 CellKey::Fill => fill.map(|[red, green, blue]| {
                     Value::Color(crate::value::Color::rgb(red, green, blue))
                 }),
+            },
+            PropKind::Row(height) => match RowKey::at(index)? {
+                RowKey::Height => height.map(length),
             },
             PropKind::Notes(notes) => match NotesKey::at(index)? {
                 NotesKey::Text => Some(Value::Text(Cow::Borrowed(notes))),

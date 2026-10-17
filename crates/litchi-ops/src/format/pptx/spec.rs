@@ -776,6 +776,13 @@ props! {
 }
 
 props! {
+    /// A table row (`table-row.json`, record 0333): its height.
+    ROW_PROPS, RowKey {
+        Height = "height": EXTENT,
+    }
+}
+
+props! {
     /// A table cell (`TableCellToNode`): its local solid fill.
     CELL_PROPS, CellKey {
         Fill = "fill": DRAWING_COLOR,
@@ -1187,7 +1194,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[Cell],
             &[],
             &["/slide[N]/table[N]/tr[N]"],
-            &[],
+            ROW_PROPS,
         ),
         element(
             Cell,
@@ -1561,12 +1568,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "colWidths",
             "L-PPTX-R8",
             "the table node does not list its grid widths; read /slide[N]/table[N]/col[N]",
-        ),
-        property_gap(
-            "tr",
-            "height",
-            "L-PPTX-R8",
-            "the table reader does not read row properties yet",
         ),
         property_gap(
             "tc",
@@ -2584,6 +2585,55 @@ pub(crate) const MASTER_CAPABILITY_PROPS: &[PropSpec] = &MASTER_WRITE_TABLE.read
 pub(super) const LAYOUT_WRITE_TABLE: crate::registry::Table<(), { LAYOUT_PROPS.len() }, 0> =
     crate::registry::Table::new(named_write_entries(LAYOUT_PROPS), []);
 pub(crate) const LAYOUT_CAPABILITY_PROPS: &[PropSpec] = &LAYOUT_WRITE_TABLE.readable();
+
+/// Table row assignments (record 0333): `height` on `add` and `set`; on
+/// `add`, OfficeCLI's `cols` check and `c1`…`c20` seed texts.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum RowSetter {
+    Height,
+    Cols,
+    /// `c{N}`, by its zero-based column.
+    Cell(u8),
+}
+/// The seed-text keys of a new row.
+const ROW_CELL_KEYS: [&str; 20] = [
+    "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "c13", "c14", "c15",
+    "c16", "c17", "c18", "c19", "c20",
+];
+const ROW_WRITE_COUNT: usize = ROW_PROPS.len() + 1 + ROW_CELL_KEYS.len();
+const fn row_write_entries() -> [crate::registry::Entry<RowSetter>; ROW_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(ROW_PROPS[0]); ROW_WRITE_COUNT];
+    entries[RowKey::Height as usize] = Entry {
+        spec: ROW_PROPS[RowKey::Height as usize],
+        access: Access::SetAndAdd(RowSetter::Height),
+        constraint: Constraint::Length {
+            min: crate::value::Length::from_emu(0),
+            max: crate::value::Length::from_emu(27_273_042_316_900),
+        },
+        clear: false,
+    };
+    entries[ROW_PROPS.len()] = Entry {
+        spec: write_only("cols", ValueType::Int),
+        access: Access::Add(RowSetter::Cols),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    let mut index = 0;
+    while index < ROW_CELL_KEYS.len() {
+        entries[ROW_PROPS.len() + 1 + index] = Entry {
+            spec: write_only(ROW_CELL_KEYS[index], ValueType::Text),
+            access: Access::Add(RowSetter::Cell(index as u8)),
+            constraint: Constraint::None,
+            clear: false,
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const ROW_WRITE_TABLE: crate::registry::Table<RowSetter, ROW_WRITE_COUNT, 0> =
+    crate::registry::Table::new(row_write_entries(), []);
+pub(crate) const ROW_CAPABILITY_PROPS: &[PropSpec] = &ROW_WRITE_TABLE.readable();
 
 /// Table column assignments (record 0321): `width` on `add` and `set`, seed
 /// `text` on `add` (OfficeCLI's `table-column.json`).

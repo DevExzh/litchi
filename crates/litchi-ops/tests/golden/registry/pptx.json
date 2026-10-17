@@ -1563,11 +1563,11 @@
         "row"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1580,12 +1580,143 @@
           "pathSegment": "tc"
         }
       ],
-      "properties": {},
-      "propertyGaps": {
+      "properties": {
         "height": {
-          "code": "unsupported_capability",
-          "followUp": "L-PPTX-R8",
-          "reason": "the table reader does not read row properties yet"
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 27273042316900
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c1": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c2": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c3": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c4": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c5": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c6": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c7": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c8": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c9": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c10": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c11": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c12": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c13": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c14": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c15": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c16": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c17": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c18": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c19": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c20": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

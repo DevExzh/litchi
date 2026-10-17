@@ -708,6 +708,8 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
         "comment" => matches!(property, "text" | "x" | "y"),
+        // Table rows (record 0333).
+        "tr" => property == "height",
         _ => false,
     }
 }
@@ -716,9 +718,21 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
 /// What a new paragraph or run takes on `add` (record 0333): its text and
 /// formatting, but not a run's click action.
 fn pptx_text_add(element: &str, property: &str) -> bool {
-    matches!(element, "paragraph" | "run")
+    (matches!(element, "paragraph" | "run")
         && pptx_text_format_set(element, property)
-        && !matches!(property, "link" | "tooltip")
+        && !matches!(property, "link" | "tooltip"))
+        || (element == "tr" && pptx_row_add(property))
+}
+
+#[cfg(feature = "pptx")]
+/// A new row's keys (record 0333): its height, OfficeCLI's `cols` check and
+/// the `c1`…`c20` seed texts.
+fn pptx_row_add(property: &str) -> bool {
+    matches!(property, "height" | "cols")
+        || property
+            .strip_prefix('c')
+            .and_then(|number| number.parse::<u8>().ok())
+            .is_some_and(|number| (1..=20).contains(&number))
 }
 
 #[cfg(feature = "pptx")]
@@ -738,6 +752,7 @@ fn pptx_write_only(element: &str, property: &str) -> bool {
         "slide" => matches!(property, "notes" | "transition"),
         "shape" | "placeholder" => matches!(property, "fill" | "geometry"),
         "picture" => property == "src",
+        "tr" => property != "height" && pptx_row_add(property),
         _ => false,
     }
 }
@@ -1224,6 +1239,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "paragraph"
                     | "run"
                     | "linebreak"
+                    | "tr"
             ),
             "{}",
             element.name()
@@ -1266,6 +1282,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "paragraph"
                     | "run"
                     | "linebreak"
+                    | "tr"
             ),
             "{}",
             element.name()
