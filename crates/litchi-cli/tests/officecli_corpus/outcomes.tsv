@@ -101,7 +101,7 @@
 153	set	xlsx	-	ok	-	B5
 155	set	xlsx	-	warned	type	A7
 156	set	xlsx	-	warned	type	B7
-158	set	xlsx	-	warned	link,tooltip	A9
+158	set	xlsx	-	ok	-	A9
 160	set	xlsx	-	ok	-	A11
 162	set	xlsx	-	ok	-	A13
 165	set	xlsx	-	ok	-	A15
