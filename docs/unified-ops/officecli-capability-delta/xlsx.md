@@ -683,11 +683,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | dateoccurring | `axisColor` | color |  | --- | litchi-only | — |  |  |  |
 | dateoccurring | `axisPosition` | string |  | --- | litchi-only | — |  |  |  |
 | dateoccurring | `direction` | string |  | --- | litchi-only | — |  |  |  |
-| detectedtable | `source` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| detectedtable | `stable` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| detectedtable | `ref` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| detectedtable | `columns` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| detectedtable | `dataRange` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| detectedtable | `source` | string | --g |  | element gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | 0339-F5 (deferred-P1): header-row table detection in queries |
+| detectedtable | `stable` | bool | --g |  | element gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | 0339-F5 (deferred-P1): header-row table detection in queries |
+| detectedtable | `ref` | string | --g |  | element gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | 0339-F5 (deferred-P1): header-row table detection in queries |
+| detectedtable | `columns` | string | --g |  | element gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | 0339-F5 (deferred-P1): header-row table detection in queries |
+| detectedtable | `dataRange` | string | --g |  | element gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | 0339-F5 (deferred-P1): header-row table detection in queries |
 | duplicatevalues | `ref` | string | a-g | asg | supported | supported |  |  |  |
 | duplicatevalues | `fill` | color | a-- | asg | supported | supported |  |  |  |
 | duplicatevalues | `font.color` | color | a-- | asg | supported | supported |  |  |  |

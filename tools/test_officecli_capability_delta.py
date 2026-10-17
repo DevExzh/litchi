@@ -301,6 +301,18 @@ class Comparison(unittest.TestCase):
                                report([element("slide", {"mermaid": READ})]))
         self.assertEqual(result.elements[0][:3], ("diagram", "", "missing"))
 
+    def test_an_element_matches_its_own_name_before_a_path_word(self) -> None:
+        # Record 0339: `/slidemaster[N]/shape[K]` names `shape` too, but the
+        # element is the slide master.
+        result = delta.compare("pptx", [self.oc("slidemaster", {"name": READ}, ["shape"])],
+                               report([element("shape", {}), element("slideMaster", {"name": READ})]))
+        self.assertEqual(result.elements[0][:3], ("slidemaster", "slideMaster", "supported"))
+        gaps = [{"subject": "element", "element": "diagram", "code": "unsupported_path",
+                 "followUp": "none", "reason": "r"}]
+        result = delta.compare("pptx", [self.oc("diagram", {"mermaid": READ}, ["slide"])],
+                               report([element("slide", {})], gaps=gaps))
+        self.assertEqual(result.elements[0][:3], ("diagram", "", "gap"))
+
     def test_pending_formats_still_exclude_raw_and_set_only_actions(self) -> None:
         result = delta.compare("xlsx", [self.oc("raw", {"xml": READ}), self.oc("sort", {})], report([], get=False))
         self.assertTrue(all(row[2] == "out of scope" for row in result.elements))

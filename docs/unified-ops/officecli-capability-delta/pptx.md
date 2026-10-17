@@ -309,18 +309,18 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | connector | `rotation` | number |  | --g | litchi-only | — |  |  |  |
 | connector | `flipH` | bool |  | --g | litchi-only | — |  |  |  |
 | connector | `flipV` | bool |  | --g | litchi-only | — |  |  |  |
-| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `x` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `y` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `width` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `height` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram | `mermaid` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `src` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `x` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `y` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `width` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `height` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `poster` | boolean | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `render` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `theme` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `layout` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `look` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `background` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | equation | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | equation | `formula` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | equation | `x` | length | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
@@ -714,98 +714,27 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | slide | `matchedShapes` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slide | `morphMode` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slide | `morphShapes` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| slidelayout | `name` | string | -sg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| slidelayout | `name` | string | -sg | -sg | supported | supported |  |  |  |
 | slidelayout | `background` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidelayout | `background.alpha` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidelayout | `background.crop` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidelayout | `background.mode` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidelayout | `background.ref` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidelayout | `background.scale` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| slidelayout | `direction` | string | -s- | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| slidelayout | `type` | string | --g |  | supported | — |  |  | the node's text |
-| slidelayout | `phType` | enum |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `isTitle` | bool |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `x` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `y` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `width` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `height` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `font` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `font.latin` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `font.ea` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `font.cs` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `bold` | bool |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `cap` | enum |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `underline` | enum |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `strike` | enum |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `highlight` | color |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `spacing` | number |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `flipH` | bool |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `flipV` | bool |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `zorder` | int |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `rotation` | number |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `align` | enum |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `lineSpacing` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `spaceBefore` | length |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `spaceAfter` | length |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `indent` | length |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `marginLeft` | length |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `marginRight` | length |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `link` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `tooltip` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `text` | string |  | as- | litchi-only | litchi-only |  |  |  |
-| slidelayout | `fill` | string |  | as- | litchi-only | litchi-only |  |  |  |
-| slidelayout | `geometry` | string |  | as- | litchi-only | litchi-only |  |  |  |
-| slidemaster | `name` | string | -sg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| slidelayout | `direction` | string | -s- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| slidelayout | `type` | string | --g | --g | supported | — |  |  |  |
+| slidemaster | `name` | string | -sg | -sg | supported | supported |  |  |  |
 | slidemaster | `background` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `background.alpha` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `background.crop` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `background.mode` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `background.ref` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `background.scale` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| slidemaster | `direction` | string | -s- | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| slidemaster | `direction` | string | -s- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `layoutCount` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `theme` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slidemaster | `shapeCount` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| slidemaster | `phType` | enum |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `isTitle` | bool |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `x` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `y` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `width` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `height` | length |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `font` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `font.latin` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `font.ea` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `font.cs` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `bold` | bool |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `cap` | enum |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `underline` | enum |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `strike` | enum |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `highlight` | color |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `spacing` | number |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `flipH` | bool |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `flipV` | bool |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `zorder` | int |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `rotation` | number |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `align` | enum |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `lineSpacing` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `spaceBefore` | length |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `spaceAfter` | length |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `indent` | length |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `marginLeft` | length |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `marginRight` | length |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `link` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `tooltip` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `text` | string |  | as- | litchi-only | litchi-only |  |  |  |
-| slidemaster | `fill` | string |  | as- | litchi-only | litchi-only |  |  |  |
-| slidemaster | `geometry` | string |  | as- | litchi-only | litchi-only |  |  |  |
+| slidemaster | `preserved` | bool |  | --g | litchi-only | — |  |  |  |
 | cell | `text` | string | -sg | -s- | write-only | supported |  |  |  |
 | cell | `colspan` | number | -sg |  | gap | gap | P1 | deferred-P1 0332 (pptx-breadth) | L-PPTX-R8 |
 | cell | `rowspan` | number | -sg |  | gap | gap | P1 | deferred-P1 0332 (pptx-breadth) | L-PPTX-R8 |

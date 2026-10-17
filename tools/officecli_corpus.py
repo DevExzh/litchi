@@ -87,9 +87,6 @@ LITCHI_VERBS = {
 SKIPPED_SEPARATOR = ";skipped:"
 CASCADE_CODES = {"path_not_found", "missing_argument", "unsupported_path", "out_of_range"}
 FATAL = {"panic", "internal_error", "timeout", "lost"}
-# The property name a skipped list's `+N` count stands for: the outcome's
-# 48-character detail bound left those names out.
-MORE = "(more)"
 
 # OfficeCLI element words (`--type`, path steps) that name a registry
 # element differently.
@@ -152,15 +149,38 @@ class Call:
 
     def skipped(self) -> list[str]:
         """The properties a warned call, or a call that failed after
-        skipping, skipped; `+N` counts names the 48-character detail bound
-        left out."""
+        skipping, skipped. The outcome lists them in full (record 0339);
+        ``<head>.{<rest>,...}`` stands for consecutive names sharing a first
+        dotted segment."""
         if self.warned:
             detail = self.detail
         elif self.failed_after_skipping:
             detail = self.after_skip
         else:
             return []
-        return [name for name in detail.split(",") if name]
+        return expand_skipped(detail, self.cite)
+
+
+def expand_skipped(detail: str, cite: str = "") -> list[str]:
+    """The names of a recorded skipped list: top-level commas separate
+    entries, and ``head.{a,b}`` is ``head.a,head.b``."""
+    names: list[str] = []
+    entry, depth = "", 0
+    for char in detail + ",":
+        if char == "," and depth == 0:
+            if entry.startswith("+"):
+                raise SystemExit(f"{cite}: a truncated skipped list (`{entry}`) predates record "
+                                 "0339; re-record the corpus")
+            head, brace, rest = entry.partition(".{")
+            if brace and rest.endswith("}"):
+                names += [f"{head}.{name}" for name in rest[:-1].split(",") if name]
+            elif entry:
+                names.append(entry)
+            entry = ""
+            continue
+        depth += {"{": 1, "}": -1}.get(char, 0)
+        entry += char
+    return names
 
 
 def parse(text: str) -> list[Call]:
@@ -718,8 +738,6 @@ def call_skipped(call: Call, loaded: dict[str, Registry] | None) -> list[tuple[C
     found = []
     refusal = "|skipped|" if call.failed_after_skipping else "|warned|"
     for name in call.skipped():
-        if name.startswith("+"):
-            name = MORE
         refused = Call(call.script, call.line, call.verb, call.fmt, call.kind,
                        "unsupported_property", name, call.target)
         verdict = cross_check(refused, (loaded or {}).get(call.fmt))
@@ -739,9 +757,6 @@ def skipped_verdicts(calls: list[Call],
 
 
 Resolution = capability_delta.Resolution
-# A `(more)` group hides the properties the detail bound left out, so no
-# disposition can account for it.
-UNVERIFIED = "unverified"
 
 
 class CorpusDispositions:
@@ -796,26 +811,23 @@ class CorpusDispositions:
         if key in self.cache:
             return self.cache[key]
         fmt, verb, element, refusal, prop = key.split("|", 4)
-        if prop == MORE:
-            resolution = Resolution(None, "", via=UNVERIFIED)
+        schema, canonical = self.officecli_names(fmt, element, prop)
+        literal = dict(where=lambda pattern: capability_delta.specificity(pattern)[0] > 0)
+        own = self.dispositions.entries.best(f"corpus:{key}", mark=False, **literal) if prop else None
+        inherited = None
+        if own is None and schema is not None:
+            if canonical is not None:
+                inherited = self.properties.get((fmt, schema, canonical))
+            elif not prop:
+                inherited = self.elements.get((fmt, schema))
+        if inherited is not None and inherited.disposition is not None:
+            where = f"{schema}.{canonical}" if canonical else schema
+            resolution = Resolution(inherited.disposition, inherited.tier, inherited.ref,
+                                    inherited.entry, inherited.reason, via=f"delta `{where}`")
         else:
-            schema, canonical = self.officecli_names(fmt, element, prop)
-            literal = dict(where=lambda pattern: capability_delta.specificity(pattern)[0] > 0)
-            own = self.dispositions.entries.best(f"corpus:{key}", mark=False, **literal) if prop else None
-            inherited = None
-            if own is None and schema is not None:
-                if canonical is not None:
-                    inherited = self.properties.get((fmt, schema, canonical))
-                elif not prop:
-                    inherited = self.elements.get((fmt, schema))
-            if inherited is not None and inherited.disposition is not None:
-                where = f"{schema}.{canonical}" if canonical else schema
-                resolution = Resolution(inherited.disposition, inherited.tier, inherited.ref,
-                                        inherited.entry, inherited.reason, via=f"delta `{where}`")
-            else:
-                tier = self.tier(key, fmt, schema or element, canonical or prop or None)
-                resolution = (self.dispositions.resolve(f"corpus:{key}", tier)
-                              or Resolution(None, tier))
+            tier = self.tier(key, fmt, schema or element, canonical or prop or None)
+            resolution = (self.dispositions.resolve(f"corpus:{key}", tier)
+                          or Resolution(None, tier))
         self.cache[key] = resolution
         return resolution
 
@@ -903,8 +915,6 @@ def blocker(found: list[tuple[str, Resolution | None]]) -> str:
             return "bug"
         if resolution.accounted:
             continue
-        if resolution.via == UNVERIFIED:
-            return "unverified: skipped properties beyond the outcome's 48-character detail bound"
         if resolution.disposition is None:
             return f"no disposition (`{name}`)"
         return f"{resolution.disposition} {resolution.ref}".strip()
@@ -930,8 +940,6 @@ def corpus_problems(calls: list[Call], verdicts: list[Verdict], classes: CorpusD
         if name in checked:
             return
         checked.add(name)
-        if resolution.via == UNVERIFIED:
-            return
         if kind == "delta":
             if resolution.disposition is None:
                 problems.append(f"corpus {name}: no disposition")
@@ -972,8 +980,6 @@ def cell(resolution: Resolution | None) -> str:
     if resolution is None:
         return ""
     text = resolution.cell()
-    if resolution.via == UNVERIFIED:
-        return "unverified (detail bound)"
     if resolution.via:
         text += f" via {resolution.via}"
     return text
@@ -991,9 +997,8 @@ def render_subset(subset: Subset, calls: list[Call], dispositions) -> list[str]:
         "(design §13). A line is **accounted** when every gap class it carries (its delta, "
         "named gap or element/property group; each property a warned call skipped; for a "
         "cascade, the refused call it follows) is `wontfix`, `deferred-P1`, `deferred-P2` "
-        "or `out-of-scope`, and **open** otherwise (a `planned` class, a bug, a class without "
-        "a disposition, or skipped properties the outcome's detail bound left out). The "
-        "subset is green when no line is open.",
+        "or `out-of-scope`, and **open** otherwise (a `planned` class, a bug or a class without "
+        "a disposition). The subset is green when no line is open.",
         "",
         f"**Status: {status}.** {len(subset.lines)} v1 lines: "
         f"{sum(1 for line in subset.lines if line[1] == 'passed')} passed, "

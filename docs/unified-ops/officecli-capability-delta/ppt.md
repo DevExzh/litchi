@@ -215,18 +215,18 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | connector | `alt` | string |  | --g | litchi-only | — |  |  |  |
 | connector | `shapeType` | string |  | --g | litchi-only | — |  |  |  |
 | connector | `length` | number |  | --g | litchi-only | — |  |  |  |
-| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `x` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `y` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `width` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `height` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram | `mermaid` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `src` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `x` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `y` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `width` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `height` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `poster` | boolean | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `render` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `theme` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `layout` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `look` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `background` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | equation | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |
 | equation | `formula` | string | asg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |
 | equation | `x` | length | asg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0323-F6 PPT Equation Editor objects |
@@ -563,44 +563,26 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | slide | `morphMode` | string | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
 | slide | `morphShapes` | number | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
 | slide | `slideNumber` | int |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `name` | string | -sg | --g | supported | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `background` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `background.alpha` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `background.crop` | string | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `background.mode` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `background.ref` | number | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `background.scale` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `direction` | string | -s- |  | write-only | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidelayout | `type` | string | --g |  | supported | — |  |  | the node's text |
-| slidelayout | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `shapeType` | string |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `x` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `y` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `width` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `height` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidelayout | `rotation` | number |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `hidden` | bool |  | --g | litchi-only | — |  |  |  |
-| slidelayout | `text` | string |  | -s- | litchi-only | litchi-only |  |  |  |
-| slidemaster | `name` | string | -sg | --g | supported | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `background` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `background.alpha` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `background.crop` | string | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `background.mode` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `background.ref` | number | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `background.scale` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `direction` | string | -s- |  | write-only | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `layoutCount` | number | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `theme` | string | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `shapeCount` | number | --g |  | unlisted | — | P1 | deferred-P1 0323 (ppt-family) |  |
-| slidemaster | `alt` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `shapeType` | string |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `x` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `y` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `width` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `height` | length |  | -sg | litchi-only | litchi-only |  |  |  |
-| slidemaster | `rotation` | number |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `hidden` | bool |  | --g | litchi-only | — |  |  |  |
-| slidemaster | `text` | string |  | -s- | litchi-only | litchi-only |  |  |  |
+| slidelayout | `name` | string | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `background` | color | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `background.alpha` | number | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `background.crop` | string | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `background.mode` | string | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `background.ref` | number | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `background.scale` | number | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `direction` | string | -s- |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidelayout | `type` | string | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT layouts as nodes |
+| slidemaster | `name` | string | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `background` | color | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `background.alpha` | number | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `background.crop` | string | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `background.mode` | string | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `background.ref` | number | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `background.scale` | number | -sg |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `direction` | string | -s- |  | element gap | gap | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `layoutCount` | number | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `theme` | string | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
+| slidemaster | `shapeCount` | number | --g |  | element gap | — | P1 | deferred-P1 0323 (ppt-family) | 0339-F4 (deferred-P1): PPT main and title masters as nodes |
 | cell | `text` | string | -sg | -s- | write-only | supported |  |  |  |
 | cell | `colspan` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | cell | `rowspan` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |

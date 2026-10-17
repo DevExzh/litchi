@@ -1241,8 +1241,26 @@ const fn removed_gap_count() -> usize {
     count
 }
 
-/// The shared gaps XLSX keeps, plus its gradient-fill gap.
-const XLSX_GAP_COUNT: usize = workbook::SPEC.gaps.len() - removed_gap_count() + 1;
+/// The shared gaps XLSX keeps, plus its gradient-fill gap and the element
+/// gaps of record 0339.
+const XLSX_GAP_COUNT: usize =
+    workbook::SPEC.gaps.len() - removed_gap_count() + 1 + XLSX_ELEMENT_GAPS.len();
+
+/// OfficeCLI's heuristic table node and SmartArt (record 0339).
+const XLSX_ELEMENT_GAPS: [GapSpec; 2] = [
+    GapSpec {
+        subject: Subject::Element("detectedtable"),
+        code: crate::error::Code::UnsupportedCapability,
+        follow_up: "0339-F5 (deferred-P1): header-row table detection in queries",
+        reason: "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only",
+    },
+    GapSpec {
+        subject: Subject::Element("smartart"),
+        code: crate::error::Code::UnsupportedCapability,
+        follow_up: "0339-F6 (deferred-P1): a worksheet-drawing diagram model in litchi-xlsx",
+        reason: "litchi-xlsx reads and writes pictures, shapes and charts in worksheet drawings but has no diagram model; a SmartArt frame is kept as it is and is not a node",
+    },
+];
 
 const fn xlsx_gaps() -> [GapSpec; XLSX_GAP_COUNT] {
     let source = workbook::SPEC.gaps;
@@ -1267,6 +1285,11 @@ const fn xlsx_gaps() -> [GapSpec; XLSX_GAP_COUNT] {
         follow_up: "M1 XLSX lossless scalar gradient property projection",
         reason: "ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format",
     };
+    let mut extra = 0;
+    while extra < XLSX_ELEMENT_GAPS.len() {
+        result[result_index + 1 + extra] = XLSX_ELEMENT_GAPS[extra];
+        extra += 1;
+    }
     result
 }
 
