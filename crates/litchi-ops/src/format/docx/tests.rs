@@ -515,3 +515,121 @@ fn transaction_errors_are_classified_and_typed() {
         assert!(std::error::Error::source(&error).is_some());
     }
 }
+
+// --- Fence scopes (record 0315) ------------------------------------------
+
+/// A source that counts its version observations and can be changed.
+struct Versioned {
+    bytes: Vec<u8>,
+    revision: std::sync::atomic::AtomicU64,
+    versions: std::sync::atomic::AtomicUsize,
+}
+
+impl ReadAt for Versioned {
+    fn len(&self) -> std::io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+        let offset = usize::try_from(offset).unwrap_or(usize::MAX);
+        if output.is_empty() || offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let count = output.len().min(self.bytes.len() - offset);
+        output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> std::io::Result<litchi_core::SourceVersion> {
+        use std::sync::atomic::Ordering;
+        self.versions.fetch_add(1, Ordering::SeqCst);
+        Ok(litchi_core::SourceVersion::new(
+            0x444f_4358_5153_3135,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
+}
+
+/// A source-backed handle over a body of `paragraphs` paragraphs, each with
+/// one plain run, and its counting source.
+fn versioned_docx(paragraphs: usize) -> (crate::File, Arc<Versioned>) {
+    let body: String = (0..paragraphs)
+        .map(|index| format!("<w:p><w:r><w:t>p{index}</w:t></w:r></w:p>"))
+        .collect();
+    let document = format!(
+        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}</w:body></w:document>"#
+    );
+    let source = Arc::new(Versioned {
+        bytes: minimal_docx(document.as_bytes()),
+        revision: std::sync::atomic::AtomicU64::new(0),
+        versions: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let package = litchi_docx::source_backed::Package::from_read_at(source.clone()).unwrap();
+    let docx = Docx::from_source(package, &OpenOptions::new()).unwrap();
+    (crate::File::Docx(docx), source)
+}
+
+/// Observations of `selector`'s second full run over a body of
+/// `paragraphs` paragraphs, its match count, and the observations one
+/// source check makes.
+fn observed_docx_query(paragraphs: usize, selector: &str) -> (usize, usize, usize) {
+    use std::sync::atomic::Ordering;
+    let (file, source) = versioned_docx(paragraphs);
+    let matches = file.query(selector).unwrap().count();
+    let crate::File::Docx(docx) = &file else {
+        unreachable!("a DOCX handle")
+    };
+    let before = source.versions.load(Ordering::SeqCst);
+    docx.owner().ensure_current().unwrap();
+    let per_check = source.versions.load(Ordering::SeqCst) - before;
+    let before = source.versions.load(Ordering::SeqCst);
+    assert_eq!(file.query(selector).unwrap().count(), matches);
+    (
+        matches,
+        source.versions.load(Ordering::SeqCst) - before,
+        per_check,
+    )
+}
+
+/// Record 0315 (record 0310 G7): inside a query step the DOCX child
+/// iterator and the node reads share the step's closing check, as the
+/// XLSX, XLSB and PPTX adapters' do (record 0262), instead of checking the
+/// source before and after every child. Every match is still checked once
+/// (owner decision 2026-10-14, record 0280 G1): ten more matching runs cost
+/// ten more checks, and ten more runs that do not match cost none. A source
+/// changed between two pulls still fails the next pull.
+#[test]
+fn query_children_share_the_step_check() {
+    for (selector, per_paragraph) in [("r", 1), ("p", 1), ("r[bold=true]", 0)] {
+        let (small_matches, small, per_check) = observed_docx_query(10, selector);
+        let (large_matches, large, _) = observed_docx_query(20, selector);
+        assert!(per_check > 0, "a source-backed check observes the source");
+        assert_eq!(
+            large_matches - small_matches,
+            10 * per_paragraph,
+            "{selector}"
+        );
+        assert_eq!(
+            large - small,
+            10 * per_paragraph * per_check,
+            "{selector}: {small} -> {large} observations"
+        );
+    }
+
+    let (file, source) = versioned_docx(3);
+    let mut matches = file.query("p").unwrap();
+    assert!(matches.next().unwrap().is_ok());
+    source
+        .revision
+        .store(1, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(matches.next().unwrap().unwrap_err().code(), Code::IoError);
+    assert!(matches.next().is_none());
+    // Outside a step every read still checks.
+    let crate::File::Docx(docx) = &file else {
+        unreachable!("a DOCX handle")
+    };
+    assert_eq!(
+        docx.owner().check_source().unwrap_err().code(),
+        Code::IoError
+    );
+}

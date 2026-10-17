@@ -439,11 +439,23 @@ impl<'f> Iterator for Children<'f> {
         if matches!(self.source, Source::Done) {
             return None;
         }
-        let item = match self.docx.owner().check_source() {
+        let owner = self.docx.owner();
+        // Inside a resolver or query step for this owner, the step's
+        // closing check fences the child: it observes a source changed
+        // before or during this read, and its error wins (record 0315; the
+        // walker still checks once per match, owner decision 2026-10-14).
+        if crate::path::fence::is_active(owner.fence_key()) {
+            let item = self.produce();
+            if matches!(item, Some(Err(_))) {
+                self.source = Source::Done;
+            }
+            return item;
+        }
+        let item = match owner.check_source() {
             Ok(()) => self.produce(),
             Err(error) => Some(Err(error)),
         };
-        let item = match self.docx.owner().check_source() {
+        let item = match owner.check_source() {
             Ok(()) => item,
             Err(error) => Some(Err(error)),
         };
