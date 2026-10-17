@@ -109,6 +109,7 @@
     reason = "names and dense flag structures intentionally follow BIFF12 records and existing public API vocabulary"
 )]
 
+pub mod auto_filter;
 pub mod binary_index;
 pub mod calc;
 pub mod calculation_chain;
@@ -121,6 +122,7 @@ pub mod custom_data;
 pub mod data_model;
 pub mod data_validation;
 pub mod date_utils;
+pub mod drawing;
 pub mod external_link;
 pub mod formula;
 pub mod hyperlinks;
@@ -130,6 +132,8 @@ pub mod metadata;
 pub mod named_ranges;
 mod open_options;
 pub mod package;
+pub mod page_breaks;
+pub(crate) mod part_edit;
 mod pivot_chart;
 pub mod pivot_view;
 pub mod raw;

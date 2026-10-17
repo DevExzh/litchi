@@ -1,0 +1,74 @@
+//! Worksheet feature reads of an eager [`Workbook`] (unified-ops record
+//! 0322): the values the worksheet edit families list, read without decoding
+//! worksheet cells.
+
+use super::Workbook;
+use crate::comments::Record;
+use crate::conditional_formatting::edit::DifferentialStyle;
+use crate::drawing::edit::Element;
+use crate::package::error::Result;
+use crate::sheet::Features;
+
+impl Workbook {
+    /// The hyperlinks, auto-filter, classic validations and conditional
+    /// formats, and page breaks of the worksheet at complete-catalog
+    /// position `sheet`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or non-worksheet tab or a malformed
+    /// stream.
+    pub fn sheet_features(&self, sheet: usize) -> Result<Features> {
+        let worksheet = crate::part_edit::worksheet_uri(self, sheet)?;
+        let part = self.package.get_part(&worksheet)?;
+        crate::sheet::features::read(
+            part.blob(),
+            part.rels(),
+            &self.formula_context,
+            sheet,
+            self.leniency,
+        )
+    }
+
+    /// The notes of the worksheet at complete-catalog position `sheet`, in
+    /// stream order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or non-worksheet tab or a malformed
+    /// comments part.
+    pub fn sheet_comments(&self, sheet: usize) -> Result<Vec<Record>> {
+        let worksheet = crate::part_edit::worksheet_uri(self, sheet)?;
+        let part = self.package.get_part(&worksheet)?;
+        match crate::comments::edit::comments_part(part.rels())? {
+            Some((_, name)) => crate::comments::edit::read(self.package.get_part(&name)?.blob()),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// The top-level objects of the drawing of the worksheet at
+    /// complete-catalog position `sheet`, in drawing order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or non-worksheet tab or a malformed
+    /// drawing graph.
+    pub fn drawing_elements(&self, sheet: usize) -> Result<Vec<Element>> {
+        let worksheet = crate::part_edit::worksheet_uri(self, sheet)?;
+        crate::drawing::edit::eager_elements(&self.package, &worksheet)
+    }
+
+    /// The differential formats (`BrtDXF`) of the styles part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a malformed styles part.
+    pub fn differential_formats(&self) -> Result<Vec<DifferentialStyle>> {
+        match crate::conditional_formatting::edit::styles_part(&self.package)? {
+            Some(styles) => crate::conditional_formatting::edit::read_differentials(
+                self.package.get_part(&styles)?.blob(),
+            ),
+            None => Ok(Vec::new()),
+        }
+    }
+}

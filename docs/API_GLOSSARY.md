@@ -2543,3 +2543,25 @@ staging returns the source package (an exact no-op keeps every byte).
 | `litchi_xlsx::workbook::comments::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_comments, apply_comments}` | `Edit::{comments, set, add, remove}` (`add` refuses an annotated cell and returns the row-major position); splices notes and their VML note shapes, keeping the other notes' bytes | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::drawing::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{drawing_elements, edit_drawings, apply_drawings}` | `Edit::{elements, add_picture, add_shape, set, remove}`; read model `Element`, `ElementKind`, `Placement`, `Marker`, `Image`, `Fill`, `Line`, `Font`, `Align`, `VerticalAlign`; specs `PictureSpec`, `ShapeSpec`, `Change` | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::Worksheet::comments`, `SourceWorksheet::{comments, page_breaks, drawing_elements}` | reads on both owners | ✅ 0320 |
+
+## XLSB worksheet feature families (record 0322)
+
+Seven scoped families publish XLSB worksheet features through immutable
+part-level edits sharing one staged engine (`litchi_xlsb::part_edit`,
+crate-private): worksheet streams are edited at the record level, so every
+unedited record keeps its bytes. Each family starts from a `Package` or,
+without copying, from a `Workbook`; `commit()` returns the triad
+`package()`, `patch()`, `diagnostics()` with `into_package()`/
+`into_parts()`, and an unchanged staging returns the source snapshot.
+Positions are complete-catalog sheet positions.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_xlsb::page_breaks::{Break, PageBreaks, read}`, `page_breaks::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `{Package, Workbook}::edit_page_breaks`, `Package::apply_page_breaks` | `Edit::{page_breaks, set_page_breaks}`; `BrtBeginRwBrk`/`BrtBeginColBrk` collections | ✅ 0322; family registered in the gate |
+| `litchi_xlsb::auto_filter::{AutoFilter, read}`, `auto_filter::edit::{…}`, `{Package, Workbook}::edit_auto_filter`, `Package::apply_auto_filter` | `Edit::{auto_filter, set_auto_filter}`; a moved range keeps the filter columns still inside it | ✅ 0322; family registered in the gate |
+| `litchi_xlsb::hyperlinks::edit::{…}`, `{Package, Workbook}::edit_hyperlinks`, `Package::apply_hyperlinks` | `Edit::{hyperlinks, add, set, remove}`; external targets live in worksheet relationships | ✅ 0322; family registered in the gate |
+| `litchi_xlsb::data_validation::edit::{…}`, `{Package, Workbook}::edit_data_validations`, `Package::apply_data_validations` | `Edit::{validations, add, set, remove}`; classic `BrtDVal` only | ✅ 0322; family registered in the gate |
+| `litchi_xlsb::conditional_formatting::edit::{…}`, `{Package, Workbook}::edit_conditional_formats`, `Package::apply_conditional_formats` | `Edit::{formats, add, set, remove, differential_formats, add_differential}`; `DifferentialStyle::{parse, encode}`, `Underline` | ✅ 0322; family registered in the gate |
+| `litchi_xlsb::comments::edit::{…}`, `{Package, Workbook}::edit_comments`, `Package::apply_comments` | `Edit::{comments, add, set, remove}` with VML note shapes | ✅ 0322; family registered in the gate |
+| `litchi_xlsb::drawing::edit::{…}`, `{Package, Workbook}::edit_drawings`, `Package::apply_drawings` | `Edit::{elements, add_picture, add_shape, set, remove}`; the XLSX drawing vocabulary with `Rgb = u32` | ✅ 0322; family registered in the gate |
+| `litchi_xlsb::sheet::Features`, `Workbook::{sheet_features, sheet_comments, drawing_elements, differential_formats}`, `SourceBackedWorksheet::{features, comments, drawing_elements}`, `SourceBackedWorkbook::differential_formats` | feature reads on both owners, without decoding cells | ✅ 0322 |
