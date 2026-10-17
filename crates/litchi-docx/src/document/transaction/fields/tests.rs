@@ -306,3 +306,58 @@ fn stale_indexes_and_bad_text_are_refused() {
         .is_err()
     );
 }
+
+#[test]
+fn instructions_bookmark_names_and_removals_are_spliced() {
+    // Record 0325: field instruction sets, bookmark renames and removals.
+    let xml = document(&format!(
+        r#"{TOC_PLACEHOLDER}<w:p><w:bookmarkStart w:id="4" w:name="Intro"/><w:r><w:t>Body</w:t></w:r><w:bookmarkEnd w:id="4"/></w:p><w:p><w:fldSimple w:instr=" PAGE "><w:r><w:t>3</w:t></w:r></w:fldSimple></w:p>"#
+    ));
+    let source = Snapshot::from_xml(xml).unwrap();
+    let target = commit(&source, |_| {
+        vec![
+            Update::Instruction {
+                field: 0,
+                instruction: r#" TOC \o "1-2" \h "#.into(),
+            },
+            Update::Instruction {
+                field: 1,
+                instruction: " NUMPAGES ".into(),
+            },
+            Update::RenameBookmark {
+                bookmark: 0,
+                name: "Start & end".into(),
+            },
+        ]
+    });
+    let fields = target.edit().fields().unwrap();
+    assert_eq!(fields.fields()[0].instruction(), r#" TOC \o "1-2" \h "#);
+    assert!(fields.fields()[0].is_dirty());
+    assert_eq!(fields.fields()[1].instruction(), " NUMPAGES ");
+    assert_eq!(fields.fields()[1].result(), "3");
+    assert_eq!(fields.bookmarks()[0].name(), "Start & end");
+    // An equal instruction and name change nothing.
+    let mut edit = target.edit();
+    let index = edit.fields().unwrap();
+    let outcome = edit
+        .refresh_fields(
+            &index,
+            &[
+                Update::Instruction {
+                    field: 1,
+                    instruction: " NUMPAGES ".into(),
+                },
+                Update::RenameBookmark {
+                    bookmark: 0,
+                    name: "Start & end".into(),
+                },
+            ],
+        )
+        .unwrap();
+    assert!(outcome.is_empty());
+    // Removing a bookmark keeps its content.
+    let removed = commit(&target, |_| vec![Update::RemoveBookmark { bookmark: 0 }]);
+    let text = text(&removed);
+    assert!(!text.contains("bookmarkStart") && !text.contains("bookmarkEnd"));
+    assert!(text.contains("<w:t>Body</w:t>"));
+}

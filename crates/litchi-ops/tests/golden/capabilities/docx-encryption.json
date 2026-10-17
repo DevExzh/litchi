@@ -5191,11 +5191,11 @@
       "element": "bookmark",
       "parent": "document",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -5208,8 +5208,8 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "id": {
@@ -5217,6 +5217,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -5232,8 +5238,8 @@
       "element": "field",
       "parent": "document",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -5246,14 +5252,14 @@
       "properties": {
         "fieldType": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "instruction": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "fldLock": {
@@ -5267,6 +5273,24 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -6194,11 +6218,11 @@
         "tableofcontents"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -6208,21 +6232,27 @@
       "properties": {
         "levels": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "hyperlinks": {
           "type": "bool",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "pageNumbers": {
           "type": "bool",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

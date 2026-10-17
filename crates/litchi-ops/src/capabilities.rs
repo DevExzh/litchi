@@ -2800,7 +2800,10 @@ impl Element {
                     || (self.adapter == Adapter::Docx
                         && self.retains_source != Some(false)
                         && (DOCX_PART_WRITES.contains(&self.data().canonical)
-                            || self.data().canonical == "tab")
+                            || matches!(
+                                self.data().canonical,
+                                "tab" | "bookmark" | "field" | "toc"
+                            ))
                         && readable)
             }
             #[cfg(not(feature = "docx"))]
@@ -2927,7 +2930,14 @@ impl Element {
                 && self.retains_source != Some(false)
                 && (matches!(
                     self.data().canonical,
-                    "picture" | "chart" | "smartart" | "tab" | "break"
+                    "picture"
+                        | "chart"
+                        | "smartart"
+                        | "tab"
+                        | "break"
+                        | "bookmark"
+                        | "field"
+                        | "toc"
                 ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
@@ -3004,7 +3014,7 @@ impl Element {
                 && self.retains_source != Some(false)
                 && (matches!(
                     self.data().canonical,
-                    "tc" | "sdt" | "chart" | "tab" | "break"
+                    "tc" | "sdt" | "chart" | "tab" | "break" | "bookmark" | "toc"
                 ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]

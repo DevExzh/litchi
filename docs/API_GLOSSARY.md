@@ -2097,7 +2097,8 @@ the main story's paragraphs, simple and complex fields (instruction, cached
 result, nesting, lock and dirty state) and bookmarks, and rewrites field
 results without evaluating anything: `document::Edit::{fields,
 refresh_fields}` over the `document::fields` module (`Fields`, `Paragraph`,
-`Field`, `Bookmark`, `Update::{Text, Toc, Bookmark}`, `TocEntry`, `Outcome`).
+`Field`, `Bookmark`, `Update::{Text, Toc, Bookmark, Instruction, RenameBookmark,
+RemoveBookmark}` (the last three record 0325), `TocEntry`, `Outcome`).
 The XLSX worksheet edit stores a formula's cached result while keeping its
 formula markup (`WorksheetEdit::set_cached`). PPTX run-text edits accept a
 field run (`a:fld`) as their target, writing its cached result.
@@ -2555,6 +2556,7 @@ does.
 | `Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml}` and `source_backed::Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml, footnotes, endnotes}` | both owners | ✅ 0319 |
 | `document::ElementStep::SectionProperties` | the body-final `w:sectPr`, position 0, first step only | ✅ 0319 |
 | `Edit::insert_break_at(paragraph, at, RunBreakType) -> Position` | a new run holding one `w:br`, before direct run `at` or appended; returns the new run's position (record 0319, P1 marks) | ✅ 0319 |
+| `Edit::{insert_bookmark_at(paragraph, at, name, text) -> i64, insert_field_at(paragraph, at, instruction, result) -> Position}`; `document::fields::Update::{Instruction, RenameBookmark, RemoveBookmark}` | a bookmark around optional text (the identifier after the largest), a complex field with its cached result, before direct run `at` or appended; field instruction sets mark the field `w:dirty`; bookmark renames and marker-only removals, spliced through `refresh_fields` (record 0325) | ✅ 0325 |
 | `source_backed::Document::{bookmarks, text_boxes}` | the main story's bookmarks and text boxes, as the eager `Document` reads them | ✅ 0319 |
 
 ## XLSX worksheet feature families (record 0320)

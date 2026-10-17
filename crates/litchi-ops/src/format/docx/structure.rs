@@ -540,7 +540,7 @@ fn run_text(run: &mut NewRun, value: Option<crate::value::Scalar<'_>>) -> Result
     Ok(())
 }
 
-fn body_anchor(
+pub(super) fn body_anchor(
     docx: &Docx,
     placement: Option<&Placement<'_>>,
     _moving: bool,

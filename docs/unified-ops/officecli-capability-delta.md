@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `c3b6c7d4fecf9cb0e88c5f6ad010b1482c2d736093fb4ac521d4692482b3b996` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `16a115edabad9f9078692e6f6ba341f3fe64d40003623650fbc77b4ca97f8d78` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `453a35d4578dbbe240f45f07e65328203b889a646b77a16354904723e588a4f6` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `0b3b2a407dfc038ef7aa176ed03e7fd147efc2756bd74abbcea401fa4e3e5b4b` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
@@ -107,7 +107,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 290 | 2 | 58 | 0 | 233 | 2 | 376 | 267 |
+| docx | 289 | 2 | 58 | 0 | 237 | 2 | 373 | 268 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 559 |
@@ -133,7 +133,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 244 | 30 | 522 | 0 | 240 | 192 |
+| docx | 250 | 34 | 512 | 0 | 241 | 192 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
@@ -240,8 +240,8 @@ Property writes:
 | abstractNum | `level<N>.bold` | bool | a-- | a-- | write-only | supported |  |
 | abstractNum | `level<N>.italic` | bool | a-- | a-- | write-only | supported |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
-| bookmark | `name` | string | asg | --g | supported | gap |  |
-| bookmark | `text` | string | a-- |  | supported | gap | the node's text |
+| bookmark | `name` | string | asg | asg | supported | supported |  |
+| bookmark | `text` | string | a-- | a-- | write-only | supported |  |
 | bookmark | `id` | string | --g | --g | supported | — |  |
 | bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
@@ -616,17 +616,18 @@ Property writes:
 | equation | `mode` | enum | asg | --g | supported | gap |  |
 | equation | `formula` | string | as- |  | supported | gap | the node's text |
 | field | `evaluated` | bool | --g | --g | supported | — |  |
-| field | `fieldType` | enum | asg | --g | supported | gap |  |
-| field | `name` | string | asg |  | missing | gap |  |
+| field | `fieldType` | enum | asg | a-g | supported | partial |  |
+| field | `name` | string | asg | a-- | write-only | partial |  |
 | field | `id` | string | asg |  | missing | gap |  |
 | field | `expression` | string | as- |  | write-only | gap |  |
 | field | `trueText` | string | as- |  | write-only | gap |  |
 | field | `falseText` | string | as- |  | write-only | gap |  |
 | field | `hyperlink` | bool | as- |  | write-only | gap |  |
-| field | `format` | string | asg |  | missing | gap |  |
-| field | `instruction` | string | asg | --g | supported | gap |  |
+| field | `format` | string | asg | a-- | write-only | partial |  |
+| field | `instruction` | string | asg | asg | supported | supported |  |
 | field | `vertAlign` | enum | a-- |  | write-only | gap |  |
 | field | `fldLock` | bool | a-g | --g | supported | gap |  |
+| field | `text` | string |  | as- | litchi-only | litchi-only |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
 | footer | `type` | enum | asg | asg | supported | supported |  |
 | footer | `text` | string | asg | asg | supported | supported |  |
@@ -1433,10 +1434,10 @@ Property writes:
 | textbox | `rotation` | string | a-- |  | write-only | gap |  |
 | textbox | `shadow` | string | a-- |  | write-only | gap |  |
 | textbox | `alt` | string | a-- | --g | supported | gap |  |
-| toc | `levels` | string | asg | --g | supported | gap |  |
-| toc | `title` | string | asg |  | missing | gap |  |
-| toc | `hyperlinks` | bool | asg | --g | supported | gap |  |
-| toc | `pageNumbers` | bool | asg | --g | supported | gap |  |
+| toc | `levels` | string | asg | asg | supported | supported |  |
+| toc | `title` | string | asg | a-- | write-only | partial |  |
+| toc | `hyperlinks` | bool | asg | asg | supported | supported |  |
+| toc | `pageNumbers` | bool | asg | asg | supported | supported |  |
 | watermark | `text` | string | asg | --g | supported | gap |  |
 | watermark | `image` | string | as- |  | write-only | gap |  |
 | watermark | `color` | color | asg | --g | supported | gap |  |

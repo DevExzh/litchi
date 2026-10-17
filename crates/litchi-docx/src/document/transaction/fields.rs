@@ -243,6 +243,11 @@ pub struct Bookmark {
     id: Option<i64>,
     paragraph: Option<usize>,
     text: String,
+    /// The `w:bookmarkStart` tag and whether it is an empty element.
+    tag: Range<usize>,
+    empty: bool,
+    /// The matching empty `w:bookmarkEnd` element.
+    end: Option<Range<usize>>,
 }
 
 impl Bookmark {
@@ -574,6 +579,29 @@ pub enum Update {
         /// The bookmark name.
         name: String,
     },
+    /// Replace a field's instruction and mark it for update (`w:dirty`), as
+    /// OfficeCLI's field `set` does; the cached result is kept (record
+    /// 0325).
+    Instruction {
+        /// The field index.
+        field: usize,
+        /// The new instruction, written as one `w:instrText` (or the simple
+        /// field's `w:instr`).
+        instruction: String,
+    },
+    /// Rename a bookmark (record 0325).
+    RenameBookmark {
+        /// The bookmark index.
+        bookmark: usize,
+        /// The new name.
+        name: String,
+    },
+    /// Remove a bookmark's start and end markers, keeping what lies between
+    /// them (record 0325).
+    RemoveBookmark {
+        /// The bookmark index.
+        bookmark: usize,
+    },
 }
 
 /// Content-free counts of one refresh.
@@ -591,7 +619,7 @@ impl Outcome {
         self.fields
     }
 
-    /// Bookmarks added.
+    /// Bookmarks added, renamed or removed.
     #[must_use]
     pub const fn bookmarks(self) -> usize {
         self.bookmarks
@@ -1002,6 +1030,9 @@ impl Scanner<'_> {
                         id,
                         paragraph,
                         text: String::new(),
+                        tag: start..end,
+                        empty,
+                        end: None,
                     });
                 }
             },
@@ -1009,7 +1040,10 @@ impl Scanner<'_> {
                 if let Some(raw) = attribute(reader, element, b"id")?
                     && let Some(open) = self.open_bookmarks.iter().position(|(id, _)| *id == raw)
                 {
-                    self.open_bookmarks.remove(open);
+                    let (_, index) = self.open_bookmarks.remove(open);
+                    if empty && let Some(bookmark) = self.out.bookmarks.get_mut(index) {
+                        bookmark.end = Some(start..end);
+                    }
                 }
             },
             b"r" if !self.paragraphs.is_empty() && self.text.is_none() => {
@@ -1384,6 +1418,113 @@ fn entry_paragraph(prefix: &str, entry: &TocEntry) -> std::result::Result<String
     Ok(output)
 }
 
+/// The markup of a new bookmark around optional `text`: its start marker,
+/// a plain run, and its end marker (record 0325).
+pub(crate) fn bookmark_markup(
+    prefix: &str,
+    id: i64,
+    name: &str,
+    text: Option<&str>,
+) -> Result<Vec<u8>> {
+    check_text(name).map_err(|reason| refused(0, reason))?;
+    if name.is_empty() || name.chars().count() > 40 {
+        return Err(refused(0, Refusal::InvalidPropertyValue));
+    }
+    let mut out = format!("<{prefix}bookmarkStart {prefix}id=\"{id}\" {prefix}name=\"");
+    escape(&mut out, name);
+    out.push_str("\"/>");
+    if let Some(text) = text.filter(|text| !text.is_empty()) {
+        check_text(text).map_err(|reason| refused(0, reason))?;
+        out.push_str(&text_run(prefix, &[], text));
+    }
+    out.push_str(&format!("<{prefix}bookmarkEnd {prefix}id=\"{id}\"/>"));
+    Ok(out.into_bytes())
+}
+
+/// The markup of a new complex field: its begin, instruction, separate,
+/// result and end runs, each carrying `properties` (record 0325).
+pub(crate) fn field_markup(
+    prefix: &str,
+    properties: &[u8],
+    instruction: &str,
+    result: Option<&str>,
+) -> Result<Vec<u8>> {
+    check_text(instruction).map_err(|reason| refused(0, reason))?;
+    if instruction.trim().is_empty() {
+        return Err(refused(0, Refusal::InvalidPropertyValue));
+    }
+    let properties = String::from_utf8_lossy(properties);
+    let marker = |kind: &str| {
+        format!(
+            "<{prefix}r>{properties}<{prefix}fldChar {prefix}fldCharType=\"{kind}\"/></{prefix}r>"
+        )
+    };
+    let mut out = marker("begin");
+    out.push_str(&format!(
+        "<{prefix}r>{properties}<{prefix}instrText xml:space=\"preserve\">"
+    ));
+    escape(&mut out, instruction);
+    out.push_str(&format!("</{prefix}instrText></{prefix}r>"));
+    out.push_str(&marker("separate"));
+    if let Some(result) = result.filter(|result| !result.is_empty()) {
+        check_text(result).map_err(|reason| refused(0, reason))?;
+        out.push_str(&text_run(prefix, properties.as_bytes(), result));
+    }
+    out.push_str(&marker("end"));
+    Ok(out.into_bytes())
+}
+
+/// A start tag (or empty element) with attribute `local` (in the tag's
+/// own prefix, as WordprocessingML writes its attributes) set to `value`;
+/// `None` for a tag this cannot rewrite.
+fn with_attribute(tag: &[u8], local: &[u8], value: &str) -> Option<Vec<u8>> {
+    let text = std::str::from_utf8(tag).ok()?;
+    let body = text.strip_prefix('<')?;
+    let name_end = body.find(|c: char| c.is_whitespace() || c == '/' || c == '>')?;
+    let name = &body[..name_end];
+    let prefix = name.split_once(':').map_or("", |(prefix, _)| prefix);
+    let local = std::str::from_utf8(local).ok()?;
+    let qualified = if prefix.is_empty() {
+        local.to_owned()
+    } else {
+        format!("{prefix}:{local}")
+    };
+    let mut escaped = String::new();
+    for character in value.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\t' => escaped.push_str("&#9;"),
+            '\n' => escaped.push_str("&#10;"),
+            '\r' => escaped.push_str("&#13;"),
+            other => escaped.push(other),
+        }
+    }
+    for quote in ['"', '\''] {
+        let needle = format!(" {qualified}={quote}");
+        if let Some(at) = text.find(&needle) {
+            let value_start = at + needle.len();
+            let value_end = value_start + text[value_start..].find(quote)?;
+            let mut out = String::with_capacity(text.len() + escaped.len());
+            out.push_str(&text[..value_start - 1]);
+            out.push('"');
+            out.push_str(&escaped);
+            out.push('"');
+            out.push_str(&text[value_end + 1..]);
+            return Some(out.into_bytes());
+        }
+    }
+    let close = if text.ends_with("/>") {
+        text.len() - 2
+    } else {
+        text.len().checked_sub(1)?
+    };
+    let head = text[..close].trim_end();
+    Some(format!("{head} {qualified}=\"{escaped}\"{}", &text[close..]).into_bytes())
+}
+
 /// Add `dirty="true"` to an empty `fldChar` element.
 fn dirty_marker(element: &[u8], prefix: &str) -> Vec<u8> {
     let text = String::from_utf8_lossy(element);
@@ -1623,6 +1764,100 @@ impl Edit {
                         target.close_start,
                         format!("<{prefix}bookmarkEnd {prefix}id=\"{id}\"/>").into_bytes(),
                     ));
+                    outcome.bookmarks += 1;
+                },
+                Update::Instruction {
+                    field: index,
+                    instruction,
+                } => {
+                    check_text(instruction).map_err(|reason| refused(*index, reason))?;
+                    let field = fields
+                        .fields
+                        .get(*index)
+                        .ok_or_else(|| refused(*index, Refusal::FieldNotFound))?;
+                    if field.instruction == *instruction {
+                        continue;
+                    }
+                    let prefix = fields
+                        .paragraphs
+                        .get(field.begin_paragraph)
+                        .map_or("", |paragraph| paragraph.prefix.as_str());
+                    if let Some(simple) = &field.simple {
+                        let tag = &xml[simple.element.start..simple.start_tag_end];
+                        let rewritten = with_attribute(tag, b"instr", instruction)
+                            .and_then(|tag| with_attribute(&tag, b"dirty", "true"))
+                            .ok_or_else(|| refused(*index, Refusal::FieldInterior))?;
+                        splices.push((simple.element.start, simple.start_tag_end, rewritten));
+                    } else {
+                        let next = field
+                            .separate
+                            .as_ref()
+                            .or(field.end.as_ref())
+                            .ok_or_else(|| refused(*index, Refusal::FieldInterior))?;
+                        // The markers must be separate runs of one parent.
+                        if next.parent != field.begin.parent || field.begin.run.end > next.run.start
+                        {
+                            return Err(refused(*index, Refusal::FieldInterior));
+                        }
+                        let region = field.begin.run.end..next.run.start;
+                        // A field nested in the instruction is not rewritten.
+                        if xml[region.clone()]
+                            .windows(b"fldChar".len())
+                            .any(|window| window == b"fldChar")
+                        {
+                            return Err(refused(*index, Refusal::FieldInterior));
+                        }
+                        let properties = field
+                            .begin
+                            .properties
+                            .as_ref()
+                            .map_or(&[][..], |range| &xml[range.clone()]);
+                        let mut run = format!("<{prefix}r>");
+                        run.push_str(&String::from_utf8_lossy(properties));
+                        run.push_str(&format!("<{prefix}instrText xml:space=\"preserve\">"));
+                        escape(&mut run, instruction);
+                        run.push_str(&format!("</{prefix}instrText></{prefix}r>"));
+                        splices.push((region.start, region.end, run.into_bytes()));
+                        if let Some(character) = &field.begin.character {
+                            splices.push((
+                                character.start,
+                                character.end,
+                                dirty_marker(&xml[character.clone()], prefix),
+                            ));
+                        }
+                    }
+                    outcome.fields += 1;
+                },
+                Update::RenameBookmark { bookmark, name } => {
+                    check_text(name).map_err(|reason| refused(*bookmark, reason))?;
+                    if name.is_empty() || name.chars().count() > 40 {
+                        return Err(refused(*bookmark, Refusal::InvalidPropertyValue));
+                    }
+                    let target = fields
+                        .bookmarks
+                        .get(*bookmark)
+                        .ok_or_else(|| refused(*bookmark, Refusal::BlockNotFound))?;
+                    if target.name == *name {
+                        continue;
+                    }
+                    let tag = &xml[target.tag.clone()];
+                    let rewritten = with_attribute(tag, b"name", name)
+                        .ok_or_else(|| refused(*bookmark, Refusal::InvalidPropertyValue))?;
+                    splices.push((target.tag.start, target.tag.end, rewritten));
+                    outcome.bookmarks += 1;
+                },
+                Update::RemoveBookmark { bookmark } => {
+                    let target = fields
+                        .bookmarks
+                        .get(*bookmark)
+                        .ok_or_else(|| refused(*bookmark, Refusal::BlockNotFound))?;
+                    if !target.empty {
+                        return Err(refused(*bookmark, Refusal::ComplexContent));
+                    }
+                    splices.push((target.tag.start, target.tag.end, Vec::new()));
+                    if let Some(end) = &target.end {
+                        splices.push((end.start, end.end, Vec::new()));
+                    }
                     outcome.bookmarks += 1;
                 },
             }

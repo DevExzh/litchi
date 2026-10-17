@@ -169,6 +169,10 @@ fn ordinary_reports_hide_native_selection_fields() {
             // are added and removed.
             "tab" => (true, true, true),
             "break" => (false, true, true),
+            // Record 0325: bookmarks and tables of contents are set, added
+            // and removed; fields are set and added.
+            "bookmark" | "toc" => (true, true, true),
+            "field" => (true, true, false),
             _ => (false, false, false),
         };
         assert_eq!(operations.set, set, "{} set", element.name());

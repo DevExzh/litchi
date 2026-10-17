@@ -97,7 +97,7 @@ fn source_or<T>(
     docx.owner().finish(result)
 }
 
-fn bookmarks(docx: &Docx) -> Result<Vec<Bookmark>> {
+pub(super) fn bookmarks(docx: &Docx) -> Result<Vec<Bookmark>> {
     source_or(
         docx,
         |package| package.document()?.bookmarks(),
@@ -105,7 +105,7 @@ fn bookmarks(docx: &Docx) -> Result<Vec<Bookmark>> {
     )
 }
 
-fn fields(docx: &Docx) -> Result<Vec<Field>> {
+pub(super) fn fields(docx: &Docx) -> Result<Vec<Field>> {
     source_or(
         docx,
         |package| package.document()?.fields(),
@@ -113,7 +113,7 @@ fn fields(docx: &Docx) -> Result<Vec<Field>> {
     )
 }
 
-fn is_toc(field: &Field) -> bool {
+pub(super) fn is_toc(field: &Field) -> bool {
     field.field_type().eq_ignore_ascii_case("TOC")
 }
 
@@ -485,6 +485,22 @@ pub(crate) enum MarkSetter {
     TabKind,
     TabLeader,
     BreakType,
+    /// A bookmark's name, and its text on add (record 0325).
+    BookmarkName,
+    BookmarkText,
+    /// A field's type on add, its instruction, its cached result text, and
+    /// the name and format a typed field's instruction takes (record 0325).
+    FieldType,
+    FieldInstruction,
+    FieldText,
+    FieldName,
+    FieldFormat,
+    /// A table of contents' levels and switches, and its title on add
+    /// (record 0325).
+    TocLevels,
+    TocHyperlinks,
+    TocPageNumbers,
+    TocTitle,
 }
 
 /// A tab stop's `val` (`ST_TabJc`).
@@ -529,6 +545,28 @@ const fn read(name: &'static str, ty: ValueType) -> Entry<MarkSetter> {
     Entry::read(PropSpec::new(name, ty))
 }
 
+/// A key `get` reads and only `add` writes.
+const fn read_add(name: &'static str, ty: ValueType, setter: MarkSetter) -> Entry<MarkSetter> {
+    Entry {
+        spec: PropSpec::new(name, ty),
+        access: Access::Add(setter),
+        constraint: Constraint::None,
+        clear: false,
+    }
+}
+
+/// A key `set` and `add` write and `get` does not read.
+const fn write_only(name: &'static str, ty: ValueType, setter: MarkSetter) -> Entry<MarkSetter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    Entry {
+        spec,
+        access: Access::SetAndAdd(setter),
+        constraint: Constraint::None,
+        clear: false,
+    }
+}
+
 const fn add_only(name: &'static str, ty: ValueType, setter: MarkSetter) -> Entry<MarkSetter> {
     let mut spec = PropSpec::new(name, ty);
     spec.access.get = false;
@@ -558,30 +596,40 @@ crate::registry::registry! {
     }
 }
 
-// A bookmark: its name and native identifier.
+// A bookmark: its name and native identifier; `name` is renamed on set
+// and, with `text`, seeds a new one (record 0325).
 crate::registry::registry! {
     pub(crate) BOOKMARK_PROPS, BOOKMARK_REGISTRY: MarkSetter {
-    read("name", ValueType::Text),
+    rsa("name", ValueType::Text, MarkSetter::BookmarkName, Constraint::NotEmpty),
     read("id", ValueType::Text),
+    add_only("text", ValueType::Text, MarkSetter::BookmarkText),
     }
 }
 
-// A field: its type, instruction, lock and whether it has a result.
+// A field: its type, instruction, lock and whether it has a result. A new
+// field takes OfficeCLI's `fieldType` (with `name` and `format`) or a raw
+// `instruction`; `set` replaces the instruction or the result `text`
+// (record 0325).
 crate::registry::registry! {
     pub(crate) FIELD_PROPS, FIELD_REGISTRY: MarkSetter {
-    read("fieldType", ValueType::Text),
-    read("instruction", ValueType::Text),
+    read_add("fieldType", ValueType::Text, MarkSetter::FieldType),
+    rsa("instruction", ValueType::Text, MarkSetter::FieldInstruction, Constraint::NotEmpty),
     read("fldLock", ValueType::Bool),
     read("evaluated", ValueType::Bool),
+    write_only("text", ValueType::Text, MarkSetter::FieldText),
+    add_only("name", ValueType::Text, MarkSetter::FieldName),
+    add_only("format", ValueType::Text, MarkSetter::FieldFormat),
     }
 }
 
-// A table of contents, from its `TOC` field's switches.
+// A table of contents, from its `TOC` field's switches; written on add and
+// set, with a `title` heading on add (record 0325).
 crate::registry::registry! {
     pub(crate) TOC_PROPS, TOC_REGISTRY: MarkSetter {
-    read("levels", ValueType::Text),
-    read("hyperlinks", ValueType::Bool),
-    read("pageNumbers", ValueType::Bool),
+    rsa("levels", ValueType::Text, MarkSetter::TocLevels, Constraint::NotEmpty),
+    rsa("hyperlinks", ValueType::Bool, MarkSetter::TocHyperlinks, Constraint::None),
+    rsa("pageNumbers", ValueType::Bool, MarkSetter::TocPageNumbers, Constraint::None),
+    add_only("title", ValueType::Text, MarkSetter::TocTitle),
     }
 }
 
