@@ -2076,3 +2076,113 @@ fn refresh_saves_only_changed_documents() {
     let run = expect(4, ["refresh", arg(&workbook), "--clock", "2026-02-30"]);
     assert!(run.stderr.contains("invalid_value"), "{}", run.stderr);
 }
+
+/// `dump`, `raw`, `raw-set`, `add-part` and `validate` (record 0336): the
+/// dump replays through `batch`, the raw writes save in place, and the
+/// statuses follow the code families.
+#[test]
+fn dump_and_raw_layer_verbs() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let source = fixture("ooxml/docx/table_footnotes.docx");
+    let dump = expect(0, ["dump", arg(&source)]);
+    let items: Value = serde_json::from_str(dump.stdout.trim()).expect("a JSON array");
+    assert_eq!(items[0], json!({"command": "meta", "dumpVersion": 2}));
+    let expected = litchi_ops::open(&source).unwrap().dump().unwrap();
+    assert_eq!(items, serde_json::to_value(&expected).unwrap());
+
+    let script = directory.path().join("dump.json");
+    let copy = directory.path().join("copy.docx");
+    expect(0, ["dump", arg(&source), "--out", arg(&script)]);
+    expect(0, ["create", arg(&copy)]);
+    expect(0, ["batch", arg(&copy), "--input", arg(&script)]);
+    assert_eq!(
+        expect(0, ["view", arg(&copy), "text"]).stdout,
+        expect(0, ["view", arg(&source), "text"]).stdout
+    );
+
+    let parts = expect(0, ["--json", "raw", arg(&copy)]).json();
+    assert!(
+        parts
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|part| part["name"] == "/word/document.xml")
+    );
+    assert!(
+        expect(0, ["raw", arg(&copy), "/document"])
+            .stdout
+            .contains("<w:body")
+    );
+    expect(3, ["raw", arg(&copy), "/nothing"]);
+
+    let added = expect(0, ["add-part", arg(&copy), "/document", "--type", "header"]);
+    assert!(
+        added.stdout.starts_with("Created header part: relId=rId"),
+        "{}",
+        added.stdout
+    );
+    expect(0, ["raw", arg(&copy), "/header[1]"]);
+    let set = expect(
+        0,
+        [
+            "raw-set",
+            arg(&copy),
+            "/document",
+            "--xpath",
+            "//w:body",
+            "--action",
+            "prepend",
+            "--xml",
+            "<w:p><w:r><w:t>Raw first</w:t></w:r></w:p>",
+        ],
+    );
+    assert!(
+        set.stdout
+            .starts_with("raw-set applied: prepend at //w:body")
+    );
+    assert!(
+        expect(0, ["view", arg(&copy), "text"])
+            .stdout
+            .contains("Raw first")
+    );
+    expect(
+        3,
+        [
+            "raw-set",
+            arg(&copy),
+            "/document",
+            "--xpath",
+            "//w:tbl[9]",
+            "--action",
+            "remove",
+        ],
+    );
+    expect(
+        4,
+        [
+            "raw-set",
+            arg(&copy),
+            "/document",
+            "--xpath",
+            "//w:body",
+            "--action",
+            "frob",
+        ],
+    );
+
+    let valid = expect(0, ["validate", arg(&copy)]);
+    assert_eq!(valid.stdout.trim(), "Validation passed: no errors found.");
+    let report = expect(0, ["--json", "validate", arg(&copy)]).json();
+    assert_eq!(report["valid"], true);
+    assert_eq!(report["format"], "docx");
+    expect(
+        3,
+        [
+            "dump",
+            arg(&fixture("ooxml/pptx/line-chart.pptx")),
+            "/slide[1]",
+        ],
+    );
+    // PPT has no dump plan: unsupported_capability.
+    expect(5, ["dump", arg(&fixture("ole/ppt/SampleShow.ppt"))]);
+}

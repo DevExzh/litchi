@@ -102,12 +102,19 @@ fn every_format_has_one_answer_for_its_reads() {
         }
         // Import is a worksheet verb with its own answer (`m4_verbs_...`);
         // merge is a template verb (`merge_is_a_template_verb`); refresh
-        // has its own answer (`refresh_is_supported_where_fields_are_computed`).
+        // has its own answer (`refresh_is_supported_where_fields_are_computed`);
+        // the raw-layer writes answer by package kind (record 0336,
+        // `raw::tests::raw_layer_verbs_answer_by_package`).
         for verb in Verb::ALL.into_iter().filter(|verb| {
             verb.is_edit()
                 && !matches!(
                     verb,
-                    Verb::Import | Verb::Merge | Verb::Replace | Verb::Refresh
+                    Verb::Import
+                        | Verb::Merge
+                        | Verb::Replace
+                        | Verb::Refresh
+                        | Verb::AddPart
+                        | Verb::RawSet
                 )
         }) {
             #[cfg(feature = "pptx")]

@@ -81,7 +81,7 @@ FORMATS = ("docx", "xlsx", "pptx")
 LITCHI_VERBS = {
     "create", "get", "query", "view", "set", "add", "remove", "move", "swap",
     "batch", "capabilities", "schema", "import", "evaluate", "recalculate", "merge",
-    "refresh",
+    "refresh", "dump", "raw", "raw-set", "add-part", "validate",
 }
 # Separates a failed call's own property from the properties it skipped.
 SKIPPED_SEPARATOR = ";skipped:"
@@ -446,11 +446,12 @@ RULES: list[Rule] = [
     ),
     When(
         "G1", "gap", "Missing verbs",
-        "the raw layer (`validate`, `raw`, `raw-set`, `add-part`, design §12) and `dump` "
-        "(the verbs the corpus calls are counted per verb in the dispositions below)",
-        "absent from `litchi-ops`, the CLI and Python (audit WP5; record 0015 W10). "
-        "`import`, `evaluate`, `recalculate` (record 0266), `merge` (record 0274) and "
-        "`refresh` (record 0279) have landed and are not in this class",
+        "an OfficeCLI verb the `litchi` CLI does not have (counted per verb in the "
+        "dispositions below)",
+        "absent from `litchi-ops`, the CLI and Python. The raw layer (`validate`, `raw`, "
+        "`raw-set`, `add-part`) and `dump` landed in record 0336; `import`, `evaluate`, "
+        "`recalculate` (record 0266), `merge` (record 0274) and `refresh` (record 0279) "
+        "earlier; none of them is in this class",
         lambda c, e: c.result == "usage" and c.verb not in LITCHI_VERBS,
     ),
     When(
@@ -702,7 +703,7 @@ FOLLOW_UPS = [
      lambda c, v: c.verb == "view" and c.result == "usage"),
     ("F6", "`add --from`, find/replace on `set`, `remove --shift`, `get --save`",
      lambda c, v: v.rule in ("G2", "G3")),
-    ("D6", "missing verbs (`validate`, `raw-set`, `add-part`, `dump`)",
+    ("D6", "missing verbs (the raw layer and `dump` landed in record 0336)",
      lambda c, v: v.rule == "G1"),
 ]
 

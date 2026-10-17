@@ -101,6 +101,11 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
         Command::Recalculate(args) => crate::m4::recalculate(&args, json, out),
         Command::Merge(args) => crate::merge::merge(&args, json, out),
         Command::Refresh(args) => crate::refresh::refresh(&args, json, out),
+        Command::Dump(args) => crate::raw::dump(&args, json, out),
+        Command::Raw(args) => crate::raw::raw(&args, json, out),
+        Command::RawSet(args) => crate::raw::raw_set(&args, json, out),
+        Command::AddPart(args) => crate::raw::add_part(&args, json, out),
+        Command::Validate(args) => crate::raw::validate(&args, json, out),
     }
 }
 
