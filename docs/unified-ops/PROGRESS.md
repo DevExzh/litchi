@@ -716,6 +716,22 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - Writes within 1.3% of the leaf; `comment_get` 1.21 (+1.3 µs) misses.
   - Open (part to 0325): XLSX note fonts/runs, XLSB chart writes, x14 CF/DV authoring, a shared spreadsheet drawing module, cross-sheet DV formulas, a unified threaded-comment node.
 - Coordinator (2026-10-17): the query-walker agent (0315) hung for about 7 hours with no tool process; it was stopped and resumed from its transcript. Three 14-hour `pgrep -f` self-matching loops from 0310 were killed. `disk-guard.sh` now also reports any active agent whose transcript is idle for more than 60 minutes (`active-agents.txt`).
+- Merged `doc-gaps` (0324):
+  - DOC answers the DOCX paths and keys for styles, numbering, hyperlinks, bookmarks, fields, TOC, sections, tab stops, text boxes and shapes. Delta DOC elements 15 → 29, reads 39 → 156; CRUD checklist DOC 86 → 188 cells, all ok.
+  - `doc::Edit` gains paragraph/run styles, tab stops, `HYPERLINK` insert/remove, field instruction/result targets, bookmarks and section page setup; unedited bytes kept, patches invert exactly. LibreOffice 26.2 reads the edited files as intended.
+  - Writes within 1.02–1.07× of the leaf. Point reads miss by a fixed 0.3–0.6 µs (to 0326). Paragraph `format` is 5–9% slower because it returns seven more keys.
+  - Deferred: style/numbering/field/TOC writes, revisions (P2), form fields, equations, pictures/OLE, watermark; `sdt` is DOCX-only.
+- Merged `query-walker` (0315):
+  - Single-subject queries take a fast walker step (XLSX bytes 5–10% faster, ODS warm query −21%, ODT `query_all` 3.0–3.3× → 2.4–2.9×). The general step is kept byte-for-byte, to avoid a measured layout penalty.
+  - DOCX children share the fenced step's source check: `saut_page` 1.50× → 1.17×, `drawing` now meets. A per-handle XLS sheet-step cache cuts 26.7% of an eager `get` + text; writes invalidate it.
+  - Fair XLSB/ODS leaf legs and RTF typed-length routes added. Open misses stay at 98 (six closed, six new rows).
+  - Found: PPTX `*_all_shape` queries 15–35% slower on trunk since 0319–0321 (to 0326). The path parser and typed coercion are not started (to 0326).
+  - Coordinator: the agent hung for about 7 hours mid-task and was resumed (see above).
+- Merged `ppt-gaps` (0323):
+  - PPT elements supported 15 → 26 (against the PPTX vocabulary). Comments, shape and text hyperlinks, table cell text and run formatting are writable; line breaks, theme, charts, OLE and media frames are readable.
+  - New leaf mechanism `slide_order::records`: whole-record replacements that keep every other byte, with exact, inverse and durable patches. Table row/column add/remove is refused, typed (F1). Zoom, 3D models and modern comments are PPTX-only (wontfix).
+  - Writes 1.009–1.054× of the leaf; comment get 1.44× (+0.6 µs) and run get 3.1× (+1.5 µs) miss (to 0326).
+  - Merge fix: the appended glossary sections and test fixture/recipe lists conflicted with 0324; both sides kept, fidelity re-blessed.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
