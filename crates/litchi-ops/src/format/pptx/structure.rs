@@ -72,7 +72,7 @@ impl Pptx {
                 "this element kind cannot be added to a PPTX presentation yet",
             )
             .with_suggestion(
-                "addable: slide, shape (textbox), picture, chart, smartart (and its nodes), table row and column, hyperlink, media, comment, paragraph and run; capabilities() lists the gaps",
+                "addable: slide, shape (textbox), picture, chart, table (and its rows and columns), smartart (and its nodes), hyperlink, media, comment, paragraph and run; capabilities() lists the gaps",
             ));
         }
         if ["picture", "image", "img"]
@@ -109,6 +109,9 @@ impl Pptx {
         }
         if node.kind().eq_ignore_ascii_case("tr") || node.kind().eq_ignore_ascii_case("row") {
             return self.add_row(parent, node, limits);
+        }
+        if node.kind().eq_ignore_ascii_case("table") {
+            return self.add_table(parent, node, limits);
         }
         if ["paragraph", "p", "para"]
             .iter()
@@ -296,6 +299,7 @@ const ADDABLE: &[&str] = &[
     "column",
     "tr",
     "row",
+    "table",
     "hyperlink",
     "hlink",
     "video",

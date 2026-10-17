@@ -754,6 +754,11 @@ fn pptx_text_add(element: &str, property: &str) -> bool {
         && pptx_text_format_set(element, property)
         && !matches!(property, "link" | "tooltip"))
         || (element == "tr" && pptx_row_add(property))
+        || (element == "table"
+            && matches!(
+                property,
+                "name" | "rows" | "cols" | "x" | "y" | "width" | "height" | "data"
+            ))
 }
 
 #[cfg(feature = "pptx")]
@@ -791,6 +796,7 @@ fn pptx_write_only(element: &str, property: &str) -> bool {
         "shape" | "placeholder" => matches!(property, "fill" | "geometry"),
         "picture" => property == "src",
         "tr" => property != "height" && pptx_row_add(property),
+        "table" => property == "data",
         _ => false,
     }
 }

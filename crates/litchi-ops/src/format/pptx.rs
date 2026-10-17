@@ -93,7 +93,7 @@ pub(crate) use spec::{
 pub(crate) use spec::{
     COLUMN_CAPABILITY_PROPS, HYPERLINK_CAPABILITY_PROPS, LAYOUT_CAPABILITY_PROPS,
     MASTER_CAPABILITY_PROPS, MEDIA_CAPABILITY_PROPS, NODE_CAPABILITY_PROPS, ROW_CAPABILITY_PROPS,
-    SMARTART_CAPABILITY_PROPS, THEME_CAPABILITY_PROPS,
+    SMARTART_CAPABILITY_PROPS, TABLE_CAPABILITY_PROPS, THEME_CAPABILITY_PROPS,
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
@@ -140,11 +140,12 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     // Pictures (`src`) and legacy comments (record 0252).
     "picture",
     "comment",
-    // Paragraphs and runs of shape, cell and notes bodies, and table rows
-    // (record 0333).
+    // Paragraphs and runs of shape, cell and notes bodies, tables and table
+    // rows (record 0333).
     "paragraph",
     "run",
     "tr",
+    "table",
 ];
 
 /// The non-slide elements `remove` deletes when the owner admits shape
@@ -201,6 +202,7 @@ pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::s
         "slideLayout" => LAYOUT_CAPABILITY_PROPS,
         "col" => COLUMN_CAPABILITY_PROPS,
         "tr" => ROW_CAPABILITY_PROPS,
+        "table" => TABLE_CAPABILITY_PROPS,
         "hyperlink" => HYPERLINK_CAPABILITY_PROPS,
         "video" | "audio" | "media" => MEDIA_CAPABILITY_PROPS,
         _ => return None,

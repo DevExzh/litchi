@@ -8,6 +8,10 @@
 //! OfficeCLI keeps it, and vertical merges stay consistent: a row is not
 //! inserted inside one, and removing a row shrinks the merges it is part of.
 //!
+//! `add(/slide[N], table, {rows, cols, data, x, y, width, height, name})`
+//! inserts a table (OfficeCLI's defaults: three by three, `data` rows split
+//! by `;` and cells by `,`, padded to the widest row).
+//!
 //! Source owners are promoted to an eager package, as column writes are.
 
 use std::sync::Arc;
@@ -16,7 +20,7 @@ use litchi_core::Position;
 use litchi_core::selector::Path;
 
 use super::node::{Item, TableItem, TreeItem};
-use super::spec::{Kind, ROW_WRITE_TABLE, RowSetter};
+use super::spec::{Kind, ROW_WRITE_TABLE, RowSetter, TABLE_WRITE_TABLE, TableSetter};
 use super::structure::{bound, error};
 use super::write::{Commit, Proof, validate_text};
 use super::{Editable, Nav, Pptx};
@@ -299,5 +303,157 @@ impl Pptx {
             Item::Row(item) => Some(item.clone()),
             _ => None,
         })
+    }
+}
+
+/// OfficeCLI's table frame defaults (EMU).
+const TABLE_X: i64 = 457_200;
+const TABLE_Y: i64 = 1_600_200;
+const TABLE_WIDTH: i64 = 8_229_600;
+const TABLE_ROW_HEIGHT: i64 = 370_840;
+
+impl Pptx {
+    /// `add(/slide[N], table, {rows, cols, data, x, y, width, height, name})`
+    /// (record 0333).
+    pub(super) fn add_table(
+        &self,
+        parent: PathArg<'_>,
+        node: NewNode<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<(Commit, Path<'static>)> {
+        let resolved = crate::path::resolve::get(&Nav::new(self), &parent)?;
+        let Item::Slide(slide) = resolved.item() else {
+            return Err(error(
+                Code::UnsupportedType,
+                "tables require a slide parent",
+            ));
+        };
+        let slide = slide.position as usize;
+        drop(resolved);
+        if !matches!(node.placement(), None | Some(Placement::End)) {
+            return Err(error(
+                Code::UnsupportedCapability,
+                "table insertion supports end placement",
+            )
+            .with_suggestion("omit placement or use Placement::End"));
+        }
+        bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+        let mut rows = None;
+        let mut cols = None;
+        let mut data: Option<String> = None;
+        let mut name = None;
+        let mut frame = [None; 4];
+        let mut seen = 0_u32;
+        for (key, value) in node.props().iter() {
+            let (index, entry) = TABLE_WRITE_TABLE
+                .resolve(key.as_str())
+                .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+            let bit = 1_u32 << index;
+            if seen & bit != 0 {
+                return Err(error(
+                    Code::InvalidArgument,
+                    "a table property was assigned more than once",
+                )
+                .with_property(entry.spec.name));
+            }
+            seen |= bit;
+            entry.prepare(Operation::Add, value, |setter, value| {
+                match (setter, value) {
+                    (TableSetter::Rows, Some(Scalar::Int(value))) => rows = Some(value),
+                    (TableSetter::Cols, Some(Scalar::Int(value))) => cols = Some(value),
+                    (TableSetter::Data, Some(Scalar::Text(value))) => {
+                        bound(
+                            LimitKind::StagedBytes,
+                            value.len(),
+                            limits.max_staged_bytes(),
+                        )?;
+                        validate_text(value).map_err(|e| e.with_property("data"))?;
+                        data = Some(value.to_owned());
+                    },
+                    (TableSetter::Name, Some(Scalar::Text(value))) => {
+                        validate_text(value).map_err(|e| e.with_property("name"))?;
+                        name = Some(value.to_owned());
+                    },
+                    (setter, Some(Scalar::Length(length))) => {
+                        let index = match setter {
+                            TableSetter::X => 0,
+                            TableSetter::Y => 1,
+                            TableSetter::Width => 2,
+                            _ => 3,
+                        };
+                        frame[index] = Some(length.emu());
+                    },
+                    _ => {},
+                }
+                Ok(())
+            })?;
+        }
+        // `data` fixes the grid, which `rows`/`cols` may only widen
+        // (OfficeCLI); without data the grid is `rows` × `cols`, three by
+        // three by default.
+        let mut cells: Vec<Vec<String>> = match &data {
+            Some(data) => data
+                .split(';')
+                .map(|row| row.split(',').map(|cell| cell.trim().to_owned()).collect())
+                .collect(),
+            None => Vec::new(),
+        };
+        let wanted = |value: Option<i64>| value.and_then(|value| usize::try_from(value).ok());
+        let (row_count, col_count) = if data.is_some() {
+            let width = cells.iter().map(Vec::len).max().unwrap_or(0);
+            (
+                cells.len().max(wanted(rows).unwrap_or(0)),
+                width.max(wanted(cols).unwrap_or(0)),
+            )
+        } else {
+            (wanted(rows).unwrap_or(3), wanted(cols).unwrap_or(3))
+        };
+        if row_count == 0 || col_count == 0 {
+            return Err(error(
+                Code::InvalidValue,
+                "a table has at least one row and one column",
+            )
+            .with_property("data"));
+        }
+        cells.resize_with(row_count, Vec::new);
+        for row in &mut cells {
+            row.resize(col_count, String::new());
+        }
+        let bounds = (
+            frame[0].unwrap_or(TABLE_X),
+            frame[1].unwrap_or(TABLE_Y),
+            frame[2].unwrap_or(TABLE_WIDTH),
+            frame[3].unwrap_or(TABLE_ROW_HEIGHT.saturating_mul(row_count as i64)),
+        );
+        let scene = self
+            .slide_scene(slide)?
+            .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
+        let ordinal = scene
+            .roots()
+            .filter(|shape| super::steps::tree_kind(shape) == Some(Kind::Table))
+            .count();
+        let name = name.unwrap_or_else(|| format!("Table {}", ordinal + 1));
+        let source = self.editable_owner()?;
+        let base = super::smartart::eager(&source)?;
+        let mut edit = base.edit()?;
+        edit.add_table(slide, &cells, bounds)?;
+        // The new table is the last shape of the slide in pre-order.
+        edit.set_shape_name(slide, scene.len(), &name)?;
+        let (target, patch) = edit.commit()?.into_parts();
+        let target = Arc::new(target);
+        let after = self.adopt_eager(Arc::clone(&target));
+        let path = Path::parse(&format!("/slide[{}]/table[{}]", slide + 1, ordinal + 1))
+            .map(Path::into_owned)
+            .map_err(|_| error(Code::InternalError, "the table path does not parse"))?;
+        Ok((
+            Commit {
+                after,
+                source,
+                target: Editable::Eager(target),
+                proof: Proof::Eager(patch),
+                operations: 1,
+            },
+            path,
+        ))
     }
 }

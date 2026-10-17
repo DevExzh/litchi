@@ -1457,7 +1457,7 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
@@ -1481,19 +1481,30 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
           "set": false,
           "get": true
         },
         "rows": {
           "type": "int",
-          "add": false,
+          "constraint": {
+            "min": 1,
+            "max": 5000
+          },
+          "add": true,
           "set": false,
           "get": true
         },
         "cols": {
           "type": "int",
-          "add": false,
+          "constraint": {
+            "min": 1,
+            "max": 5000
+          },
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1542,28 +1553,36 @@
         "x": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "y": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "width": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "constraint": {
+            "minEmu": 1,
+            "maxEmu": 9223372036854775807
+          },
+          "add": true,
           "set": false,
           "get": true
         },
         "height": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "constraint": {
+            "minEmu": 1,
+            "maxEmu": 9223372036854775807
+          },
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1572,6 +1591,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "propertyGaps": {

@@ -191,3 +191,58 @@ fn rows_are_removed_but_one_is_kept() {
         );
     }
 }
+
+#[test]
+fn tables_are_added_from_data_or_a_grid() {
+    let bytes = fixture();
+    for eager in [false, true] {
+        let file = open(&bytes, eager);
+        let added = file
+            .add(
+                "/slide[1]",
+                NewNode::new("table")
+                    .prop("data", "Name,Score;Ann,9;Bob")
+                    .prop("x", "1in")
+                    .prop("width", "4in")
+                    .prop("name", "Scores"),
+            )
+            .unwrap();
+        assert_eq!(added.path.to_string(), "/slide[1]/table[2]");
+        let file = reopen(&added.file, eager);
+        let table = "/slide[1]/table[2]";
+        assert_eq!(prop(&file, table, "rows").as_deref(), Some("3"));
+        assert_eq!(prop(&file, table, "cols").as_deref(), Some("2"));
+        assert_eq!(prop(&file, table, "name").as_deref(), Some("Scores"));
+        assert_eq!(text(&file, "/slide[1]/table[2]/tr[2]/tc[2]"), "9");
+        assert_eq!(text(&file, "/slide[1]/table[2]/tr[3]/tc[2]"), "");
+        // The default grid is three by three; rows and cols widen data.
+        let grid = file.add("/slide[1]", NewNode::new("table")).unwrap();
+        assert_eq!(prop(&grid.file, "/slide[1]/table[3]", "rows").as_deref(), Some("3"));
+        assert_eq!(prop(&grid.file, "/slide[1]/table[3]", "cols").as_deref(), Some("3"));
+        assert_eq!(
+            prop(&grid.file, "/slide[1]/table[3]", "name").as_deref(),
+            Some("Table 3")
+        );
+        let wide = file
+            .add(
+                "/slide[1]",
+                NewNode::new("table").prop("data", "a").prop("cols", 4),
+            )
+            .unwrap();
+        assert_eq!(prop(&wide.file, "/slide[1]/table[3]", "cols").as_deref(), Some("4"));
+        // The new table takes row and column edits.
+        let more = grid
+            .file
+            .add("/slide[1]/table[3]", NewNode::new("tr").prop("c3", "z"))
+            .unwrap();
+        assert_eq!(text(&more.file, "/slide[1]/table[3]/tr[4]/tc[3]"), "z");
+        assert_eq!(
+            code(file.add("/slide[1]", NewNode::new("table").prop("rows", 0))),
+            Code::InvalidValue
+        );
+        assert_eq!(
+            code(file.add("/slide[1]/table[1]", NewNode::new("table"))),
+            Code::UnsupportedType
+        );
+    }
+}

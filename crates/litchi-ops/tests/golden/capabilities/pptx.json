@@ -1231,7 +1231,7 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
@@ -1255,19 +1255,19 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "rows": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "cols": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1315,25 +1315,25 @@
         },
         "x": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "y": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "width": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "height": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1342,6 +1342,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

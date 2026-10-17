@@ -355,4 +355,88 @@ impl Edit {
         self.note_scene_read(&selected.part_name);
         Ok(true)
     }
+
+    /// Rename a shape-tree element of a slide (`p:cNvPr@name`, record
+    /// 0333). Returns whether the slide changed; an equal name is an exact
+    /// no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing slide or shape, an empty name, a name
+    /// with a character XML cannot carry or over 64 KiB, or
+    /// markup-compatibility content.
+    pub fn set_shape_name<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        name: &str,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        if name.is_empty()
+            || name.len() > MAX_DESCRIPTION_BYTES
+            || !name.chars().all(super::is_xml_char)
+        {
+            return Err(invalid("opened-presentation shape name is invalid"));
+        }
+        let key = shape.into();
+        let owner = self.working.get_part(&selected.part_name)?;
+        let xml = owner.blob();
+        let scene = crate::shape::Scene::read(xml)?;
+        if scene.is_rewritten() {
+            return Err(Error::UnsafeEdit {
+                operation: "set_shape_name",
+                reason: "shape edits do not select markup-compatibility branches",
+            });
+        }
+        let target = scene.shape(key)?;
+        let span = target.common().span()?.range(xml.len())?;
+        let tag = first_start_tag(&xml[span.clone()], b"cNvPr")?
+            .ok_or_else(|| invalid("the shape has no p:cNvPr"))?;
+        let tag = span.start + tag.start..span.start + tag.end;
+        let raw = &xml[tag.clone()];
+        let escaped = escape_attribute(name);
+        let rewritten =
+            match attribute_value(raw, b"name").filter(|(_, key, _)| key.as_slice() == b"name") {
+                Some((value, _, _)) => {
+                    if &raw[value.clone()] == escaped.as_bytes() {
+                        return Ok(false);
+                    }
+                    let mut out = raw[..value.start].to_vec();
+                    out.extend_from_slice(escaped.as_bytes());
+                    out.extend_from_slice(&raw[value.end..]);
+                    out
+                },
+                None => {
+                    let close = if raw.ends_with(b"/>") {
+                        raw.len() - 2
+                    } else {
+                        raw.len() - 1
+                    };
+                    let mut out = raw[..close].to_vec();
+                    out.extend_from_slice(b" name=\"");
+                    out.extend_from_slice(escaped.as_bytes());
+                    out.push(b'"');
+                    out.extend_from_slice(&raw[close..]);
+                    out
+                },
+            };
+        let mut next = Vec::with_capacity(xml.len() + rewritten.len());
+        next.extend_from_slice(&xml[..tag.start]);
+        next.extend_from_slice(&rewritten);
+        next.extend_from_slice(&xml[tag.end..]);
+        let staged = crate::shape::Scene::read(&next)?;
+        if staged.len() != scene.len()
+            || scene
+                .iter()
+                .zip(staged.iter())
+                .any(|(left, right)| left.id() != right.id())
+        {
+            return Err(invalid("the shape name edit did not round-trip"));
+        }
+        self.working
+            .get_part_mut(&selected.part_name)?
+            .set_blob(next);
+        self.note_scene_read(&selected.part_name);
+        Ok(true)
+    }
 }

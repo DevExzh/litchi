@@ -108,3 +108,19 @@ fn descriptions_are_set_and_removed() -> Result<()> {
     assert_eq!(slide_xml(&cleared)?, slide_xml(&package)?);
     Ok(())
 }
+
+#[test]
+fn shapes_are_renamed() -> Result<()> {
+    let package = deck()?;
+    let mut edit = package.edit()?;
+    assert!(edit.set_shape_name(0usize, 0usize, "Logo & mark")?);
+    assert!(!edit.set_shape_name(0usize, 0usize, "Logo & mark")?);
+    assert!(edit.set_shape_name(0usize, 0usize, "").is_err());
+    let renamed = edit.commit()?.into_package();
+    let xml = slide_xml(&renamed)?;
+    assert!(
+        xml.windows(b"name=\"Logo &amp; mark\"".len())
+            .any(|window| window == b"name=\"Logo &amp; mark\"")
+    );
+    Ok(())
+}

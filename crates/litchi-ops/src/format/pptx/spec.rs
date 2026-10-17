@@ -2710,6 +2710,86 @@ pub(super) const LAYOUT_WRITE_TABLE: crate::registry::Table<(), { LAYOUT_PROPS.l
     crate::registry::Table::new(named_write_entries(LAYOUT_PROPS), []);
 pub(crate) const LAYOUT_CAPABILITY_PROPS: &[PropSpec] = &LAYOUT_WRITE_TABLE.readable();
 
+/// Table insertion assignments (record 0333): OfficeCLI's `add --type
+/// table` keys Litchi authors: `rows`, `cols`, `data`, `name` and the frame.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum TableSetter {
+    Name,
+    Rows,
+    Cols,
+    X,
+    Y,
+    Width,
+    Height,
+    Data,
+}
+const TABLE_WRITE_COUNT: usize = TABLE_PROPS.len() + 1;
+const fn table_write_entries() -> [crate::registry::Entry<TableSetter>; TABLE_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(TABLE_PROPS[0]); TABLE_WRITE_COUNT];
+    let mut index = 0;
+    while index < TABLE_PROPS.len() {
+        let spec = TABLE_PROPS[index];
+        let setter = if index == TableKey::Name as usize {
+            Some(TableSetter::Name)
+        } else if index == TableKey::Rows as usize {
+            Some(TableSetter::Rows)
+        } else if index == TableKey::Cols as usize {
+            Some(TableSetter::Cols)
+        } else if index == TableKey::X as usize {
+            Some(TableSetter::X)
+        } else if index == TableKey::Y as usize {
+            Some(TableSetter::Y)
+        } else if index == TableKey::Width as usize {
+            Some(TableSetter::Width)
+        } else if index == TableKey::Height as usize {
+            Some(TableSetter::Height)
+        } else {
+            None
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: Access::Add(setter),
+                constraint: match setter {
+                    TableSetter::Rows | TableSetter::Cols => Constraint::Int { min: 1, max: 5_000 },
+                    TableSetter::Width | TableSetter::Height => Constraint::Length {
+                        min: crate::value::Length::from_emu(1),
+                        max: crate::value::Length::from_emu(i64::MAX),
+                    },
+                    TableSetter::Name => Constraint::NotEmpty,
+                    _ => Constraint::None,
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries[TABLE_PROPS.len()] = Entry {
+        spec: write_only("data", ValueType::Text),
+        access: Access::Add(TableSetter::Data),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries
+}
+pub(super) const TABLE_WRITE_TABLE: crate::registry::Table<TableSetter, TABLE_WRITE_COUNT, 2> =
+    crate::registry::Table::new(
+        table_write_entries(),
+        [
+            crate::registry::Alias {
+                name: "w",
+                entry: TableKey::Width as usize,
+            },
+            crate::registry::Alias {
+                name: "h",
+                entry: TableKey::Height as usize,
+            },
+        ],
+    );
+pub(crate) const TABLE_CAPABILITY_PROPS: &[PropSpec] = &TABLE_WRITE_TABLE.readable();
+
 /// Table row assignments (record 0333): `height` on `add` and `set`; on
 /// `add`, OfficeCLI's `cols` check and `c1`…`c20` seed texts.
 #[derive(Clone, Copy, PartialEq, Eq)]
