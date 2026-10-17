@@ -83,9 +83,8 @@ impl Pptx {
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Commit>> {
-        if !metadata::is_target(target)
-            && !(metadata::is_root(target) && metadata::names_metadata(props))
-        {
+        let root = metadata::is_root(target) && metadata::names_metadata(props);
+        if !(metadata::is_target(target) || root) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Pptx)?;

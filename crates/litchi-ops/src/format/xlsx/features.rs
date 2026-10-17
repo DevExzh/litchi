@@ -819,7 +819,8 @@ keyed!(PictureKey, PictureKey, PICTURE_TABLE, PICTURE_PROPS, PICTURE_KEYS, [
     entry(read("flip", TEXT), Access::SetAndAdd(PictureKey::Flip)) => Flip,
     entry(read("contentType", TEXT), Access::ReadOnly) => ContentType,
     entry(read("fileSize", INT), Access::ReadOnly) => FileSize,
-    entry(write_only("src", TEXT), Access::Add(PictureKey::Src)) => Src,
+    // `set src` replaces the image (record 0338).
+    entry(write_only("src", TEXT), Access::SetAndAdd(PictureKey::Src)) => Src,
     entry(write_only("anchor", TEXT), Access::Add(PictureKey::Anchor)) => Anchor,
     entry(write_only("flipH", BOOL), Access::SetAndAdd(PictureKey::FlipH)) => FlipH,
     entry(write_only("flipV", BOOL), Access::SetAndAdd(PictureKey::FlipV)) => FlipV,

@@ -556,11 +556,12 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
         }));
         // Chart writes have their own report test (`tests/charts.rs`),
         // worksheet features theirs (`tests/xlsx_features.rs`, record 0320),
-        // and the root's metadata keys theirs (`tests/root_metadata.rs`,
-        // record 0338).
+        // the root's metadata keys theirs (`tests/root_metadata.rs`, record
+        // 0338), and rich-text runs theirs (`tests/xlsx_cells_runs.rs`).
         if matches!(
             element.name(),
             "workbook"
+                | "run"
                 | "chart"
                 | "series"
                 | "axis"
@@ -637,6 +638,11 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                         | "superscript"
                         | "subscript"
                         | "merge"
+                        // Record 0338: the cell type, rich-text runs and
+                        // the address of an added cell.
+                        | "type"
+                        | "runs"
+                        | "ref"
                 );
             let write_only = (cell_write
                 && ((element.name() == "range" && property.name() != "merge")
@@ -648,6 +654,8 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                             | "border.all"
                             | "border.color"
                             | "border.all.color"
+                            | "runs"
+                            | "ref"
                     )))
                 || (matches!(element.name(), "row" | "column") && property.name() == "outline")
                 || (element.name() == "sheet" && property.name() == "merge")
@@ -662,7 +670,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                 );
             assert_eq!(
                 property.set(),
-                cell_write
+                (cell_write && property.name() != "ref")
                     || sheet_write
                     || dimension_write
                     || link_write
@@ -670,7 +678,16 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                 "{}",
                 property.name()
             );
-            assert_eq!(property.add(), sheet_write, "{}", property.name());
+            // Record 0338: an added cell takes the cell setters.
+            let cell_add = element.name() == "cell"
+                && cell_write
+                && !matches!(property.name(), "clear" | "merge");
+            assert_eq!(
+                property.add(),
+                sheet_write || cell_add,
+                "{}",
+                property.name()
+            );
         }
     }
 }

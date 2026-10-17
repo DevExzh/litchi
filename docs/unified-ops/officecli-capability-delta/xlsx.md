@@ -48,80 +48,80 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | aboveaverage | `direction` | string |  | --- | litchi-only | — |  |  |  |
 | autofilter | `range` | string | asg | asg | supported | supported |  |  |  |
 | autofilter | `criteria0` | string | a-- | a-- | write-only | supported |  |  |  |
-| cell | `value` | string | asg | -s- | write-only | partial | P0 | planned WP16 (xlsx-p0-residue) |  |
-| cell | `formula` | string | asg | -sg | supported | partial | P0 | planned WP16 (xlsx-p0-residue) |  |
-| cell | `numberformat` | string | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `font.bold` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `font.italic` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `font.name` | string | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `font.size` | font-size | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `font.color` | color | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `fill` | color | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `fillPattern` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `fillBg` | color | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `strike` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `underline` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| cell | `value` | string | asg | as- | write-only | supported |  |  |  |
+| cell | `formula` | string | asg | asg | supported | supported |  |  |  |
+| cell | `numberformat` | string | asg | asg | supported | supported |  |  |  |
+| cell | `font.bold` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `font.italic` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `font.name` | string | asg | asg | supported | supported |  |  |  |
+| cell | `font.size` | font-size | asg | asg | supported | supported |  |  |  |
+| cell | `font.color` | color | asg | asg | supported | supported |  |  |  |
+| cell | `fill` | color | asg | asg | supported | supported |  |  |  |
+| cell | `fillPattern` | enum | asg | asg | supported | supported |  |  |  |
+| cell | `fillBg` | color | asg | asg | supported | supported |  |  |  |
+| cell | `strike` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `underline` | enum | asg | asg | supported | supported |  |  |  |
 | cell | `locked` | bool | as- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `protection.locked` | bool | --g | -sg | supported | litchi-only |  |  |  |
-| cell | `protection.hidden` | bool | --g | -sg | supported | litchi-only |  |  |  |
+| cell | `protection.locked` | bool | --g | asg | supported | litchi-only |  |  |  |
+| cell | `protection.hidden` | bool | --g | asg | supported | litchi-only |  |  |  |
 | cell | `numFmtId` | number | --g |  | raw-only | — | P1 | out-of-scope (native-selection) | ADR 0034: native selection requires explicit raw admission |
 | cell | `phonetic` | string | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
-| cell | `quotePrefix` | bool | --g | -sg | supported | litchi-only |  |  |  |
-| cell | `alignment.horizontal` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `alignment.vertical` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `alignment.wrapText` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `alignment.readingOrder` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| cell | `quotePrefix` | bool | --g | asg | supported | litchi-only |  |  |  |
+| cell | `alignment.horizontal` | enum | asg | asg | supported | supported |  |  |  |
+| cell | `alignment.vertical` | enum | asg | asg | supported | supported |  |  |  |
+| cell | `alignment.wrapText` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `alignment.readingOrder` | enum | asg | asg | supported | supported |  |  |  |
 | cell | `merge` | string | as- | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `ref` | string | a-- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| cell | `ref` | string | a-- | a-- | write-only | supported |  |  |  |
 | cell | `link` | string | asg | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `tooltip` | string | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `display` | string | asg | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `type` | enum | asg | --g | supported | gap | P0 | planned WP16 (xlsx-p0-residue) |  |
-| cell | `runs` | string | a-- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| cell | `type` | enum | asg | asg | supported | supported |  |  |  |
+| cell | `runs` | string | a-- | as- | write-only | supported |  |  |  |
 | cell | `clear` | bool | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `shift` | string | a-- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `arrayformula` | string | as- | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `cachedValue` | string | --g | --g | supported | — |  |  |  |
 | cell | `computedValue` | string | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M4 follow-up: project computed values in cell views |
 | cell | `evaluated` | bool | --g | --g | supported | — |  |  |  |
-| cell | `alignment.indent` | number | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `alignment.shrinkToFit` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `alignment.textRotation` | number | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.diagonal` | string | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.diagonal.color` | color | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.diagonalDown` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.diagonalUp` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border` | string | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.all` | string | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.top` | string | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.bottom` | string | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.left` | string | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.right` | string | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.color` | color | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| cell | `alignment.indent` | number | asg | asg | supported | supported |  |  |  |
+| cell | `alignment.shrinkToFit` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `alignment.textRotation` | number | asg | asg | supported | supported |  |  |  |
+| cell | `border.diagonal` | string | asg | asg | supported | supported |  |  |  |
+| cell | `border.diagonal.color` | color | asg | asg | supported | supported |  |  |  |
+| cell | `border.diagonalDown` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `border.diagonalUp` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `border` | string | as- | as- | write-only | supported |  |  |  |
+| cell | `border.all` | string | as- | as- | write-only | supported |  |  |  |
+| cell | `border.top` | string | asg | asg | supported | supported |  |  |  |
+| cell | `border.bottom` | string | asg | asg | supported | supported |  |  |  |
+| cell | `border.left` | string | asg | asg | supported | supported |  |  |  |
+| cell | `border.right` | string | asg | asg | supported | supported |  |  |  |
+| cell | `border.color` | color | as- | as- | write-only | supported |  |  |  |
 | cell | `arrayref` | string | --g | --g | supported | — |  |  |  |
 | cell | `mergeAnchor` | bool | --g | --g | supported | — |  |  |  |
 | cell | `empty` | bool | --g | --g | supported | — |  |  |  |
 | cell | `richtext` | bool | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
-| cell | `subscript` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `superscript` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
+| cell | `subscript` | bool | asg | asg | supported | supported |  |  |  |
+| cell | `superscript` | bool | asg | asg | supported | supported |  |  |  |
 | cell | `image` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `alt` | string | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
 | cell | `image.contentType` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `image.fileSize` | int | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `border.left.color` | color |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `border.right.color` | color |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `border.top.color` | color |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `border.bottom.color` | color |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `font.outline` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `font.shadow` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `font.condense` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `font.extend` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `font.charset` | int |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `font.family` | int |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `font.scheme` | enum |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `alignment.relativeIndent` | int |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `alignment.justifyLastLine` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
-| cell | `border.all.color` | color |  | -s- | litchi-only | litchi-only |  |  |  |
+| cell | `border.left.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `border.right.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `border.top.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `border.bottom.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `font.outline` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `font.shadow` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `font.condense` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `font.extend` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `font.charset` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `font.family` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `font.scheme` | enum |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `alignment.relativeIndent` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `alignment.justifyLastLine` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cell | `border.all.color` | color |  | as- | litchi-only | litchi-only |  |  |  |
 | cellis | `ref` | string | a-g | asg | supported | supported |  |  |  |
 | cellis | `operator` | enum | a-g | asg | supported | supported |  |  |  |
 | cellis | `value` | string | a-g | asg | supported | supported |  |  |  |
@@ -873,7 +873,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `contentType` | string | --g | --g | supported | — |  |  |  |
 | picture | `fileSize` | number | --g | --g | supported | — |  |  |  |
 | picture | `relId` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| picture | `src` | string | as- | a-- | write-only | partial | P0 | planned WP16 (xlsx-p0-residue) |  |
+| picture | `src` | string | as- | as- | write-only | supported |  |  |  |
 | pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
 | pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
 | pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
@@ -965,6 +965,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | range | `border.diagonal.color` | color |  | -s- | litchi-only | litchi-only |  |  |  |
 | range | `border.diagonalUp` | bool |  | -s- | litchi-only | litchi-only |  |  |  |
 | range | `border.diagonalDown` | bool |  | -s- | litchi-only | litchi-only |  |  |  |
+| range | `type` | enum |  | -s- | litchi-only | litchi-only |  |  |  |
+| range | `runs` | string |  | -s- | litchi-only | litchi-only |  |  |  |
+| range | `ref` | string |  | --- | litchi-only | — |  |  |  |
 | row | `matchedTable` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | row | `tableSource` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | row | `cols` | int | a-- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
@@ -978,14 +981,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | rowbreak | `manual` | bool | -s- | asg | supported | supported |  |  |  |
 | rowbreak | `min` | int | -s- | asg | supported | supported |  |  |  |
 | rowbreak | `max` | int | -s- | asg | supported | supported |  |  |  |
-| run | `subscript` | bool | asg |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
-| run | `superscript` | bool | asg |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
-| run | `bold` | bool | asg |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
-| run | `color` | color | asg |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
-| run | `font` | string | as- |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
-| run | `italic` | bool | asg |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
-| run | `size` | font-size | asg |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
-| run | `text` | string | asg |  | element gap | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
+| run | `subscript` | bool | asg | asg | supported | supported |  |  |  |
+| run | `superscript` | bool | asg | asg | supported | supported |  |  |  |
+| run | `bold` | bool | asg | asg | supported | supported |  |  |  |
+| run | `color` | color | asg | asg | supported | supported |  |  |  |
+| run | `font` | string | as- | asg | supported | supported |  |  |  |
+| run | `italic` | bool | asg | asg | supported | supported |  |  |  |
+| run | `size` | font-size | asg | asg | supported | supported |  |  |  |
+| run | `text` | string | asg | as- | write-only | supported |  |  |  |
+| run | `strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| run | `underline` | enum |  | asg | litchi-only | litchi-only |  |  |  |
 | shape | `hyperlink` | string | a-g | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | shape | `reflection` | string | asg | --- | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | shape | `anchor` | string | a-- | a-- | write-only | supported |  |  |  |

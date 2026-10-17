@@ -28,8 +28,8 @@ Every delta, named gap and element/property group carries a disposition (`tools/
 
 | Family | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 1555 | 0 | 29 | 45 | 4 | 0 | 0 | 20 | 20/20 |
-| excel/charts | 743 | 451 | 0 | 255 | 22 | 15 | 0 | 0 | 32 | 32/32 |
+| excel | 1633 | 1567 | 0 | 20 | 42 | 4 | 0 | 0 | 20 | 20/20 |
+| excel/charts | 743 | 454 | 0 | 258 | 16 | 15 | 0 | 0 | 32 | 32/32 |
 | ppt | 310 | 131 | 32 | 35 | 141 | 2 | 1 | 0 | 10 | 12/12 |
 | ppt/charts | 735 | 318 | 113 | 402 | 14 | 1 | 0 | 0 | 28 | 28/28 |
 | ppt/ole | 26 | 19 | 2 | 0 | 5 | 0 | 2 | 0 | 6 | 6/6 |
@@ -40,7 +40,7 @@ Every delta, named gap and element/property group carries a disposition (`tools/
 | ppt/textboxes | 132 | 50 | 10 | 17 | 65 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
 | word | 1133 | 662 | 3 | 197 | 198 | 36 | 40 | 0 | 24 | 32/32 |
-| **total** | **6431** | **3953** | **344** | **1192** | **644** | **201** | **441** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3968** | **344** | **1186** | **635** | **201** | **441** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -50,14 +50,14 @@ The format is the extension of the document each call names.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | docx | 949 | 512 | 0 | 194 | 167 | 36 | 40 | 0 | 22 | 30/30 |
 | pptx | 2959 | 1288 | 344 | 714 | 410 | 146 | 401 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 2153 | 0 | 284 | 67 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **3953** | **344** | **1192** | **644** | **201** | **441** | **0** | **177** | **200/200** |
+| xlsx | 2523 | 2168 | 0 | 278 | 58 | 19 | 0 | 0 | 56 | 56/56 |
+| **total** | **6431** | **3968** | **344** | **1186** | **635** | **201** | **441** | **0** | **177** | **200/200** |
 
 ## v1-scope subset (design §14)
 
 Design §14 requires the v1-scope subset of the corpus green, with every remaining delta recorded. The subset is every counted line of the scripts whose tier (`corpusScripts` in `tools/officecli_dispositions.json`) is P0 or v1 (design §13). A line is **accounted** when every gap class it carries (its delta, named gap or element/property group; each property a warned call skipped; for a cascade, the refused call it follows) is `wontfix`, `deferred-P1`, `deferred-P2` or `out-of-scope`, and **open** otherwise (a `planned` class, a bug, a class without a disposition, or skipped properties the outcome's detail bound left out). The subset is green when no line is open.
 
-**Status: red.** 3443 v1 lines: 1882 passed, 945 accounted, 616 open.
+**Status: red.** 3443 v1 lines: 1897 passed, 948 accounted, 598 open.
 
 Script tiers:
 
@@ -78,8 +78,8 @@ Script tiers:
 
 | Family | v1 lines | passed | wontfix | deferred-P1 | deferred-P2 | out-of-scope | open |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| excel | 454 | 424 | 4 | 4 | 0 | 0 | 22 |
-| excel/charts | 743 | 451 | 5 | 194 | 0 | 0 | 93 |
+| excel | 454 | 436 | 4 | 4 | 0 | 0 | 10 |
+| excel/charts | 743 | 454 | 5 | 197 | 0 | 0 | 87 |
 | ppt | 12 | 4 | 0 | 3 | 0 | 0 | 5 |
 | ppt/charts | 735 | 318 | 1 | 399 | 0 | 0 | 17 |
 | ppt/pictures | 68 | 36 | 0 | 0 | 0 | 15 | 17 |
@@ -87,7 +87,7 @@ Script tiers:
 | ppt/tables | 457 | 95 | 0 | 8 | 0 | 0 | 354 |
 | ppt/textboxes | 132 | 50 | 0 | 17 | 0 | 0 | 65 |
 | word | 718 | 458 | 30 | 195 | 0 | 0 | 35 |
-| **total** | **3443** | **1882** | **40** | **890** | **0** | **15** | **616** |
+| **total** | **3443** | **1897** | **40** | **893** | **0** | **15** | **598** |
 
 Open v1 lines by what blocks them (the first class that does not account for the line):
 
@@ -96,7 +96,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | planned WP3 | 432 | `ppt/pictures/pictures-basic.sh:87`, `ppt/pictures/pictures-basic.sh:97`, `ppt/pictures/pictures-basic.sh:107` |
 | unverified: skipped properties beyond the outcome's 48-character detail bound | 93 | `excel/charts/charts-area.sh:209`, `excel/charts/charts-area.sh:254`, `excel/charts/charts-area.sh:288` |
 | planned WP5 | 57 | `excel/cell-formatting.sh:199`, `excel/charts.sh:213`, `excel/charts.sh:214` |
-| planned WP16 | 18 | `excel/cell-formatting.sh:124`, `excel/cell-formatting.sh:126`, `excel/cell-formatting.sh:128` |
 | planned WP4 | 15 | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154`, `word/pictures.sh:81` |
 | planned 0253 | 1 | `word/document-formatting.sh:28` |
 
@@ -566,13 +565,11 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | chart | `warned` | `bubbleScale` | 10 | not in the registry; OfficeCLI documents it | `excel/charts/charts-advanced.sh:84`, `excel/charts/charts-advanced.sh:227` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.bubbleScale` |
 | add | chart | `warned` | `series.outline` | 10 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:224`, `excel/charts/charts-bar.sh:110` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.seriesoutline` |
 | add | chart | `warned` | `chartArea.border` | 9 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:254`, `excel/charts/charts-bar.sh:364` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.chartborder` |
-| set | cell | `warned` | `type` | 9 | registry: `type` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:124`, `excel/cell-formatting.sh:126` | P0 | planned WP16 (xlsx-p0-residue) via delta `cell.type` |
 | add | chart | `warned` | `gradients` | 7 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:135`, `excel/charts/charts-bar.sh:230` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.gradients` |
 | add | chart | `warned` | `plotArea.x` | 7 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-area.sh:318`, `excel/charts/charts-bar.sh:348` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `plotArea.y` | 7 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-area.sh:318`, `excel/charts/charts-bar.sh:348` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `roundedCorners` | 7 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:152`, `excel/charts/charts-bar.sh:242` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.roundedCorners` |
 | add | sparkline | `unsupported_element` | - | 7 | registry gap M1-extended (R4x) | `excel/sparklines.sh:55`, `excel/sparklines.sh:57` | P2 | deferred-P2 0332 (xlsx-breadth) via delta `sparkline` |
-| add | cell | `unsupported_element` | - | 6 | registry: no add on cell | `excel/cell-formatting.sh:181`, `excel/cell-formatting.sh:183` | P0 | planned WP16 (xlsx-cell-add) |
 | add | chart | `warned` | `axisNumFmt` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:164`, `excel/charts/charts-bar.sh:155` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.axisnumfmt` |
 | add | chart | `warned` | `catAxisLine` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:262`, `excel/charts/charts-basic.sh:130` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.cataxisline` |
 | add | chart | `warned` | `colorRule` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:380`, `excel/charts/charts-basic.sh:418` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.colorrule` |
@@ -597,7 +594,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | chart | `warned` | `series3.marker` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-advanced.sh:63`, `excel/charts/charts-scatter.sh:92` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | set | workbook | `warned` | `(more)` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/workbook-settings.sh:43`, `excel/workbook-settings.sh:47` |  | unverified (detail bound) |
 | add | chart | `skipped` | `(more)` | 3 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-histogram.sh:460`, `excel/charts/charts-pie.sh:49` |  | unverified (detail bound) |
-| add | chart | `unsupported_capability` | - | 3 | registry lists add; refused for this target (operation gap) | `excel/charts/charts-basic.sh:159`, `excel/charts/charts-column.sh:79` | v1 | planned WP16 (xlsx-cell-add) |
 | add | chart | `warned` | `areafill` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:123`, `excel/charts/charts-area.sh:351` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.areafill` |
 | add | chart | `warned` | `axisReverse` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:275`, `excel/charts/charts-column.sh:241` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.axisorientation` |
 | add | chart | `warned` | `axisVisible` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-basic.sh:232`, `excel/charts/charts-column.sh:272` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.axisvisible` |
@@ -605,6 +601,7 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | chart | `warned` | `dataLabel2.delete` | 3 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-area.sh:288`, `excel/charts/charts-column.sh:303` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `minorTickMark` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-basic.sh:375`, `excel/charts/charts-column.sh:256` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.minorTickMark` |
 | add | chart | `warned` | `preset` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-extended.sh:258`, `excel/charts/charts-extended.sh:280` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.preset` |
+| add | chart | `warned` | `series1.categories` | 3 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-basic.sh:159`, `excel/charts/charts-column.sh:79` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `shape` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:183`, `excel/charts/charts-column.sh:442` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.shape` |
 | add | slicer | `unsupported_element` | - | 3 | registry gap M1-extended (R4x) | `excel/slicers.sh:81`, `excel/slicers.sh:92` | P2 | deferred-P2 0332 (xlsx-breadth) via delta `slicer` |
 | add | chart | `warned` | `crosses` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:449`, `excel/charts/charts-line.sh:589` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.crosses` |
@@ -655,6 +652,7 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | chart | `warned` | `series1.trendline.equation` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-scatter.sh:161` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `series1.trendline.name` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-scatter.sh:189` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `series1.trendline.rsquared` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-scatter.sh:175` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
+| add | chart | `warned` | `series2.categories` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-column.sh:79` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `series2.trendline` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-scatter.sh:203` | P1 | deferred-P1 0332 (corpus-xlsx-breadth) |
 | add | chart | `warned` | `serlines` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:473` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.serlines` |
 | add | chart | `warned` | `shownegbubbles` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bubble.sh:194` | P1 | deferred-P1 0332 (xlsx-breadth) via delta `chart.shownegbubbles` |
@@ -717,7 +715,7 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1192 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1186 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
 | F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 131 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
@@ -728,19 +726,19 @@ None.
 
 | Script | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `excel/cell-formatting.sh` | 109 | 95 | 0 | 10 | 4 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/cell-formatting.sh` | 109 | 107 | 0 | 1 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts.sh` | 320 | 313 | 0 | 3 | 4 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-advanced.sh` | 17 | 10 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-area.sh` | 92 | 74 | 0 | 16 | 1 | 1 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-bar.sh` | 82 | 57 | 0 | 20 | 1 | 4 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-basic.sh` | 102 | 76 | 0 | 24 | 2 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-basic.sh` | 102 | 76 | 0 | 25 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-boxwhisker.sh` | 13 | 6 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bubble.sh` | 24 | 7 | 0 | 13 | 4 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-column.sh` | 102 | 77 | 0 | 23 | 2 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bubble.sh` | 24 | 10 | 0 | 13 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-column.sh` | 102 | 77 | 0 | 24 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-combo.sh` | 23 | 8 | 0 | 13 | 1 | 1 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-extended.sh` | 28 | 13 | 0 | 14 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-histogram.sh` | 37 | 7 | 0 | 28 | 1 | 1 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-line.sh` | 108 | 75 | 0 | 31 | 2 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-line.sh` | 108 | 75 | 0 | 32 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-pie.sh` | 18 | 6 | 0 | 4 | 1 | 7 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-radar.sh` | 23 | 8 | 0 | 13 | 1 | 1 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-scatter.sh` | 33 | 11 | 0 | 21 | 1 | 0 | 0 | 0 | 2 | 2/2 |
@@ -824,4 +822,4 @@ None.
 | `word/sections.sh` | 33 | 28 | 0 | 1 | 4 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 210 | 3 | 108 | 39 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **3953** | **344** | **1192** | **644** | **201** | **441** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3968** | **344** | **1186** | **635** | **201** | **441** | **0** | **177** | **200/200** |

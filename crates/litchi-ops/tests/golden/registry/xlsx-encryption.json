@@ -346,7 +346,7 @@
         "range"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -376,14 +376,14 @@
             "Date",
             "Unknown"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "formula": {
           "type": "string",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -423,7 +423,7 @@
             "bold"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -433,7 +433,7 @@
             "italic"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -445,7 +445,7 @@
             "strikethrough"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -461,7 +461,7 @@
             "doubleAccounting"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -472,7 +472,7 @@
           ],
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -482,7 +482,7 @@
             "font.superscript"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -492,7 +492,7 @@
             "font.subscript"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -508,7 +508,7 @@
             "maxEmu": 5194300
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -522,7 +522,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -537,7 +537,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -570,7 +570,7 @@
             "gray75": "darkGray"
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -578,7 +578,7 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -603,7 +603,7 @@
             "slantDashDot"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -611,7 +611,7 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -636,7 +636,7 @@
             "slantDashDot"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -644,7 +644,7 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -669,7 +669,7 @@
             "slantDashDot"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -677,7 +677,7 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -702,7 +702,7 @@
             "slantDashDot"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -710,7 +710,7 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -735,7 +735,7 @@
             "slantDashDot"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -743,21 +743,21 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.diagonalUp": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.diagonalDown": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -768,7 +768,7 @@
             "wraptext"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -792,7 +792,7 @@
             "centeracrossselection": "centerContinuous"
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -809,7 +809,7 @@
             "distributed"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -825,7 +825,7 @@
             "max": 255
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -839,7 +839,7 @@
             "max": 255
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -851,7 +851,7 @@
             "alignment.shrink"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -876,7 +876,7 @@
             "righttoleft": "rtl"
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -886,7 +886,7 @@
             "locked"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -896,14 +896,14 @@
             "formulahidden"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "quotePrefix": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -917,7 +917,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -937,28 +937,28 @@
         "font.outline": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.shadow": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.condense": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.extend": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -969,7 +969,7 @@
             "max": 255
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -980,7 +980,7 @@
             "max": 5
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -992,21 +992,21 @@
             "minor"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.relativeIndent": {
           "type": "int",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.justifyLastLine": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -1016,7 +1016,7 @@
             "text"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -1045,7 +1045,7 @@
             "none"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -1071,7 +1071,7 @@
             "none"
           ],
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -1079,7 +1079,7 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -1087,8 +1087,23 @@
           "type": "color",
           "colorContext": "spreadsheet",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
+          "get": false
+        },
+        "runs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "ref": {
+          "type": "string",
+          "aliases": [
+            "address"
+          ],
+          "add": true,
+          "set": false,
           "get": false
         },
         "link": {
@@ -1880,6 +1895,42 @@
           "clearable": true,
           "add": false,
           "set": true,
+          "get": false
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "string",
+            "number",
+            "boolean",
+            "date",
+            "error",
+            "richtext"
+          ],
+          "valueAliases": {
+            "bool": "boolean",
+            "err": "error",
+            "num": "number",
+            "rich": "richtext",
+            "str": "string"
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "runs": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "ref": {
+          "type": "string",
+          "aliases": [
+            "address"
+          ],
+          "add": false,
+          "set": false,
           "get": false
         }
       }
@@ -4255,7 +4306,7 @@
         "src": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "anchor": {
@@ -4730,22 +4781,146 @@
       "element": "run",
       "parent": "cell",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/<A1>/run[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
-        "reason": "the XLSX cell model flattens rich-text runs into plain text"
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "aliases": [
+            "font.bold"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "aliases": [
+            "font.italic"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "aliases": [
+            "font.strike"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting",
+            "none"
+          ],
+          "valueAliases": {
+            "0": "none",
+            "1": "single",
+            "dbl": "double",
+            "doubleacct": "doubleAccounting",
+            "false": "none",
+            "no": "none",
+            "off": "none",
+            "on": "single",
+            "singleacct": "singleAccounting",
+            "true": "single",
+            "yes": "single"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "aliases": [
+            "font.size",
+            "fontsize"
+          ],
+          "unit": "pt",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 5194300
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "aliases": [
+            "font.color"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "aliases": [
+            "font.name",
+            "fontname"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     }
   ],

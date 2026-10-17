@@ -50,7 +50,8 @@ impl Xlsx {
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Commit>> {
-        if !metadata::is_target(target) && !(metadata::is_root(target) && !props.is_empty()) {
+        let root = metadata::is_root(target) && !props.is_empty();
+        if !(metadata::is_target(target) || root) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Xlsx)?;

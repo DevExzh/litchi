@@ -1470,6 +1470,8 @@ impl Xlsx {
         let mut geometry = Geometry::default();
         let (mut flip_h, mut flip_v) = (None, None);
         let picture = feature.kind == Kind::Picture;
+        // A new image for the picture (record 0338).
+        let mut image = None;
         let admitted: Vec<(Option<PictureKey>, Option<ShapeKey>, &'static str, Arg)> = if picture {
             admit(&features::PICTURE_TABLE, Operation::Set, props)?
                 .into_iter()
@@ -1494,6 +1496,7 @@ impl Xlsx {
                 (Some(PictureKey::FlipH), _) | (_, Some(ShapeKey::FlipH)) => "flipH",
                 (Some(PictureKey::FlipV), _) | (_, Some(ShapeKey::FlipV)) => "flipV",
                 (Some(PictureKey::FlipBoth), _) | (_, Some(ShapeKey::FlipBoth)) => "flipBoth",
+                (Some(PictureKey::Src), _) => "src",
                 _ => {
                     return Err(
                         error(Code::UnsupportedProperty, "the property is not settable")
@@ -1515,6 +1518,21 @@ impl Xlsx {
                     flip_v = Some(v);
                 },
                 "flipH" => flip_h = Some(arg.flag()),
+                "src" => {
+                    let src = arg.text().ok_or_else(|| {
+                        error(Code::InvalidValue, "src names an image file or a data URI")
+                            .with_property("src")
+                    })?;
+                    let bytes = read_source(&src)?;
+                    let (content_type, extension) = classify(&bytes).ok_or_else(|| {
+                        error(
+                            Code::UnsupportedCapability,
+                            "the picture is not a PNG, JPEG, GIF, BMP or TIFF image",
+                        )
+                        .with_property("src")
+                    })?;
+                    image = Some((bytes, content_type, extension));
+                },
                 "flipBoth" => {
                     flip_h = Some(arg.flag());
                     flip_v = Some(arg.flag());
@@ -1536,6 +1554,16 @@ impl Xlsx {
         let mut edit = source.edit_drawings()?;
         edit.set(sheet, kind, feature.index as usize, &change)
             .map_err(authored)?;
+        if let Some((bytes, content_type, extension)) = image {
+            edit.replace_image(
+                sheet,
+                feature.index as usize,
+                bytes,
+                content_type,
+                extension,
+            )
+            .map_err(|failure| authored(failure).with_property("src"))?;
+        }
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         Ok(self.publish(source, commit.into_package(), changed))

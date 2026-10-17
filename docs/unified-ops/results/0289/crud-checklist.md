@@ -15,9 +15,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused |
 |---|---|---|---|---|---|---|---|---|---|
-| docx | 41 | 302 | 302 | 0 | 0 | 78 | 83 | 8 | 36 |
-| xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 |
-| pptx | 37 | 279 | 279 | 0 | 0 | 65 | 73 | 2 | 40 |
+| docx | 41 | 305 | 305 | 0 | 0 | 78 | 80 | 8 | 36 |
+| xlsx | 26 | 206 | 206 | 0 | 0 | 65 | 25 | 2 | 20 |
+| pptx | 37 | 282 | 282 | 0 | 0 | 65 | 70 | 2 | 40 |
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
 | xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 |
@@ -44,7 +44,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| document | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| document | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | body | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | run | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
@@ -88,14 +88,14 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## xlsx
 
-- fixtures: `create()`, `ooxml/xlsx/DataValidationListTooLong.xlsx`, `poi/test-data/spreadsheet/47889.xlsx`, `ooxml/xlsx/column_style.xlsx`, `ooxml/xlsx/ExcelTables.xlsx`, `ooxml/xlsx/named-ranges-global.xlsx`, `ooxml/xlsx/SimpleScatterChart.xlsx`, `libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx`, `create() + add sheet`, `create() + add comment`, `create() + add chart`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
+- fixtures: `create()`, `ooxml/xlsx/DataValidationListTooLong.xlsx`, `poi/test-data/spreadsheet/47889.xlsx`, `ooxml/xlsx/column_style.xlsx`, `ooxml/xlsx/ExcelTables.xlsx`, `ooxml/xlsx/named-ranges-global.xlsx`, `ooxml/xlsx/SimpleScatterChart.xlsx`, `libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx`, `create() + add sheet`, `create() + add cell`, `create() + add comment`, `create() + add chart`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`, `create() + add sheet + add run`
 - document views on `ooxml/xlsx/DataValidationListTooLong.xlsx`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| workbook | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| workbook | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | sheet | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | ok | n/a | refused | refused | ok | ok | ok | ok |
 | range | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | column | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
@@ -118,7 +118,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | rowbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | colbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
-| run | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| run | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 
 ## pptx
 
@@ -127,7 +127,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| presentation | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| presentation | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | placeholder | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |

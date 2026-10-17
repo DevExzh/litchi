@@ -2832,6 +2832,7 @@ impl Element {
                         | "chart"
                         | "series"
                         | "axis"
+                        | "run"
                 ) || crate::format::xlsx::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
@@ -2912,7 +2913,7 @@ impl Element {
         let structural = structural
             || (self.adapter == Adapter::Xlsx
                 && self.retains_source != Some(false)
-                && (matches!(self.data().canonical, "sheet" | "chart")
+                && (matches!(self.data().canonical, "sheet" | "chart" | "run")
                     || crate::format::xlsx::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "pptx")]
@@ -2929,6 +2930,13 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let add = structural;
+        // XLSX cells are added, not removed: a cell is cleared (record 0338).
+        #[cfg(feature = "xlsx")]
+        let add = add
+            || (self.adapter == Adapter::Xlsx
+                && self.retains_source != Some(false)
+                && self.data().canonical == "cell"
+                && readable);
         // DOCX pictures are addable but not yet removable (record 0251d);
         // charts are both (record 0283).
         #[cfg(feature = "docx")]

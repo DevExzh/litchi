@@ -29,8 +29,8 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `61c9304cc0e1ab3992e1062a25e59d905b5d89970dbd80d8ebcbfa1b0af78159` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `456328bd718fdf2c24e154b8548069f96170d9ea2bdffdb54a78c77ef82cf4bb` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `ee3294b75f1127c4713bfe8fdfd468db2c92857504805c8b773f580f48728bac` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `0146e0cad75aca13eafeb4e2126692bd6637b1735f5d8a5364b533ffdfb2f99b` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `0c4efc630e6bb9affd4dfe15ae1930ce34bbf6909a12378f697fbdfc58059e40` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `0dcca5a64b3b61a1f442e09dd0dbaf2d33e8ed40daf3acdbba92c04dede6b2d9` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `6769b6e588c2abedd1e298586c7c90cd0741f3bf4147db3a12cf1ff7f2abe77c` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `264c125d573ab6fc72f3c7e1a5b4ca8e9264b101986b98cfb9873d61d68077ad` |
@@ -89,7 +89,7 @@ Elements:
 | docx | 31 | 4 | 0 | 0 | 0 | 9 | 2 | 6 |
 | doc | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
 | rtf | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
-| xlsx | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
+| xlsx | 34 | 4 | 0 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
 | xls | 29 | 9 | 0 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 29 | 3 | 0 | 0 | 0 | 1 | 1 | 9 |
@@ -115,7 +115,7 @@ Property reads:
 | docx | 289 | 2 | 58 | 0 | 237 | 2 | 0 | 373 | 269 |
 | doc | 157 | 0 | 59 | 0 | 237 | 1 | 0 | 507 | 59 |
 | rtf | 109 | 0 | 59 | 0 | 241 | 1 | 0 | 551 | 36 |
-| xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 0 | 145 | 559 |
+| xlsx | 340 | 12 | 79 | 0 | 114 | 1 | 0 | 145 | 564 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 0 | 159 | 430 |
 | xls | 244 | 4 | 263 | 0 | 74 | 1 | 0 | 105 | 400 |
 | pptx | 228 | 19 | 30 | 0 | 123 | 0 | 0 | 287 | 269 |
@@ -141,7 +141,7 @@ Property writes:
 | docx | 255 | 39 | 502 | 0 | 246 | 188 |
 | doc | 10 | 29 | 757 | 0 | 27 | 197 |
 | rtf | 15 | 35 | 746 | 0 | 23 | 178 |
-| xlsx | 223 | 60 | 261 | 0 | 524 | 182 |
+| xlsx | 268 | 26 | 250 | 0 | 528 | 183 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 157 | 24 | 363 | 0 | 359 | 188 |
 | pptx | 123 | 34 | 404 | 0 | 151 | 244 |
@@ -182,7 +182,7 @@ Element gap rows:
 | docx | 4 | 5 | 2 | 0 | 4 | 0 |
 | doc | 1 | 11 | 1 | 0 | 4 | 0 |
 | rtf | 1 | 11 | 1 | 0 | 4 | 0 |
-| xlsx | 2 | 2 | 4 | 0 | 0 | 0 |
+| xlsx | 1 | 2 | 4 | 0 | 0 | 0 |
 | xlsb | 1 | 3 | 4 | 0 | 0 | 0 |
 | xls | 8 | 0 | 4 | 0 | 0 | 0 |
 | pptx | 1 | 0 | 3 | 0 | 1 | 0 |
@@ -208,7 +208,7 @@ Property gap rows:
 | docx | 90 | 533 | 35 | 0 | 19 | 0 |
 | doc | 0 | 882 | 35 | 0 | 19 | 0 |
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
-| xlsx | 12 | 318 | 79 | 0 | 1 | 0 |
+| xlsx | 0 | 285 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
 | xls | 189 | 219 | 79 | 0 | 1 | 0 |
 | pptx | 44 | 438 | 57 | 0 | 12 | 0 |
@@ -231,9 +231,9 @@ All gap rows by tier:
 
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| P0 | 61 | 0 | 0 | 0 | 4 | 0 |
+| P0 | 48 | 0 | 0 | 0 | 4 | 0 |
 | v1 | 39 | 0 | 0 | 0 | 0 | 0 |
-| P1 | 453 | 6044 | 0 | 0 | 44 | 0 |
+| P1 | 453 | 6011 | 0 | 0 | 44 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -253,14 +253,13 @@ properties share its entry unless an entry names the property):
 | xls-breadth | deferred | 0327 | 219 | `delta:xls:*.*` | XLS property breadth of supported elements; XLS is outside the v1 boundary |
 | ods-breadth | deferred | 0327 | 247 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
 | docx-breadth | deferred | 0332 | 575 | `delta:docx:*` | DOCX P1/P2 surface and formatting breadth beyond §13 P0 |
-| xlsx-breadth | deferred | 0332 | 403 | `delta:xlsx:*` | XLSX P1/P2 surface and formatting breadth beyond §13 P0 |
+| xlsx-breadth | deferred | 0332 | 370 | `delta:xlsx:*` | XLSX P1/P2 surface and formatting breadth beyond §13 P0 |
 | pptx-breadth | deferred | 0332 | 498 | `delta:pptx:*` | PPTX P1/P2 surface and formatting breadth beyond §13 P0 |
 | raw-layer | planned | WP5 | 11 | `delta:*:raw` | the raw XML layer (`raw`, `raw-set`, `add-part`, `validate`): design §12, audit WP5 |
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
 | docx-p0-residue | planned | WP4 | 82 | `delta:docx:chart-axis`, `delta:docx:chart-series`, `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:comment.*`, `delta:docx:hyperlink.*`, `delta:docx:picture.*`, `delta:docx:table.style` | DOCX P0/v1 residue: chart series and axes, table columns, table and row writes, comment set, picture set/remove, style and list application |
 | pptx-p0-residue | planned | WP3 | 44 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:paragraph.text`, `delta:pptx:run.text`, `delta:pptx:picture.*`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text`, `delta:pptx:table.style` | PPTX P0/v1 residue: paragraph/run add and remove, comment remove, picture set, slide text and layout writes |
-| xlsx-p0-residue | planned | WP16 | 13 | `delta:xlsx:run`, `delta:xlsx:cell.value`, `delta:xlsx:cell.formula`, `delta:xlsx:cell.type`, `delta:xlsx:picture.src` | XLSX P0/v1 residue (WP16, proposed in record 0332): rich-text runs, `add` of a cell, the cell type, picture source replacement |
 | mermaid-diagram | out-of-scope |  | 83 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
 | complex-field-parts | out-of-scope |  | 16 | `delta:*:fieldChar`, `delta:*:instrText` | Litchi models a complex field as one `field` node (field refresh, record 0279); its `fldChar`/`instrText` runs are raw markup (design §12) |
 | numbering-native-ids | out-of-scope |  | 20 | `delta:*:abstractNum.id`, `delta:*:abstractNum.abstractNumId`, `delta:*:num.id`, `delta:*:num.numId`, `delta:*:level.ilvl` | a numbering identifier is a native identity, addressed only by raw paths (ADR 0034, record 0319) |
@@ -576,7 +575,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
-| run | run | gap | P0 | planned WP16 (xlsx-p0-residue) | M1-extended (R4x) |
+| run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
 | slicer | slicer | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
@@ -589,7 +588,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | workbook | workbook | supported |  |  |  |
 |  | mergeCell | litchi-only |  |  | M1-extended (R4x) |
 
-Properties: 1250 rows, 410 of them gaps, in [`xlsx.md`](officecli-capability-delta/xlsx.md).
+Properties: 1255 rows, 365 of them gaps, in [`xlsx.md`](officecli-capability-delta/xlsx.md).
 
 ### Contextual operation gaps
 
