@@ -191,8 +191,23 @@ fn meta() -> BatchItem<'static> {
 struct Out {
     format: FileFormat,
     capabilities: Capabilities,
+    /// The registry's writable properties per element kind, looked up once
+    /// per kind instead of once per node.
+    writable: Vec<(String, Option<Writable>)>,
     items: Vec<BatchItem<'static>>,
     warnings: Vec<Error>,
+}
+
+/// One element's properties a dump may write, by key.
+struct Writable {
+    props: std::collections::HashMap<&'static str, Writes>,
+}
+
+#[derive(Clone, Copy)]
+struct Writes {
+    add: bool,
+    set: bool,
+    ty: crate::value::ValueType,
 }
 
 /// Which command a node's properties are filtered for.
@@ -207,6 +222,7 @@ impl Out {
         Self {
             format,
             capabilities: Capabilities::of(format),
+            writable: Vec::new(),
             items: Vec::new(),
             warnings: Vec::new(),
         }
@@ -233,7 +249,30 @@ impl Out {
         exclude: &[&str],
     ) -> Result<Props<'static>> {
         let mut props = Props::new();
-        let Some(element) = self.capabilities.element(element) else {
+        let index = match self.writable.iter().position(|(kind, _)| kind == element) {
+            Some(index) => index,
+            None => {
+                let writable = self.capabilities.element(element).map(|element| Writable {
+                    props: element
+                        .properties()
+                        .filter(|property| property.write_gap().is_none())
+                        .map(|property| {
+                            (
+                                property.name(),
+                                Writes {
+                                    add: property.add(),
+                                    set: property.set(),
+                                    ty: property.value_type(),
+                                },
+                            )
+                        })
+                        .collect(),
+                });
+                self.writable.push((element.to_owned(), writable));
+                self.writable.len() - 1
+            },
+        };
+        let Some(writable) = &self.writable[index].1 else {
             return Ok(props);
         };
         let mut dropped: Vec<&'static str> = Vec::new();
@@ -242,14 +281,14 @@ impl Out {
             if exclude.contains(&key) {
                 continue;
             }
-            let Some(property) = element.property(key) else {
+            let Some(property) = writable.props.get(key).copied() else {
                 continue;
             };
-            let writable = match command {
-                Command::Add => property.add(),
-                Command::Set => property.set(),
+            let allowed = match command {
+                Command::Add => property.add,
+                Command::Set => property.set,
             };
-            if !writable || property.write_gap().is_some() {
+            if !allowed {
                 continue;
             }
             let value = match prop.value() {
@@ -263,9 +302,9 @@ impl Out {
                     // reported rather than failing the replay. PPTX writes
                     // opaque RGB colours only, not scheme colours.
                     let scheme_colour = self.format == FileFormat::Pptx
-                        && matches!(property.value_type(), crate::value::ValueType::Color(_))
+                        && matches!(property.ty, crate::value::ValueType::Color(_))
                         && !text.starts_with('#');
-                    if scheme_colour || property.value_type().coerce(&text).is_err() {
+                    if scheme_colour || property.ty.coerce(&text).is_err() {
                         dropped.push(key);
                         continue;
                     }
