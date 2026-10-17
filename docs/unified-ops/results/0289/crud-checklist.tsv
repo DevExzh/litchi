@@ -2560,19 +2560,19 @@ ppt	connector	edit	n/a	edit not offered for this element	-
 ppt	connector	batch	n/a	batch not offered for this element	-
 ppt	connector	create	supported		ok format
 ppt	connector	save	supported		ok format
-ppt	smartart	get	gap	M1-extended	unreached
-ppt	smartart	find	gap	M1-extended	unreached
-ppt	smartart	query	gap	M1-extended	unreached
-ppt	smartart	view	gap	M1-extended	unreached
-ppt	smartart	set	gap	M1-extended	unreached
-ppt	smartart	add	gap	M1-extended	-
-ppt	smartart	remove	gap	M1-extended	unreached
-ppt	smartart	move	gap	M1-extended	unreached
-ppt	smartart	swap	gap	M1-extended	unreached
-ppt	smartart	edit	gap	M1-extended	-
-ppt	smartart	batch	gap	M1-extended	-
-ppt	smartart	create	gap	M1-extended	ok format
-ppt	smartart	save	gap	M1-extended	ok format
+ppt	smartart	get	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	find	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	query	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	view	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	set	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	add	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
+ppt	smartart	remove	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	move	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	swap	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	edit	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
+ppt	smartart	batch	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
+ppt	smartart	create	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
+ppt	smartart	save	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
 ppt	ole	get	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	find	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	query	supported		ok matches in unified-ops/0294/elements.ppt
@@ -2729,32 +2729,32 @@ ppt	model3d	edit	gap	wontfix: PPTX-only (record 0323)	-
 ppt	model3d	batch	gap	wontfix: PPTX-only (record 0323)	-
 ppt	model3d	create	gap	wontfix: PPTX-only (record 0323)	ok format
 ppt	model3d	save	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	slideMaster	get	gap	M1-extended	unreached
-ppt	slideMaster	find	gap	M1-extended	unreached
-ppt	slideMaster	query	gap	M1-extended	unreached
-ppt	slideMaster	view	gap	M1-extended	unreached
-ppt	slideMaster	set	gap	M1-extended	unreached
-ppt	slideMaster	add	gap	M1-extended	-
-ppt	slideMaster	remove	gap	M1-extended	unreached
-ppt	slideMaster	move	gap	M1-extended	unreached
-ppt	slideMaster	swap	gap	M1-extended	unreached
-ppt	slideMaster	edit	gap	M1-extended	-
-ppt	slideMaster	batch	gap	M1-extended	-
-ppt	slideMaster	create	gap	M1-extended	ok format
-ppt	slideMaster	save	gap	M1-extended	ok format
-ppt	slideLayout	get	gap	M1-extended	unreached
-ppt	slideLayout	find	gap	M1-extended	unreached
-ppt	slideLayout	query	gap	M1-extended	unreached
-ppt	slideLayout	view	gap	M1-extended	unreached
-ppt	slideLayout	set	gap	M1-extended	unreached
-ppt	slideLayout	add	gap	M1-extended	-
-ppt	slideLayout	remove	gap	M1-extended	unreached
-ppt	slideLayout	move	gap	M1-extended	unreached
-ppt	slideLayout	swap	gap	M1-extended	unreached
-ppt	slideLayout	edit	gap	M1-extended	-
-ppt	slideLayout	batch	gap	M1-extended	-
-ppt	slideLayout	create	gap	M1-extended	ok format
-ppt	slideLayout	save	gap	M1-extended	ok format
+ppt	slideMaster	get	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	find	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	query	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	view	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	set	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	add	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
+ppt	slideMaster	remove	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	move	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	swap	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	edit	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
+ppt	slideMaster	batch	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
+ppt	slideMaster	create	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	ok format
+ppt	slideMaster	save	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	ok format
+ppt	slideLayout	get	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	find	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	query	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	view	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	set	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	add	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
+ppt	slideLayout	remove	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	move	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	swap	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	edit	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
+ppt	slideLayout	batch	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
+ppt	slideLayout	create	gap	0339-F4 (deferred-P1): PPT layouts as nodes	ok format
+ppt	slideLayout	save	gap	0339-F4 (deferred-P1): PPT layouts as nodes	ok format
 ppt	theme	get	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
 ppt	theme	find	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
 ppt	theme	query	supported		ok matches in poi/test-data/slideshow/headers_footers_2007.ppt
