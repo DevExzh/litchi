@@ -1063,6 +1063,174 @@ impl File {
         Ok(PyBytes::new(py, &bytes))
     }
 
+    /// The document as an OfficeCLI v2 batch: a list of item dicts that
+    /// ``batch`` replays onto ``create(format)`` to rebuild it (record 0336).
+    ///
+    /// The first item is ``{"command": "meta", "dumpVersion": 2}``. Content
+    /// the write verbs cannot rebuild (pictures, charts, fields, comments,
+    /// resources other than styles) is skipped; with ``strict`` it raises
+    /// instead. The GIL is released while the document is walked.
+    ///
+    /// Args:
+    ///     strict: Raise UnsupportedError ("unsupported_element") when the
+    ///         dump would skip anything
+    ///
+    /// Returns:
+    ///     The items, as dicts
+    ///
+    /// Raises:
+    ///     UnsupportedError: (a ValueError) If the format cannot be dumped
+    ///         ("unsupported_capability"), or with ``strict`` when content
+    ///         was skipped
+    ///     ProtectedError: (a ValueError) If the file is encrypted
+    ///     IoError: (an OSError) If the file is closed or changed on disk
+    #[pyo3(signature = (*, strict = false))]
+    fn dump<'py>(&self, py: Python<'py>, strict: bool) -> PyResult<Bound<'py, PyAny>> {
+        let file = self.handle()?;
+        let dump = py.detach(|| file.dump().map_err(|error| Failure::read(&error)))?;
+        if let Some(warning) = dump.warnings().first().filter(|_| strict) {
+            return Err(Failure::read(warning).into());
+        }
+        pyser::to_py(py, &dump)
+    }
+
+    /// The package parts: a list of ``{"name", "contentType"}`` dicts in
+    /// name order (design §12, record 0336).
+    ///
+    /// Raises:
+    ///     UnsupportedError: (a ValueError) If the format has no package
+    ///         parts (legacy binary, RTF, flat ODF, iWork)
+    ///     IoError: (an OSError) If the file is closed
+    fn parts<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let file = self.handle()?;
+        let parts = py.detach(|| file.parts().map_err(|error| Failure::read(&error)))?;
+        pyser::to_py(py, &parts)
+    }
+
+    /// One package part's bytes, as the File would publish them (OfficeCLI
+    /// ``raw``; record 0336).
+    ///
+    /// Args:
+    ///     part: A part name ("/word/document.xml") or alias ("/document",
+    ///         "/styles", "/slide[1]", "/Sheet1", "/Sheet1/chart[1]",
+    ///         "/content")
+    ///
+    /// Returns:
+    ///     The part's bytes (decode XML parts with ``.decode()``)
+    ///
+    /// Raises:
+    ///     PathError: (a LookupError) If there is no such part
+    ///     UnsupportedError: (a ValueError) As ``parts``
+    fn raw<'py>(&self, py: Python<'py>, part: PyBackedStr) -> PyResult<Bound<'py, PyBytes>> {
+        let file = self.handle()?;
+        let part = py.detach(|| file.raw(&part).map_err(|error| Failure::read(&error)))?;
+        Ok(PyBytes::new(py, part.bytes()))
+    }
+
+    /// Add a package part with its content type and a relationship from
+    /// ``parent``; return a Commit whose ``value`` is ``{"part",
+    /// "relationshipId"}`` (OfficeCLI ``add-part``; record 0336).
+    ///
+    /// ``type`` is "chart", "header" or "footer" for an empty part of that
+    /// kind; otherwise pass ``content_type``, ``relationship``, ``data``
+    /// and ``name``. ``parent`` "/" relates the part from the package.
+    ///
+    /// Raises:
+    ///     PathError: (a LookupError) If the parent does not resolve
+    ///     PropertyError: (a ValueError) If arguments are missing or the
+    ///         type is unknown
+    ///     UnsupportedError: (a ValueError) Outside DOCX, XLSX, PPTX and XLSB
+    ///     ProtectedError: (a ValueError) If the File is signed or encrypted
+    #[pyo3(signature = (parent, r#type = None, *, content_type = None, relationship = None, data = None, name = None))]
+    #[allow(clippy::too_many_arguments, reason = "the Python keyword arguments")]
+    fn add_part(
+        &self,
+        py: Python<'_>,
+        parent: PyBackedStr,
+        r#type: Option<PyBackedStr>,
+        content_type: Option<String>,
+        relationship: Option<String>,
+        data: Option<Vec<u8>>,
+        name: Option<String>,
+    ) -> PyResult<Commit> {
+        let file = self.handle()?;
+        let part = crate::raw::new_part(r#type.as_deref(), content_type, relationship, data, name)?;
+        let added = py.detach(|| {
+            file.add_part(&parent, part)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        let value = PyDict::new(py);
+        value.set_item("part", &added.part)?;
+        value.set_item("relationshipId", &added.relationship_id)?;
+        Commit::new(
+            py,
+            added.file,
+            true,
+            1,
+            None,
+            Some(value.into_any().unbind()),
+        )
+    }
+
+    /// Edit one part's XML at every element ``xpath`` matches; return a
+    /// Commit whose ``value`` is ``{"matched": n}`` (OfficeCLI ``raw-set``;
+    /// record 0336).
+    ///
+    /// The XPath is a location path of "/" and "//" steps with prefixed
+    /// names or "*" and [n], [last()] or [@name='value'] predicates.
+    /// ``action`` is append, prepend, insertbefore, insertafter, replace,
+    /// remove or setattr (``xml`` is then "name=value"). The edited part
+    /// passes the package's publication audit before the new File opens.
+    ///
+    /// Raises:
+    ///     PathError: (a LookupError) If the part does not resolve, the
+    ///         XPath is malformed ("invalid_xpath") or matches nothing
+    ///         ("zero_matches")
+    ///     PropertyError: (a ValueError) If the action or fragment is invalid
+    ///     UnsupportedError: (a ValueError) Outside DOCX, XLSX, PPTX and XLSB
+    ///     ProtectedError: (a ValueError) If the File is signed or encrypted
+    #[pyo3(signature = (part, xpath, action, xml = None))]
+    fn raw_set(
+        &self,
+        py: Python<'_>,
+        part: PyBackedStr,
+        xpath: PyBackedStr,
+        action: PyBackedStr,
+        xml: Option<PyBackedStr>,
+    ) -> PyResult<Commit> {
+        let file = self.handle()?;
+        let action: litchi::raw::Action = action.parse().map_err(|error| Failure::read(&error))?;
+        let edited = py.detach(|| {
+            file.raw_set(&part, &xpath, action, xml.as_deref())
+                .map_err(|error| Failure::read(&error))
+        })?;
+        let value = PyDict::new(py);
+        value.set_item("matched", edited.matched)?;
+        Commit::new(
+            py,
+            edited.file,
+            true,
+            1,
+            None,
+            Some(value.into_any().unbind()),
+        )
+    }
+
+    /// Check the package structure read-only (OfficeCLI ``validate``;
+    /// record 0336): a dict with ``format``, ``valid`` (no error or fatal
+    /// finding), ``complete``, ``checks`` and ``issues`` (each with
+    /// ``code``, ``severity``, ``message`` and ``locations``).
+    ///
+    /// Raises:
+    ///     UnsupportedError: (a ValueError) For iWork packages
+    ///     ProtectedError: (a ValueError) If the file is encrypted
+    ///     IoError: (an OSError) If the file is closed
+    fn validate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let file = self.handle()?;
+        let validation = py.detach(|| file.validate().map_err(|error| Failure::read(&error)))?;
+        pyser::to_py(py, &validation)
+    }
+
     /// A File that may edit this signed document.
     ///
     /// Editing a signed document invalidates its signature, so the write
