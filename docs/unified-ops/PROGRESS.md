@@ -703,6 +703,12 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - Word corpus gap 248 → 221; DOCX delta elements supported 14 → 31, gap 21 → 4 (formfield, ole, revision, shape). New corpus deltas D1b (positional `num` path) and D11.
   - Writes within budget (max `footnote_add` 1.09). Reads `style_get_format` 1.22 (+1.1 µs) and `paragraph_list_format` 1.13 (+0.25 µs) miss.
   - Open: bookmark/field/TOC writes, paragraphs inside headers/footers/notes, `levelN.*` shortcut keys, the two read misses.
+- Merged `pptx-p1` (0321):
+  - `/theme` (colour/font scheme read and set, exact no-op on equal values); master/layout `name` and direct-shape `text` sets; table `col[C]` get/add/set width/remove; shape and run hyperlinks (URL, `slide[N]`, named actions; unsafe schemes refused); media get/remove/add with a poster; equation `formula` read.
+  - New elements are reached by path or named query only, so views and `*` queries keep their shape.
+  - Delta PPTX elements 25/8 → 30/3 (animation, zoom, model3d deferred as P2); corpus pptx gap 416 → 410, passed unchanged.
+  - Writes 1.00–1.094× (column add on a one-slide deck); equation get 1.30× (+14 µs) is a recorded miss (F6).
+  - Open: F1 `link`/`tooltip` as shape/run properties; F2 equation writes; F3 media timing; F4 master/layout other props; F5 colWidths, defaultFont, mediaType.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
