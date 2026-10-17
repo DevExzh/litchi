@@ -109,6 +109,7 @@ pub mod package;
 pub mod page_breaks;
 pub mod page_margins;
 pub mod page_setup;
+mod part_edit;
 pub mod phonetic_properties;
 pub mod pivot;
 pub mod print_options;

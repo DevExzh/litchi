@@ -151,6 +151,9 @@ impl<'f> Nav<'f> {
     ) -> Result<Lookup<Node<'f>, GapSpec>> {
         let file = self.file;
         let position = sheet.position;
+        if super::features::is_feature(kind) {
+            return super::features::lookup(file, sheet, kind, select);
+        }
         Ok(match (kind, select) {
             (Kind::Cell, Select::Cell(at)) => {
                 let at = address(at)?;
@@ -416,6 +419,12 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 (Item::Sheet(sheet), Kind::Chart) => {
                     out.kind("chart", file.sheet_chart_count(sheet.position)?);
                 },
+                (Item::Sheet(sheet), kind) if super::features::is_feature(kind) => {
+                    out.kind(
+                        super::features::step_name(kind),
+                        super::features::list(file, sheet, kind)?.len(),
+                    );
+                },
                 (Item::Chart(chart), Kind::Series) => {
                     out.kind("series", chart.summary()?.series.len());
                 },
@@ -478,6 +487,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
                     .get(*index)
                     .map(|name| Cow::Borrowed(name.name.as_str())),
                 Item::Chart(chart) => chart.summary()?.title.as_deref().map(Cow::Borrowed),
+                Item::Feature(feature) => feature.text(),
                 Item::Workbook | Item::Range(_) | Item::Series(_) | Item::Axis(_) => None,
             })
         })

@@ -6,6 +6,7 @@
 
 mod access;
 mod alternatives;
+mod catalogs;
 mod data_stores;
 mod document;
 mod merge;

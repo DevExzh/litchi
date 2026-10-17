@@ -690,6 +690,12 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - Numbers cell comments (request 19): per-table census, lists without FieldInfo, effective locators, a multi-member writer; all 35 corpus tables round trip. `File` reads, sets, adds and removes the cell `comment`.
   - New routes `row_insert_formulas` 1.011 and `comment_set` 1.002 meet the bar; `open_get` 1.063–1.069 (+6 µs, within the 20 µs arm).
   - Open: `#REF!` on deleted references, splitting shared formulas, cell-writer clears (21), comment edge cases (new member, `NeedSparse`, more than one author); Keynote/Pages table creation and notes run styles not started (plan in record §5).
+- Merged `xlsx-p0p1` (0320) — **XLSX P0 surface closed**:
+  - litchi-xlsx: five ADR 0034 edit families (conditional formatting, data validation, auto-filter, legacy notes, drawings) on one staged part engine with exact, reversible patches; note splices with VML shapes; fixed an empty `<cfRule/>` parse bug.
+  - Unified nodes under a sheet: `comment[N]`, `hyperlink[N]`, `picture[N]`, `shape[N]`, `cf[N]` (12 rule kinds), `dataValidation[N]`, `autofilter`, `rowbreak[N]`, `colbreak[N]`.
+  - OfficeCLI excel corpus: passed 1484 → 1552, gap 124 → 51, bug 0. Delta: XLSX elements supported 11 → 33 (gap 27 → 5: ole, pivottable, run, slicer, sparkline). CRUD checklist XLSX 92 → 191 cells, all ok.
+  - Performance: every write within 1.011× the leaf; `comment_get` 1.10 (+4 µs, sort and clone of the sheet's notes).
+  - Open (part to 0322): x14 CF styling, drawing effects, threaded comments, note runs, filter criteria, the prefixed-root validation/hyperlink writer conflict.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;

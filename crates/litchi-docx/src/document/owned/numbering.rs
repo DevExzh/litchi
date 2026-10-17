@@ -9,6 +9,9 @@
 use super::super::{Error, Refusal, Result};
 use super::Edit;
 use crate::Package;
+use crate::numbering::catalog::{
+    AbstractNumChange, Catalog, LevelChange, NewAbstractNum, NewLevel, NewNum,
+};
 use crate::numbering::{AddedList, ListKind};
 
 const NUMBERING_RELATIONSHIP: &str =
@@ -139,5 +142,271 @@ impl Edit<Package> {
                     ListKind::Decimal
                 }
             }))
+    }
+
+    /// The numbering part as the staged changes leave it, or `None` when the
+    /// document has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns a package-graph error, or a malformed-part error.
+    pub fn numbering_catalog(&self) -> Result<Option<Catalog>> {
+        Ok(self.numbering_part()?.map(|(_, catalog)| catalog))
+    }
+
+    /// Apply `change` to level `ilvl` of abstract definition `abstract_num_id`.
+    ///
+    /// ```
+    /// use litchi_docx::numbering::ListKind;
+    /// use litchi_docx::numbering::catalog::LevelChange;
+    ///
+    /// let package = litchi_docx::Builder::new()?.build()?;
+    /// let mut edit = package.edit()?;
+    /// let list = edit.add_list(ListKind::Decimal, None)?;
+    /// edit.set_level(
+    ///     list.abstract_num_id(),
+    ///     0,
+    ///     &LevelChange::default().with_format(Some("upperRoman".into())),
+    /// )?;
+    /// let next = edit.commit()?.into_package();
+    /// let catalog = next.numbering_catalog()?.unwrap();
+    /// assert_eq!(catalog.format_of(list.num_id(), 0), Some("upperRoman"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown definition or level,
+    /// or a typed error for a property change that cannot be written.
+    pub fn set_level(
+        &mut self,
+        abstract_num_id: u32,
+        ilvl: u8,
+        change: &LevelChange,
+    ) -> Result<&mut Self> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        if catalog
+            .abstract_num(abstract_num_id)
+            .and_then(|definition| definition.level(ilvl))
+            .is_none()
+        {
+            return Err(not_found());
+        }
+        if let Some(updated) = catalog
+            .with_level_changed(abstract_num_id, ilvl, change)
+            .map_err(Error::Document)?
+        {
+            self.replace_part(&name, updated)?;
+        }
+        Ok(self)
+    }
+
+    /// Apply `change` to abstract definition `id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown definition.
+    pub fn set_abstract_num(&mut self, id: u32, change: &AbstractNumChange) -> Result<&mut Self> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        if catalog.abstract_num(id).is_none() {
+            return Err(not_found());
+        }
+        if let Some(updated) = catalog
+            .with_abstract_num_changed(id, change)
+            .map_err(Error::Document)?
+        {
+            self.replace_part(&name, updated)?;
+        }
+        Ok(self)
+    }
+
+    /// Point numbering instance `id` at abstract definition `abstract_num_id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown instance or
+    /// definition.
+    pub fn set_num_definition(&mut self, id: u32, abstract_num_id: u32) -> Result<&mut Self> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        if catalog.num(id).is_none() || catalog.abstract_num(abstract_num_id).is_none() {
+            return Err(not_found());
+        }
+        if let Some(updated) = catalog
+            .with_num_retargeted(id, abstract_num_id)
+            .map_err(Error::Document)?
+        {
+            self.replace_part(&name, updated)?;
+        }
+        Ok(self)
+    }
+
+    /// Add a numbering instance and return its identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown definition, and
+    /// [`Refusal::InvalidPropertyValue`] for an identifier in use or 0.
+    pub fn add_num(&mut self, num: &NewNum) -> Result<u32> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        let (updated, id) = catalog.with_num_added(num).map_err(refusal_of)?;
+        self.replace_part(&name, updated)?;
+        Ok(id)
+    }
+
+    /// Add an abstract definition, creating the numbering part when the
+    /// document has none, and return its identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::InvalidPropertyValue`] for an identifier in use or
+    /// a level that cannot be written.
+    pub fn add_abstract_num(&mut self, definition: &NewAbstractNum) -> Result<u32> {
+        match self.numbering_part()? {
+            Some((name, catalog)) => {
+                let (updated, id) = catalog
+                    .with_abstract_num_added(definition)
+                    .map_err(refusal_of)?;
+                self.replace_part(&name, updated)?;
+                Ok(id)
+            },
+            None => {
+                let strict = self.inner.is_strict();
+                let empty = crate::numbering::empty_numbering_xml(strict);
+                let catalog =
+                    Catalog::from_xml(std::sync::Arc::new(empty)).map_err(Error::Document)?;
+                let (updated, id) = catalog
+                    .with_abstract_num_added(definition)
+                    .map_err(refusal_of)?;
+                self.stage_related_part(
+                    numbering_relationship(strict),
+                    ("", "numbering", ".xml"),
+                    true,
+                    NUMBERING_CONTENT_TYPE,
+                    updated,
+                )?;
+                Ok(id)
+            },
+        }
+    }
+
+    /// Add `level` to abstract definition `id`, replacing the level of the
+    /// same index when there is one.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown definition.
+    pub fn add_level(&mut self, id: u32, level: &NewLevel) -> Result<&mut Self> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        if catalog.abstract_num(id).is_none() {
+            return Err(not_found());
+        }
+        let updated = catalog.with_level_added(id, level).map_err(refusal_of)?;
+        self.replace_part(&name, updated)?;
+        Ok(self)
+    }
+
+    /// Remove numbering instance `id`. Paragraphs that name it keep the
+    /// reference, which Word reads as no numbering.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown instance.
+    pub fn remove_num(&mut self, id: u32) -> Result<&mut Self> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        if catalog.num(id).is_none() {
+            return Err(not_found());
+        }
+        let updated = catalog.with_num_removed(id).map_err(Error::Document)?;
+        self.replace_part(&name, updated)?;
+        Ok(self)
+    }
+
+    /// Remove abstract definition `id` and the numbering instances of it.
+    /// Paragraphs that name a removed instance keep the reference, which
+    /// Word reads as no numbering.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown definition.
+    pub fn remove_abstract_num(&mut self, id: u32) -> Result<&mut Self> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        if catalog.abstract_num(id).is_none() {
+            return Err(not_found());
+        }
+        let updated = catalog
+            .with_abstract_num_removed(id)
+            .map_err(Error::Document)?;
+        self.replace_part(&name, updated)?;
+        Ok(self)
+    }
+
+    /// Remove level `ilvl` of abstract definition `id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for an unknown definition or level.
+    pub fn remove_level(&mut self, id: u32, ilvl: u8) -> Result<&mut Self> {
+        let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
+        if catalog
+            .abstract_num(id)
+            .and_then(|definition| definition.level(ilvl))
+            .is_none()
+        {
+            return Err(not_found());
+        }
+        let updated = catalog
+            .with_level_removed(id, ilvl)
+            .map_err(Error::Document)?;
+        self.replace_part(&name, updated)?;
+        Ok(self)
+    }
+
+    /// The numbering part's name and catalog, staged changes included.
+    fn numbering_part(&self) -> Result<Option<(String, Catalog)>> {
+        let Some((name, _)) = self.related_part(numbering_relationship(self.inner.is_strict()))?
+        else {
+            return Ok(None);
+        };
+        let payload = self
+            .part_payload(&name)?
+            .ok_or_else(|| crate::Error::PartNotFound(name.clone()))?;
+        Ok(Some((
+            name,
+            Catalog::from_xml(payload).map_err(Error::Document)?,
+        )))
+    }
+}
+
+const fn numbering_relationship(strict: bool) -> &'static str {
+    if strict {
+        STRICT_NUMBERING_RELATIONSHIP
+    } else {
+        NUMBERING_RELATIONSHIP
+    }
+}
+
+const fn not_found() -> Error {
+    Error::Refused {
+        position: 0,
+        reason: Refusal::BlockNotFound,
+    }
+}
+
+/// A catalog refusal: an identifier in use, an unknown definition, or a
+/// level that cannot be written.
+fn refusal_of(error: crate::Error) -> Error {
+    match error {
+        crate::Error::InvalidFormat(message) if message.contains("no abstract definition") => {
+            not_found()
+        },
+        crate::Error::InvalidFormat(message)
+            if message.contains("taken") || message.contains("cannot be written") =>
+        {
+            Error::Refused {
+                position: 0,
+                reason: Refusal::InvalidPropertyValue,
+            }
+        },
+        other => Error::Document(other),
     }
 }

@@ -108,6 +108,9 @@ pub(super) enum Item {
     Chart(ChartItem),
     Series(ChartItem),
     Axis(ChartItem),
+    /// A worksheet feature: a note, hyperlink, picture, shape, conditional
+    /// format, validation, auto-filter or page break (record 0320).
+    Feature(Arc<super::features::Feature>),
 }
 
 /// A worksheet chart read from its part: the chart's position on the sheet,
@@ -635,6 +638,11 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// An element of the worksheet at `sheet`, for a sibling module.
+    pub(super) fn in_sheet_item(file: &'f Xlsx, sheet: usize, item: Item) -> Self {
+        Self::in_sheet(file, sheet, item)
+    }
+
     /// An element of the worksheet at `sheet`, `/sheet[N]/<tail>`.
     fn in_sheet(file: &'f Xlsx, sheet: usize, item: Item) -> Self {
         Self {
@@ -797,6 +805,7 @@ impl<'f> Node<'f> {
             Item::Chart(chart) => PathStep::at("chart", Position::new(chart.chart as usize)),
             Item::Series(chart) => PathStep::at("series", Position::new(chart.child as usize)),
             Item::Axis(chart) => PathStep::at("axis", Position::new(chart.child as usize)),
+            Item::Feature(feature) => feature.step(),
         })
     }
 
@@ -831,6 +840,7 @@ impl<'f> Node<'f> {
             Item::Chart(_) => Kind::Chart,
             Item::Series(_) => Kind::Series,
             Item::Axis(_) => Kind::Axis,
+            Item::Feature(ref feature) => feature.kind,
         }
     }
 
@@ -1008,6 +1018,10 @@ impl<'f> Node<'f> {
                 ),
             ),
             Item::Series(chart) => (super::chart::SERIES_PROPS, Props::Series(chart.clone())),
+            Item::Feature(feature) => (
+                feature.table(),
+                Props::Feature(feature, sheet_name(file, self.sheet_position())),
+            ),
             Item::Axis(chart) => (super::chart::AXIS_PROPS, Props::Axis(chart.clone())),
             Item::NamedRange(index) => match defined_names(file).get(*index) {
                 Some(name) => (
@@ -1192,6 +1206,7 @@ impl<'f> Project<'f> for Node<'f> {
                         name.reference.as_str()
                     })
                 }),
+                Item::Feature(feature) => feature.text(),
                 Item::Workbook
                 | Item::Sheet(_)
                 | Item::Range(_)
@@ -1237,6 +1252,7 @@ impl<'f> Project<'f> for Node<'f> {
                     .as_deref()
                     .map(|title| Preview::Text(Cow::Borrowed(title))),
                 Item::Series(_) | Item::Axis(_) => None,
+                Item::Feature(feature) => feature.preview(),
             })
         })
     }
@@ -1252,7 +1268,8 @@ impl<'f> Project<'f> for Node<'f> {
                 | Item::Table(_)
                 | Item::NamedRange(_)
                 | Item::Series(_)
-                | Item::Axis(_) => 0,
+                | Item::Axis(_)
+                | Item::Feature(_) => 0,
                 Item::Chart(chart) => {
                     let summary = chart.summary()?;
                     summary.series.len() + summary.axes.len()
@@ -1412,6 +1429,8 @@ pub(crate) enum Props<'a> {
     Chart(Arc<crate::format::chart::Summary>, Option<[u32; 4]>),
     Series(ChartItem),
     Axis(ChartItem),
+    /// A worksheet feature and its worksheet's name (record 0320).
+    Feature(&'a super::features::Feature, &'a str),
 }
 
 /// What a cell's keys read.
@@ -1435,6 +1454,7 @@ impl fmt::Debug for Props<'_> {
             Self::Chart(..) => "Chart",
             Self::Series(_) => "Series",
             Self::Axis(_) => "Axis",
+            Self::Feature(..) => "Feature",
         };
         f.debug_tuple("Props").field(&name).finish()
     }
@@ -1466,6 +1486,7 @@ impl<'a> Props<'a> {
             Self::Chart(ref summary, cells) => super::chart::chart_value_at(summary, cells, index),
             Self::Series(ref item) => super::chart::series_value(item, index).map(owned),
             Self::Axis(ref item) => super::chart::axis_value(item, index).map(owned),
+            Self::Feature(feature, sheet) => feature.value(index, sheet),
             Self::NamedRange { name, scope } => match NamedRangeKey::at(index)? {
                 NamedRangeKey::Name => Some(Value::Text(Cow::Borrowed(&name.name))),
                 NamedRangeKey::Ref => Some(Value::Text(Cow::Borrowed(&name.reference))),

@@ -235,7 +235,7 @@ fn compile_time_findings_are_diagnostics_or_errors() {
         Code::InvalidSelector
     );
     for (selector, code) in [
-        ("comment", Code::UnsupportedCapability),
+        ("sparkline", Code::UnsupportedCapability),
         ("pivottable[1]", Code::UnsupportedCapability),
         ("cell[link=x]", Code::UnsupportedCapability),
         ("cell[computedValue=1]", Code::UnsupportedCapability),

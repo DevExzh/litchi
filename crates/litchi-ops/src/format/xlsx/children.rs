@@ -68,6 +68,11 @@ enum State {
         rect: Rect,
         next: Option<Address>,
     },
+    /// A worksheet's features (record 0320).
+    Features {
+        sheet: usize,
+        items: std::vec::IntoIter<super::features::Feature>,
+    },
     /// A worksheet's charts, or a chart's series and axes (record 0270).
     Charts {
         sheet: usize,
@@ -272,7 +277,8 @@ impl<'f> Children<'f> {
             | Item::Table(_)
             | Item::NamedRange(_)
             | Item::Series(_)
-            | Item::Axis(_) => State::Done,
+            | Item::Axis(_)
+            | Item::Feature(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
@@ -292,6 +298,28 @@ impl<'f> Children<'f> {
                 sheets: kinds.contains(Kind::Sheet),
                 names: kinds.contains(Kind::NamedRange),
                 name: 0,
+            },
+            Item::Sheet(sheet)
+                if super::features::KINDS
+                    .iter()
+                    .any(|kind| kinds.contains(*kind))
+                    && !(cells
+                        || kinds.contains(Kind::Column)
+                        || kinds.contains(Kind::Row)
+                        || kinds.contains(Kind::Table)
+                        || kinds.contains(Kind::Chart)) =>
+            {
+                // A walk scoped to worksheet features lists them (record 0320).
+                let mut items = Vec::new();
+                for kind in super::features::KINDS {
+                    if kinds.contains(kind) {
+                        items.extend(super::features::list(file, sheet, kind)?);
+                    }
+                }
+                State::Features {
+                    sheet: sheet.position,
+                    items: items.into_iter(),
+                }
             },
             Item::Sheet(sheet)
                 if kinds.contains(Kind::Chart)
@@ -378,6 +406,11 @@ impl<'f> Children<'f> {
         loop {
             match &mut self.state {
                 State::Done => return Ok(None),
+                State::Features { sheet, items } => {
+                    return Ok(items
+                        .next()
+                        .map(|feature| Node::new_feature(file, *sheet, feature)));
+                },
                 State::Charts { sheet, items } => {
                     return Ok(items.next().map(|(kind, item)| match kind {
                         Kind::Chart => {

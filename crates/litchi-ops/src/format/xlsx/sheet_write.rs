@@ -107,7 +107,67 @@ impl Xlsx {
         props: &Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
-        try_set_sheet(self, target, props, limits)
+        let mut filter = None;
+        let mut rest = Props::with_capacity(props.len());
+        for (key, value) in props.iter() {
+            match super::spec::SHEET_FILTER_TABLE.lookup(key.as_str()) {
+                Some((_, entry)) if !direct_cell_or_range_path(target) => {
+                    let range = entry.prepare(Operation::Set, value, |_, scalar| {
+                        Ok(match scalar {
+                            Some(Scalar::Text(text)) => Some(text.to_owned()),
+                            _ => None,
+                        })
+                    })?;
+                    if filter.is_some() {
+                        return Err(duplicate_property("autoFilter"));
+                    }
+                    filter = Some(range.filter(|range| {
+                        !(range.is_empty()
+                            || range.eq_ignore_ascii_case("none")
+                            || range.eq_ignore_ascii_case("false"))
+                    }));
+                },
+                _ => rest.push(key.reborrow(), value.reborrow()),
+            }
+        }
+        let Some(filter) = filter else {
+            return try_set_sheet(self, target, props, limits);
+        };
+        // The tab properties first, then the auto-filter on their result,
+        // published as one commit of the original snapshot (record 0320).
+        let Some(positions) = resolve_sheet_targets(self, target, limits)? else {
+            return Ok(None);
+        };
+        let middle = if rest.is_empty() {
+            self.clone()
+        } else {
+            match try_set_sheet(self, target, &rest, limits)? {
+                Some(commit) => commit.into_file(),
+                None => return Ok(None),
+            }
+        };
+        let source = self.editor()?;
+        let base = middle.editor()?;
+        let mut edit = base.edit_auto_filter()?;
+        for position in positions {
+            let value = filter
+                .as_deref()
+                .map(|range| {
+                    xlsx::auto_filter::Range::new(range.trim().replace('$', ""))
+                        .map(|range| xlsx::auto_filter::Definition::new(Some(range)))
+                        .map_err(|error| Error::from(error).with_property("autoFilter"))
+                })
+                .transpose()?;
+            edit.set_auto_filter(position, value)
+                .map_err(|error| native_property_error(error, "autoFilter"))?;
+        }
+        let target = edit.commit()?.into_package();
+        let after = if source.same_content(&target).map_err(native_error)? {
+            self.clone()
+        } else {
+            middle.adopt_workbook(target.clone())
+        };
+        Ok(Some(Commit::from_metadata(after, source, target)))
     }
 }
 

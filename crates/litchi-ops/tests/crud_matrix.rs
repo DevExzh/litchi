@@ -86,6 +86,15 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx",
             "ooxml/docx/comment.docx",
             "libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx",
+            // Record 0319: notes, headers and footers, and numbering.
+            "ooxml/docx/footnotes.docx",
+            "ooxml/docx/endnotes.docx",
+            "ooxml/docx/headerFooter.docx",
+            "ooxml/docx/ComplexNumberedLists.docx",
+            // Record 0319: a bookmark, a text box and a watermark.
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
+            "libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx",
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx",
         ],
     },
     Spec {
@@ -469,6 +478,32 @@ const RECIPES: &[Recipe] = &[
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
         start: false,
     },
+    // Record 0319: notes are anchored on a paragraph and need their text; a
+    // level is added to a definition by its ilvl.
+    Recipe {
+        format: "docx",
+        element: "footnote",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("text", "Note")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "endnote",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("text", "End")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "level",
+        fixture: "ooxml/docx/ComplexNumberedLists.docx",
+        parent: "/numbering/abstractNum[1]",
+        props: &[("ilvl", "8"), ("format", "decimal"), ("lvlText", "%9.")],
+        start: false,
+    },
     // Record 0295: DOCX SmartArt is added under a paragraph from an outline.
     Recipe {
         format: "docx",
@@ -484,6 +519,88 @@ const RECIPES: &[Recipe] = &[
         fixture: "create()",
         parent: "/Sheet1",
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
+        start: false,
+    },
+    // Record 0320: worksheet features need their anchor (a cell, a range, a
+    // row or column, an image).
+    Recipe {
+        format: "xlsx",
+        element: "comment",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("ref", "B2"), ("text", "note"), ("author", "Ann")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "hyperlink",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("ref", "A1"), ("url", "https://example.test/")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "picture",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[(
+            "src",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+        )],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "shape",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("geometry", "rect"), ("text", "box")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "conditionalFormatting",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[
+            ("type", "cellIs"),
+            ("ref", "A1:A9"),
+            ("value", "5"),
+            ("fill", "FFC7CE"),
+        ],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "dataValidation",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("type", "list"), ("ref", "A1:A9"), ("formula1", "a,b")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "autofilter",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("range", "A1:C9")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "rowbreak",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("row", "10")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsx",
+        element: "colbreak",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("col", "4")],
         start: false,
     },
     Recipe {

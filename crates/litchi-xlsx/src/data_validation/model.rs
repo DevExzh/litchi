@@ -41,7 +41,12 @@ pub enum ValidationType {
 }
 
 impl ValidationType {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// Parse the SpreadsheetML token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a token outside the vocabulary.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
             "whole" => Ok(Self::Whole),
@@ -54,7 +59,9 @@ impl ValidationType {
             _ => Err(invalid(format!("invalid data-validation type '{value}'"))),
         }
     }
-    pub(crate) fn as_str(self) -> &'static str {
+    /// The SpreadsheetML token.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
             Self::Whole => "whole",
@@ -81,7 +88,12 @@ pub enum ValidationOperator {
 }
 
 impl ValidationOperator {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// Parse the SpreadsheetML token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a token outside the vocabulary.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "between" => Ok(Self::Between),
             "notBetween" => Ok(Self::NotBetween),
@@ -96,7 +108,9 @@ impl ValidationOperator {
             ))),
         }
     }
-    pub(crate) fn as_str(self) -> &'static str {
+    /// The SpreadsheetML token.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Between => "between",
             Self::NotBetween => "notBetween",
@@ -118,7 +132,12 @@ pub enum ValidationErrorStyle {
 }
 
 impl ValidationErrorStyle {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// Parse the SpreadsheetML token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a token outside the vocabulary.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "stop" => Ok(Self::Stop),
             "warning" => Ok(Self::Warning),
@@ -128,7 +147,9 @@ impl ValidationErrorStyle {
             ))),
         }
     }
-    pub(crate) fn as_str(self) -> &'static str {
+    /// The SpreadsheetML token.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Stop => "stop",
             Self::Warning => "warning",
@@ -153,7 +174,12 @@ pub enum ValidationImeMode {
 }
 
 impl ValidationImeMode {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// Parse the SpreadsheetML token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a token outside the vocabulary.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "noControl" => Ok(Self::NoControl),
             "off" => Ok(Self::Off),
@@ -171,7 +197,9 @@ impl ValidationImeMode {
             ))),
         }
     }
-    pub(crate) fn as_str(self) -> &'static str {
+    /// The SpreadsheetML token.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::NoControl => "noControl",
             Self::Off => "off",
@@ -330,6 +358,14 @@ impl Validation {
 
     pub fn set_operator(&mut self, value: ValidationOperator) {
         self.operator = value;
+    }
+    /// Replace the cells the validation applies to.
+    pub fn set_sqref(&mut self, value: Sqref) {
+        self.sqref = value;
+    }
+    /// Replace the kind of value the validation admits.
+    pub fn set_validation_type(&mut self, value: ValidationType) {
+        self.validation_type = value;
     }
     pub fn set_error_style(&mut self, value: ValidationErrorStyle) {
         self.error_style = value;

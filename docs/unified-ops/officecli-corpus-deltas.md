@@ -26,7 +26,7 @@ Kinds:
 
 | Family | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 1484 | 0 | 21 | 124 | 4 | 0 | 0 | 20 | 20/20 |
+| excel | 1633 | 1552 | 0 | 26 | 51 | 4 | 0 | 0 | 20 | 20/20 |
 | excel/charts | 743 | 451 | 0 | 255 | 22 | 15 | 0 | 0 | 32 | 32/32 |
 | ppt | 310 | 129 | 32 | 37 | 141 | 2 | 1 | 0 | 10 | 12/12 |
 | ppt/charts | 735 | 318 | 113 | 402 | 14 | 1 | 0 | 0 | 28 | 28/28 |
@@ -37,8 +37,8 @@ Kinds:
 | ppt/templates | 452 | 27 | 0 | 152 | 52 | 119 | 102 | 0 | 11 | 24/24 |
 | ppt/textboxes | 132 | 50 | 10 | 17 | 65 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
-| word | 1133 | 629 | 3 | 183 | 248 | 6 | 67 | 0 | 24 | 32/32 |
-| **total** | **6431** | **3847** | **344** | **1172** | **773** | **171** | **468** | **0** | **177** | **200/200** |
+| word | 1133 | 645 | 3 | 187 | 221 | 25 | 55 | 0 | 24 | 32/32 |
+| **total** | **6431** | **3931** | **344** | **1181** | **673** | **190** | **456** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -46,16 +46,18 @@ The format is the extension of the document each call names.
 
 | Format | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| docx | 949 | 479 | 0 | 180 | 217 | 6 | 67 | 0 | 22 | 30/30 |
+| docx | 949 | 495 | 0 | 184 | 190 | 25 | 55 | 0 | 22 | 30/30 |
 | pptx | 2959 | 1286 | 344 | 716 | 410 | 146 | 401 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 2082 | 0 | 276 | 146 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **3847** | **344** | **1172** | **773** | **171** | **468** | **0** | **177** | **200/200** |
+| xlsx | 2523 | 2150 | 0 | 281 | 73 | 19 | 0 | 0 | 56 | 56/56 |
+| **total** | **6431** | **3931** | **344** | **1181** | **673** | **190** | **456** | **0** | **177** | **200/200** |
 
 ## Deltas
 
 | Id | Delta | OfficeCLI | Litchi | Lines | Examples |
 |---|---|---|---|---:|---|
 | D1 | Created-path form captured by the script | `add` prints the new paragraph as `/body/p[@paraId=...]`, which the script greps to address it later | `add` prints the positional path `/body/p[N]` (record 0256 §3), so the capture is empty and the dependent `set` has no path (`missing_argument`) | 6 | `word/revisions.sh:286`, `word/revisions.sh:296`, `word/revisions.sh:305` |
+| D1b | Created numbering-instance path captured by the script | `add --type num` prints `/numbering/num[@id=N]`, which the script greps for the new `numId` | `add` prints the positional path `/numbering/num[K]`: a numbering identifier is a native identity, addressed only by raw paths (record 0319), so the capture is empty and the dependent `numId=` is `invalid_value` | 17 | `word/numbering.sh:76`, `word/numbering.sh:79`, `word/numbering.sh:82` |
+| D11 | Re-adding a built-in style | `add --type style` with the id of a built-in style the document already has (`Heading1`, `Normal`, ...) replaces that definition (upsert) | an existing style id is refused (`duplicate_name`, record 0319): `add` never drops an existing definition; `set /styles/<id>` changes it | 2 | `word/fields.sh:37`, `word/fields.sh:40` |
 | D4 | Bare slide insertion | `add / --type slide` picks the deck's first layout; layout-type words (`blank`, `title`) also select a layout | `layout` names a layout exactly (record 0256 D4); the harness adds `layout=Title Slide` (the first layout of Litchi's blank deck) or maps `title` and `blank` to `Title Slide` and `Blank`, and counts the line as translated | 344 | `ppt/animations.sh:32`, `ppt/charts/charts-3d.sh:38`, `ppt/charts/charts-3d.sh:46` |
 | D4b | Bare slide insertion inside a batch | a batch `add` of a slide without `layout`, or with a layout-type word (`blank`), picks a layout as on the command line | the harness translates only command-line slide insertions (D4), not batch items, so the batch refuses (`missing_property` layout, or `not_found` for `layout=blank`) once its other properties are admitted (record 0269) | 2 | `ppt/templates/styles/brand--aura-coffee-dark/build.sh:157`, `ppt/templates/styles/science--space-exploration/build.sh:16` |
 | D5 | Resident mode | `open`/`close` start and stop a resident process that later commands reuse | absent (record 0256 D5); every command opens and saves the file, so the harness treats both as no-ops (counted as resident, not run) | 177 | `excel/cell-formatting.sh:27`, `excel/cell-formatting.sh:190`, `excel/charts.sh:17` |
@@ -75,11 +77,11 @@ The format is the extension of the document each call names.
 | G2 | Copying an element (`add --from`) | `add <file> <parent> --from <path>` clones an element | the CLI passes `--from` (record 0265); `File::apply` refuses it: "add-from copying is not integrated" (record 0256 F6) | 40 | `ppt/templates/styles/brand--aura-coffee/build.sh:58`, `ppt/templates/styles/brand--aura-coffee/build.sh:75`, `ppt/templates/styles/brand--aura-coffee/build.sh:104` |
 | G3 | Find and replace on `set` | `set --find T --replace R` (or `--prop find=`/`replace=`) rewrites matching text | the CLI maps the options to `find=`/`replace=` props (record 0265); record 0273 integrates the engine for DOCX, PPTX, XLSX and RTF, and record 0285 extends it to DOCX headers, footers, notes, comments and field results and PPTX table cells and notes; regular expressions (`regex=true`, record 0010 Q3), tracked-change finds, XLSX rich-text cells and the other formats remain refused | 0 |  |
 | G4 | Revision-tracked removal (`remove --prop`) | `remove` takes `--prop revision.author=...` to record a tracked deletion | the CLI passes the props (record 0265); `remove` admits no props (invalid_argument) | 2 | `word/revisions.sh:123`, `word/revisions.sh:202` |
-| G5 | Path grammar: OfficeCLI-only steps | `cell[R,C]` table-cell steps, `@id`/`@author` revision identities and other OfficeCLI path forms | `invalid_path`: the selector grammar (record 0005) has no such step or identity yet | 33 | `word/revisions.sh:219`, `word/revisions.sh:382`, `word/revisions.sh:394` |
+| G5 | Path grammar: OfficeCLI-only steps | `cell[R,C]` table-cell steps, `@id`/`@author` revision identities and other OfficeCLI path forms | `invalid_path`: the selector grammar (record 0005) has no such step or identity yet | 36 | `word/numbering.sh:257`, `word/numbering.sh:302`, `word/numbering.sh:304` |
 | G6 | Value vocabulary | documented value forms such as table-cell `fill=none` and gradient fills `COLOR1-COLOR2[-ANGLE]` (pptx table-cell.json) | `invalid_value`: the property's coercion accepts colors only | 2 | `ppt/tables/tables-basic.sh:83`, `ppt/tables/tables-basic.sh:93` |
 | G7 | Undocumented OfficeCLI alias: cell `text` | the cell handler takes `text` as another name of `value` (`ExcelHandler.Set.Cells.cs`, `case "value" or "text"`); the help schema lists only `value` | closed by record 0269: `text` is a registry alias of the cell `value` (XLSX, XLSB, XLS); a refusal here would be a regression | 0 |  |
-| C1 | Numbering definitions refused | `add --type num`/`abstractNum` creates the numbering that `numId` names | numbering is a registry gap, so the later `numId` is `invalid_value` | 27 | `word/numbering.sh:76`, `word/numbering.sh:79`, `word/numbering.sh:82` |
-| F3b | Failed after skipping unsupported properties | applies the supported properties and warns about the rest; a command whose remaining properties are not enough fails | `--unsupported warn` skipped properties, then the rest of the call failed with `missing_property`, which no other rule explains; the error carries the skipped properties (`Error::warnings`, record 0271), which are the gap (each is listed in the property gaps with refusal `skipped`) | 0 |  |
+| C1 | Numbering definitions refused | `add --type num`/`abstractNum` creates the numbering that `numId` names | numbering is a registry gap, so the later `numId` is `invalid_value` | 11 | `word/numbering.sh:203`, `word/numbering.sh:206`, `word/numbering.sh:209` |
+| F3b | Failed after skipping unsupported properties | applies the supported properties and warns about the rest; a command whose remaining properties are not enough fails | `--unsupported warn` skipped properties, then the rest of the call failed with `missing_property`, which no other rule explains; the error carries the skipped properties (`Error::warnings`, record 0271), which are the gap (each is listed in the property gaps with refusal `skipped`) | 1 | `word/numbering.sh:200` |
 
 ## Element and property gaps: docx
 
@@ -93,17 +95,18 @@ The format is the extension of the document each call names.
 | add | diagram | `unsupported_capability` | - | 19 | element not in the registry | `word/diagram.sh:64`, `word/diagram.sh:100` |
 | set | cell | `warned` | `vmerge` | 18 | registry: `vmerge` is not set-able; OfficeCLI documents it | `word/tables.sh:42`, `word/tables.sh:49` |
 | set | document | `unsupported_element` | - | 13 | registry: no set on document | `word/document-formatting.sh:25`, `word/document-formatting.sh:28` |
-| add | textbox | `unsupported_element` | - | 11 | registry gap R4x | `word/textbox.sh:39`, `word/textbox.sh:184` |
-| add | num | `unsupported_capability` | - | 9 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:73`, `word/numbering.sh:111` |
+| add | textbox | `unsupported_element` | - | 11 | registry: no add on textbox | `word/textbox.sh:39`, `word/textbox.sh:184` |
 | add | sdt | `unsupported_element` | - | 8 | registry: no add on sdt | `word/content-controls.sh:36`, `word/content-controls.sh:44` |
 | set | cell | `warned` | `valign` | 8 | registry: `valign` is not set-able; OfficeCLI documents it | `word/tables.sh:34`, `word/tables.sh:42` |
-| add | field | `unsupported_element` | - | 7 | registry gap R4x | `word/fields.sh:91`, `word/fields.sh:95` |
+| add | field | `unsupported_element` | - | 7 | registry: no add on field | `word/fields.sh:91`, `word/fields.sh:95` |
 | set | run | `warned` | `revision.author` | 7 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` |
 | set | run | `warned` | `revision.date` | 7 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` |
 | set | table | `unsupported_element` | - | 7 | registry: no set on table | `word/revisions.sh:177`, `word/tables.sh:189` |
 | query | revision | `unsupported_capability` | - | 6 | registry gap R4x | `word/revisions.sh:360`, `word/revisions.sh:389` |
 | set | run | `warned` | `revision.type` | 6 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` |
-| add | abstractNum | `unsupported_capability` | - | 4 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:46`, `word/numbering.sh:160` |
+| add | abstractNum | `warned` | `(more)` | 4 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:46`, `word/numbering.sh:160` |
+| add | abstractNum | `warned` | `level0.format` | 4 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:46`, `word/numbering.sh:160` |
+| add | abstractNum | `warned` | `level0.text` | 4 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:46`, `word/numbering.sh:160` |
 | add | table | `warned` | `border.all` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:179`, `word/tables.sh:247` |
 | set | cell | `warned` | `fill` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:198`, `word/tables.sh:199` |
 | add | diagram | `unsupported_element` | - | 3 | element not in the registry | `word/diagram.sh:57`, `word/diagram.sh:78` |
@@ -112,12 +115,8 @@ The format is the extension of the document each call names.
 | add | picture | `warned` | `anchor` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
 | add | picture | `warned` | `wrap` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
 | add | section | `unsupported_element` | - | 3 | registry: no add on section | `word/sections.sh:60`, `word/sections.sh:87` |
-| add | style | `unsupported_capability` | - | 3 | registry gap L-DOCX-R6 (R4x) | `word/fields.sh:37`, `word/fields.sh:40` |
-| set | level | `unsupported_capability` | - | 3 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:257`, `word/numbering.sh:302` |
+| add | abstractNum | `warned` | `level0.indent` | 2 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:46`, `word/numbering.sh:222` |
 | add | chart | `warned` | `axisNumFmt` | 2 | not in the registry; OfficeCLI documents it | `word/charts.sh:50`, `word/charts.sh:215` |
-| add | endnote | `unsupported_element` | - | 2 | registry gap L-DOCX-R5 | `word/sections.sh:116`, `word/sections.sh:117` |
-| add | field | `unsupported_capability` | - | 2 | registry gap R4x | `word/fields.sh:149`, `word/fields.sh:153` |
-| add | footnote | `unsupported_element` | - | 2 | registry gap L-DOCX-R5 | `word/sections.sh:53`, `word/sections.sh:54` |
 | add | paragraph | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:108`, `word/paragraph-formatting.sh:117` |
 | add | paragraph | `warned` | `border` | 2 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:127`, `word/paragraph-formatting.sh:128` |
 | add | paragraph | `warned` | `font` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:88`, `word/run-formatting.sh:92` |
@@ -132,7 +131,9 @@ The format is the extension of the document each call names.
 | set | revision | `unsupported_capability` | - | 2 | registry gap R4x | `word/revisions.sh:398`, `word/revisions.sh:431` |
 | set | row | `unsupported_element` | - | 2 | registry: no set on row | `word/revisions.sh:183`, `word/tables.sh:197` |
 | set | run | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:145`, `word/revisions.sh:150` |
-| add | bookmark | `unsupported_element` | - | 1 | registry gap R4x | `word/fields.sh:75` |
+| add | abstractNum | `warned` | `level0.color` | 1 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:160` |
+| add | abstractNum | `warned` | `level0.start` | 1 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:288` |
+| add | bookmark | `unsupported_element` | - | 1 | registry: no add on bookmark | `word/fields.sh:75` |
 | add | cell | `unsupported_element` | - | 1 | registry: no add on cell | `word/revisions.sh:196` |
 | add | chart | `warned` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `word/charts.sh:215` |
 | add | chart | `warned` | `areafill` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:119` |
@@ -143,7 +144,8 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `roundedcorners` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:215` |
 | add | chart | `warned` | `secondaryaxis` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:198` |
 | add | chart | `warned` | `transparency` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:150` |
-| add | footer | `unsupported_element` | - | 1 | registry gap L-DOCX-R5 | `word/fields.sh:147` |
+| add | num | `skipped` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:200` |
+| add | num | `skipped` | `level0.format` | 1 | not in the registry; not in OfficeCLI's help schema | `word/numbering.sh:200` |
 | add | paragraph | `warned` | `adjustRightInd` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:145` |
 | add | paragraph | `warned` | `autoSpaceDE` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:139` |
 | add | paragraph | `warned` | `autoSpaceDN` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:139` |
@@ -198,7 +200,6 @@ The format is the extension of the document each call names.
 | add | picture | `warned` | `vRelative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:121` |
 | add | row | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:207` |
 | add | row | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:207` |
-| add | run | `unsupported_capability` | - | 1 | registry lists add; refused for this target (operation gap) | `word/fields.sh:151` |
 | add | run | `warned` | `snapToGrid` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:144` |
 | add | run | `warned` | `specVanish` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:145` |
 | add | table | `warned` | `cellSpacing` | 1 | registry: `cellSpacing` is not add-able; OfficeCLI documents it | `word/tables.sh:179` |
@@ -206,11 +207,8 @@ The format is the extension of the document each call names.
 | add | table | `warned` | `indent` | 1 | registry: `indent` is not add-able; OfficeCLI documents it | `word/tables.sh:179` |
 | add | table | `warned` | `layout` | 1 | registry: `layout` is not add-able; OfficeCLI documents it | `word/tables.sh:179` |
 | add | table | `warned` | `padding` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:179` |
-| add | toc | `unsupported_element` | - | 1 | registry gap R4x | `word/fields.sh:66` |
+| add | toc | `unsupported_element` | - | 1 | registry: no add on toc | `word/fields.sh:66` |
 | get | group | `unsupported_capability` | - | 1 | element not in the registry | `word/diagram.sh:60` |
-| query | field | `unsupported_capability` | - | 1 | registry gap R4x | `word/fields.sh:168` |
-| query | toc | `unsupported_capability` | - | 1 | registry gap R4x | `word/fields.sh:171` |
-| query | - | `unsupported_capability` | - | 1 | element not in the registry | `word/numbering.sh:335` |
 | set | cell | `warned` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `word/tables.sh:221` |
 | set | cell | `warned` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:204` |
 | set | cell | `warned` | `border.bottom` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:229` |
@@ -237,7 +235,6 @@ The format is the extension of the document each call names.
 | set | cell | `warned` | `textDirection` | 1 | registry: `textDirection` is not set-able; OfficeCLI documents it | `word/tables.sh:216` |
 | set | cell | `warned` | `underline` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:209` |
 | set | cell | `warned` | `width` | 1 | registry: `width` is not set-able; OfficeCLI documents it | `word/tables.sh:240` |
-| set | field | `unsupported_capability` | - | 1 | registry gap R4x | `word/fields.sh:160` |
 | set | paragraph | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:130` |
 | set | paragraph | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:130` |
 | set | run | `warned` | `font.color` | 1 | not in the registry; OfficeCLI documents it | `word/revisions.sh:90` |
@@ -499,10 +496,7 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `title.size` | 35 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:209`, `excel/charts/charts-basic.sh:83` |
 | add | chart | `warned` | `title.bold` | 33 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:209`, `excel/charts/charts-basic.sh:83` |
 | add | chart | `warned` | `title.font` | 30 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:209`, `excel/charts/charts-bar.sh:412` |
-| add | conditionalFormatting | `unsupported_element` | - | 25 | registry gap M1-extended (R4x) | `excel/conditional-formatting.sh:32`, `excel/conditional-formatting.sh:33` |
 | add | chart | `warned` | `transparency` | 22 | not in the registry; OfficeCLI documents it | `excel/charts/charts-advanced.sh:210`, `excel/charts/charts-area.sh:109` |
-| add | dataValidation | `unsupported_element` | - | 22 | registry gap M1-extended (R4x) | `excel/data-validation.sh:42`, `excel/data-validation.sh:44` |
-| add | shape | `unsupported_element` | - | 20 | registry gap L-XLSX-R7 | `excel/shapes.sh:39`, `excel/shapes.sh:44` |
 | add | chart | `warned` | `plotFill` | 19 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:152`, `excel/charts/charts-area.sh:254` |
 | add | chart | `warned` | `fill` | 18 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-boxwhisker.sh:121`, `excel/charts/charts-histogram.sh:120` |
 | add | pivottable | `unsupported_element` | - | 18 | registry gap M1-extended (R4x) | `excel/pivot-tables.sh:121`, `excel/pivot-tables.sh:138` |
@@ -545,7 +539,6 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `style` | 5 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:170`, `excel/charts/charts-basic.sh:141` |
 | add | chart | `warned` | `trendline` | 5 | not in the registry; OfficeCLI documents it | `excel/charts.sh:183`, `excel/charts/charts-bubble.sh:175` |
 | add | chart | `warned` | `updownbars` | 5 | not in the registry; OfficeCLI documents it | `excel/charts.sh:271`, `excel/charts/charts-line.sh:513` |
-| get | shape | `unsupported_capability` | - | 5 | registry gap L-XLSX-R7 | `excel/shapes.sh:186`, `excel/shapes.sh:187` |
 | add | chart | `warned` | `dataLabels.numFmt` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-basic.sh:311`, `excel/charts/charts-column.sh:290` |
 | add | chart | `warned` | `dataTable` | 4 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:430`, `excel/charts/charts-basic.sh:194` |
 | add | chart | `warned` | `series1.marker` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-advanced.sh:63`, `excel/charts/charts-scatter.sh:92` |
@@ -574,7 +567,6 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `point3.color` | 2 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-basic.sh:297`, `excel/charts/charts-pie.sh:35` |
 | add | chart | `warned` | `showMarker` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-scatter.sh:73`, `excel/charts/charts-scatter.sh:141` |
 | add | chart | `warned` | `tickLabelPos` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-basic.sh:184`, `excel/charts/charts-line.sh:187` |
-| set | sheet | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `excel/sheet-settings.sh:71`, `excel/sheet-settings.sh:110` |
 | add | chart | `skipped` | `dataLabels.numFmt` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-area.sh:275` |
 | add | chart | `skipped` | `fill` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-histogram.sh:460` |
 | add | chart | `skipped` | `gradients` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-pie.sh:125` |
@@ -620,15 +612,21 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `title.overlay` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-pie.sh:171` |
 | add | chart | `warned` | `valAxisVisible` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:449` |
 | add | chart | `warned` | `valaxis.line` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-boxwhisker.sh:104` |
+| add | conditionalFormatting | `warned` | `axisColor` | 1 | registry: `axisColor` is not add-able; OfficeCLI documents it | `excel/conditional-formatting.sh:58` |
+| add | conditionalFormatting | `warned` | `axisPosition` | 1 | registry: `axisPosition` is not add-able; OfficeCLI documents it | `excel/conditional-formatting.sh:58` |
+| add | conditionalFormatting | `warned` | `negativeColor` | 1 | registry: `negativeColor` is not add-able; OfficeCLI documents it | `excel/conditional-formatting.sh:58` |
+| add | shape | `warned` | `glow` | 1 | registry: `glow` is not add-able; OfficeCLI documents it | `excel/shapes.sh:123` |
+| add | shape | `warned` | `gradientFill` | 1 | registry: `gradientFill` is not add-able; OfficeCLI documents it | `excel/shapes.sh:128` |
+| add | shape | `warned` | `reflection` | 1 | registry: `reflection` is not add-able; OfficeCLI documents it | `excel/shapes.sh:133` |
+| add | shape | `warned` | `shadow` | 1 | registry: `shadow` is not add-able; OfficeCLI documents it | `excel/shapes.sh:138` |
+| add | shape | `warned` | `softEdge` | 1 | registry: `softEdge` is not add-able; OfficeCLI documents it | `excel/shapes.sh:138` |
 | add | sheet | `warned` | `tabColor` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:128` |
-| query | shape | `unsupported_capability` | - | 1 | registry gap L-XLSX-R7 | `excel/shapes.sh:185` |
 | set | axis | `warned` | `format` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:263` |
 | set | axis | `warned` | `labelRotation` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:263` |
 | set | axis | `warned` | `majorGridlines` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:263` |
 | set | cell | `warned` | `arrayformula` | 1 | registry: `arrayformula` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:166` |
-| set | cell | `warned` | `link` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
-| set | cell | `warned` | `tooltip` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
-| set | sheet | `warned` | `autoFilter` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:110` |
+| set | sheet | `warned` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/sheet-settings.sh:71` |
+| set | sheet | `warned` | `direction` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:110` |
 | set | sheet | `warned` | `fitToPage` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:71` |
 | set | sheet | `warned` | `footer` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:94` |
 | set | sheet | `warned` | `freeze` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:55` |
@@ -647,7 +645,10 @@ The format is the extension of the document each call names.
 
 ## Bugs
 
-None: every refusal is a recorded delta, a gap the registry agrees with, or a cascade.
+| Script line | Verb | Format | Element | Refusal | Detail | Note |
+|---|---|---|---|---|---|---|
+| `excel/cell-formatting.sh:158` | set | xlsx | A9 | `unsupported_property` | link | skipped link: the registry lists `link` as set-able |
+| `excel/cell-formatting.sh:158` | set | xlsx | A9 | `unsupported_property` | tooltip | skipped tooltip: the registry lists `tooltip` as set-able |
 
 ## Passed calls the registry does not claim
 
@@ -659,9 +660,9 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1172 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1181 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
-| F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 134 |
+| F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 135 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
 | F6 | `add --from`, find/replace on `set`, `remove --shift`, `get --save` | 40 |
 | D6 | missing verbs (`validate`, `raw-set`, `add-part`, `dump`) | 138 |
@@ -688,10 +689,10 @@ None.
 | `excel/charts/charts-scatter.sh` | 33 | 11 | 0 | 21 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-stock.sh` | 18 | 6 | 0 | 11 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-waterfall.sh` | 23 | 10 | 0 | 12 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/conditional-formatting.sh` | 165 | 139 | 0 | 0 | 26 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/data-validation.sh` | 88 | 65 | 0 | 0 | 23 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/conditional-formatting.sh` | 165 | 163 | 0 | 1 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/data-validation.sh` | 88 | 87 | 0 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/pivot-tables.sh` | 586 | 568 | 0 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/shapes.sh` | 62 | 35 | 0 | 0 | 27 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/shapes.sh` | 62 | 57 | 0 | 4 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/sheet-settings.sh` | 104 | 96 | 0 | 7 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/slicers.sh` | 60 | 54 | 0 | 0 | 6 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/sparklines.sh` | 114 | 106 | 0 | 0 | 8 | 0 | 0 | 0 | 2 | 2/2 |
@@ -756,14 +757,14 @@ None.
 | `word/content-controls.sh` | 21 | 11 | 0 | 0 | 9 | 0 | 1 | 0 | 2 | 2/2 |
 | `word/diagram.sh` | 50 | 26 | 0 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/document-formatting.sh` | 17 | 5 | 0 | 0 | 12 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/fields.sh` | 39 | 19 | 0 | 0 | 20 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/fields.sh` | 39 | 22 | 0 | 0 | 11 | 2 | 4 | 0 | 2 | 2/2 |
 | `word/formulas.sh` | 171 | 90 | 0 | 0 | 81 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/numbering.sh` | 70 | 24 | 0 | 0 | 19 | 0 | 27 | 0 | 1 | 2/2 |
+| `word/numbering.sh` | 70 | 33 | 0 | 4 | 5 | 17 | 11 | 0 | 1 | 2/2 |
 | `word/paragraph-formatting.sh` | 78 | 54 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/pictures.sh` | 31 | 24 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/revisions.sh` | 73 | 35 | 0 | 15 | 17 | 6 | 0 | 0 | 2 | 2/2 |
 | `word/run-formatting.sh` | 80 | 56 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/sections.sh` | 33 | 24 | 0 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/sections.sh` | 33 | 28 | 0 | 0 | 5 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 210 | 3 | 108 | 39 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **3847** | **344** | **1172** | **773** | **171** | **468** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3931** | **344** | **1181** | **673** | **190** | **456** | **0** | **177** | **200/200** |

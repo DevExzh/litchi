@@ -40,6 +40,7 @@ registry fragments also carry their own MPL-2.0 / Apache-2.0 headers.
 | `sw/qa/extras/layout/data/inline-textbox-position.docx` | `ffef711a9531d47da480d48bb107d0d8aebebbc1112c645061bdbaf6317ff839` | same, two text boxes in one paragraph |
 | `sw/qa/writerfilter/dmapper/data/redlined-shape-sdt.docx` | `1f93998fb483bb99e27370e1ef91d081d0011cbc3c295be1c6b85626b5e32547` | same, a group shape in a tracked insertion |
 | `sw/qa/extras/ooxmlexport/data/tdf103389.docx` | `1e966f982f6664f17d63d508d7299a577c98427a3d3943e550e1c359dc6e4048` | same, two drawing canvases |
+| `sw/qa/extras/ooxmlexport/data/textWatermark.docx` | `9beceea6b922aad096516cbb161ee2119094c84785d32e29732711df75a6c345` | `crates/litchi-ops/tests/crud_matrix.rs` and `crates/litchi-ops/tests/docx_unified_marks.rs`, a text watermark in three headers (record 0319; copied 2026-10-16) |
 
 ## Filter registry fragments
 
