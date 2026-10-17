@@ -1575,6 +1575,129 @@ impl Edit {
         )
     }
 
+    /// Insert a paragraph into a text body of one effective slide, with the
+    /// semantics of [`crate::opened::Edit::insert_paragraph`]; it composes
+    /// with earlier staged changes and participates in source-local replay.
+    /// Notes-page bodies are refused (record 0333).
+    ///
+    /// # Errors
+    ///
+    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    pub fn insert_paragraph(
+        &mut self,
+        slide: impl Into<Position>,
+        body: crate::opened::TextBody,
+        position: Position,
+        properties: crate::opened::TextProperties<'_>,
+    ) -> Result<()> {
+        self.change_text_body(
+            slide.into(),
+            body,
+            &crate::opened::TextChange::InsertParagraph {
+                position: position.get(),
+                properties,
+            },
+        )
+    }
+
+    /// Remove a paragraph of a text body of one effective slide, with the
+    /// semantics of [`crate::opened::Edit::remove_paragraph`].
+    ///
+    /// # Errors
+    ///
+    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    pub fn remove_paragraph(
+        &mut self,
+        slide: impl Into<Position>,
+        body: crate::opened::TextBody,
+        paragraph: Position,
+    ) -> Result<()> {
+        self.change_text_body(
+            slide.into(),
+            body,
+            &crate::opened::TextChange::RemoveParagraph {
+                paragraph: paragraph.get(),
+            },
+        )
+    }
+
+    /// Insert a text run into a paragraph of one effective slide, with the
+    /// semantics of [`crate::opened::Edit::insert_run`].
+    ///
+    /// # Errors
+    ///
+    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    pub fn insert_run(
+        &mut self,
+        slide: impl Into<Position>,
+        body: crate::opened::TextBody,
+        paragraph: Position,
+        position: Position,
+        properties: crate::opened::TextProperties<'_>,
+    ) -> Result<()> {
+        self.change_text_body(
+            slide.into(),
+            body,
+            &crate::opened::TextChange::InsertRun {
+                paragraph: paragraph.get(),
+                position: position.get(),
+                properties,
+            },
+        )
+    }
+
+    /// Remove a run child of a paragraph of one effective slide, with the
+    /// semantics of [`crate::opened::Edit::remove_run`].
+    ///
+    /// # Errors
+    ///
+    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    pub fn remove_run(
+        &mut self,
+        slide: impl Into<Position>,
+        body: crate::opened::TextBody,
+        paragraph: Position,
+        run: Position,
+    ) -> Result<()> {
+        self.change_text_body(
+            slide.into(),
+            body,
+            &crate::opened::TextChange::RemoveRun {
+                paragraph: paragraph.get(),
+                run: run.get(),
+            },
+        )
+    }
+
+    fn change_text_body(
+        &mut self,
+        slide: Position,
+        body: crate::opened::TextBody,
+        change: &crate::opened::TextChange<'_>,
+    ) -> Result<()> {
+        self.stage_slide_edit(
+            slide,
+            |_package, _snapshot| Ok(None),
+            |edit| edit.change_text_body(body, change),
+        )
+        .map(|_| ())
+    }
+
+    /// Apply several bounded batches of rich text edits to one effective
+    /// slide in one pass, with the semantics of
+    /// [`crate::opened::Edit::set_text_property_chunks`] (record 0333).
+    pub fn set_text_property_chunks(
+        &mut self,
+        slide: impl Into<Position>,
+        chunks: &[&[crate::opened::TextEdit<'_>]],
+    ) -> Result<usize> {
+        self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| edit.set_text_property_chunks(chunks),
+        )
+    }
+
     /// Set (`Some`) or clear (`None`) one effective slide's direct
     /// transition, with the semantics of
     /// [`super::SourceBackedSlideEdit::set_transition`] and

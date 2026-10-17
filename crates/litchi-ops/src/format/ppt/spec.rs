@@ -480,8 +480,8 @@ const fn property_gap(
 
 static SMARTART_GAP: GapSpec = element_gap(
     "smartart",
-    "M1-extended",
-    "legacy PPT diagram frames have no semantic diagram projection",
+    "0339-F3 (deferred-P1): PPT SmartArt and diagram groups",
+    "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected",
 );
 static EQUATION_GAP: GapSpec = element_gap(
     "equation",
@@ -500,13 +500,13 @@ static MODEL3D_GAP: GapSpec = element_gap(
 );
 static MASTER_GAP: GapSpec = element_gap(
     "slideMaster",
-    "M1-extended",
+    "0339-F4 (deferred-P1): PPT main and title masters as nodes",
     "legacy PPT master records are not exposed as navigable nodes",
 );
 static LAYOUT_GAP: GapSpec = element_gap(
     "slideLayout",
-    "M1-extended",
-    "legacy PPT layout records are not exposed as navigable nodes",
+    "0339-F4 (deferred-P1): PPT layouts as nodes",
+    "a legacy PPT slide names a layout type in its slide atom (PowerPoint 2007 and later add one master per layout); there are no layout records to expose as navigable nodes yet",
 );
 static MODERN_COMMENT_GAP: GapSpec = element_gap(
     "modernComment",
@@ -954,7 +954,18 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &NOTES_MASTER_GAP,
         ),
     ],
-    gaps: &[PICTURE_MEDIA_GAP, SHAPE_FILL_GAP, STATS_CHART_GAP],
+    gaps: &[
+        PICTURE_MEDIA_GAP,
+        SHAPE_FILL_GAP,
+        STATS_CHART_GAP,
+        // OfficeCLI's Mermaid `diagram` (record 0339).
+        GapSpec {
+            subject: Subject::Element("diagram"),
+            code: Code::UnsupportedPath,
+            follow_up: "none: out of scope (record 0332, design §10)",
+            reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
+        },
+    ],
 };
 
 check_format_spec!(SPEC);

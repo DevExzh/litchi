@@ -1979,6 +1979,13 @@
       "reason": "ODS rich cell text is flattened into the cell's displayed text"
     },
     {
+      "subject": "element",
+      "element": "detectedtable",
+      "code": "unsupported_capability",
+      "followUp": "WP11 (record 0339 F5): header-row table detection in queries",
+      "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
+    },
+    {
       "subject": "operation",
       "verb": "query",
       "element": "row",

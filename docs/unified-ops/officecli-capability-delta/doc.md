@@ -30,153 +30,153 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | bookmark | `name` | string | asg | asg | supported | supported |  |  |  |
 | bookmark | `text` | string | a-- | a-- | write-only | supported |  |  |  |
 | bookmark | `id` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| bookmarkEnd | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| bookmarkEnd | `name` | string | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `axisFont` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `axisMax` | number | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `axisMin` | number | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `axisNumFmt` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `axisOrientation` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `axisTitle` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `format` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `labelOffset` | number | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `labelRotation` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `logBase` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `majorGridlines` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `max` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `min` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `minorGridlines` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `tickLabelSkip` | number | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `title` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-axis | `visible` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `categories` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `categoriesRef` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `color` | color | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `dataLabels.numFmt` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `dataLabels.separator` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `errBars` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `invertIfNeg` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `lineDash` | enum | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `lineWidth` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `marker` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `markerSize` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `markerColor` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `name` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `nameRef` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `scatterStyle` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `secondaryAxis` | bool | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `smooth` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `values` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `bubbleSize` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart-series | `bubbleSizeRef` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `dispUnits` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `seriesCount` | number | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `radarstyle` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `roundedcorners` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `valaxisvisible` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `areafill` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `autotitledeleted` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axisfont` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axisline` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axismax` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axismin` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axisnumfmt` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axisorientation` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axisposition` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axistitle` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `axisvisible` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `bubbleScale` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `catAxisVisible` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `catTitle` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `cataxisline` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `categories` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `chartFill` | color | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `chartType` | enum | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `chartareafill` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `chartborder` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `colorrule` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `colors` | string | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `combosplit` | number | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `combotypes` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `crossBetween` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `crosses` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `crossesAt` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `data` | string | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `dataLabels` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `dataTable` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `decreaseColor` | color | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `dispBlanksAs` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `droplines` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `errbars` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `explosion` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `firstSliceAngle` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `gapdepth` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `gapwidth` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `gradient` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `gradients` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `gridlines` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `height` | length | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `hilowlines` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `holeSize` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `increaseColor` | color | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `invertifneg` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labelPos` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labelfont` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labelFont.size` | number | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labelFont.color` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labelFont.bold` | bool | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labelFont.name` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labeloffset` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `labelrotation` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `leaderlines` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `legend` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `legend.overlay` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `legendFont` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `linedash` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `linewidth` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `logbase` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `majorTickMark` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `majorunit` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `marker` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `markersize` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `markercolor` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `minorGridlines` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `minorTickMark` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `minorunit` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `overlap` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `plotFill` | color | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `plotborder` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `plotvisonly` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `preset` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `referenceline` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `scatterstyle` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `secondaryaxis` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `series{N}` | string | -s- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `seriesoutline` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `seriesshadow` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `serlines` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `shape` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `showMarker` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `shownegbubbles` | bool | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `sizerepresents` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `smooth` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `style` | number | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `tickLabelPos` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `ticklabelskip` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `title` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `title.bold` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `title.color` | color | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `title.font` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `title.overlay` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `title.size` | font-size | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `totalColor` | color | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `transparency` | number | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `trendline` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `updownbars` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `valaxisline` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `varyColors` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `view3d` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| chart | `width` | length | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
+| bookmarkEnd | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| bookmarkEnd | `name` | string | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| chart-axis | `axisFont` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `axisMax` | number | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `axisMin` | number | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `axisNumFmt` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `axisOrientation` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `axisTitle` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `format` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `labelOffset` | number | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `labelRotation` | number | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `logBase` | number | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `majorGridlines` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `max` | number | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `min` | number | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `minorGridlines` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `tickLabelSkip` | number | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `title` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-axis | `visible` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `categories` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `categoriesRef` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `color` | color | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `dataLabels.numFmt` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `dataLabels.separator` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `errBars` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `invertIfNeg` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `lineDash` | enum | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `lineWidth` | number | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `marker` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `markerSize` | number | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `markerColor` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `name` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `nameRef` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `scatterStyle` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `secondaryAxis` | bool | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `smooth` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `values` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `bubbleSize` | string | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart-series | `bubbleSizeRef` | string | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `dispUnits` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `seriesCount` | number | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `radarstyle` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `roundedcorners` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `valaxisvisible` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `areafill` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `autotitledeleted` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axisfont` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axisline` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axismax` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axismin` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axisnumfmt` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axisorientation` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axisposition` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axistitle` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `axisvisible` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `bubbleScale` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `catAxisVisible` | bool | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `catTitle` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `cataxisline` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `categories` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `chartFill` | color | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `chartType` | enum | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `chartareafill` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `chartborder` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `colorrule` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `colors` | string | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `combosplit` | number | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `combotypes` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `crossBetween` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `crosses` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `crossesAt` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `data` | string | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `dataLabels` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `dataTable` | bool | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `decreaseColor` | color | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `droplines` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `errbars` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `explosion` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `firstSliceAngle` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `gapdepth` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `gapwidth` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `gradient` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `gradients` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `gridlines` | bool | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `height` | length | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `hilowlines` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `holeSize` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `increaseColor` | color | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `invertifneg` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labelPos` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labelfont` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labelFont.size` | number | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labelFont.color` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labelFont.bold` | bool | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labelFont.name` | string | --g |  | element gap | — | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labeloffset` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `labelrotation` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `leaderlines` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `legend` | enum | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `legend.overlay` | bool | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `legendFont` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `linedash` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `linewidth` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `logbase` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `majorTickMark` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `majorunit` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `marker` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `markersize` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `markercolor` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `minorGridlines` | bool | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `minorTickMark` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `minorunit` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `overlap` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `plotFill` | color | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `plotborder` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `plotvisonly` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `preset` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `referenceline` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `scatterstyle` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `secondaryaxis` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `series{N}` | string | -s- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `seriesoutline` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `seriesshadow` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `serlines` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `shape` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `showMarker` | string | -sg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `shownegbubbles` | bool | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `sizerepresents` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `smooth` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `style` | number | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `tickLabelPos` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `ticklabelskip` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `title` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `title.bold` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `title.color` | color | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `title.font` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `title.overlay` | bool | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `title.size` | font-size | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `totalColor` | color | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `transparency` | number | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `trendline` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `updownbars` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `valaxisline` | string | as- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `varyColors` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `view3d` | string | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
+| chart | `width` | length | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1): DOC charts as chart nodes |
 | comment | `id` | number | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
 | comment | `anchoredTo` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
 | comment | `runStart` | int | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
@@ -187,16 +187,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | comment | `initials` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | comment | `author` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | comment | `text` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `width` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `height` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `render` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `poster` | boolean | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `theme` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
+| diagram | `mermaid` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `src` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `width` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `height` | length | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `render` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `poster` | boolean | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `theme` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `layout` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `look` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
+| diagram | `background` | string | a-- |  | element gap | gap | P2 | out-of-scope (mermaid-diagram) | none: out of scope (record 0332, design §10) |
 | document | `author` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | document | `title` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | document | `keywords` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
@@ -320,7 +320,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | field | `instruction` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | field | `vertAlign` | enum | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | field | `fldLock` | bool | a-g | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| fieldChar | `fieldCharType` | enum | -sg |  | unlisted | gap | P1 | out-of-scope (complex-field-parts) |  |
+| fieldChar | `fieldCharType` | enum | -sg |  | element gap | gap | P1 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | footer | `type` | enum | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | footer | `text` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | footer | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
@@ -373,7 +373,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | hyperlink | `docLocation` | string | --g |  | unlisted | — | P1 | deferred-P1 0324 (doc-family) |  |
 | hyperlink | `tgtFrame` | string |  | --g | litchi-only | — |  |  |  |
 | hyperlink | `strike` | bool |  | --g | litchi-only | — |  |  |  |
-| instrText | `instruction` | string | -sg |  | unlisted | gap | P1 | out-of-scope (complex-field-parts) |  |
+| instrText | `instruction` | string | -sg |  | element gap | gap | P1 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | level | `ilvl` | int | a-g |  | unlisted | gap | P1 | out-of-scope (numbering-native-ids) |  |
 | level | `format` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | level | `lvlText` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
@@ -585,11 +585,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | paragraph | `text` | string | asg | asg | supported | supported |  |  |  |
 | paragraph | `styleId` | string |  | -sg | litchi-only | litchi-only |  |  |  |
 | paragraph | `styleName` | string |  | -sg | litchi-only | litchi-only |  |  |  |
-| permStart | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| permStart | `edGrp` | enum | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| permStart | `ed` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| permStart | `colFirst` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| permStart | `colLast` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
+| permStart | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| permStart | `edGrp` | enum | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| permStart | `ed` | string | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| permStart | `colFirst` | number | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| permStart | `colLast` | number | a-g |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
 | picture | `decorative` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | picture | `crop` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | picture | `cropLeft` | string | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
@@ -630,9 +630,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `superscript` | bool |  | --g | litchi-only | — |  |  |  |
 | picture | `subscript` | bool |  | --g | litchi-only | — |  |  |  |
 | picture | `rStyle` | string |  | -sg | litchi-only | litchi-only |  |  |  |
-| ptab | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| ptab | `relativeTo` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| ptab | `leader` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
+| ptab | `align` | enum | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| ptab | `relativeTo` | enum | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| ptab | `leader` | enum | asg |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
 | revision | `type` | enum | --g |  | element gap | — | P2 | deferred-P2 0324 (doc-family) | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
 | revision | `text` | string | --g |  | element gap | — | P2 | deferred-P2 0324 (doc-family) | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
 | revision | `author` | string | --g |  | element gap | — | P2 | deferred-P2 0324 (doc-family) | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
@@ -947,8 +947,8 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `border.top` | string | -s- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | cell | `border.tr2bl` | string | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | cell | `text` | string | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| column | `width` | length | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
-| column | `text` | string | a-- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
+| column | `width` | length | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
+| column | `text` | string | a-- |  | element gap | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
 | row | `height.exact` | length | as- |  | write-only | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | row | `header` | bool | asg | --g | supported | gap | P1 | deferred-P1 0324 (doc-family) |  |
 | row | `cantSplit` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0324 (doc-family) |  |

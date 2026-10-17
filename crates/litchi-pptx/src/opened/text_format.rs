@@ -14,12 +14,11 @@
 //! children follow the schema order of `a:rPr`, `a:pPr`, `a:tcPr` and
 //! `p:spPr` and use the `DrawingML` prefix of the element that receives them.
 
-use std::borrow::Cow;
 use std::ops::Range;
 
 use litchi_core::Position;
 use litchi_drawingml::geom::Preset;
-use litchi_drawingml::text::Alignment;
+use litchi_drawingml::text::{Alignment, Anchor, Strike, Underline};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -84,6 +83,18 @@ pub enum TextTarget {
         /// Position among the row's `a:tc` cells.
         column: Position,
     },
+    /// One paragraph of a table cell's text body, as [`Self::Paragraph`]
+    /// is one of a shape's (record 0333).
+    CellParagraph {
+        /// Positional scene index of the table frame.
+        shape: Position,
+        /// Position among the table's `a:tr` rows.
+        row: Position,
+        /// Position among the row's `a:tc` cells.
+        column: Position,
+        /// Position among the cell body's `a:p` children.
+        paragraph: Position,
+    },
     /// One run (`a:r`, `a:br` or `a:fld`) of a paragraph of a table cell's
     /// text body, as [`Self::Run`] is one of a shape's (record 0285).
     CellRun {
@@ -122,6 +133,46 @@ pub enum TextTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rgb(pub [u8; 3]);
 
+/// A table cell's local fill, the fill choice of its `a:tcPr` (record
+/// 0333).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CellFill {
+    /// A solid RGB colour (`a:solidFill/a:srgbClr`).
+    Rgb(Rgb),
+    /// A solid theme colour (`a:solidFill/a:schemeClr`).
+    Scheme(litchi_drawingml::color::Scheme),
+    /// No fill (`a:noFill`).
+    None,
+}
+
+/// One cell inset of `a:tcPr` (record 0333).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CellMargin {
+    /// `marL`.
+    Left,
+    /// `marR`.
+    Right,
+    /// `marT`.
+    Top,
+    /// `marB`.
+    Bottom,
+}
+
+impl CellMargin {
+    /// Every inset, in `marL`, `marR`, `marT`, `marB` order.
+    pub const ALL: [Self; 4] = [Self::Left, Self::Right, Self::Top, Self::Bottom];
+
+    const fn attribute(self) -> &'static [u8] {
+        match self {
+            Self::Left => b"marL",
+            Self::Right => b"marR",
+            Self::Top => b"marT",
+            Self::Bottom => b"marB",
+        }
+    }
+}
+
 /// A shape's own fill, the fill choice of its `p:spPr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -150,7 +201,11 @@ pub struct TextProperties<'a> {
     font: Option<Option<&'a str>>,
     latin: Option<Option<&'a str>>,
     align: Option<Option<Alignment>>,
-    fill: Option<Option<Rgb>>,
+    underline: Option<Option<Underline>>,
+    strike: Option<Option<Strike>>,
+    fill: Option<Option<CellFill>>,
+    anchor: Option<Option<Anchor>>,
+    margins: [Option<Option<i64>>; 4],
     shape_fill: Option<Option<ShapeFill>>,
     geometry: Option<Preset>,
 }
@@ -213,10 +268,37 @@ impl<'a> TextProperties<'a> {
         self.align = Some(value);
         self
     }
-    /// Set or remove a table cell's solid fill (`a:tcPr`); cells only.
+    /// Set or remove `a:rPr@u` on every addressed run (record 0333).
     #[must_use]
-    pub const fn with_fill(mut self, value: Option<Rgb>) -> Self {
+    pub const fn with_underline(mut self, value: Option<Underline>) -> Self {
+        self.underline = Some(value);
+        self
+    }
+    /// Set or remove `a:rPr@strike` on every addressed run (record 0333).
+    #[must_use]
+    pub const fn with_strike(mut self, value: Option<Strike>) -> Self {
+        self.strike = Some(value);
+        self
+    }
+    /// Set or remove a table cell's local fill (`a:tcPr`): a solid RGB or
+    /// theme colour, or no fill; cells only.
+    #[must_use]
+    pub const fn with_fill(mut self, value: Option<CellFill>) -> Self {
         self.fill = Some(value);
+        self
+    }
+    /// Set or remove a table cell's vertical anchor (`a:tcPr@anchor`);
+    /// cells only (record 0333).
+    #[must_use]
+    pub const fn with_cell_anchor(mut self, value: Option<Anchor>) -> Self {
+        self.anchor = Some(value);
+        self
+    }
+    /// Set or remove one table cell inset (`a:tcPr@marL`, …), in EMU; cells
+    /// only (record 0333).
+    #[must_use]
+    pub const fn with_cell_margin(mut self, margin: CellMargin, value: Option<i64>) -> Self {
+        self.margins[margin as usize] = Some(value);
         self
     }
     /// Set or remove a shape's own fill (`p:spPr`); shape targets only.
@@ -247,6 +329,8 @@ impl<'a> TextProperties<'a> {
             || self.color.is_some()
             || self.font.is_some()
             || self.latin.is_some()
+            || self.underline.is_some()
+            || self.strike.is_some()
     }
     fn has_shape_properties(&self) -> bool {
         self.shape_fill.is_some() || self.geometry.is_some()
@@ -254,8 +338,12 @@ impl<'a> TextProperties<'a> {
     fn has_body_properties(&self) -> bool {
         self.text.is_some() || self.has_run_properties() || self.align.is_some()
     }
+    /// Whether a cell-only property (fill, anchor, insets) is assigned.
+    fn has_cell_properties(&self) -> bool {
+        self.fill.is_some() || self.anchor.is_some() || self.margins.iter().any(Option::is_some)
+    }
     fn is_empty(&self) -> bool {
-        !self.has_body_properties() && self.fill.is_none() && !self.has_shape_properties()
+        !self.has_body_properties() && !self.has_cell_properties() && !self.has_shape_properties()
     }
 }
 
@@ -315,6 +403,75 @@ pub(crate) fn stage_text_properties(
             limit: max_text_bytes,
         });
     }
+    stage_admitted_text_edits(xml, edits, max_output_bytes)
+}
+
+/// Stage several already bounded batches of text formatting edits, applied
+/// in order, in one scene read and one read-back (record 0333). Each chunk
+/// keeps the limits of [`stage_text_properties`]; the chunk count is bounded
+/// by the scene's shape limit and the total by 100,000 edits.
+pub(crate) fn stage_text_property_chunks(
+    xml: &[u8],
+    chunks: &[&[TextEdit<'_>]],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
+        return Err(Error::Limit {
+            resource: "opened-presentation text property chunks",
+            limit: crate::shape::Limits::DEFAULT.shapes(),
+        });
+    }
+    let mut total = 0usize;
+    for chunk in chunks {
+        if chunk.len() > super::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
+            return Err(Error::Limit {
+                resource: "opened-presentation text property edits",
+                limit: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+            });
+        }
+        let mut text_bytes = 0usize;
+        for edit in *chunk {
+            validate(edit)?;
+            text_bytes = text_bytes.saturating_add(edit.properties.text.map_or(0, str::len));
+        }
+        if text_bytes > max_text_bytes {
+            return Err(Error::Limit {
+                resource: "opened-presentation aggregate text property bytes",
+                limit: max_text_bytes,
+            });
+        }
+        total = total.saturating_add(chunk.len());
+    }
+    if total > 100_000 {
+        return Err(Error::Limit {
+            resource: "opened-presentation text property edits",
+            limit: 100_000,
+        });
+    }
+    if total == 0 {
+        return Ok((None, 0));
+    }
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(total)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation text property chunks",
+            source,
+        })?;
+    for chunk in chunks {
+        edits.extend_from_slice(chunk);
+    }
+    stage_admitted_text_edits(xml, &edits, max_output_bytes)
+}
+
+/// The staging of admitted text formatting edits: one scene read, the
+/// edited elements rewritten in order, one splice and one read-back.
+fn stage_admitted_text_edits(
+    xml: &[u8],
+    edits: &[TextEdit<'_>],
+    max_output_bytes: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
     let original = crate::shape::Scene::read(xml)?;
     if original.is_rewritten() {
         return Err(Error::UnsafeEdit {
@@ -322,95 +479,127 @@ pub(crate) fn stage_text_properties(
             reason: "text property edits do not support markup-compatibility branch selection",
         });
     }
-    let mut current: Cow<'_, [u8]> = Cow::Borrowed(xml);
+    // Every target is a leaf element of the original scene (a text shape or
+    // a table frame), so their spans are disjoint: each edit rewrites its
+    // shape's current element, and the rewritten elements are spliced into
+    // the part once (record 0333). This keeps a batch proportional to the
+    // part plus the edited elements, rather than reading the scene again
+    // for every edit.
+    let mut elements: Vec<(usize, Range<usize>, Vec<u8>)> = Vec::new();
+    let mut slots: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
     let mut changed = 0;
     for edit in edits {
-        let next = {
-            let scene = crate::shape::Scene::read(&current)?;
-            let index = shape_position(edit.target).get();
-            let shape = scene.at(index)?;
-            let span = shape.common().span()?.range(current.len())?;
-            let is_table = matches!(shape, crate::shape::Shape::Table(_));
-            let element = &current[span.clone()];
-            let cell = match edit.target {
-                TextTarget::Cell { row, column, .. }
-                | TextTarget::CellRun { row, column, .. }
-                | TextTarget::CellRunSpan { row, column, .. } => Some((row.get(), column.get())),
-                _ => None,
-            };
-            let replacement = match cell {
-                Some((row, column)) => {
-                    if !is_table {
-                        return Err(Error::UnsafeEdit {
-                            operation: "set_text_properties",
-                            reason: "a table cell edit requires a table graphic frame",
-                        });
-                    }
-                    rewrite_cell_frame(element, row, column, |cell| match edit.target {
-                        TextTarget::CellRun { paragraph, run, .. } => rewrite_cell_run(
-                            cell,
-                            paragraph.get(),
-                            run.get(),
-                            None,
-                            &edit.properties,
-                        ),
-                        TextTarget::CellRunSpan {
-                            paragraph,
-                            run,
-                            start,
-                            end,
-                            ..
-                        } => rewrite_cell_run(
-                            cell,
-                            paragraph.get(),
-                            run.get(),
-                            Some(start..end),
-                            &edit.properties,
-                        ),
-                        _ => rewrite_cell(cell, &edit.properties),
-                    })?
-                },
-                None => {
-                    if is_table || edit.properties.fill.is_some() {
-                        return Err(Error::UnsafeEdit {
-                            operation: "set_text_properties",
-                            reason: "text formatting requires a shape text body; fill applies to table cells",
-                        });
-                    }
-                    rewrite_shape(element, edit.target, &edit.properties)?
-                },
-            };
-            if replacement.as_slice() == element {
-                None
-            } else {
-                let length = current.len() - span.len() + replacement.len();
-                if length > max_output_bytes {
-                    return Err(Error::Limit {
-                        resource: "opened-presentation text property output bytes",
-                        limit: max_output_bytes,
-                    });
-                }
-                let mut output = Vec::new();
-                output
-                    .try_reserve_exact(length)
+        let index = shape_position(edit.target).get();
+        let shape = original.at(index)?;
+        let slot = match slots.get(&index) {
+            Some(slot) => *slot,
+            None => {
+                let span = shape.common().span()?.range(xml.len())?;
+                elements
+                    .try_reserve(1)
                     .map_err(|source| Error::Allocation {
-                        resource: "opened-presentation text property output",
+                        resource: "opened-presentation text property elements",
                         source,
                     })?;
-                output.extend_from_slice(&current[..span.start]);
-                output.extend_from_slice(&replacement);
-                output.extend_from_slice(&current[span.end..]);
-                Some(output)
-            }
+                slots.insert(index, elements.len());
+                elements.push((index, span.clone(), xml[span].to_vec()));
+                elements.len() - 1
+            },
         };
-        if let Some(next) = next {
-            current = Cow::Owned(next);
+        let is_table = matches!(shape, crate::shape::Shape::Table(_));
+        let element = &elements[slot].2;
+        let cell = match edit.target {
+            TextTarget::Cell { row, column, .. }
+            | TextTarget::CellParagraph { row, column, .. }
+            | TextTarget::CellRun { row, column, .. }
+            | TextTarget::CellRunSpan { row, column, .. } => Some((row.get(), column.get())),
+            _ => None,
+        };
+        let replacement = match cell {
+            Some((row, column)) => {
+                if !is_table {
+                    return Err(Error::UnsafeEdit {
+                        operation: "set_text_properties",
+                        reason: "a table cell edit requires a table graphic frame",
+                    });
+                }
+                rewrite_cell_frame(element, row, column, |cell| match edit.target {
+                    TextTarget::CellParagraph { paragraph, .. } => {
+                        rewrite_cell_paragraph(cell, paragraph.get(), &edit.properties)
+                    },
+                    TextTarget::CellRun { paragraph, run, .. } => {
+                        rewrite_cell_run(cell, paragraph.get(), run.get(), None, &edit.properties)
+                    },
+                    TextTarget::CellRunSpan {
+                        paragraph,
+                        run,
+                        start,
+                        end,
+                        ..
+                    } => rewrite_cell_run(
+                        cell,
+                        paragraph.get(),
+                        run.get(),
+                        Some(start..end),
+                        &edit.properties,
+                    ),
+                    _ => rewrite_cell(cell, &edit.properties),
+                })?
+            },
+            None => {
+                if is_table || edit.properties.has_cell_properties() {
+                    return Err(Error::UnsafeEdit {
+                        operation: "set_text_properties",
+                        reason: "text formatting requires a shape text body; fill applies to table cells",
+                    });
+                }
+                rewrite_shape(element, edit.target, &edit.properties)?
+            },
+        };
+        if replacement != *element {
+            elements[slot].2 = replacement;
             changed += 1;
         }
     }
-    let Cow::Owned(candidate) = current else {
+    if changed == 0 {
         return Ok((None, 0));
-    };
+    }
+    elements.sort_unstable_by_key(|(_, span, _)| span.start);
+    if elements
+        .windows(2)
+        .any(|pair| pair[0].1.end > pair[1].1.start)
+    {
+        return Err(Error::UnsafeEdit {
+            operation: "set_text_properties",
+            reason: "text property edits address nested shapes",
+        });
+    }
+    let removed: usize = elements.iter().map(|(_, span, _)| span.len()).sum();
+    let added: usize = elements.iter().map(|(_, _, bytes)| bytes.len()).sum();
+    let length = (xml.len() - removed).saturating_add(added);
+    if length > max_output_bytes {
+        return Err(Error::Limit {
+            resource: "opened-presentation text property output bytes",
+            limit: max_output_bytes,
+        });
+    }
+    let mut candidate = Vec::new();
+    candidate
+        .try_reserve_exact(length)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation text property output",
+            source,
+        })?;
+    let mut cursor = 0;
+    for (_, span, bytes) in &elements {
+        candidate.extend_from_slice(&xml[cursor..span.start]);
+        candidate.extend_from_slice(bytes);
+        cursor = span.end;
+    }
+    candidate.extend_from_slice(&xml[cursor..]);
+    if candidate == xml {
+        return Ok((None, 0));
+    }
     let published = crate::shape::Scene::read(&candidate)?;
     if published.is_rewritten() || published.len() != original.len() {
         return Err(Error::Invalid(
@@ -434,6 +623,7 @@ const fn shape_position(target: TextTarget) -> Position {
         | TextTarget::Run { shape, .. }
         | TextTarget::RunSpan { shape, .. }
         | TextTarget::Cell { shape, .. }
+        | TextTarget::CellParagraph { shape, .. }
         | TextTarget::CellRun { shape, .. }
         | TextTarget::CellRunSpan { shape, .. } => shape,
     }
@@ -486,8 +676,13 @@ fn validate(edit: &TextEdit<'_>) -> Result<()> {
     {
         return Err(Error::Invalid("a run span is empty".into()));
     }
-    if properties.fill.is_some() && !matches!(edit.target, TextTarget::Cell { .. }) {
+    if properties.has_cell_properties() && !matches!(edit.target, TextTarget::Cell { .. }) {
         return Err(Error::Invalid("fill applies to table cells only".into()));
+    }
+    for margin in properties.margins.into_iter().flatten().flatten() {
+        if !(0..=crate::table::columns::MAX_COLUMN_WIDTH).contains(&margin) {
+            return Err(Error::Invalid("a cell inset is out of range".into()));
+        }
     }
     if properties.has_shape_properties() && !matches!(edit.target, TextTarget::Shape { .. }) {
         return Err(Error::Invalid(
@@ -804,6 +999,32 @@ fn srgb_fill(prefix: &[u8], color: Rgb) -> Vec<u8> {
     output
 }
 
+/// The fill markup of a table cell.
+fn cell_fill(prefix: &[u8], fill: CellFill) -> Vec<u8> {
+    match fill {
+        CellFill::Rgb(color) => srgb_fill(prefix, color),
+        CellFill::Scheme(scheme) => {
+            let fill = qualified(prefix, "solidFill");
+            let mut output = b"<".to_vec();
+            output.extend_from_slice(&fill);
+            output.extend_from_slice(b"><");
+            output.extend_from_slice(&qualified(prefix, "schemeClr"));
+            output.extend_from_slice(b" val=\"");
+            output.extend_from_slice(scheme.token().as_bytes());
+            output.extend_from_slice(b"\"/></");
+            output.extend_from_slice(&fill);
+            output.push(b'>');
+            output
+        },
+        CellFill::None => {
+            let mut output = b"<".to_vec();
+            output.extend_from_slice(&qualified(prefix, "noFill"));
+            output.extend_from_slice(b"/>");
+            output
+        },
+    }
+}
+
 fn typeface(prefix: &[u8], local: &str, face: &str) -> Vec<u8> {
     let mut output = Vec::with_capacity(32 + face.len());
     output.push(b'<');
@@ -949,6 +1170,12 @@ fn rewrite_rpr(element: &[u8], prefix: &[u8], properties: &TextProperties<'_>) -
     if let Some(value) = properties.size {
         size = value.map(|value| value.to_string());
         attributes.push((b"sz", size.as_deref().map(str::as_bytes)));
+    }
+    if let Some(value) = properties.underline {
+        attributes.push((b"u", value.map(|value| value.dml().as_bytes())));
+    }
+    if let Some(value) = properties.strike {
+        attributes.push((b"strike", value.map(|value| value.token().as_bytes())));
     }
     let mut changes = Vec::new();
     if let Some(color) = properties.color {
@@ -1515,7 +1742,10 @@ fn rewrite_shape(
             end,
             ..
         } => (Some(paragraph.get()), Some(run.get()), Some(start..end)),
-        TextTarget::Cell { .. } | TextTarget::CellRun { .. } | TextTarget::CellRunSpan { .. } => {
+        TextTarget::Cell { .. }
+        | TextTarget::CellParagraph { .. }
+        | TextTarget::CellRun { .. }
+        | TextTarget::CellRunSpan { .. } => {
             unreachable!("cells are rewritten through their frame")
         },
     };
@@ -1609,6 +1839,34 @@ fn rewrite_cell_run(
     splices.apply(cell)
 }
 
+/// Rewrite one paragraph of a cell's text body, as a shape's paragraph is
+/// rewritten (record 0333).
+fn rewrite_cell_paragraph(
+    cell: &[u8],
+    paragraph: usize,
+    properties: &TextProperties<'_>,
+) -> Result<Vec<u8>> {
+    let node = root(cell)?;
+    if node.empty {
+        return Err(invalid("an empty a:tc has no paragraphs"));
+    }
+    let kids = children(cell, &node)?;
+    let body = child(cell, &kids, b"txBody").ok_or(Error::UnsafeEdit {
+        operation: "set_text_properties",
+        reason: "the table cell has no text body",
+    })?;
+    let rewritten = rewrite_body(
+        &cell[body.span.clone()],
+        Some(paragraph),
+        None,
+        None,
+        properties,
+    )?;
+    let mut splices = Splices::new();
+    splices.replace(body.span.clone(), rewritten);
+    splices.apply(cell)
+}
+
 fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>> {
     let node = root(cell)?;
     if node.empty {
@@ -1631,22 +1889,44 @@ fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>>
         };
         splices.replace(body.span.clone(), rewritten);
     }
-    if let Some(fill) = properties.fill {
-        let changes = [ChildChange {
-            rank: 7,
-            bytes: fill.map(|color| srgb_fill(&prefix, color)),
-        }];
+    if properties.has_cell_properties() {
+        let mut changes = Vec::new();
+        if let Some(fill) = properties.fill {
+            changes.push(ChildChange {
+                rank: 7,
+                bytes: fill.map(|fill| cell_fill(&prefix, fill)),
+            });
+        }
+        let margins: Vec<Option<String>> = properties
+            .margins
+            .iter()
+            .map(|margin| margin.flatten().map(|value| value.to_string()))
+            .collect();
+        let mut attributes: Vec<(&[u8], Option<&[u8]>)> = Vec::new();
+        for (index, margin) in CellMargin::ALL.into_iter().enumerate() {
+            if properties.margins[index].is_some() {
+                attributes.push((
+                    margin.attribute(),
+                    margins[index].as_deref().map(str::as_bytes),
+                ));
+            }
+        }
+        if let Some(anchor) = properties.anchor {
+            attributes.push((b"anchor", anchor.map(|anchor| anchor.token().as_bytes())));
+        }
+        let creates = changes.iter().any(|change| change.bytes.is_some())
+            || attributes.iter().any(|(_, value)| value.is_some());
         match child(cell, &kids, b"tcPr") {
             Some(tcpr) => {
                 let rewritten =
-                    rewrite_properties(&cell[tcpr.span.clone()], &[], &changes, tcpr_rank)?;
+                    rewrite_properties(&cell[tcpr.span.clone()], &attributes, &changes, tcpr_rank)?;
                 splices.replace(tcpr.span.clone(), rewritten);
             },
-            None if fill.is_some() => {
+            None if creates => {
                 let mut empty = b"<".to_vec();
                 empty.extend_from_slice(&qualified(&prefix, "tcPr"));
                 empty.extend_from_slice(b"/>");
-                let created = rewrite_properties(&empty, &[], &changes, tcpr_rank)?;
+                let created = rewrite_properties(&empty, &attributes, &changes, tcpr_rank)?;
                 // tcPr follows txBody and precedes extLst.
                 let at =
                     child(cell, &kids, b"extLst").map_or(node.close_start, |ext| ext.span.start);
@@ -1718,6 +1998,8 @@ fn rewrite_body_text(
             let formatting = TextProperties {
                 text: None,
                 fill: None,
+                anchor: None,
+                margins: [None; 4],
                 ..*properties
             };
             rewrite_paragraph(&paragraph, None, None, &formatting)?
@@ -1738,3 +2020,8 @@ fn rewrite_body_text(
     }
     splices.apply(body)
 }
+
+#[path = "text_structure.rs"]
+mod structure;
+pub use structure::TextBody;
+pub(crate) use structure::{Change as TextChange, stage_text_structure};

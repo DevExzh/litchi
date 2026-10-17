@@ -46,9 +46,9 @@ use super::spec::{
     AXIS_PROPS, AxisKey, CELL_PROPS, COLUMN_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey,
     EQUATION_PROPS, FRAME_PROPS, FrameKey, HYPERLINK_PROPS, Kind, LINKED_FRAME_PROPS,
     LinkedFrameKey, MEDIA_PROPS, MediaKey, NODE_PROPS, NOTES_PROPS, NodeKey, NotesKey,
-    PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey,
-    RunKey, SERIES_PROPS, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey,
-    ShapeKey, SlideKey, SmartArtKey, TABLE_PROPS, THEME_PROPS, TableKey,
+    PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, ROW_PROPS, RUN_PROPS,
+    RootKey, RowKey, RunKey, SERIES_PROPS, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS,
+    SeriesKey, ShapeKey, SlideKey, SmartArtKey, TABLE_PROPS, THEME_PROPS, TableKey,
 };
 use super::steps::{self, Builder};
 use super::text;
@@ -306,14 +306,30 @@ fn missing_layout(master: u32, position: u32) -> Error {
 pub(super) enum TreeContainer {
     Slide(u32),
     Master(u32),
-    Layout { master: u32, position: u32 },
+    Layout {
+        master: u32,
+        position: u32,
+    },
+    /// The notes page of a slide: the container of the notes body shape a
+    /// notes paragraph or run belongs to (record 0333).
+    Notes(u32),
 }
 
 impl TreeContainer {
+    /// The slide whose shape tree holds the element; `None` for masters,
+    /// layouts and notes pages, so slide-shape writes refuse them.
     pub(super) const fn slide(self) -> Option<u32> {
         match self {
             Self::Slide(position) => Some(position),
-            Self::Master(_) | Self::Layout { .. } => None,
+            Self::Master(_) | Self::Layout { .. } | Self::Notes(_) => None,
+        }
+    }
+
+    /// The slide of a notes page.
+    pub(super) const fn notes(self) -> Option<u32> {
+        match self {
+            Self::Notes(slide) => Some(slide),
+            Self::Slide(_) | Self::Master(_) | Self::Layout { .. } => None,
         }
     }
 }
@@ -340,6 +356,9 @@ pub(super) struct TreeItem {
 enum FramePart {
     Chart(Arc<Summary>),
     Diagram(Arc<Outline>),
+    /// A table frame's cell count per row (record 0333), so resolving a
+    /// row and then a cell reads the table once.
+    Table(Arc<Vec<u32>>),
 }
 
 impl TreeItem {
@@ -399,8 +418,34 @@ impl TreeItem {
         }
     }
 
+    /// A table frame's cell count per row, read on first use; `None` for
+    /// another element.
+    pub(super) fn table_grid(&self) -> Result<Option<Arc<Vec<u32>>>> {
+        if self.kind != Kind::Table {
+            return Ok(None);
+        }
+        let read = self.frame.get_or_init(|| {
+            let table = self.handle.table().map_err(Error::from)?;
+            let counts = table.row_cell_counts().map_err(Error::from)?;
+            Ok(Some(FramePart::Table(Arc::new(
+                counts
+                    .into_iter()
+                    .map(|count| u32::try_from(count).unwrap_or(u32::MAX))
+                    .collect(),
+            ))))
+        });
+        match read {
+            Ok(Some(FramePart::Table(grid))) => Ok(Some(Arc::clone(grid))),
+            Ok(_) => Ok(None),
+            Err(error) => Err(error.clone()),
+        }
+    }
+
     pub(super) const fn slide_position(&self) -> Option<u32> {
-        self.container.slide()
+        match self.container {
+            TreeContainer::Notes(slide) => Some(slide),
+            container => container.slide(),
+        }
     }
 
     /// The shape's text body with local properties, parsed and pinned on
@@ -487,6 +532,12 @@ impl TreeItem {
                 ));
                 push_tree_tail(&mut out, &self.handle, self.kind, self.ordinal, canonical);
             },
+            // A notes body is addressed through the notes node: its text
+            // nodes are `/slide[N]/notes/paragraph[K]` (record 0333).
+            TreeContainer::Notes(slide) => {
+                out.push(steps::slide(slide));
+                out.push(PathStep::new("notes"));
+            },
         }
         out
     }
@@ -533,6 +584,9 @@ pub(super) fn is_title(handle: &Handle) -> bool {
 /// where it sits in it.
 #[derive(Clone)]
 pub(super) struct TextItem {
+    /// The shape whose body holds the text: a slide shape, the table frame
+    /// of a cell's text ([`Self::cell`]), or a notes page's body shape (a
+    /// [`TreeContainer::Notes`] container).
     pub(super) shape: TreeItem,
     pub(super) body: Arc<Body>,
     pub(super) paragraph: u32,
@@ -540,9 +594,52 @@ pub(super) struct TextItem {
     pub(super) run: u32,
     /// The position among the paragraph's runs, or among its line breaks.
     pub(super) ordinal: u32,
+    /// The table cell whose body holds the text; [`CellRef::NONE`] for a
+    /// shape's or notes page's text (record 0333). It fills the padding
+    /// after the three positions, so the item keeps its size.
+    pub(super) cell: CellRef,
+}
+
+/// A table cell's row and column, packed into one word: rows and columns
+/// up to 65,534 are addressable (`PowerPoint` tables hold 75 of each).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) struct CellRef(u32);
+
+impl CellRef {
+    /// No cell: the text of a shape or notes page.
+    pub(super) const NONE: Self = Self(u32::MAX);
+
+    /// The cell at `row` and `column`; `None` past the packed range.
+    pub(super) const fn new(row: u32, column: u32) -> Option<Self> {
+        if row < 0xFFFF && column < 0xFFFF {
+            Some(Self((row << 16) | column))
+        } else {
+            None
+        }
+    }
+
+    /// The cell's row and column.
+    pub(super) const fn get(self) -> Option<(u32, u32)> {
+        if self.0 == u32::MAX {
+            None
+        } else {
+            Some((self.0 >> 16, self.0 & 0xFFFF))
+        }
+    }
 }
 
 impl TextItem {
+    /// The steps of the node whose body holds the text: the shape, the
+    /// table cell, or the notes node.
+    pub(super) fn owner_steps(&self, canonical: bool) -> Builder {
+        let mut out = self.shape.steps(canonical);
+        if let Some((row, column)) = self.cell.get() {
+            out.push(PathStep::at("tr", Position::new(row as usize)));
+            out.push(PathStep::at("tc", Position::new(column as usize)));
+        }
+        out
+    }
+
     pub(super) fn paragraph(&self) -> Option<&Paragraph> {
         self.body.paragraphs.get(self.paragraph as usize)
     }
@@ -858,18 +955,18 @@ impl<'f> Node<'f> {
             },
             Item::Tree(tree) => tree.steps(canonical),
             Item::Paragraph(text) => {
-                let mut out = text.shape.steps(canonical);
+                let mut out = text.owner_steps(canonical);
                 out.push(at("paragraph", text.paragraph));
                 out
             },
             Item::Run(text) => {
-                let mut out = text.shape.steps(canonical);
+                let mut out = text.owner_steps(canonical);
                 out.push(at("paragraph", text.paragraph));
                 out.push(at("run", text.ordinal));
                 out
             },
             Item::LineBreak(text) => {
-                let mut out = text.shape.steps(canonical);
+                let mut out = text.owner_steps(canonical);
                 out.push(at("paragraph", text.paragraph));
                 out.push(at("linebreak", text.ordinal));
                 out
@@ -941,7 +1038,7 @@ impl<'f> Node<'f> {
                 let mut out = match &item.owner {
                     super::links::Owner::Shape(tree) => tree.steps(canonical),
                     super::links::Owner::Run(text) => {
-                        let mut out = text.shape.steps(canonical);
+                        let mut out = text.owner_steps(canonical);
                         out.push(at("paragraph", text.paragraph));
                         out.push(at("run", text.ordinal));
                         out
@@ -1267,8 +1364,9 @@ impl<'f> Node<'f> {
                 ),
                 None => (RUN_PROPS, PropKind::Empty),
             },
-            Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_fill(cell)?)),
-            Item::LineBreak(_) | Item::Row(_) => (&[][..], PropKind::Empty),
+            Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_properties(cell)?)),
+            Item::Row(row) => (ROW_PROPS, PropKind::Row(text::row_height(row)?)),
+            Item::LineBreak(_) => (&[][..], PropKind::Empty),
             Item::Series(item) => (SERIES_PROPS, PropKind::Series(item)),
             Item::DiagramNode(item) => (NODE_PROPS, PropKind::DiagramNode(item)),
             Item::Axis(item) => (AXIS_PROPS, PropKind::Axis(item)),
@@ -1463,7 +1561,9 @@ enum PropKind<'a> {
         Option<Arc<litchi_pptx::hyperlinks::Link>>,
     ),
     Notes(&'a str),
-    Cell(Option<[u8; 3]>),
+    Cell(litchi_pptx::table::CellProperties),
+    /// A table row's height (record 0333).
+    Row(Option<i64>),
     Comment(&'a Comment),
     ModernComment(&'a ModernComment),
     Reply(&'a ModernReply),
@@ -1961,10 +2061,9 @@ impl<'a> Props<'a> {
                 RunKey::Tooltip => super::links::click_value(link.as_deref(), true),
                 key => text::run_value(properties, key),
             },
-            PropKind::Cell(fill) => match CellKey::at(index)? {
-                CellKey::Fill => fill.map(|[red, green, blue]| {
-                    Value::Color(crate::value::Color::rgb(red, green, blue))
-                }),
+            PropKind::Cell(properties) => text::cell_value(properties, CellKey::at(index)?),
+            PropKind::Row(height) => match RowKey::at(index)? {
+                RowKey::Height => height.map(length),
             },
             PropKind::Notes(notes) => match NotesKey::at(index)? {
                 NotesKey::Text => Some(Value::Text(Cow::Borrowed(notes))),

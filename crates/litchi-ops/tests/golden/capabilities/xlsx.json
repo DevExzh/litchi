@@ -4122,6 +4122,20 @@
       "reason": "ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format"
     },
     {
+      "subject": "element",
+      "element": "detectedtable",
+      "code": "unsupported_capability",
+      "followUp": "0339-F5 (deferred-P1): header-row table detection in queries",
+      "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
+    },
+    {
+      "subject": "element",
+      "element": "smartart",
+      "code": "unsupported_capability",
+      "followUp": "0339-F6 (deferred-P1): a worksheet-drawing diagram model in litchi-xlsx",
+      "reason": "litchi-xlsx reads and writes pictures, shapes and charts in worksheet drawings but has no diagram model; a SmartArt frame is kept as it is and is not a node"
+    },
+    {
       "subject": "operation",
       "verb": "create",
       "element": "workbook",

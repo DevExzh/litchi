@@ -761,6 +761,42 @@ fn stale_files_are_rejected_while_a_native_run_is_pending() {
     );
 }
 
+/// Record 0337: items inside a coalesced run add no source check of their
+/// own; the next item's resolution and leaf read still observe a source that
+/// changed after the run's first item, and nothing is published.
+#[test]
+fn stale_files_are_rejected_inside_coalesced_set_and_remove_runs() {
+    for remove in [false, true] {
+        let directory = tempfile::tempdir().expect("stale source directory");
+        let path = directory.path().join("stale.xls");
+        std::fs::write(&path, fixture()).expect("write stale source");
+        let original =
+            litchi_ops::open_with(&path, &OpenOptions::new().source_mode(SourceMode::Auto))
+                .expect("open source-backed XLS");
+        let error = original
+            .edit::<()>(|transaction| {
+                if remove {
+                    transaction.remove(A1)?;
+                } else {
+                    transaction.set(A1, props! { "value" => 7 })?;
+                }
+                std::fs::write(&path, b"changed inside the run").expect("change physical source");
+                if remove {
+                    transaction.remove(A2)?;
+                } else {
+                    transaction.set(A2, props! { "value" => 8 })?;
+                }
+                Ok(())
+            })
+            .expect_err("a source changed inside the run must be refused");
+        assert_eq!(error.code(), Code::IoError, "remove={remove}");
+        assert_eq!(
+            std::fs::read(&path).expect("read changed source"),
+            b"changed inside the run"
+        );
+    }
+}
+
 #[test]
 fn signed_and_encrypted_security_wrappers_survive_batch_admission() {
     let signed_bytes = signed_fixture();

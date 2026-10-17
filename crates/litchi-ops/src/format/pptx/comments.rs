@@ -2,9 +2,15 @@
 //!
 //! `set(/slide[N]/comment[K], {text, x, y})` replaces one comment's text or
 //! location; `add(/slide[N], comment, {text, author, initials, date, x, y})`
-//! appends one, creating the named author when absent. Source owners are
-//! promoted to an eager package for the edit, since comment parts are
-//! separate parts the source-backed slide edit does not stage.
+//! appends one, creating the named author when absent;
+//! `remove(/slide[N]/comment[K])` deletes one (record 0333), as do
+//! `remove(/slide[N]/moderncomment[K])` (with its replies) and
+//! `remove(/slide[N]/moderncomment[K]/reply[R])` for threaded comments.
+//! Removal keeps the comment authors (other slides may name them; record
+//! 0319's rule: no edit of content the caller did not name) and drops a
+//! slide's comment part with its last comment, as OfficeCLI does. Source
+//! owners are promoted to an eager package for the edit, since comment
+//! parts are separate parts the source-backed slide edit does not stage.
 use super::node::Item;
 use super::spec::{COMMENT_WRITE_TABLE, CommentSetter};
 use super::structure::{bound, error};
@@ -212,5 +218,83 @@ impl Pptx {
             },
             path,
         ))
+    }
+}
+
+impl Pptx {
+    /// A `remove` of a legacy comment, modern comment or reply path; `None`
+    /// for other targets (record 0333).
+    pub(super) fn try_remove_comment(
+        &self,
+        target: &crate::target::TargetArg<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
+        let Some(path) = target.path() else {
+            return Ok(None);
+        };
+        if !path.path().steps().last().is_some_and(|step| {
+            [
+                "comment",
+                "moderncomment",
+                "modern-comment",
+                "thread",
+                "threadedcomment",
+                "reply",
+            ]
+            .iter()
+            .any(|name| step.name().eq_ignore_ascii_case(name))
+        }) {
+            return Ok(None);
+        }
+        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        enum Target {
+            Legacy(usize, usize),
+            Modern(usize, usize),
+            Reply(usize, usize, usize),
+        }
+        let target = match node.item() {
+            Item::Comment(comment) => {
+                Target::Legacy(comment.slide as usize, comment.index as usize)
+            },
+            Item::ModernComment(comment) => {
+                Target::Modern(comment.slide as usize, comment.index as usize)
+            },
+            Item::Reply(reply) => Target::Reply(
+                reply.slide as usize,
+                reply.comment as usize,
+                reply.index as usize,
+            ),
+            _ => return Ok(None),
+        };
+        drop(node);
+        bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+        let source = self.editable_owner()?;
+        let base = Self::eager_base(&source)?;
+        let mut edit = base.edit()?;
+        let changed = match target {
+            Target::Legacy(slide, index) => edit.remove_comment_at(slide, Position::new(index))?,
+            Target::Modern(slide, index) => {
+                edit.remove_modern_comment_at(slide, Position::new(index))?
+            },
+            Target::Reply(slide, comment, reply) => edit.remove_modern_comment_reply_at(
+                slide,
+                Position::new(comment),
+                Position::new(reply),
+            )?,
+        };
+        let (target, patch) = edit.commit()?.into_parts();
+        let target = Arc::new(target);
+        let after = if changed {
+            self.adopt_eager(Arc::clone(&target))
+        } else {
+            self.clone()
+        };
+        Ok(Some(Commit {
+            after,
+            source,
+            target: Editable::Eager(target),
+            proof: Proof::Eager(patch),
+            operations: usize::from(changed),
+        }))
     }
 }

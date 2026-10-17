@@ -1127,6 +1127,56 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             follow_up: "record 0328 follow-up: the ODT header text-art watermark",
             reason: "a watermark is a header drawing shape the region reads do not project",
         },
+        // OfficeCLI Word elements the navigator refuses as `ABSENT` (record
+        // 0339): typed gaps, so `capabilities()` lists them.
+        GapSpec {
+            subject: Subject::Element("bookmarkEnd"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: not an OpenDocument text element (record 0339)",
+            reason: "a bookmark is one node over its start and end (text:bookmark-start, text:bookmark-end); a standalone end marker is not an element",
+        },
+        GapSpec {
+            subject: Subject::Element("permStart"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: not an OpenDocument text element (record 0339)",
+            reason: "OpenDocument text has no editing-permission ranges",
+        },
+        GapSpec {
+            subject: Subject::Element("ptab"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: not an OpenDocument text element (record 0339)",
+            reason: "OpenDocument text has no positional tabs",
+        },
+        GapSpec {
+            subject: Subject::Element("fieldChar"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: not an OpenDocument text element (record 0339)",
+            reason: "an OpenDocument field is one element; there are no field-character runs",
+        },
+        GapSpec {
+            subject: Subject::Element("instrText"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: not an OpenDocument text element (record 0339)",
+            reason: "an OpenDocument field is one element; there are no field-instruction runs",
+        },
+        GapSpec {
+            subject: Subject::Element("series"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "M6 ODT body index (record 0276), with the chart gap",
+            reason: "chart series are not nodes: embedded charts are a gap of the ODT body index",
+        },
+        GapSpec {
+            subject: Subject::Element("axis"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "M6 ODT body index (record 0276), with the chart gap",
+            reason: "chart axes are not nodes: embedded charts are a gap of the ODT body index",
+        },
+        GapSpec {
+            subject: Subject::Element("diagram"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: out of scope (record 0332, design §10)",
+            reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API",
+        },
     ],
 };
 

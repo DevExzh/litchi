@@ -6,7 +6,7 @@ use litchi_drawingml::text::Alignment;
 
 use litchi_drawingml::geom::Preset;
 
-use super::{Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
+use super::{CellFill, Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
 use crate::{Error, Package, Result};
 
 fn deck() -> Result<Package> {
@@ -142,7 +142,7 @@ fn cell_text_and_fill() -> Result<()> {
     };
     let properties = TextProperties::default()
         .with_text("changed")
-        .with_fill(Some(Rgb([0xFF, 0xEE, 0x00])))
+        .with_fill(Some(CellFill::Rgb(Rgb([0xFF, 0xEE, 0x00]))))
         .with_bold(Some(true));
     let (after, changed) = apply(&package, &[TextEdit::new(target, properties)])?;
     assert_eq!(changed, 1);
@@ -175,7 +175,7 @@ fn refusals_leave_the_edit_unchanged() -> Result<()> {
         TextEdit::new(run(0, 0), TextProperties::default()),
         TextEdit::new(
             TextTarget::Shape { shape: at(0) },
-            TextProperties::default().with_fill(Some(Rgb([0, 0, 0]))),
+            TextProperties::default().with_fill(Some(CellFill::Rgb(Rgb([0, 0, 0])))),
         ),
         TextEdit::new(
             TextTarget::Cell {
@@ -544,6 +544,144 @@ fn notes_pages_take_run_edits() -> Result<()> {
             )]
         )
         .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn cell_theme_fill_anchor_and_insets_round_trip() -> Result<()> {
+    use super::CellMargin;
+    use litchi_drawingml::color::Scheme;
+    use litchi_drawingml::text::Anchor;
+    let package = deck()?;
+    let target = TextTarget::Cell {
+        shape: at(1),
+        row: at(0),
+        column: at(1),
+    };
+    let properties = TextProperties::default()
+        .with_fill(Some(CellFill::Scheme(Scheme::Accent1)))
+        .with_cell_anchor(Some(Anchor::Center))
+        .with_cell_margin(CellMargin::Left, Some(91_440))
+        .with_cell_margin(CellMargin::Bottom, Some(45_720));
+    let (after, changed) = apply(&package, &[TextEdit::new(target, properties)])?;
+    assert_eq!(changed, 1);
+    let read = |package: &Package| -> Result<crate::table::CellProperties> {
+        let xml = slide_xml(package)?;
+        let scene = crate::shape::Scene::read(&xml)?;
+        let frame = scene.at(1)?.xml()?.to_vec();
+        let table = crate::table::Table::from_graphic_frame(&frame)?;
+        table.cell(0, 1)?.expect("cell").properties()
+    };
+    let cell = read(&after)?;
+    assert_eq!(cell.fill, Some(CellFill::Scheme(Scheme::Accent1)));
+    assert_eq!(cell.anchor, Some(Anchor::Center));
+    assert_eq!(cell.margins, [Some(91_440), None, None, Some(45_720)]);
+    assert!(contains(
+        &slide_xml(&after)?,
+        "<a:schemeClr val=\"accent1\"/>"
+    ));
+    // An exact repeat changes nothing; `none` writes an explicit no-fill.
+    let (_, unchanged) = apply(&after, &[TextEdit::new(target, properties)])?;
+    assert_eq!(unchanged, 0);
+    let none = TextProperties::default()
+        .with_fill(Some(CellFill::None))
+        .with_cell_anchor(None)
+        .with_cell_margin(CellMargin::Left, None);
+    let (cleared, _) = apply(&after, &[TextEdit::new(target, none)])?;
+    let cell = read(&cleared)?;
+    assert_eq!(cell.fill, Some(CellFill::None));
+    assert_eq!(cell.anchor, None);
+    assert_eq!(cell.margins, [None, None, None, Some(45_720)]);
+    // Cell-only properties refuse other targets.
+    let mut edit = package.edit()?;
+    assert!(
+        edit.set_text_properties(
+            0usize,
+            &[TextEdit::new(
+                run(0, 0),
+                TextProperties::default().with_cell_anchor(Some(Anchor::Top))
+            )]
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn underline_and_strike_round_trip() -> Result<()> {
+    use litchi_drawingml::text::{Strike, Underline};
+    let package = deck()?;
+    let properties = TextProperties::default()
+        .with_underline(Some(Underline::Double))
+        .with_strike(Some(Strike::Single));
+    let (after, _) = apply(&package, &[TextEdit::new(run(0, 0), properties)])?;
+    let xml = slide_xml(&after)?;
+    assert!(contains(&xml, "u=\"dbl\""));
+    assert!(contains(&xml, "strike=\"sngStrike\""));
+    let clear = TextProperties::default()
+        .with_underline(None)
+        .with_strike(None);
+    let (cleared, _) = apply(&after, &[TextEdit::new(run(0, 0), clear)])?;
+    assert_eq!(slide_xml(&cleared)?, slide_xml(&package)?);
+    Ok(())
+}
+
+#[test]
+fn row_cell_counts_match_the_row_reader() -> Result<()> {
+    let package = deck()?;
+    let xml = slide_xml(&package)?;
+    let scene = crate::shape::owned::Scene::read(xml)?;
+    let handle = scene
+        .shape(1_usize)
+        .map_err(|_| Error::Invalid("selector".into()))?
+        .expect("table frame");
+    let table = handle.table()?;
+    let counts = table.row_cell_counts()?;
+    let rows: Vec<usize> = table
+        .rows()?
+        .into_iter()
+        .map(|row| row.cell_count())
+        .collect();
+    assert_eq!(counts, rows);
+    assert_eq!(counts, [2, 2]);
+    Ok(())
+}
+
+#[test]
+fn chunked_text_edits_equal_one_call_per_chunk() -> Result<()> {
+    let package = deck()?;
+    let bold = TextProperties::default().with_bold(Some(true));
+    let italic = TextProperties::default().with_italic(Some(true));
+    let first = [TextEdit::new(run(0, 0), bold)];
+    let second = [
+        TextEdit::new(run(0, 0), italic),
+        TextEdit::new(
+            TextTarget::Cell {
+                shape: at(1),
+                row: at(0),
+                column: at(0),
+            },
+            bold,
+        ),
+    ];
+    let mut one = package.edit()?;
+    one.set_text_properties(0usize, &first)?;
+    one.set_text_properties(0usize, &second)?;
+    let expected = slide_xml(&one.commit()?.into_package())?;
+    let mut chunked = package.edit()?;
+    assert_eq!(
+        chunked.set_text_property_chunks(0usize, &[&first[..], &second[..]])?,
+        3
+    );
+    assert_eq!(slide_xml(&chunked.commit()?.into_package())?, expected);
+    let mut empty = package.edit()?;
+    assert_eq!(empty.set_text_property_chunks(0usize, &[])?, 0);
+    let too_many = vec![TextEdit::new(run(0, 0), bold); 257];
+    assert!(
+        empty
+            .set_text_property_chunks(0usize, &[&too_many])
+            .is_err()
     );
     Ok(())
 }

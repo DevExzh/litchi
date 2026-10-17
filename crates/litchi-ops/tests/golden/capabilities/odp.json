@@ -2345,6 +2345,13 @@
       "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
     },
     {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API"
+    },
+    {
       "subject": "operation",
       "verb": "set",
       "element": "run",

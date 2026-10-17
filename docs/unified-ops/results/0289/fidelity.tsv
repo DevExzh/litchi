@@ -227,7 +227,7 @@ libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	pptx	exact		byte-exact	/sli
 libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
-libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx	pptx	exact		value-exact	/slide[1]/picture[1] alt: 35202 -> 35219 bytes, first difference at 3438	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp	odp	exact		byte-exact	/slide[1] name	byte-exact	linebreak add+remove
 libreoffice-core/starmath/qa/extras/data/tdf151842.odf	odf	exact		value-exact	/ starmath: 6073 -> 4725 bytes, first difference at 7	-	

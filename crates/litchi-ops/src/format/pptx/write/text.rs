@@ -13,8 +13,10 @@ use crate::value::{Base, Scalar};
 use crate::{Code, Props, Result};
 use litchi_core::Position;
 use litchi_drawingml::geom::Preset;
-use litchi_drawingml::text::Alignment;
-use litchi_pptx::opened::{Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
+use litchi_drawingml::text::{Alignment, Anchor, Strike, Underline};
+use litchi_pptx::opened::{
+    CellFill, CellMargin, Rgb, ShapeFill, TextEdit, TextProperties, TextTarget,
+};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -75,7 +77,11 @@ pub(in crate::format::pptx) struct TextValues {
     font: Option<Option<String>>,
     latin: Option<Option<String>>,
     align: Option<Option<Alignment>>,
-    fill: Option<Option<Rgb>>,
+    underline: Option<Option<Underline>>,
+    strike: Option<Option<Strike>>,
+    fill: Option<Option<CellFill>>,
+    valign: Option<Option<Anchor>>,
+    margins: [Option<Option<i64>>; 4],
     shape_fill: Option<Option<ShapeFill>>,
     geometry: Option<Preset>,
 }
@@ -90,9 +96,93 @@ impl TextValues {
             && self.font.is_none()
             && self.latin.is_none()
             && self.align.is_none()
+            && self.underline.is_none()
+            && self.strike.is_none()
             && self.fill.is_none()
+            && self.valign.is_none()
+            && self.margins.iter().all(Option::is_none)
             && self.shape_fill.is_none()
             && self.geometry.is_none()
+    }
+
+    /// Whether a coalesced formatting run can stage these assignments and
+    /// tell their change from the reader's model (record 0333): run and
+    /// paragraph character formatting, alignment and run text, but no
+    /// fills, cell properties or geometry.
+    pub(in crate::format::pptx) fn coalescible(&self) -> bool {
+        !self.is_empty()
+            && self.fill.is_none()
+            && self.valign.is_none()
+            && self.margins.iter().all(Option::is_none)
+            && self.shape_fill.is_none()
+            && self.geometry.is_none()
+    }
+
+    /// Whether the assignments change a run, compared with the local
+    /// properties the reader gives.
+    pub(in crate::format::pptx) fn run_changed(
+        &self,
+        run: &litchi_drawingml::text::body::Run,
+    ) -> bool {
+        let properties = &run.properties;
+        fn face(font: &Option<litchi_drawingml::text::body::Font>) -> Option<&str> {
+            font.as_ref().map(|font| font.typeface.as_str())
+        }
+        let color = properties
+            .fill
+            .as_ref()
+            .map(|fill| match fill.solid_color() {
+                Some(litchi_drawingml::color::Value::Rgb(rgb)) => {
+                    Some(Rgb([rgb.red(), rgb.green(), rgb.blue()]))
+                },
+                _ => None,
+            });
+        self.text.as_deref().is_some_and(|text| text != run.text)
+            || self.bold.is_some_and(|value| value != properties.bold)
+            || self.italic.is_some_and(|value| value != properties.italic)
+            || self
+                .size
+                .is_some_and(|value| value != properties.size.map(|size| size.get()))
+            || self.color.is_some_and(|value| match (value, color) {
+                (None, None) => false,
+                (Some(wanted), Some(Some(current))) => wanted != current,
+                _ => true,
+            })
+            || self
+                .underline
+                .is_some_and(|value| value != properties.underline)
+            || self.strike.is_some_and(|value| value != properties.strike)
+            || self
+                .latin
+                .as_ref()
+                .is_some_and(|value| value.as_deref() != face(&properties.latin))
+            || self.font.as_ref().is_some_and(|value| {
+                let value = value.as_deref();
+                value != face(&properties.latin)
+                    || value != face(&properties.east_asian)
+                    || value != face(&properties.complex_script)
+            })
+    }
+
+    /// Whether the assignments change a paragraph: its alignment, or any of
+    /// its runs. Paragraph text is not coalesced.
+    pub(in crate::format::pptx) fn paragraph_changed(
+        &self,
+        paragraph: &litchi_drawingml::text::body::Paragraph,
+    ) -> bool {
+        let runs = Self {
+            text: None,
+            align: None,
+            ..self.clone()
+        };
+        self.align
+            .is_some_and(|value| value != paragraph.properties.alignment)
+            || (!runs.is_empty() && paragraph.runs.iter().any(|run| runs.run_changed(run)))
+    }
+
+    /// The assigned text, if any.
+    pub(in crate::format::pptx) fn text(&self) -> Option<&str> {
+        self.text.as_deref()
     }
 
     pub(super) fn charge(&self) -> usize {
@@ -136,8 +226,22 @@ impl TextValues {
         if let Some(value) = self.align {
             properties = properties.with_align(value);
         }
+        if let Some(value) = self.underline {
+            properties = properties.with_underline(value);
+        }
+        if let Some(value) = self.strike {
+            properties = properties.with_strike(value);
+        }
         if let Some(value) = self.fill {
             properties = properties.with_fill(value);
+        }
+        if let Some(value) = self.valign {
+            properties = properties.with_cell_anchor(value);
+        }
+        for (margin, value) in CellMargin::ALL.into_iter().zip(self.margins) {
+            if let Some(value) = value {
+                properties = properties.with_cell_margin(margin, value);
+            }
         }
         if let Some(value) = self.shape_fill {
             properties = properties.with_shape_fill(value);
@@ -160,6 +264,16 @@ impl TextValues {
             TextSetter::FontLatin => self.latin.is_some(),
             TextSetter::Align => self.align.is_some(),
             TextSetter::Fill => self.fill.is_some(),
+            TextSetter::Underline => self.underline.is_some(),
+            TextSetter::Strike => self.strike.is_some(),
+            TextSetter::Valign => self.valign.is_some(),
+            TextSetter::Margin(margin) => self.margins[margin as usize].is_some(),
+            TextSetter::Padding => {
+                self.margins[0].is_some()
+                    || self.margins[1].is_some()
+                    || self.margins[2].is_some()
+                    || self.margins[3].is_some()
+            },
             TextSetter::ShapeFill => self.shape_fill.is_some(),
             TextSetter::Geometry => self.geometry.is_some(),
             TextSetter::Click(_) => false,
@@ -221,16 +335,85 @@ impl TextValues {
                     _ => unreachable!("font size coercion"),
                 });
             },
-            TextSetter::Color | TextSetter::Fill => {
-                let color = match value {
+            TextSetter::Color => {
+                self.color = Some(match value {
                     Some(Scalar::Color(color)) => Some(rgb(&color)?),
                     None => None,
                     _ => unreachable!("colour coercion"),
+                });
+            },
+            TextSetter::Fill => {
+                self.fill = Some(match value {
+                    Some(Scalar::Color(color)) => Some(cell_fill(&color)?),
+                    None => None,
+                    _ => unreachable!("colour coercion"),
+                });
+            },
+            TextSetter::Underline => {
+                self.underline = Some(match value {
+                    Some(Scalar::Token(token)) => Some(underline(token)?),
+                    None => None,
+                    _ => unreachable!("underline coercion"),
+                });
+            },
+            TextSetter::Strike => {
+                self.strike = Some(match value {
+                    Some(Scalar::Token(token)) => Some(match token {
+                        "single" => Strike::Single,
+                        "double" => Strike::Double,
+                        "none" => Strike::None,
+                        _ => {
+                            return Err(
+                                error(Code::InvalidValue, "unknown strike").with_property("strike")
+                            );
+                        },
+                    }),
+                    None => None,
+                    _ => unreachable!("strike coercion"),
+                });
+            },
+            TextSetter::Valign => {
+                self.valign = Some(match value {
+                    Some(Scalar::Token(token)) => Some(match token {
+                        "top" => Anchor::Top,
+                        "center" => Anchor::Center,
+                        "bottom" => Anchor::Bottom,
+                        _ => {
+                            return Err(error(Code::InvalidValue, "unknown vertical alignment")
+                                .with_property("valign"));
+                        },
+                    }),
+                    None => None,
+                    _ => unreachable!("anchor coercion"),
+                });
+            },
+            TextSetter::Margin(_) | TextSetter::Padding => {
+                let inset = match value {
+                    Some(Scalar::Length(length)) => {
+                        let emu = length.emu();
+                        if emu < 0 {
+                            return Err(error(
+                                Code::InvalidValue,
+                                "a cell inset cannot be negative",
+                            )
+                            .with_property("padding"));
+                        }
+                        Some(emu)
+                    },
+                    None => None,
+                    _ => unreachable!("inset coercion"),
                 };
-                if setter == TextSetter::Color {
-                    self.color = Some(color);
-                } else {
-                    self.fill = Some(color);
+                // `padding` and one side's key name the same inset.
+                if self.has(setter) {
+                    return Err(error(
+                        Code::InvalidArgument,
+                        "a cell inset was assigned more than once",
+                    )
+                    .with_property("padding"));
+                }
+                match setter {
+                    TextSetter::Margin(margin) => self.margins[margin as usize] = Some(inset),
+                    _ => self.margins = [Some(inset); 4],
                 }
             },
             TextSetter::Font | TextSetter::FontLatin => {
@@ -347,6 +530,71 @@ fn rgb(color: &crate::value::Color) -> Result<Rgb> {
     }
 }
 
+/// A table cell fill colour: opaque RGB, or a theme colour without
+/// transforms (record 0333).
+fn cell_fill(color: &crate::value::Color) -> Result<CellFill> {
+    if let Base::Scheme(scheme) = color.base()
+        && color.transforms().is_empty()
+    {
+        return Ok(CellFill::Scheme(drawing_scheme(scheme)));
+    }
+    rgb(color).map(CellFill::Rgb).map_err(|error| {
+        error.with_property("fill").with_suggestion(
+            "use a hex colour such as 1F4E79, a theme colour such as accent1, or none",
+        )
+    })
+}
+
+/// The `DrawingML` token of a theme colour.
+fn drawing_scheme(scheme: crate::value::Scheme) -> litchi_drawingml::color::Scheme {
+    use crate::value::Scheme;
+    use litchi_drawingml::color::Scheme as Drawing;
+    match scheme {
+        Scheme::Background1 => Drawing::Background,
+        Scheme::Text1 => Drawing::Text,
+        Scheme::Background2 => Drawing::Background2,
+        Scheme::Text2 => Drawing::Text2,
+        Scheme::Accent1 => Drawing::Accent1,
+        Scheme::Accent2 => Drawing::Accent2,
+        Scheme::Accent3 => Drawing::Accent3,
+        Scheme::Accent4 => Drawing::Accent4,
+        Scheme::Accent5 => Drawing::Accent5,
+        Scheme::Accent6 => Drawing::Accent6,
+        Scheme::Hyperlink => Drawing::Hyperlink,
+        Scheme::FollowedHyperlink => Drawing::FollowedHyperlink,
+        Scheme::Placeholder => Drawing::Placeholder,
+        Scheme::Dark1 => Drawing::Dark1,
+        Scheme::Light1 => Drawing::Light1,
+        Scheme::Dark2 => Drawing::Dark2,
+        Scheme::Light2 => Drawing::Light2,
+    }
+}
+
+/// An underline token, as OfficeCLI names it.
+fn underline(token: &str) -> Result<Underline> {
+    Ok(match token {
+        "none" => Underline::None,
+        "single" => Underline::Single,
+        "double" => Underline::Double,
+        "words" => Underline::Words,
+        "heavy" => Underline::Heavy,
+        "dotted" => Underline::Dotted,
+        "dottedHeavy" => Underline::DottedHeavy,
+        "dash" => Underline::Dash,
+        "dashHeavy" => Underline::DashHeavy,
+        "dashLong" => Underline::DashLong,
+        "dashLongHeavy" => Underline::DashLongHeavy,
+        "dotDash" => Underline::DotDash,
+        "dotDashHeavy" => Underline::DotDashHeavy,
+        "dotDotDash" => Underline::DotDotDash,
+        "dotDotDashHeavy" => Underline::DotDotDashHeavy,
+        "wavy" => Underline::Wavy,
+        "wavyHeavy" => Underline::WavyHeavy,
+        "wavyDbl" => Underline::WavyDouble,
+        _ => return Err(error(Code::InvalidValue, "unknown underline").with_property("underline")),
+    })
+}
+
 fn alignment(token: &str) -> Result<Alignment> {
     Ok(match token {
         "left" => Alignment::Left,
@@ -363,6 +611,24 @@ fn alignment(token: &str) -> Result<Alignment> {
 pub(super) fn admit<const N: usize, const A: usize>(
     table: &Table<TextSetter, N, A>,
     props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<TextValues> {
+    let values = admit_for(table, props, Operation::Set, limits)?;
+    if values.is_empty() {
+        return Err(error(
+            Code::InvalidArgument,
+            "no text property was assigned",
+        ));
+    }
+    Ok(values)
+}
+
+/// Admit `props` for `operation` through `table`: `set` or, for a new
+/// paragraph or run, `add` (record 0333). An empty payload is admitted.
+pub(in crate::format::pptx) fn admit_for<const N: usize, const A: usize>(
+    table: &Table<TextSetter, N, A>,
+    props: &Props<'_>,
+    operation: Operation,
     limits: &SemanticLimits,
 ) -> Result<TextValues> {
     let mut values = TextValues::default();
@@ -382,15 +648,16 @@ pub(super) fn admit<const N: usize, const A: usize>(
             .with_property(entry.spec.name));
         }
         seen |= bit;
-        entry.prepare(Operation::Set, value, |setter, value| {
+        // OfficeCLI's `fill=none` is an explicit no-fill, not a colour.
+        if matches!(entry.access, crate::registry::Access::Set(TextSetter::Fill))
+            && matches!(value, crate::PropValue::Text(text) if text.trim().eq_ignore_ascii_case("none"))
+        {
+            values.fill = Some(Some(CellFill::None));
+            continue;
+        }
+        entry.prepare(operation, value, |setter, value| {
             values.stage(setter, value, limits)
         })?;
-    }
-    if values.is_empty() {
-        return Err(error(
-            Code::InvalidArgument,
-            "no text property was assigned",
-        ));
     }
     Ok(values)
 }
@@ -421,27 +688,46 @@ impl Pptx {
             );
         }
         let per_target = values.charge();
-        let mut targets: Vec<(usize, TextTarget)> = Vec::new();
+        // `(notes page, slide, target)`: a notes body's text is edited in
+        // its notes part (record 0333).
+        let mut targets: Vec<(bool, usize, TextTarget)> = Vec::new();
         let mut seen = HashSet::new();
         let mut append = |node: crate::format::pptx::Node<'_>| -> Result<()> {
-            let (slide, target) = match (kind, node.item()) {
+            let (container, target) = match (kind, node.item()) {
                 (TextKind::Paragraph, Item::Paragraph(text)) => (
-                    text.shape.container.slide(),
-                    TextTarget::Paragraph {
-                        shape: text.shape.handle.position(),
-                        paragraph: Position::new(text.paragraph as usize),
+                    text.shape.container,
+                    match text.cell.get() {
+                        Some((row, column)) => TextTarget::CellParagraph {
+                            shape: text.shape.handle.position(),
+                            row: Position::new(row as usize),
+                            column: Position::new(column as usize),
+                            paragraph: Position::new(text.paragraph as usize),
+                        },
+                        None => TextTarget::Paragraph {
+                            shape: text.shape.handle.position(),
+                            paragraph: Position::new(text.paragraph as usize),
+                        },
                     },
                 ),
                 (TextKind::Run, Item::Run(text) | Item::LineBreak(text)) => (
-                    text.shape.container.slide(),
-                    TextTarget::Run {
-                        shape: text.shape.handle.position(),
-                        paragraph: Position::new(text.paragraph as usize),
-                        run: Position::new(text.run as usize),
+                    text.shape.container,
+                    match text.cell.get() {
+                        Some((row, column)) => TextTarget::CellRun {
+                            shape: text.shape.handle.position(),
+                            row: Position::new(row as usize),
+                            column: Position::new(column as usize),
+                            paragraph: Position::new(text.paragraph as usize),
+                            run: Position::new(text.run as usize),
+                        },
+                        None => TextTarget::Run {
+                            shape: text.shape.handle.position(),
+                            paragraph: Position::new(text.paragraph as usize),
+                            run: Position::new(text.run as usize),
+                        },
                     },
                 ),
                 (TextKind::Cell, Item::Cell(cell)) => (
-                    cell.table.container.slide(),
+                    cell.table.container,
                     TextTarget::Cell {
                         shape: cell.table.handle.position(),
                         row: Position::new(cell.row as usize),
@@ -455,13 +741,17 @@ impl Pptx {
                     ));
                 },
             };
-            let Some(slide) = slide else {
-                return Err(error(
-                    Code::UnsupportedCapability,
-                    "master and layout text writes are not integrated",
-                ));
+            let (notes, slide) = match (container.slide(), container.notes()) {
+                (Some(slide), _) => (false, slide),
+                (None, Some(slide)) => (true, slide),
+                (None, None) => {
+                    return Err(error(
+                        Code::UnsupportedCapability,
+                        "master and layout text writes are not integrated",
+                    ));
+                },
             };
-            let key = (slide, target);
+            let key = (notes, slide, target);
             if seen.contains(&key) {
                 return Ok(());
             }
@@ -479,7 +769,7 @@ impl Pptx {
             targets.try_reserve(1).map_err(allocation)?;
             seen.try_reserve(1).map_err(allocation)?;
             seen.insert(key);
-            targets.push((slide as usize, target));
+            targets.push((notes, slide as usize, target));
             Ok(())
         };
         let nav = Nav::new(self);
@@ -505,10 +795,16 @@ impl Pptx {
                 "mutation selector matched no element",
             ));
         }
-        targets.sort_by_key(|(slide, _)| *slide);
+        targets.sort_by_key(|(notes, slide, _)| (*notes, *slide));
         let properties = values.properties();
         let mut groups: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
-        for (slide, target) in &targets {
+        let mut notes_groups: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
+        for (notes, slide, target) in &targets {
+            let groups = if *notes {
+                &mut notes_groups
+            } else {
+                &mut groups
+            };
             if groups.last().is_none_or(|(current, _)| current != slide) {
                 groups.try_reserve(1).map_err(allocation)?;
                 groups.push((*slide, Vec::new()));
@@ -519,7 +815,7 @@ impl Pptx {
             edits.try_reserve(1).map_err(allocation)?;
             edits.push(TextEdit::new(*target, properties));
         }
-        self.commit_text_edits(&groups)
+        self.commit_story_text_edits(&groups, &notes_groups)
     }
 
     /// Publish slide-grouped text edits through one native edit.
@@ -559,9 +855,8 @@ impl Pptx {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for (slide, edits) in groups {
-                    for chunk in edits.chunks(capacity) {
-                        operations += edit.set_text_properties(Position::new(*slide), chunk)?;
-                    }
+                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(capacity).collect();
+                    operations += edit.set_text_property_chunks(Position::new(*slide), &chunks)?;
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -570,9 +865,8 @@ impl Pptx {
             Editable::Eager(package) => {
                 let mut edit = package.edit()?;
                 for (slide, edits) in groups {
-                    for chunk in edits.chunks(capacity) {
-                        operations += edit.set_text_properties(*slide, chunk)?;
-                    }
+                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(capacity).collect();
+                    operations += edit.set_text_property_chunks(*slide, &chunks)?;
                 }
                 for (slide, edits) in notes {
                     for chunk in edits.chunks(capacity) {

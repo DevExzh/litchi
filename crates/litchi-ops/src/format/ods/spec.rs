@@ -576,6 +576,12 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     root: workbook::SPEC.root,
     elements: &ELEMENTS,
     gaps: &[
+        // OfficeCLI's heuristic table node (record 0339).
+        gap(
+            "detectedtable",
+            "WP11 (record 0339 F5): header-row table detection in queries",
+            "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only",
+        ),
         GapSpec {
             subject: Subject::Operation {
                 verb: "query",

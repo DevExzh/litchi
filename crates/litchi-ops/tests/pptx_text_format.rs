@@ -242,7 +242,8 @@ fn edit_closure_composes_text_writes_atomically() {
         assert_eq!(prop(&updated, CELL, "fill").as_deref(), Some("#00FF00"));
         let failed = file.edit(|edit| {
             edit.set(RUN, props! { "bold" => true })?;
-            edit.set(CELL, props! { "fill" => "accent1" })?;
+            // A transformed theme colour is not writable (record 0333).
+            edit.set(CELL, props! { "fill" => "accent1+lumMod75" })?;
             Ok(())
         });
         assert!(failed.is_err());

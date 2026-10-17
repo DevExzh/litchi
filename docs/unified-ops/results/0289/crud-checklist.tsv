@@ -965,7 +965,7 @@ pptx	picture	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/d
 pptx	picture	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx
 pptx	picture	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
-pptx	picture	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/picture[1] {"link":"Litchi"}
+pptx	picture	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/picture[1] {"alt":"Litchi"}
 pptx	picture	add	supported		ok /slide[1]/picture[2] on `ooxml/pptx/shapes.pptx` under /slide[1] {"src":"<PNG>","name":"Logo"}
 pptx	picture	remove	supported		ok `create() + add slide + add video` /slide[1]/picture[1]
 pptx	picture	move	format-verb		refused unsupported_type
@@ -979,10 +979,10 @@ pptx	table	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide
 pptx	table	query	supported		ok matches in ooxml/pptx/shapes.pptx
 pptx	table	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	set	n/a	set not offered for this element	-
-pptx	table	add	n/a	add not offered for this element	-
+pptx	table	add	supported		ok /slide[1]/table[1] on `create() + add slide` under /slide[1] {}
 pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]
-pptx	table	move	format-verb		unreached
-pptx	table	swap	format-verb		unreached
+pptx	table	move	format-verb		refused unsupported_type
+pptx	table	swap	format-verb		refused unsupported_type
 pptx	table	edit	n/a	edit not offered for this element	-
 pptx	table	batch	n/a	batch not offered for this element	-
 pptx	table	create	supported		ok format
@@ -991,13 +991,13 @@ pptx	tr	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/
 pptx	tr	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
 pptx	tr	query	supported		ok matches in ooxml/pptx/shapes.pptx
 pptx	tr	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]
-pptx	tr	set	n/a	set not offered for this element	-
-pptx	tr	add	n/a	add not offered for this element	-
-pptx	tr	remove	n/a	remove not offered for this element	-
+pptx	tr	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]/tr[1] {"height":"12pt"}
+pptx	tr	add	supported		ok /slide[1]/table[1]/tr[3] on `ooxml/pptx/shapes.pptx + add picture` under /slide[1]/table[1] {}
+pptx	tr	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]/tr[1]
 pptx	tr	move	format-verb		refused unsupported_type
 pptx	tr	swap	format-verb		refused unsupported_type
-pptx	tr	edit	n/a	edit not offered for this element	-
-pptx	tr	batch	n/a	batch not offered for this element	-
+pptx	tr	edit	supported		ok tx.set
+pptx	tr	batch	supported		ok set item
 pptx	tr	create	supported		ok format
 pptx	tr	save	supported		ok format
 pptx	tc	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
@@ -1083,8 +1083,8 @@ pptx	paragraph	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/uni
 pptx	paragraph	query	supported		ok matches in create()
 pptx	paragraph	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/shape[1]/paragraph[1]
 pptx	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] {"align":"left"}
-pptx	paragraph	add	n/a	add not offered for this element	-
-pptx	paragraph	remove	n/a	remove not offered for this element	-
+pptx	paragraph	add	supported		ok /slide[1]/shape[1]/paragraph[2] on `create() + add slide + add shape` under /slide[1]/shape[1] {}
+pptx	paragraph	remove	supported		ok `create() + add slide + add shape + add paragraph` /slide[1]/shape[1]/paragraph[1]
 pptx	paragraph	move	format-verb		refused unsupported_type
 pptx	paragraph	swap	format-verb		refused unsupported_type
 pptx	paragraph	edit	supported		ok tx.set
@@ -1096,8 +1096,8 @@ pptx	run	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data
 pptx	run	query	supported		ok matches in create()
 pptx	run	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[1]/paragraph[1]/run[1]
 pptx	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"font.latin":"Litchi"}
-pptx	run	add	n/a	add not offered for this element	-
-pptx	run	remove	n/a	remove not offered for this element	-
+pptx	run	add	supported		ok /slide[1]/shape[1]/paragraph[1]/run[2] on `create() + add slide + add shape` under /slide[1]/shape[1]/paragraph[1] {}
+pptx	run	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1]
 pptx	run	move	format-verb		refused unsupported_type
 pptx	run	swap	format-verb		refused unsupported_type
 pptx	run	edit	supported		ok tx.set
@@ -1110,7 +1110,7 @@ pptx	linebreak	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/p
 pptx	linebreak	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
 pptx	linebreak	set	n/a	set not offered for this element	-
 pptx	linebreak	add	n/a	add not offered for this element	-
-pptx	linebreak	remove	n/a	remove not offered for this element	-
+pptx	linebreak	remove	supported		ok `unified-ops/0294/modern-comments.pptx` /slide[1]/shape[3]/paragraph[1]/linebreak[1]
 pptx	linebreak	move	format-verb		unreached
 pptx	linebreak	swap	format-verb		unreached
 pptx	linebreak	edit	n/a	edit not offered for this element	-
@@ -1136,7 +1136,7 @@ pptx	comment	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/ppt
 pptx	comment	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	set	supported		ok `ooxml/pptx/shapes.pptx + add comment` /slide[1]/comment[1] {"text":"Litchi"}
 pptx	comment	add	supported		ok /slide[1]/comment[1] on `ooxml/pptx/shapes.pptx` under /slide[1] {"author":"Ada","text":"Check"}
-pptx	comment	remove	n/a	remove not offered for this element	-
+pptx	comment	remove	supported		ok `ooxml/pptx/shapes.pptx + add comment` /slide[1]/comment[1]
 pptx	comment	move	format-verb		refused unsupported_type
 pptx	comment	swap	format-verb		refused unsupported_type
 pptx	comment	edit	supported		ok tx.set
@@ -1266,7 +1266,7 @@ pptx	modernComment	query	supported		ok matches in unified-ops/0294/modern-commen
 pptx	modernComment	view	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
 pptx	modernComment	set	n/a	set not offered for this element	-
 pptx	modernComment	add	n/a	add not offered for this element	-
-pptx	modernComment	remove	n/a	remove not offered for this element	-
+pptx	modernComment	remove	supported		ok `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
 pptx	modernComment	move	format-verb		refused unsupported_type
 pptx	modernComment	swap	format-verb		refused unsupported_type
 pptx	modernComment	edit	n/a	edit not offered for this element	-
@@ -1279,7 +1279,7 @@ pptx	reply	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
 pptx	reply	view	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
 pptx	reply	set	n/a	set not offered for this element	-
 pptx	reply	add	n/a	add not offered for this element	-
-pptx	reply	remove	n/a	remove not offered for this element	-
+pptx	reply	remove	supported		ok `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
 pptx	reply	move	format-verb		unreached
 pptx	reply	swap	format-verb		unreached
 pptx	reply	edit	n/a	edit not offered for this element	-
@@ -2560,19 +2560,19 @@ ppt	connector	edit	n/a	edit not offered for this element	-
 ppt	connector	batch	n/a	batch not offered for this element	-
 ppt	connector	create	supported		ok format
 ppt	connector	save	supported		ok format
-ppt	smartart	get	gap	M1-extended	unreached
-ppt	smartart	find	gap	M1-extended	unreached
-ppt	smartart	query	gap	M1-extended	unreached
-ppt	smartart	view	gap	M1-extended	unreached
-ppt	smartart	set	gap	M1-extended	unreached
-ppt	smartart	add	gap	M1-extended	-
-ppt	smartart	remove	gap	M1-extended	unreached
-ppt	smartart	move	gap	M1-extended	unreached
-ppt	smartart	swap	gap	M1-extended	unreached
-ppt	smartart	edit	gap	M1-extended	-
-ppt	smartart	batch	gap	M1-extended	-
-ppt	smartart	create	gap	M1-extended	ok format
-ppt	smartart	save	gap	M1-extended	ok format
+ppt	smartart	get	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	find	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	query	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	view	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	set	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	add	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
+ppt	smartart	remove	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	move	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	swap	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
+ppt	smartart	edit	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
+ppt	smartart	batch	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
+ppt	smartart	create	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
+ppt	smartart	save	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
 ppt	ole	get	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	find	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	query	supported		ok matches in unified-ops/0294/elements.ppt
@@ -2729,32 +2729,32 @@ ppt	model3d	edit	gap	wontfix: PPTX-only (record 0323)	-
 ppt	model3d	batch	gap	wontfix: PPTX-only (record 0323)	-
 ppt	model3d	create	gap	wontfix: PPTX-only (record 0323)	ok format
 ppt	model3d	save	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	slideMaster	get	gap	M1-extended	unreached
-ppt	slideMaster	find	gap	M1-extended	unreached
-ppt	slideMaster	query	gap	M1-extended	unreached
-ppt	slideMaster	view	gap	M1-extended	unreached
-ppt	slideMaster	set	gap	M1-extended	unreached
-ppt	slideMaster	add	gap	M1-extended	-
-ppt	slideMaster	remove	gap	M1-extended	unreached
-ppt	slideMaster	move	gap	M1-extended	unreached
-ppt	slideMaster	swap	gap	M1-extended	unreached
-ppt	slideMaster	edit	gap	M1-extended	-
-ppt	slideMaster	batch	gap	M1-extended	-
-ppt	slideMaster	create	gap	M1-extended	ok format
-ppt	slideMaster	save	gap	M1-extended	ok format
-ppt	slideLayout	get	gap	M1-extended	unreached
-ppt	slideLayout	find	gap	M1-extended	unreached
-ppt	slideLayout	query	gap	M1-extended	unreached
-ppt	slideLayout	view	gap	M1-extended	unreached
-ppt	slideLayout	set	gap	M1-extended	unreached
-ppt	slideLayout	add	gap	M1-extended	-
-ppt	slideLayout	remove	gap	M1-extended	unreached
-ppt	slideLayout	move	gap	M1-extended	unreached
-ppt	slideLayout	swap	gap	M1-extended	unreached
-ppt	slideLayout	edit	gap	M1-extended	-
-ppt	slideLayout	batch	gap	M1-extended	-
-ppt	slideLayout	create	gap	M1-extended	ok format
-ppt	slideLayout	save	gap	M1-extended	ok format
+ppt	slideMaster	get	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	find	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	query	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	view	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	set	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	add	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
+ppt	slideMaster	remove	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	move	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	swap	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
+ppt	slideMaster	edit	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
+ppt	slideMaster	batch	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
+ppt	slideMaster	create	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	ok format
+ppt	slideMaster	save	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	ok format
+ppt	slideLayout	get	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	find	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	query	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	view	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	set	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	add	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
+ppt	slideLayout	remove	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	move	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	swap	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
+ppt	slideLayout	edit	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
+ppt	slideLayout	batch	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
+ppt	slideLayout	create	gap	0339-F4 (deferred-P1): PPT layouts as nodes	ok format
+ppt	slideLayout	save	gap	0339-F4 (deferred-P1): PPT layouts as nodes	ok format
 ppt	theme	get	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
 ppt	theme	find	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
 ppt	theme	query	supported		ok matches in poi/test-data/slideshow/headers_footers_2007.ppt

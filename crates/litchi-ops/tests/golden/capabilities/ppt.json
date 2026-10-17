@@ -1057,8 +1057,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT diagram frames have no semantic diagram projection"
+        "followUp": "0339-F3 (deferred-P1): PPT SmartArt and diagram groups",
+        "reason": "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected"
       }
     },
     {
@@ -1730,7 +1730,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "0339-F4 (deferred-P1): PPT main and title masters as nodes",
         "reason": "legacy PPT master records are not exposed as navigable nodes"
       }
     },
@@ -1807,8 +1807,8 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT layout records are not exposed as navigable nodes"
+        "followUp": "0339-F4 (deferred-P1): PPT layouts as nodes",
+        "reason": "a legacy PPT slide names a layout type in its slide atom (PowerPoint 2007 and later add one master per layout); there are no layout records to expose as navigable nodes yet"
       }
     },
     {
@@ -2242,8 +2242,8 @@
       "subject": "element",
       "element": "smartart",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT diagram frames have no semantic diagram projection"
+      "followUp": "0339-F3 (deferred-P1): PPT SmartArt and diagram groups",
+      "reason": "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected"
     },
     {
       "subject": "element",
@@ -2270,15 +2270,15 @@
       "subject": "element",
       "element": "slideMaster",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "0339-F4 (deferred-P1): PPT main and title masters as nodes",
       "reason": "legacy PPT master records are not exposed as navigable nodes"
     },
     {
       "subject": "element",
       "element": "slideLayout",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT layout records are not exposed as navigable nodes"
+      "followUp": "0339-F4 (deferred-P1): PPT layouts as nodes",
+      "reason": "a legacy PPT slide names a layout type in its slide atom (PowerPoint 2007 and later add one master per layout); there are no layout records to expose as navigable nodes yet"
     },
     {
       "subject": "element",
@@ -2344,6 +2344,13 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended",
       "reason": "legacy PPT exposes only common geometry in the unified node view"
+    },
+    {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
     },
     {
       "subject": "operation",

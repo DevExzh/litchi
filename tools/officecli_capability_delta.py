@@ -617,6 +617,14 @@ class OcElement:
     def names(self) -> set[str]:
         return {normalize(self.stem), normalize(self.name), *map(normalize, self.aliases)}
 
+    def lookup_order(self) -> list[str]:
+        """The names to look a Litchi element up by: the element's own name
+        and file stem first, then its aliases and path words, sorted. A path
+        word (`shape` in `/slidemaster[N]/shape[K]`) must not win over the
+        element's own name (record 0339)."""
+        own = [normalize(self.name), normalize(self.stem)]
+        return list(dict.fromkeys([*own, *sorted(self.names() - set(own))]))
+
 
 @dataclass
 class LitchiElement:
@@ -847,7 +855,7 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
     matched: set[str] = set()
     folded = FOLDED.get(reference_format(fmt), {})
     for schema in officecli:
-        target = next((index[name] for name in sorted(schema.names()) if name in index), None)
+        target = next((index[name] for name in schema.lookup_order() if name in index), None)
         note = ""
         if schema.stem in OUT_OF_SCOPE or schema.name in OUT_OF_SCOPE:
             reason = OUT_OF_SCOPE.get(schema.stem) or OUT_OF_SCOPE[schema.name]
@@ -863,7 +871,7 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
                 raise SystemExit(f"{fmt}: {schema.stem} is folded into {into}, which the report lacks")
             status = "folded"
         elif target is None:
-            gap = next((undeclared[name] for name in sorted(schema.names()) if name in undeclared), None)
+            gap = next((undeclared[name] for name in schema.lookup_order() if name in undeclared), None)
             if gap is not None:
                 # Listed in `capabilities()` as an element gap without a table entry.
                 delta.elements.append((schema.name, "", "gap", gap["followUp"]))

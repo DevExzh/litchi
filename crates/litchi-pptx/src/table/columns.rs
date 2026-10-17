@@ -1,12 +1,29 @@
-//! Lexical table-column edits of a slide graphic frame (record 0321).
+//! Lexical table-column and table-row edits of a slide graphic frame
+//! (records 0321 and 0333).
 //!
 //! A column is one `a:gridCol` of the table's `a:tblGrid` and the cell at
-//! its position in every `a:tr`. The editor rewrites only the bytes of the
-//! column it changes (the `w` attribute, an inserted or removed `a:gridCol`
-//! and its row cells) and the frame's `p:xfrm/a:ext/@cx`, which it keeps
-//! equal to the sum of the column widths (OfficeCLI's frame sync). Tables
-//! with merged cells across columns (`gridSpan`, `hMerge`) are refused for
-//! insertion and removal: moving a span boundary is not a column edit.
+//! its position in every `a:tr`; a row is one `a:tr`. The editor rewrites
+//! only the bytes of the column or row it changes (the `w` attribute, an
+//! inserted or removed `a:gridCol` and its row cells, an inserted or removed
+//! `a:tr`), the merge attributes of the cells a merge moves to, and the
+//! frame's `p:xfrm/a:ext` `cx` or `cy`, which it keeps equal to the sum of
+//! the column widths or row heights (OfficeCLI's frame sync).
+//!
+//! Every row holds one `a:tc` per grid column, merged ones included
+//! (`gridSpan` on a merge's first cell, `hMerge` on the cells it covers to
+//! the right, `rowSpan` and `vMerge` likewise downwards), so a cell's grid
+//! column is its position in its row. Merges stay consistent where that is
+//! safe (record 0333):
+//!
+//! - a column is inserted at a boundary no horizontal merge crosses;
+//! - removing a column shrinks the horizontal merges it is part of (the
+//!   merge's next cell becomes its first when the first goes); cells that
+//!   take part in a merge spanning both rows and columns are refused;
+//! - a row is inserted at a boundary no vertical merge crosses;
+//! - removing a row shrinks the vertical merges it is part of the same way.
+//!
+//! Tables whose rows do not hold one cell per grid column are refused for
+//! every structural edit.
 
 use std::ops::Range;
 
@@ -41,10 +58,55 @@ pub(crate) enum Change<'a> {
     },
     /// Remove the column at a zero-based position.
     Remove { column: usize },
+    /// Insert a row before a zero-based position (the row count appends),
+    /// with a height (`None`: the first row's, else 370,840 EMU) and seed
+    /// text for its cells, by column (missing columns are empty).
+    InsertRow {
+        position: usize,
+        height: Option<i64>,
+        texts: &'a [&'a str],
+    },
+    /// Remove the row at a zero-based position.
+    RemoveRow { row: usize },
+    /// Set the height of the row at a zero-based position.
+    RowHeight { row: usize, height: i64 },
 }
 
 fn invalid(message: &str) -> Error {
     Error::Invalid(format!("table column edit: {message}"))
+}
+
+/// One `a:tc` of a row: its element span, start-tag span and merge
+/// attributes.
+#[derive(Clone)]
+struct CellInfo {
+    span: Range<usize>,
+    tag: Range<usize>,
+    grid_span: u32,
+    row_span: u32,
+    h_merge: bool,
+    v_merge: bool,
+}
+
+impl CellInfo {
+    /// Whether the cell is a horizontal merge's first or covered cell.
+    const fn horizontal(&self) -> bool {
+        self.grid_span > 1 || self.h_merge
+    }
+
+    /// Whether the cell is a vertical merge's first or covered cell.
+    const fn vertical(&self) -> bool {
+        self.row_span > 1 || self.v_merge
+    }
+}
+
+/// One `a:tr`: its element span, the value span of its `h`, its cells and
+/// the start of its end tag.
+struct RowInfo {
+    span: Range<usize>,
+    height: Option<Range<usize>>,
+    cells: Vec<CellInfo>,
+    end: usize,
 }
 
 #[derive(Default)]
@@ -54,16 +116,175 @@ struct Grid {
     grid: Option<(Range<usize>, Option<usize>)>,
     /// `(element span, w value span)` of each `a:gridCol`.
     columns: Vec<(Range<usize>, Option<Range<usize>>)>,
-    /// Each row's direct cells: the element spans, and the start of the
-    /// row's end tag.
-    rows: Vec<(Vec<Range<usize>>, usize)>,
-    /// Whether any cell spans or continues a horizontal merge.
-    merged: bool,
-    /// The frame's `p:xfrm/a:ext` start-tag span and its `cx` value span.
+    /// The table's direct rows.
+    rows: Vec<RowInfo>,
+    /// The start of the `a:tbl` end tag, where an appended row goes.
+    table_end: Option<usize>,
+    /// The frame's `p:xfrm/a:ext` `cx` value span.
     extent: Option<Range<usize>>,
+    /// The frame's `p:xfrm/a:ext` `cy` value span.
+    extent_height: Option<Range<usize>>,
     /// The DrawingML prefix the table spells (`a`), empty for a default
     /// namespace.
     prefix: Option<Vec<u8>>,
+}
+
+impl Grid {
+    /// Whether any cell spans or continues a horizontal merge.
+    fn merged(&self) -> bool {
+        self.rows
+            .iter()
+            .any(|row| row.cells.iter().any(CellInfo::horizontal))
+    }
+
+    /// Whether any cell spans or continues a vertical merge.
+    fn vertically_merged(&self) -> bool {
+        self.rows
+            .iter()
+            .any(|row| row.cells.iter().any(CellInfo::vertical))
+    }
+
+    /// Refuse a merged table whose rows do not hold one cell per column.
+    fn require_regular(&self, operation: &'static str) -> Result<()> {
+        if (self.merged() || self.vertically_merged())
+            && self
+                .rows
+                .iter()
+                .any(|row| row.cells.len() != self.columns.len())
+        {
+            return Err(Error::UnsafeEdit {
+                operation,
+                reason: "a merged table's rows do not hold one cell per grid column",
+            });
+        }
+        Ok(())
+    }
+}
+
+/// A non-negative integer attribute of a raw start tag; `default` when
+/// absent.
+fn number_attribute(tag: &[u8], name: &[u8], default: u32) -> Result<u32> {
+    match attribute_value(tag, name) {
+        None => Ok(default),
+        Some(value) => std::str::from_utf8(&tag[value])
+            .ok()
+            .and_then(|value| value.trim().parse::<u32>().ok())
+            .ok_or_else(|| invalid("a cell span is not a non-negative integer")),
+    }
+}
+
+/// A boolean attribute of a raw start tag (`1`/`true`).
+fn flag_attribute(tag: &[u8], name: &[u8]) -> bool {
+    attribute_value(tag, name).is_some_and(|value| matches!(&tag[value], b"1" | b"true"))
+}
+
+/// Rewrite a raw start tag, setting (`Some`) or removing (`None`) unprefixed
+/// attributes; every other attribute keeps its bytes, and set attributes
+/// that were absent are appended.
+fn set_attributes(tag: &[u8], changes: &[(&[u8], Option<String>)]) -> Vec<u8> {
+    let mut out = tag.to_vec();
+    // Apply from the last existing attribute to the first so earlier spans
+    // stay valid.
+    let mut present: Vec<(Range<usize>, Option<&String>)> = Vec::new();
+    let mut appended: Vec<(&[u8], &String)> = Vec::new();
+    for (name, value) in changes {
+        match attribute_span(tag, name) {
+            Some(span) => present.push((span, value.as_ref())),
+            None => {
+                if let Some(value) = value {
+                    appended.push((name, value));
+                }
+            },
+        }
+    }
+    present.sort_by_key(|(span, _)| std::cmp::Reverse(span.start));
+    for (span, value) in present {
+        match value {
+            Some(value) => {
+                let name_end = tag[span.clone()]
+                    .iter()
+                    .position(|byte| *byte == b'=')
+                    .unwrap_or(0);
+                let name = tag[span.start..span.start + name_end].to_vec();
+                let mut replacement = name;
+                replacement.extend_from_slice(b"=\"");
+                replacement.extend_from_slice(value.as_bytes());
+                replacement.push(b'"');
+                out.splice(span, replacement);
+            },
+            None => {
+                // Drop the attribute with the whitespace before it.
+                let mut start = span.start;
+                while start > 0 && tag[start - 1].is_ascii_whitespace() {
+                    start -= 1;
+                }
+                out.splice(start..span.end, std::iter::empty());
+            },
+        }
+    }
+    if !appended.is_empty() {
+        let close = if out.ends_with(b"/>") {
+            out.len() - 2
+        } else {
+            out.len() - 1
+        };
+        let mut extra = Vec::new();
+        for (name, value) in appended {
+            extra.push(b' ');
+            extra.extend_from_slice(name);
+            extra.extend_from_slice(b"=\"");
+            extra.extend_from_slice(value.as_bytes());
+            extra.push(b'"');
+        }
+        out.splice(close..close, extra);
+    }
+    out
+}
+
+/// The span of a whole attribute (`name="value"`) of a raw start tag.
+fn attribute_span(tag: &[u8], name: &[u8]) -> Option<Range<usize>> {
+    let mut at = 1;
+    while at < tag.len() && !tag[at].is_ascii_whitespace() && tag[at] != b'>' && tag[at] != b'/' {
+        at += 1;
+    }
+    loop {
+        while at < tag.len() && tag[at].is_ascii_whitespace() {
+            at += 1;
+        }
+        let start = at;
+        while at < tag.len() && tag[at] != b'=' && !tag[at].is_ascii_whitespace() {
+            if tag[at] == b'>' || tag[at] == b'/' {
+                return None;
+            }
+            at += 1;
+        }
+        let key = &tag[start..at];
+        while at < tag.len() && tag[at].is_ascii_whitespace() {
+            at += 1;
+        }
+        if tag.get(at) != Some(&b'=') {
+            return None;
+        }
+        at += 1;
+        while at < tag.len() && tag[at].is_ascii_whitespace() {
+            at += 1;
+        }
+        let quote = *tag.get(at)?;
+        if quote != b'"' && quote != b'\'' {
+            return None;
+        }
+        at += 1;
+        while at < tag.len() && tag[at] != quote {
+            at += 1;
+        }
+        if at >= tag.len() {
+            return None;
+        }
+        at += 1;
+        if key == name {
+            return Some(start..at);
+        }
+    }
 }
 
 fn is_ns(namespace: &ResolveResult<'_>, wanted: [&[u8]; 2]) -> bool {
@@ -168,6 +389,8 @@ fn read_grid(xml: &[u8], frame: Range<usize>) -> Result<Grid> {
                     (b"ext", Some((b"xfrm", _, true))) if dml && depth == 2 => {
                         grid.extent = attribute_value(&xml[tag.clone()], b"cx")
                             .map(|value| value.start + tag.start..value.end + tag.start);
+                        grid.extent_height = attribute_value(&xml[tag.clone()], b"cy")
+                            .map(|value| value.start + tag.start..value.end + tag.start);
                     },
                     (b"tblGrid", Some((b"tbl", true, _))) if dml => {
                         grid.grid = Some((tag.clone(), None));
@@ -178,18 +401,29 @@ fn read_grid(xml: &[u8], frame: Range<usize>) -> Result<Grid> {
                         grid.columns.push((tag.start..tag.end, width));
                     },
                     (b"tr", Some((b"tbl", true, _))) if dml => {
-                        grid.rows.push((Vec::new(), 0));
+                        let height = attribute_value(&xml[tag.clone()], b"h")
+                            .map(|value| value.start + tag.start..value.end + tag.start);
+                        let empty = matches!(event, Event::Empty(_));
+                        grid.rows.push(RowInfo {
+                            span: tag.clone(),
+                            height,
+                            cells: Vec::new(),
+                            // An empty row has no end tag to insert before.
+                            end: if empty { usize::MAX } else { 0 },
+                        });
                     },
                     (b"tc", Some((b"tr", true, _))) if dml => {
                         let raw = &xml[tag.clone()];
-                        if attribute_value(raw, b"hMerge").is_some()
-                            || attribute_value(raw, b"gridSpan")
-                                .is_some_and(|value| &raw[value] != b"1")
-                        {
-                            grid.merged = true;
-                        }
-                        if let Some((cells, _)) = grid.rows.last_mut() {
-                            cells.push(tag.start..tag.end);
+                        let cell = CellInfo {
+                            span: tag.clone(),
+                            tag: tag.clone(),
+                            grid_span: number_attribute(raw, b"gridSpan", 1)?,
+                            row_span: number_attribute(raw, b"rowSpan", 1)?,
+                            h_merge: flag_attribute(raw, b"hMerge"),
+                            v_merge: flag_attribute(raw, b"vMerge"),
+                        };
+                        if let Some(row) = grid.rows.last_mut() {
+                            row.cells.push(cell);
                         }
                     },
                     _ => {},
@@ -215,15 +449,20 @@ fn read_grid(xml: &[u8], frame: Range<usize>) -> Result<Grid> {
                         column.0.end = after;
                     }
                 } else if dml && local == b"tc" && parent_dml {
-                    if let Some(cell) = grid.rows.last_mut().and_then(|(cells, _)| cells.last_mut())
-                        && cell.start == start
+                    if let Some(cell) = grid.rows.last_mut().and_then(|row| row.cells.last_mut())
+                        && cell.span.start == start
                     {
-                        cell.end = after;
+                        cell.span.end = after;
                     }
                 } else if dml && local == b"tr" {
-                    if let Some(row) = grid.rows.last_mut() {
-                        row.1 = before;
+                    if let Some(row) = grid.rows.last_mut()
+                        && row.span.start == start
+                    {
+                        row.end = before;
+                        row.span.end = after;
                     }
+                } else if dml && local == b"tbl" {
+                    grid.table_end = Some(before);
                 } else if dml && local == b"tblGrid" {
                     if let Some((_, end)) = grid.grid.as_mut() {
                         *end = Some(before);
@@ -237,6 +476,26 @@ fn read_grid(xml: &[u8], frame: Range<usize>) -> Result<Grid> {
         }
     }
     Ok(grid)
+}
+
+/// A span attribute's value: absent at one.
+fn span_value(span: u32) -> Option<String> {
+    (span > 1).then(|| span.to_string())
+}
+
+/// Every row's height (`a:tr@h`, zero when absent).
+fn row_heights(xml: &[u8], grid: &Grid) -> Result<Vec<i64>> {
+    grid.rows
+        .iter()
+        .map(|row| match &row.height {
+            Some(range) => std::str::from_utf8(&xml[range.clone()])
+                .ok()
+                .and_then(|value| value.trim().parse::<i64>().ok())
+                .filter(|value| *value >= 0)
+                .ok_or_else(|| invalid("a row height is not a non-negative integer")),
+            None => Ok(0),
+        })
+        .collect()
 }
 
 fn parse_width(xml: &[u8], range: &Option<Range<usize>>) -> Result<i64> {
@@ -310,6 +569,8 @@ pub(crate) fn change(
     // (range, replacement) edits, applied in ascending order.
     let mut edits: Vec<(Range<usize>, Vec<u8>)> = Vec::new();
     let mut next_widths = widths.clone();
+    // The row heights after the edit, when rows change.
+    let mut next_heights: Option<Vec<i64>> = None;
     match change {
         Change::Width { column, width } => {
             if !(0..=MAX_COLUMN_WIDTH).contains(&width) {
@@ -329,14 +590,21 @@ pub(crate) fn change(
             width,
             text,
         } => {
-            if grid.merged {
-                return Err(Error::UnsafeEdit {
-                    operation: "insert_table_column",
-                    reason: "the table has cells merged across columns",
-                });
-            }
+            grid.require_regular("insert_table_column")?;
             if position > widths.len() {
                 return Err(invalid("the column position is past the column count"));
+            }
+            // A merge covering the column at the position started left of
+            // it: the new column would cut it.
+            if grid
+                .rows
+                .iter()
+                .any(|row| row.cells.get(position).is_some_and(|cell| cell.h_merge))
+            {
+                return Err(Error::UnsafeEdit {
+                    operation: "insert_table_column",
+                    reason: "the position cuts through cells merged across columns",
+                });
             }
             let width = match width {
                 Some(width) => width,
@@ -361,9 +629,15 @@ pub(crate) fn change(
                 },
             }
             let cell = new_cell(&prefix, text);
-            for (cells, end) in &grid.rows {
-                let at = cells.get(position).map_or(*end, |span| span.start);
-                if cells.len() < position {
+            for row in &grid.rows {
+                if row.end == usize::MAX {
+                    return Err(invalid("an empty row cannot take a cell"));
+                }
+                let at = row
+                    .cells
+                    .get(position)
+                    .map_or(row.end, |cell| cell.span.start);
+                if row.cells.len() < position {
                     return Err(invalid("a row has fewer cells than the column position"));
                 }
                 edits.push((at..at, cell.clone().into_bytes()));
@@ -371,12 +645,7 @@ pub(crate) fn change(
             next_widths.insert(position, width);
         },
         Change::Remove { column } => {
-            if grid.merged {
-                return Err(Error::UnsafeEdit {
-                    operation: "remove_table_column",
-                    reason: "the table has cells merged across columns",
-                });
-            }
+            grid.require_regular("remove_table_column")?;
             let Some((span, _)) = grid.columns.get(column) else {
                 return Err(invalid("the column position is past the last column"));
             };
@@ -387,16 +656,225 @@ pub(crate) fn change(
                 });
             }
             edits.push((span.clone(), Vec::new()));
-            for (cells, _) in &grid.rows {
-                let span = cells
+            for row in &grid.rows {
+                let cell = row
+                    .cells
                     .get(column)
                     .ok_or_else(|| invalid("a row has no cell at the column position"))?;
-                edits.push((span.clone(), Vec::new()));
+                if cell.horizontal() && cell.vertical() {
+                    return Err(Error::UnsafeEdit {
+                        operation: "remove_table_column",
+                        reason: "the column takes part in a merge spanning rows and columns",
+                    });
+                }
+                if cell.h_merge {
+                    // A covered cell: its merge's first cell spans one
+                    // column less.
+                    let (anchor, first) = row.cells[..column]
+                        .iter()
+                        .enumerate()
+                        .rev()
+                        .find(|(_, cell)| !cell.h_merge)
+                        .ok_or_else(|| invalid("a covered cell has no merge to its left"))?;
+                    if first.vertical() {
+                        return Err(Error::UnsafeEdit {
+                            operation: "remove_table_column",
+                            reason: "the column takes part in a merge spanning rows and columns",
+                        });
+                    }
+                    if first.grid_span as usize + anchor > column {
+                        edits.push((
+                            first.tag.clone(),
+                            set_attributes(
+                                &xml[first.tag.clone()],
+                                &[(b"gridSpan", span_value(first.grid_span - 1))],
+                            ),
+                        ));
+                    }
+                } else if cell.grid_span > 1 {
+                    // A merge's first cell: the next cell becomes it.
+                    let next = row
+                        .cells
+                        .get(column + 1)
+                        .filter(|next| next.h_merge && !next.vertical())
+                        .ok_or(Error::UnsafeEdit {
+                            operation: "remove_table_column",
+                            reason: "a merged cell's covered cells are not in its row",
+                        })?;
+                    edits.push((
+                        next.tag.clone(),
+                        set_attributes(
+                            &xml[next.tag.clone()],
+                            &[
+                                (b"hMerge", None),
+                                (b"gridSpan", span_value(cell.grid_span - 1)),
+                            ],
+                        ),
+                    ));
+                }
+                edits.push((cell.span.clone(), Vec::new()));
             }
             next_widths.remove(column);
         },
+        Change::InsertRow {
+            position,
+            height,
+            texts,
+        } => {
+            grid.require_regular("insert_table_row")?;
+            if position > grid.rows.len() {
+                return Err(invalid("the row position is past the row count"));
+            }
+            if widths.is_empty() {
+                return Err(invalid("a table without grid columns cannot take a row"));
+            }
+            if texts.len() > widths.len() {
+                return Err(invalid("the row has more seed texts than grid columns"));
+            }
+            // A vertical merge covering the row at the position started
+            // above it: the new row would cut it.
+            if grid
+                .rows
+                .get(position)
+                .is_some_and(|row| row.cells.iter().any(|cell| cell.v_merge))
+            {
+                return Err(Error::UnsafeEdit {
+                    operation: "insert_table_row",
+                    reason: "the position cuts through cells merged across rows",
+                });
+            }
+            let mut heights = row_heights(xml, &grid)?;
+            let height = match height {
+                Some(height) => height,
+                None => heights.first().copied().unwrap_or(370_840),
+            };
+            if !(0..=MAX_COLUMN_WIDTH).contains(&height) {
+                return Err(invalid("the row height is out of range"));
+            }
+            let mut row = format!("<{} h=\"{height}\">", qualified("tr"));
+            for column in 0..widths.len() {
+                row.push_str(&new_cell(&prefix, texts.get(column).copied().unwrap_or("")));
+            }
+            row.push_str(&format!("</{}>", qualified("tr")));
+            let at = match (grid.rows.get(position), grid.rows.last(), grid.table_end) {
+                (Some(next), _, _) => next.span.start,
+                (None, Some(last), _) => last.span.end,
+                (None, None, Some(end)) => end,
+                (None, None, None) => return Err(invalid("the table has no end tag")),
+            };
+            edits.push((at..at, row.into_bytes()));
+            heights.insert(position, height);
+            next_heights = Some(heights);
+        },
+        Change::RowHeight { row, height } => {
+            if !(0..=MAX_COLUMN_WIDTH).contains(&height) {
+                return Err(invalid("the row height is out of range"));
+            }
+            let Some(target) = grid.rows.get(row) else {
+                return Err(invalid("the row position is past the last row"));
+            };
+            let mut heights = row_heights(xml, &grid)?;
+            if heights[row] == height && target.height.is_some() {
+                return Ok(None);
+            }
+            match &target.height {
+                Some(range) => edits.push((range.clone(), height.to_string().into_bytes())),
+                None => {
+                    let tag_end = xml[target.span.start..]
+                        .iter()
+                        .position(|byte| *byte == b'>')
+                        .map(|offset| target.span.start + offset)
+                        .ok_or_else(|| invalid("a row start tag is unterminated"))?;
+                    let at = if xml[..tag_end].ends_with(b"/") {
+                        tag_end - 1
+                    } else {
+                        tag_end
+                    };
+                    edits.push((at..at, format!(" h=\"{height}\"").into_bytes()));
+                },
+            }
+            heights[row] = height;
+            next_heights = Some(heights);
+        },
+        Change::RemoveRow { row } => {
+            grid.require_regular("remove_table_row")?;
+            let Some(removed) = grid.rows.get(row) else {
+                return Err(invalid("the row position is past the last row"));
+            };
+            if grid.rows.len() == 1 {
+                return Err(Error::UnsafeEdit {
+                    operation: "remove_table_row",
+                    reason: "a table keeps at least one row",
+                });
+            }
+            let mut heights = row_heights(xml, &grid)?;
+            for (column, cell) in removed.cells.iter().enumerate() {
+                if cell.v_merge && !cell.h_merge {
+                    // A covered cell: its merge's first cell spans one row
+                    // less.
+                    let first = grid.rows[..row]
+                        .iter()
+                        .rev()
+                        .filter_map(|above| above.cells.get(column))
+                        .find(|above| !above.v_merge)
+                        .ok_or_else(|| invalid("a covered cell has no merge above it"))?;
+                    if first.row_span > 1 {
+                        edits.push((
+                            first.tag.clone(),
+                            set_attributes(
+                                &xml[first.tag.clone()],
+                                &[(b"rowSpan", span_value(first.row_span - 1))],
+                            ),
+                        ));
+                    }
+                } else if cell.row_span > 1 && !cell.v_merge {
+                    // A merge's first cell: the cells below become it.
+                    let below = grid
+                        .rows
+                        .get(row + 1)
+                        .ok_or_else(|| invalid("a merged cell's covered cells are missing"))?;
+                    let columns = (cell.grid_span.max(1)) as usize;
+                    for offset in 0..columns {
+                        let next = below
+                            .cells
+                            .get(column + offset)
+                            .filter(|next| next.v_merge)
+                            .ok_or(Error::UnsafeEdit {
+                                operation: "remove_table_row",
+                                reason: "a merged cell's covered cells are not below it",
+                            })?;
+                        let mut changes: Vec<(&[u8], Option<String>)> = vec![(b"vMerge", None)];
+                        if offset == 0 {
+                            changes.push((b"rowSpan", span_value(cell.row_span - 1)));
+                            changes.push((b"gridSpan", span_value(cell.grid_span)));
+                        }
+                        edits.push((
+                            next.tag.clone(),
+                            set_attributes(&xml[next.tag.clone()], &changes),
+                        ));
+                    }
+                }
+            }
+            edits.push((removed.span.clone(), Vec::new()));
+            heights.remove(row);
+            next_heights = Some(heights);
+        },
     }
-    if let Some(extent) = &grid.extent {
+    if let Some(heights) = &next_heights {
+        if let Some(extent) = &grid.extent_height {
+            let total: i128 = heights.iter().map(|height| i128::from(*height)).sum();
+            let total = i64::try_from(total)
+                .ok()
+                .filter(|total| *total <= MAX_COLUMN_WIDTH)
+                .ok_or_else(|| invalid("the table height is out of range"))?;
+            let current = std::str::from_utf8(&xml[extent.clone()])
+                .ok()
+                .and_then(|value| value.trim().parse::<i64>().ok());
+            if current != Some(total) {
+                edits.push((extent.clone(), total.to_string().into_bytes()));
+            }
+        }
+    } else if let Some(extent) = &grid.extent {
         let total: i128 = next_widths.iter().map(|width| i128::from(*width)).sum();
         let total = i64::try_from(total)
             .ok()
@@ -411,7 +889,7 @@ pub(crate) fn change(
     }
     edits.sort_by_key(|(range, _)| (range.start, range.end));
     if edits.windows(2).any(|pair| pair[0].0.end > pair[1].0.start) {
-        return Err(invalid("column edits overlap"));
+        return Err(invalid("table edits overlap"));
     }
     let mut out = Vec::with_capacity(xml.len() + 256);
     let mut cursor = 0;
@@ -519,5 +997,164 @@ mod tests {
             .unwrap();
         assert!(change(&once, 0..once.len(), Change::Remove { column: 0 }).is_err());
         assert!(change(xml, 0..xml.len(), Change::Remove { column: 2 }).is_err());
+    }
+
+    /// A three-column table whose first row merges its first two cells and
+    /// whose first column merges its first two rows.
+    fn merged() -> String {
+        concat!(
+            r#"<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" "#,
+            r#"xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#,
+            r#"<p:xfrm><a:off x="0" y="0"/><a:ext cx="300" cy="150"/></p:xfrm>"#,
+            r#"<a:graphic><a:graphicData><a:tbl><a:tblPr/><a:tblGrid>"#,
+            r#"<a:gridCol w="100"/><a:gridCol w="100"/><a:gridCol w="100"/></a:tblGrid>"#,
+            r#"<a:tr h="50"><a:tc rowSpan="2"><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc>"#,
+            r#"<a:tc gridSpan="2"><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc>"#,
+            r#"<a:tc hMerge="1"><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc></a:tr>"#,
+            r#"<a:tr h="50"><a:tc vMerge="1"><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc>"#,
+            r#"<a:tc><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc>"#,
+            r#"<a:tc><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc></a:tr>"#,
+            r#"<a:tr h="50"><a:tc><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc>"#,
+            r#"<a:tc><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc>"#,
+            r#"<a:tc><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc></a:tr>"#,
+            r#"</a:tbl></a:graphicData></a:graphic></p:graphicFrame>"#
+        )
+        .to_owned()
+    }
+
+    fn apply(xml: &str, edit: Change<'_>) -> Result<String> {
+        let bytes = xml.as_bytes();
+        Ok(String::from_utf8(change(bytes, 0..bytes.len(), edit)?.expect("changed")).unwrap())
+    }
+
+    #[test]
+    fn column_removal_shrinks_horizontal_merges() {
+        let xml = merged();
+        // The covered cell goes: the merge spans one column.
+        let covered = apply(&xml, Change::Remove { column: 2 }).unwrap();
+        assert!(covered.contains(r#"<a:tc><a:txBody>"#));
+        assert!(!covered.contains("gridSpan") && !covered.contains("hMerge"));
+        assert!(covered.contains(r#"cx="200""#));
+        // The first cell goes: the covered cell becomes a plain cell.
+        let first = apply(&xml, Change::Remove { column: 1 }).unwrap();
+        assert!(!first.contains("gridSpan") && !first.contains("hMerge"));
+        assert_eq!(first.matches("</a:tc>").count(), 6);
+        // A column inside a vertical merge goes with the whole merge.
+        let vertical = apply(&xml, Change::Remove { column: 0 }).unwrap();
+        assert!(!vertical.contains("rowSpan") && !vertical.contains("vMerge"));
+    }
+
+    #[test]
+    fn column_insertion_keeps_out_of_merges() {
+        let xml = merged();
+        assert!(matches!(
+            apply(
+                &xml,
+                Change::Insert {
+                    position: 2,
+                    width: None,
+                    text: ""
+                }
+            ),
+            Err(Error::UnsafeEdit { .. })
+        ));
+        let inserted = apply(
+            &xml,
+            Change::Insert {
+                position: 1,
+                width: Some(50),
+                text: "",
+            },
+        )
+        .unwrap();
+        assert_eq!(inserted.matches("</a:tc>").count(), 12);
+        assert!(inserted.contains(r#"gridSpan="2""#) && inserted.contains(r#"cx="350""#));
+    }
+
+    #[test]
+    fn rows_are_inserted_and_removed_with_vertical_merges_kept() {
+        let xml = merged();
+        let appended = apply(
+            &xml,
+            Change::InsertRow {
+                position: 3,
+                height: None,
+                texts: &["x & y"],
+            },
+        )
+        .unwrap();
+        assert_eq!(appended.matches("<a:tr ").count(), 4);
+        assert!(appended.contains("x &amp; y"));
+        assert!(appended.contains(r#"cy="200""#));
+        let tall = apply(
+            &xml,
+            Change::InsertRow {
+                position: 0,
+                height: Some(80),
+                texts: &[],
+            },
+        )
+        .unwrap();
+        assert!(tall.find(r#"<a:tr h="80">"#) < tall.find(r#"<a:tr h="50">"#));
+        assert!(tall.contains(r#"<a:tr h="80">"#) && tall.contains(r#"cy="230""#));
+        // A new row cannot cut the vertical merge of the first column.
+        assert!(matches!(
+            apply(
+                &xml,
+                Change::InsertRow {
+                    position: 1,
+                    height: None,
+                    texts: &[]
+                }
+            ),
+            Err(Error::UnsafeEdit { .. })
+        ));
+        // The covered row goes: the merge spans one row.
+        let covered = apply(&xml, Change::RemoveRow { row: 1 }).unwrap();
+        assert!(!covered.contains("rowSpan") && !covered.contains("vMerge"));
+        assert!(covered.contains(r#"cy="100""#));
+        // The first row goes: the covered cell becomes a plain cell.
+        let first = apply(&xml, Change::RemoveRow { row: 0 }).unwrap();
+        assert!(!first.contains("rowSpan") && !first.contains("vMerge"));
+        assert_eq!(first.matches("<a:tr ").count(), 2);
+        // The last row is kept.
+        let one = FRAME.as_bytes();
+        assert!(matches!(
+            change(one, 0..one.len(), Change::RemoveRow { row: 0 }),
+            Err(Error::UnsafeEdit { .. })
+        ));
+    }
+
+    #[test]
+    fn longer_vertical_merges_shrink_by_one() {
+        let xml = merged()
+            .replacen(r#"rowSpan="2""#, r#"rowSpan="3""#, 1)
+            .replacen(
+                r#"<a:tr h="50"><a:tc><a:txBody>"#,
+                r#"<a:tr h="50"><a:tc vMerge="1"><a:txBody>"#,
+                1,
+            );
+        let first = apply(&xml, Change::RemoveRow { row: 0 }).unwrap();
+        assert!(first.contains(r#"<a:tc rowSpan="2">"#), "{first}");
+        assert_eq!(first.matches("vMerge").count(), 1);
+        let middle = apply(&xml, Change::RemoveRow { row: 2 }).unwrap();
+        assert!(middle.contains(r#"<a:tc rowSpan="2">"#));
+    }
+
+    #[test]
+    fn row_heights_are_set_and_the_frame_follows() {
+        let xml = FRAME.as_bytes();
+        let all = 0..xml.len();
+        assert!(
+            change(xml, all.clone(), Change::RowHeight { row: 0, height: 50 })
+                .unwrap()
+                .is_none()
+        );
+        let tall = apply(FRAME, Change::RowHeight { row: 0, height: 80 }).unwrap();
+        assert!(tall.contains(r#"<a:tr h="80">"#) && tall.contains(r#"cy="80""#));
+        let bare = FRAME.replacen(r#"<a:tr h="50">"#, "<a:tr>", 1);
+        let set = apply(&bare, Change::RowHeight { row: 0, height: 60 }).unwrap();
+        assert!(set.contains(r#"<a:tr h="60">"#), "{set}");
+        assert!(apply(FRAME, Change::RowHeight { row: 3, height: 1 }).is_err());
     }
 }

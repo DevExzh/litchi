@@ -474,7 +474,8 @@
       },
       "children": [
         {
-          "element": "paragraph"
+          "element": "paragraph",
+          "pathSegment": "paragraph"
         },
         {
           "element": "equation",
@@ -631,8 +632,8 @@
             "wavyDbl",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -642,8 +643,8 @@
             "double",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -818,7 +819,8 @@
       },
       "children": [
         {
-          "element": "paragraph"
+          "element": "paragraph",
+          "pathSegment": "paragraph"
         }
       ],
       "properties": {
@@ -964,7 +966,7 @@
             "none"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -975,7 +977,7 @@
             "none"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -1155,32 +1157,32 @@
         },
         "alt": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "x": {
           "type": "length",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "width": {
           "type": "length",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rotation": {
@@ -1222,7 +1224,7 @@
         "src": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         }
       },
@@ -1244,7 +1246,7 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
@@ -1268,19 +1270,19 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "rows": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "cols": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1328,25 +1330,25 @@
         },
         "x": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "y": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "width": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "height": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1355,6 +1357,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -1373,11 +1381,11 @@
         "row"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1390,7 +1398,140 @@
           "pathSegment": "tc"
         }
       ],
-      "properties": {},
+      "properties": {
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c1": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c2": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c3": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c4": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c5": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c6": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c7": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c8": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c9": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c10": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c11": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c12": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c13": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c14": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c15": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c16": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c17": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c18": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c19": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c20": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
       "predicates": {
         "keys": [
           "style",
@@ -1418,9 +1559,50 @@
           "/slide[N]/table[N]/tr[N]/tc[N]"
         ]
       },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
       "properties": {
         "fill": {
           "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "valign": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.left": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.right": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.top": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "length",
           "add": false,
           "set": true,
           "get": true
@@ -1472,6 +1654,49 @@
             "dist",
             "thaiDist"
           ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "padding": {
+          "type": "length",
           "add": false,
           "set": true,
           "get": false
@@ -2773,19 +2998,26 @@
       "element": "paragraph",
       "parent": [
         "shape",
-        "placeholder"
+        "placeholder",
+        "tc",
+        "notes"
       ],
       "elementAliases": [
         "p"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
-      "paths": {},
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]/tc[N]/paragraph[N]",
+          "/slide[N]/notes/paragraph[N]"
+        ]
+      },
       "children": [
         {
           "element": "run"
@@ -2806,7 +3038,7 @@
             "dist",
             "thaiDist"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -2864,37 +3096,74 @@
         },
         "size": {
           "type": "font-size",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "bold": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "italic": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "font": {
           "type": "string",
-          "add": false,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "add": true,
           "set": true,
           "get": false
         }
@@ -2915,11 +3184,11 @@
         "r"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {},
       "children": [
@@ -2931,7 +3200,7 @@
       "properties": {
         "font.latin": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -2949,19 +3218,19 @@
         },
         "size": {
           "type": "font-size",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -2987,8 +3256,8 @@
             "wavyDbl",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -2998,8 +3267,8 @@
             "double",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "spacing": {
@@ -3016,7 +3285,7 @@
         },
         "color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3063,13 +3332,13 @@
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "font": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         }
@@ -3094,7 +3363,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {},
       "properties": {},
@@ -3122,6 +3391,12 @@
           "/slide[N]/notes"
         ]
       },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
       "properties": {
         "text": {
           "type": "string",
@@ -3147,7 +3422,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -4019,7 +4294,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -4116,7 +4391,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -4510,6 +4785,13 @@
       "reason": "notes slides are read through /slide[N]/notes; their parts have no adapter node"
     },
     {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
+    },
+    {
       "subject": "property",
       "element": "presentation",
       "key": "defaultFont",
@@ -4647,14 +4929,6 @@
     },
     {
       "subject": "property",
-      "element": "tr",
-      "key": "height",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R8",
-      "reason": "the table reader does not read row properties yet"
-    },
-    {
-      "subject": "property",
       "element": "tc",
       "key": "colspan",
       "code": "unsupported_capability",
@@ -4668,6 +4942,46 @@
       "code": "unsupported_capability",
       "followUp": "L-PPTX-R8",
       "reason": "the table reader does not read cell properties yet"
+    },
+    {
+      "subject": "property",
+      "element": "picture",
+      "key": "crop",
+      "code": "unsupported_capability",
+      "followUp": "0333-F4",
+      "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+    },
+    {
+      "subject": "property",
+      "element": "picture",
+      "key": "cropLeft",
+      "code": "unsupported_capability",
+      "followUp": "0333-F4",
+      "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+    },
+    {
+      "subject": "property",
+      "element": "picture",
+      "key": "cropTop",
+      "code": "unsupported_capability",
+      "followUp": "0333-F4",
+      "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+    },
+    {
+      "subject": "property",
+      "element": "picture",
+      "key": "cropRight",
+      "code": "unsupported_capability",
+      "followUp": "0333-F4",
+      "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+    },
+    {
+      "subject": "property",
+      "element": "picture",
+      "key": "cropBottom",
+      "code": "unsupported_capability",
+      "followUp": "0333-F4",
+      "reason": "the picture reader does not model the blip fill's a:srcRect yet"
     },
     {
       "subject": "property",

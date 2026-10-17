@@ -66,6 +66,7 @@ mod owner;
 mod picture;
 mod publish;
 mod remove;
+mod rows;
 mod scenes;
 mod shape_add;
 mod smartart;
@@ -73,6 +74,7 @@ mod spec;
 mod steps;
 mod structure;
 mod text;
+mod text_structure;
 mod theme;
 mod views;
 pub(crate) mod write;
@@ -90,8 +92,8 @@ pub(crate) use spec::{
 };
 pub(crate) use spec::{
     COLUMN_CAPABILITY_PROPS, HYPERLINK_CAPABILITY_PROPS, LAYOUT_CAPABILITY_PROPS,
-    MASTER_CAPABILITY_PROPS, MEDIA_CAPABILITY_PROPS, NODE_CAPABILITY_PROPS,
-    SMARTART_CAPABILITY_PROPS, THEME_CAPABILITY_PROPS,
+    MASTER_CAPABILITY_PROPS, MEDIA_CAPABILITY_PROPS, NODE_CAPABILITY_PROPS, ROW_CAPABILITY_PROPS,
+    SMARTART_CAPABILITY_PROPS, TABLE_CAPABILITY_PROPS, THEME_CAPABILITY_PROPS,
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
@@ -120,6 +122,8 @@ pub(crate) const SETTABLE: &[&str] = &[
     "run",
     "notes",
     "comment",
+    // Table row height (record 0333).
+    "tr",
 ];
 
 /// The non-slide elements `add` creates when the owner admits shape adds.
@@ -136,6 +140,12 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     // Pictures (`src`) and legacy comments (record 0252).
     "picture",
     "comment",
+    // Paragraphs and runs of shape, cell and notes bodies, tables and table
+    // rows (record 0333).
+    "paragraph",
+    "run",
+    "tr",
+    "table",
 ];
 
 /// The non-slide elements `remove` deletes when the owner admits shape
@@ -156,6 +166,16 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "video",
     "audio",
     "media",
+    // Paragraphs, runs and line breaks of text bodies, and table rows
+    // (record 0333).
+    "paragraph",
+    "run",
+    "linebreak",
+    "tr",
+    // Legacy and modern comments and replies (record 0333).
+    "comment",
+    "modernComment",
+    "reply",
 ];
 
 /// The capability property table of an element whose writable keys extend
@@ -181,6 +201,8 @@ pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::s
         "slideMaster" => MASTER_CAPABILITY_PROPS,
         "slideLayout" => LAYOUT_CAPABILITY_PROPS,
         "col" => COLUMN_CAPABILITY_PROPS,
+        "tr" => ROW_CAPABILITY_PROPS,
+        "table" => TABLE_CAPABILITY_PROPS,
         "hyperlink" => HYPERLINK_CAPABILITY_PROPS,
         "video" | "audio" | "media" => MEDIA_CAPABILITY_PROPS,
         _ => return None,
@@ -237,6 +259,11 @@ struct PptxState {
     revision: Option<pptx::source::Package>,
     /// Explicit signature removal never replaces the original source cache.
     unsigned_promotion: OnceLock<Mutex<Option<Arc<pptx::Package>>>>,
+    /// Set once the eager package passed the native edit admission
+    /// (`Package::edit`), which depends on the immutable package only: a
+    /// transaction's admission check then skips a second capture of the
+    /// package (record 0333).
+    admitted: OnceLock<()>,
 }
 
 struct EagerSlide {
@@ -398,6 +425,7 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
+            admitted: OnceLock::new(),
         }))
         .with_origin(self.origin())
     }
@@ -440,6 +468,7 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
+            admitted: OnceLock::new(),
         }))
     }
 
@@ -482,6 +511,7 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: Some(revision),
             unsigned_promotion: OnceLock::new(),
+            admitted: OnceLock::new(),
         }))
         .with_signature(self.signature())
         .with_origin(self.origin());
@@ -877,9 +907,13 @@ impl Pptx {
     /// are retryable; cached results still enforce freshness and execution.
     pub(crate) fn editable(&self) -> Result<Editable> {
         let owner = self.editable_owner()?;
-        if let Editable::Eager(package) = &owner {
+        if let Editable::Eager(package) = &owner
+            && self.0.admitted.get().is_none()
+            && self.signature() != Signature::RemovalAuthorized
+        {
             // Admission-only callers still require the native strict checks.
             drop(package.edit()?);
+            let _ = self.0.admitted.set(());
         }
         Ok(owner)
     }
