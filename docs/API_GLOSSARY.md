@@ -2723,3 +2723,19 @@ stops ride on the existing paragraph-property edit.
 | `litchi_rtf::edit::SectionValue` | one section page-setup value (break type, page size, orientation, margins, header and footer distance, columns, column spacing, title page, vertical alignment) | ✅ 0328 |
 | `litchi_rtf::ParagraphFormat::tab_stops` | a paragraph's custom tab stops in declaration order | ✅ 0328 |
 | `litchi_ops` RTF kinds `Section`, `Bookmark`, `Field`, `Toc`, `Tab`, `TextBox`, `Shape` | the DOCX paths (`/section[N]`, `/bookmark[N]`, `/bookmark[@name=X]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/textbox[N]`, `/body/shape[N]`) over the native collections; sections, bookmark names, field instructions, TOC switches and tab stops are writable, tab stops are added and removed, bookmarks removed | ✅ 0328 |
+
+## DOCX picture, comment and SmartArt edits; DOCX chart series and axes (record 0335)
+
+The eager package-bound `document::Edit` gains the set and remove halves of
+the DOCX picture, comment and SmartArt families whose add halves landed in
+records 0251c, 0251d and 0295. Changes are `with_*` builders, as
+`styles::catalog::StyleChange` is; each part left unset keeps the current
+value. Every verb travels in the main-document `Patch` (graph changes and
+element replacements), so replay and the exact inverse apply; no second
+transaction family is introduced.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_docx::document::PictureChange` (`new`, `with_size`, `with_name`, `with_description`, `with_image`, `is_empty`), `Edit::{set_picture_at, remove_picture_at}` | addressed as `insert_picture_at` returns them: a paragraph and the picture's position among `Paragraph::images`; a new image is a new media part, the previous one stays unreferenced (the removed-chart policy) | ✅ 0335 |
+| `litchi_docx::document::CommentChange` (`new`, `with_author`, `with_initials`, `with_date`, `with_text`, `is_empty`), `Edit::set_comment` | by native comment identifier, as `remove_comment`; text replaced as `set_note_text` replaces a note's | ✅ 0335 |
+| `litchi_docx::document::SmartArtParts` (`data`, `layout`, `quick_style`, `colors`, `drawing`), `Edit::{smartart_parts, set_smartart, remove_smartart}` | by the data-model relationship `insert_smartart_at` returns; the PPTX `opened::SmartArtParts` shape | ✅ 0335 |

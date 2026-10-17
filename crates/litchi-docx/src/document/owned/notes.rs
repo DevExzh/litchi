@@ -235,7 +235,8 @@ impl Edit<Package> {
     /// [`Refusal::InvalidPropertyValue`] for text XML cannot carry.
     pub fn set_note_text(&mut self, kind: NoteKind, id: u32, text: &str) -> Result<&mut Self> {
         let (name, xml) = self.notes_part(kind)?;
-        let tree = part_scan::scan(&xml, 3).map_err(Error::Document)?;
+        // Down to the runs' children, where the reference mark is.
+        let tree = part_scan::scan(&xml, 4).map_err(Error::Document)?;
         let note = find_note(&tree, kind, id).ok_or_else(not_found)?;
         // A field is refused rather than kept or dropped (record 0304).
         let element = &tree.elements[note];
