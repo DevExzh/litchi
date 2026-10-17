@@ -40,6 +40,10 @@ pub mod function_map;
 /// Payload-level cell writes shared by the Pages and Keynote table owners.
 pub mod table_write;
 
+/// Payload builders for new tables cloned from a template, shared by the
+/// Pages and Keynote table owners (record 0329).
+pub mod table_create;
+
 use std::collections::BTreeMap;
 
 use std::fmt;
