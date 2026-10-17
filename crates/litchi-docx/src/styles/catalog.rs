@@ -1,6 +1,6 @@
 //! A source-located catalog of the styles part (record 0319, L-DOCX-R6).
 //!
-//! [`Catalog`] reads a `styles.xml` payload once and keeps, for every
+//! [`Catalog`](crate::styles::catalog::Catalog) reads a `styles.xml` payload once and keeps, for every
 //! `w:style`, its identity, its UI flags and the byte range of its element.
 //! The style's paragraph and run properties are read on request through the
 //! same typed readers that read a paragraph's or run's direct properties
