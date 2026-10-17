@@ -348,23 +348,23 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | document | `marginHeader` | length | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `marginFooter` | length | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `marginGutter` | length | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| document | `extended.application` | string | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
+| document | `extended.application` | string | --g | --g | supported | — |  |  |  |
 | document | `bookFoldPrintingSheets` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `bookFoldReversePrinting` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `doNotDisplayPageBoundaries` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `columns.equalWidth` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `columns.separator` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `locale` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
-| document | `extended.applicationVersion` | string | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.characters` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.company` | string | -sg |  | unlisted | gap | P0 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.lines` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.manager` | string | -sg |  | unlisted | gap | P0 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.pages` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.paragraphs` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.template` | string | -sg |  | unlisted | gap | P0 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.totalTime` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
-| document | `extended.words` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
+| document | `extended.applicationVersion` | string | --g | --g | supported | — |  |  |  |
+| document | `extended.characters` | number | --g | --g | supported | — |  |  |  |
+| document | `extended.company` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `extended.lines` | number | --g | --g | supported | — |  |  |  |
+| document | `extended.manager` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `extended.pages` | number | --g | --g | supported | — |  |  |  |
+| document | `extended.paragraphs` | number | --g | --g | supported | — |  |  |  |
+| document | `extended.template` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `extended.totalTime` | number | --g | --g | supported | — |  |  |  |
+| document | `extended.words` | number | --g | --g | supported | — |  |  |  |
 | document | `subject` | string | -sg | -sg | supported | supported |  |  |  |
 | document | `theme.color.accent1` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `theme.color.accent2` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -641,10 +641,10 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | paragraph | `spaceAfter` | length | asg | asg | supported | supported |  |  |  |
 | paragraph | `spaceBeforeAuto` | boolean | asg | asg | supported | supported |  |  |  |
 | paragraph | `spaceAfterAuto` | boolean | asg | asg | supported | supported |  |  |  |
-| paragraph | `listStyle` | enum | asg | -sg | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
+| paragraph | `listStyle` | enum | asg | asg | supported | supported |  |  |  |
 | paragraph | `numId` | int | asg | asg | supported | supported |  |  |  |
 | paragraph | `numLevel` | int | asg | asg | supported | supported |  |  |  |
-| paragraph | `start` | int | as- | -sg | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
+| paragraph | `start` | int | as- | asg | supported | supported |  |  |  |
 | paragraph | `bold` | bool | asg | a-- | write-only | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | paragraph | `italic` | bool | asg | a-- | write-only | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | paragraph | `font` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -1148,9 +1148,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `text` | string | asg | -s- | write-only | partial | P0 | planned WP4 (docx-p0-residue) |  |
 | column | `width` | length | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
 | column | `text` | string | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
-| row | `height.exact` | length | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| row | `header` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| row | `cantSplit` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
+| row | `height.exact` | length | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
+| row | `header` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
+| row | `cantSplit` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `height.rule` | string | --g | --g | supported | — |  |  |  |
 | row | `cnfStyle` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `gridBefore` | int | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -1159,9 +1159,10 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | row | `wAfter` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `cellSpacing` | number | -sg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `cols` | int | a-- | a-- | write-only | supported |  |  |  |
-| row | `height` | length | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| row | `hidden` | bool |  | --g | litchi-only | — |  |  |  |
+| row | `height` | length | asg | -sg | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
+| row | `hidden` | bool |  | -sg | litchi-only | litchi-only |  |  |  |
 | row | `rowAlign` | enum |  | --g | litchi-only | — |  |  |  |
+| row | `height.atLeast` | string |  | -s- | litchi-only | litchi-only |  |  |  |
 | table | `colWidths` | string | a-g | a-g | supported | supported |  |  |  |
 | table | `direction` | enum | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | table | `align` | enum | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -1174,18 +1175,18 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | table | `rowBandSize` | integer | a-g | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | table | `colBandSize` | integer | a-g | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | table | `tblLook` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `border.all` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `border.bottom` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `border.horizontal` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `border.left` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `border.right` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `border.top` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `border.vertical` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
+| table | `border.all` | string | as- | as- | write-only | supported |  |  |  |
+| table | `border.bottom` | string | as- | as- | write-only | supported |  |  |  |
+| table | `border.horizontal` | string | as- | as- | write-only | supported |  |  |  |
+| table | `border.left` | string | as- | as- | write-only | supported |  |  |  |
+| table | `border.right` | string | as- | as- | write-only | supported |  |  |  |
+| table | `border.top` | string | as- | as- | write-only | supported |  |  |  |
+| table | `border.vertical` | string | as- | as- | write-only | supported |  |  |  |
 | table | `cols` | int | a-g | a-g | supported | supported |  |  |  |
 | table | `data` | string | a-- | a-- | write-only | supported |  |  |  |
 | table | `rows` | int | a-g | a-g | supported | supported |  |  |  |
 | table | `width` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| table | `style` | string | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
+| table | `style` | string | asg | asg | supported | supported |  |  |  |
 | table | `padding.top` | int |  | --g | litchi-only | — |  |  |  |
 | table | `padding.bottom` | int |  | --g | litchi-only | — |  |  |  |
 | table | `padding.left` | int |  | --g | litchi-only | — |  |  |  |

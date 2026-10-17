@@ -35,12 +35,12 @@ Every delta, named gap and element/property group carries a disposition (`tools/
 | ppt/ole | 26 | 19 | 2 | 0 | 5 | 0 | 2 | 0 | 6 | 6/6 |
 | ppt/pictures | 68 | 36 | 5 | 0 | 2 | 24 | 6 | 0 | 2 | 2/2 |
 | ppt/shapes | 220 | 106 | 19 | 94 | 20 | 0 | 0 | 0 | 8 | 8/8 |
-| ppt/tables | 457 | 358 | 33 | 90 | 9 | 0 | 0 | 0 | 14 | 14/14 |
+| ppt/tables | 457 | 359 | 33 | 90 | 8 | 0 | 0 | 0 | 14 | 14/14 |
 | ppt/templates | 452 | 27 | 0 | 152 | 52 | 119 | 102 | 0 | 11 | 24/24 |
 | ppt/textboxes | 132 | 90 | 10 | 40 | 2 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
-| word | 1133 | 662 | 3 | 198 | 197 | 36 | 40 | 0 | 24 | 32/32 |
-| **total** | **6431** | **4275** | **344** | **1295** | **509** | **201** | **151** | **0** | **177** | **200/200** |
+| word | 1133 | 674 | 3 | 195 | 188 | 36 | 40 | 0 | 24 | 32/32 |
+| **total** | **6431** | **4288** | **344** | **1292** | **499** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -48,16 +48,16 @@ The format is the extension of the document each call names.
 
 | Format | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| docx | 949 | 512 | 0 | 194 | 167 | 36 | 40 | 0 | 22 | 30/30 |
-| pptx | 2959 | 1595 | 344 | 823 | 284 | 146 | 111 | 0 | 99 | 114/114 |
+| docx | 949 | 524 | 0 | 191 | 158 | 36 | 40 | 0 | 22 | 30/30 |
+| pptx | 2959 | 1596 | 344 | 823 | 283 | 146 | 111 | 0 | 99 | 114/114 |
 | xlsx | 2523 | 2168 | 0 | 278 | 58 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **4275** | **344** | **1295** | **509** | **201** | **151** | **0** | **177** | **200/200** |
+| **total** | **6431** | **4288** | **344** | **1292** | **499** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## v1-scope subset (design §14)
 
 Design §14 requires the v1-scope subset of the corpus green, with every remaining delta recorded. The subset is every counted line of the scripts whose tier (`corpusScripts` in `tools/officecli_dispositions.json`) is P0 or v1 (design §13). A line is **accounted** when every gap class it carries (its delta, named gap or element/property group; each property a warned call skipped; for a cascade, the refused call it follows) is `wontfix`, `deferred-P1`, `deferred-P2` or `out-of-scope`, and **open** otherwise (a `planned` class, a bug or a class without a disposition). The subset is green when no line is open.
 
-**Status: red.** 3443 v1 lines: 2204 passed, 1171 accounted, 68 open.
+**Status: red.** 3443 v1 lines: 2217 passed, 1169 accounted, 57 open.
 
 Script tiers:
 
@@ -84,19 +84,16 @@ Script tiers:
 | ppt/charts | 735 | 318 | 1 | 402 | 0 | 0 | 14 |
 | ppt/pictures | 68 | 36 | 0 | 15 | 0 | 16 | 1 |
 | ppt/shapes | 124 | 50 | 0 | 72 | 0 | 0 | 2 |
-| ppt/tables | 457 | 358 | 0 | 91 | 0 | 0 | 8 |
+| ppt/tables | 457 | 359 | 0 | 91 | 0 | 0 | 7 |
 | ppt/textboxes | 132 | 90 | 0 | 40 | 0 | 0 | 2 |
-| word | 718 | 458 | 30 | 212 | 0 | 0 | 18 |
-| **total** | **3443** | **2204** | **40** | **1115** | **0** | **16** | **68** |
+| word | 718 | 470 | 30 | 210 | 0 | 0 | 8 |
+| **total** | **3443** | **2217** | **40** | **1113** | **0** | **16** | **57** |
 
 Open v1 lines by what blocks them (the first class that does not account for the line):
 
 | Blocked by | Lines | Examples |
 |---|---:|---|
 | planned WP5 | 57 | `excel/cell-formatting.sh:199`, `excel/charts.sh:213`, `excel/charts.sh:214` |
-| planned WP4 | 9 | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154`, `word/tables.sh:189` |
-| planned 0253 | 1 | `word/document-formatting.sh:28` |
-| planned 0333 | 1 | `ppt/tables/tables-nested.sh:86` |
 
 ## Deltas
 
@@ -146,10 +143,8 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | set | cell | `warned` | `valign` | 8 | registry: `valign` is not set-able; OfficeCLI documents it | `word/tables.sh:34`, `word/tables.sh:42` | P1 | deferred-P1 0332 (docx-breadth) via delta `cell.valign` |
 | set | run | `warned` | `revision.author` | 7 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | set | run | `warned` | `revision.date` | 7 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
-| set | table | `unsupported_element` | - | 7 | registry: no set on table | `word/revisions.sh:177`, `word/tables.sh:189` | P0 | planned WP4 (docx-structure-writes) |
 | query | revision | `unsupported_capability` | - | 6 | registry gap R4x | `word/revisions.sh:360`, `word/revisions.sh:389` | P2 | deferred-P2 0332 (docx-breadth) via delta `revision` |
 | set | run | `warned` | `revision.type` | 6 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
-| add | table | `warned` | `border.all` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:179`, `word/tables.sh:247` | P1 | deferred-P1 0332 (docx-breadth) via delta `table.border.all` |
 | set | cell | `warned` | `fill` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:198`, `word/tables.sh:199` | P1 | deferred-P1 0332 (docx-breadth) via delta `cell.fill` |
 | add | diagram | `unsupported_element` | - | 3 | element not in the registry | `word/diagram.sh:57`, `word/diagram.sh:78` | P2 | out-of-scope (mermaid-diagram) via delta `diagram` |
 | add | paragraph | `warned` | `em` | 3 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:135`, `word/run-formatting.sh:136` | P1 | deferred-P1 0332 (corpus-docx-breadth) |
@@ -162,7 +157,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | chart | `warned` | `axisNumFmt` | 2 | not in the registry; OfficeCLI documents it | `word/charts.sh:50`, `word/charts.sh:215` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.axisnumfmt` |
 | add | paragraph | `warned` | `border` | 2 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:127`, `word/paragraph-formatting.sh:128` | P1 | deferred-P1 0332 (corpus-docx-breadth) |
 | add | paragraph | `warned` | `font` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:88`, `word/run-formatting.sh:92` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.font` |
-| add | paragraph | `warned` | `listStyle` | 2 | registry: `listStyle` is not add-able; OfficeCLI documents it | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154` | P0 | planned WP4 (docx-p0-residue) via delta `paragraph.listStyle` |
 | add | paragraph | `warned` | `revision.author` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:115`, `word/revisions.sh:244` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | paragraph | `warned` | `revision.date` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:115`, `word/revisions.sh:244` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | paragraph | `warned` | `textAlignment` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:133`, `word/paragraph-formatting.sh:134` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.textAlignment` |
@@ -174,7 +168,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | set | document | `warned` | `pageHeight` | 2 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:32`, `word/sections.sh:137` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.pageHeight` |
 | set | document | `warned` | `pageWidth` | 2 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:32`, `word/sections.sh:137` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.pageWidth` |
 | set | revision | `unsupported_capability` | - | 2 | registry gap R4x | `word/revisions.sh:398`, `word/revisions.sh:431` | P2 | deferred-P2 0332 (docx-breadth) via delta `revision` |
-| set | row | `unsupported_element` | - | 2 | registry: no set on row | `word/revisions.sh:183`, `word/tables.sh:197` | P0 | planned WP4 (docx-structure-writes) |
 | set | run | `warned` | `revision.id` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:145`, `word/revisions.sh:150` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | cell | `unsupported_element` | - | 1 | registry: no add on cell | `word/revisions.sh:196` | P0 | planned WP4 (docx-structure-writes) |
 | add | chart | `warned` | `areafill` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:119` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.areafill` |
@@ -231,7 +224,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | paragraph | `warned` | `shading.val` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:100` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.shading.val` |
 | add | paragraph | `warned` | `shd` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:99` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.shd` |
 | add | paragraph | `warned` | `snapToGrid` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:145` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.snapToGrid` |
-| add | paragraph | `warned` | `start` | 1 | registry: `start` is not add-able; OfficeCLI documents it | `word/paragraph-formatting.sh:154` | P0 | planned WP4 (docx-p0-residue) via delta `paragraph.start` |
 | add | paragraph | `warned` | `suppressAutoHyphens` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:144` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.suppressAutoHyphens` |
 | add | paragraph | `warned` | `suppressLineNumbers` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:144` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.suppressLineNumbers` |
 | add | paragraph | `warned` | `tabs` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:104` | P1 | deferred-P1 0332 (docx-breadth) via delta `paragraph.tabs` |
@@ -316,9 +308,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | set | document | `warned` | `embedFonts` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:65` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.embedFonts` |
 | set | document | `warned` | `embedSystemFonts` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:65` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.embedSystemFonts` |
 | set | document | `warned` | `evenAndOddHeaders` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:68` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.evenAndOddHeaders` |
-| set | document | `warned` | `extended.company` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:28` | P0 | planned 0253 (docx-app-metadata) via delta `document.extended.company` |
-| set | document | `warned` | `extended.manager` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:28` | P0 | planned 0253 (docx-app-metadata) via delta `document.extended.manager` |
-| set | document | `warned` | `extended.template` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:28` | P0 | planned 0253 (docx-app-metadata) via delta `document.extended.template` |
 | set | document | `warned` | `gutterAtTop` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:36` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.gutterAtTop` |
 | set | document | `warned` | `kinsoku` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:60` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.kinsoku` |
 | set | document | `warned` | `marginFooter` | 1 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:32` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.marginFooter` |
@@ -353,7 +342,11 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | set | field | `warned` | `format` | 1 | registry: `format` is not set-able; OfficeCLI documents it | `word/fields.sh:160` | P1 | deferred-P1 0332 (docx-breadth) via delta `field.format` |
 | set | paragraph | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:130` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | set | paragraph | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:130` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
+| set | row | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:183` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
+| set | row | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:183` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | set | run | `warned` | `font.color` | 1 | not in the registry; OfficeCLI documents it | `word/revisions.sh:90` | P1 | deferred-P1 0332 (corpus-docx-breadth) |
+| set | table | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:177` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
+| set | table | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:177` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 
 ## Element and property gaps: pptx
 
@@ -462,7 +455,7 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | add | shape | `warned` | `material` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:172`, `ppt/shapes/shapes-effects.sh:178` | P1 | deferred-P1 0332 (pptx-breadth) via delta `shape.material` |
 | add | shape | `warned` | `softEdge` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:199`, `ppt/shapes/shapes-effects.sh:204` | P1 | deferred-P1 0332 (pptx-breadth) via delta `shape.softEdge` |
 | add | shape | `warned` | `spacing` | 3 | registry: `spacing` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:78`, `ppt/shapes/shapes-typography.sh:83` | P1 | deferred-P1 0332 (pptx-breadth) via delta `shape.spacing` |
-| batch | - | `warned` | `name` | 3 | refused on a batch item; the registry lists it on series, slide, slideLayout, slideMaster, theme | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` | P1 | deferred-P1 0332 (corpus-pptx-breadth) |
+| batch | - | `warned` | `name` | 3 | refused on a batch item; the registry lists it on series, slide, slideLayout, slideMaster, table, theme | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` | P1 | deferred-P1 0332 (corpus-pptx-breadth) |
 | batch | - | `warned` | `opacity` | 3 | refused on a batch item; not in the registry | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` | P1 | deferred-P1 0332 (corpus-pptx-breadth) |
 | batch | - | `warned` | `rotation` | 3 | refused on a batch item; not in the registry | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` | P1 | deferred-P1 0332 (corpus-pptx-breadth) |
 | set | axis | `warned` | `visible` | 3 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236`, `ppt/charts/charts-advanced.sh:251` | P1 | deferred-P1 0332 (pptx-breadth) via delta `chart-axis.visible` |
@@ -606,14 +599,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | set | presentation | `warned` | `theme.font.minor.latin` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:56` | P1 | deferred-P1 0332 (pptx-breadth) via delta `presentation.theme.font.minor.latin` |
 | set | slide | `warned` | `advanceClick` | 1 | not in the registry; OfficeCLI documents it | `ppt/transitions/transitions-timing.sh:74` | P1 | deferred-P1 0332 (pptx-breadth) via delta `slide.advanceClick` |
 | set | slide | `warned` | `advanceTime` | 1 | not in the registry; OfficeCLI documents it | `ppt/transitions/transitions-timing.sh:63` | P1 | deferred-P1 0332 (pptx-breadth) via delta `slide.advanceTime` |
-| set | table | `skipped` | `bandedCols` | 1 | registry: `bandedCols` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.bandedCols` |
-| set | table | `skipped` | `bandedRows` | 1 | registry: `bandedRows` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.bandedRows` |
-| set | table | `skipped` | `firstCol` | 1 | registry: `firstCol` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.firstCol` |
-| set | table | `skipped` | `firstRow` | 1 | registry: `firstRow` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.firstRow` |
-| set | table | `skipped` | `lastCol` | 1 | registry: `lastCol` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.lastCol` |
-| set | table | `skipped` | `lastRow` | 1 | registry: `lastRow` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.lastRow` |
-| set | table | `unsupported_capability` | - | 1 | registry: no set on table | `ppt/tables/tables-nested.sh:86` | P0 | planned 0333 (pptx-table-set) |
-| set | table | `warned` | `bandedRows` | 1 | registry: `bandedRows` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.bandedRows` |
 | set | table | `warned` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.border.all` |
 | set | table | `warned` | `border.bottom` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.border.bottom` |
 | set | table | `warned` | `border.horizontal` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.border.horizontal` |
@@ -621,7 +606,6 @@ Open v1 lines by what blocks them (the first class that does not account for the
 | set | table | `warned` | `border.right` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.border.right` |
 | set | table | `warned` | `border.top` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.border.top` |
 | set | table | `warned` | `border.vertical` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.border.vertical` |
-| set | table | `warned` | `firstRow` | 1 | registry: `firstRow` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` | P1 | deferred-P1 0332 (pptx-breadth) via delta `table.firstRow` |
 | set | table | `warned` | `style` | 1 | registry: `style` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` | P1 | deferred-P1 0333 (pptx-picture-table-breadth) via delta `table.style` |
 | set | tc | `warned` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:103` | P1 | deferred-P1 0332 (pptx-breadth) via delta `cell.border.all` |
 | set | tc | `warned` | `border.bottom` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:104` | P1 | deferred-P1 0332 (pptx-breadth) via delta `cell.border.bottom` |
@@ -870,9 +854,9 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1295 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1292 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
-| F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 73 |
+| F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 72 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
 | F6 | `add --from`, find/replace on `set`, `remove --shift`, `get --save` | 40 |
 | D6 | missing verbs (`validate`, `raw-set`, `add-part`, `dump`) | 138 |
@@ -936,7 +920,7 @@ None.
 | `ppt/tables/tables-borders.sh` | 55 | 37 | 3 | 17 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/tables/tables-financial.sh` | 75 | 70 | 4 | 4 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/tables/tables-merged.sh` | 63 | 55 | 2 | 7 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-nested.sh` | 63 | 35 | 4 | 26 | 2 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-nested.sh` | 63 | 36 | 4 | 26 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/tables/tables-rows-cols.sh` | 84 | 74 | 4 | 9 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/tables/tables-styled.sh` | 44 | 29 | 11 | 14 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/templates/styles/brand--aura-coffee-dark/build.sh` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2/2 |
@@ -966,15 +950,15 @@ None.
 | `word/charts.sh` | 46 | 37 | 0 | 8 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/content-controls.sh` | 21 | 11 | 0 | 0 | 9 | 0 | 1 | 0 | 2 | 2/2 |
 | `word/diagram.sh` | 50 | 26 | 0 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/document-formatting.sh` | 17 | 6 | 0 | 10 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/document-formatting.sh` | 17 | 7 | 0 | 9 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/fields.sh` | 39 | 33 | 0 | 3 | 1 | 2 | 0 | 0 | 2 | 2/2 |
 | `word/formulas.sh` | 171 | 90 | 0 | 0 | 81 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/numbering.sh` | 70 | 38 | 0 | 0 | 4 | 28 | 0 | 0 | 1 | 2/2 |
-| `word/paragraph-formatting.sh` | 78 | 54 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
+| `word/paragraph-formatting.sh` | 78 | 56 | 0 | 21 | 1 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/pictures.sh` | 31 | 24 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/revisions.sh` | 73 | 35 | 0 | 15 | 17 | 6 | 0 | 0 | 2 | 2/2 |
+| `word/revisions.sh` | 73 | 35 | 0 | 17 | 15 | 6 | 0 | 0 | 2 | 2/2 |
 | `word/run-formatting.sh` | 80 | 56 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/sections.sh` | 33 | 28 | 0 | 1 | 4 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/tables.sh` | 357 | 210 | 3 | 109 | 38 | 0 | 0 | 0 | 6 | 6/6 |
+| `word/tables.sh` | 357 | 219 | 3 | 107 | 31 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **4275** | **344** | **1295** | **509** | **201** | **151** | **0** | **177** | **200/200** |
+| **total** | **6431** | **4288** | **344** | **1292** | **499** | **201** | **151** | **0** | **177** | **200/200** |
