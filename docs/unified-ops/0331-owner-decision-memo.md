@@ -22,6 +22,8 @@ Source: the coordinator's definition-of-done audit (2026-10-17, §7), the
 | 9 | Early defaults | F2 flat `File`, Q1 `limit_exceeded`/`cancelled`, Q3 `retain_source = true`, Q4 `Signed` wraps signed input. **Q2 (iWork → `unsupported_format`) is withdrawn**, as owner decision D1 (2026-10-15) superseded it | 0007 |
 | 10 | Surface shape and names | One `OpenOptions` with per-format sub-options; verb `apply`; find/replace through props; `merge` means template merge | design, 0015 |
 | 11 | Core `Limits` | The glossary ban on the core `Limits` name stands | 0249 |
+| 12 | XLSX SmartArt tier | Deferred to P1 as a typed capability gap. Design §13 lists typed SmartArt CRUD as "also in v1" because the models exist, but `litchi-xlsx` has no diagram model, and no OfficeCLI corpus line uses XLSX SmartArt | 0339 |
+| 13 | Picture and table breadth | PPTX picture crop/effects, `table.style` and DOCX picture crop/floating/link are deferred-P1 under 0332's breadth rule (a P0 element's properties are P1 unless design §13 names them); the picture elements stay P0 and supported | 0332, 0333, 0339 |
 
-The questions most likely to change behaviour if overridden are 2, 3, 4
-and 7 (Q3, regex).
+The questions most likely to change behaviour if overridden are 2, 3, 4,
+7 (Q3, regex) and 12.
