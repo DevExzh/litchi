@@ -85,6 +85,20 @@ impl SourceBackedWorksheet {
             crate::drawing::edit::source_elements(&self.inner.package, &partname)
         })
     }
+
+    /// The charts of this worksheet's drawing, in drawing order, with their
+    /// chart part markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-worksheet tab, a changed source, or a
+    /// malformed drawing graph.
+    pub fn drawing_charts(&self) -> Result<Vec<crate::drawing::edit::ChartPart>> {
+        self.fenced(|| {
+            let partname = self.physical_partname()?.clone();
+            crate::drawing::edit::source_charts(&self.inner.package, &partname)
+        })
+    }
 }
 
 impl SourceBackedWorkbook {
@@ -203,5 +217,24 @@ mod tests {
             workbook.differential_formats().unwrap()
         );
         assert_eq!(workbook.differential_formats().unwrap()[0].bold, Some(true));
+    }
+
+    #[test]
+    fn charts_read_on_both_owners() {
+        let bytes = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/poi/test-data/spreadsheet/testVarious.xlsb"
+        ))
+        .unwrap();
+        let workbook = Package::from_bytes(&bytes)
+            .unwrap()
+            .into_workbook()
+            .unwrap();
+        let eager = workbook.drawing_charts(0).unwrap();
+        assert_eq!(eager.len(), 1);
+        assert!(eager[0].xml.starts_with(b"<?xml"));
+        let source = SourceBackedWorkbook::from_reader(bytes.as_slice()).unwrap();
+        let sheet = source.sheet_by_index(0).unwrap().unwrap();
+        assert_eq!(sheet.drawing_charts().unwrap(), eager);
     }
 }

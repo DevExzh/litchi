@@ -68,6 +68,10 @@ pub(super) enum Item {
     /// A worksheet feature: a note, hyperlink, picture, shape, conditional
     /// format, validation, auto-filter or page break (record 0322).
     Feature(Arc<super::features::Feature>),
+    /// A worksheet chart, its series and its axes, read-only (record 0322).
+    Chart(Box<super::chart::ChartItem>),
+    Series(Box<super::chart::ChartItem>),
+    Axis(Box<super::chart::ChartItem>),
 }
 
 /// One complete-catalog tab and its lazily pinned worksheet grid.
@@ -588,6 +592,9 @@ impl<'f> Node<'f> {
             Item::Table(table) => PathStep::at("table", Position::new(table.index)),
             Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
             Item::Feature(feature) => feature.step(),
+            Item::Chart(chart) => chart.step(Kind::Chart),
+            Item::Series(chart) => chart.step(Kind::Series),
+            Item::Axis(chart) => chart.step(Kind::Axis),
         })
     }
 
@@ -617,6 +624,9 @@ impl<'f> Node<'f> {
             Item::Table(_) => Kind::Table,
             Item::NamedRange(_) => Kind::NamedRange,
             Item::Feature(ref feature) => feature.kind,
+            Item::Chart(_) => Kind::Chart,
+            Item::Series(_) => Kind::Series,
+            Item::Axis(_) => Kind::Axis,
         }
     }
 
@@ -741,6 +751,18 @@ impl<'f> Node<'f> {
                 };
                 (feature.table(), Props::Feature(feature, sheet))
             },
+            Item::Chart(chart) => (
+                super::chart::props(Kind::Chart),
+                Props::Chart(chart, Kind::Chart),
+            ),
+            Item::Series(chart) => (
+                super::chart::props(Kind::Series),
+                Props::Chart(chart, Kind::Series),
+            ),
+            Item::Axis(chart) => (
+                super::chart::props(Kind::Axis),
+                Props::Chart(chart, Kind::Axis),
+            ),
             Item::NamedRange(index) => {
                 let Some(entry) = self.file.defined_name_entries()?.into_iter().nth(*index) else {
                     return Ok(Format::empty());
@@ -876,6 +898,12 @@ impl<'f> Project<'f> for Node<'f> {
         match (&self.item, self.last_step()) {
             (_, None) => NodePath::ROOT,
             (Item::Sheet(_) | Item::NamedRange(_), Some(step)) => NodePath::short(step, None),
+            (Item::Series(chart) | Item::Axis(chart), Some(step)) => NodePath::inline(&[
+                PathStep::at("sheet", Position::new(self.sheet_position())),
+                PathStep::at("chart", Position::new(chart.chart as usize)),
+                step,
+            ])
+            .unwrap_or(NodePath::ROOT),
             (_, Some(step)) => NodePath::short(
                 PathStep::at("sheet", Position::new(self.sheet_position())),
                 Some(step),
@@ -902,7 +930,13 @@ impl<'f> Project<'f> for Node<'f> {
                     .cloned()
                     .map(Cow::Owned),
                 Item::Feature(feature) => feature.text(),
-                Item::Workbook | Item::Sheet(_) | Item::Range(_) | Item::Column(_) => None,
+                Item::Chart(chart) => chart.title()?,
+                Item::Workbook
+                | Item::Sheet(_)
+                | Item::Range(_)
+                | Item::Column(_)
+                | Item::Series(_)
+                | Item::Axis(_) => None,
             })
         })
     }
@@ -922,6 +956,8 @@ impl<'f> Project<'f> for Node<'f> {
                     .map(Cow::Owned)
                     .map(Preview::Text),
                 Item::Feature(feature) => feature.preview(),
+                Item::Chart(chart) => chart.title()?.map(Preview::Text),
+                Item::Series(_) | Item::Axis(_) => None,
             })
         })
     }
@@ -931,7 +967,16 @@ impl<'f> Project<'f> for Node<'f> {
             let count = match &self.item {
                 Item::Workbook => catalog_count(self.file)?,
                 Item::Sheet(_) if options.depth == 0 => return Ok(None),
-                Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) | Item::Feature(_) => 0,
+                Item::Cell(_)
+                | Item::Table(_)
+                | Item::NamedRange(_)
+                | Item::Feature(_)
+                | Item::Series(_)
+                | Item::Axis(_) => 0,
+                Item::Chart(chart) => {
+                    let summary = chart.summary()?;
+                    summary.series.len() + summary.axes.len()
+                },
                 Item::Sheet(_) | Item::Row(_) | Item::Column(_) | Item::Range(_) => {
                     Children::count(self, options)?
                 },
@@ -1012,6 +1057,8 @@ pub(crate) enum Props<'a> {
     },
     /// A worksheet feature and its worksheet's name (record 0322).
     Feature(&'a super::features::Feature, String),
+    /// A worksheet chart, series or axis (record 0322).
+    Chart(&'a super::chart::ChartItem, Kind),
 }
 
 pub(crate) struct CellProps<'a> {
@@ -1033,6 +1080,7 @@ impl fmt::Debug for Props<'_> {
             Self::NamedRange { .. } => "NamedRange",
             Self::Range { .. } => "Range",
             Self::Feature(..) => "Feature",
+            Self::Chart(..) => "Chart",
         };
         f.debug_tuple("Props").field(&name).finish()
     }
@@ -1067,6 +1115,7 @@ impl<'a> Props<'a> {
                 (index == RANGE_MERGE_INDEX && *merged).then_some(Value::Bool(true))
             },
             Self::Feature(feature, sheet) => feature.value(index, sheet),
+            Self::Chart(chart, kind) => chart.value(*kind, index),
             Self::NamedRange { entry, scope } => match NamedRangeKey::at(index)? {
                 NamedRangeKey::Name => Some(Value::Text(Cow::Owned(entry.name.clone()))),
                 NamedRangeKey::Ref => entry

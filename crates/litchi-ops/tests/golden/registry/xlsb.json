@@ -1742,8 +1742,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1761,11 +1761,74 @@
           "pathSegment": "axis"
         }
       ],
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
-        "reason": "the XLSB workbook keeps drawing and chart parts, but the unified node has no chart projection yet"
+      "properties": {
+        "chartType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "legend": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "catTitle": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "seriesCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1775,8 +1838,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1784,11 +1847,38 @@
           "/<sheet>/chart[N]/series[K]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
-        "reason": "XLSB chart series are not projected into unified nodes yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "values": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1798,8 +1888,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1807,11 +1897,38 @@
           "/<sheet>/chart[N]/axis[@role=<role>]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
-        "reason": "XLSB chart axes are not projected into unified nodes yet"
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "min": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "max": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {

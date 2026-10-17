@@ -716,3 +716,38 @@ fn fixture_features_read_and_keep_their_bytes() {
     };
     assert_eq!(parts(&changed.to_bytes().unwrap()), parts(&bytes));
 }
+
+#[test]
+fn charts_read_through_the_shared_projection() {
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-data/");
+    let bytes = std::fs::read(format!("{root}poi/test-data/spreadsheet/testVarious.xlsb")).unwrap();
+    for eager in [false, true] {
+        let file = litchi_ops::open_bytes_with(
+            bytes.clone(),
+            &OpenOptions::new().source_mode(if eager {
+                SourceMode::Eager
+            } else {
+                SourceMode::Auto
+            }),
+        )
+        .unwrap();
+        assert_eq!(file.query("chart").unwrap().count(), 1);
+        let chart = "/sheet[1]/chart[1]";
+        let series = prop(&file, chart, "seriesCount").unwrap();
+        assert!(prop(&file, chart, "chartType").is_some());
+        assert_eq!(prop(&file, chart, "title").as_deref(), Some("myChartTitle"));
+        let count: usize = series.parse().unwrap();
+        assert!(count > 0);
+        assert!(prop(&file, "/sheet[1]/chart[1]/series[1]", "values").is_some());
+        assert_eq!(
+            file.get("/sheet[1]/chart[1]/series[1]")
+                .unwrap()
+                .path()
+                .to_string(),
+            "/sheet[1]/chart[1]/series[1]"
+        );
+        assert_eq!(file.query("series").unwrap().count(), count);
+        let error = file.set(chart, props! { "title" => "x" }).unwrap_err();
+        assert_ne!(error.code(), Code::InternalError);
+    }
+}

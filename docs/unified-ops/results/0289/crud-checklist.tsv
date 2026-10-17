@@ -1468,45 +1468,45 @@ xlsb	comment	edit	supported		ok tx.set
 xlsb	comment	batch	supported		ok set item
 xlsb	comment	create	supported		ok format
 xlsb	comment	save	supported		ok format
-xlsb	chart	get	gap	M1-extended (R4x)	unreached
-xlsb	chart	find	gap	M1-extended (R4x)	unreached
-xlsb	chart	query	gap	M1-extended (R4x)	unreached
-xlsb	chart	view	gap	M1-extended (R4x)	unreached
-xlsb	chart	set	gap	M1-extended (R4x)	unreached
-xlsb	chart	add	gap	M1-extended (R4x)	-
-xlsb	chart	remove	gap	M1-extended (R4x)	unreached
-xlsb	chart	move	gap	M1-extended (R4x)	unreached
-xlsb	chart	swap	gap	M1-extended (R4x)	unreached
-xlsb	chart	edit	gap	M1-extended (R4x)	-
-xlsb	chart	batch	gap	M1-extended (R4x)	-
-xlsb	chart	create	gap	M1-extended (R4x)	ok format
-xlsb	chart	save	gap	M1-extended (R4x)	ok format
-xlsb	series	get	gap	M1-extended (R4x)	unreached
-xlsb	series	find	gap	M1-extended (R4x)	unreached
-xlsb	series	query	gap	M1-extended (R4x)	unreached
-xlsb	series	view	gap	M1-extended (R4x)	unreached
-xlsb	series	set	gap	M1-extended (R4x)	unreached
-xlsb	series	add	gap	M1-extended (R4x)	-
-xlsb	series	remove	gap	M1-extended (R4x)	unreached
-xlsb	series	move	gap	M1-extended (R4x)	unreached
-xlsb	series	swap	gap	M1-extended (R4x)	unreached
-xlsb	series	edit	gap	M1-extended (R4x)	-
-xlsb	series	batch	gap	M1-extended (R4x)	-
-xlsb	series	create	gap	M1-extended (R4x)	ok format
-xlsb	series	save	gap	M1-extended (R4x)	ok format
-xlsb	axis	get	gap	M1-extended (R4x)	unreached
-xlsb	axis	find	gap	M1-extended (R4x)	unreached
-xlsb	axis	query	gap	M1-extended (R4x)	unreached
-xlsb	axis	view	gap	M1-extended (R4x)	unreached
-xlsb	axis	set	gap	M1-extended (R4x)	unreached
-xlsb	axis	add	gap	M1-extended (R4x)	-
-xlsb	axis	remove	gap	M1-extended (R4x)	unreached
-xlsb	axis	move	gap	M1-extended (R4x)	unreached
-xlsb	axis	swap	gap	M1-extended (R4x)	unreached
-xlsb	axis	edit	gap	M1-extended (R4x)	-
-xlsb	axis	batch	gap	M1-extended (R4x)	-
-xlsb	axis	create	gap	M1-extended (R4x)	ok format
-xlsb	axis	save	gap	M1-extended (R4x)	ok format
+xlsb	chart	get	supported		ok 1 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]
+xlsb	chart	find	supported		ok 1 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]
+xlsb	chart	query	supported		ok matches in poi/test-data/spreadsheet/testVarious.xlsb
+xlsb	chart	view	supported		ok 1 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]
+xlsb	chart	set	n/a	set not offered for this element	-
+xlsb	chart	add	n/a	add not offered for this element	-
+xlsb	chart	remove	n/a	remove not offered for this element	-
+xlsb	chart	move	format-verb		unreached
+xlsb	chart	swap	format-verb		unreached
+xlsb	chart	edit	n/a	edit not offered for this element	-
+xlsb	chart	batch	n/a	batch not offered for this element	-
+xlsb	chart	create	supported		ok format
+xlsb	chart	save	supported		ok format
+xlsb	series	get	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]/series[1]
+xlsb	series	find	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]/series[1]
+xlsb	series	query	supported		ok matches in poi/test-data/spreadsheet/testVarious.xlsb
+xlsb	series	view	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]/series[1]
+xlsb	series	set	n/a	set not offered for this element	-
+xlsb	series	add	n/a	add not offered for this element	-
+xlsb	series	remove	n/a	remove not offered for this element	-
+xlsb	series	move	format-verb		refused unsupported_type
+xlsb	series	swap	format-verb		refused unsupported_type
+xlsb	series	edit	n/a	edit not offered for this element	-
+xlsb	series	batch	n/a	batch not offered for this element	-
+xlsb	series	create	supported		ok format
+xlsb	series	save	supported		ok format
+xlsb	axis	get	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]/axis[1]
+xlsb	axis	find	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]/axis[1]
+xlsb	axis	query	supported		ok matches in poi/test-data/spreadsheet/testVarious.xlsb
+xlsb	axis	view	supported		ok 2 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/chart[1]/axis[1]
+xlsb	axis	set	n/a	set not offered for this element	-
+xlsb	axis	add	n/a	add not offered for this element	-
+xlsb	axis	remove	n/a	remove not offered for this element	-
+xlsb	axis	move	format-verb		refused unsupported_type
+xlsb	axis	swap	format-verb		refused unsupported_type
+xlsb	axis	edit	n/a	edit not offered for this element	-
+xlsb	axis	batch	n/a	batch not offered for this element	-
+xlsb	axis	create	supported		ok format
+xlsb	axis	save	supported		ok format
 xlsb	pivottable	get	gap	M1-extended (R4x)	unreached
 xlsb	pivottable	find	gap	M1-extended (R4x)	unreached
 xlsb	pivottable	query	gap	M1-extended (R4x)	unreached

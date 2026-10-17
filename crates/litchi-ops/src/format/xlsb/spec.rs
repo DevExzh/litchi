@@ -794,21 +794,6 @@ const fn property_gap(
 // not project them into ordinary nodes yet (record 0322 projects the
 // worksheet features).  Keep the reasons format-local; in particular, do not
 // inherit the XLSX follow-ups from the shared table.
-static CHART_GAP: GapSpec = element_gap(
-    "chart",
-    "M1-extended (R4x)",
-    "the XLSB workbook keeps drawing and chart parts, but the unified node has no chart projection yet",
-);
-static SERIES_GAP: GapSpec = element_gap(
-    "series",
-    "M1-extended (R4x)",
-    "XLSB chart series are not projected into unified nodes yet",
-);
-static AXIS_GAP: GapSpec = element_gap(
-    "axis",
-    "M1-extended (R4x)",
-    "XLSB chart axes are not projected into unified nodes yet",
-);
 static PIVOT_GAP: GapSpec = element_gap(
     "pivottable",
     "M1-extended (R4x)",
@@ -882,9 +867,13 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
         super::features::COMMENT_PROPS,
         None,
     ),
-    with_gap(&workbook::SPEC.elements[9], Some(&CHART_GAP)),
-    with_gap(&workbook::SPEC.elements[10], Some(&SERIES_GAP)),
-    with_gap(&workbook::SPEC.elements[11], Some(&AXIS_GAP)),
+    with_props(&workbook::SPEC.elements[9], super::chart::CHART_PROPS, None),
+    with_props(
+        &workbook::SPEC.elements[10],
+        super::chart::SERIES_PROPS,
+        None,
+    ),
+    with_props(&workbook::SPEC.elements[11], super::chart::AXIS_PROPS, None),
     with_gap(&workbook::SPEC.elements[12], Some(&PIVOT_GAP)),
     with_gap(&workbook::SPEC.elements[13], Some(&SLICER_GAP)),
     with_gap(&workbook::SPEC.elements[14], Some(&SPARKLINE_GAP)),

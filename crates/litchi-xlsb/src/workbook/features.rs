@@ -59,6 +59,18 @@ impl Workbook {
         crate::drawing::edit::eager_elements(&self.package, &worksheet)
     }
 
+    /// The charts of the drawing of the worksheet at complete-catalog
+    /// position `sheet`, in drawing order, with their chart part markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or non-worksheet tab or a malformed
+    /// drawing graph.
+    pub fn drawing_charts(&self, sheet: usize) -> Result<Vec<crate::drawing::edit::ChartPart>> {
+        let worksheet = crate::part_edit::worksheet_uri(self, sheet)?;
+        crate::drawing::edit::eager_charts(&self.package, &worksheet)
+    }
+
     /// The differential formats (`BrtDXF`) of the styles part.
     ///
     /// # Errors

@@ -18,7 +18,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | docx | 41 | 127 | 127 | 0 | 0 | 325 | 49 | 8 | 10 |
 | xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 |
 | pptx | 37 | 189 | 189 | 0 | 0 | 156 | 86 | 2 | 32 |
-| xlsb | 26 | 157 | 157 | 0 | 0 | 117 | 30 | 2 | 14 |
+| xlsb | 26 | 175 | 175 | 0 | 0 | 78 | 45 | 2 | 18 |
 | doc | 13 | 86 | 86 | 0 | 0 | 0 | 57 | 2 | 6 |
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
 | ppt | 36 | 76 | 76 | 0 | 0 | 338 | 34 | 2 | 10 |
@@ -181,9 +181,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | namedrange | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| chart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| series | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| axis | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| series | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| axis | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | pivottable | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slicer | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | sparkline | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |

@@ -1051,6 +1051,88 @@ pub(crate) fn source_elements(
     Ok(elements)
 }
 
+/// A chart a worksheet drawing hosts: its frame's placement and name, and
+/// the chart part's DrawingML (`c:chartSpace`) markup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ChartPart {
+    /// Where the chart's frame sits.
+    pub placement: Option<Placement>,
+    /// The frame's `cNvPr/@name`.
+    pub name: Option<String>,
+    /// The chart part's markup.
+    pub xml: Vec<u8>,
+}
+
+/// The chart relationship a frame names, among `relationships`.
+fn chart_target(fragment: &[u8], relationships: &Relationships) -> Option<PackURI> {
+    relationship_ids(fragment).into_iter().find_map(|id| {
+        let relationship = relationships.get(&id)?;
+        (!relationship.is_external()
+            && matches!(relationship.reltype(), rt::CHART | rt::STRICT_CHART))
+        .then(|| relationship.target_partname().ok())
+        .flatten()
+    })
+}
+
+/// The charts of a worksheet part's drawing in an eager package, in drawing
+/// order.
+pub(crate) fn eager_charts(package: &OpcPackage, worksheet: &PackURI) -> Result<Vec<ChartPart>> {
+    let Some(drawing) = drawing_in(package.get_part(worksheet)?.rels())? else {
+        return Ok(Vec::new());
+    };
+    let part = package.get_part(&drawing)?;
+    let (elements, _, _) = scan(part.blob())?;
+    let mut charts = Vec::new();
+    for element in elements
+        .iter()
+        .filter(|element| element.kind == ElementKind::Frame)
+    {
+        let Some(target) = chart_target(&part.blob()[element.span.clone()], part.rels()) else {
+            continue;
+        };
+        charts.push(ChartPart {
+            placement: element.placement,
+            name: element.name.clone(),
+            xml: package.get_part(&target)?.blob().to_vec(),
+        });
+    }
+    Ok(charts)
+}
+
+/// The charts of a worksheet part's drawing in a source-backed package.
+pub(crate) fn source_charts(
+    package: &litchi_opc::SourceBackedPackage,
+    worksheet: &PackURI,
+) -> Result<Vec<ChartPart>> {
+    let Some(drawing) = drawing_in(package.part(worksheet)?.rels())? else {
+        return Ok(Vec::new());
+    };
+    let part = package.part(&drawing)?;
+    let declared = part.declared_uncompressed_size()?;
+    LimitKind::DrawingBytes.check(usize::try_from(declared).unwrap_or(usize::MAX))?;
+    let data = part.data()?;
+    let (elements, _, _) = scan(data.as_bytes())?;
+    let mut charts = Vec::new();
+    for element in elements
+        .iter()
+        .filter(|element| element.kind == ElementKind::Frame)
+    {
+        let Some(target) = chart_target(&data.as_bytes()[element.span.clone()], part.rels()) else {
+            continue;
+        };
+        let chart = package.part(&target)?;
+        let declared = chart.declared_uncompressed_size()?;
+        LimitKind::DrawingBytes.check(usize::try_from(declared).unwrap_or(usize::MAX))?;
+        charts.push(ChartPart {
+            placement: element.placement,
+            name: element.name.clone(),
+            xml: chart.data()?.as_bytes().to_vec(),
+        });
+    }
+    Ok(charts)
+}
+
 impl Package {
     /// Start a worksheet drawing edit.
     ///

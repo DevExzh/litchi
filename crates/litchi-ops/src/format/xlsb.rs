@@ -50,6 +50,7 @@ use crate::options::{OpenOptions, SourceMode};
 
 #[cfg(feature = "eval")]
 pub(crate) mod calc;
+mod chart;
 mod children;
 pub(crate) mod create;
 mod feature_write;
