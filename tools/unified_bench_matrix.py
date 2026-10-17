@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337, 0340).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0337 (`docs/unified-ops/02[4-9]*.md`, `03[0-3]*.md`)
+operations records 0249-0340 (`docs/unified-ops/02[4-9]*.md`, `03[0-4]*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -41,7 +41,7 @@ Conventions:
 
 Records 0285-0326 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
-0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315, 0326 and 0337 their own) are collected
+0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315, 0326, 0337 and 0340 their own) are collected
 only when their record file is on this tree; the Markdown lists every
 record of that range, absent ones as "not on this tree", so the tool can
 be rerun unchanged after later merges.
@@ -982,7 +982,7 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 337)
+FOLLOW_RANGE = (285, 340)
 
 
 def record_file(record: str):
@@ -1837,7 +1837,7 @@ BATCH_0337_SCENARIOS = {
 STAGES_0337 = {"trunk": ("", 1), "after": ("after record 0337", 2)}
 
 
-def batch_closure(record, paths):
+def batch_closure(record, paths, stages=STAGES_0337):
     """Record 0337's `unified-batch-closure` harness: one JSON document per
     process (trial); a case is one (format, owner, scenario, operations). The
     unified leg is one atomic `File::batch` of N items, the leaf leg one
@@ -1848,7 +1848,7 @@ def batch_closure(record, paths):
     groups = {}
     for p in paths:
         m = re.search(r"batch-[A-Z]-([a-z]+)-\d+(?:-n\d+)?\.json$", p.name)
-        stage, rank = STAGES_0337["trunk" if m.group(1) in ("trunk", "before") else m.group(1)]
+        stage, rank = stages["trunk" if m.group(1) in ("trunk", "before") else m.group(1)]
         for c in load_json(p)["cases"]:
             k = (c["format"], c["owner"], c["scenario"], c["operations"], stage, rank,
                  c["fixture_targets"])
@@ -1874,13 +1874,23 @@ def p0337():
     return batch_closure("0337", sorted((RES / "0337" / "abba").glob("batch-*.json")))
 
 
+@needs("0340")
+def p0340():
+    """Record 0340: the iWork and ODC batches re-measured after the Keynote
+    paragraph-run and object-navigator fixes (`abba/batch-A-after-*.json`;
+    the `before` runs of the same session repeat record 0337's trunk and are
+    not listed)."""
+    return batch_closure("0340", sorted((RES / "0340" / "abba").glob("batch-*-after-*.json")),
+                         stages={"after": ("", 1)})
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
            p0306, p0309, p0310, p0311, p0312,
-           p0313, p0315, p0326, p0337]
+           p0313, p0315, p0326, p0337, p0340]
 
 
 # ---------------------------------------------------------------- merge
@@ -2088,7 +2098,7 @@ def to_md(rows, conflicts, agreements, cur):
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
       "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
       "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306; "
-      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; records 0315, 0326 and 0337 their own.")
+      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; records 0315, 0326, 0337 and 0340 their own.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "
