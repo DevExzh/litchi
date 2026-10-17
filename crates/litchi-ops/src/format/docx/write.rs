@@ -349,6 +349,14 @@ impl Docx {
             if editor.bulk_paragraph_text(&targets, &assignments)? {
                 return O::publish(editor, self);
             }
+            // A table's or row's assignments are spliced in one property
+            // edit per target (record 0342).
+            if matches!(targets[0].kind, TargetKind::Table | TargetKind::Row) {
+                for target in &targets {
+                    editor.format_structure(target, &assignments)?;
+                }
+                return O::publish(editor, self);
+            }
             for target in &targets {
                 for assignment in &assignments {
                     editor.apply_with_policy(target, assignment, command_text)?;
@@ -708,6 +716,49 @@ impl WorkEdit {
             },
         };
         result.map_err(|error| property_error(error, &assignment.key))
+    }
+
+    /// Apply every admitted assignment of a table or row target in one
+    /// property edit (record 0342).
+    fn format_structure(&mut self, target: &Target, assignments: &[Assignment<'_>]) -> Result<()> {
+        let Selection::Element(path) = &target.selection else {
+            return Err(Error::new(
+                Code::InternalError,
+                "a DOCX table or row target has an element path",
+            ));
+        };
+        let mut failure = None;
+        let mut stage =
+            |apply: &mut dyn FnMut(Setter, Option<crate::value::Scalar<'_>>) -> Result<()>| {
+                for assignment in assignments {
+                    if failure.is_some() {
+                        break;
+                    }
+                    if let Err(error) = assignment.entry.prepare(
+                        Operation::Set,
+                        &assignment.value,
+                        |setter, value| apply(setter, value),
+                    ) {
+                        failure = Some(property_error(error, &assignment.key));
+                    }
+                }
+            };
+        let result = match target.kind {
+            TargetKind::Table => both!(self, |edit| edit
+                .format_table_at(path, |table| {
+                    stage(&mut |setter, value| setter.apply_table(table, value));
+                })
+                .map(|_| ())
+                .map_err(Error::from)),
+            _ => both!(self, |edit| edit
+                .format_row_at(path, |row| {
+                    stage(&mut |setter, value| setter.apply_row(row, value));
+                })
+                .map(|_| ())
+                .map_err(Error::from)),
+        };
+        // A refused value wins over what the staged change then did.
+        failure.map_or(result, Err)
     }
 
     /// Apply one admitted assignment to an element reached by its leaf path.
