@@ -1,9 +1,10 @@
 use std::io::Cursor;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
+use litchi_xls::AnchorBehavior;
 use litchi_xls::PivotCacheItem;
 use litchi_xls::shapes::extract_shapes_from_workbook;
-use litchi_xls::writer::shape::{Anchor, Behavior, Point};
+use litchi_xls::writer::shape::{Anchor, Point};
 use litchi_xls::writer::{
     Builder, PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig,
     PivotTableConfig, ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun,
@@ -14,7 +15,7 @@ fn anchor() -> Anchor {
     Anchor::new(
         Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
         Point::new(6, 4).unwrap().offset(200, 900).unwrap(),
-        Behavior::MoveAndSize,
+        AnchorBehavior::Absolute,
     )
     .unwrap()
 }

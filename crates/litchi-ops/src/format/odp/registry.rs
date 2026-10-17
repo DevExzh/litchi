@@ -131,6 +131,33 @@ const fn write_entries<const N: usize>(
 
 const GEOMETRY: &[&str] = &["name", "x", "y", "width", "height"];
 
+/// A shape's geometry and the character formatting of its whole text
+/// (record 0316).
+const SHAPE_WRITABLE: &[&str] = &[
+    "name",
+    "x",
+    "y",
+    "width",
+    "height",
+    "bold",
+    "italic",
+    "underline",
+    "size",
+    "color",
+    "font",
+];
+
+/// Notes text and the character formatting of the whole notes story.
+const NOTES_WRITABLE: &[&str] = &[
+    "text",
+    "bold",
+    "italic",
+    "underline",
+    "size",
+    "color",
+    "font",
+];
+
 const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len();
 const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 1;
 const FRAME_WRITE_COUNT: usize = FRAME_PROPS.len();
@@ -144,7 +171,7 @@ const NOTES_WRITE_COUNT: usize = NOTES_PROPS.len();
 pub(crate) const SLIDE_WRITE_TABLE: crate::registry::Table<Setter, SLIDE_WRITE_COUNT, 0> =
     crate::registry::Table::new(write_entries(SLIDE_PROPS, &["name"]), []);
 pub(crate) const SHAPE_WRITE_TABLE: crate::registry::Table<Setter, SHAPE_WRITE_COUNT, 0> =
-    crate::registry::Table::new(write_entries(SHAPE_PROPS, GEOMETRY), []);
+    crate::registry::Table::new(write_entries(SHAPE_PROPS, SHAPE_WRITABLE), []);
 pub(crate) const FRAME_WRITE_TABLE: crate::registry::Table<Setter, FRAME_WRITE_COUNT, 0> =
     crate::registry::Table::new(write_entries(FRAME_PROPS, GEOMETRY), []);
 pub(crate) const TABLE_WRITE_TABLE: crate::registry::Table<Setter, TABLE_WRITE_COUNT, 0> =
@@ -156,9 +183,9 @@ pub(crate) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<Setter, PARAGRAPH
 pub(crate) const RUN_WRITE_TABLE: crate::registry::Table<Setter, RUN_WRITE_COUNT, 0> =
     crate::registry::Table::new(write_entries(RUN_PROPS, CHARACTER_KEYS), []);
 pub(crate) const CELL_WRITE_TABLE: crate::registry::Table<Setter, CELL_WRITE_COUNT, 0> =
-    crate::registry::Table::new(write_entries(CELL_PROPS, &[]), []);
+    crate::registry::Table::new(write_entries(CELL_PROPS, CHARACTER_KEYS), []);
 pub(crate) const NOTES_WRITE_TABLE: crate::registry::Table<Setter, NOTES_WRITE_COUNT, 0> =
-    crate::registry::Table::new(write_entries(NOTES_PROPS, &["text"]), []);
+    crate::registry::Table::new(write_entries(NOTES_PROPS, NOTES_WRITABLE), []);
 
 pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();
 pub(crate) const SHAPE_CAPABILITY_PROPS: &[PropSpec] = &SHAPE_WRITE_TABLE.readable();
@@ -255,8 +282,8 @@ pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
         "set",
         "shape",
         "character-format",
-        "0308 ODP shape and cell character formatting",
-        "bold, italic, underline, size, colour and font are set on paragraphs and runs (derived automatic styles); a shape, table cell or notes story takes no character formatting, and its text sets write plain paragraphs in the first paragraph's style",
+        "0316 ODP inherited shape formatting",
+        "bold, italic, underline, size, colour and font are set on paragraphs, runs (links and fields included), and on a shape, table cell or notes story as a whole (each paragraph and every run that overrides the value); reads resolve the node's style chain through the common styles of styles.xml but not a shape's graphic or presentation style, and text sets write plain paragraphs in the first paragraph's style",
     ),
     operation_gap(
         "set",

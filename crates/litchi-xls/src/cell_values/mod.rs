@@ -8167,6 +8167,24 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
             found_eof = true;
             break;
         }
+        if record.kind().get() == BOF {
+            // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
+            // its data-cache Number and Label records are the chart's, not
+            // cells of this worksheet, as the worksheet parser reads them
+            // (records 0293, 0316).
+            let mut depth = 1_usize;
+            while depth > 0 {
+                let nested = records
+                    .next()
+                    .ok_or(Error::Eof("embedded substream EOF"))??;
+                match nested.kind().get() {
+                    BOF => depth += 1,
+                    EOF => depth -= 1,
+                    _ => {},
+                }
+            }
+            continue;
+        }
         let kind = record.kind().get();
         let kind_offset = base_offset
             .checked_add(record.offset())

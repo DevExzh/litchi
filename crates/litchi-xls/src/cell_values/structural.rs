@@ -2167,19 +2167,10 @@ fn patch_3d_references(
 /// External names belong to another workbook's `SupBook` and are untouched.
 /// Records whose coordinates this owner does not model stay refusals.
 fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift) -> Result<()> {
-    // These records can retain formulas or coordinates into any worksheet.
-    // Without a complete token/range rewriter, moving coordinates would make
-    // them stale even when the selected worksheet itself has no Formula cell.
-    const GLOBAL_OR_CROSS_SHEET_DEPENDENCIES: &[u16] = &[
-        TABLE,
-        SHARED_FORMULA,
-        ARRAY,
-        0x01b0,
-        0x0879,
-        0x087a,
-        0x01be,
-        0x009e,
-    ];
+    // AutoFilter keeps column positions relative to a filter range this
+    // owner does not shift; it stays refused in the shifted worksheet and
+    // wherever a 3-D reference can reach it.
+    const GLOBAL_OR_CROSS_SHEET_DEPENDENCIES: &[u16] = &[0x009e];
     let records = raw_records(workbook)?;
     let sheets = extern_sheets(workbook, &records)?;
     // A record of another worksheet reaches the shifted one only through a
@@ -2204,7 +2195,6 @@ fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift
     if let Some(record) = records.iter().find(|record| {
         GLOBAL_OR_CROSS_SHEET_DEPENDENCIES.contains(&record.kind)
             && (reachable || target.contains(&record.start))
-            && !(target.contains(&record.start) && IN_SHEET_SHIFTED.contains(&record.kind))
     }) {
         return Err(Error::UnsafeEdit(format!(
             "row/column movement cannot close workbook dependency record 0x{:04X}",
@@ -2288,8 +2278,8 @@ fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift
                     .ok_or_else(|| Error::InvalidData("Formula payload is truncated".into()))?;
                 let length = formula_tokens(payload)?.len();
                 let tokens = &mut payload[22..22 + length];
-                // A shared formula cell's PtgExp holds no 3-D reference.
-                if crate::formula::ptg_exp_anchor(tokens).is_none() {
+                // A PtgExp or PtgTbl cell holds no 3-D reference.
+                if formula_anchor(tokens).is_none() {
                     patch_3d_references(tokens, &sheets, tab, shift, false)?;
                 }
             },
@@ -2297,15 +2287,43 @@ fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift
                 let payload = record_payload(workbook, record, "HLINK")?;
                 certify_hyperlink_target(payload, target.contains(&record.start), &target_name)?;
             },
+            // Shared, array, conditional-format and validation formulas of
+            // any worksheet keep their 3-D references into the shifted one;
+            // their same-sheet references move with their own worksheet
+            // (record 0316).
+            SHARED_FORMULA | ARRAY | CF | rules::CF12 | DV if continued => {
+                return Err(Error::UnsafeEdit(format!(
+                    "row/column movement cannot close a continued record 0x{:04X}",
+                    record.kind
+                )));
+            },
+            SHARED_FORMULA | ARRAY if !reachable => {},
+            SHARED_FORMULA | ARRAY => {
+                let payload = workbook
+                    .get_mut(payload_start..record.end)
+                    .ok_or_else(|| Error::InvalidData("formula payload is truncated".into()))?;
+                let (length_at, tokens_at) = if record.kind == ARRAY {
+                    (12, 14)
+                } else {
+                    (8, 10)
+                };
+                let length = usize::from(binary::read_u16_le_at(payload, length_at)?);
+                let tokens = payload
+                    .get_mut(tokens_at..tokens_at + length)
+                    .ok_or_else(|| Error::InvalidData("formula tokens are truncated".into()))?;
+                rules::patch_rule_3d_references(tokens, &sheets, tab, shift)?;
+            },
+            CF | rules::CF12 | DV if reachable => {
+                let payload = workbook
+                    .get_mut(payload_start..record.end)
+                    .ok_or_else(|| Error::InvalidData("rule payload is truncated".into()))?;
+                rules::patch_rule_record_3d(record.kind, payload, &sheets, tab, shift)?;
+            },
             _ => {},
         }
     }
     Ok(())
 }
-
-/// Dependency records of the shifted worksheet that its rebuild shifts
-/// itself (record 0308).
-const IN_SHEET_SHIFTED: &[u16] = &[SHARED_FORMULA, CONDFMT, DV];
 
 const CONDFMT: u16 = 0x01b0;
 const CF: u16 = 0x01b1;
@@ -2335,75 +2353,6 @@ fn patch_sqref(payload: &mut [u8], shift: AxisShift) -> Result<()> {
         patch_ref8(range, shift)?;
     }
     Ok(())
-}
-
-/// The two formulas of a `CF` rule (`[MS-XLS]` 2.4.42): `cce1` and `cce2`
-/// bytes at the end of the record, after its differential format.
-fn cf_formulas(payload: &[u8]) -> Result<[&[u8]; 2]> {
-    if payload.len() < 6 {
-        return Err(Error::InvalidData("CF record is truncated".into()));
-    }
-    let first = usize::from(binary::read_u16_le_at(payload, 2)?);
-    let second = usize::from(binary::read_u16_le_at(payload, 4)?);
-    let start = payload
-        .len()
-        .checked_sub(first + second)
-        .filter(|start| *start >= 6)
-        .ok_or_else(|| Error::InvalidData("CF formulas exceed the record".into()))?;
-    Ok([&payload[start..start + first], &payload[start + first..]])
-}
-
-/// Refuses formulas that hold a cell, area, shared-relative or 3-D
-/// reference: their relative references are offsets this shift does not
-/// rewrite.
-fn certify_reference_free(formulas: [&[u8]; 2], what: &str) -> Result<()> {
-    for formula in formulas {
-        if formula.is_empty() {
-            continue;
-        }
-        let free = crate::formula::shared_formula_reference_spans(formula).is_some_and(
-            |(same_sheet, relative, three_d)| {
-                same_sheet.is_empty() && relative.is_empty() && three_d.is_empty()
-            },
-        );
-        if !free {
-            return Err(Error::UnsafeEdit(format!(
-                "row/column movement cannot close a {what} formula with cell references"
-            )));
-        }
-    }
-    Ok(())
-}
-
-/// Shifts a `DV` record (`[MS-XLS]` 2.4.112): its `sqref`, after its four
-/// strings and two formulas, which must hold no cell references.
-fn patch_dv(payload: &mut [u8], shift: AxisShift) -> Result<()> {
-    let mut offset = 4_usize;
-    for _ in 0..4 {
-        let characters = usize::from(binary::read_u16_le_at(payload, offset)?);
-        let flags = *payload
-            .get(offset + 2)
-            .ok_or_else(|| Error::InvalidData("DV string is truncated".into()))?;
-        offset += 3 + characters * if flags & 1 != 0 { 2 } else { 1 };
-    }
-    let mut formulas: [std::ops::Range<usize>; 2] = [0..0, 0..0];
-    for formula in &mut formulas {
-        let length = usize::from(binary::read_u16_le_at(payload, offset)?);
-        let start = offset + 4;
-        *formula = start..start + length;
-        offset = start + length;
-    }
-    let first = payload
-        .get(formulas[0].clone())
-        .ok_or_else(|| Error::InvalidData("DV formula is truncated".into()))?;
-    let second = payload
-        .get(formulas[1].clone())
-        .ok_or_else(|| Error::InvalidData("DV formula is truncated".into()))?;
-    certify_reference_free([first, second], "data validation")?;
-    let sqref = payload
-        .get_mut(offset..)
-        .ok_or_else(|| Error::InvalidData("DV range list is truncated".into()))?;
-    patch_sqref(sqref, shift)
 }
 
 /// The byte range of the worksheet substream at workbook tab `tab`.
@@ -2474,17 +2423,43 @@ fn rebuild_sheet(
     } else {
         last_dbcell
     };
+    // An empty sheet whose producer still wrote a DBCELL (and an INDEX
+    // pointing at it) keeps that row table while it stays empty (record
+    // 0316).
+    // Only a sheet without ROW records asks.
+    let top_holds_cells = || {
+        top.iter().any(|(_, record)| {
+            is_cell_record(record.kind)
+                || matches!(
+                    record.kind,
+                    STRING | TABLE | ARRAY | SHARED_FORMULA | 0x0091
+                )
+        })
+    };
+    let lone_dbcells = match (first_row, last_dbcell) {
+        (None, Some(last)) if !unindexed && !top_holds_cells() => records[..=last]
+            .iter()
+            .position(|record| record.kind == DBCELL)
+            .filter(|first| {
+                *first > index
+                    && records[*first..=last]
+                        .iter()
+                        .all(|record| record.kind == DBCELL)
+            }),
+        _ => None,
+    };
     let (row_records, row_table_start, row_table_end) = match (first_row, last_row_record) {
         (Some(first), Some(last)) if first > index && last >= first => (
             &records[first..=last],
             records[first].start,
             records[last].end,
         ),
+        (None, Some(last)) if lone_dbcells.is_some() => {
+            let first = lone_dbcells.unwrap_or(last);
+            (&records[0..0], records[first].start, records[last].end)
+        },
         (None, None) if unindexed => {
-            if records.iter().any(|record| {
-                is_cell_record(record.kind)
-                    || matches!(record.kind, STRING | TABLE | ARRAY | SHARED_FORMULA)
-            }) {
+            if top_holds_cells() {
                 return Err(Error::UnsafeEdit(
                     "empty worksheet row-table metadata is inconsistent".into(),
                 ));
@@ -2509,13 +2484,7 @@ fn rebuild_sheet(
                 || dimensions <= index
                 || def_col <= index
                 || def_col >= dimensions
-                || records.iter().any(|record| {
-                    is_cell_record(record.kind)
-                        || matches!(
-                            record.kind,
-                            STRING | TABLE | ARRAY | SHARED_FORMULA | CONTINUE | 0x0091
-                        )
-                })
+                || top_holds_cells()
             {
                 return Err(Error::UnsafeEdit(
                     "empty worksheet row-table metadata is inconsistent".into(),
@@ -2622,7 +2591,33 @@ fn rebuild_sheet(
         layout_rows,
     )
     .map_err(|error| Error::UnsafeEdit(format!("BIFF8 row-block regeneration: {error}")))?;
-    let (new_index, new_rows) = plan.into_records();
+    let (mut new_index, new_rows) = plan.into_records();
+    // A producer INDEX whose `ibXF` does not locate DEFCOLWIDTH keeps its
+    // value; readers locate DEFCOLWIDTH by record order (record 0316).
+    if !unindexed {
+        let source_ibxf = worksheet
+            .get(records[index].start + 16..records[index].start + 20)
+            .ok_or_else(|| Error::InvalidData("INDEX record is truncated".into()))?;
+        let actual = u32::try_from(absolute_start + records[def_col].start)
+            .map_err(|_error| Error::InvalidData("DEFCOLWIDTH offset exceeds u32".into()))?;
+        if source_ibxf != actual.to_le_bytes() {
+            new_index
+                .get_mut(16..20)
+                .ok_or_else(|| Error::InvalidData("regenerated INDEX is truncated".into()))?
+                .copy_from_slice(source_ibxf);
+        }
+    }
+    let (new_index, new_rows) = if lone_dbcells.is_some()
+        && between.len() == source_between.len()
+        && !new_rows_hold_rows(&new_rows)?
+    {
+        (
+            worksheet[records[index].start..records[index].end].to_vec(),
+            worksheet[row_table_start..row_table_end].to_vec(),
+        )
+    } else {
+        (new_index, new_rows)
+    };
 
     let computed = dimensions_from_row_table(&new_rows)?;
     // Producers write DIMENSIONS wider than the cells span (rows with only a
@@ -2647,6 +2642,12 @@ fn rebuild_sheet(
         },
         _ => None,
     };
+    // Some producers write the last row and column, not one past them; the
+    // shifted extents keep that convention while it still describes the
+    // cells exactly (record 0316).
+    let inclusive = |extents: (u32, u32, u16, u16)| {
+        extents.1 > 0 && extents.3 > 0 && extents.1 > extents.0 && extents.3 > extents.2
+    };
     let (first_used_row, last_used_row, first_used_col, last_used_col) = match stored {
         Some(stored)
             if computed == (0, 0, 0, 0)
@@ -2654,6 +2655,12 @@ fn rebuild_sheet(
                     && stored.1 >= computed.1
                     && stored.2 <= computed.2
                     && stored.3 >= computed.3) =>
+        {
+            stored
+        },
+        Some(stored)
+            if inclusive(computed)
+                && stored == (computed.0, computed.1 - 1, computed.2, computed.3 - 1) =>
         {
             stored
         },
@@ -2701,8 +2708,26 @@ fn rebuild_sheet(
     result.extend_from_slice(&between);
     result.extend_from_slice(&new_rows);
     result.extend_from_slice(&worksheet[row_table_end..]);
-    patch_coordinate_dependencies(&mut result, operations)?;
+    // Anchors that keep their place are checked against the sizes one
+    // shift predicts, so a batch with several shifts or with row and column
+    // layout changes keeps refusing them (record 0316).
+    let predictable = layout.is_empty()
+        && operations
+            .iter()
+            .filter(|operation| axis_shift(operation).is_some())
+            .count()
+            == 1;
+    patch_coordinate_dependencies(
+        &mut result,
+        operations,
+        predictable.then_some((worksheet, records.as_slice())),
+    )?;
     Ok(result)
+}
+
+/// Whether a regenerated row table holds a `ROW` record.
+fn new_rows_hold_rows(rows: &[u8]) -> Result<bool> {
+    Ok(raw_records(rows)?.iter().any(|record| record.kind == ROW))
 }
 
 /// `rows`, a regenerated row table, without its DBCELL records.
@@ -2847,6 +2872,7 @@ fn axis_shift(operation: &StructuralChange) -> Option<AxisShift> {
 fn patch_coordinate_dependencies(
     worksheet: &mut [u8],
     operations: &[&StructuralChange],
+    source: Option<(&[u8], &[RawRecord])>,
 ) -> Result<()> {
     patch_selection_records(worksheet, operations)?;
     let records = raw_records(worksheet)?;
@@ -2854,6 +2880,7 @@ fn patch_coordinate_dependencies(
         let Some(shift) = axis_shift(operation) else {
             continue;
         };
+        let mut rules = false;
         for record in &records {
             let payload_start = record
                 .start
@@ -2865,10 +2892,13 @@ fn patch_coordinate_dependencies(
                     Error::InvalidData("coordinate record payload is truncated".into())
                 })?;
             match record.kind {
-                FORMULA => patch_formula_record(payload, shift)?,
+                FORMULA => patch_formula_references(payload, shift)?,
                 SHARED_FORMULA => patch_shared_formula(payload, shift)?,
-                CONDFMT => patch_condfmt(payload, shift)?,
-                DV => patch_dv(payload, shift)?,
+                // Their ranges moved with their rows (`shift_rows`,
+                // `shift_columns`).
+                ARRAY => rules::patch_array_formula(payload, shift)?,
+                TABLE => rules::patch_table_inputs(payload, shift)?,
+                kind if rules::RULE_RECORDS.contains(&kind) => rules = true,
                 MERGED_CELLS => patch_merged_cells(payload, shift)?,
                 HLINK => patch_hyperlink(payload, shift)?,
                 HLINK_TOOLTIP => patch_hyperlink_tooltip(payload, shift)?,
@@ -2879,7 +2909,16 @@ fn patch_coordinate_dependencies(
                 _ => {},
             }
         }
-        patch_drawing_stream(worksheet, &records, shift)?;
+        if rules {
+            rules::patch_rule_records(worksheet, &records, shift)?;
+        }
+        let sizes = match source {
+            Some((source, source_records)) if !drawing_ranges(&records).is_empty() => {
+                Some(sizes::SizeCheck::predict(source, source_records, shift)?)
+            },
+            _ => None,
+        };
+        patch_drawing_stream(worksheet, &records, shift, sizes.as_ref())?;
     }
     Ok(())
 }
@@ -2910,6 +2949,7 @@ fn shifted_drawing_stream(
     worksheet: &[u8],
     ranges: &[std::ops::Range<usize>],
     shift: AxisShift,
+    sizes: Option<&sizes::SizeCheck>,
 ) -> Result<Option<Vec<u8>>> {
     if ranges.is_empty() {
         return Ok(None);
@@ -2922,18 +2962,20 @@ fn shifted_drawing_stream(
                 .ok_or_else(|| Error::InvalidData("MsoDrawing payload is truncated".into()))?,
         );
     }
-    patch_officeart(&mut stream, shift)?;
+    patch_officeart(&mut stream, shift, sizes)?;
     Ok(Some(stream))
 }
 
 /// Shifts the ClientAnchors of the worksheet's OfficeArt stream in place.
+/// `sizes` are the shifted axis's sizes, for anchors that keep their place.
 fn patch_drawing_stream(
     worksheet: &mut [u8],
     records: &[RawRecord],
     shift: AxisShift,
+    sizes: Option<&sizes::SizeCheck>,
 ) -> Result<()> {
     let ranges = drawing_ranges(records);
-    let Some(stream) = shifted_drawing_stream(worksheet, &ranges, shift)? else {
+    let Some(stream) = shifted_drawing_stream(worksheet, &ranges, shift, sizes)? else {
         return Ok(());
     };
     let mut offset = 0;
@@ -3306,11 +3348,19 @@ fn patch_ref8(range: &mut [u8], shift: AxisShift) -> Result<()> {
     Ok(())
 }
 
-fn patch_officeart(data: &mut [u8], shift: AxisShift) -> Result<()> {
-    patch_officeart_records(data, shift)
+fn patch_officeart(
+    data: &mut [u8],
+    shift: AxisShift,
+    sizes: Option<&sizes::SizeCheck>,
+) -> Result<()> {
+    patch_officeart_records(data, shift, sizes)
 }
 
-fn patch_officeart_records(data: &mut [u8], shift: AxisShift) -> Result<()> {
+fn patch_officeart_records(
+    data: &mut [u8],
+    shift: AxisShift,
+    sizes: Option<&sizes::SizeCheck>,
+) -> Result<()> {
     let mut offset = 0_usize;
     while offset < data.len() {
         let header_end = offset
@@ -3339,9 +3389,9 @@ fn patch_officeart_records(data: &mut [u8], shift: AxisShift) -> Result<()> {
                     "worksheet drawing has a noncanonical ClientAnchor".into(),
                 ));
             }
-            patch_client_anchor(payload, shift)?;
+            patch_client_anchor(payload, shift, sizes)?;
         } else if version == 0x000f {
-            patch_officeart_records(payload, shift)?;
+            patch_officeart_records(payload, shift, sizes)?;
         }
         offset = end;
     }
@@ -3351,15 +3401,24 @@ fn patch_officeart_records(data: &mut [u8], shift: AxisShift) -> Result<()> {
 /// Shifts one `OfficeArtClientAnchorSheet` (`[MS-XLS]` 2.5.193).
 ///
 /// Its first word holds `fMove` (bit 0) and `fSize` (bit 1), each set when
-/// the shape is kept intact as cells move or resize: 0 is "move and size
-/// with cells", 2 "move but don't size", 3 "don't move or size" (Apache
-/// POI's `AnchorType` values; LibreOffice's position- and size-locked
-/// flags). Record 0308 corrected this patch, which had read 0 as fixed and
-/// 3 as moving: a moving anchor's endpoints shift like cells; a
-/// size-locked one shifts whole when the shift point is outside it; a
-/// position-locked one is unchanged by a shift after it and refused
-/// otherwise, since keeping its place would need the row and column sizes.
-fn patch_client_anchor(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+/// the shape is kept intact as cells move or resize: 0 is
+/// `AnchorBehavior::MoveAndResize`, 2 `MoveWithoutResize`, 3 `Absolute`
+/// (Apache POI's `AnchorType` values; LibreOffice's position- and
+/// size-locked flags; record 0308 corrected the reading). A moving anchor's
+/// endpoints shift like cells; a size-locked one shifts whole when the
+/// shift point is before it. An endpoint that keeps its place (both of a
+/// position-locked anchor, the far end of a size-locked one the shift point
+/// falls inside) is unchanged by a shift after it, and otherwise keeps its
+/// cell coordinates when every row or column from the shift point to it
+/// keeps its size (`sizes`, record 0316); anything else is refused, since
+/// keeping its place would need the sizes converted. The spec-invalid 1
+/// (`fMove` alone) is read as Apache POI and LibreOffice read it: the
+/// top-left keeps its place and the bottom-right moves with its cell.
+fn patch_client_anchor(
+    payload: &mut [u8],
+    shift: AxisShift,
+    sizes: Option<&sizes::SizeCheck>,
+) -> Result<()> {
     let behavior = binary::read_u16_le_at(payload, 0)?;
     let (first_offset, last_offset, start, count, insert, limit) = match shift {
         AxisShift::Rows {
@@ -3375,6 +3434,8 @@ fn patch_client_anchor(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     };
     let first = binary::read_u16_le_at(payload, first_offset)?;
     let last = binary::read_u16_le_at(payload, last_offset)?;
+    // Whether an endpoint that keeps its place keeps its coordinates.
+    let in_place = |to: u16| sizes.is_some_and(|sizes| sizes.unchanged(start, to));
     let (first, last) = match behavior {
         0 => shift_axis_range(first, last, start, count, insert, limit)?,
         _ if start > last => return Ok(()),
@@ -3382,11 +3443,28 @@ fn patch_client_anchor(payload: &mut [u8], shift: AxisShift) -> Result<()> {
             shift_axis_point(first, start, count, insert, limit)?,
             shift_axis_point(last, start, count, insert, limit)?,
         ),
+        // The top-left cell stays and the size is kept.
+        0b10 if start > first && in_place(last) => return Ok(()),
         0b10 => {
             return Err(Error::UnsafeEdit(
                 "a size-locked drawing anchor that spans the shift point is not reversibly shiftable"
                     .into(),
             ));
+        },
+        0b11 if in_place(last) => return Ok(()),
+        // `fMove` without `fSize` breaks the spec's "fSize MUST be 1 when
+        // fMove is 1", but Excel writes it on AutoFilter and PivotTable
+        // drop-downs. Apache POI (`DONT_MOVE_DO_RESIZE`) and LibreOffice
+        // read it as position-locked and resizing: the top-left keeps its
+        // place and the bottom-right moves with its cell (record 0316).
+        0b01 if start > first || in_place(first) => {
+            let moved = shift_axis_point(last, start, count, insert, limit)?;
+            if moved < first {
+                return Err(Error::UnsafeEdit(
+                    "a row/column deletion would invert a resizing drawing anchor".into(),
+                ));
+            }
+            (first, moved)
         },
         _ => {
             return Err(Error::UnsafeEdit(
@@ -4332,7 +4410,7 @@ fn shift_rows(
         } else {
             row - count
         };
-        patch_row_number(&mut data, target)?;
+        patch_row_number(&mut data, row, target, start, count, insert)?;
         shifted.insert(target, data);
     }
     *rows = shifted;
@@ -4354,9 +4432,15 @@ fn shift_columns(
         for mut record in std::mem::take(&mut data.cell_records) {
             let kind = record_kind(&record)?;
             if matches!(kind, TABLE | ARRAY) {
-                return Err(Error::UnsafeEdit(
-                    "column movement of formula ownership records is refused".into(),
-                ));
+                // The range moves whole (record 0316).
+                let shift = AxisShift::Columns {
+                    start,
+                    count,
+                    insert,
+                };
+                rules::move_owner_range(&mut record, shift, 0, 0)?;
+                retained.push(record);
+                continue;
             }
             if !is_cell_record(kind) {
                 retained.push(record);
@@ -4418,6 +4502,16 @@ fn shift_columns(
                 column - count
             };
             record[6..8].copy_from_slice(&u16::from(target).to_le_bytes());
+            if kind == FORMULA {
+                shift_formula_anchor(
+                    &mut record,
+                    AxisShift::Columns {
+                        start,
+                        count,
+                        insert,
+                    },
+                )?;
+            }
             retained.push(record);
         }
         data.cell_records = retained;
@@ -4425,7 +4519,14 @@ fn shift_columns(
     Ok(())
 }
 
-fn patch_row_number(data: &mut RowData, row: u16) -> Result<()> {
+fn patch_row_number(
+    data: &mut RowData,
+    from: u16,
+    row: u16,
+    start: u16,
+    count: u16,
+    insert: bool,
+) -> Result<()> {
     data.row_record
         .get_mut(4..6)
         .ok_or_else(|| Error::InvalidData("ROW record is truncated".into()))?
@@ -4433,9 +4534,16 @@ fn patch_row_number(data: &mut RowData, row: u16) -> Result<()> {
     for record in &mut data.cell_records {
         let kind = record_kind(record)?;
         if matches!(kind, TABLE | ARRAY) {
-            return Err(Error::UnsafeEdit(
-                "row movement of formula ownership records is refused".into(),
-            ));
+            // The range moves whole with its first row (record 0316).
+            if from != row {
+                let shift = AxisShift::Rows {
+                    start,
+                    count,
+                    insert,
+                };
+                rules::move_owner_range(record, shift, from, row)?;
+            }
+            continue;
         }
         if !is_cell_record(kind) {
             continue;
@@ -4444,6 +4552,16 @@ fn patch_row_number(data: &mut RowData, row: u16) -> Result<()> {
             .get_mut(4..6)
             .ok_or_else(|| Error::InvalidData("cell record is truncated".into()))?
             .copy_from_slice(&row.to_le_bytes());
+        if kind == FORMULA && from != row {
+            shift_formula_anchor(
+                record,
+                AxisShift::Rows {
+                    start,
+                    count,
+                    insert,
+                },
+            )?;
+        }
     }
     Ok(())
 }
@@ -4760,7 +4878,7 @@ fn certify_coordinate_shift(
     records: &[RawRecord],
     shift: AxisShift,
 ) -> Result<()> {
-    const DEPENDENT: &[u16] = &[TABLE, ARRAY, 0x0879, 0x087a, 0x009e, 0x0041, 0x0090];
+    const DEPENDENT: &[u16] = &[0x009e, 0x0041, 0x0090];
     if let Some(record) = records
         .iter()
         .find(|record| DEPENDENT.contains(&record.kind))
@@ -4770,7 +4888,12 @@ fn certify_coordinate_shift(
             record.kind
         )));
     }
-    shifted_drawing_stream(worksheet, &drawing_ranges(records), shift)?;
+    let drawings = drawing_ranges(records);
+    if !drawings.is_empty() {
+        let sizes = sizes::SizeCheck::predict(worksheet, records, shift)?;
+        shifted_drawing_stream(worksheet, &drawings, shift, Some(&sizes))?;
+    }
+    let mut has_rules = false;
     for record in records {
         let payload_start = record
             .start
@@ -4782,9 +4905,9 @@ fn certify_coordinate_shift(
         match record.kind {
             FORMULA => certify_mutation(payload, shift, patch_formula_record)?,
             SHARED_FORMULA => certify_mutation(payload, shift, patch_shared_formula)?,
-            CONDFMT => certify_mutation(payload, shift, patch_condfmt)?,
-            CF => certify_reference_free(cf_formulas(payload)?, "conditional format")?,
-            DV => certify_mutation(payload, shift, patch_dv)?,
+            ARRAY => certify_mutation(payload, shift, rules::patch_array)?,
+            TABLE => certify_mutation(payload, shift, rules::patch_table)?,
+            kind if rules::RULE_RECORDS.contains(&kind) => has_rules = true,
             SELECTION => certify_mutation(payload, shift, patch_selection_shift)?,
             MERGED_CELLS => certify_mutation(payload, shift, patch_merged_cells)?,
             HLINK => certify_mutation(payload, shift, patch_hyperlink)?,
@@ -4798,6 +4921,16 @@ fn certify_coordinate_shift(
             },
             _ => {},
         }
+    }
+    if has_rules {
+        // Conditional-format rules are read against the ranges of the
+        // records before them, so the rules are certified together.
+        let mut candidate = Vec::new();
+        candidate
+            .try_reserve_exact(worksheet.len())
+            .map_err(|_error| Error::Allocation("certifying conditional formats"))?;
+        candidate.extend_from_slice(worksheet);
+        rules::patch_rule_records(&mut candidate, records, shift)?;
     }
     Ok(())
 }
@@ -4913,14 +5046,60 @@ fn formula_tokens(payload: &[u8]) -> Result<&[u8]> {
     Ok(tokens)
 }
 
+/// The cell a Formula's `PtgExp` or `PtgTbl` (`[MS-XLS]` 2.5.198.58,
+/// 2.5.198.91) names: the first cell of its shared formula, array formula or
+/// data table. Such a formula holds no other token.
+fn formula_anchor(tokens: &[u8]) -> Option<(u16, u16)> {
+    crate::formula::ptg_exp_anchor(tokens).or_else(|| {
+        (tokens.len() == 5 && tokens[0] == 0x02 && tokens[4] == 0).then(|| {
+            (
+                u16::from_le_bytes([tokens[1], tokens[2]]),
+                u16::from_le_bytes([tokens[3], tokens[4]]),
+            )
+        })
+    })
+}
+
+/// Shifts the references of a Formula record of the rebuilt row table. The
+/// `PtgExp`/`PtgTbl` anchor of a shared, array or table cell already moved
+/// with its row (`shift_formula_anchor`), so the row-block planner sees an
+/// `Array` or `Table` record next to its anchor (record 0316).
+fn patch_formula_references(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let token_length = formula_tokens(payload)?.len();
+    let tokens = payload
+        .get_mut(22..22 + token_length)
+        .ok_or_else(|| Error::InvalidData("Formula tokens are truncated".into()))?;
+    if formula_anchor(tokens).is_some() {
+        return Ok(());
+    }
+    patch_formula_tokens(tokens, shift)
+}
+
+/// Moves the `PtgExp`/`PtgTbl` anchor of a Formula cell record (`record`,
+/// header included) under `shift`; other formulas are unchanged.
+fn shift_formula_anchor(record: &mut [u8], shift: AxisShift) -> Result<()> {
+    let payload = record
+        .get_mut(4..)
+        .ok_or_else(|| Error::InvalidData("Formula record is truncated".into()))?;
+    let Some(tokens) = payload.get(22..) else {
+        return Err(Error::InvalidData("Formula record is truncated".into()));
+    };
+    let length = usize::from(binary::read_u16_le_at(payload, 20)?);
+    if tokens.len() < length || formula_anchor(&tokens[..length]).is_none() {
+        return Ok(());
+    }
+    patch_formula_record(payload, shift)
+}
+
 fn patch_formula_record(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     let token_length = formula_tokens(payload)?.len();
     let tokens = payload
         .get_mut(22..22 + token_length)
         .ok_or_else(|| Error::InvalidData("Formula tokens are truncated".into()))?;
-    if crate::formula::ptg_exp_anchor(tokens).is_some() {
-        // A cell of a shared formula: its PtgExp names the shared range's
-        // first cell, which moves with the range (record 0308).
+    if formula_anchor(tokens).is_some() {
+        // A cell of a shared or array formula: its PtgExp names the range's
+        // first cell, which moves with the range (record 0308); a data-table
+        // cell's PtgTbl names the table's first cell likewise (record 0316).
         return match shift {
             AxisShift::Rows {
                 start,
@@ -4946,7 +5125,8 @@ fn patch_formula_record(payload: &mut [u8], shift: AxisShift) -> Result<()> {
 /// (a shift point inside it would split it and is refused), absolute
 /// references shift like ordinary ones, and a relative `PtgRefN`/`PtgAreaN`
 /// component stays when every cell and the cell it names lie on the same
-/// side of the shift point. 3-D references are refused. Record 0308.
+/// side of the shift point. 3-D references are closed by the workbook pass
+/// (record 0316). Record 0308.
 fn patch_shared_formula(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     if payload.len() < 10 {
         return Err(Error::InvalidData("ShrFmla record is truncated".into()));
@@ -4991,71 +5171,28 @@ fn patch_shared_formula(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     let tokens = payload
         .get_mut(10..10 + token_length)
         .ok_or_else(|| Error::InvalidData("ShrFmla tokens are truncated".into()))?;
-    let (same_sheet, relative, three_d) = crate::formula::shared_formula_reference_spans(tokens)
+    // 3-D references, including those naming this worksheet, are closed by
+    // `patch_workbook_dependencies` over the whole stream (record 0316).
+    let (same_sheet, relative, _three_d) = crate::formula::shared_formula_reference_spans(tokens)
         .ok_or_else(|| {
-            Error::UnsafeEdit(
-                "row/column movement cannot read a shared formula's references".into(),
-            )
-        })?;
-    if !three_d.is_empty() {
-        return Err(Error::UnsafeEdit(
-            "row/column movement cannot close a shared formula's 3-D reference".into(),
-        ));
-    }
+        Error::UnsafeEdit("row/column movement cannot read a shared formula's references".into())
+    })?;
     for reference in same_sheet {
         patch_reference_span(tokens, reference, shift)?;
     }
-    // Whether a relative offset keeps naming the same cell for every cell
-    // of the range.
-    let relative_kept = |offset: i32| {
-        let (low, high) = (
-            i32::from(range_first) + offset,
-            i32::from(range_last) + offset,
-        );
-        let (start, end) = (i32::from(start), i32::from(end));
-        if !moves {
-            high < start
-        } else if insert {
-            low >= start
-        } else {
-            low >= end
-        }
-    };
-    let rows = matches!(shift, AxisShift::Rows { .. });
-    let component = |tokens: &mut [u8], row_offset: usize, flags_offset: usize| -> Result<()> {
-        let flags = binary::read_u16_le_at(tokens, flags_offset)?;
-        if rows {
-            if flags & 0x8000 != 0 {
-                let offset = i32::from(binary::read_u16_le_at(tokens, row_offset)? as i16);
-                return if relative_kept(offset) {
-                    Ok(())
-                } else {
-                    Err(Error::UnsafeEdit(
-                        "a shared formula's relative reference would cross the shift point".into(),
-                    ))
-                };
-            }
-            patch_formula_row(tokens, row_offset, start, count, insert)
-        } else {
-            if flags & 0x4000 != 0 {
-                let offset = i32::from((flags & 0x00ff) as u8 as i8);
-                return if relative_kept(offset) {
-                    Ok(())
-                } else {
-                    Err(Error::UnsafeEdit(
-                        "a shared formula's relative reference would cross the shift point".into(),
-                    ))
-                };
-            }
-            let column = flags & 0x00ff;
-            let column = shift_axis_point(column, start, count, insert, limit)?;
-            write_formula_u16(tokens, flags_offset, (flags & 0xff00) | column)
-        }
-    };
+    // A relative offset must keep naming the same cell for every cell of
+    // the range.
     for reference in relative {
         match reference {
             crate::formula::FormulaReferenceSpan::Cell { row, column } => {
-                component(tokens, row, column)?;
+                rules::patch_relative_component(
+                    tokens,
+                    row,
+                    column,
+                    shift,
+                    range_first,
+                    range_last,
+                )?;
             },
             crate::formula::FormulaReferenceSpan::Area {
                 first_row,
@@ -5063,8 +5200,16 @@ fn patch_shared_formula(payload: &mut [u8], shift: AxisShift) -> Result<()> {
                 first_column,
                 last_column,
             } => {
-                component(tokens, first_row, first_column)?;
-                component(tokens, last_row, last_column)?;
+                for (row, column) in [(first_row, first_column), (last_row, last_column)] {
+                    rules::patch_relative_component(
+                        tokens,
+                        row,
+                        column,
+                        shift,
+                        range_first,
+                        range_last,
+                    )?;
+                }
             },
         }
     }
@@ -5718,32 +5863,32 @@ mod tests {
         // "Move and size with cells" (flags 0) shifts like cells.
         let original_anchor = [0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0];
         let mut anchor = original_anchor;
-        patch_client_anchor(&mut anchor, insert_rows).unwrap();
+        patch_client_anchor(&mut anchor, insert_rows, None).unwrap();
         assert_eq!(&anchor[14..16], &[7, 0]);
-        patch_client_anchor(&mut anchor, delete_rows).unwrap();
+        patch_client_anchor(&mut anchor, delete_rows, None).unwrap();
         assert_eq!(anchor, original_anchor);
         // "Don't move or size" (3) is refused when the shift reaches it and
         // unchanged after it; "move but don't size" (2) moves whole only
         // when the shift point is outside it (record 0308).
         let mut locked = original_anchor;
         locked[0] = 3;
-        assert!(patch_client_anchor(&mut locked, insert_rows).is_err());
+        assert!(patch_client_anchor(&mut locked, insert_rows, None).is_err());
         let late = AxisShift::Rows {
             start: 9,
             count: 2,
             insert: true,
         };
-        patch_client_anchor(&mut locked, late).unwrap();
+        patch_client_anchor(&mut locked, late, None).unwrap();
         assert_eq!(&locked[6..8], &[1, 0]);
         let mut moving = original_anchor;
         moving[0] = 2;
-        assert!(patch_client_anchor(&mut moving, insert_rows).is_err());
+        assert!(patch_client_anchor(&mut moving, insert_rows, None).is_err());
         let early = AxisShift::Rows {
             start: 0,
             count: 2,
             insert: true,
         };
-        patch_client_anchor(&mut moving, early).unwrap();
+        patch_client_anchor(&mut moving, early, None).unwrap();
         assert_eq!((&moving[6..8], &moving[14..16]), (&[3, 0][..], &[7, 0][..]));
 
         let insert_columns = AxisShift::Columns {
@@ -5761,8 +5906,8 @@ mod tests {
         patch_ref8(&mut range, delete_columns).unwrap();
         assert_eq!(range, original_range);
         let mut anchor = original_anchor;
-        patch_client_anchor(&mut anchor, insert_columns).unwrap();
-        patch_client_anchor(&mut anchor, delete_columns).unwrap();
+        patch_client_anchor(&mut anchor, insert_columns, None).unwrap();
+        patch_client_anchor(&mut anchor, delete_columns, None).unwrap();
         assert_eq!(anchor, original_anchor);
 
         let destructive = AxisShift::Rows {
@@ -6294,6 +6439,9 @@ mod tests {
         assert!(location_reaches("Sheet1:Sheet3!A1", false, "Data"));
     }
 }
+
+mod rules;
+mod sizes;
 
 #[cfg(test)]
 #[path = "structural_sst_tests.rs"]

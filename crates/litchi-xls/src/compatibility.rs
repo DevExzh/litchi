@@ -13,10 +13,15 @@ pub enum CompatibilityProfile {
     Strict,
     /// Preserve a Formula `fShrFmla` flag without the leading `PtgExp` token.
     ///
-    /// `[MS-XLS]` 2.4.127 requires the token. This V1 profile exists for the
-    /// real `ConditionalFormattingSamples.xls` fixture mirrored in the Apache
-    /// POI spreadsheet test-data corpus. Local provenance does not identify
-    /// the original producing application, so no producer is inferred.
+    /// `[MS-XLS]` 2.4.127 requires the token only for a formula that is part
+    /// of a shared formula. The strict profile ignores such a stale flag and
+    /// records [`crate::WorksheetDefect::SharedFormulaFlag`] (record 0316);
+    /// this V1 profile keeps the flag in the typed metadata instead and
+    /// reports [`crate::formula_metadata::Defect::SharedFlagWithoutPtgExp`].
+    /// It exists for the real `ConditionalFormattingSamples.xls` fixture
+    /// mirrored in the Apache POI spreadsheet test-data corpus. Local
+    /// provenance does not identify the original producing application, so
+    /// no producer is inferred.
     SharedFormulaFlagWithoutPtgExpV1,
 }
 

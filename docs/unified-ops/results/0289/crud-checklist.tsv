@@ -3656,7 +3656,7 @@ odp	tc	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/ta
 odp	tc	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]
 odp	tc	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	tc	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]
-odp	tc	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
+odp	tc	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1] {"bold":"true"}
 odp	tc	add	n/a	add not offered for this element	-
 odp	tc	remove	n/a	remove not offered for this element	-
 odp	tc	move	format-verb		refused unsupported_capability

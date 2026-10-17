@@ -401,3 +401,73 @@ fn signed_and_encrypted_workbooks_refuse_structure_edits() {
         assert_eq!(error.code(), Code::DocumentProtected);
     }
 }
+
+/// Record 0316: an array formula and a data table move whole with their
+/// cells, on both owners, and removing the inserted row and column restores
+/// the input bytes.
+#[test]
+fn array_formulas_and_data_tables_move_with_their_cells() {
+    use litchi_xls::formula_metadata::Range;
+    use litchi_xls::{DataTable, DataTableInputCell, DataTableRange};
+
+    let mut builder = litchi_xls::Builder::new();
+    let sheet = builder.add_worksheet("Model").unwrap();
+    builder.write_number(sheet, 0, 0, 3.0).unwrap();
+    builder.write_number(sheet, 0, 6, 1.0).unwrap();
+    builder
+        .write_array_formula(sheet, Range::try_new(6, 1, 7, 2).unwrap(), "A1+7")
+        .unwrap();
+    let table = DataTable::one_variable(
+        DataTableRange::new(12, 16, 3, 5).unwrap(),
+        true,
+        DataTableInputCell::Present { row: 0, col: 6 },
+    );
+    builder.add_data_table(sheet, 11, 2, table).unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+
+    for eager in [true, false] {
+        let file = open_owner(&bytes, eager);
+        for (kind, rows, columns) in [("row", 1_u16, 0_u16), ("column", 0, 1)] {
+            let added = file
+                .add("/sheet[1]", NewNode::new(kind).at(Placement::Start))
+                .unwrap_or_else(|error| {
+                    let mut text = error.to_string();
+                    let mut source = std::error::Error::source(&error);
+                    while let Some(cause) = source {
+                        text.push_str(&format!(" <- {cause}"));
+                        source = cause.source();
+                    }
+                    panic!("{kind} eager={eager}: {text}")
+                });
+            let shifted = added.file.to_bytes().unwrap();
+            let workbook =
+                litchi_xls::raw::Reader::new(std::io::Cursor::new(shifted.clone())).unwrap();
+            let worksheet = workbook.xls_worksheet(0).unwrap();
+            assert_eq!(
+                worksheet.array_formulas().next().unwrap().range(),
+                Range::try_new(
+                    6 + u32::from(rows),
+                    1 + columns,
+                    7 + u32::from(rows),
+                    2 + columns
+                )
+                .unwrap(),
+                "{kind}"
+            );
+            let moved = worksheet.data_tables()[0];
+            assert_eq!(
+                moved.range(),
+                DataTableRange::new(
+                    12 + rows,
+                    16 + rows,
+                    3 + u8::try_from(columns).unwrap(),
+                    5 + u8::try_from(columns).unwrap(),
+                )
+                .unwrap(),
+                "{kind}"
+            );
+            let removed = added.file.remove(&added.path).unwrap();
+            assert_eq!(removed.to_bytes().unwrap(), bytes, "{kind} eager={eager}");
+        }
+    }
+}
