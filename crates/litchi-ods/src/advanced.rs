@@ -22,6 +22,8 @@ use quick_xml::{
 
 use crate::{Cell, CellValue, Row, Sheet, package::Archive};
 
+pub mod sheet_features;
+
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";

@@ -1096,6 +1096,20 @@ fn column_name(mut column: usize) -> String {
 
 include!("formula_function_metadata.rs");
 
+/// The Excel function-table entry of a built-in function by upper-case
+/// name: its index and its minimum and maximum argument counts.
+pub(crate) fn built_in_function(name: &str) -> Option<(u16, u8, u8)> {
+    BUILT_IN_FUNCTIONS
+        .iter()
+        .find(|metadata| metadata.name == name)
+        .map(|metadata| (metadata.index, metadata.min_params, metadata.max_params))
+}
+
+/// The minimum and maximum argument counts of a built-in function.
+pub(crate) fn function_arity_range(index: u16) -> Option<(u8, u8)> {
+    function_metadata(index).map(|metadata| (metadata.min_params, metadata.max_params))
+}
+
 /// Return the exact fixed arity of a built-in BIFF function, or `None` for
 /// variable-arity and unknown functions.
 pub(crate) fn fixed_function_arity(index: u16) -> Option<usize> {

@@ -20,11 +20,41 @@ use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
 
-/// The native proof and immutable endpoints of one unified XLS write.
-/// The patch an XLS write step retains: a primary edit or a metadata edit.
-pub(crate) type StepPatch =
-    crate::format::ole_metadata::StepPatch<litchi_xls::Patch, litchi_xls::package::metadata::Patch>;
+/// The patch an XLS write step retains: a primary edit, a metadata edit or
+/// a worksheet-feature edit (record 0327). Each exposes the exact package
+/// images the generic history compares.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the step history boxes the patch; the primary patch is the common one"
+)]
+pub(crate) enum StepPatch {
+    /// A primary content edit.
+    Primary(litchi_xls::Patch),
+    /// A metadata edit.
+    Metadata(litchi_xls::package::metadata::Patch),
+    /// A worksheet-feature edit.
+    Features(litchi_xls::sheet_features::edit::Patch),
+}
 
+impl StepPatch {
+    pub(crate) fn before(&self) -> &[u8] {
+        match self {
+            Self::Primary(patch) => patch.before(),
+            Self::Metadata(patch) => patch.before_bytes(),
+            Self::Features(patch) => patch.before(),
+        }
+    }
+
+    pub(crate) fn after(&self) -> &[u8] {
+        match self {
+            Self::Primary(patch) => patch.after(),
+            Self::Metadata(patch) => patch.after_bytes(),
+            Self::Features(patch) => patch.after(),
+        }
+    }
+}
+
+/// The native proof and immutable endpoints of one unified XLS write.
 pub(crate) struct WriteCommit {
     pub(crate) before: Xls,
     pub(crate) after: Xls,
@@ -80,6 +110,8 @@ pub(crate) fn set_with_limits<'p, 'v>(
     // sheet property: a worksheet named `metadata` stays renamable there.
     let result = if crate::format::ole_metadata::is_target(&target) && !is_sheet_property(&props) {
         file.set_metadata(&props, limits)
+    } else if let Some(commit) = file.try_set_feature(&target, &props, limits)? {
+        Ok(commit)
     } else if is_sheet_property(&props) {
         set_sheet_with_limits(file, target, &props, limits)
     } else if let Some(commit) = super::layout::set_layout(file, &target, &props, limits)? {
@@ -100,6 +132,9 @@ pub(crate) fn remove_with_limits(
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
     file.admit_edit()?;
+    if let Some(commit) = file.try_remove_feature(&target, limits)? {
+        return Ok(commit);
+    }
     if let Some(commit) = super::structure::remove_sheet(file, &target, limits)? {
         return Ok(commit);
     }

@@ -1,8 +1,10 @@
 # 0332 — OfficeCLI parity dispositions and the v1 corpus subset (audit WP1 + WP13)
 
 - Status: implemented on `uo2/dispositions`, cut from `feat/unified-ops-api`
-  at `d761892de3` (record 0330 merge). Trunk had not moved when this record
-  was written.
+  at `d761892de3` (record 0330 merge); trunk merged at `243aab0e0b`
+  (record 0327, XLS/ODS worksheet features). The counts below are after
+  that merge, which closed many XLS/ODS gap rows (one stale tier key,
+  `xlsx:hyperlink`, was removed).
 - Date: 2026-10-17
 - Input: the definition-of-done audit of 2026-10-17, §1 items 2 and 6, §3,
   §4, WP1 and WP13; the goal's "§14's three acceptance layers pass for the
@@ -122,18 +124,18 @@ turns red until the new rows are classified.
 
 ## 4. Result: the capability delta
 
-Every gap row now has a disposition: 7,849 rows (elements and properties,
+Every gap row now has a disposition: 7,458 rows (elements and properties,
 21 formats).
 
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope |
 |---|---:|---:|---:|---:|---:|
 | P0 | 89 | 0 | 0 | 0 | 4 |
 | v1 | 39 | 0 | 0 | 0 | 0 |
-| P1 | 975 | 5,955 | 0 | 0 | 44 |
-| P2 | 0 | 0 | 660 | 0 | 83 |
+| P1 | 453 | 6,082 | 0 | 0 | 44 |
+| P2 | 0 | 0 | 660 | 0 | 87 |
 
 - The 54 untriaged element rows are now `unlisted` with a disposition.
-- The 958 rows whose follow-up names only a milestone now carry a current
+- The 694 rows whose follow-up names only a milestone now carry a current
   id: a work package, the owning record (0322, 0323, 0324, 0327, 0328), or
   0332 for a deferral this record makes.
 - **Planned, by work package:**
@@ -262,7 +264,7 @@ can account for them. Follow-up F1 below covers this.
   fails today, and the fix is a routing change, so the honest disposition
   is planned.
 - **The breadth rule** (properties of P0 elements are P1 unless named)
-  decides most of the 5,955 deferred-P1 rows. Changing a property to P0 is
+  decides most of the 6,082 deferred-P1 rows. Changing a property to P0 is
   one tier key. `--check` then forces its rows to be planned.
 - **F1, the corpus detail bound.** Raise or remove the 48-character bound
   on skipped-property lists in `crates/litchi-cli/tests/officecli_corpus.rs`

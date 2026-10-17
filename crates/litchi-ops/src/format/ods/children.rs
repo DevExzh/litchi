@@ -67,6 +67,7 @@ enum Phase {
     Cells,
     Comments,
     Merges,
+    Features,
     Done,
 }
 
@@ -80,6 +81,8 @@ struct SheetItems<'f> {
     next: usize,
     /// The per-sheet ordinal of the next annotation.
     ordinal: usize,
+    /// The worksheet features still to list (record 0327).
+    features: Option<std::vec::IntoIter<super::features::Feature>>,
 }
 
 impl<'f> SheetItems<'f> {
@@ -90,7 +93,8 @@ impl<'f> SheetItems<'f> {
             Phase::Rows => Phase::Cells,
             Phase::Cells => Phase::Comments,
             Phase::Comments => Phase::Merges,
-            Phase::Merges | Phase::Done => Phase::Done,
+            Phase::Merges => Phase::Features,
+            Phase::Features | Phase::Done => Phase::Done,
         };
     }
 
@@ -156,6 +160,21 @@ impl<'f> SheetItems<'f> {
                     }
                     self.advance();
                 },
+                Phase::Features => {
+                    if self.features.is_none() {
+                        let mut items = Vec::new();
+                        for kind in super::features::KINDS {
+                            if self.kinds.contains(kind) {
+                                items.extend(super::features::list(file, self.sheet, kind)?);
+                            }
+                        }
+                        self.features = Some(items.into_iter());
+                    }
+                    if let Some(feature) = self.features.as_mut().and_then(Iterator::next) {
+                        return Ok(Some(Node::new_feature(file, self.sheet, feature)));
+                    }
+                    self.advance();
+                },
                 Phase::Done => return Ok(None),
             }
         }
@@ -200,6 +219,7 @@ impl<'f> Children<'f> {
                     Kind::MergeCell,
                 ]
                 .into_iter()
+                .chain(super::features::KINDS)
                 .any(|kind| kinds.contains(kind));
                 if !wanted {
                     return Ok(Self::done(file));
@@ -207,6 +227,7 @@ impl<'f> Children<'f> {
                 let position = parent.sheet_position();
                 if [Kind::Column, Kind::Row, Kind::Comment, Kind::MergeCell]
                     .into_iter()
+                    .chain(super::features::KINDS)
                     .all(|kind| !kinds.contains(kind))
                 {
                     // Only cells are wanted (record 0287): the sheet walk's
@@ -231,6 +252,7 @@ impl<'f> Children<'f> {
                         phase: Phase::Columns,
                         next: 0,
                         ordinal: 0,
+                        features: None,
                     })),
                 }
             },

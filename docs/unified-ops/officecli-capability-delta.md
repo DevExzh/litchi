@@ -32,7 +32,7 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `4fddfc467504bf3bf407a791b52c03e624c16c6423615d25cd7e6c91322e5dc2` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `0dcca5a64b3b61a1f442e09dd0dbaf2d33e8ed40daf3acdbba92c04dede6b2d9` |
-| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
+| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `6769b6e588c2abedd1e298586c7c90cd0741f3bf4147db3a12cf1ff7f2abe77c` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `5f7fd859d62b6f570a465c859cfc1b26d5218386a4eb6c251a63678a71e446fc` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `2fdded1c92e64c56696c48a388dd03c27c4f6297468640ffa1133bd113bc8529` |
@@ -44,7 +44,7 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `ae58459a816d8f5e9589778be23054de447115fe445e805eda0bb7ac6fee9445` |
 | golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `ff30dfda02183baa2952667b60f97fc880ae89102392884fb022c2e1bb416eae` |
 | golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `358dabe30ca61a98bec5da7ace7ba00d4a8bfb23aa7fc5ce1fef6e7d176ff439` |
-| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `8101c13967ee6059e70011f78af45c0b7d64b0fdf8952178f901b2ceb7a57dec` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `adbc9fc35ffae00c3089b29ffbe50bf327f8a0f7ec11080651ed8ddda00f87ba` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d7ed0734b44bf5cec561cea44b5e7629e2c19e96ce1834aecacf776daf95b990` |
 | golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `51c51512e3c89b13c59f053cfb96cdd907747af2510db1945450c8e8fbb800dd` |
@@ -91,7 +91,7 @@ Elements:
 | rtf | 22 | 8 | 0 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
-| xls | 7 | 31 | 0 | 0 | 0 | 1 | 2 | 1 |
+| xls | 29 | 9 | 0 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 29 | 3 | 0 | 0 | 0 | 1 | 1 | 9 |
 | ppt | 25 | 7 | 0 | 0 | 0 | 1 | 1 | 8 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
@@ -103,7 +103,7 @@ Elements:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
 | odp | 20 | 8 | 0 | 0 | 0 | 5 | 1 | 6 |
-| ods | 8 | 30 | 0 | 0 | 0 | 1 | 2 | 1 |
+| ods | 29 | 9 | 0 | 0 | 0 | 1 | 2 | 1 |
 | odt | 19 | 12 | 0 | 0 | 0 | 13 | 2 | 5 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 11 |
@@ -117,7 +117,7 @@ Property reads:
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 0 | 546 | 34 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 0 | 145 | 559 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 0 | 159 | 430 |
-| xls | 56 | 4 | 504 | 0 | 24 | 1 | 0 | 102 | 0 |
+| xls | 244 | 4 | 263 | 0 | 74 | 1 | 0 | 105 | 400 |
 | pptx | 228 | 19 | 30 | 0 | 123 | 0 | 0 | 287 | 269 |
 | ppt | 93 | 3 | 86 | 0 | 127 | 0 | 0 | 378 | 49 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -129,7 +129,7 @@ Property reads:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 95 | 2 | 80 | 0 | 120 | 0 | 0 | 390 | 88 |
-| ods | 25 | 11 | 501 | 0 | 26 | 1 | 0 | 127 | 6 |
+| ods | 194 | 11 | 263 | 0 | 92 | 1 | 0 | 130 | 406 |
 | odt | 63 | 0 | 199 | 0 | 168 | 1 | 0 | 530 | 45 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -143,7 +143,7 @@ Property writes:
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
-| xls | 1 | 19 | 524 | 0 | 0 | 147 |
+| xls | 157 | 24 | 363 | 0 | 359 | 188 |
 | pptx | 112 | 34 | 415 | 0 | 149 | 246 |
 | ppt | 6 | 23 | 532 | 0 | 15 | 160 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Property writes:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 9 | 58 | 494 | 0 | 43 | 171 |
-| ods | 6 | 5 | 533 | 0 | 6 | 147 |
+| ods | 134 | 10 | 400 | 0 | 372 | 181 |
 | odt | 12 | 32 | 752 | 0 | 31 | 179 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -184,7 +184,7 @@ Element gap rows:
 | rtf | 1 | 18 | 1 | 0 | 4 | 0 |
 | xlsx | 2 | 2 | 4 | 0 | 0 | 0 |
 | xlsb | 1 | 3 | 4 | 0 | 0 | 0 |
-| xls | 30 | 0 | 4 | 0 | 0 | 0 |
+| xls | 8 | 0 | 4 | 0 | 0 | 0 |
 | pptx | 1 | 0 | 3 | 0 | 1 | 0 |
 | ppt | 1 | 4 | 3 | 0 | 1 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -196,7 +196,7 @@ Element gap rows:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 1 | 8 | 4 | 0 | 1 | 0 |
-| ods | 29 | 0 | 4 | 0 | 0 | 0 |
+| ods | 8 | 0 | 4 | 0 | 0 | 0 |
 | odt | 1 | 21 | 1 | 0 | 4 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -210,7 +210,7 @@ Property gap rows:
 | rtf | 0 | 885 | 35 | 0 | 19 | 0 |
 | xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
-| xls | 430 | 168 | 79 | 0 | 1 | 0 |
+| xls | 189 | 219 | 79 | 0 | 1 | 0 |
 | pptx | 55 | 438 | 57 | 0 | 12 | 0 |
 | ppt | 0 | 608 | 58 | 0 | 12 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -222,7 +222,7 @@ Property gap rows:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 0 | 604 | 58 | 0 | 12 | 0 |
-| ods | 427 | 171 | 79 | 0 | 1 | 0 |
+| ods | 189 | 247 | 79 | 0 | 1 | 0 |
 | odt | 0 | 885 | 35 | 0 | 19 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -233,7 +233,7 @@ All gap rows by tier:
 |---|---:|---:|---:|---:|---:|---:|
 | P0 | 89 | 0 | 0 | 0 | 4 | 0 |
 | v1 | 39 | 0 | 0 | 0 | 0 | 0 |
-| P1 | 975 | 5955 | 0 | 0 | 44 | 0 |
+| P1 | 453 | 6082 | 0 | 0 | 44 | 0 |
 | P2 | 0 | 0 | 660 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -247,11 +247,11 @@ properties share its entry unless an entry names the property):
 | odp-family | deferred | 0328 | 674 | `delta:odp:*` | ODP is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
 | ppt-family | deferred | 0323 | 673 | `delta:ppt:*` | PPT is outside the v1 boundary; record 0323 lists its element follow-ups |
 | xlsb-family | deferred | 0322 | 477 | `delta:xlsb:*` | XLSB is outside the v1 boundary; record 0322 lists its worksheet-feature follow-ups |
-| xls-parity | planned | WP10 | 459 | `delta:xls:*` | XLS element parity: the gap element families and their properties (audit WP10, record 0327) |
-| ods-parity | planned | WP11 | 455 | `delta:ods:*` | ODS element parity: the gap element families and their properties (audit WP11, record 0327) |
+| xls-parity | planned | WP10 | 196 | `delta:xls:*` | XLS element parity: the gap element families and their properties (audit WP10, record 0327) |
+| ods-parity | planned | WP11 | 196 | `delta:ods:*` | ODS element parity: the gap element families and their properties (audit WP11, record 0327) |
 | spreadsheet-p2-families | deferred | 0327 | 166 | `delta:xls:pivottable`, `delta:xls:slicer`, `delta:xls:sparkline`, `delta:xls:ole`, `delta:ods:pivottable`, `delta:ods:slicer`, `delta:ods:sparkline`, `delta:ods:ole` | §13 P2 families (pivot tables, slicers, sparklines, OLE) stay out of the XLS and ODS parity work packages |
-| xls-breadth | deferred | 0327 | 168 | `delta:xls:*.*` | XLS property breadth of supported elements; XLS is outside the v1 boundary |
-| ods-breadth | deferred | 0327 | 171 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
+| xls-breadth | deferred | 0327 | 219 | `delta:xls:*.*` | XLS property breadth of supported elements; XLS is outside the v1 boundary |
+| ods-breadth | deferred | 0327 | 247 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
 | docx-breadth | deferred | 0332 | 575 | `delta:docx:*` | DOCX P1/P2 surface and formatting breadth beyond §13 P0 |
 | xlsx-breadth | deferred | 0332 | 403 | `delta:xlsx:*` | XLSX P1/P2 surface and formatting breadth beyond §13 P0 |
 | pptx-breadth | deferred | 0332 | 498 | `delta:pptx:*` | PPTX P1/P2 surface and formatting breadth beyond §13 P0 |
@@ -717,50 +717,50 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Tier | Disposition | Follow-up |
 |---|---|---|---|---|---|
-| aboveaverage | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| autofilter | autofilter | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| aboveaverage | conditionalFormatting | supported |  |  |  |
+| autofilter | autofilter | supported |  |  |  |
 | cell | cell | supported |  |  |  |
-| cellis | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| cfextended | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| cellis | conditionalFormatting | supported |  |  |  |
+| cfextended | conditionalFormatting | supported |  |  |  |
 | chart-axis | axis | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | chart-series | series | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
 | chart | chart | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| colbreak | colbreak | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| colorscale | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| colbreak | colbreak | supported |  |  |  |
+| colorscale | conditionalFormatting | supported |  |  |  |
 | column | column | supported |  |  |  |
-| comment | comment | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| conditionalformatting | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| containstext | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| databar | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| dateoccurring | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| comment | comment | supported |  |  |  |
+| conditionalformatting | conditionalFormatting | supported |  |  |  |
+| containstext | conditionalFormatting | supported |  |  |  |
+| databar | conditionalFormatting | supported |  |  |  |
+| dateoccurring | conditionalFormatting | supported |  |  |  |
 | detectedtable |  | unlisted | P1 | planned WP10 (xls-parity) |  |
-| duplicatevalues | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| formulacf | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| hyperlink | hyperlink | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| iconset | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| duplicatevalues | conditionalFormatting | supported |  |  |  |
+| formulacf | conditionalFormatting | supported |  |  |  |
+| hyperlink | hyperlink | supported |  |  |  |
+| iconset | conditionalFormatting | supported |  |  |  |
 | namedrange | namedrange | supported |  |  |  |
 | ole | ole | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pagebreak | colbreak | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| picture | picture | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| pagebreak | colbreak | supported |  |  |  |
+| picture | picture | supported |  |  |  |
 | pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | range | range | supported |  |  |  |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | row | row | supported |  |  |  |
-| rowbreak | rowbreak | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| rowbreak | rowbreak | supported |  |  |  |
 | run | run | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| shape | shape | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
 | slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | sort |  | out of scope | P1 | planned WP10 (xls-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
 | sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | table | table | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| topn | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| uniquevalues | conditionalFormatting | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| validation | dataValidation | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| topn | conditionalFormatting | supported |  |  |  |
+| uniquevalues | conditionalFormatting | supported |  |  |  |
+| validation | dataValidation | supported |  |  |  |
 | workbook | workbook | supported |  |  |  |
 |  | mergeCell | litchi-only |  |  | M1-extended (R6b) |
 
-Properties: 691 rows, 678 of them gaps, in [`xls.md`](officecli-capability-delta/xls.md).
+Properties: 1091 rows, 488 of them gaps, in [`xls.md`](officecli-capability-delta/xls.md).
 
 ### Contextual operation gaps
 
@@ -1234,50 +1234,50 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Tier | Disposition | Follow-up |
 |---|---|---|---|---|---|
-| aboveaverage | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| autofilter | autofilter | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| aboveaverage | conditionalFormatting | supported |  |  |  |
+| autofilter | autofilter | supported |  |  |  |
 | cell | cell | supported |  |  |  |
-| cellis | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| cellis | conditionalFormatting | supported |  |  |  |
+| cfextended | conditionalFormatting | supported |  |  |  |
 | chart-axis | axis | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | chart-series | series | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | chart | chart | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colbreak | colbreak | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| colbreak | colbreak | supported |  |  |  |
+| colorscale | conditionalFormatting | supported |  |  |  |
 | column | column | supported |  |  |  |
 | comment | comment | supported |  |  |  |
-| conditionalformatting | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| conditionalformatting | conditionalFormatting | supported |  |  |  |
+| containstext | conditionalFormatting | supported |  |  |  |
+| databar | conditionalFormatting | supported |  |  |  |
+| dateoccurring | conditionalFormatting | supported |  |  |  |
 | detectedtable |  | unlisted | P1 | planned WP11 (ods-parity) |  |
-| duplicatevalues | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| hyperlink | hyperlink | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| iconset | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| duplicatevalues | conditionalFormatting | supported |  |  |  |
+| formulacf | conditionalFormatting | supported |  |  |  |
+| hyperlink | hyperlink | supported |  |  |  |
+| iconset | conditionalFormatting | supported |  |  |  |
 | namedrange | namedrange | supported |  |  |  |
 | ole | ole | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
-| pagebreak | colbreak | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | picture | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| pagebreak | colbreak | supported |  |  |  |
+| picture | picture | supported |  |  |  |
 | pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | range | range | supported |  |  |  |
 | raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | row | row | supported |  |  |  |
-| rowbreak | rowbreak | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| rowbreak | rowbreak | supported |  |  |  |
 | run | run | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | shape | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
 | slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
 | sort |  | out of scope | P1 | planned WP11 (ods-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
 | sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | table | table | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | conditionalFormatting | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | dataValidation | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| topn | conditionalFormatting | supported |  |  |  |
+| uniquevalues | conditionalFormatting | supported |  |  |  |
+| validation | dataValidation | supported |  |  |  |
 | workbook | workbook | supported |  |  |  |
 |  | mergeCell | litchi-only |  |  |  |
 
-Properties: 697 rows, 678 of them gaps, in [`ods.md`](officecli-capability-delta/ods.md).
+Properties: 1097 rows, 516 of them gaps, in [`ods.md`](officecli-capability-delta/ods.md).
 
 ### Contextual operation gaps
 

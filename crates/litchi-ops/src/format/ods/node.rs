@@ -53,6 +53,9 @@ pub(super) enum Item<'f> {
     NamedRange(usize),
     Comment(CommentItem),
     Merge(MergeItem),
+    /// A worksheet feature: a hyperlink, picture, shape, conditional
+    /// format, validation, auto-filter or page break (record 0327).
+    Feature(std::sync::Arc<super::features::Feature>),
 }
 
 #[derive(Clone)]
@@ -188,6 +191,11 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// An element of the worksheet at `sheet`, for a sibling module.
+    pub(super) fn in_sheet_item(file: &'f Ods, sheet: u32, item: Item<'f>) -> Self {
+        Self { file, item, sheet }
+    }
+
     pub(super) fn file(&self) -> &'f Ods {
         self.file
     }
@@ -249,6 +257,7 @@ impl<'f> Node<'f> {
             Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
             Item::Comment(comment) => PathStep::at("comment", Position::new(comment.ordinal)),
             Item::Merge(merge) => PathStep::at("mergeCell", Position::new(merge.ordinal)),
+            Item::Feature(feature) => feature.step(),
         })
     }
 
@@ -264,6 +273,7 @@ impl<'f> Node<'f> {
             Item::NamedRange(_) => Kind::NamedRange,
             Item::Comment(_) => Kind::Comment,
             Item::Merge(_) => Kind::MergeCell,
+            Item::Feature(ref feature) => feature.kind,
         }
     }
 
@@ -374,9 +384,21 @@ impl<'f> Node<'f> {
                     u32::try_from(cell.column()).unwrap_or(u32::MAX),
                     u32::try_from(cell.row()).unwrap_or(u32::MAX),
                 );
-                (COMMENT_PROPS, Props::Comment { entry, label })
+                let sheet = self.sheet()?.name.as_str();
+                (
+                    COMMENT_PROPS,
+                    Props::Comment {
+                        entry,
+                        label,
+                        sheet,
+                    },
+                )
             },
             Item::Merge(merge) => (MERGE_PROPS, Props::Merge(*merge_label(merge))),
+            Item::Feature(feature) => (
+                feature.table(),
+                Props::Feature(std::sync::Arc::clone(feature)),
+            ),
         };
         Ok(Format::new(table, Source::Ods(props)))
     }
@@ -493,8 +515,11 @@ pub(crate) enum Props<'a> {
     Comment {
         entry: &'a litchi_ods::annotations::Entry,
         label: Label,
+        sheet: &'a str,
     },
     Merge(Label),
+    /// A worksheet feature (record 0327); its values are owned.
+    Feature(std::sync::Arc<super::features::Feature>),
 }
 
 impl fmt::Debug for Props<'_> {
@@ -507,6 +532,7 @@ impl fmt::Debug for Props<'_> {
             Self::Name(_) => "Name",
             Self::Comment { .. } => "Comment",
             Self::Merge(_) => "Merge",
+            Self::Feature(_) => "Feature",
         };
         formatter.debug_tuple("Props").field(&name).finish()
     }
@@ -529,7 +555,11 @@ impl<'a> Props<'a> {
                     Scope::Sheet(name) => Cow::Borrowed(name.as_str()),
                 })),
             },
-            Self::Comment { entry, label } => {
+            Self::Comment {
+                entry,
+                label,
+                sheet,
+            } => {
                 let annotation = entry.annotation();
                 match CommentKey::at(index)? {
                     CommentKey::Ref => Some(Value::Text(Cow::Owned(label.as_str().to_owned()))),
@@ -542,11 +572,16 @@ impl<'a> Props<'a> {
                         .date()
                         .filter(|date| !date.is_empty())
                         .map(|date| Value::Text(Cow::Owned(date))),
+                    CommentKey::AnchoredTo => Some(Value::Text(Cow::Owned(format!(
+                        "/{sheet}/{}",
+                        label.as_str()
+                    )))),
                 }
             },
             Self::Merge(label) => {
                 (index == 0).then(|| Value::Text(Cow::Owned(label.as_str().to_owned())))
             },
+            Self::Feature(feature) => feature.value(index).map(Value::into_owned),
         }
     }
 }
@@ -682,6 +717,7 @@ impl<'f> Project<'f> for Node<'f> {
                     .comment()?
                     .map(|entry| Cow::Owned(entry.annotation().text())),
                 Item::Merge(merge) => Some(Cow::Owned(joined_text(self, merge.rect)?)),
+                Item::Feature(feature) => feature.text(),
                 Item::Workbook | Item::Range(_) => None,
             })
         })
@@ -702,6 +738,7 @@ impl<'f> Project<'f> for Node<'f> {
                 Item::NamedRange(_) => self
                     .named_range_text()?
                     .map(|text| Preview::Text(Cow::Borrowed(text))),
+                Item::Feature(feature) => feature.preview(),
             })
         })
     }

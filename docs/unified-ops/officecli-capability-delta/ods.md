@@ -5,18 +5,49 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 
 | Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Tier | Disposition | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|
-| aboveaverage | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `aboveAverage` | bool | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `stdDev` | number | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `equalAverage` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| aboveaverage | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| autofilter | `range` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| autofilter | `criteria0` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| aboveaverage | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| aboveaverage | `aboveAverage` | bool | a-g | asg | supported | supported |  |  |  |
+| aboveaverage | `stdDev` | number | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| aboveaverage | `equalAverage` | bool | a-- | asg | supported | supported |  |  |  |
+| aboveaverage | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| aboveaverage | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| aboveaverage | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| aboveaverage | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| aboveaverage | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| aboveaverage | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| aboveaverage | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| aboveaverage | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| aboveaverage | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| aboveaverage | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| autofilter | `range` | string | asg | asg | supported | supported |  |  |  |
+| autofilter | `criteria0` | string | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | cell | `value` | string | asg | -s- | write-only | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
 | cell | `formula` | string | asg | -sg | supported | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
 | cell | `numberformat` | string | asg |  | gap | gap | P1 | deferred-P1 0327 (ods-breadth) | ODS adapter follow-up (record 0277) |
@@ -78,24 +109,88 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `image.contentType` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
 | cell | `image.fileSize` | int | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
 | cell | `style` | string |  | -s- | litchi-only | litchi-only |  |  |  |
-| cellis | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `operator` | enum | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `value` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `value2` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cellis | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `text` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| cfextended | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| cellis | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| cellis | `operator` | enum | a-g | asg | supported | supported |  |  |  |
+| cellis | `value` | string | a-g | asg | supported | supported |  |  |  |
+| cellis | `value2` | string | a-g | asg | supported | supported |  |  |  |
+| cellis | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| cellis | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| cellis | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| cellis | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| cellis | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| cellis | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| cellis | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| cellis | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| cellis | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| cellis | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cellis | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| cfextended | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| cfextended | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| cfextended | `text` | string | a-g | asg | supported | supported |  |  |  |
+| cfextended | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| cfextended | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| cfextended | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| cfextended | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| cfextended | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| cfextended | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| cfextended | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| cfextended | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| cfextended | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| cfextended | `direction` | string |  | --- | litchi-only | — |  |  |  |
 | chart-axis | `role` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | chart-axis | `dispUnits` | enum | -sg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | chart-axis | `majorUnit` | number | -sg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
@@ -257,18 +352,51 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | chart | `varyColors` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | chart | `view3d` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | chart | `width` | length | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colbreak | `col` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colbreak | `manual` | bool | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colbreak | `min` | int | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colbreak | `max` | int | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `minColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `maxColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `midColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `midpoint` | number | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| colorscale | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| colbreak | `col` | string | as- | asg | supported | supported |  |  |  |
+| colbreak | `manual` | bool | -s- | asg | supported | supported |  |  |  |
+| colbreak | `min` | int | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| colbreak | `max` | int | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| colorscale | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| colorscale | `minColor` | color | a-g | asg | supported | supported |  |  |  |
+| colorscale | `maxColor` | color | a-g | asg | supported | supported |  |  |  |
+| colorscale | `midColor` | color | a-g | asg | supported | supported |  |  |  |
+| colorscale | `midpoint` | number | a-- | asg | supported | supported |  |  |  |
+| colorscale | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| colorscale | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| colorscale | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| colorscale | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| colorscale | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| colorscale | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| colorscale | `fill` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `font.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| colorscale | `direction` | string |  | --- | litchi-only | — |  |  |  |
 | column | `name` | string | a-- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | column | `width` | length | asg |  | gap | gap | P1 | deferred-P1 0327 (ods-breadth) | ODS adapter follow-up (record 0277) |
 | column | `hidden` | bool | asg |  | gap | gap | P1 | deferred-P1 0327 (ods-breadth) | ODS adapter follow-up (record 0277) |
@@ -281,101 +409,304 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | comment | `author` | string | asg | asg | supported | supported |  |  |  |
 | comment | `text` | string | asg | asg | supported | supported |  |  |  |
 | comment | `date` | string |  | asg | litchi-only | litchi-only |  |  |  |
-| conditionalformatting | `type` | enum | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `ref` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `fill` | color | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `operator` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `value` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `color` | color | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `value2` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `text` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `rank` | number | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `percent` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `bottom` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `aboveAverage` | bool | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `stdDev` | number | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `equalAverage` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `period` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `min` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `max` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `showValue` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `negativeColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `axisColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `axisPosition` | enum | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `minColor` | color | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `maxColor` | color | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `midColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `midPoint` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `iconset` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `reverse` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `formula` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| conditionalformatting | `dxfId` | int | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `text` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| containstext | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `min` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `max` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `color` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `showValue` | bool | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `negativeColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `axisColor` | color | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `axisPosition` | enum | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `minLength` | number | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `maxLength` | number | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `direction` | enum | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| databar | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `period` | enum | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| dateoccurring | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| comment | `anchoredTo` | string |  | --g | litchi-only | — |  |  |  |
+| conditionalformatting | `type` | enum | --g | a-g | supported | litchi-only |  |  |  |
+| conditionalformatting | `ref` | string | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `fill` | color | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `operator` | string | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `value` | string | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `color` | color | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `value2` | string | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `text` | string | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `rank` | number | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `percent` | bool | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `bottom` | bool | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `aboveAverage` | bool | a-g | asg | supported | supported |  |  |  |
+| conditionalformatting | `stdDev` | number | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| conditionalformatting | `equalAverage` | bool | a-- | asg | supported | supported |  |  |  |
+| conditionalformatting | `period` | string | a-g | asg | supported | supported |  |  |  |
+| conditionalformatting | `min` | string | a-g | asg | supported | supported |  |  |  |
+| conditionalformatting | `max` | string | a-g | asg | supported | supported |  |  |  |
+| conditionalformatting | `showValue` | bool | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `negativeColor` | color | a-g | asg | supported | supported |  |  |  |
+| conditionalformatting | `axisColor` | color | a-g | asg | supported | supported |  |  |  |
+| conditionalformatting | `axisPosition` | enum | a-- | asg | supported | supported |  |  |  |
+| conditionalformatting | `minColor` | color | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `maxColor` | color | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `midColor` | color | a-g | asg | supported | supported |  |  |  |
+| conditionalformatting | `midPoint` | string | a-- | asg | supported | supported |  |  |  |
+| conditionalformatting | `iconset` | string | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `reverse` | bool | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| conditionalformatting | `formula` | string | asg | asg | supported | supported |  |  |  |
+| conditionalformatting | `dxfId` | int | --g | --g | supported | — |  |  |  |
+| conditionalformatting | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| conditionalformatting | `stopIfTrue` | bool |  | --- | litchi-only | — |  |  |  |
+| conditionalformatting | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `font.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| conditionalformatting | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| containstext | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| containstext | `text` | string | a-g | asg | supported | supported |  |  |  |
+| containstext | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| containstext | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| containstext | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| containstext | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| containstext | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| containstext | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| containstext | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| containstext | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| containstext | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| containstext | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| containstext | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| databar | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| databar | `min` | string | a-- | asg | supported | supported |  |  |  |
+| databar | `max` | string | a-- | asg | supported | supported |  |  |  |
+| databar | `color` | color | a-g | asg | supported | supported |  |  |  |
+| databar | `showValue` | bool | a-g | asg | supported | supported |  |  |  |
+| databar | `negativeColor` | color | a-g | asg | supported | supported |  |  |  |
+| databar | `axisColor` | color | a-g | asg | supported | supported |  |  |  |
+| databar | `axisPosition` | enum | a-- | asg | supported | supported |  |  |  |
+| databar | `minLength` | number | a-g | asg | supported | supported |  |  |  |
+| databar | `maxLength` | number | a-g | asg | supported | supported |  |  |  |
+| databar | `direction` | enum | a-g | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| databar | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| databar | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| databar | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| databar | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| databar | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| databar | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| databar | `fill` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `font.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| databar | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| dateoccurring | `period` | enum | a-g | asg | supported | supported |  |  |  |
+| dateoccurring | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| dateoccurring | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| dateoccurring | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| dateoccurring | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| dateoccurring | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| dateoccurring | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| dateoccurring | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| dateoccurring | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| dateoccurring | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| dateoccurring | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| dateoccurring | `direction` | string |  | --- | litchi-only | — |  |  |  |
 | detectedtable | `source` | string | --g |  | unlisted | — | P1 | planned WP11 (ods-parity) |  |
 | detectedtable | `stable` | bool | --g |  | unlisted | — | P1 | planned WP11 (ods-parity) |  |
 | detectedtable | `ref` | string | --g |  | unlisted | — | P1 | planned WP11 (ods-parity) |  |
 | detectedtable | `columns` | string | --g |  | unlisted | — | P1 | planned WP11 (ods-parity) |  |
 | detectedtable | `dataRange` | string | --g |  | unlisted | — | P1 | planned WP11 (ods-parity) |  |
-| duplicatevalues | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| duplicatevalues | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| duplicatevalues | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| duplicatevalues | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| duplicatevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| duplicatevalues | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| duplicatevalues | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `formula` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `font.italic` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `font.underline` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `font.strike` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `font.size` | font-size | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `font.name` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| formulacf | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| hyperlink | `url` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| hyperlink | `ref` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| hyperlink | `location` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| hyperlink | `display` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| hyperlink | `tooltip` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| iconset | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| iconset | `iconset` | enum | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| iconset | `reverse` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| iconset | `showValue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| iconset | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| iconset | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| duplicatevalues | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| duplicatevalues | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| duplicatevalues | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| duplicatevalues | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| duplicatevalues | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| duplicatevalues | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| duplicatevalues | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| duplicatevalues | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| duplicatevalues | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| duplicatevalues | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| duplicatevalues | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| formulacf | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| formulacf | `formula` | string | a-g | asg | supported | supported |  |  |  |
+| formulacf | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| formulacf | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| formulacf | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| formulacf | `font.italic` | bool | a-- | asg | supported | supported |  |  |  |
+| formulacf | `font.underline` | bool | a-- | asg | supported | supported |  |  |  |
+| formulacf | `font.strike` | bool | a-- | asg | supported | supported |  |  |  |
+| formulacf | `font.size` | font-size | a-- | asg | supported | supported |  |  |  |
+| formulacf | `font.name` | string | a-- | asg | supported | supported |  |  |  |
+| formulacf | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| formulacf | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| formulacf | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| formulacf | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| formulacf | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| formulacf | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| formulacf | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| formulacf | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| hyperlink | `url` | string | --g | asg | supported | litchi-only |  |  |  |
+| hyperlink | `ref` | string | --g | asg | supported | litchi-only |  |  |  |
+| hyperlink | `location` | string | --g | asg | supported | litchi-only |  |  |  |
+| hyperlink | `display` | string | --g | asg | supported | litchi-only |  |  |  |
+| hyperlink | `tooltip` | string | --g | asg | supported | litchi-only |  |  |  |
+| iconset | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| iconset | `iconset` | enum | a-g | asg | supported | supported |  |  |  |
+| iconset | `reverse` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| iconset | `showValue` | bool | a-- | asg | supported | supported |  |  |  |
+| iconset | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| iconset | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| iconset | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| iconset | `stopIfTrue` | bool |  | --- | litchi-only | — |  |  |  |
+| iconset | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| iconset | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `fill` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `font.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| iconset | `direction` | string |  | --- | litchi-only | — |  |  |  |
 | namedrange | `name` | string | asg | asg | supported | supported |  |  |  |
 | namedrange | `ref` | string | asg | asg | supported | supported |  |  |  |
 | namedrange | `scope` | string | asg | a-g | supported | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
@@ -391,46 +722,49 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
-| pagebreak | `row` | int | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| pagebreak | `col` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `crop` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `title` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `decorative` | bool | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `rotation` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `flip` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `flipH` | bool | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `flipV` | bool | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `flipBoth` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `opacity` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `hyperlink` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `anchor` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `anchorMode` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `shadow` | string | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `glow` | string | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `reflection` | string | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `softEdge` | string | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `crop.l` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `crop.r` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `crop.t` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `crop.b` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `srcRect` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `anchoredTo` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `mergeAnchor` | bool | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `x` | length | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `y` | length | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `width` | integer | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `height` | integer | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `cropBottom` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `cropLeft` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `cropRight` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `cropTop` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `name` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `fallback` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `alt` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `contentType` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `fileSize` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `relId` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| picture | `src` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| pagebreak | `row` | int | a-- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| pagebreak | `col` | string | a-- | asg | supported | supported |  |  |  |
+| pagebreak | `manual` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| pagebreak | `min` | int |  | --- | litchi-only | — |  |  |  |
+| pagebreak | `max` | int |  | --- | litchi-only | — |  |  |  |
+| picture | `crop` | string | --g | --- | write-only | — |  |  |  |
+| picture | `title` | string | a-- | a-g | supported | supported |  |  |  |
+| picture | `decorative` | bool | a-g | --g | supported | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `rotation` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `flip` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `flipH` | bool | as- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `flipV` | bool | as- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `flipBoth` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `opacity` | string | a-g | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `hyperlink` | string | a-- | --g | supported | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `anchor` | string | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `anchorMode` | string | a-- | --g | supported | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `shadow` | string | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `glow` | string | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `reflection` | string | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `softEdge` | string | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `crop.l` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `crop.r` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `crop.t` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `crop.b` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `srcRect` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `anchoredTo` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `mergeAnchor` | bool | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `x` | length | asg | asg | supported | supported |  |  |  |
+| picture | `y` | length | asg | asg | supported | supported |  |  |  |
+| picture | `width` | integer | asg | asg | supported | supported |  |  |  |
+| picture | `height` | integer | asg | asg | supported | supported |  |  |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `cropRight` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `cropTop` | string | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `name` | string | a-g | asg | supported | supported |  |  |  |
+| picture | `fallback` | string | a-- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `alt` | string | asg | asg | supported | supported |  |  |  |
+| picture | `contentType` | string | --g | --g | supported | — |  |  |  |
+| picture | `fileSize` | number | --g | --g | supported | — |  |  |  |
+| picture | `relId` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
+| picture | `src` | string | as- | a-- | write-only | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
 | pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
@@ -488,10 +822,10 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | row | `outlineLevel` | number | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
 | row | `collapsed` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | row | `customHeight` | bool | --g |  | unlisted | — | P1 | deferred-P1 0327 (ods-breadth) |  |
-| rowbreak | `row` | int | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| rowbreak | `manual` | bool | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| rowbreak | `min` | int | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| rowbreak | `max` | int | -s- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| rowbreak | `row` | int | as- | asg | supported | supported |  |  |  |
+| rowbreak | `manual` | bool | -s- | asg | supported | supported |  |  |  |
+| rowbreak | `min` | int | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| rowbreak | `max` | int | -s- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | run | `subscript` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | run | `superscript` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | run | `bold` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
@@ -500,36 +834,37 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | run | `italic` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | run | `size` | font-size | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | run | `text` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `hyperlink` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `reflection` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `anchor` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `gradientFill` | string | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `geometry` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `flip` | string | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `flipBoth` | bool | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `x` | length | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `y` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `width` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `height` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `align` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `bold` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `color` | color | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `fill` | color | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `flipH` | bool | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `flipV` | bool | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `font` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `glow` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `italic` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `line` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `margin` | length | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `name` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `rotation` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `shadow` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `size` | font-size | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `softEdge` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `text` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `underline` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| shape | `valign` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| shape | `hyperlink` | string | a-g | --g | supported | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `reflection` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `anchor` | string | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `gradientFill` | string | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `geometry` | string | asg | a-g | supported | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `flip` | string | as- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `flipBoth` | bool | as- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `x` | length | asg | asg | supported | supported |  |  |  |
+| shape | `y` | string | asg | asg | supported | supported |  |  |  |
+| shape | `width` | string | asg | asg | supported | supported |  |  |  |
+| shape | `height` | string | asg | asg | supported | supported |  |  |  |
+| shape | `align` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `bold` | bool | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `color` | color | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `fill` | color | asg | a-g | supported | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `flipH` | bool | as- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `flipV` | bool | as- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `font` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `glow` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `italic` | bool | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `line` | string | asg | a-g | supported | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `margin` | length | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `name` | string | asg | asg | supported | supported |  |  |  |
+| shape | `rotation` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `shadow` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `size` | font-size | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `softEdge` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `text` | string | asg | a-g | supported | partial | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `underline` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `valign` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| shape | `alt` | string |  | asg | litchi-only | litchi-only |  |  |  |
 | sheet | `name` | string | asg | asg | supported | supported |  |  |  |
 | sheet | `autoFilter` | string | asg |  | unlisted | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
 | sheet | `tabColor` | color | asg |  | unlisted | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
@@ -609,38 +944,103 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | table | `totalLabel` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | table | `name` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
 | table | `style` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `rank` | number | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `percent` | bool | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `bottom` | bool | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| topn | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | `ref` | string | a-g |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | `fill` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | `font.color` | color | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | `font.bold` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | `type` | string | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| uniquevalues | `dxfId` | number | --g |  | element gap | — | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `type` | enum | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `ref` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `allowBlank` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `showError` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `showInput` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `errorTitle` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `promptTitle` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `errorStyle` | enum | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `inCellDropdown` | bool | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `showDropDown` | bool | as- |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `operator` | enum | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `formula1` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `formula2` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `prompt` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| validation | `error` | string | asg |  | element gap | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| topn | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| topn | `rank` | number | a-g | asg | supported | supported |  |  |  |
+| topn | `percent` | bool | a-g | asg | supported | supported |  |  |  |
+| topn | `bottom` | bool | a-g | asg | supported | supported |  |  |  |
+| topn | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| topn | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| topn | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| topn | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| topn | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| topn | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| topn | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| topn | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| topn | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| topn | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| topn | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| uniquevalues | `ref` | string | a-g | asg | supported | supported |  |  |  |
+| uniquevalues | `fill` | color | a-- | asg | supported | supported |  |  |  |
+| uniquevalues | `font.color` | color | a-- | asg | supported | supported |  |  |  |
+| uniquevalues | `font.bold` | bool | a-- | asg | supported | supported |  |  |  |
+| uniquevalues | `stopIfTrue` | bool | a-- | --- | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| uniquevalues | `type` | string | --g | a-g | supported | litchi-only |  |  |  |
+| uniquevalues | `dxfId` | number | --g | --g | supported | — |  |  |  |
+| uniquevalues | `priority` | int |  | --g | litchi-only | — |  |  |  |
+| uniquevalues | `operator` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `value` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `value2` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `formula` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `text` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `rank` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `percent` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `bottom` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `aboveAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `equalAverage` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `stdDev` | int |  | --- | litchi-only | — |  |  |  |
+| uniquevalues | `period` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `color` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `min` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `max` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `minLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `maxLength` | int |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `showValue` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `minColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `midColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `maxColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `midpoint` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `iconset` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `reverse` | bool |  | --- | litchi-only | — |  |  |  |
+| uniquevalues | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `font.strike` | bool |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `font.underline` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `font.name` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `negativeColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `axisColor` | color |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `axisPosition` | string |  | asg | litchi-only | litchi-only |  |  |  |
+| uniquevalues | `direction` | string |  | --- | litchi-only | — |  |  |  |
+| validation | `type` | enum | asg | asg | supported | supported |  |  |  |
+| validation | `ref` | string | asg | asg | supported | supported |  |  |  |
+| validation | `allowBlank` | bool | asg | asg | supported | supported |  |  |  |
+| validation | `showError` | bool | asg | asg | supported | supported |  |  |  |
+| validation | `showInput` | bool | asg | asg | supported | supported |  |  |  |
+| validation | `errorTitle` | string | asg | asg | supported | supported |  |  |  |
+| validation | `promptTitle` | string | asg | asg | supported | supported |  |  |  |
+| validation | `errorStyle` | enum | asg | asg | supported | supported |  |  |  |
+| validation | `inCellDropdown` | bool | asg | asg | supported | supported |  |  |  |
+| validation | `showDropDown` | bool | as- |  | write-only | gap | P1 | deferred-P1 0327 (ods-breadth) |  |
+| validation | `operator` | enum | asg | asg | supported | supported |  |  |  |
+| validation | `formula1` | string | asg | asg | supported | supported |  |  |  |
+| validation | `formula2` | string | asg | asg | supported | supported |  |  |  |
+| validation | `prompt` | string | asg | asg | supported | supported |  |  |  |
+| validation | `error` | string | asg | asg | supported | supported |  |  |  |
 | workbook | `defaultFont` | string | --- |  | write-only | — |  |  |  |
 | workbook | `defaultFontSize` | length | --- |  | write-only | — |  |  |  |
 | workbook | `author` | string | -sg | --g | supported | gap | P1 | deferred-P1 0327 (ods-breadth) |  |

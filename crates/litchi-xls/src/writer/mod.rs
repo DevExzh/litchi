@@ -24,6 +24,7 @@ pub mod view;
 /// Checked extended range-sort configuration.
 pub mod sort;
 
+pub(crate) use core::deterministic_comment_guid;
 /// Checked worksheet-shape anchors and primitive shape values.
 pub use core::shape;
 

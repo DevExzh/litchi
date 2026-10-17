@@ -30,6 +30,8 @@ use litchi_ods::{Package, Sheet};
 use crate::{Code, Error, OpenOptions, Result};
 
 mod children;
+mod feature_write;
+mod features;
 mod index;
 pub(crate) mod metadata;
 mod nav;
