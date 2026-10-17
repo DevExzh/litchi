@@ -1462,18 +1462,23 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/body/p[N]/chart[M]/series[K]", "/chart[N]/series[K]"],
                 super::chart::SERIES_PROPS,
             ),
-            element(
-                K::Axis,
-                "axis",
-                &["axis"],
-                &[K::Chart],
-                &[],
-                &[
-                    "/body/p[N]/chart[M]/axis[@role=ROLE]",
-                    "/body/p[N]/chart[M]/axis[N]",
-                    "/chart[N]/axis[@role=ROLE]",
-                ],
-                super::chart::AXIS_PROPS,
+            // `role` selects an axis (`axis[@role=value]`) and is also an
+            // ordinary property, as on PPTX.
+            identities(
+                element(
+                    K::Axis,
+                    "axis",
+                    &["axis"],
+                    &[K::Chart],
+                    &[],
+                    &[
+                        "/body/p[N]/chart[M]/axis[@role=ROLE]",
+                        "/body/p[N]/chart[M]/axis[N]",
+                        "/chart[N]/axis[@role=ROLE]",
+                    ],
+                    super::chart::AXIS_PROPS,
+                ),
+                &["role"],
             ),
             element(
                 K::Node,

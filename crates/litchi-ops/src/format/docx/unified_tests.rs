@@ -1067,7 +1067,7 @@ fn capabilities_match_live_paths_queries_and_views() {
     let smartart = file
         .add(
             "/body/p[1]",
-            crate::NewNode::new("smartart").prop("text", "A\nB"),
+            crate::NewNode::new("smartart").prop("text", "A\n\tA1\nB"),
         )
         .expect("add a SmartArt graphic")
         .into_file();
@@ -1156,9 +1156,9 @@ fn capabilities_match_live_paths_queries_and_views() {
             &commented
         } else if name == "picture" {
             &pictured
-        } else if name == "chart" {
+        } else if matches!(name, "chart" | "series" | "axis") {
             &charted
-        } else if name == "smartart" {
+        } else if matches!(name, "smartart" | "node") {
             &smartart
         } else if matches!(
             name,
@@ -1184,6 +1184,7 @@ fn capabilities_match_live_paths_queries_and_views() {
                 .replace("<id or name>", "Accent")
                 .replace("[@type=T]", "[@type=default]")
                 .replace("[@name=X]", "[@name=Intro]")
+                .replace("[@role=ROLE]", "[@role=category]")
                 .replace("[L]", "[1]")
                 .replace("[N]", "[1]")
                 .replace("[M]", "[1]")

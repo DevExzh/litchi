@@ -295,7 +295,13 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         );
     }
     let table = node.kind.spec().props;
-    Ok(Format::new(table, Source::Docx(props)).without(node.kind.spec().identities))
+    // An axis's `role` is semantic: it selects and is shown (record 0335).
+    let hidden = if node.kind == Kind::Axis {
+        &[]
+    } else {
+        node.kind.spec().identities
+    };
+    Ok(Format::new(table, Source::Docx(props)).without(hidden))
 }
 
 /// Refuse malformed typed direct properties instead of reporting them as absent.
