@@ -209,22 +209,7 @@ pub mod common {
     pub use litchi_core::*;
 
     // Re-export the smart-detection entry points beside the core vocabulary.
-    #[cfg(any(
-        feature = "doc",
-        feature = "docx",
-        feature = "ppt",
-        feature = "pptx",
-        feature = "xls",
-        feature = "xlsx",
-        feature = "xlsb",
-        feature = "rtf",
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "pages",
-        feature = "keynote",
-        feature = "numbers"
-    ))]
+    #[cfg(litchi_unified)]
     pub use crate::detection_smart::{detect_file_format, detect_file_format_from_bytes};
 
     /// Detection re-exports — merges `litchi-core`'s signature detection with
@@ -232,22 +217,7 @@ pub mod common {
     pub mod detection {
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         pub use crate::detection_smart::detect_format_smart_with_limits;
-        #[cfg(any(
-            feature = "doc",
-            feature = "ppt",
-            feature = "xls",
-            feature = "docx",
-            feature = "pptx",
-            feature = "xlsx",
-            feature = "xlsb",
-            feature = "pages",
-            feature = "keynote",
-            feature = "numbers",
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "rtf"
-        ))]
+        #[cfg(litchi_unified)]
         pub use crate::detection_smart::{
             DetectedFormat, detect_file_format, detect_file_format_from_bytes,
             detect_format_from_reader, detect_format_smart,
@@ -264,22 +234,7 @@ pub mod common {
 }
 
 // Smart format detection (depends on per-format crates; can't live in litchi-core).
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "pages",
-    feature = "keynote",
-    feature = "numbers",
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "rtf"
-))]
+#[cfg(litchi_unified)]
 pub mod detection_smart;
 
 #[cfg(feature = "yaml")]
@@ -291,22 +246,7 @@ pub use metadata_ext::MetadataYaml;
 /// Format-neutral repair reports
 ///
 /// See [`ToleranceReport`] and [`File::tolerance_report`].
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "rtf",
-    feature = "odt",
-    feature = "pages",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "odp",
-    feature = "keynote",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
+#[cfg(litchi_unified)]
 pub mod tolerance;
 
 /// Image processing and conversion module
@@ -462,10 +402,13 @@ pub mod pages {
     /// Immutable Pages values: the read-only `Document` projection and its
     /// sections, with the ingress limit profiles.
     ///
-    /// The readers here open a [`crate::pages::Package`] (a single-file
-    /// package or an app-authored package directory) and return its
-    /// read-only projection; no native archive, generated message, or
-    /// compatibility projection is re-exported here.
+    /// No native archive, generated message, or compatibility projection is
+    /// re-exported here.
+    ///
+    /// The namespace holds types only; it has no reader of its own. Open a
+    /// Pages file with [`crate::open`] (a `File::Pages`), or with
+    /// [`crate::pages::Package`] and its `document()` projection for
+    /// format-specific work (record 0334).
     pub mod semantic {
         pub use litchi_pages::{
             Body, Document, DocumentStats, Error, LimitKind, OpenOptions, PackageError, Position,
@@ -473,28 +416,6 @@ pub mod pages {
             SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits, TextPosition,
             TextSpan,
         };
-
-        /// Result returned by the Pages readers.
-        ///
-        /// This is separate from [`Result`], which is the leaf crate's
-        /// semantic-construction result. Keeping the package error visible at
-        /// this boundary preserves typed wrong-format, limit, and malformed
-        /// input failures for callers.
-        pub type ReadResult<T> = std::result::Result<T, PackageError>;
-
-        /// Read one immutable Pages document from a complete package or an
-        /// app-authored package directory.
-        ///
-        /// A source belonging to another iWork family is reported as
-        /// [`PackageError::UnexpectedFormat`].
-        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Document> {
-            litchi_pages::Package::open(path).map(|package| package.document())
-        }
-
-        /// Read one immutable Pages document from package bytes.
-        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {
-            litchi_pages::Package::from_bytes(bytes).map(|package| package.document())
-        }
     }
 }
 
@@ -510,6 +431,11 @@ pub mod keynote {
     /// preservation or editing is required. The source and semantic limit
     /// profiles, selector errors, and immutable value errors are available
     /// here as well, so no package-layer type is needed to configure a read.
+    ///
+    /// The namespace holds types only; it has no reader of its own. Open a
+    /// Keynote file with [`crate::open`] (a `File::Keynote`), or with
+    /// [`crate::keynote::Presentation::open`] for format-specific work
+    /// (record 0334).
     pub mod semantic {
         pub use litchi_keynote::presentation;
         pub use litchi_keynote::show::{Mode, Settings, Show, Size};
@@ -519,28 +445,6 @@ pub mod keynote {
             SlideSelectorError, SlideSelectorResult, SourceLimitKind, SourceLimits,
             SourceLimitsBuilder, TextPosition, TextSpan, Transition,
         };
-
-        /// Result returned by the archive-free Keynote source readers.
-        ///
-        /// This is separate from [`Result`], which remains the focused
-        /// semantic-operation result. The source reader keeps Keynote's
-        /// typed I/O, limit, malformed-input, allocation, and wrong-format
-        /// errors available to callers.
-        pub type ReadResult<T> = std::result::Result<T, presentation::Error>;
-
-        /// Read one immutable Keynote presentation from a complete package
-        /// or app-authored package directory.
-        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Presentation> {
-            Presentation::open(path)
-        }
-
-        /// Read one immutable Keynote presentation from package bytes.
-        ///
-        /// Format detection and semantic projection stay owned by the
-        /// Keynote reader; no native identifiers enter this facade.
-        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Presentation> {
-            Presentation::from_bytes(bytes)
-        }
     }
 }
 
@@ -574,6 +478,11 @@ pub mod numbers {
     /// package preservation or editing is required via [`crate::numbers::Package`].
     /// The checked source and semantic limit profiles and their errors remain
     /// in this namespace for a complete immutable-reader boundary.
+    ///
+    /// The namespace holds types only; it has no reader of its own. Open a
+    /// Numbers file with [`crate::open`] (a `File::Numbers`), or with
+    /// [`crate::numbers::Workbook::open`] for format-specific work (record
+    /// 0334).
     pub mod semantic {
         /// Archive-free typed Numbers cell values.
         ///
@@ -615,27 +524,6 @@ pub mod numbers {
             OpenOptions, SemanticLimitKind, SemanticLimits, Sheet, SheetSelector, SourceLimitKind,
             SourceLimits, Table, TableSelector, TableSelectorError, Workbook,
         };
-
-        /// Result returned by the archive-free Numbers source readers.
-        ///
-        /// This is separate from [`Result`], which is the semantic workbook
-        /// construction result. The source reader's typed error retains
-        /// format routing and bounded-ingress diagnostics.
-        pub type ReadResult<T> = std::result::Result<T, ReadError>;
-
-        /// Read one immutable Numbers snapshot from a complete package or
-        /// app-authored package directory.
-        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Workbook> {
-            Workbook::open(path)
-        }
-
-        /// Read one immutable Numbers snapshot from package bytes.
-        ///
-        /// The Numbers owner performs family detection and semantic
-        /// projection, so callers never need native identifiers or wire data.
-        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Workbook> {
-            Workbook::from_bytes(bytes)
-        }
     }
 }
 
@@ -703,68 +591,20 @@ pub use litchi_ops::calc;
 // The unified operations API (ADR 0033, `litchi-ops`): `open` and `File`
 // are the entry point. The openers wrap the `litchi-ops` ones with the
 // facade's iWork classifier.
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "rtf",
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "pages",
-    feature = "keynote",
-    feature = "numbers"
-))]
+#[cfg(litchi_unified)]
 mod unified;
 
 #[cfg(feature = "doc")]
 pub use litchi_ops::DocOptions;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 pub use litchi_ops::DocumentView;
-#[cfg(all(
-    feature = "encryption",
-    any(
-        feature = "doc",
-        feature = "docx",
-        feature = "ppt",
-        feature = "pptx",
-        feature = "xls",
-        feature = "xlsx",
-        feature = "xlsb",
-        feature = "rtf",
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "pages",
-        feature = "keynote",
-        feature = "numbers"
-    )
-))]
+#[cfg(all(feature = "encryption", litchi_unified))]
 pub use litchi_ops::Password;
 #[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]
 pub use litchi_ops::PresentationView;
 #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
 pub use litchi_ops::WorkbookView;
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "rtf",
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "pages",
-    feature = "keynote",
-    feature = "numbers"
-))]
+#[cfg(litchi_unified)]
 pub use litchi_ops::{
     Added, Applied, BatchCommit, BatchItem, BatchMode, Code, Conformance, CreateOptions,
     EncryptionKind, Error, Family, File, Flavor, IntoNode, IntoPlacement, IntoProps, IntoTarget,
@@ -778,65 +618,20 @@ pub use litchi_ops::{
     any(unix, windows)
 ))]
 pub use litchi_ops::{open_prepared, open_prepared_with};
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "rtf",
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "pages",
-    feature = "keynote",
-    feature = "numbers"
-))]
+#[cfg(litchi_unified)]
 pub use unified::{open, open_bytes, open_bytes_with, open_with};
 
 // One entry of `format::pptx::Pptx::slide_catalog`, also named at the root.
 #[cfg(feature = "pptx")]
 pub use litchi_ops::format::pptx::SlideDescriptor;
 
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "rtf",
-    feature = "odt",
-    feature = "pages",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "odp",
-    feature = "keynote",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
+#[cfg(litchi_unified)]
 pub use tolerance::ToleranceReport;
 
 // Re-export commonly used types
 pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
 
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "pages",
-    feature = "keynote",
-    feature = "numbers",
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "rtf"
-))]
+#[cfg(litchi_unified)]
 pub use common::{detect_file_format, detect_file_format_from_bytes};
 
 #[cfg(all(
@@ -889,5 +684,99 @@ mod standalone_odf_facade_tests {
         let _: Option<super::odp::Package> = None;
         let _: Option<super::odt::Document> = None;
         let _: Option<super::odf_common::detect::Format> = None;
+    }
+}
+
+#[cfg(test)]
+#[path = "../build/format_features.rs"]
+mod format_features;
+
+/// The build script derives `cfg(litchi_unified)` from the format features
+/// in `Cargo.toml` (record 0334); these tests pin what it derives.
+#[cfg(test)]
+mod format_feature_tests {
+    use super::format_features::format_features;
+
+    /// The 21 claimed formats of `docs/FEATURE_MATRIX.md`, by facade feature.
+    const FORMATS: [&str; 21] = [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "rtf",
+        "odt",
+        "ods",
+        "odp",
+        "oth",
+        "odm",
+        "odg",
+        "odc",
+        "odi",
+        "odb",
+        "odf-formula",
+        "pages",
+        "keynote",
+        "numbers",
+    ];
+
+    #[test]
+    fn every_claimed_format_feature_gates_the_unified_entry_point() {
+        let mut derived = format_features(include_str!("../Cargo.toml"));
+        derived.sort_unstable();
+        let mut expected = FORMATS.map(str::to_owned).to_vec();
+        expected.sort_unstable();
+        assert_eq!(
+            derived, expected,
+            "each format feature must enable \"litchi-ops/<format>\"; a feature that does not \
+             builds a facade without `litchi::open`"
+        );
+    }
+
+    #[test]
+    fn every_format_feature_names_a_litchi_ops_feature() {
+        let ops = include_str!("../../litchi-ops/Cargo.toml");
+        let declared = |name: &str| {
+            ops.lines().any(|line| {
+                line.strip_prefix(name)
+                    .is_some_and(|rest| rest.trim_start().starts_with('='))
+            })
+        };
+        for feature in FORMATS {
+            assert!(declared(feature), "litchi-ops has no `{feature}` feature");
+        }
+    }
+
+    #[test]
+    fn parser_reads_multi_line_arrays_and_skips_weak_items_and_comments() {
+        let manifest = r#"
+[package]
+name = "x" # "litchi-ops/not-a-feature"
+
+[features]
+default = []
+# odd = ["litchi-ops/commented"]
+one = ["dep:a", "litchi-ops/one"]
+two = [
+    "dep:b",
+    # "litchi-ops/ignored",
+    "litchi-ops/two",
+]
+weak = ["litchi-ops?/encryption"]
+aggregate = ["one", "two"]
+
+[dependencies]
+three = ["litchi-ops/three"]
+"#;
+        assert_eq!(format_features(manifest), ["one", "two"]);
+    }
+
+    #[cfg(litchi_unified)]
+    #[test]
+    fn the_unified_entry_point_is_present() {
+        let error = crate::open("/nonexistent/litchi-0334.docx").unwrap_err();
+        assert_eq!(error.code(), crate::Code::FileNotFound);
     }
 }
