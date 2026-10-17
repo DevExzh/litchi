@@ -12,5 +12,5 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use link::{Click, Link, Target};
+pub use link::{Click, Link, Target, mentions_click};
 pub use model::Hyperlink;

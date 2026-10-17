@@ -87,6 +87,11 @@ impl Docx {
         // admission failure below.
         let editor = self.edit()?;
         let parent = resolve_path(self, &parent)?;
+        // Header, footer and note paragraphs and runs (record 0325).
+        let editor = match self.try_add_story(editor, &parent, &node)? {
+            Ok(added) => return Ok(added),
+            Err(editor) => editor,
+        };
         let placement = node.placement().cloned();
         let kind = new_kind(node.kind())?;
         let (planned, anchor) = match (kind, parent.element_kind()) {
@@ -187,6 +192,11 @@ impl Docx {
     fn remove_inner<'p>(&self, target: TargetArg<'p>) -> Result<Commit> {
         let editor = self.edit()?;
         let nodes = self.resolve_targets(&target)?;
+        // Header, footer and note paragraphs and runs (record 0325).
+        let editor = match self.try_remove_story(editor, &nodes)? {
+            Ok(commit) => return Ok(commit),
+            Err(editor) => editor,
+        };
         let selections = match admit_remove(&nodes) {
             Ok(selections) => selections,
             // Anything beyond direct-body paragraphs and runs takes the
@@ -540,7 +550,7 @@ fn run_text(run: &mut NewRun, value: Option<crate::value::Scalar<'_>>) -> Result
     Ok(())
 }
 
-fn body_anchor(
+pub(super) fn body_anchor(
     docx: &Docx,
     placement: Option<&Placement<'_>>,
     _moving: bool,

@@ -25,7 +25,7 @@ use super::super::write::{Commit, WorkEdit};
 use super::super::{Docx, DocxEditor};
 use super::{
     ABSTRACT_NUM_REGISTRY, AbstractKey, LEVEL_REGISTRY, LevelKey, MULTI_LEVEL_TYPE, NOTE_REGISTRY,
-    NUM_REGISTRY, NumKey, PartSetter, PartValue, STORY_REGISTRY, STYLE_REGISTRY, StyleKey,
+    NUM_REGISTRY, NumKey, PartSetter, PartValue, STORY_REGISTRY, STYLE_REGISTRY, SeedKey, StyleKey,
 };
 use crate::error::{Code, Error, Result};
 use crate::new_node::NewNode;
@@ -874,6 +874,12 @@ impl Docx {
                 Ok(())
             })?;
         }
+        let bare = Bare {
+            format: format.is_some(),
+            text: text.is_some(),
+            start: start.is_some(),
+            indent: indent.is_some(),
+        };
         let definition = new_abstract_num(
             id,
             multi_level_type,
@@ -885,6 +891,7 @@ impl Docx {
             start,
             indent,
         )?;
+        let definition = seed_levels(definition, &assignments, bare)?;
         if let Some(wanted) = id
             && super::numbering(self)?.is_some_and(|catalog| {
                 u32::try_from(wanted).is_ok_and(|wanted| catalog.abstract_num(wanted).is_some())
@@ -901,16 +908,13 @@ impl Docx {
         let WorkEdit::Eager(eager) = &mut edit else {
             return Err(refusal("numbering needs the owning package editor"));
         };
-        let added = eager.add_abstract_num(&definition).map_err(Error::from)?;
+        // The schema puts every definition before the instances, and the
+        // leaf appends a new one after the last (record 0325): its ordinal
+        // is the handle's definition count, read without reparsing the
+        // committed part.
+        let ordinal = super::numbering(self)?.map_or(0, |catalog| catalog.abstract_nums().len());
+        let _ = eager.add_abstract_num(&definition).map_err(Error::from)?;
         let commit = edit.commit(self)?;
-        let ordinal = super::numbering(commit.file())?
-            .and_then(|catalog| {
-                catalog
-                    .abstract_nums()
-                    .iter()
-                    .position(|entry| entry.id() == added)
-            })
-            .ok_or_else(|| refusal("the new numbering definition is not in the numbering part"))?;
         Ok((commit, numbering_path("abstractNum", ordinal)))
     }
 
@@ -926,11 +930,35 @@ impl Docx {
         let mut abstract_num_id = None;
         let mut overrides: Vec<(u8, i64)> = Vec::new();
         let mut continues = false;
+        // OfficeCLI's "Mode A" (record 0325): the definition the instance
+        // creates when it names none.
+        let mut template = false;
+        let mut multi_level_type = None;
+        let mut name = None;
+        let mut style_link = None;
+        let mut num_style_link = None;
+        let mut format = None;
+        let mut text = None;
+        let mut indent = None;
         for assignment in &assignments {
             stage(assignment, Operation::Add, |setter, value| {
                 match setter {
                     PartSetter::Num(NumKey::Id) => id = int_of(value),
                     PartSetter::Num(NumKey::AbstractNumId) => abstract_num_id = int_of(value),
+                    PartSetter::Num(NumKey::Template(key)) => {
+                        template = true;
+                        match key {
+                            AbstractKey::Type => multi_level_type = text_of(value),
+                            AbstractKey::Name => name = text_of(value),
+                            AbstractKey::StyleLink => style_link = text_of(value),
+                            AbstractKey::NumStyleLink => num_style_link = text_of(value),
+                            AbstractKey::Seed(LevelKey::Format) => format = text_of(value),
+                            AbstractKey::Seed(LevelKey::Text) => text = text_of(value),
+                            AbstractKey::Seed(LevelKey::Indent) => indent = int_of(value),
+                            _ => {},
+                        }
+                    },
+                    PartSetter::LevelSeed { .. } => template = true,
                     PartSetter::Num(NumKey::StartOverride(level)) => {
                         if let Some(start) = int_of(value) {
                             overrides.retain(|(other, _)| *other != level);
@@ -945,13 +973,46 @@ impl Docx {
                 Ok(())
             })?;
         }
+        if template {
+            if abstract_num_id.is_some() {
+                return Err(error(
+                    Code::InvalidArgument,
+                    "a numbering instance names its definition or describes a new one, not both",
+                )
+                .with_property("abstractNumId"));
+            }
+            let start = overrides
+                .iter()
+                .find(|(level, _)| *level == 0)
+                .map(|(_, start)| *start);
+            let bare = Bare {
+                format: format.is_some(),
+                text: text.is_some(),
+                start: start.is_some(),
+                indent: indent.is_some(),
+            };
+            let definition = new_abstract_num(
+                None,
+                multi_level_type,
+                name,
+                style_link,
+                num_style_link,
+                format,
+                text,
+                start,
+                indent,
+            )?;
+            let definition = seed_levels(definition, &assignments, bare)?;
+            return self.add_templated_num(editor, definition, id, overrides, continues);
+        }
         let Some(abstract_num_id) = abstract_num_id.and_then(|value| u32::try_from(value).ok())
         else {
             return Err(error(
                 Code::MissingProperty,
                 "a new numbering instance needs the definition it instantiates",
             )
-            .with_property("abstractNumId"));
+            .with_property("abstractNumId")
+            .with_suggestion("or describe a new definition with format, text or level<N>.* keys"));
         };
         let catalog = super::numbering(self)?;
         let Some(definition) = catalog.and_then(|catalog| catalog.abstract_num(abstract_num_id))
@@ -995,6 +1056,52 @@ impl Docx {
         let WorkEdit::Eager(eager) = &mut edit else {
             return Err(refusal("numbering needs the owning package editor"));
         };
+        let added = eager.add_num(&num).map_err(Error::from)?;
+        let commit = edit.commit(self)?;
+        let ordinal = super::numbering(commit.file())?
+            .and_then(|catalog| catalog.nums().iter().position(|entry| entry.id() == added))
+            .ok_or_else(|| refusal("the new numbering instance is not in the numbering part"))?;
+        Ok((commit, numbering_path("num", ordinal)))
+    }
+
+    /// Add a new definition and an instance of it in one edit (OfficeCLI's
+    /// `add num` "Mode A", record 0325).
+    fn add_templated_num(
+        &self,
+        editor: DocxEditor,
+        definition: NewAbstractNum,
+        id: Option<i64>,
+        mut overrides: Vec<(u8, i64)>,
+        continues: bool,
+    ) -> Result<(Commit, Path<'static>)> {
+        if let Some(wanted) = id
+            && super::numbering(self)?.is_some_and(|catalog| {
+                u32::try_from(wanted).is_ok_and(|wanted| catalog.num(wanted).is_some())
+            })
+        {
+            return Err(error(
+                Code::DuplicateName,
+                "a numbering instance with this identifier exists",
+            )
+            .with_property("id"));
+        }
+        if !continues && !overrides.iter().any(|(level, _)| *level == 0) {
+            let start = definition.level(0).map_or(1, NewLevel::start);
+            overrides.push((0, start));
+        }
+        self.owner().check_source()?;
+        let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
+        let WorkEdit::Eager(eager) = &mut edit else {
+            return Err(refusal("numbering needs the owning package editor"));
+        };
+        let abstract_num_id = eager.add_abstract_num(&definition).map_err(Error::from)?;
+        let mut num = NewNum::new(abstract_num_id);
+        if let Some(id) = id.and_then(|id| u32::try_from(id).ok()) {
+            num = num.with_id(id);
+        }
+        for (level, start) in overrides {
+            num = num.with_start_override(level, start);
+        }
         let added = eager.add_num(&num).map_err(Error::from)?;
         let commit = edit.commit(self)?;
         let ordinal = super::numbering(commit.file())?
@@ -1458,6 +1565,136 @@ fn numbering_path(step: &'static str, ordinal: usize) -> Path<'static> {
 /// levels, an explicit `format` on every level, and `text`, `start` and
 /// `indent` seeding level 0.
 #[allow(clippy::too_many_arguments, reason = "one argument per OfficeCLI key")]
+/// Which bare level-0 keys a new definition was given: they win over the
+/// same `level0.*` key (OfficeCLI).
+#[derive(Clone, Copy)]
+struct Bare {
+    format: bool,
+    text: bool,
+    start: bool,
+    indent: bool,
+}
+
+/// The `level<N>.*` values of one level.
+#[derive(Default)]
+struct Seeds<'a, 'p, 'v> {
+    format: Option<String>,
+    text: Option<String>,
+    start: Option<i64>,
+    indent: Option<i64>,
+    hanging: Option<i64>,
+    justification: Option<String>,
+    suffix: Option<String>,
+    run: Vec<&'a Assignment<'p, 'v>>,
+}
+
+/// Apply the `level<N>.*` keys among `assignments` to the template levels
+/// of `definition` (OfficeCLI's `BuildAbstractNumElement`, record 0325):
+/// a level keeps its template value for every key it is not given, a bare
+/// level-0 key wins over its `level0.*` spelling, a `bullet` format without
+/// text takes the level's bullet character, and `indent` and `hanging`
+/// default to `(N + 1) × 720` and 360 twips.
+fn seed_levels(
+    mut definition: NewAbstractNum,
+    assignments: &[Assignment<'_, '_>],
+    bare: Bare,
+) -> Result<NewAbstractNum> {
+    let mut levels: [Option<Seeds<'_, '_, '_>>; 9] = Default::default();
+    for assignment in assignments {
+        let crate::registry::Access::Add(PartSetter::LevelSeed { level, key }) =
+            assignment.entry.access
+        else {
+            continue;
+        };
+        let seeds = levels
+            .get_mut(usize::from(level))
+            .ok_or_else(|| error(Code::InternalError, "a numbering level is above 8"))?
+            .get_or_insert_with(Seeds::default);
+        match key {
+            SeedKey::Run(_) => seeds.run.push(assignment),
+            SeedKey::Level(key) => stage(assignment, Operation::Add, |_, value| {
+                match key {
+                    LevelKey::Format => seeds.format = text_of(value),
+                    LevelKey::Text => seeds.text = text_of(value),
+                    LevelKey::Start => seeds.start = int_of(value),
+                    LevelKey::Indent => seeds.indent = int_of(value),
+                    LevelKey::Hanging => seeds.hanging = int_of(value),
+                    LevelKey::Justification => seeds.justification = text_of(value),
+                    LevelKey::Suffix => seeds.suffix = text_of(value),
+                    _ => {},
+                }
+                Ok(())
+            })?,
+        }
+    }
+    for (ilvl, seeds) in (0_u8..).zip(levels) {
+        let Some(seeds) = seeds else {
+            continue;
+        };
+        let Some(mut level) = definition.level(ilvl).cloned() else {
+            continue;
+        };
+        let first = ilvl == 0;
+        if let Some(format) = seeds.format.filter(|_| !(first && bare.format)) {
+            let bullet = format.eq_ignore_ascii_case("bullet");
+            level = level.with_format(format);
+            if bullet && seeds.text.is_none() && !(first && bare.text) {
+                level =
+                    level.with_text(["\u{2022}", "\u{25E6}", "\u{25AA}"][usize::from(ilvl % 3)]);
+            }
+        }
+        if let Some(text) = seeds.text.filter(|_| !(first && bare.text)) {
+            level = level.with_text(text);
+        }
+        if let Some(start) = seeds.start.filter(|_| !(first && bare.start)) {
+            level = level.with_start(start);
+        }
+        if let Some(justification) = seeds.justification {
+            level = level.with_justification(justification);
+        }
+        if let Some(suffix) = seeds.suffix {
+            level = level.with_suffix(suffix);
+        }
+        let indent = seeds.indent.filter(|_| !(first && bare.indent));
+        if indent.is_some() || seeds.hanging.is_some() {
+            let current = level.paragraph().indentation.as_ref().map(|indentation| {
+                (
+                    indentation.left.map(|twips| twips.0),
+                    indentation.hanging.map(|twips| twips.0),
+                )
+            });
+            let mut paragraph = direct::Paragraph::default();
+            let mut indentation = direct::Indentation::default();
+            indentation.left = Some(direct::Twips(indent.unwrap_or_else(|| {
+                current
+                    .and_then(|(left, _)| left)
+                    .unwrap_or(720 * (i64::from(ilvl) + 1))
+            })));
+            indentation.hanging =
+                Some(direct::Twips(seeds.hanging.unwrap_or_else(|| {
+                    current.and_then(|(_, hanging)| hanging).unwrap_or(360)
+                })));
+            paragraph.indentation = Some(indentation);
+            level = level.with_paragraph(paragraph);
+        }
+        if !seeds.run.is_empty() {
+            let mut run = direct::Run::default();
+            for assignment in seeds.run {
+                stage(assignment, Operation::Add, |setter, value| match setter {
+                    PartSetter::LevelSeed {
+                        key: SeedKey::Run(setter),
+                        ..
+                    } => setter.apply_run(&mut run, value),
+                    _ => Ok(()),
+                })?;
+            }
+            level = level.with_run(run);
+        }
+        definition = definition.with_level(level);
+    }
+    Ok(definition)
+}
+
 fn new_abstract_num(
     id: Option<i64>,
     multi_level_type: Option<String>,

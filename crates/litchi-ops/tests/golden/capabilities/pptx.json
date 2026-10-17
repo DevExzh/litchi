@@ -734,6 +734,18 @@
           "set": false,
           "get": true
         },
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "add": true,
@@ -1054,6 +1066,18 @@
           "set": false,
           "get": true
         },
+        "link": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "add": false,
@@ -1096,8 +1120,8 @@
         "pic"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -1166,6 +1190,18 @@
           "type": "int",
           "add": false,
           "set": false,
+          "get": true
+        },
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
           "get": true
         },
         "src": {
@@ -1357,7 +1393,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -2288,7 +2324,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -2407,6 +2443,18 @@
           "type": "int",
           "add": false,
           "set": false,
+          "get": true
+        },
+        "link": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": false,
+          "set": true,
           "get": true
         }
       },
@@ -2717,7 +2765,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -2853,7 +2901,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -2986,6 +3034,18 @@
           "set": false,
           "get": true
         },
+        "link": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "add": false,
@@ -3037,7 +3097,7 @@
       "parent": "slide",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -3068,8 +3128,8 @@
       "element": "comment",
       "parent": "slide",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -4549,22 +4609,6 @@
     {
       "subject": "property",
       "element": "shape",
-      "key": "link",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
-    },
-    {
-      "subject": "property",
-      "element": "shape",
-      "key": "tooltip",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
-    },
-    {
-      "subject": "property",
-      "element": "shape",
       "key": "list",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
@@ -4577,22 +4621,6 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended",
       "reason": "bullets are read but not yet named in OfficeCLI's list vocabulary"
-    },
-    {
-      "subject": "property",
-      "element": "run",
-      "key": "link",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
-    },
-    {
-      "subject": "property",
-      "element": "run",
-      "key": "tooltip",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
     },
     {
       "subject": "property",

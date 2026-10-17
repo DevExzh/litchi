@@ -30,6 +30,7 @@ use xlsx::drawing::edit::{
     Align, COLUMN_EMU, Change, ElementKind, Fill, Font, Line, Marker, PictureSpec, Placement,
     ROW_EMU, ShapeSpec, VerticalAlign,
 };
+use xlsx::workbook::comments::{RunColor, RunFont, TextRun};
 
 use super::features::{
     self, AutofilterKey, BreakKey, CfKey, CommentKey, Data, Feature, HyperlinkKey, PictureKey,
@@ -414,19 +415,174 @@ fn check_cell(key: &'static str, reference: &str) -> Result<String> {
         .to_owned())
 }
 
+/// The `font.*` keys of one note write, which become the run properties
+/// of the single run OfficeCLI writes for them.
+#[derive(Default)]
+struct NoteFont {
+    given: bool,
+    bold: Option<bool>,
+    italic: Option<bool>,
+    underline: Option<String>,
+    size: Option<f64>,
+    color: Option<xlsx::Rgb>,
+    name: Option<String>,
+}
+
+impl NoteFont {
+    /// Admit one `font.*` key; `false` for any other key.
+    fn admit(&mut self, key: CommentKey, name: &'static str, arg: &Arg) -> Result<bool> {
+        match key {
+            CommentKey::FontBold => self.bold = Some(arg.flag()),
+            CommentKey::FontItalic => self.italic = Some(arg.flag()),
+            CommentKey::FontUnderline => self.underline = note_underline(name, arg)?,
+            CommentKey::FontSize => self.size = Some(note_size(name, arg)?),
+            CommentKey::FontColor => {
+                self.color = Some(arg_color(name, arg, ColorContext::Spreadsheet)?);
+            },
+            CommentKey::FontName => self.name = arg.text(),
+            _ => return Ok(false),
+        }
+        self.given = true;
+        Ok(true)
+    }
+
+    /// The one run of `text` OfficeCLI writes for `font.*` keys: Excel's
+    /// note size and typeface, and its note color (`indexed` 81), unless
+    /// the keys name others.
+    fn run(self, text: String) -> TextRun {
+        TextRun {
+            text,
+            font: RunFont {
+                bold: self.bold.filter(|on| *on),
+                italic: self.italic.filter(|on| *on),
+                underline: self.underline,
+                size: Some(self.size.unwrap_or(features::NOTE_SIZE)),
+                color: Some(self.color.map_or(RunColor::Indexed(81), argb)),
+                name: Some(self.name.unwrap_or_else(|| features::NOTE_FONT.to_owned())),
+                ..RunFont::default()
+            },
+        }
+    }
+}
+
+fn argb(color: xlsx::Rgb) -> RunColor {
+    RunColor::Rgb(format!(
+        "FF{:02X}{:02X}{:02X}",
+        color.red(),
+        color.green(),
+        color.blue()
+    ))
+}
+
+/// OfficeCLI's note underline: `double`, or `single` for any other value
+/// except `none`/`false`.
+fn note_underline(key: &'static str, arg: &Arg) -> Result<Option<String>> {
+    let value = match arg {
+        Arg::Bool(on) => return Ok(on.then(|| "single".to_owned())),
+        other => other.text().unwrap_or_default(),
+    };
+    Ok(match value.trim().to_ascii_lowercase().as_str() {
+        "" | "none" | "false" => None,
+        "double" => Some("double".to_owned()),
+        "single" | "true" => Some("single".to_owned()),
+        _ => return Err(invalid(key, "underline is single, double or none")),
+    })
+}
+
+fn note_size(key: &'static str, arg: &Arg) -> Result<f64> {
+    match arg {
+        Arg::Length(length) => Ok(length.points()),
+        other => other.number(key),
+    }
+}
+
+/// Parse OfficeCLI's `runs` JSON: an array of run objects with `text`,
+/// `bold`, `italic`, `strike`, `superscript`, `subscript`, `underline`,
+/// `size`, `color` and `font`; every run gets Excel's note size, color and
+/// typeface unless it names others.
+fn note_runs(key: &'static str, value: &str) -> Result<Vec<TextRun>> {
+    let parsed: serde_json::Value =
+        serde_json::from_str(value).map_err(|_| invalid(key, "runs is not JSON"))?;
+    let serde_json::Value::Array(items) = parsed else {
+        return Err(invalid(key, "runs is a JSON array of run objects"));
+    };
+    let truthy = |value: Option<&serde_json::Value>| match value {
+        Some(serde_json::Value::Bool(on)) => *on,
+        Some(serde_json::Value::String(text)) => {
+            matches!(text.to_ascii_lowercase().as_str(), "true" | "1" | "yes")
+        },
+        _ => false,
+    };
+    let string = |value: Option<&serde_json::Value>| match value {
+        Some(serde_json::Value::String(text)) => Some(text.clone()),
+        Some(serde_json::Value::Number(number)) => Some(number.to_string()),
+        _ => None,
+    };
+    let mut runs = Vec::new();
+    for item in &items {
+        let serde_json::Value::Object(item) = item else {
+            continue;
+        };
+        let mut font = NoteFont::default();
+        if let Some(size) = string(item.get("size")) {
+            let size = size.trim().trim_end_matches("pt").trim();
+            font.size = Some(
+                size.parse()
+                    .map_err(|_| invalid(key, "a run size is a number of points"))?,
+            );
+        }
+        if let Some(color) = string(item.get("color")) {
+            font.color = Some(parse_color(key, &color, ColorContext::Spreadsheet)?);
+        }
+        if let Some(underline) = string(item.get("underline")) {
+            font.underline = note_underline(key, &Arg::Text(underline))?;
+        }
+        font.name = string(item.get("font"));
+        font.bold = Some(truthy(item.get("bold")));
+        font.italic = Some(truthy(item.get("italic")));
+        let mut run = font.run(string(item.get("text")).unwrap_or_default());
+        run.font.strike = truthy(item.get("strike")).then_some(true);
+        run.font.vert_align = if truthy(item.get("superscript")) {
+            Some("superscript".to_owned())
+        } else if truthy(item.get("subscript")) {
+            Some("subscript".to_owned())
+        } else {
+            None
+        };
+        runs.push(run);
+    }
+    if runs.is_empty() {
+        return Err(invalid(key, "runs names no run object"));
+    }
+    Ok(runs)
+}
+
 impl Xlsx {
     fn add_comment(&self, parent: &Parent, props: &Props<'_>) -> Result<(Commit, Path<'static>)> {
         let mut reference = None;
         let mut author = None;
         let mut text = None;
+        let mut font = NoteFont::default();
+        let mut runs = None;
         for (key, name, arg) in admit(&features::COMMENT_TABLE, Operation::Add, props)? {
+            if font.admit(key, name, &arg)? {
+                continue;
+            }
             match key {
                 CommentKey::Ref => {
                     reference = Some(check_cell(name, &arg.text().unwrap_or_default())?)
                 },
                 CommentKey::Author => author = arg.text(),
                 CommentKey::Text => text = arg.text(),
-                CommentKey::AnchoredTo => {},
+                // OfficeCLI: a non-blank `runs` wins over `text` and `font.*`.
+                CommentKey::Runs => {
+                    runs = arg
+                        .text()
+                        .filter(|value| !value.trim().is_empty())
+                        .map(|value| note_runs(name, &value))
+                        .transpose()?;
+                },
+                _ => {},
             }
         }
         let reference = match (reference, &parent.reference) {
@@ -438,14 +594,22 @@ impl Xlsx {
         };
         let source = self.editor()?;
         let mut edit = source.edit_comments()?;
-        let index = edit
-            .add(
+        let author = author.as_deref().unwrap_or("Author");
+        let runs = match runs {
+            Some(runs) => Some(runs),
+            None if font.given => Some(vec![font.run(text.clone().unwrap_or_default())]),
+            None => None,
+        };
+        let index = match &runs {
+            Some(runs) => edit.add_runs(parent.sheet, &reference, author, runs),
+            None => edit.add(
                 parent.sheet,
                 &reference,
-                author.as_deref().unwrap_or("Author"),
+                author,
                 text.as_deref().unwrap_or(""),
-            )
-            .map_err(authored)?;
+            ),
+        }
+        .map_err(authored)?;
         // Notes are numbered row-major, as `features::list` numbers them.
         let Some(index) = index else {
             return Err(error(Code::InvalidArgument, "the cell already has a note")
@@ -464,14 +628,31 @@ impl Xlsx {
         let mut reference = note.reference.clone();
         let mut author = note.author.clone();
         let mut text = note.text.clone();
+        let mut font = NoteFont::default();
+        let mut runs = None;
         for (key, name, arg) in admit(&features::COMMENT_TABLE, Operation::Set, props)? {
+            if font.admit(key, name, &arg)? {
+                continue;
+            }
             match key {
                 CommentKey::Ref => reference = check_cell(name, &arg.text().unwrap_or_default())?,
                 CommentKey::Author => author = arg.text().unwrap_or_default(),
                 CommentKey::Text => text = arg.text().unwrap_or_default(),
-                CommentKey::AnchoredTo => {},
+                CommentKey::Runs => {
+                    runs = Some(note_runs(name, &arg.text().unwrap_or_default())?);
+                },
+                _ => {},
             }
         }
+        // `font.*` rebuilds the note as one run formatted by this call's keys
+        // alone, keeping its text (OfficeCLI); a new `text` alone writes plain
+        // text; a rich note whose text stays keeps its runs.
+        let runs = match runs {
+            Some(runs) => Some(runs),
+            None if font.given => Some(vec![font.run(text.clone())]),
+            None if text == note.text && !note.runs.is_empty() => Some(note.runs.clone()),
+            None => None,
+        };
         let source = self.editor()?;
         let mut edit = source.edit_comments()?;
         if reference != note.reference {
@@ -486,8 +667,11 @@ impl Xlsx {
             }
             edit.remove(sheet, &note.reference)?;
         }
-        edit.set(sheet, &reference, &author, &text)
-            .map_err(authored)?;
+        match &runs {
+            Some(runs) => edit.set_runs(sheet, &reference, &author, runs),
+            None => edit.set(sheet, &reference, &author, &text),
+        }
+        .map_err(authored)?;
         let (target, changed) = split(edit.commit()?);
         Ok(self.publish(source, target, changed))
     }

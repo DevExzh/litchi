@@ -78,12 +78,12 @@ pub(super) fn items(file: &Pptx, slide: u32, shape: Option<&TreeItem>) -> Result
         if shape.is_some() && equation.shape_id() != id {
             continue;
         }
-        out.push(Item::Equation(EquationItem {
+        out.push(Item::Equation(Box::new(EquationItem {
             slide,
             shape: shape.cloned(),
             index: u32::try_from(out.len()).unwrap_or(u32::MAX),
             equation: Arc::new(equation),
-        }));
+        })));
     }
     Ok(out)
 }

@@ -46,11 +46,11 @@ pub(super) fn children(table: &TreeItem) -> Result<Vec<Item>> {
     let widths = widths(table)?;
     Ok((0..widths.len())
         .map(|index| {
-            Item::Column(ColumnItem {
+            Item::Column(Box::new(ColumnItem {
                 table: table.clone(),
                 widths: Arc::clone(&widths),
                 index: u32::try_from(index).unwrap_or(u32::MAX),
-            })
+            }))
         })
         .collect())
 }
@@ -293,7 +293,7 @@ impl Pptx {
         }
         let node = crate::path::resolve::get(&Nav::new(self), path)?;
         Ok(match node.item() {
-            Item::Column(item) => Some(item.clone()),
+            Item::Column(item) => Some(ColumnItem::clone(item)),
             _ => None,
         })
     }

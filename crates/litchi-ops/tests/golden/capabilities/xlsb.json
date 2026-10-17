@@ -1308,11 +1308,11 @@
         "definedname"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -2768,6 +2768,15 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4x)",
       "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "namedrange",
+      "context": "earlier-name",
+      "code": "unsupported_capability",
+      "followUp": "XLSB defined-name index renumbering (record 0330)",
+      "reason": "only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references"
     },
     {
       "subject": "property",

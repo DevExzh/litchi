@@ -303,7 +303,7 @@ docx	num	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/oo
 docx	num	query	supported		ok matches in create()
 docx	num	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/num[1]
 docx	num	set	supported		ok `seed + add paragraph` /numbering/num[1] {"abstractNumId":"9"}
-docx	num	add	supported		ok /numbering/num[14] on `seed + add paragraph` under /numbering {"abstractNumId":"1","startOverride.0":"1","startOverride.1":"1","startOverride.2":"1","startOverride.3":"1","startOverride.4":"1","startOverride.5":"1","startOverride.6":"1","startOverride.7":"1","startOverride.8":"1","start":"1","continue":"true"}
+docx	num	add	supported		ok /numbering/num[14] on `seed + add paragraph` under /numbering {"text":"Litchi"}
 docx	num	remove	supported		ok `seed + add paragraph` /numbering/num[1]
 docx	num	move	format-verb		refused unsupported_capability
 docx	num	swap	format-verb		refused unsupported_capability
@@ -350,30 +350,30 @@ docx	theme	edit	gap	L-DOCX-R6 (R4x)	-
 docx	theme	batch	gap	L-DOCX-R6 (R4x)	-
 docx	theme	create	gap	L-DOCX-R6 (R4x)	ok format
 docx	theme	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	bookmark	get	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
-docx	bookmark	find	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
+docx	bookmark	get	supported		ok 7 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
+docx	bookmark	find	supported		ok 7 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
 docx	bookmark	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx
-docx	bookmark	view	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
-docx	bookmark	set	n/a	set not offered for this element	-
-docx	bookmark	add	n/a	add not offered for this element	-
-docx	bookmark	remove	n/a	remove not offered for this element	-
+docx	bookmark	view	supported		ok 7 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
+docx	bookmark	set	supported		ok `seed + add bookmark` /bookmark[1] {"name":"Litchi"}
+docx	bookmark	add	supported		ok /bookmark[1] on `seed` under /body/p[1] {"name":"Mark","text":"here"}
+docx	bookmark	remove	supported		ok `seed + add bookmark` /bookmark[1]
 docx	bookmark	move	format-verb		refused unsupported_capability
 docx	bookmark	swap	format-verb		refused unsupported_capability
-docx	bookmark	edit	n/a	edit not offered for this element	-
-docx	bookmark	batch	n/a	batch not offered for this element	-
+docx	bookmark	edit	supported		ok tx.set
+docx	bookmark	batch	supported		ok set item
 docx	bookmark	create	supported		ok format
 docx	bookmark	save	supported		ok format
-docx	field	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
-docx	field	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
+docx	field	get	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
+docx	field	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
 docx	field	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx
-docx	field	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
-docx	field	set	n/a	set not offered for this element	-
-docx	field	add	n/a	add not offered for this element	-
+docx	field	view	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
+docx	field	set	supported		ok `seed + add field` /field[1] {"instruction":"Litchi"}
+docx	field	add	supported		ok /body/p[1]/r[5] on `seed` under /body/p[1] {"fieldType":"page"}
 docx	field	remove	n/a	remove not offered for this element	-
-docx	field	move	format-verb		unreached
-docx	field	swap	format-verb		unreached
-docx	field	edit	n/a	edit not offered for this element	-
-docx	field	batch	n/a	batch not offered for this element	-
+docx	field	move	format-verb		refused unsupported_capability
+docx	field	swap	format-verb		refused unsupported_capability
+docx	field	edit	supported		ok tx.set
+docx	field	batch	supported		ok set item
 docx	field	create	supported		ok format
 docx	field	save	supported		ok format
 docx	formfield	get	gap	R4x	unreached
@@ -428,17 +428,17 @@ docx	ole	edit	gap	R4x	-
 docx	ole	batch	gap	R4x	-
 docx	ole	create	gap	R4x	ok format
 docx	ole	save	gap	R4x	ok format
-docx	toc	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
-docx	toc	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
+docx	toc	get	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
+docx	toc	find	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
 docx	toc	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx
-docx	toc	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
-docx	toc	set	n/a	set not offered for this element	-
-docx	toc	add	n/a	add not offered for this element	-
-docx	toc	remove	n/a	remove not offered for this element	-
-docx	toc	move	format-verb		unreached
-docx	toc	swap	format-verb		unreached
-docx	toc	edit	n/a	edit not offered for this element	-
-docx	toc	batch	n/a	batch not offered for this element	-
+docx	toc	view	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
+docx	toc	set	supported		ok `seed + add toc` /toc[1] {"levels":"7"}
+docx	toc	add	supported		ok /toc[1] on `seed` under /body {"levels":"1-3"}
+docx	toc	remove	supported		ok `seed + add toc` /toc[1]
+docx	toc	move	format-verb		refused unsupported_capability
+docx	toc	swap	format-verb		refused unsupported_capability
+docx	toc	edit	supported		ok tx.set
+docx	toc	batch	supported		ok set item
 docx	toc	create	supported		ok format
 docx	toc	save	supported		ok format
 docx	revision	get	gap	R4x	unreached
@@ -913,9 +913,9 @@ pptx	placeholder	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/un
 pptx	placeholder	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
 pptx	placeholder	query	supported		ok matches in create()
 pptx	placeholder	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
-pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[2]/shape[2] {"font":"Litchi"}
+pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[2]/shape[2] {"font":"Litchi"}
 pptx	placeholder	add	n/a	add not offered for this element	-
-pptx	placeholder	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[2]/shape[2]
+pptx	placeholder	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[2]/shape[2]
 pptx	placeholder	move	format-verb		refused unsupported_type
 pptx	placeholder	swap	format-verb		refused unsupported_type
 pptx	placeholder	edit	supported		ok tx.set
@@ -926,22 +926,22 @@ pptx	picture	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/d
 pptx	picture	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
 pptx	picture	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx
 pptx	picture	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/picture[1]
-pptx	picture	set	n/a	set not offered for this element	-
-pptx	picture	add	n/a	add not offered for this element	-
+pptx	picture	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/picture[1] {"link":"Litchi"}
+pptx	picture	add	supported		ok /slide[1]/picture[2] on `ooxml/pptx/shapes.pptx` under /slide[1] {"src":"<PNG>","name":"Logo"}
 pptx	picture	remove	supported		ok `create() + add slide + add video` /slide[1]/picture[1]
 pptx	picture	move	format-verb		refused unsupported_type
 pptx	picture	swap	format-verb		refused unsupported_type
-pptx	picture	edit	n/a	edit not offered for this element	-
-pptx	picture	batch	n/a	batch not offered for this element	-
+pptx	picture	edit	supported		ok tx.set
+pptx	picture	batch	supported		ok set item
 pptx	picture	create	supported		ok format
 pptx	picture	save	supported		ok format
-pptx	table	get	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
-pptx	table	find	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	table	view	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
+pptx	table	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	set	n/a	set not offered for this element	-
 pptx	table	add	n/a	add not offered for this element	-
-pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/table[1]
+pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]
 pptx	table	move	format-verb		unreached
 pptx	table	swap	format-verb		unreached
 pptx	table	edit	n/a	edit not offered for this element	-
@@ -965,13 +965,13 @@ pptx	tc	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/
 pptx	tc	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
 pptx	tc	query	supported		ok matches in ooxml/pptx/shapes.pptx
 pptx	tc	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]/tc[1]
-pptx	tc	set	n/a	set not offered for this element	-
+pptx	tc	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]/tr[1]/tc[1] {"fill":"FF0000"}
 pptx	tc	add	n/a	add not offered for this element	-
 pptx	tc	remove	n/a	remove not offered for this element	-
 pptx	tc	move	format-verb		refused unsupported_type
 pptx	tc	swap	format-verb		refused unsupported_type
-pptx	tc	edit	n/a	edit not offered for this element	-
-pptx	tc	batch	n/a	batch not offered for this element	-
+pptx	tc	edit	supported		ok tx.set
+pptx	tc	batch	supported		ok set item
 pptx	tc	create	supported		ok format
 pptx	tc	save	supported		ok format
 pptx	chart	get	supported		ok 4 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]
@@ -987,17 +987,17 @@ pptx	chart	edit	supported		ok tx.set
 pptx	chart	batch	supported		ok set item
 pptx	chart	create	supported		ok format
 pptx	chart	save	supported		ok format
-pptx	group	get	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
-pptx	group	find	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
 pptx	group	query	supported		ok matches in ooxml/pptx/shapes.pptx
-pptx	group	view	supported		ok 7 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
-pptx	group	set	n/a	set not offered for this element	-
+pptx	group	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[3]/group[1]
+pptx	group	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[3]/group[1] {"link":"Litchi"}
 pptx	group	add	n/a	add not offered for this element	-
-pptx	group	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[3]/group[1]
+pptx	group	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[3]/group[1]
 pptx	group	move	format-verb		unreached
 pptx	group	swap	format-verb		unreached
-pptx	group	edit	n/a	edit not offered for this element	-
-pptx	group	batch	n/a	batch not offered for this element	-
+pptx	group	edit	supported		ok tx.set
+pptx	group	batch	supported		ok set item
 pptx	group	create	supported		ok format
 pptx	group	save	supported		ok format
 pptx	connector	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
@@ -1006,7 +1006,7 @@ pptx	connector	query	supported		ok matches in ooxml/pptx/shapes.pptx
 pptx	connector	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/connector[1]
 pptx	connector	set	n/a	set not offered for this element	-
 pptx	connector	add	n/a	add not offered for this element	-
-pptx	connector	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/connector[1]
+pptx	connector	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/connector[1]
 pptx	connector	move	format-verb		refused unsupported_type
 pptx	connector	swap	format-verb		refused unsupported_type
 pptx	connector	edit	n/a	edit not offered for this element	-
@@ -1043,26 +1043,26 @@ pptx	paragraph	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit
 pptx	paragraph	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/shape[1]/paragraph[1]
 pptx	paragraph	query	supported		ok matches in create()
 pptx	paragraph	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]/shape[1]/paragraph[1]
-pptx	paragraph	set	n/a	set not offered for this element	-
+pptx	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] {"align":"left"}
 pptx	paragraph	add	n/a	add not offered for this element	-
 pptx	paragraph	remove	n/a	remove not offered for this element	-
 pptx	paragraph	move	format-verb		refused unsupported_type
 pptx	paragraph	swap	format-verb		refused unsupported_type
-pptx	paragraph	edit	n/a	edit not offered for this element	-
-pptx	paragraph	batch	n/a	batch not offered for this element	-
+pptx	paragraph	edit	supported		ok tx.set
+pptx	paragraph	batch	supported		ok set item
 pptx	paragraph	create	supported		ok format
 pptx	paragraph	save	supported		ok format
 pptx	run	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[1]/paragraph[1]/run[1]
 pptx	run	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[1]/paragraph[1]/run[1]
 pptx	run	query	supported		ok matches in create()
 pptx	run	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[1]/paragraph[1]/run[1]
-pptx	run	set	n/a	set not offered for this element	-
+pptx	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"font.latin":"Litchi"}
 pptx	run	add	n/a	add not offered for this element	-
 pptx	run	remove	n/a	remove not offered for this element	-
 pptx	run	move	format-verb		refused unsupported_type
 pptx	run	swap	format-verb		refused unsupported_type
-pptx	run	edit	n/a	edit not offered for this element	-
-pptx	run	batch	n/a	batch not offered for this element	-
+pptx	run	edit	supported		ok tx.set
+pptx	run	batch	supported		ok set item
 pptx	run	create	supported		ok format
 pptx	run	save	supported		ok format
 pptx	linebreak	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
@@ -1082,26 +1082,26 @@ pptx	notes	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/dat
 pptx	notes	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
 pptx	notes	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
 pptx	notes	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
-pptx	notes	set	n/a	set not offered for this element	-
+pptx	notes	set	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes {"text":"Litchi"}
 pptx	notes	add	n/a	add not offered for this element	-
 pptx	notes	remove	n/a	remove not offered for this element	-
 pptx	notes	move	format-verb		unreached
 pptx	notes	swap	format-verb		unreached
-pptx	notes	edit	n/a	edit not offered for this element	-
-pptx	notes	batch	n/a	batch not offered for this element	-
+pptx	notes	edit	supported		ok tx.set
+pptx	notes	batch	supported		ok set item
 pptx	notes	create	supported		ok format
 pptx	notes	save	supported		ok format
-pptx	comment	get	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
-pptx	comment	find	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
-pptx	comment	view	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
-pptx	comment	set	n/a	set not offered for this element	-
-pptx	comment	add	n/a	add not offered for this element	-
+pptx	comment	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	set	supported		ok `ooxml/pptx/shapes.pptx + add comment` /slide[1]/comment[1] {"text":"Litchi"}
+pptx	comment	add	supported		ok /slide[1]/comment[1] on `ooxml/pptx/shapes.pptx` under /slide[1] {"author":"Ada","text":"Check"}
 pptx	comment	remove	n/a	remove not offered for this element	-
 pptx	comment	move	format-verb		refused unsupported_type
 pptx	comment	swap	format-verb		refused unsupported_type
-pptx	comment	edit	n/a	edit not offered for this element	-
-pptx	comment	batch	n/a	batch not offered for this element	-
+pptx	comment	edit	supported		ok tx.set
+pptx	comment	batch	supported		ok set item
 pptx	comment	create	supported		ok format
 pptx	comment	save	supported		ok format
 pptx	video	get	supported		ok 5 instances, first `poi/test-data/slideshow/EmbeddedVideo.pptx` /slide[1]/video[1]
@@ -1303,9 +1303,9 @@ pptx	col	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]
 pptx	col	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/col[1]
 pptx	col	query	supported		ok matches in ooxml/pptx/shapes.pptx
 pptx	col	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/col[1]
-pptx	col	set	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/table[1]/col[1] {"width":"12pt"}
-pptx	col	add	supported		ok /slide[1]/table[1]/col[4] on `ooxml/pptx/shapes.pptx` under /slide[1]/table[1] {}
-pptx	col	remove	supported		ok `ooxml/pptx/shapes.pptx + add col` /slide[1]/table[1]/col[1]
+pptx	col	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]/col[1] {"width":"12pt"}
+pptx	col	add	supported		ok /slide[1]/table[1]/col[4] on `ooxml/pptx/shapes.pptx + add picture` under /slide[1]/table[1] {}
+pptx	col	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]/col[1]
 pptx	col	move	format-verb		refused unsupported_type
 pptx	col	swap	format-verb		refused unsupported_type
 pptx	col	edit	supported		ok tx.set
@@ -1442,17 +1442,17 @@ xlsb	table	edit	n/a	edit not offered for this element	-
 xlsb	table	batch	n/a	batch not offered for this element	-
 xlsb	table	create	supported		ok format
 xlsb	table	save	supported		ok format
-xlsb	namedrange	get	supported		ok 2 instances, first `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb` /namedrange[1]
-xlsb	namedrange	find	supported		ok 2 instances, first `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb` /namedrange[1]
+xlsb	namedrange	get	supported		ok 3 instances, first `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb` /namedrange[1]
+xlsb	namedrange	find	supported		ok 3 instances, first `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb` /namedrange[1]
 xlsb	namedrange	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb
-xlsb	namedrange	view	supported		ok 2 instances, first `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb` /namedrange[1]
-xlsb	namedrange	set	n/a	set not offered for this element	-
-xlsb	namedrange	add	n/a	add not offered for this element	-
-xlsb	namedrange	remove	n/a	remove not offered for this element	-
+xlsb	namedrange	view	supported		ok 3 instances, first `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb` /namedrange[1]
+xlsb	namedrange	set	supported		ok `create() + add namedrange` /namedrange[1] {"ref":"Sheet1!$A$1:$B$2"} (value unchanged: no-op only)
+xlsb	namedrange	add	supported		ok /namedrange[1] on `create()` under / {"name":"Totals","ref":"Sheet1!$A$1:$B$2"}
+xlsb	namedrange	remove	supported		ok `create() + add namedrange` /namedrange[1]
 xlsb	namedrange	move	format-verb		unreached
 xlsb	namedrange	swap	format-verb		unreached
-xlsb	namedrange	edit	n/a	edit not offered for this element	-
-xlsb	namedrange	batch	n/a	batch not offered for this element	-
+xlsb	namedrange	edit	supported		ok tx.set
+xlsb	namedrange	batch	supported		ok set item
 xlsb	namedrange	create	supported		ok format
 xlsb	namedrange	save	supported		ok format
 xlsb	comment	get	supported		ok 7 instances, first `poi/test-data/spreadsheet/testVarious.xlsb` /sheet[1]/comment[1]

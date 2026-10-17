@@ -334,3 +334,57 @@ fn warn_adds_the_element_without_the_refused_properties() {
         .map(std::borrow::Cow::into_owned);
     assert_eq!(text.as_deref(), Some("Hello"));
 }
+
+/// A cell `set` carrying a hyperlink takes the ordinary cell-link path in a
+/// batch too: the coalesced cell-payload run declines it instead of refusing
+/// `link` and `tooltip`, which the registry lists as settable (record 0330,
+/// the OfficeCLI corpus line `excel/cell-formatting.sh:158`).
+#[cfg(feature = "xlsx")]
+#[test]
+fn cell_links_in_a_batch_are_applied_not_skipped() {
+    let file = create(FileFormat::Xlsx).unwrap();
+    let item = set(
+        "/Sheet1/A9",
+        Props::new()
+            .with("value", "OfficeCLI on GitHub")
+            .with("link", "https://github.com/iOfficeAI/OfficeCLI")
+            .with("tooltip", "Open the repo"),
+    );
+    for options in [Options::new(), warn()] {
+        let commit = file.apply_with(&item, &options).unwrap();
+        assert!(
+            commit.value.warnings.is_empty(),
+            "{:?}",
+            commit.value.warnings
+        );
+        let link = commit.file.get("/Sheet1/hyperlink[1]").unwrap();
+        let format: Vec<_> = link
+            .view()
+            .format()
+            .unwrap()
+            .map(|prop| (prop.key().to_owned(), prop.value().to_string()))
+            .collect();
+        assert!(
+            format.contains(&("tooltip".to_owned(), "Open the repo".to_owned())),
+            "{format:?}"
+        );
+        // Identical to the direct, non-batch set.
+        let direct = file
+            .set(
+                "/Sheet1/A9",
+                litchi_ops::props! {
+                    "value" => "OfficeCLI on GitHub",
+                    "link" => "https://github.com/iOfficeAI/OfficeCLI",
+                    "tooltip" => "Open the repo",
+                },
+            )
+            .unwrap();
+        assert_eq!(commit.file.to_bytes().unwrap(), direct.to_bytes().unwrap());
+    }
+    // In a batch of several cell sets, the link still lands.
+    let other = set("/Sheet1/B1", Props::new().with("value", 2));
+    let batch = file
+        .batch([other.clone(), item.clone(), other], BatchMode::Atomic)
+        .unwrap();
+    assert!(batch.file.get("/Sheet1/hyperlink[1]").is_ok());
+}

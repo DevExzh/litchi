@@ -637,6 +637,22 @@ fn handle_is_one_pointer_and_shares_state_on_clone() {
 }
 
 #[test]
+fn query_items_stay_as_small_as_a_text_item() {
+    // Record 0326: every node a query yields is moved several times, so its
+    // size is paid per match. Record 0321's column, hyperlink and equation
+    // items are boxed, and a chart or SmartArt frame keeps one lazy part
+    // cell: 144 bytes, against 176 before.
+    use super::node::{Item, TextItem, TreeItem};
+    assert!(size_of::<Item>() <= size_of::<TextItem>() + size_of::<usize>());
+    assert!(size_of::<TreeItem>() <= 88, "{}", size_of::<TreeItem>());
+    assert!(
+        size_of::<super::Node<'static>>() <= 144,
+        "{}",
+        size_of::<super::Node<'static>>()
+    );
+}
+
+#[test]
 fn transient_promotion_fence_failure_can_retry_without_reopening() {
     use litchi_core::{OwnedSource, SourceVersion};
     use std::sync::atomic::{AtomicUsize, Ordering};

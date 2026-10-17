@@ -737,6 +737,18 @@
           "set": false,
           "get": true
         },
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "clearable": true,
@@ -818,16 +830,6 @@
           "code": "unsupported_capability",
           "followUp": "L-PPTX-R7b",
           "reason": "the text-body reader applies body-property defaults, so local values are unknown"
-        },
-        "link": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended",
-          "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
-        },
-        "tooltip": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended",
-          "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
         },
         "list": {
           "code": "unsupported_capability",
@@ -1220,6 +1222,18 @@
           "set": false,
           "get": true
         },
+        "link": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "clearable": true,
@@ -1274,8 +1288,8 @@
         "pic"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -1356,6 +1370,20 @@
           "type": "int",
           "add": false,
           "set": false,
+          "get": true
+        },
+        "link": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "src": {
@@ -1575,7 +1603,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -2796,7 +2824,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -2919,6 +2947,20 @@
           "type": "int",
           "add": false,
           "set": false,
+          "get": true
+        },
+        "link": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
           "get": true
         }
       },
@@ -3252,7 +3294,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -3422,7 +3464,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -3575,6 +3617,20 @@
           "set": false,
           "get": true
         },
+        "link": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "add": false,
@@ -3595,18 +3651,6 @@
           "add": false,
           "set": true,
           "get": false
-        }
-      },
-      "propertyGaps": {
-        "link": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended",
-          "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
-        },
-        "tooltip": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended",
-          "reason": "the shape and run tables do not carry click actions yet; read and write their hyperlink element"
         }
       },
       "predicates": {
@@ -3647,7 +3691,7 @@
       "parent": "slide",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -3679,8 +3723,8 @@
       "element": "comment",
       "parent": "slide",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false

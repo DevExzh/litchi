@@ -15,10 +15,10 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused |
 |---|---|---|---|---|---|---|---|---|---|
-| docx | 41 | 288 | 288 | 0 | 0 | 78 | 97 | 8 | 32 |
+| docx | 41 | 302 | 302 | 0 | 0 | 78 | 83 | 8 | 36 |
 | xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 |
-| pptx | 37 | 256 | 256 | 0 | 0 | 65 | 96 | 2 | 40 |
-| xlsb | 26 | 175 | 175 | 0 | 0 | 78 | 45 | 2 | 18 |
+| pptx | 37 | 279 | 279 | 0 | 0 | 65 | 73 | 2 | 40 |
+| xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
 | ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
@@ -39,7 +39,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## docx
 
-- fixtures: `create()`, `seed`, `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`, `ooxml/docx/Hyperlink.docx`, `officecli/examples/word/revisions.docx`, `ooxml/docx/table-indent.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`, `ooxml/docx/comment.docx`, `libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`, `ooxml/docx/footnotes.docx`, `ooxml/docx/endnotes.docx`, `ooxml/docx/headerFooter.docx`, `ooxml/docx/ComplexNumberedLists.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx`, `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx`, `seed + add paragraph`, `seed + add paragraph + add run`, `seed + add hyperlink`, `seed + add table`, `seed + add table + add row`, `seed + add paragraph + add header`, `seed + add paragraph + add footer`, `seed + add footnote`, `seed + add endnote`, `seed + add comment`, `seed + add paragraph + add style`, `seed + add paragraph + add abstractNum`, `seed + add paragraph + add num`, `ooxml/docx/ComplexNumberedLists.docx + add level`, `seed + add picture`, `seed + add chart`, `seed + add paragraph + add break`, `seed + add paragraph + add tab`, `seed + add smartart`
+- fixtures: `create()`, `seed`, `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`, `ooxml/docx/Hyperlink.docx`, `officecli/examples/word/revisions.docx`, `ooxml/docx/table-indent.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`, `ooxml/docx/comment.docx`, `libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`, `ooxml/docx/footnotes.docx`, `ooxml/docx/endnotes.docx`, `ooxml/docx/headerFooter.docx`, `ooxml/docx/ComplexNumberedLists.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx`, `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx`, `seed + add paragraph`, `seed + add paragraph + add run`, `seed + add hyperlink`, `seed + add table`, `seed + add table + add row`, `seed + add paragraph + add header`, `seed + add paragraph + add footer`, `seed + add footnote`, `seed + add endnote`, `seed + add comment`, `seed + add paragraph + add style`, `seed + add paragraph + add abstractNum`, `seed + add paragraph + add num`, `ooxml/docx/ComplexNumberedLists.docx + add level`, `seed + add bookmark`, `seed + add field`, `seed + add picture`, `seed + add chart`, `seed + add toc`, `seed + add paragraph + add break`, `seed + add paragraph + add tab`, `seed + add smartart`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -71,13 +71,13 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | level | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | settings | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | theme | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| bookmark | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| field | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| bookmark | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| field | ok | ok | ok | ok | ok | ok | n/a | refused | refused | ok | ok | ok | ok |
 | formfield | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | picture | ok | ok | n/a | ok | n/a | ok | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | chart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | revision | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | watermark | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | textbox | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
@@ -122,7 +122,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## pptx
 
-- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `libreoffice-core/oox/qa/unit/data/import-mce.pptx`, `poi/test-data/slideshow/EmbeddedAudio.pptx`, `poi/test-data/slideshow/EmbeddedVideo.pptx`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `create() + add slide + add video`, `create() + add slide + add audio`, `create() + add slide + add media`, `create() + add slide + add shape + add hyperlink`, `ooxml/pptx/shapes.pptx + add col`, `create() + add slide + add smartart + add node`
+- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `libreoffice-core/oox/qa/unit/data/import-mce.pptx`, `poi/test-data/slideshow/EmbeddedAudio.pptx`, `poi/test-data/slideshow/EmbeddedVideo.pptx`, `create() + add slide`, `create() + add slide + add shape`, `ooxml/pptx/shapes.pptx + add picture`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `ooxml/pptx/shapes.pptx + add comment`, `create() + add slide + add video`, `create() + add slide + add audio`, `create() + add slide + add media`, `create() + add slide + add shape + add hyperlink`, `ooxml/pptx/shapes.pptx + add picture + add col`, `create() + add slide + add smartart + add node`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -131,20 +131,20 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | placeholder | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
-| picture | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
+| picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| tc | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| group | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
+| group | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | connector | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
 | smartart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | ole | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
-| paragraph | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| run | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| paragraph | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| run | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | linebreak | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| notes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| comment | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| comment | ok | ok | ok | ok | ok | ok | n/a | refused | refused | ok | ok | ok | ok |
 | video | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 | audio | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 | media | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
@@ -167,7 +167,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## xlsb
 
-- fixtures: `create()`, `ooxml/xlsb/date.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb`, `poi/test-data/spreadsheet/testVarious.xlsb`, `unified-ops/0294/table.xlsb`, `create() + add sheet`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
+- fixtures: `create()`, `ooxml/xlsb/date.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb`, `poi/test-data/spreadsheet/testVarious.xlsb`, `unified-ops/0294/table.xlsb`, `create() + add sheet`, `create() + add namedrange`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
 - document views on `ooxml/xlsb/date.xlsb`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -179,7 +179,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| namedrange | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| namedrange | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | series | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |

@@ -17,6 +17,56 @@ pub struct Comment {
     pub guid: Option<String>,
     /// Optional legacy VML shape identifier.
     pub shape_id: Option<u32>,
+    /// The rich-text runs of a note written as `<r>` runs, in order; empty
+    /// for a note written as one plain `<t>`. Their texts join to
+    /// [`Comment::text`].
+    pub runs: Vec<TextRun>,
+}
+
+/// One rich-text run of a note: its text and run properties (`rPr`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TextRun {
+    /// The run's text.
+    pub text: String,
+    /// The run's formatting.
+    pub font: RunFont,
+}
+
+impl Eq for TextRun {}
+
+/// The run properties (`CT_RPrElt`) a note run carries; `None` leaves a
+/// property unwritten.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RunFont {
+    /// `b`.
+    pub bold: Option<bool>,
+    /// `i`.
+    pub italic: Option<bool>,
+    /// `strike`.
+    pub strike: Option<bool>,
+    /// `u/@val` (`single`, `double`, `singleAccounting`, ...).
+    pub underline: Option<String>,
+    /// `vertAlign/@val` (`superscript`, `subscript`, `baseline`).
+    pub vert_align: Option<String>,
+    /// `sz/@val`, in points.
+    pub size: Option<f64>,
+    /// `color`.
+    pub color: Option<RunColor>,
+    /// `rFont/@val`.
+    pub name: Option<String>,
+}
+
+/// The color of a note run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RunColor {
+    /// `color/@rgb`, eight hexadecimal `AARRGGBB` digits as written.
+    Rgb(String),
+    /// `color/@indexed`, a legacy palette index (Excel writes 81 for note
+    /// text).
+    Indexed(u32),
+    /// `color/@theme`.
+    Theme(u32),
 }
 
 /// All classic comments and their author table from one comments part.

@@ -44,11 +44,11 @@ use super::children::{Children, Listing};
 use super::owner::SlideFacts;
 use super::spec::{
     AXIS_PROPS, AxisKey, CELL_PROPS, COLUMN_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey,
-    EQUATION_PROPS, FRAME_PROPS, FrameKey, HYPERLINK_PROPS, Kind, MEDIA_PROPS, MediaKey,
-    NODE_PROPS, NOTES_PROPS, NodeKey, NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE,
-    PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey, RunKey, SERIES_PROPS, SHAPE_PROPS,
-    SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey, ShapeKey, SlideKey, SmartArtKey,
-    TABLE_PROPS, THEME_PROPS, TableKey,
+    EQUATION_PROPS, FRAME_PROPS, FrameKey, HYPERLINK_PROPS, Kind, LINKED_FRAME_PROPS,
+    LinkedFrameKey, MEDIA_PROPS, MediaKey, NODE_PROPS, NOTES_PROPS, NodeKey, NotesKey,
+    PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey,
+    RunKey, SERIES_PROPS, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey,
+    ShapeKey, SlideKey, SmartArtKey, TABLE_PROPS, THEME_PROPS, TableKey,
 };
 use super::steps::{self, Builder};
 use super::text;
@@ -118,12 +118,15 @@ pub(super) enum Item {
     Reply(ReplyItem),
     /// The presentation theme (record 0321).
     Theme(super::theme::ThemeItem),
-    /// A table grid column (record 0321).
-    Column(super::columns::ColumnItem),
+    /// A table grid column (record 0321). Boxed, as are the other two
+    /// record 0321 elements, so the item stays as large as a text item and
+    /// every query that never names them moves no more bytes per node
+    /// (record 0326).
+    Column(Box<super::columns::ColumnItem>),
     /// A shape's or run's click action (record 0321).
-    Hyperlink(super::links::LinkItem),
+    Hyperlink(Box<super::links::LinkItem>),
     /// An Office Math equation (record 0321).
-    Equation(super::equations::EquationItem),
+    Equation(Box<super::equations::EquationItem>),
 }
 
 /// A slide: its position, and its scene and facts once a read needed them.
@@ -324,10 +327,19 @@ pub(super) struct TreeItem {
     pub(super) handle: Handle,
     pub(super) ordinal: u32,
     body: OnceLock<std::result::Result<Option<Arc<Body>>, Error>>,
-    /// A chart frame's chart part, read on first use (record 0270).
-    chart: OnceLock<std::result::Result<Option<Arc<Summary>>, Error>>,
-    /// A SmartArt frame's data model, read on first use (record 0284).
-    diagram: OnceLock<std::result::Result<Option<Arc<Outline>>, Error>>,
+    /// A chart frame's chart part (record 0270) or a SmartArt frame's data
+    /// model (record 0284), read on first use. One cell for both, since a
+    /// frame is one kind or the other: every node of a query is moved
+    /// several times, and a second cell made each move 24 bytes longer
+    /// (record 0326).
+    frame: OnceLock<std::result::Result<Option<FramePart>, Error>>,
+}
+
+/// What a chart or SmartArt frame's part reads as.
+#[derive(Clone)]
+enum FramePart {
+    Chart(Arc<Summary>),
+    Diagram(Arc<Outline>),
 }
 
 impl TreeItem {
@@ -338,8 +350,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -350,8 +361,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -368,8 +378,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -386,8 +395,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -418,8 +426,14 @@ impl TreeItem {
         if self.kind != Kind::Chart {
             return Ok(None);
         }
-        let read = self.chart.get_or_init(|| super::chart::summary(file, self));
-        read.clone()
+        let read = self.frame.get_or_init(|| {
+            super::chart::summary(file, self).map(|chart| chart.map(FramePart::Chart))
+        });
+        match read {
+            Ok(Some(FramePart::Chart(chart))) => Ok(Some(Arc::clone(chart))),
+            Ok(_) => Ok(None),
+            Err(error) => Err(error.clone()),
+        }
     }
 
     /// A SmartArt frame's data-model outline, read from its data part on
@@ -429,10 +443,14 @@ impl TreeItem {
         if self.kind != Kind::SmartArt {
             return Ok(None);
         }
-        let read = self
-            .diagram
-            .get_or_init(|| super::smartart::outline(file, self));
-        read.clone()
+        let read = self.frame.get_or_init(|| {
+            super::smartart::outline(file, self).map(|outline| outline.map(FramePart::Diagram))
+        });
+        match read {
+            Ok(Some(FramePart::Diagram(outline))) => Ok(Some(Arc::clone(outline))),
+            Ok(_) => Ok(None),
+            Err(error) => Err(error.clone()),
+        }
     }
 
     /// The placeholder type token of a `p:sp` with a `p:ph`, as OfficeCLI
@@ -1090,7 +1108,28 @@ impl<'f> Node<'f> {
         };
         Ok(match tree.kind {
             Kind::Shape => match ShapeKey::at(index) {
+                Some(key @ (ShapeKey::Link | ShapeKey::Tooltip)) => super::links::click_value(
+                    super::links::of_shape(self.file, tree)?
+                        .as_ref()
+                        .map(|item| &*item.link),
+                    key == ShapeKey::Tooltip,
+                ),
                 Some(key) => TreeProps::read_for(tree, Needs::shape(tree, key))?.shape(key),
+                None => None,
+            },
+            Kind::Picture | Kind::Group => match LinkedFrameKey::at(index) {
+                Some(key @ (LinkedFrameKey::Link | LinkedFrameKey::Tooltip)) => {
+                    super::links::click_value(
+                        super::links::of_frame(self.file, tree)?
+                            .as_ref()
+                            .map(|item| &*item.link),
+                        key == LinkedFrameKey::Tooltip,
+                    )
+                },
+                Some(_) => match FrameKey::at(index) {
+                    Some(key) => TreeProps::read_for(tree, Needs::frame(tree, key))?.frame(key),
+                    None => None,
+                },
                 None => None,
             },
             Kind::Table | Kind::Chart | Kind::Video | Kind::Audio | Kind::Media => {
@@ -1162,10 +1201,16 @@ impl<'f> Node<'f> {
                 PropKind::Layout(layout.facts(self.file)?),
             ),
             Item::Tree(tree) => match tree.kind {
-                Kind::Shape => (
-                    SHAPE_PROPS,
-                    PropKind::Shape(Box::new(TreeProps::read(tree, true)?)),
-                ),
+                Kind::Shape => {
+                    let mut props = TreeProps::read(tree, true)?;
+                    props.link = super::links::of_shape(self.file, tree)?.map(|item| item.link);
+                    (SHAPE_PROPS, PropKind::Shape(Box::new(props)))
+                },
+                Kind::Picture | Kind::Group => {
+                    let mut props = TreeProps::read(tree, false)?;
+                    props.link = super::links::of_frame(self.file, tree)?.map(|item| item.link);
+                    (LINKED_FRAME_PROPS, PropKind::LinkedFrame(Box::new(props)))
+                },
                 Kind::Table => {
                     let (rows, cols) = text::table_shape(&tree.handle)?;
                     let properties = text::table_properties(&tree.handle)?;
@@ -1213,7 +1258,13 @@ impl<'f> Node<'f> {
                 None => (PARAGRAPH_PROPS, PropKind::Empty),
             },
             Item::Run(text) => match text.run() {
-                Some(run) => (RUN_PROPS, PropKind::Run(&run.properties)),
+                Some(run) => (
+                    RUN_PROPS,
+                    PropKind::Run(
+                        &run.properties,
+                        super::links::of_run(self.file, text)?.map(|item| item.link),
+                    ),
+                ),
                 None => (RUN_PROPS, PropKind::Empty),
             },
             Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_fill(cell)?)),
@@ -1398,6 +1449,8 @@ enum PropKind<'a> {
     Layout(&'a LayoutFacts),
     Shape(Box<TreeProps<'a>>),
     Frame(Box<TreeProps<'a>>),
+    /// A picture or a group (record 0325).
+    LinkedFrame(Box<TreeProps<'a>>),
     SmartArt(Box<SmartArtProps<'a>>),
     DiagramNode(&'a DiagramItem),
     Chart(Box<ChartProps<'a>>),
@@ -1405,7 +1458,10 @@ enum PropKind<'a> {
     Axis(&'a ChartItem),
     Table(Box<TableProps<'a>>),
     Paragraph(&'a Paragraph),
-    Run(&'a RunProperties),
+    Run(
+        &'a RunProperties,
+        Option<Arc<litchi_pptx::hyperlinks::Link>>,
+    ),
     Notes(&'a str),
     Cell(Option<[u8; 3]>),
     Comment(&'a Comment),
@@ -1428,6 +1484,9 @@ struct TreeProps<'a> {
     transform: Option<Transform>,
     description: Option<Cow<'a, str>>,
     text: Option<text::Facts<'a>>,
+    /// The click action of a shape, picture or group, when the caller
+    /// resolved it (record 0325).
+    link: Option<Arc<litchi_pptx::hyperlinks::Link>>,
 }
 
 /// The inputs a [`TreeProps`] reads.
@@ -1483,7 +1542,9 @@ impl Needs {
             | ShapeKey::PhIndex
             | ShapeKey::Id
             | ShapeKey::IsTitle
-            | ShapeKey::Zorder => Self::NONE,
+            | ShapeKey::Zorder
+            | ShapeKey::Link
+            | ShapeKey::Tooltip => Self::NONE,
             ShapeKey::Alt => Self::DESCRIPTION,
             ShapeKey::X | ShapeKey::Y | ShapeKey::Width | ShapeKey::Height => Self::geometry(tree),
             ShapeKey::FlipH | ShapeKey::FlipV | ShapeKey::Rotation => Self::TRANSFORM,
@@ -1563,6 +1624,7 @@ impl<'a> TreeProps<'a> {
             transform,
             description,
             text,
+            link: None,
         })
     }
 
@@ -1665,6 +1727,8 @@ impl<'a> TreeProps<'a> {
             ShapeKey::FlipV => self.flip_v(),
             ShapeKey::Zorder => self.zorder(),
             ShapeKey::Rotation => self.rotation(),
+            ShapeKey::Link => super::links::click_value(self.link.as_deref(), false),
+            ShapeKey::Tooltip => super::links::click_value(self.link.as_deref(), true),
             ShapeKey::Font
             | ShapeKey::FontLatin
             | ShapeKey::FontEa
@@ -1702,6 +1766,16 @@ impl<'a> TreeProps<'a> {
             FrameKey::FlipH => self.flip_h(),
             FrameKey::FlipV => self.flip_v(),
             FrameKey::Zorder => self.zorder(),
+        }
+    }
+
+    /// The value at `index` of [`LINKED_FRAME_PROPS`]: a frame key, then the
+    /// click action.
+    fn linked_frame(&self, index: usize) -> Option<Value<'a>> {
+        match LinkedFrameKey::at(index)? {
+            LinkedFrameKey::Link => super::links::click_value(self.link.as_deref(), false),
+            LinkedFrameKey::Tooltip => super::links::click_value(self.link.as_deref(), true),
+            _ => self.frame(FrameKey::at(index)?),
         }
     }
 
@@ -1868,6 +1942,7 @@ impl<'a> Props<'a> {
             },
             PropKind::Shape(props) => props.shape(ShapeKey::at(index)?),
             PropKind::Frame(props) => props.frame(FrameKey::at(index)?),
+            PropKind::LinkedFrame(props) => props.linked_frame(index),
             PropKind::SmartArt(props) => props.value(SmartArtKey::at(index)?),
             PropKind::DiagramNode(item) => match NodeKey::at(index)? {
                 NodeKey::Level => item
@@ -1881,7 +1956,11 @@ impl<'a> Props<'a> {
             PropKind::Paragraph(paragraph) => {
                 text::paragraph_value(paragraph, ParagraphKey::at(index)?)
             },
-            PropKind::Run(properties) => text::run_value(properties, RunKey::at(index)?),
+            PropKind::Run(properties, link) => match RunKey::at(index)? {
+                RunKey::Link => super::links::click_value(link.as_deref(), false),
+                RunKey::Tooltip => super::links::click_value(link.as_deref(), true),
+                key => text::run_value(properties, key),
+            },
             PropKind::Cell(fill) => match CellKey::at(index)? {
                 CellKey::Fill => fill.map(|[red, green, blue]| {
                     Value::Color(crate::value::Color::rgb(red, green, blue))

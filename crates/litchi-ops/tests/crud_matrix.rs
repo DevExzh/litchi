@@ -545,6 +545,32 @@ const RECIPES: &[Recipe] = &[
         props: &[("ilvl", "8"), ("format", "decimal"), ("lvlText", "%9.")],
         start: false,
     },
+    // Record 0325: bookmarks and fields go into a paragraph, a table of
+    // contents under the body.
+    Recipe {
+        format: "docx",
+        element: "bookmark",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("name", "Mark"), ("text", "here")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "field",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("fieldType", "page")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "toc",
+        fixture: "seed",
+        parent: "/body",
+        props: &[("levels", "1-3")],
+        start: false,
+    },
     // Record 0295: DOCX SmartArt is added under a paragraph from an outline.
     Recipe {
         format: "docx",
@@ -788,6 +814,34 @@ const RECIPES: &[Recipe] = &[
         fixture: "create() + add slide",
         parent: "/slide[1]",
         props: &[("src", MP4), ("poster", PNG)],
+        start: false,
+    },
+    // Record 0330: claims that agree with the registry. A picture needs
+    // its image and a legacy comment its author, both on a producer's
+    // slide; an XLSB defined name needs its name and a sheet-qualified
+    // reference.
+    Recipe {
+        format: "pptx",
+        element: "picture",
+        fixture: "ooxml/pptx/shapes.pptx",
+        parent: "/slide[1]",
+        props: &[("src", PNG), ("name", "Logo")],
+        start: false,
+    },
+    Recipe {
+        format: "pptx",
+        element: "comment",
+        fixture: "ooxml/pptx/shapes.pptx",
+        parent: "/slide[1]",
+        props: &[("author", "Ada"), ("text", "Check")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsb",
+        element: "namedrange",
+        fixture: "create()",
+        parent: "/",
+        props: &[("name", "Totals"), ("ref", "Sheet1!$A$1:$B$2")],
         start: false,
     },
     Recipe {

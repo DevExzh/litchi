@@ -1622,11 +1622,11 @@
         "definedname"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -3161,6 +3161,15 @@
     }
   ],
   "gaps": [
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "namedrange",
+      "context": "earlier-name",
+      "code": "unsupported_capability",
+      "followUp": "XLSB defined-name index renumbering (record 0330)",
+      "reason": "only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references"
+    },
     {
       "subject": "operation",
       "verb": "create",
