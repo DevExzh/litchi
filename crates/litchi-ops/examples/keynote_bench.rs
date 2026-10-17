@@ -36,7 +36,10 @@
 //! - record 0329: `table_add`, a 3 x 3 table on the table slide of
 //!   `table-discovery.key` (leaf `edit_slide_drawables` + `add_table`;
 //!   unified `File::add` of `tbl` with `rows` and `cols`); outputs compared
-//!   byte for byte before timing.
+//!   byte for byte before timing; `notes_run_style` (bold on the first
+//!   run of slide 2's speaker notes, written outside the clock; leaf
+//!   `edit_slide_drawables` + `set_notes_text_style`; unified `set` of the
+//!   notes run's `bold`).
 //!
 //! Inputs (opened packages and files) are prepared outside the timed
 //! region; the unified legs include building the object tree on their first
@@ -306,6 +309,35 @@ fn main() {
             .to_bytes()
             .unwrap();
         assert!(leaf == unified, "table_add outputs differ");
+    }
+    // Record 0329: speaker notes on slide 2, written outside the clock.
+    let notes_bytes = {
+        let source = package();
+        let mut edit = source.edit_slide_notes(SlideSelector::index(1)).unwrap();
+        edit.set("Remember the second point").unwrap();
+        leaf_bytes(edit.commit().unwrap().package())
+    };
+    let notes_bytes = &notes_bytes;
+    let notes_package = || Package::from_bytes(notes_bytes).unwrap();
+    let notes_file = || litchi_ops::open_bytes(notes_bytes.clone()).unwrap();
+    const NOTES_RUN: &str = "/slide[2]/notes/p[1]/run[1]";
+    let notes_length = "Remember the second point".chars().count();
+    {
+        let source = notes_package();
+        let mut edit = source.edit_slide_drawables();
+        edit.set_notes_text_style(
+            SlideSelector::index(1),
+            DrawableSpan::new(0, notes_length),
+            Style::new().with_bold(true),
+        )
+        .unwrap();
+        let leaf = leaf_bytes(edit.commit().unwrap().package());
+        let unified = notes_file()
+            .set(NOTES_RUN, props! { "bold" => true })
+            .unwrap()
+            .to_bytes()
+            .unwrap();
+        assert!(leaf == unified, "notes_run_style outputs differ");
     }
     let media_bytes =
         std::fs::read(test_data().join("iwork/keynote/media-lifecycle-audio-remove-native.key"))
@@ -693,6 +725,26 @@ fn main() {
                         )
                         .unwrap(),
                     );
+                })
+            }),
+        },
+        Scenario {
+            name: "notes_run_style",
+            leaf: Box::new(move |n| {
+                leg(n, notes_package, |package| {
+                    let mut edit = package.edit_slide_drawables();
+                    edit.set_notes_text_style(
+                        SlideSelector::index(1),
+                        DrawableSpan::new(0, notes_length),
+                        Style::new().with_bold(true),
+                    )
+                    .unwrap();
+                    drop(black_box(edit.commit().unwrap()));
+                })
+            }),
+            unified: Box::new(move |n| {
+                leg(n, notes_file, |file| {
+                    black_box(file.set(NOTES_RUN, props! { "bold" => true }).unwrap());
                 })
             }),
         },
