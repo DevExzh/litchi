@@ -82,6 +82,8 @@ pub(crate) struct Note {
     pub(super) reference: String,
     pub(super) author: String,
     pub(super) text: String,
+    /// The note's rich-text runs; empty for plain text.
+    pub(super) runs: Vec<xlsx::workbook::comments::TextRun>,
 }
 
 /// A conditional format and the formatting its first rule applies.
@@ -335,11 +337,7 @@ pub(super) fn list(file: &Xlsx, sheet: &Sheet, kind: Kind) -> Result<Vec<Feature
                 .map(|comments| {
                     comments
                         .iter()
-                        .map(|(reference, comment)| Note {
-                            reference: reference.to_owned(),
-                            author: comment.author.clone(),
-                            text: comment.text.clone(),
-                        })
+                        .map(|(reference, comment)| note(reference, comment))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -438,6 +436,9 @@ pub(super) fn lookup<'f>(
     kind: Kind,
     select: Select<'_>,
 ) -> Result<Lookup<Node<'f>, GapSpec>> {
+    if kind == Kind::Comment {
+        return comment(file, sheet, select);
+    }
     let mut features = list(file, sheet, kind)?;
     let index = match select {
         Select::Ordinal(position) => Some(position.get()),
@@ -453,6 +454,61 @@ pub(super) fn lookup<'f>(
         )),
         None => Lookup::Missing,
     })
+}
+
+/// [`lookup`] of a note: the notes are ordered row-major by their cells
+/// alone, and only the selected one is copied (record 0326). The order is
+/// [`list`]'s: its stable sort keeps equal cells in part order, as the
+/// part index does here.
+fn comment<'f>(
+    file: &'f Xlsx,
+    sheet: &Sheet,
+    select: Select<'_>,
+) -> Result<Lookup<Node<'f>, GapSpec>> {
+    let comments = if sheet.handle.is_grid() {
+        sheet.handle.comments()?
+    } else {
+        None
+    };
+    let entries: Vec<_> = comments
+        .as_ref()
+        .map(|comments| comments.iter().collect())
+        .unwrap_or_default();
+    let index = match select {
+        Select::Ordinal(position) => Some(position.get()),
+        Select::None => Some(0),
+        Select::Last => entries.len().checked_sub(1),
+        _ => return Ok(Lookup::NotApplicable),
+    };
+    let Some(index) = index.filter(|index| *index < entries.len()) else {
+        return Ok(Lookup::Missing);
+    };
+    let mut order: Vec<((u32, u32), usize)> = entries
+        .iter()
+        .enumerate()
+        .map(|(at, (reference, _))| (row_major(reference), at))
+        .collect();
+    let (_, &mut (_, at), _) = order.select_nth_unstable(index);
+    let (reference, comment) = entries[at];
+    Ok(Lookup::Found(Node::new_feature(
+        file,
+        sheet.position,
+        Feature {
+            kind: Kind::Comment,
+            index: u32::try_from(index).unwrap_or(u32::MAX),
+            data: Data::Comment(note(reference, comment)),
+        },
+    )))
+}
+
+/// A note's copy of a comment of the part.
+fn note(reference: &str, comment: &xlsx::workbook::comments::Comment) -> Note {
+    Note {
+        reference: reference.to_owned(),
+        author: comment.author.clone(),
+        text: comment.text.clone(),
+        runs: comment.runs.clone(),
+    }
 }
 
 impl<'f> Node<'f> {
@@ -567,6 +623,13 @@ pub(crate) enum CommentKey {
     Author,
     Text,
     AnchoredTo,
+    FontBold,
+    FontItalic,
+    FontUnderline,
+    FontSize,
+    FontColor,
+    FontName,
+    Runs,
 }
 
 keyed!(CommentKey, CommentKey, COMMENT_TABLE, COMMENT_PROPS, COMMENT_KEYS, [
@@ -574,7 +637,85 @@ keyed!(CommentKey, CommentKey, COMMENT_TABLE, COMMENT_PROPS, COMMENT_KEYS, [
     entry(read("author", TEXT), Access::SetAndAdd(CommentKey::Author)) => Author,
     entry(read("text", TEXT), Access::SetAndAdd(CommentKey::Text)) => Text,
     entry(read("anchoredTo", TEXT), Access::ReadOnly) => AnchoredTo,
+    entry(read("font.bold", BOOL), Access::SetAndAdd(CommentKey::FontBold)) => FontBold,
+    entry(read("font.italic", BOOL), Access::SetAndAdd(CommentKey::FontItalic)) => FontItalic,
+    entry(read("font.underline", TEXT), Access::SetAndAdd(CommentKey::FontUnderline)) => FontUnderline,
+    entry(read("font.size", FONT_SIZE), Access::SetAndAdd(CommentKey::FontSize)) => FontSize,
+    entry(read("font.color", SHEET_COLOR), Access::SetAndAdd(CommentKey::FontColor)) => FontColor,
+    entry(read("font.name", TEXT), Access::SetAndAdd(CommentKey::FontName)) => FontName,
+    entry(read("runs", TEXT), Access::SetAndAdd(CommentKey::Runs)) => Runs,
 ], []);
+
+/// The size and typeface Excel gives note text, which a note's single-run
+/// `font.size` and `font.name` leave unreported (as OfficeCLI does).
+pub(super) const NOTE_SIZE: f64 = 9.0;
+/// See [`NOTE_SIZE`].
+pub(super) const NOTE_FONT: &str = "Tahoma";
+
+/// The `RRGGBB` of an `AARRGGBB` run color.
+fn run_rgb(color: Option<&xlsx::workbook::comments::RunColor>) -> Option<xlsx::Rgb> {
+    match color? {
+        xlsx::workbook::comments::RunColor::Rgb(argb) => {
+            xlsx::Rgb::from_hex(argb.get(argb.len().checked_sub(6)?..)?).ok()
+        },
+        _ => None,
+    }
+}
+
+/// A note's runs as OfficeCLI's `runs` JSON array.
+fn runs_json(runs: &[xlsx::workbook::comments::TextRun]) -> String {
+    let items: Vec<serde_json::Value> = runs
+        .iter()
+        .map(|run| {
+            let font = &run.font;
+            let mut item = serde_json::Map::new();
+            item.insert("text".into(), run.text.clone().into());
+            for (key, on) in [
+                ("bold", font.bold),
+                ("italic", font.italic),
+                ("strike", font.strike),
+                (
+                    "superscript",
+                    font.vert_align.as_deref().map(|v| v == "superscript"),
+                ),
+                (
+                    "subscript",
+                    font.vert_align.as_deref().map(|v| v == "subscript"),
+                ),
+            ] {
+                if on == Some(true) {
+                    item.insert(key.into(), true.into());
+                }
+            }
+            if let Some(underline) = font.underline.as_deref().filter(|u| *u != "none") {
+                item.insert("underline".into(), underline.into());
+            }
+            if let Some(size) = font.size {
+                item.insert(
+                    "size".into(),
+                    format!("{}pt", crate::value::DotNetDouble(size)).into(),
+                );
+            }
+            if let Some(color) = run_rgb(font.color.as_ref()) {
+                item.insert(
+                    "color".into(),
+                    format!(
+                        "#{:02X}{:02X}{:02X}",
+                        color.red(),
+                        color.green(),
+                        color.blue()
+                    )
+                    .into(),
+                );
+            }
+            if let Some(name) = &font.name {
+                item.insert("font".into(), name.clone().into());
+            }
+            serde_json::Value::Object(item)
+        })
+        .collect();
+    serde_json::Value::Array(items).to_string()
+}
 
 fn comment_value(note: &Note, key: CommentKey) -> Option<Value<'_>> {
     match key {
@@ -583,6 +724,30 @@ fn comment_value(note: &Note, key: CommentKey) -> Option<Value<'_>> {
         CommentKey::Text => Some(text(&note.text)),
         // Read through `Feature::value`, which knows the sheet's name.
         CommentKey::AnchoredTo => None,
+        // Two or more runs read as `runs`; one run as its non-default
+        // `font.*` facets, as OfficeCLI reports them.
+        CommentKey::Runs => (note.runs.len() > 1).then(|| owned(runs_json(&note.runs))),
+        key => {
+            let [run] = note.runs.as_slice() else {
+                return None;
+            };
+            let font = &run.font;
+            match key {
+                CommentKey::FontBold => (font.bold == Some(true)).then_some(Value::Bool(true)),
+                CommentKey::FontItalic => (font.italic == Some(true)).then_some(Value::Bool(true)),
+                CommentKey::FontUnderline => {
+                    font.underline.as_deref().filter(|u| *u != "none").map(text)
+                },
+                CommentKey::FontSize => font.size.filter(|size| *size != NOTE_SIZE).map(points),
+                CommentKey::FontColor => run_rgb(font.color.as_ref()).map(rgb),
+                CommentKey::FontName => font
+                    .name
+                    .as_deref()
+                    .filter(|name| *name != NOTE_FONT)
+                    .map(text),
+                _ => None,
+            }
+        },
     }
 }
 

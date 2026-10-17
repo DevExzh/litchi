@@ -243,6 +243,11 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
+        // Header, footer and note paragraphs and runs (record 0325).
+        let editor = match self.try_set_story(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
         let controls = command_text && crate::batch::has_text_controls(&props);
         if controls
             && nodes
@@ -326,6 +331,87 @@ impl Docx {
             editor.set_numbering(target, planned, explicit_level)?;
         }
         O::publish(editor, self)
+    }
+
+    /// `set` on paragraphs and runs of headers, footers and notes (record
+    /// 0325): the main document's element-path setters, run on each story
+    /// through the leaf's story edit. `Err(editor)` hands the editor back
+    /// when no target is in a story.
+    fn try_set_story(
+        &self,
+        editor: DocxEditor,
+        nodes: &[Node<'_>],
+        props: &Props<'_>,
+    ) -> Result<std::result::Result<Commit, DocxEditor>> {
+        let mut stories = Vec::with_capacity(nodes.len());
+        for node in nodes {
+            if let Some(found) = element::story_path(node)? {
+                stories.push((found, node.element_kind()));
+            }
+        }
+        if stories.is_empty() {
+            return Ok(Err(editor));
+        }
+        let unsupported = |message: &'static str| {
+            Error::new(Code::UnsupportedCapability, message).with_format(FileFormat::Docx)
+        };
+        if stories.len() != nodes.len() {
+            return Err(unsupported(
+                "one set writes story elements or main-story elements, not both",
+            ));
+        }
+        let kind = match stories[0].1 {
+            Kind::Paragraph => TargetKind::Paragraph,
+            Kind::Run => TargetKind::Run,
+            _ => return Err(unsupported("story paragraphs and runs are set")),
+        };
+        if stories.iter().any(|(_, other)| *other != stories[0].1) {
+            return Err(unsupported("one DOCX mutation cannot mix target kinds"));
+        }
+        let mut assignments = admit_assignments(kind, props)?;
+        self.resolve_style_names(&mut assignments)?;
+        if list_request(&mut assignments)?.is_some()
+            || assignments.iter().any(|assignment| {
+                matches!(
+                    assignment.entry.access,
+                    crate::registry::Access::Set(Setter::HyperlinkUrl)
+                        | crate::registry::Access::SetAndAdd(Setter::HyperlinkUrl)
+                )
+            })
+        {
+            return Err(unsupported(
+                "list styles and hyperlink targets are not written in headers, footers and notes",
+            ));
+        }
+        self.owner().check_source()?;
+        let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
+        let WorkEdit::Eager(eager) = &mut edit else {
+            return Err(Error::new(
+                Code::InternalError,
+                "a story edit needs the owning package editor",
+            ));
+        };
+        let mut index = 0;
+        while index < stories.len() {
+            let key = stories[index].0.0.clone();
+            let end = index
+                + stories[index..]
+                    .iter()
+                    .take_while(|((other, _), _)| *other == key)
+                    .count();
+            let group = &stories[index..end];
+            eager.edit_story(super::story::target(&key), |story| -> Result<()> {
+                for ((_, path), _) in group {
+                    for assignment in &assignments {
+                        apply_story(story, path, kind, assignment)
+                            .map_err(|error| property_error(error, &assignment.key))?;
+                    }
+                }
+                Ok(())
+            })?;
+            index = end;
+        }
+        Ok(Ok(edit.commit(self)?))
     }
 
     /// An editor over the owning package: package-graph changes
@@ -1073,6 +1159,53 @@ fn admit_targets(nodes: &[Node<'_>]) -> Result<Few<Target>> {
         .with_format(FileFormat::Docx));
     }
     Ok(targets)
+}
+
+/// Apply one admitted assignment to a story element on the story's edit,
+/// as [`WorkEdit::apply_element`] does on the main document's.
+fn apply_story(
+    story: &mut litchi_docx::document::snapshot::Edit,
+    path: &litchi_docx::document::ElementPath,
+    kind: TargetKind,
+    assignment: &Assignment<'_>,
+) -> Result<()> {
+    assignment
+        .entry
+        .prepare(Operation::Set, &assignment.value, |setter, value| {
+            if setter.is_text() {
+                let text = text_value(value)?;
+                story.replace_text_at(path, text).map_err(Error::from)?;
+                return Ok(());
+            }
+            let mut failure = None;
+            match kind {
+                TargetKind::Paragraph => {
+                    story
+                        .format_paragraph_at(path, |paragraph| {
+                            if let Err(error) = setter.apply_paragraph(paragraph, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map_err(Error::from)?;
+                },
+                TargetKind::Run => {
+                    story
+                        .format_run_at(path, |run| {
+                            if let Err(error) = setter.apply_run(run, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map_err(Error::from)?;
+                },
+                TargetKind::Hyperlink | TargetKind::Cell => {
+                    return Err(Error::new(
+                        Code::UnsupportedProperty,
+                        "the DOCX element accepts only its text property",
+                    ));
+                },
+            }
+            failure.map_or(Ok(()), Err)
+        })
 }
 
 fn admit_assignments<'a>(kind: TargetKind, props: &'a Props<'_>) -> Result<Few<Assignment<'a>>> {

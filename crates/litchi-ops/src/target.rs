@@ -244,13 +244,28 @@ fn mixed_union_scope() -> Error {
 /// last top-level `/` (outside brackets and parentheses). One pass keeps
 /// whether such a byte follows the latest top-level slash seen so far
 /// (record 0291; it used to find the last slash in a separate pass first).
+/// The bytes that can make [`has_query_syntax`] answer `true`.
+static QUERY_BYTES: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut byte = 0;
+    while byte < 256 {
+        #[allow(clippy::cast_possible_truncation, reason = "byte < 256")]
+        let b = byte as u8;
+        table[byte] = matches!(b, b'"' | b'\'' | b',' | b'>' | b'*' | b':' | b'(' | b')')
+            || b.is_ascii_whitespace();
+        byte += 1;
+    }
+    table
+};
+
 fn has_query_syntax(text: &str) -> bool {
     // Only these bytes can make the answer `true` (brackets, slashes and
-    // the rest only change state); a plain path has none (record 0302).
-    if !text.bytes().any(|byte| {
-        matches!(byte, b'"' | b'\'' | b',' | b'>' | b'*' | b':' | b'(' | b')')
-            || byte.is_ascii_whitespace()
-    }) {
+    // the rest only change state); a plain path has none (record 0302). One
+    // table lookup per byte, folded without a branch (record 0326).
+    if !text
+        .bytes()
+        .fold(false, |seen, byte| seen | QUERY_BYTES[usize::from(byte)])
+    {
         return false;
     }
     let mut brackets = 0_usize;

@@ -248,6 +248,34 @@ impl Length {
         }
     }
 
+    /// The length a typed value coerces to under `context` (record 0326):
+    /// the value [`Length::parse_in`] reads from this length's
+    /// [`LengthStyle::Auto`] text, given without writing and reading the
+    /// text when the read is certain to succeed with this exact value.
+    /// `None` when the text decides: the read would refuse it (out of the
+    /// context's range, or a unit the context does not read) or round it
+    /// (word spacing is kept in twips).
+    pub(crate) const fn coerced_in(self, context: LengthContext) -> Option<Self> {
+        // Below 2^50 EMU the unit text reads back exactly (see `exact`).
+        const EXACT: i64 = 1 << 50;
+        let emu = self.0;
+        let certain = match context {
+            LengthContext::Emu => -EXACT < emu && emu < EXACT,
+            LengthContext::Extent | LengthContext::LineWidth => 0 <= emu && emu <= i32::MAX as i64,
+            // Only the `pt` text is a font size: a whole number of
+            // hundredths of a point that is not one of centimetres (which
+            // `Auto` prints first), from 0.5 pt to 4000 pt.
+            LengthContext::FontSize => {
+                emu % (EMU_PER_POINT / 100) == 0
+                    && emu % (EMU_PER_CM / 100) != 0
+                    && EMU_PER_POINT / 2 <= emu
+                    && emu <= 4000 * EMU_PER_POINT
+            },
+            LengthContext::WordSpacing => false,
+        };
+        if certain { Some(self) } else { None }
+    }
+
     /// The canonical text of this length in `style`. Allocation-free.
     #[must_use]
     pub fn display(self, style: LengthStyle) -> LengthDisplay {

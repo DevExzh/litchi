@@ -732,6 +732,14 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - New leaf mechanism `slide_order::records`: whole-record replacements that keep every other byte, with exact, inverse and durable patches. Table row/column add/remove is refused, typed (F1). Zoom, 3D models and modern comments are PPTX-only (wontfix).
   - Writes 1.009–1.054× of the leaf; comment get 1.44× (+0.6 µs) and run get 3.1× (+1.5 µs) miss (to 0326).
   - Merge fix: the appended glossary sections and test fixture/recipe lists conflicted with 0324; both sides kept, fidelity re-blessed.
+- Merged `ooxml-followups` (0325):
+  - DOCX stories: `/header|/footer|/footnote|/endnote[N]/p[M]` and their runs get/set/add/remove through the leaf `Edit::edit_story`.
+  - DOCX marks: bookmark add/rename/remove; field add (OfficeCLI types or raw), instruction and result set; TOC add/switch set/remove. `level<N>.*` keys on `abstractNum` add; num "Mode A".
+  - PPTX `link`/`tooltip` on shapes, placeholders, runs, pictures and groups. XLSX note `font.*` and `runs=` on add and set.
+  - New crate `litchi-spreadsheet-drawing` (`objects`, `vml`), shared by XLSX and XLSB with byte-identical output.
+  - Word corpus passed 645 → 661, gap 221 → 211, bug 0; DOCX property writes 227 → 250.
+  - Writes within 1.07×; XLSX note set 1.48× (an existing extra parse from 0320; a per-handle notes cache is the follow-up); a rich-note read 1.10–1.12×.
+  - Open: story paragraphs in views and unscoped queries, story tables/list styles, remaining mark edits, XLSB note formatting.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;

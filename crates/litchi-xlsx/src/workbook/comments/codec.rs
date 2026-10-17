@@ -11,7 +11,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Result, invalid};
 
-use super::model::{Comment, Comments};
+use super::model::{Comment, Comments, RunColor, RunFont, TextRun};
 use super::{MAX_AUTHORS, MAX_COMMENTS, MAX_PART_BYTES, MAX_TEXT_BYTES};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -26,6 +26,7 @@ enum Context {
     Comment,
     CommentText,
     RichRun,
+    RunProperties,
     Text(TextTarget),
     Other,
 }
@@ -44,6 +45,7 @@ struct PendingComment {
     shape_id: Option<u32>,
     saw_text: bool,
     text_mode: Option<CommentTextMode>,
+    runs: Vec<TextRun>,
 }
 
 #[derive(Clone, Copy)]
@@ -61,6 +63,7 @@ struct Parser {
     seen_comment_list: bool,
     comment_list_start: usize,
     run_saw_text: bool,
+    run: Option<TextRun>,
 }
 
 impl Parser {
@@ -74,6 +77,7 @@ impl Parser {
             seen_comment_list: false,
             comment_list_start: 0,
             run_saw_text: false,
+            run: None,
         }
     }
 
@@ -259,7 +263,19 @@ impl Parser {
             }
             comment.text_mode = Some(CommentTextMode::Rich);
             self.run_saw_text = false;
+            self.run = Some(TextRun::default());
             return Ok(Context::RichRun);
+        }
+        if parent == Context::RichRun && is_spreadsheetml_name(namespace, element.name(), b"rPr") {
+            return Ok(Context::RunProperties);
+        }
+        if parent == Context::RunProperties
+            && let Some(run) = self.run.as_mut()
+        {
+            if is_spreadsheetml_name(namespace, element.name(), element.local_name().as_ref()) {
+                run_property(&mut run.font, element, decoder)?;
+            }
+            return Ok(Context::Other);
         }
         if parent == Context::RichRun && is_spreadsheetml_name(namespace, element.name(), b"t") {
             if self.run_saw_text {
@@ -288,6 +304,7 @@ impl Parser {
             shape_id: optional_u32(element, b"shapeId", decoder, "comment shape ID")?,
             saw_text: false,
             text_mode: None,
+            runs: Vec::new(),
         });
         Ok(())
     }
@@ -299,12 +316,16 @@ impl Parser {
                 .as_mut()
                 .ok_or_else(|| invalid("author text outside an author"))?
                 .push_str(value),
-            TextTarget::Comment => self
-                .comment
-                .as_mut()
-                .ok_or_else(|| invalid("comment text outside a comment"))?
-                .text
-                .push_str(value),
+            TextTarget::Comment => {
+                self.comment
+                    .as_mut()
+                    .ok_or_else(|| invalid("comment text outside a comment"))?
+                    .text
+                    .push_str(value);
+                if let Some(run) = self.run.as_mut() {
+                    run.text.push_str(value);
+                }
+            },
         }
         let size = match target {
             TextTarget::Author => self.author.as_ref().map_or(0, String::len),
@@ -343,6 +364,11 @@ impl Parser {
             Context::RichRun if !self.run_saw_text => {
                 return Err(invalid("comment rich-text run is missing its text"));
             },
+            Context::RichRun => {
+                if let (Some(run), Some(comment)) = (self.run.take(), self.comment.as_mut()) {
+                    comment.runs.push(run);
+                }
+            },
             Context::Comment => {
                 let pending = self
                     .comment
@@ -374,6 +400,7 @@ impl Parser {
                         text: pending.text,
                         guid: pending.guid,
                         shape_id: pending.shape_id,
+                        runs: pending.runs,
                     },
                 );
                 if self.comments.len() > MAX_COMMENTS {
@@ -392,12 +419,44 @@ impl Parser {
             | Context::Authors
             | Context::CommentList
             | Context::CommentText
-            | Context::RichRun
+            | Context::RunProperties
             | Context::Text(_)
             | Context::Other => {},
         }
         Ok(())
     }
+}
+
+/// Read one `CT_RPrElt` child into `font`; unknown children are ignored.
+fn run_property(font: &mut RunFont, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+    let value = |name: &[u8]| unqualified_attribute_value(element, name, decoder);
+    let flag = |value: Option<String>| Some(value.is_none_or(|v| v != "0" && v != "false"));
+    match element.local_name().as_ref() {
+        b"b" => font.bold = flag(value(b"val")?),
+        b"i" => font.italic = flag(value(b"val")?),
+        b"strike" => font.strike = flag(value(b"val")?),
+        b"u" => font.underline = Some(value(b"val")?.unwrap_or_else(|| "single".to_owned())),
+        b"vertAlign" => font.vert_align = value(b"val")?,
+        b"sz" => {
+            font.size = value(b"val")?
+                .and_then(|v| v.parse::<f64>().ok())
+                .filter(|v| v.is_finite());
+        },
+        b"color" => {
+            font.color = if let Some(rgb) = value(b"rgb")? {
+                Some(RunColor::Rgb(rgb))
+            } else if let Some(index) = value(b"indexed")?.and_then(|v| v.parse().ok()) {
+                Some(RunColor::Indexed(index))
+            } else {
+                value(b"theme")?
+                    .and_then(|v| v.parse().ok())
+                    .map(RunColor::Theme)
+            };
+        },
+        b"rFont" => font.name = value(b"val")?,
+        _ => {},
+    }
+    Ok(())
 }
 
 /// Parse one complete classic `SpreadsheetML` comments part.
@@ -667,6 +726,7 @@ mod tests {
                 text: "x < y".into(),
                 guid: None,
                 shape_id: None,
+                runs: Vec::new(),
             },
         );
         let xml = write_comments(&comments).unwrap();

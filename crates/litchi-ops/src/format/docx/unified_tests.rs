@@ -1194,7 +1194,13 @@ fn capabilities_match_live_paths_queries_and_views() {
                     "/body/tbl[1]/tr[1]/tc[1]/tbl",
                     "/body/tbl[1]/tr[2]/tc[1]/tbl",
                 );
-            let node = file_for(element.name())
+            // Story paragraphs (record 0325) live in the parts fixture.
+            let owner = if path.starts_with("/header") || path.starts_with("/footnote") {
+                file_for("header")
+            } else {
+                file_for(element.name())
+            };
+            let node = owner
                 .get(path.as_str())
                 .unwrap_or_else(|error| panic!("{path}: {error}"));
             assert_eq!(node.kind(), element.name());

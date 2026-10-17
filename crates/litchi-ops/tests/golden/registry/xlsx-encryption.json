@@ -2277,6 +2277,50 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "runs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
         }
       },
       "predicates": {

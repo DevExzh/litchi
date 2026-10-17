@@ -329,6 +329,8 @@ pub(crate) fn run_value(properties: &RunProperties, key: RunKey) -> Option<Value
         RunKey::Kern => properties
             .kerning
             .map(|kerning| Value::Int(i64::from(kerning.get()))),
+        // Resolved through the slide's relationships by the node layer.
+        RunKey::Link | RunKey::Tooltip => None,
         RunKey::Lang => properties
             .language
             .as_deref()

@@ -117,15 +117,16 @@ impl Pptx {
                     strict_scene(slide.scene()?).map(Some)
                 },
                 PptxOwner::Eager(package) => {
-                    let Some((slide, payload)) =
-                        super::eager_slide_with_payload(self, package, position)?
-                    else {
+                    let Some(part) = super::eager_slide_part(self, package, position)? else {
                         return Ok(None);
                     };
+                    let payload = part.payload.clone();
+                    // A cached scene was read from this very payload, so the
+                    // part is read as a slide only on a miss (record 0326).
                     if let Some(scene) = payload.as_ref().and_then(|key| self.0.scenes.get(key)) {
                         return Ok(Some(scene));
                     }
-                    let scene = strict_scene(slide.scene()?)?;
+                    let scene = strict_scene(part.slide()?.scene()?)?;
                     if let Some(payload) = payload {
                         self.0.scenes.insert(payload, scene.clone());
                     }

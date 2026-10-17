@@ -21,15 +21,15 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `137339ca055080024cbcc80287ca72cd2eaf31d4c0d1a533c75b59784aabf8cb` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6036228da65ef4bd4889a861832909bfaf95d6fa316df17f2fd703ad232846e1` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `9eb31b777528bbbac652faab27251b654d1dea259cd0aa73453e320d9a7be9bb` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `7759f0cd63b8e1ffdc73e6fac6d070adccf1adaceec3bbf3a7c3e198486773b6` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `c5dce2f2b310342025a6297ff3e415e7df028f30672ef737694dd85446a5f266` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `319c2f64b082acd6ad4fd954c975e824a682e5c568335d00f08ff5ac0ef7d2ef` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `4fddfc467504bf3bf407a791b52c03e624c16c6423615d25cd7e6c91322e5dc2` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `2e0f0a530e324122151d0c4966192b0045a219e9083fa40150cf7e8542bc0877` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `4feb37072541ce3dc7ec1ebd0994aae5abc0facd72bf360055b72da7b3526369` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `bbcb48b620ebb64871dd628c613438c692d5126b0d7ff1d24da6cf8a157dfe5b` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `2fdded1c92e64c56696c48a388dd03c27c4f6297468640ffa1133bd113bc8529` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `bcfba00773c28a5c08f4a081185dd93e258334c1e625a6e812ac48cac651beac` |
@@ -107,13 +107,13 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 291 | 2 | 58 | 0 | 232 | 2 | 376 | 165 |
-| doc | 156 | 0 | 59 | 0 | 238 | 1 | 507 | 68 |
+| docx | 289 | 2 | 58 | 0 | 237 | 2 | 373 | 269 |
+| doc | 157 | 0 | 59 | 0 | 237 | 1 | 507 | 59 |
 | rtf | 109 | 0 | 59 | 0 | 241 | 1 | 551 | 36 |
-| xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 552 |
+| xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 559 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 159 | 430 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
-| pptx | 226 | 22 | 30 | 0 | 120 | 0 | 289 | 262 |
+| pptx | 230 | 20 | 30 | 0 | 120 | 0 | 287 | 274 |
 | ppt | 94 | 3 | 86 | 0 | 126 | 0 | 378 | 51 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -133,13 +133,13 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 227 | 30 | 539 | 0 | 138 | 192 |
-| doc | 10 | 29 | 757 | 0 | 27 | 206 |
+| docx | 250 | 38 | 508 | 0 | 242 | 192 |
+| doc | 10 | 29 | 757 | 0 | 27 | 197 |
 | rtf | 15 | 35 | 746 | 0 | 23 | 178 |
-| xlsx | 212 | 60 | 272 | 0 | 515 | 184 |
+| xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
-| pptx | 109 | 34 | 418 | 0 | 141 | 247 |
+| pptx | 113 | 34 | 414 | 0 | 153 | 247 |
 | ppt | 6 | 23 | 532 | 0 | 16 | 161 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -227,21 +227,21 @@ Property writes:
 | abstractNum | `text` | string | a-- | a-- | write-only | supported |  |
 | abstractNum | `start` | int | a-- | a-- | write-only | supported |  |
 | abstractNum | `indent` | int | a-- | a-- | write-only | supported |  |
-| abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.text` | string | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.start` | int | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.indent` | int | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.hanging` | int | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.justification` | enum | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.suff` | enum | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.font` | string | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.size` | font-size | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.color` | color | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
-| abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.format` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.text` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.start` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.indent` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.hanging` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.justification` | enum | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.suff` | enum | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.font` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.size` | font-size | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.color` | color | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.bold` | bool | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.italic` | bool | a-- | a-- | write-only | supported |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
-| bookmark | `name` | string | asg | --g | supported | gap |  |
-| bookmark | `text` | string | a-- |  | supported | gap | the node's text |
+| bookmark | `name` | string | asg | asg | supported | supported |  |
+| bookmark | `text` | string | a-- | a-- | write-only | supported |  |
 | bookmark | `id` | string | --g | --g | supported | — |  |
 | bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
@@ -616,17 +616,19 @@ Property writes:
 | equation | `mode` | enum | asg | --g | supported | gap |  |
 | equation | `formula` | string | as- |  | supported | gap | the node's text |
 | field | `evaluated` | bool | --g | --g | supported | — |  |
-| field | `fieldType` | enum | asg | --g | supported | gap |  |
-| field | `name` | string | asg |  | missing | gap |  |
+| field | `fieldType` | enum | asg | a-g | supported | partial |  |
+| field | `name` | string | asg | a-- | write-only | partial |  |
 | field | `id` | string | asg |  | missing | gap |  |
-| field | `expression` | string | as- |  | write-only | gap |  |
-| field | `trueText` | string | as- |  | write-only | gap |  |
-| field | `falseText` | string | as- |  | write-only | gap |  |
-| field | `hyperlink` | bool | as- |  | write-only | gap |  |
-| field | `format` | string | asg |  | missing | gap |  |
-| field | `instruction` | string | asg | --g | supported | gap |  |
+| field | `expression` | string | as- | a-- | write-only | partial |  |
+| field | `trueText` | string | as- | a-- | write-only | partial |  |
+| field | `falseText` | string | as- | a-- | write-only | partial |  |
+| field | `hyperlink` | bool | as- | a-- | write-only | partial |  |
+| field | `format` | string | asg | a-- | write-only | partial |  |
+| field | `instruction` | string | asg | asg | supported | supported |  |
 | field | `vertAlign` | enum | a-- |  | write-only | gap |  |
 | field | `fldLock` | bool | a-g | --g | supported | gap |  |
+| field | `text` | string |  | as- | litchi-only | litchi-only |  |
+| field | `bookmarkName` | string |  | a-- | litchi-only | litchi-only |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
 | footer | `type` | enum | asg | asg | supported | supported |  |
 | footer | `text` | string | asg | asg | supported | supported |  |
@@ -708,23 +710,125 @@ Property writes:
 | level | `italic` | bool | as- | asg | supported | supported |  |
 | num | `id` | int | a-g |  | missing | gap |  |
 | num | `abstractNumId` | int | asg | asg | supported | supported |  |
-| num | `format` | string | a-- |  | write-only | gap |  |
-| num | `text` | string | a-- |  | supported | gap | the node's text |
-| num | `indent` | int | a-- |  | write-only | gap |  |
-| num | `type` | enum | a-- |  | supported | gap | the node's text |
+| num | `format` | string | a-- | a-- | write-only | supported |  |
+| num | `text` | string | a-- | a-- | write-only | supported |  |
+| num | `indent` | int | a-- | a-- | write-only | supported |  |
+| num | `type` | enum | a-- | a-- | write-only | supported |  |
 | num | `start` | int | a-- | a-- | write-only | supported |  |
-| num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
+| num | `startOverride.<N>` | int | a-- | a-g | supported | supported |  |
 | num | `continue` | bool | a-- | a-- | write-only | supported |  |
 | num | `numId` | int | --g |  | missing | — |  |
-| num | `startOverride.0` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.1` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.2` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.3` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.4` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.5` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.6` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.7` | int |  | a-g | litchi-only | litchi-only |  |
-| num | `startOverride.8` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `name` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `styleLink` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `numStyleLink` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level0.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level1.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level2.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level3.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level4.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level5.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level6.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level7.italic` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.format` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.text` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.start` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.indent` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.hanging` | int |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.justification` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.suff` | enum |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.font` | string |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.size` | font-size |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.color` | color |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.bold` | bool |  | a-- | litchi-only | litchi-only |  |
+| num | `level8.italic` | bool |  | a-- | litchi-only | litchi-only |  |
 | numbering | `abstractNumCount` | number | --g | --g | supported | — |  |
 | numbering | `abstractNumId` | number | --g |  | missing | — |  |
 | numbering | `numCount` | int |  | --g | litchi-only | — |  |
@@ -1331,10 +1435,10 @@ Property writes:
 | textbox | `rotation` | string | a-- |  | write-only | gap |  |
 | textbox | `shadow` | string | a-- |  | write-only | gap |  |
 | textbox | `alt` | string | a-- | --g | supported | gap |  |
-| toc | `levels` | string | asg | --g | supported | gap |  |
-| toc | `title` | string | asg |  | missing | gap |  |
-| toc | `hyperlinks` | bool | asg | --g | supported | gap |  |
-| toc | `pageNumbers` | bool | asg | --g | supported | gap |  |
+| toc | `levels` | string | asg | asg | supported | supported |  |
+| toc | `title` | string | asg | a-- | write-only | partial |  |
+| toc | `hyperlinks` | bool | asg | asg | supported | supported |  |
+| toc | `pageNumbers` | bool | asg | asg | supported | supported |  |
 | watermark | `text` | string | asg | --g | supported | gap |  |
 | watermark | `image` | string | as- |  | write-only | gap |  |
 | watermark | `color` | color | asg | --g | supported | gap |  |
@@ -1837,18 +1941,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | num | `indent` | int | a-- |  | write-only | gap |  |
 | num | `type` | enum | a-- |  | supported | gap | the node's text |
 | num | `start` | int | a-- |  | write-only | gap |  |
-| num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
+| num | `startOverride.<N>` | int | a-- | --g | supported | gap |  |
 | num | `continue` | bool | a-- |  | write-only | gap |  |
 | num | `numId` | int | --g |  | missing | — |  |
-| num | `startOverride.0` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.1` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.2` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.3` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.4` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.5` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.6` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.7` | int |  | --g | litchi-only | — |  |
-| num | `startOverride.8` | int |  | --g | litchi-only | — |  |
 | numbering | `abstractNumCount` | number | --g | --g | supported | — |  |
 | numbering | `abstractNumId` | number | --g |  | missing | — |  |
 | numbering | `numCount` | int |  | --g | litchi-only | — |  |
@@ -4150,6 +4245,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | comment | `author` | string | asg | asg | supported | supported |  |
 | comment | `text` | string | asg | asg | supported | supported |  |
 | comment | `anchoredTo` | string |  | --g | litchi-only | — |  |
+| comment | `font.bold` | bool |  | asg | litchi-only | litchi-only |  |
+| comment | `font.italic` | bool |  | asg | litchi-only | litchi-only |  |
+| comment | `font.underline` | string |  | asg | litchi-only | litchi-only |  |
+| comment | `font.size` | font-size |  | asg | litchi-only | litchi-only |  |
+| comment | `font.color` | color |  | asg | litchi-only | litchi-only |  |
+| comment | `font.name` | string |  | asg | litchi-only | litchi-only |  |
+| comment | `runs` | string |  | asg | litchi-only | litchi-only |  |
 | conditionalformatting | `type` | enum | --g | a-g | supported | litchi-only |  |
 | conditionalformatting | `ref` | string | asg | asg | supported | supported |  |
 | conditionalformatting | `fill` | color | asg | asg | supported | supported |  |
@@ -7292,6 +7394,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | group | `rotation` | number |  | --g | litchi-only | — |  |
 | group | `flipH` | bool |  | --g | litchi-only | — |  |
 | group | `flipV` | bool |  | --g | litchi-only | — |  |
+| group | `link` | string |  | -sg | litchi-only | litchi-only |  |
+| group | `tooltip` | string |  | -sg | litchi-only | litchi-only |  |
 | hyperlink | `link` | string | asg | asg | supported | supported |  |
 | hyperlink | `tooltip` | string | asg | asg | supported | supported |  |
 | media | `src` | string | as- | a-- | write-only | partial |  |
@@ -7380,8 +7484,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | `rotation` | number | asg | --g | supported | gap |  |
 | picture | `flipH` | boolean | asg | --g | supported | gap |  |
 | picture | `flipV` | boolean | asg | --g | supported | gap |  |
-| picture | `link` | string | asg |  | missing | gap |  |
-| picture | `tooltip` | string | asg |  | missing | gap |  |
+| picture | `link` | string | asg | asg | supported | supported |  |
+| picture | `tooltip` | string | asg | asg | supported | supported |  |
 | picture | `opacity` | number | asg |  | missing | gap |  |
 | picture | `brightness` | number | -sg |  | missing | gap |  |
 | picture | `contrast` | number | -sg |  | missing | gap |  |
@@ -7442,6 +7546,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | placeholder | `marginLeft` | length |  | --g | litchi-only | — |  |
 | placeholder | `marginRight` | length |  | --g | litchi-only | — |  |
 | placeholder | `direction` | enum |  | --g | litchi-only | — |  |
+| placeholder | `link` | string |  | -sg | litchi-only | litchi-only |  |
+| placeholder | `tooltip` | string |  | -sg | litchi-only | litchi-only |  |
 | placeholder | `fill` | string |  | -s- | litchi-only | litchi-only |  |
 | placeholder | `geometry` | string |  | -s- | litchi-only | litchi-only |  |
 | presentation | `title` | string | -sg | --g | supported | gap |  |
@@ -7529,6 +7635,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `font.ea` | string |  | --g | litchi-only | — |  |
 | run | `font.cs` | string |  | --g | litchi-only | — |  |
 | run | `strike` | enum |  | --g | litchi-only | — |  |
+| run | `link` | string |  | -sg | litchi-only | litchi-only |  |
+| run | `tooltip` | string |  | -sg | litchi-only | litchi-only |  |
 | shape | `size` | font-size | asg | asg | supported | supported |  |
 | shape | `evaluated` | bool | --g |  | missing | — |  |
 | shape | `isTitle` | bool | --g | --g | supported | — |  |
@@ -7571,8 +7679,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | shape | `headEnd` | enum | asg |  | missing | gap |  |
 | shape | `tailEnd` | enum | asg |  | missing | gap |  |
 | shape | `list` | string | asg |  | gap | gap | M1-extended |
-| shape | `link` | string | asg |  | gap | gap | M1-extended |
-| shape | `tooltip` | string | asg |  | gap | gap | M1-extended |
+| shape | `link` | string | asg | asg | supported | supported |  |
+| shape | `tooltip` | string | asg | asg | supported | supported |  |
 | shape | `animation` | string | asg |  | missing | gap |  |
 | shape | `effective.direction` | enum | --g |  | missing | — |  |
 | shape | `effective.size` | length | --g |  | missing | — |  |
@@ -7698,6 +7806,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidelayout | `indent` | length |  | --g | litchi-only | — |  |
 | slidelayout | `marginLeft` | length |  | --g | litchi-only | — |  |
 | slidelayout | `marginRight` | length |  | --g | litchi-only | — |  |
+| slidelayout | `link` | string |  | asg | litchi-only | litchi-only |  |
+| slidelayout | `tooltip` | string |  | asg | litchi-only | litchi-only |  |
 | slidelayout | `text` | string |  | as- | litchi-only | litchi-only |  |
 | slidelayout | `fill` | string |  | as- | litchi-only | litchi-only |  |
 | slidelayout | `geometry` | string |  | as- | litchi-only | litchi-only |  |
@@ -7743,6 +7853,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidemaster | `indent` | length |  | --g | litchi-only | — |  |
 | slidemaster | `marginLeft` | length |  | --g | litchi-only | — |  |
 | slidemaster | `marginRight` | length |  | --g | litchi-only | — |  |
+| slidemaster | `link` | string |  | asg | litchi-only | litchi-only |  |
+| slidemaster | `tooltip` | string |  | asg | litchi-only | litchi-only |  |
 | slidemaster | `text` | string |  | as- | litchi-only | litchi-only |  |
 | slidemaster | `fill` | string |  | as- | litchi-only | litchi-only |  |
 | slidemaster | `geometry` | string |  | as- | litchi-only | litchi-only |  |
@@ -7863,6 +7975,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | textbox | `indent` | length |  | --g | litchi-only | — |  |
 | textbox | `marginLeft` | length |  | --g | litchi-only | — |  |
 | textbox | `marginRight` | length |  | --g | litchi-only | — |  |
+| textbox | `link` | string |  | asg | litchi-only | litchi-only |  |
+| textbox | `tooltip` | string |  | asg | litchi-only | litchi-only |  |
 | textbox | `geometry` | string |  | as- | litchi-only | litchi-only |  |
 | theme | `headingFont` | string | -sg | -sg | supported | supported |  |
 | theme | `bodyFont` | string | -sg | -sg | supported | supported |  |

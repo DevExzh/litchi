@@ -319,7 +319,9 @@
         "positional": [
           "/body/p[N]",
           "/body/tbl[N]/tr[M]/tc[K]/p[J]",
-          "/body/sdt[N]/p[M]"
+          "/body/sdt[N]/p[M]",
+          "/header[N]/p[M]",
+          "/footnote[N]/p[M]"
         ]
       },
       "children": [
@@ -3348,6 +3350,762 @@
           "add": true,
           "set": false,
           "get": false
+        },
+        "level0.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -3442,6 +4200,809 @@
           "get": false
         },
         "continue": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "hybridMultilevel",
+            "multilevel",
+            "singleLevel"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "styleLink": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "numStyleLink": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.italic": {
           "type": "bool",
           "add": true,
           "set": false,
@@ -3632,11 +5193,11 @@
       "element": "bookmark",
       "parent": "document",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -3649,8 +5210,8 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "id": {
@@ -3658,6 +5219,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -3673,8 +5240,8 @@
       "element": "field",
       "parent": "document",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -3687,14 +5254,14 @@
       "properties": {
         "fieldType": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "instruction": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "fldLock": {
@@ -3708,6 +5275,54 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "bookmarkName": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "hyperlink": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "expression": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "trueText": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "falseText": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -4635,11 +6250,11 @@
         "tableofcontents"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -4649,21 +6264,27 @@
       "properties": {
         "levels": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "hyperlinks": {
           "type": "bool",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "pageNumbers": {
           "type": "bool",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

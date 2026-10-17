@@ -986,6 +986,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                         "/body/p[@paraId=X]",
                         "/body/tbl[N]/tr[M]/tc[K]/p[J]",
                         "/body/sdt[N]/p[M]",
+                        "/header[N]/p[M]",
+                        "/footnote[N]/p[M]",
                     ],
                     PARAGRAPH_PROPS,
                 ),

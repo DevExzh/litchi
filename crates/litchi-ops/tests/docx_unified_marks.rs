@@ -214,3 +214,201 @@ fn the_watermark_and_text_boxes_are_read() {
         );
     }
 }
+
+fn text(file: &File, path: &str) -> String {
+    file.get(path)
+        .unwrap_or_else(|error| panic!("{path}: {error}"))
+        .view()
+        .text()
+        .unwrap_or_else(|error| panic!("{path} text: {error}"))
+        .map(std::borrow::Cow::into_owned)
+        .unwrap_or_default()
+}
+
+#[test]
+fn bookmarks_fields_and_tables_of_contents_are_written() {
+    // Record 0325: OfficeCLI's add, set and remove of bookmarks, fields
+    // and tables of contents.
+    let start = litchi_ops::create(litchi_core::FileFormat::Docx)
+        .unwrap()
+        .add("/body", NewNode::new("paragraph").prop("text", "Intro"))
+        .unwrap()
+        .file;
+    let file = start
+        .add(
+            "/body/p[1]",
+            NewNode::new("bookmark")
+                .prop("name", "Start")
+                .prop("text", "here"),
+        )
+        .unwrap();
+    assert_eq!(file.path.to_string(), "/bookmark[1]");
+    let file = file
+        .file
+        .add(
+            "/body",
+            NewNode::new("bookmark")
+                .prop("name", "Body")
+                .prop("text", "x"),
+        )
+        .unwrap()
+        .file
+        .add("/body/p[1]", NewNode::new("page"))
+        .unwrap()
+        .file
+        .add(
+            "/body/p[1]",
+            NewNode::new("field")
+                .prop("fieldType", "mergefield")
+                .prop("name", "Customer"),
+        )
+        .unwrap()
+        .file
+        .add(
+            "/body",
+            NewNode::new("toc")
+                .prop("levels", "1-2")
+                .prop("title", "Contents"),
+        )
+        .unwrap()
+        .file;
+    for eager in [false, true] {
+        let file = reopen(&file, eager);
+        assert_eq!(
+            property(&file, "/bookmark[1]", "name").as_deref(),
+            Some("Start")
+        );
+        assert_eq!(
+            property(&file, "/bookmark[2]", "name").as_deref(),
+            Some("Body")
+        );
+        assert_eq!(
+            property(&file, "/field[1]", "instruction").as_deref(),
+            Some("PAGE")
+        );
+        assert_eq!(text(&file, "/field[1]"), "1");
+        assert_eq!(
+            property(&file, "/field[2]", "instruction").as_deref(),
+            Some("MERGEFIELD Customer")
+        );
+        assert_eq!(text(&file, "/field[2]"), "\u{ab}Customer\u{bb}");
+        assert_eq!(property(&file, "/toc[1]", "levels").as_deref(), Some("1-2"));
+        assert_eq!(
+            property(&file, "/toc[1]", "hyperlinks").as_deref(),
+            Some("true")
+        );
+        assert_eq!(
+            text(&file, "/toc[1]"),
+            "Update field to see table of contents"
+        );
+
+        // set: rename, instruction, result, TOC switches.
+        let set = file
+            .set("/bookmark[1]", props! { "name" => "Renamed" })
+            .unwrap()
+            .set("/field[1]", props! { "instruction" => "NUMPAGES" })
+            .unwrap()
+            .set("/field[2]", props! { "text" => "Ann" })
+            .unwrap()
+            .set(
+                "/toc[1]",
+                props! { "levels" => "1-4", "hyperlinks" => false, "pageNumbers" => false },
+            )
+            .unwrap();
+        let set = reopen(&set, eager);
+        assert_eq!(
+            property(&set, "/bookmark[1]", "name").as_deref(),
+            Some("Renamed")
+        );
+        assert_eq!(
+            property(&set, "/field[1]", "instruction").as_deref(),
+            Some("NUMPAGES")
+        );
+        assert_eq!(text(&set, "/field[2]"), "Ann");
+        assert_eq!(property(&set, "/toc[1]", "levels").as_deref(), Some("1-4"));
+        assert_eq!(
+            property(&set, "/toc[1]", "hyperlinks").as_deref(),
+            Some("false")
+        );
+        assert_eq!(
+            property(&set, "/toc[1]", "pageNumbers").as_deref(),
+            Some("false")
+        );
+        // A duplicate name is refused; an equal name is an exact no-op.
+        let error = set
+            .set("/bookmark[1]", props! { "name" => "Body" })
+            .unwrap_err();
+        assert_eq!(error.code(), litchi_ops::Code::DuplicateName);
+        let bytes = set.to_bytes().unwrap();
+        let same = set
+            .set("/bookmark[1]", props! { "name" => "Renamed" })
+            .unwrap();
+        assert_eq!(same.to_bytes().unwrap(), bytes);
+
+        // remove: the bookmark keeps its text; the TOC goes with its title.
+        let paragraphs = paths(&set, "paragraph").len();
+        let removed = set
+            .remove("/bookmark[1]")
+            .unwrap()
+            .remove("/toc[1]")
+            .unwrap();
+        assert_eq!(paths(&removed, "bookmark").len(), 1);
+        assert!(paths(&removed, "toc").is_empty());
+        assert_eq!(paths(&removed, "paragraph").len(), paragraphs - 2);
+        assert!(text(&removed, "/body/p[1]").contains("here"));
+    }
+}
+
+#[test]
+fn fields_go_into_story_paragraphs_and_take_officecli_types() {
+    // Record 0325: fields.sh's footer page numbers, REF \h and IF fields.
+    let file = litchi_ops::create(litchi_core::FileFormat::Docx)
+        .unwrap()
+        .add("/body", NewNode::new("paragraph").prop("text", "Body"))
+        .unwrap()
+        .file
+        .add("/", NewNode::new("footer").prop("text", "Page "))
+        .unwrap()
+        .file;
+    let added = file
+        .add(
+            "/footer[1]/p[1]",
+            NewNode::new("field").prop("fieldType", "page"),
+        )
+        .unwrap();
+    // The result run, as OfficeCLI returns it.
+    assert_eq!(added.path.to_string(), "/footer[1]/p[1]/r[5]");
+    let file = added
+        .file
+        .add(
+            "/body",
+            NewNode::new("field")
+                .prop("fieldType", "ref")
+                .prop("bookmarkName", "Intro")
+                .prop("hyperlink", true),
+        )
+        .unwrap()
+        .file
+        .add(
+            "/body",
+            NewNode::new("field")
+                .prop("fieldType", "if")
+                .prop("expression", "1 = 1")
+                .prop("trueText", "Yes")
+                .prop("falseText", "No"),
+        )
+        .unwrap()
+        .file;
+    for eager in [false, true] {
+        let file = reopen(&file, eager);
+        assert_eq!(text(&file, "/footer[1]"), "Page 1");
+        assert_eq!(
+            property(&file, "/field[1]", "instruction").as_deref(),
+            Some("REF Intro \\h")
+        );
+        assert_eq!(
+            property(&file, "/field[2]", "instruction").as_deref(),
+            Some("IF 1 = 1 \"Yes\" \"No\"")
+        );
+    }
+}

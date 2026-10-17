@@ -457,6 +457,14 @@ impl<'a> PropValue<'a> {
                 Self::Length(_) | Self::Color(_) => Err(PropCoercionError::UnsupportedScalar),
             };
         }
+        // A typed length is the value its text reads as; take it without the
+        // text whenever that read is certain to succeed, so registry
+        // validation and errors stay the text route's (record 0326).
+        if let (Self::Length(value), ValueType::Length(spec)) = (self, ty)
+            && let Some(length) = value.coerced_in(spec.context)
+        {
+            return Ok(Some(Scalar::Length(length)));
+        }
         match self {
             Self::Null => Ok(None),
             Self::Text(text) => ty.coerce(text).map(Some).map_err(PropCoercionError::Value),
@@ -1296,7 +1304,91 @@ impl Serialize for Props<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::{Color, LengthSpec};
+    use crate::value::{Color, LengthContext, LengthSpec, LengthStyle};
+
+    /// Record 0326: a typed length coerces as the text it prints as, value
+    /// and error alike, in every length context, whether or not it takes the
+    /// direct route.
+    #[test]
+    fn typed_lengths_coerce_as_their_text() {
+        fn outcome(value: &PropValue<'_>, ty: ValueType) -> String {
+            match value.with_coerced(ty, |scalar| {
+                Ok(match scalar {
+                    Some(Scalar::Length(length)) => format!("length {}", length.emu()),
+                    other => format!("{other:?}"),
+                })
+            }) {
+                Ok(text) => text,
+                Err(error) => format!(
+                    "{} {} {:?}",
+                    error.code().as_str(),
+                    error,
+                    error.suggestion()
+                ),
+            }
+        }
+        let mut values: Vec<i64> = vec![
+            i64::MIN,
+            i64::MIN + 1,
+            i64::MAX,
+            i64::MAX - 1,
+            1 << 50,
+            (1 << 50) - 1,
+            (1 << 50) + 1,
+            -(1 << 50),
+            1 << 53,
+            i64::from(i32::MAX),
+            i64::from(i32::MAX) + 1,
+            i64::from(i32::MAX) - 1,
+            6_349,
+            6_350,
+            6_351,
+            6_477,
+            50_800_000,
+            50_800_127,
+            50_799_873,
+        ];
+        for step in [
+            1_i64, 127, 635, 3_600, 9_525, 12_700, 36_000, 360_000, 914_400,
+        ] {
+            values.extend((-300..=300).map(|k| k * step));
+            values.extend((1..=200).map(|k| k * step * 997));
+        }
+        let mut seed = 0x9E37_79B9_7F4A_7C15_u64;
+        for _ in 0..20_000 {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            #[allow(clippy::cast_possible_wrap, reason = "any bit pattern is a test value")]
+            let raw = seed as i64;
+            values.extend([raw, raw >> 20, raw >> 34, (raw >> 40) * 127]);
+        }
+        let specs = [
+            LengthSpec::POSITION,
+            LengthSpec::EXTENT,
+            LengthSpec::LINE_WIDTH,
+            LengthSpec::FONT_SIZE,
+            LengthSpec::new(LengthContext::WordSpacing, LengthStyle::Auto),
+        ];
+        let mut direct = 0;
+        for &emu in &values {
+            let length = Length::from_emu(emu);
+            let text = Scalar::Length(length).display(None).to_string();
+            for spec in specs {
+                let ty = ValueType::Length(spec);
+                if length.coerced_in(spec.context).is_some() {
+                    direct += 1;
+                }
+                assert_eq!(
+                    outcome(&PropValue::Length(length), ty),
+                    outcome(&PropValue::Text(Cow::Borrowed(&text)), ty),
+                    "{emu} EMU ({text}) as {:?}",
+                    spec.context
+                );
+            }
+        }
+        assert!(direct > values.len(), "{direct}");
+    }
 
     #[test]
     fn scalar_admission_preserves_kinds_and_refuses_lossy_inputs() {
