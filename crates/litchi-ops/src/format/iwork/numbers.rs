@@ -11,6 +11,9 @@
 //! |---|---|---|
 //! | `set` | `cell` `value`/`formula` | `edit_table_cells` (one per table) |
 //! | `set` | `cell` `numberFormat` | `edit_table_cell_{number,percentage}_format` |
+//! | `set` | `cell` `comment` (`null` clears) | `set_table_cell_comment`, `clear_table_cell_comment` (record 0318) |
+//! | `add` | `comment` under a cell (`text`) | `set_table_cell_comment` |
+//! | `remove` | `<cell>/comment` | `clear_table_cell_comment` |
 //! | `set` | `sheet`/`table` `name` | `edit_names` (one for every rename) |
 //! | `add` | `mergeCell` | `edit_table_merges` |
 //! | `remove` | `cell` (clears) / `mergeCell` | `edit_table_cells` / `edit_table_merges` |
@@ -118,6 +121,7 @@ pub(crate) const CELL_PROPS: &[PropSpec] = &[
     PropSpec::new("type", ValueType::Text),
     writable("value", ValueType::Scalar),
     writable("formula", ValueType::Text),
+    writable("comment", ValueType::Text),
     PropSpec::new("merge", ValueType::Text),
     PropSpec::new("mergeAnchor", ValueType::Bool),
     set_only("numberFormat", ValueType::Text),
@@ -143,27 +147,16 @@ pub(crate) const MERGE_PROPS: &[PropSpec] = &[{
 
 const FOLLOW_UP: &str = "record 0297 follow-ups (IWORK_API_REQUESTS.md)";
 
-static GAPS: [GapSpec; 2] = [
-    GapSpec {
-        subject: Subject::Property {
-            element: "cell",
-            key: "comment",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: FOLLOW_UP,
-        reason: "the leaf's cell-comment transaction refuses every natively authored corpus package (`InvalidSource`/`UnsupportedDependency`: author storage and comment-list ownership outside its admitted scope), and comments are resolved per cell, so neither reads nor writes are claimed",
+static GAPS: [GapSpec; 1] = [GapSpec {
+    subject: Subject::Operation {
+        verb: "set",
+        element: "cell",
+        context: "cross-table formula references",
     },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "cell",
-            context: "cross-table formula references",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: FOLLOW_UP,
-        reason: "formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles",
-    },
-];
+    code: Code::UnsupportedCapability,
+    follow_up: FOLLOW_UP,
+    reason: "formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles",
+}];
 
 static OPERATION_GAPS: [GapSpec; 3] = [
     GapSpec {
@@ -180,11 +173,11 @@ static OPERATION_GAPS: [GapSpec; 3] = [
         subject: Subject::Operation {
             verb: "add",
             element: "row",
-            context: "tables with formulas or merges",
+            context: "formulas the coordinate shift refuses, merges",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0309 follow-ups (IWORK_API_REQUESTS.md request 6)",
-        reason: "rows and columns are inserted and removed when no formula coordinate moves: a table holding formulas, one a formula or chart elsewhere reads, merged cells, filters, categories, pivots and (for columns) sort rules are refused, as are removing a hidden, bordered or commented row or column",
+        follow_up: "record 0318 follow-ups (IWORK_API_REQUESTS.md request 6)",
+        reason: "rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); refused: removing a row or column a surviving formula reads (native Numbers writes #REF!), a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a shared formula whose cells would diverge, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden, bordered or commented row or column",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -321,6 +314,8 @@ pub enum EditError {
     Topology(litchi_numbers::table::topology::Error),
     /// Cell character properties.
     TextStyle(litchi_numbers::cell::text_style::Error),
+    /// A cell comment (record 0318).
+    Comment(litchi_numbers::cell::comment::Error),
 }
 
 impl fmt::Display for EditError {
@@ -339,6 +334,7 @@ impl fmt::Display for EditError {
             Self::TableOrder(error) => error.fmt(formatter),
             Self::Topology(error) => error.fmt(formatter),
             Self::TextStyle(error) => error.fmt(formatter),
+            Self::Comment(error) => error.fmt(formatter),
         }
     }
 }
@@ -359,6 +355,7 @@ impl EditError {
             Self::TableOrder(error) => error,
             Self::Topology(error) => error,
             Self::TextStyle(error) => error,
+            Self::Comment(error) => error,
         })
     }
 
@@ -501,6 +498,22 @@ impl EditError {
                     _ => Code::InternalError,
                 }
             },
+            Self::Comment(error) => {
+                use litchi_numbers::cell::comment::Error as E;
+                match error {
+                    E::SheetNotFound | E::TableNotFound | E::CommentNotFound { .. } => {
+                        Code::PathNotFound
+                    },
+                    E::InvalidAddress => Code::InvalidPath,
+                    E::OutOfBounds { .. } => Code::OutOfRange,
+                    E::UnsupportedDependency { .. } | E::UnsupportedSource => {
+                        Code::UnsupportedCapability
+                    },
+                    E::LimitExceeded { .. } => Code::LimitExceeded,
+                    E::InvalidSource { .. } | E::PatchConflict => Code::InvalidInput,
+                    _ => Code::InternalError,
+                }
+            },
         }
     }
 }
@@ -529,6 +542,8 @@ pub(crate) enum Patch {
     Topology(litchi_numbers::table::topology::Patch),
     /// Cell character properties.
     TextStyle(litchi_numbers::cell::text_style::Patch),
+    /// A cell comment set or cleared.
+    Comment(litchi_numbers::cell::comment::Patch),
 }
 
 impl Patch {
@@ -545,6 +560,7 @@ impl Patch {
             Self::TableOrder(patch) => patch.is_noop(),
             Self::Topology(patch) => patch.is_noop(),
             Self::TextStyle(patch) => patch.is_noop(),
+            Self::Comment(patch) => patch.is_noop(),
         }
     }
 }
@@ -672,6 +688,9 @@ pub(crate) struct Cells {
     axes: [u32; 2],
     /// The row items, then the column items.
     axis_items: std::sync::OnceLock<Box<[super::tree::Item]>>,
+    /// The table's cell comments, read on the first cell item (record
+    /// 0318): `(position, text)` in row-major order.
+    comments: std::sync::OnceLock<Box<[(CellPosition, String)]>>,
 }
 
 impl Cells {
@@ -691,7 +710,32 @@ impl Cells {
             regions: regions.into_boxed_slice(),
             axes,
             axis_items: std::sync::OnceLock::new(),
+            comments: std::sync::OnceLock::new(),
         }
+    }
+
+    /// The comment text of the cell at `position`, if any. A table whose
+    /// comment list is empty costs one model and list decode; a comment
+    /// graph the leaf cannot read lists no comment.
+    fn comment(&self, package: &Package, position: CellPosition) -> Option<&str> {
+        let comments = self.comments.get_or_init(|| {
+            package
+                .table_cell_comments(
+                    SheetSelector::index(self.sheet),
+                    TableSelector::index(self.table),
+                )
+                .map(|comments| {
+                    comments
+                        .into_iter()
+                        .map(|(at, comment)| (at, comment.text().to_owned()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        });
+        comments
+            .binary_search_by(|(at, _)| at.cmp(&position))
+            .ok()
+            .map(|index| comments[index].1.as_str())
     }
 
     /// The first row slot.
@@ -821,6 +865,7 @@ impl Cells {
             return super::tree::Item::detached(spec, self.path.clone(), slot);
         };
         let position = cell.position();
+        let comment = Self::package(file).and_then(|package| self.comment(package, position));
         let mut path = Vec::with_capacity(self.path.len() + 1);
         path.extend_from_slice(&self.path);
         path.push(PathStep::cell(position.column(), position.row()));
@@ -842,6 +887,7 @@ impl Cells {
             .prop("type", text(Some(kind)))
             .prop("value", value)
             .prop("formula", formula)
+            .prop("comment", text(comment))
             .prop("merge", region.map(|region| region_ref(*region).into()))
             .prop(
                 "mergeAnchor",
@@ -1162,6 +1208,8 @@ struct Staged {
     formats: Vec<(Address, DisplayFormat)>,
     /// Cell character properties, per table (record 0309).
     text_styles: BTreeMap<(usize, usize), Vec<(CellPosition, CharacterProperties)>>,
+    /// Cell comments, in call order; `None` clears (record 0318).
+    comments: Vec<(Address, Option<String>)>,
 }
 
 /// Set properties on every target. Renames share one names transaction,
@@ -1185,6 +1233,10 @@ pub(crate) fn set(
                     .push(write.change(address.position()));
             } else if key.eq_ignore_ascii_case("numberformat") {
                 staged.formats.push((address, display_format(value)?));
+            } else if key.eq_ignore_ascii_case("comment") {
+                staged
+                    .comments
+                    .push((address, super::write::text(value, "comment")?));
             } else if key.len() > 5 && key[..5].eq_ignore_ascii_case("font.") {
                 let cells = staged
                     .text_styles
@@ -1292,6 +1344,9 @@ fn commit_staged(chain: &mut Chain<Package>, staged: Staged) -> Result<()> {
         push(chain, commit.into_package(), Patch::Names(patch));
     }
     commit_cells(chain, staged.cells)?;
+    for (address, text) in staged.comments {
+        commit_comment(chain, address, text.as_deref())?;
+    }
     for ((sheet, table), cells) in staged.text_styles {
         let error = |error| edit_error(EditError::TextStyle(error));
         let mut edit = chain
@@ -1350,6 +1405,25 @@ fn commit_staged(chain: &mut Chain<Package>, staged: Staged) -> Result<()> {
     Ok(())
 }
 
+/// Set (`Some`) or clear (`None`) one cell comment.
+fn commit_comment(chain: &mut Chain<Package>, address: Address, text: Option<&str>) -> Result<()> {
+    let error = |error| edit_error(EditError::Comment(error));
+    let sheet = SheetSelector::index(address.sheet);
+    let table = TableSelector::index(address.table);
+    let commit = match text {
+        Some(text) => chain
+            .package
+            .set_table_cell_comment(sheet, table, address.position(), text),
+        None => chain
+            .package
+            .clear_table_cell_comment(sheet, table, address.position()),
+    }
+    .map_err(|failure| error(failure).with_property("comment".to_owned()))?;
+    let patch = commit.patch().clone();
+    push(chain, commit.into_package(), Patch::Comment(patch));
+    Ok(())
+}
+
 /// Stage each table's changes on one cell transaction, tables in document
 /// order.
 pub(crate) fn commit_cells(
@@ -1393,6 +1467,9 @@ pub(crate) fn add(
     }
     if let Some(row_axis) = axis_kind(kind) {
         return add_axis(file, package, parent, node, row_axis, limits);
+    }
+    if kind.eq_ignore_ascii_case("comment") {
+        return add_comment(file, package, parent, node, limits);
     }
     if !(kind.eq_ignore_ascii_case("mergeCell")
         || kind.eq_ignore_ascii_case("merge")
@@ -1698,8 +1775,107 @@ fn parse_region(range: &str) -> Result<Region> {
 fn add_gap(_kind: &str) -> crate::Error {
     refusal(
         Code::UnsupportedCapability,
-        "a Numbers workbook adds sheets, tables, rows, columns (`row`, `col`) and merged ranges (`mergeCell`)",
+        "a Numbers workbook adds sheets, tables, rows, columns (`row`, `col`), merged ranges (`mergeCell`) and cell comments (`comment` under a cell)",
     )
+}
+
+/// The cell `path` names, stored or empty in the grid.
+fn cell_at(file: &Iwork, path: &PathArg<'_>) -> Result<Address> {
+    match node_at::<Numbers>(file, path) {
+        Ok(node) if node.item().type_name() == "cell" => Ok(cell_address(&node)),
+        Ok(_) => Err(refusal(
+            Code::InvalidArgument,
+            "a cell comment goes on a cell (`/sheet[N]/table[N]/A1`)",
+        )),
+        Err(error) if error.code() == Code::PathNotFound => {
+            empty_cell(file, path.path()).ok_or(error)
+        },
+        Err(error) => Err(error),
+    }
+}
+
+/// Add a comment (`text`) to a cell that has none (record 0318).
+fn add_comment(
+    file: &Iwork,
+    package: &Package,
+    parent: &PathArg<'_>,
+    node: &NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    let address = cell_at(file, parent)?;
+    let mut text = None;
+    for (key, value) in node.props().iter() {
+        if key.as_str().eq_ignore_ascii_case("text") || key.as_str().eq_ignore_ascii_case("comment")
+        {
+            text = super::write::text(value, "text")?;
+        } else {
+            return Err(super::write::unwritable("comment", key.as_str()));
+        }
+    }
+    let text = text.ok_or_else(|| {
+        refusal(Code::InvalidArgument, "a cell comment needs `text`")
+            .with_property("text".to_owned())
+    })?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    let existing = package
+        .table_cell_comment(
+            SheetSelector::index(address.sheet),
+            TableSelector::index(address.table),
+            address.position(),
+        )
+        .map_err(|error| edit_error(EditError::Comment(error)))?;
+    if existing.is_some() {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "the cell already has a comment; set its `comment` to replace it",
+        ));
+    }
+    let mut chain = Chain::new(package.clone());
+    commit_comment(&mut chain, address, Some(&text))?;
+    let commit = finish(
+        file,
+        chain.changed,
+        Owner::Numbers(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )?;
+    Ok((commit, address_path(address)))
+}
+
+/// The canonical path of a cell.
+fn address_path(address: Address) -> Path<'static> {
+    let mut column = address.column + 1;
+    let mut letters = Vec::new();
+    while column > 0 {
+        let digit = (column - 1) % 26;
+        letters.push(char::from(b'A' + u8::try_from(digit).unwrap_or(0)));
+        column = (column - 1) / 26;
+    }
+    let name: String = letters
+        .into_iter()
+        .rev()
+        .chain((address.row + 1).to_string().chars())
+        .collect();
+    Path::from_steps([
+        Step::new("sheet").with(Predicate::Index(Position::new(address.sheet))),
+        Step::new("table").with(Predicate::Index(Position::new(address.table))),
+        Step::new(name),
+    ])
+}
+
+/// The cell whose comment `path` names: `<cell>/comment`.
+fn comment_target(file: &Iwork, path: &Path<'_>) -> Option<Address> {
+    let (last, parent) = path.steps().split_last()?;
+    if !last.name().eq_ignore_ascii_case("comment")
+        || !(last.predicates().is_empty()
+            || matches!(last.predicates(), [Predicate::Index(position)] if position.get() == 0))
+    {
+        return None;
+    }
+    let parent = Path::from_steps(parent.iter().cloned());
+    let parent = parent.into_path().ok()?;
+    cell_at(file, &parent).ok()
 }
 
 // ------------------------------------------------------------ rows / columns
@@ -1943,6 +2119,22 @@ pub(crate) fn remove(
         .and_then(|path| axis_target(file, path.path()))
     {
         return remove_axis(file, package, axis, limits);
+    }
+    if let Some(address) = target
+        .path()
+        .and_then(|path| comment_target(file, path.path()))
+    {
+        bound(LimitKind::Operations, 1, limits.max_operations())?;
+        let mut chain = Chain::new(package.clone());
+        commit_comment(&mut chain, address, None)?;
+        return finish(
+            file,
+            chain.changed,
+            Owner::Numbers(chain.package),
+            chain.patches,
+            1,
+            limits,
+        );
     }
     let nodes = match targets(file, target, limits)? {
         Targets::EmptyCell(_) => {

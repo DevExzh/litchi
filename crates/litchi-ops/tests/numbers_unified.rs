@@ -200,7 +200,7 @@ fn writes_formulas_through_the_formula_parser() {
 }
 
 #[test]
-fn sets_display_formats_and_refuses_comments() {
+fn sets_display_formats() {
     let file = read("basic.numbers");
     let edited = file
         .set(
@@ -221,13 +221,99 @@ fn sets_display_formats_and_refuses_comments() {
         .set("/sheet[1]/table[1]/B3", props! { "numberFormat" => "0.0x" })
         .expect_err("format code");
     assert_eq!(error.code(), Code::InvalidValue);
+}
 
-    // Comments are a declared gap: the leaf's comment transaction refuses
-    // natively authored packages, so the unified key is not claimed.
-    let error = file
-        .set("/sheet[1]/table[1]/B2", props! { "comment" => "check me" })
-        .expect_err("comment gap");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+/// Record 0318: cell comments are read, set, added and removed, on native
+/// packages (their lists, tiles and authors in members of their own) and
+/// on a created workbook.
+#[test]
+fn cell_comments_are_read_set_added_and_removed() {
+    let native = read("comment-reader-native-created.numbers");
+    let commented = native
+        .query("cell")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .find(|node| {
+            node.view()
+                .format()
+                .expect("format")
+                .into_iter()
+                .any(|prop| prop.key() == "comment")
+        })
+        .map(|node| node.path().to_string())
+        .expect("a natively commented cell");
+    // Replace, clear, and set again.
+    let replaced = native
+        .set(&commented, props! { "comment" => "replaced" })
+        .expect("replace a native comment");
+    assert_eq!(
+        prop(&reopen(&replaced), &commented, "comment").as_deref(),
+        Some("replaced")
+    );
+    let cleared = replaced
+        .set(
+            &commented,
+            props! { "comment" => litchi_ops::PropValue::Null },
+        )
+        .expect("clear");
+    assert_eq!(prop(&reopen(&cleared), &commented, "comment"), None);
+    let removed = native
+        .remove(&format!("{commented}/comment"))
+        .expect("remove the comment");
+    assert_eq!(prop(&reopen(&removed), &commented, "comment"), None);
+
+    for file in [
+        read("basic.numbers"),
+        create(FileFormat::Numbers)
+            .expect("create")
+            .set("/sheet[1]/table[1]/B2", props! { "value" => 1 })
+            .expect("value"),
+    ] {
+        let added = file
+            .add(
+                "/sheet[1]/table[1]/B2",
+                NewNode::new("comment").prop("text", "check me"),
+            )
+            .expect("add a comment");
+        assert_eq!(added.path.to_string(), "/sheet[1]/table[1]/B2");
+        let reopened = reopen(&added.file);
+        assert_eq!(
+            prop(&reopened, "/sheet[1]/table[1]/B2", "comment").as_deref(),
+            Some("check me")
+        );
+        let edit = file
+            .edit(|tx| {
+                tx.add(
+                    "/sheet[1]/table[1]/B2",
+                    NewNode::new("comment").prop("text", "check me"),
+                )
+                .map(|_| ())
+            })
+            .expect("add in a transaction");
+        let restored = edit.patch.inverse().apply(&edit.file).expect("inverse");
+        assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+        let error = reopened
+            .add(
+                "/sheet[1]/table[1]/B2",
+                NewNode::new("comment").prop("text", "twice"),
+            )
+            .expect_err("one comment per cell");
+        assert_eq!(error.code(), Code::InvalidArgument);
+        let edited = reopened
+            .set("/sheet[1]/table[1]/B2", props! { "comment" => "edited" })
+            .expect("edit");
+        assert_eq!(
+            prop(&reopen(&edited), "/sheet[1]/table[1]/B2", "comment").as_deref(),
+            Some("edited")
+        );
+        let gone = edited
+            .remove("/sheet[1]/table[1]/B2/comment")
+            .expect("remove");
+        assert_eq!(
+            prop(&reopen(&gone), "/sheet[1]/table[1]/B2", "comment"),
+            None
+        );
+    }
 }
 
 #[test]
@@ -659,6 +745,59 @@ fn rows_and_columns_are_inserted_and_removed() {
     let error = read("formula-arena-native.numbers")
         .add("/sheet[1]/table[1]", NewNode::new("row"))
         .expect_err("formulas");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+}
+
+/// Record 0318: rows and columns of a table with formulas move the
+/// formulas' references; removing a row a formula reads is refused.
+#[test]
+fn rows_and_columns_move_formula_references() {
+    let file = create(FileFormat::Numbers)
+        .expect("create")
+        .edit(|tx| {
+            tx.set("/sheet[1]/table[1]/B2", props! { "value" => 1 })?;
+            tx.set("/sheet[1]/table[1]/B3", props! { "value" => 2 })?;
+            tx.set("/sheet[1]/table[1]/C3", props! { "value" => 3 })?;
+            tx.set(
+                "/sheet[1]/table[1]/D2",
+                props! { "formula" => "=SUM($B$2:B3)+C3" },
+            )?;
+            Ok(())
+        })
+        .expect("formulas")
+        .file;
+    let added = file
+        .add(
+            "/sheet[1]/table[1]",
+            NewNode::new("row").at(Placement::Position(litchi_core::Position::new(2))),
+        )
+        .expect("insert a row under formulas");
+    let reopened = reopen(&added.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/D2", "formula").as_deref(),
+        Some("=(SUM($B$2:B4)+C4)")
+    );
+    let column = file
+        .add(
+            "/sheet[1]/table[1]",
+            NewNode::new("col").at(Placement::Position(litchi_core::Position::new(2))),
+        )
+        .expect("insert a column under formulas");
+    assert_eq!(
+        prop(&reopen(&column.file), "/sheet[1]/table[1]/E2", "formula").as_deref(),
+        Some("=(SUM($B$2:B3)+D3)")
+    );
+    let edited = file
+        .edit(|tx| {
+            tx.add("/sheet[1]/table[1]", NewNode::new("row"))
+                .map(|_| ())
+        })
+        .expect("append a row");
+    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let error = file
+        .remove("/sheet[1]/table[1]/row[3]")
+        .expect_err("row 3 is read");
     assert_eq!(error.code(), Code::UnsupportedCapability);
 }
 

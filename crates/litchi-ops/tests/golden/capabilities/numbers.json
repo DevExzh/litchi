@@ -309,6 +309,12 @@
           "set": true,
           "get": true
         },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "merge": {
           "type": "string",
           "add": false,
@@ -475,14 +481,6 @@
   ],
   "gaps": [
     {
-      "subject": "property",
-      "element": "cell",
-      "key": "comment",
-      "code": "unsupported_capability",
-      "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
-      "reason": "the leaf's cell-comment transaction refuses every natively authored corpus package (`InvalidSource`/`UnsupportedDependency`: author storage and comment-list ownership outside its admitted scope), and comments are resolved per cell, so neither reads nor writes are claimed"
-    },
-    {
       "subject": "operation",
       "verb": "set",
       "element": "cell",
@@ -504,10 +502,10 @@
       "subject": "operation",
       "verb": "add",
       "element": "row",
-      "context": "tables with formulas or merges",
+      "context": "formulas the coordinate shift refuses, merges",
       "code": "unsupported_capability",
-      "followUp": "record 0309 follow-ups (IWORK_API_REQUESTS.md request 6)",
-      "reason": "rows and columns are inserted and removed when no formula coordinate moves: a table holding formulas, one a formula or chart elsewhere reads, merged cells, filters, categories, pivots and (for columns) sort rules are refused, as are removing a hidden, bordered or commented row or column"
+      "followUp": "record 0318 follow-ups (IWORK_API_REQUESTS.md request 6)",
+      "reason": "rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); refused: removing a row or column a surviving formula reads (native Numbers writes #REF!), a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a shared formula whose cells would diverge, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden, bordered or commented row or column"
     },
     {
       "subject": "operation",
