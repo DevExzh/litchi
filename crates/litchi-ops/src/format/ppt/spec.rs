@@ -320,6 +320,68 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec::new("color", ValueType::Color(ColorContext::Drawing)),
 ];
 
+/// An OLE object frame (record 0323): a picture frame showing an embedded or
+/// linked object, with the object's `ProgID`.
+const OLE_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("progId", ValueType::Text),
+    PropSpec::new("linked", ValueType::Bool),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+];
+
+/// A media frame (record 0323): a picture frame playing a movie (`video`) or
+/// a sound (`audio`); `media` names both.
+const MEDIA_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+];
+
+/// An embedded chart (record 0323): a Microsoft Graph or Excel chart object
+/// shown by an OLE picture frame, read through its MS-OGRAPH chart. The
+/// frame keys are the picture's; `chartType` uses the PPTX chart names.
+const CHART_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+    PropSpec::new("chartType", ValueType::Text),
+    PropSpec::new("title", ValueType::Text),
+];
+
+/// The presentation theme (record 0323): the `PowerPoint` 2007 theme part a
+/// `RoundTripThemeAtom` carries, read with the PPTX theme vocabulary.
+pub(crate) const THEME_PROPS: &[PropSpec] = &[
+    PropSpec::new("dk1", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("lt1", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("dk2", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("lt2", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent1", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent2", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent3", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent4", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent5", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("accent6", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("hyperlink", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("followedhyperlink", ValueType::Color(ColorContext::Drawing)),
+    PropSpec::new("headingFont", ValueType::Text),
+    PropSpec::new("bodyFont", ValueType::Text),
+    PropSpec::new("headingFont.ea", ValueType::Text),
+    PropSpec::new("bodyFont.ea", ValueType::Text),
+    PropSpec::new("headingFont.cs", ValueType::Text),
+    PropSpec::new("bodyFont.cs", ValueType::Text),
+    PropSpec::new("name", ValueType::Text),
+];
+
 /// A click hyperlink (record 0323), in the PPTX vocabulary: `link` is a URL,
 /// `slide[N]`, or `firstslide`, `lastslide`, `nextslide`, `previousslide`,
 /// `endshow`; `tooltip` is the screen tip.
@@ -416,50 +478,25 @@ const fn property_gap(
     }
 }
 
-static CHART_GAP: GapSpec = element_gap(
-    "chart",
-    "M1-extended",
-    "legacy PPT chart frames have no chart-part projection",
-);
 static SMARTART_GAP: GapSpec = element_gap(
     "smartart",
     "M1-extended",
     "legacy PPT diagram frames have no semantic diagram projection",
 );
-static OLE_GAP: GapSpec = element_gap(
-    "ole",
-    "M1-extended",
-    "legacy PPT object frames are retained as picture metadata only",
-);
-static VIDEO_GAP: GapSpec = element_gap(
-    "video",
-    "M1-extended",
-    "media frames are retained as native picture metadata only",
-);
-static AUDIO_GAP: GapSpec = element_gap(
-    "audio",
-    "M1-extended",
-    "media frames are retained as native picture metadata only",
-);
-static MEDIA_GAP: GapSpec = element_gap(
-    "media",
-    "M1-extended",
-    "media frames are retained as native picture metadata only",
-);
 static EQUATION_GAP: GapSpec = element_gap(
     "equation",
-    "M1-extended",
-    "legacy PPT has no equation semantic model",
+    "0323-F6 PPT Equation Editor objects",
+    "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element",
 );
 static ZOOM_GAP: GapSpec = element_gap(
     "zoom",
-    "M1-extended",
-    "legacy PPT has no zoom semantic model",
+    "wontfix: PPTX-only (record 0323)",
+    "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record",
 );
 static MODEL3D_GAP: GapSpec = element_gap(
     "model3d",
-    "M1-extended",
-    "legacy PPT has no 3D-model semantic model",
+    "wontfix: PPTX-only (record 0323)",
+    "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record",
 );
 static MASTER_GAP: GapSpec = element_gap(
     "slideMaster",
@@ -471,35 +508,30 @@ static LAYOUT_GAP: GapSpec = element_gap(
     "M1-extended",
     "legacy PPT layout records are not exposed as navigable nodes",
 );
-static THEME_GAP: GapSpec = element_gap(
-    "theme",
-    "M1-extended",
-    "legacy PPT has no theme semantic projection",
-);
 static MODERN_COMMENT_GAP: GapSpec = element_gap(
     "modernComment",
-    "M1-extended",
-    "legacy PPT has no threaded-comment semantic projection",
+    "wontfix: PPTX-only (record 0323)",
+    "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements",
 );
 static REPLY_GAP: GapSpec = element_gap(
     "reply",
-    "M1-extended",
-    "legacy PPT has no threaded-comment semantic projection",
+    "wontfix: PPTX-only (record 0323)",
+    "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies",
 );
 static ANIMATION_GAP: GapSpec = element_gap(
     "animation",
-    "M1-extended",
-    "legacy PPT timing records are not exposed as nodes",
+    "0323-F5 PPT animation nodes",
+    "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes",
 );
 static SERIES_GAP: GapSpec = element_gap(
     "series",
-    "M1-extended",
-    "legacy PPT chart series are not exposed as nodes",
+    "0323-F7 PPT chart series and axes",
+    "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)",
 );
 static AXIS_GAP: GapSpec = element_gap(
     "axis",
-    "M1-extended",
-    "legacy PPT chart axes are not exposed as nodes",
+    "0323-F7 PPT chart series and axes",
+    "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)",
 );
 static NOTE_SLIDE_GAP: GapSpec = element_gap(
     "noteSlide",
@@ -517,12 +549,6 @@ static PICTURE_MEDIA_GAP: GapSpec = property_gap(
     "mediaType",
     "M1-extended",
     "legacy PPT frame classification is exposed as frameKind",
-);
-static CHART_TYPE_GAP: GapSpec = property_gap(
-    "chart",
-    "chartType",
-    "M1-extended",
-    "legacy PPT chart frames have no chart-part projection",
 );
 static SHAPE_FILL_GAP: GapSpec = property_gap(
     "shape",
@@ -652,14 +678,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/table[N]/tr[N]/tc[N]"],
             CELL_PROPS,
         ),
-        gap(
+        element(
             Kind::Chart,
             "chart",
             &["chart"],
             TREE_PARENTS,
             &[Kind::Series, Kind::Axis, Kind::Animation],
+            &[],
             &["/slide[N]/chart[N]"],
-            &CHART_GAP,
+            CHART_PROPS,
         ),
         element(
             Kind::Group,
@@ -690,14 +717,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/smartart[N]"],
             &SMARTART_GAP,
         ),
-        gap(
+        element(
             Kind::Ole,
             "ole",
             &["embed", "object", "ole", "oleobject"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/ole[N]"],
-            &OLE_GAP,
+            OLE_PROPS,
         ),
         element(
             Kind::Paragraph,
@@ -749,32 +777,35 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/comment[N]"],
             COMMENT_PROPS,
         ),
-        gap(
+        element(
             Kind::Video,
             "video",
             &["video"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/video[N]"],
-            &VIDEO_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Kind::Audio,
             "audio",
             &["audio"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/audio[N]"],
-            &AUDIO_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Kind::Media,
             "media",
             &["media"],
             TREE_PARENTS,
             &[],
+            SHAPE_IDS,
             &["/slide[N]/media[N]"],
-            &MEDIA_GAP,
+            MEDIA_PROPS,
         ),
         gap(
             Kind::Equation,
@@ -821,14 +852,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slidemaster[N]/slidelayout[N]", "/slidelayout[N]"],
             &LAYOUT_GAP,
         ),
-        gap(
+        element(
             Kind::Theme,
             "theme",
             &["theme"],
             &[Kind::Presentation],
             &[],
+            &[],
             &["/theme"],
-            &THEME_GAP,
+            THEME_PROPS,
         ),
         gap(
             Kind::ModernComment,
@@ -922,12 +954,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &NOTES_MASTER_GAP,
         ),
     ],
-    gaps: &[
-        PICTURE_MEDIA_GAP,
-        CHART_TYPE_GAP,
-        SHAPE_FILL_GAP,
-        STATS_CHART_GAP,
-    ],
+    gaps: &[PICTURE_MEDIA_GAP, SHAPE_FILL_GAP, STATS_CHART_GAP],
 };
 
 check_format_spec!(SPEC);

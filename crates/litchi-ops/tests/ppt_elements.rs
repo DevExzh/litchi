@@ -508,3 +508,100 @@ fn run_formatting_and_text_set_round_trip() {
         );
     });
 }
+
+#[test]
+fn theme_reads_the_round_trip_theme_like_pptx() {
+    let deck = eager(&fixture("poi/test-data/slideshow/headers_footers_2007.ppt"));
+    assert_eq!(prop(&deck, "/theme", "name").as_deref(), Some("Office"));
+    assert_eq!(prop(&deck, "/theme", "dk2").as_deref(), Some("#1F497D"));
+    assert_eq!(
+        prop(&deck, "/theme", "hyperlink").as_deref(),
+        Some("#0000FF")
+    );
+    assert_eq!(
+        prop(&deck, "/theme", "headingFont").as_deref(),
+        Some("Calibri")
+    );
+    assert_eq!(paths(&deck, "theme"), ["/theme"]);
+    assert_eq!(
+        eager(&fixture(NO_COMMENTS))
+            .get("/theme")
+            .unwrap_err()
+            .code(),
+        Code::PathNotFound
+    );
+    assert!(deck.set("/theme", props! { "dk1" => "FF0000" }).is_err());
+}
+
+/// A deck with a bar and a pie Microsoft Graph chart.
+fn chart_deck() -> Vec<u8> {
+    use litchi_ppt::writer::{Chart, ChartKind};
+    let mut writer = litchi_ppt::writer::Builder::new();
+    let slide = writer.add_slide().unwrap();
+    for kind in [ChartKind::Bar, ChartKind::Pie] {
+        let mut chart = Chart::new(kind);
+        chart.set_title("Quarterly sales");
+        chart.set_categories(["Q1", "Q2", "Q3", "Q4"]);
+        chart
+            .add_series(Some("2024"), vec![1.5, 2.5, 3.5, 4.5])
+            .unwrap();
+        writer.add_chart(slide, 50, 50, 400, 240, chart).unwrap();
+    }
+    let mut output = std::io::Cursor::new(Vec::new());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
+    output.into_inner()
+}
+
+#[test]
+fn embedded_graph_charts_read_like_pptx_charts() {
+    let deck = eager(&chart_deck());
+    assert_eq!(
+        paths(&deck, "chart"),
+        ["/slide[1]/chart[1]", "/slide[1]/chart[2]"]
+    );
+    assert_eq!(
+        prop(&deck, "/slide[1]/chart[1]", "chartType").as_deref(),
+        Some("bar")
+    );
+    assert_eq!(
+        prop(&deck, "/slide[1]/chart[1]", "title").as_deref(),
+        Some("Quarterly sales")
+    );
+    assert_eq!(
+        prop(&deck, "/slide[1]/chart[2]", "chartType").as_deref(),
+        Some("pie")
+    );
+    assert!(prop(&deck, "/slide[1]/chart[1]", "width").is_some());
+    assert_eq!(
+        deck.get("/slide[1]/chart[3]").unwrap_err().code(),
+        Code::PathNotFound
+    );
+    assert_eq!(
+        deck.get("/slide[1]/chart[1]/series[1]").unwrap_err().code(),
+        Code::UnsupportedCapability
+    );
+}
+
+#[test]
+fn ole_and_media_frames_read_their_object_kinds() {
+    let ole = eager(&fixture("poi/test-data/slideshow/testPPT_oleWorkbook.ppt"));
+    let frame = "/slide[2]/ole[1]";
+    assert!(
+        prop(&ole, frame, "progId").is_some_and(|program| program.starts_with("Excel.Sheet")),
+        "{:?}",
+        prop(&ole, frame, "progId")
+    );
+    assert_eq!(prop(&ole, frame, "linked").as_deref(), Some("false"));
+    assert!(prop(&ole, frame, "width").is_some());
+    assert_eq!(paths(&ole, "ole"), [frame]);
+
+    let sound = eager(&fixture("poi/test-data/slideshow/sound.ppt"));
+    assert_eq!(paths(&sound, "audio"), ["/slide[1]/audio[1]"]);
+    assert_eq!(paths(&sound, "media"), ["/slide[1]/media[1]"]);
+    assert!(paths(&sound, "video").is_empty());
+    assert!(
+        sound
+            .add("/slide[1]", NewNode::new("audio").prop("src", "a.wav"))
+            .is_err()
+    );
+}

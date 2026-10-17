@@ -54,6 +54,198 @@ pub(crate) enum Element {
     },
     /// A line break (`\u{b}`) of one paragraph.
     LineBreak { shape: ShapeItem },
+    /// The presentation theme.
+    Theme(Arc<litchi_ppt::theme::Theme>),
+    /// An embedded chart of a slide.
+    Chart {
+        slide: usize,
+        chart: Arc<ChartSummary>,
+    },
+    /// An OLE object or media picture frame read as its element kind
+    /// (`ole`, `video`, `audio` or `media`), with an OLE object's `ProgID`
+    /// and whether it is linked.
+    Frame {
+        shape: ShapeItem,
+        kind: Kind,
+        program: Option<Arc<str>>,
+        linked: bool,
+    },
+}
+
+/// The frames of `kind` (`ole`, `video`, `audio`, `media`) among the direct
+/// pictures of a slide or group's shape array, in source order.
+pub(crate) fn frames(
+    file: &super::Ppt,
+    direct: &[litchi_ppt::shapes::ShapeEnum<'static>],
+    kind: Kind,
+) -> Result<Vec<(usize, Option<Arc<str>>, bool)>> {
+    use litchi_ppt::shapes::{PictureFrameKind, ShapeEnum};
+    let wanted = match kind {
+        Kind::Ole => PictureFrameKind::OleObject,
+        _ => PictureFrameKind::Media,
+    };
+    let mut out = Vec::new();
+    let mut objects = None;
+    let mut media = None;
+    for (index, shape) in direct.iter().enumerate() {
+        let ShapeEnum::Picture(picture) = shape else {
+            continue;
+        };
+        if picture.frame_kind() != wanted {
+            continue;
+        }
+        let id = picture.external_object_id();
+        match kind {
+            Kind::Ole => {
+                if objects.is_none() {
+                    objects = Some(file.reader().ole_objects()?);
+                }
+                let definition =
+                    id.and_then(|id| {
+                        objects
+                            .as_ref()?
+                            .as_ref()?
+                            .objects
+                            .iter()
+                            .find_map(|object| match object {
+                                litchi_ppt::embedded::object::ExternalObject::Object(
+                                    definition,
+                                ) if object.id() == id => Some(definition),
+                                _ => None,
+                            })
+                    });
+                out.push((
+                    index,
+                    definition
+                        .and_then(|definition| definition.program_id.as_deref())
+                        .map(Arc::from),
+                    definition.is_some_and(|definition| {
+                        matches!(
+                            definition.kind,
+                            litchi_ppt::embedded::object::ContainerKind::Linked(_)
+                        )
+                    }),
+                ));
+            },
+            Kind::Media => out.push((index, None, false)),
+            _ => {
+                if media.is_none() {
+                    media = Some(file.reader().external_media()?);
+                }
+                let movie = id.is_some_and(|id| {
+                    media
+                        .as_ref()
+                        .and_then(Option::as_ref)
+                        .is_some_and(|collection| {
+                            collection.objects.iter().any(|object| {
+                                object.id() == id
+                                    && matches!(
+                                        object,
+                                        litchi_ppt::external_media::Object::Movie(_)
+                                    )
+                            })
+                        })
+                });
+                if movie == (kind == Kind::Video) {
+                    out.push((index, None, false));
+                }
+            },
+        }
+    }
+    Ok(out)
+}
+
+/// What a chart node reads: its frame and its first chart substream.
+#[derive(Debug)]
+pub(crate) struct ChartSummary {
+    shape_id: u32,
+    name: Option<String>,
+    bounds: Option<(i32, i32, i32, i32)>,
+    chart_type: Option<&'static str>,
+    title: Option<String>,
+}
+
+/// The PPTX `chartType` name of an MS-OGRAPH chart group family.
+fn chart_type(family: litchi_ppt::chart::semantic::Family) -> &'static str {
+    use litchi_ppt::chart::semantic::Family;
+    let stacked = |stacked: bool, percent: bool, name: &'static [&'static str; 3]| {
+        if percent {
+            name[2]
+        } else if stacked {
+            name[1]
+        } else {
+            name[0]
+        }
+    };
+    match family {
+        Family::Bar { flags, .. } if flags & 0x0001 != 0 => stacked(
+            flags & 0x0002 != 0,
+            flags & 0x0004 != 0,
+            &["bar", "stackedBar", "percentStackedBar"],
+        ),
+        Family::Bar { flags, .. } => stacked(
+            flags & 0x0002 != 0,
+            flags & 0x0004 != 0,
+            &["column", "stackedColumn", "percentStackedColumn"],
+        ),
+        Family::Line { flags } => stacked(
+            flags & 0x0001 != 0,
+            flags & 0x0002 != 0,
+            &["line", "stackedLine", "percentStackedLine"],
+        ),
+        Family::Area { flags } => stacked(
+            flags & 0x0001 != 0,
+            flags & 0x0002 != 0,
+            &["area", "stackedArea", "percentStackedArea"],
+        ),
+        Family::Pie { hole, .. } if hole > 0 => "doughnut",
+        Family::Pie { .. } => "pie",
+        Family::Scatter { flags, .. } if flags & 0x0001 != 0 => "bubble",
+        Family::Scatter { .. } => "scatter",
+        Family::Radar { .. } => "radar",
+        Family::Surface { .. } => "surface",
+    }
+}
+
+/// The charts of the slide at `slide`, in inventory order.
+pub(crate) fn slide_charts(file: &super::Ppt, slide: usize) -> Result<Vec<ChartSummary>> {
+    let reader = file.reader();
+    let inventory = reader.charts()?;
+    let shapes = match reader.slide_at(slide)? {
+        Some(selected) => selected.shared_shapes()?,
+        None => return Ok(Vec::new()),
+    };
+    let mut out = Vec::new();
+    for chart in inventory.on_slide(slide + 1) {
+        let Some(frame) = chart.info().frame() else {
+            continue;
+        };
+        let shape = shapes.iter().find(|shape| shape.id() == frame.shape());
+        let bounds = match shape {
+            Some(litchi_ppt::shapes::ShapeEnum::Picture(picture)) => {
+                let properties = picture.properties();
+                Some((
+                    properties.x,
+                    properties.y,
+                    properties.width,
+                    properties.height,
+                ))
+            },
+            _ => None,
+        };
+        let semantic = chart.semantic_chart(0).ok().flatten();
+        out.push(ChartSummary {
+            shape_id: frame.shape(),
+            name: shape.and_then(super::node::shape_name).map(str::to_owned),
+            bounds,
+            chart_type: semantic
+                .as_ref()
+                .and_then(|chart| chart.groups().first())
+                .map(|group| chart_type(group.family)),
+            title: semantic.and_then(|chart| chart.title().map(str::to_owned)),
+        });
+    }
+    Ok(out)
 }
 
 /// One run piece: its UTF-16 range in the body and its character format's
@@ -132,6 +324,9 @@ impl Element {
             Self::Hyperlink { .. } => Kind::Hyperlink,
             Self::Run { .. } => Kind::Run,
             Self::LineBreak { .. } => Kind::LineBreak,
+            Self::Theme(_) => Kind::Theme,
+            Self::Chart { .. } => Kind::Chart,
+            Self::Frame { kind, .. } => *kind,
         }
     }
 
@@ -143,7 +338,10 @@ impl Element {
             | Self::Column { shape, .. }
             | Self::Hyperlink { shape, .. }
             | Self::Run { shape, .. }
-            | Self::LineBreak { shape, .. } => Some(shape.slide),
+            | Self::LineBreak { shape, .. }
+            | Self::Frame { shape, .. } => Some(shape.slide),
+            Self::Chart { slide, .. } => Some(*slide),
+            Self::Theme(_) => None,
         }
     }
 
@@ -155,7 +353,9 @@ impl Element {
             | Self::Column { shape, .. }
             | Self::Hyperlink { shape, .. }
             | Self::Run { shape, .. }
-            | Self::LineBreak { shape, .. } => Some(shape),
+            | Self::LineBreak { shape, .. }
+            | Self::Frame { shape, .. } => Some(shape),
+            Self::Theme(_) | Self::Chart { .. } => None,
         }
     }
 
@@ -171,7 +371,10 @@ impl Element {
             Self::Row { .. }
             | Self::Column { .. }
             | Self::Hyperlink { .. }
-            | Self::LineBreak { .. } => None,
+            | Self::LineBreak { .. }
+            | Self::Frame { .. }
+            | Self::Theme(_) => None,
+            Self::Chart { chart, .. } => chart.title.as_deref().map(Cow::Borrowed),
         })
     }
 
@@ -186,7 +389,10 @@ impl Element {
             | Self::Cell { .. }
             | Self::Column { .. }
             | Self::Hyperlink { .. }
-            | Self::LineBreak { .. } => 0,
+            | Self::LineBreak { .. }
+            | Self::Theme(_)
+            | Self::Frame { .. }
+            | Self::Chart { .. } => 0,
             Self::Run { .. } => usize::from(run_click(node)?.is_some()),
         })
     }
@@ -220,6 +426,54 @@ impl Element {
             },
             Self::Cell { .. } => Vec::new(),
             Self::LineBreak { .. } => Vec::new(),
+            Self::Frame {
+                program, linked, ..
+            } => {
+                let picture = node.shape();
+                let bounds = node.anchor_bounds();
+                props
+                    .iter()
+                    .map(|prop| match prop.name {
+                        "id" => picture.map(|shape| Value::Int(i64::from(shape.id()))),
+                        "name" => picture
+                            .and_then(super::node::shape_name)
+                            .map(|name| Value::Text(Cow::Borrowed(name))),
+                        "progId" => program
+                            .as_deref()
+                            .map(|program| Value::Text(Cow::Borrowed(program))),
+                        "linked" => program.as_ref().map(|_| Value::Bool(*linked)),
+                        "x" => bounds.map(|bounds| length(bounds.0)),
+                        "y" => bounds.map(|bounds| length(bounds.1)),
+                        "width" => bounds.map(|bounds| length(bounds.2)),
+                        "height" => bounds.map(|bounds| length(bounds.3)),
+                        _ => None,
+                    })
+                    .collect()
+            },
+            Self::Chart { chart, .. } => props
+                .iter()
+                .map(|prop| match prop.name {
+                    "id" => Some(Value::Int(i64::from(chart.shape_id))),
+                    "name" => chart
+                        .name
+                        .as_deref()
+                        .map(|name| Value::Text(Cow::Borrowed(name))),
+                    "x" => chart.bounds.map(|bounds| length(bounds.0)),
+                    "y" => chart.bounds.map(|bounds| length(bounds.1)),
+                    "width" => chart.bounds.map(|bounds| length(bounds.2)),
+                    "height" => chart.bounds.map(|bounds| length(bounds.3)),
+                    "chartType" => chart.chart_type.map(Value::Token),
+                    "title" => chart
+                        .title
+                        .as_deref()
+                        .map(|title| Value::Text(Cow::Borrowed(title))),
+                    _ => None,
+                })
+                .collect(),
+            Self::Theme(theme) => props
+                .iter()
+                .map(|prop| theme_value(theme, prop.name))
+                .collect(),
             Self::Run { body, piece, .. } => {
                 let format = &body.runs()[piece.format].format;
                 let font = match format.font_ref() {
@@ -399,4 +653,33 @@ pub(crate) fn run_click(
         }
     }
     Ok(None)
+}
+
+fn theme_value<'a>(theme: &'a litchi_ppt::theme::Theme, key: &str) -> Option<Value<'a>> {
+    let slot = match key {
+        "hyperlink" => Some("hlink"),
+        "followedhyperlink" => Some("folHlink"),
+        other if litchi_ppt::theme::COLOR_SLOTS.contains(&other) => Some(other),
+        _ => None,
+    };
+    if let Some(slot) = slot {
+        return theme
+            .color(slot)
+            .map(|[red, green, blue]| Value::Color(crate::value::Color::rgb(red, green, blue)));
+    }
+    let text = |value: &'a Option<String>| {
+        value
+            .as_deref()
+            .map(|text| Value::Text(Cow::Borrowed(text)))
+    };
+    match key {
+        "headingFont" => text(&theme.major.latin),
+        "bodyFont" => text(&theme.minor.latin),
+        "headingFont.ea" => text(&theme.major.east_asian),
+        "bodyFont.ea" => text(&theme.minor.east_asian),
+        "headingFont.cs" => text(&theme.major.complex),
+        "bodyFont.cs" => text(&theme.minor.complex),
+        "name" => text(&theme.name),
+        _ => None,
+    }
 }

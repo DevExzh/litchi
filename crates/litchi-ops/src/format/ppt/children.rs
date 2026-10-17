@@ -207,6 +207,64 @@ impl<'f> Children<'f> {
                 Err(error) => failed = Some(error),
             }
         }
+        for kind in [Kind::Ole, Kind::Video, Kind::Audio, Kind::Media] {
+            if !kinds.contains(kind)
+                || (kind != Kind::Media && kinds.contains(Kind::Media))
+                || !matches!(parent.item(), Item::Slide(_) | Item::Shape(_))
+            {
+                continue;
+            }
+            let found = (|| -> Result<()> {
+                let Some(source) = source_for(parent)? else {
+                    return Ok(());
+                };
+                let Some(direct) = source.direct() else {
+                    return Ok(());
+                };
+                for (index, (position, program, linked)) in
+                    super::elements::frames(parent.file(), direct, kind)?
+                        .into_iter()
+                        .enumerate()
+                {
+                    let (Some(roots), Some(path)) = (source.roots(), source.child_path(position))
+                    else {
+                        continue;
+                    };
+                    extra.push(Node::element_node(
+                        parent.file(),
+                        parent.steps(),
+                        crate::node::PathStep::at(kind.name(), litchi_core::Position::new(index)),
+                        super::elements::Element::Frame {
+                            shape: ShapeItem {
+                                slide: parent.slide_position().unwrap_or(0),
+                                kind: Kind::Picture,
+                                source: roots,
+                                path,
+                            },
+                            kind,
+                            program,
+                            linked,
+                        },
+                    ));
+                }
+                Ok(())
+            })();
+            if let Err(error) = found {
+                failed = Some(error);
+            }
+        }
+        if let Item::Slide(slide) = parent.item()
+            && kinds.contains(Kind::Chart)
+        {
+            match super::elements::slide_charts(parent.file(), slide.position) {
+                Ok(charts) => {
+                    for (index, chart) in charts.into_iter().enumerate() {
+                        extra.push(super::nav::chart_node(parent, slide.position, index, chart));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
         if let Item::Shape(shape) = parent.item()
             && kinds.contains(Kind::Hyperlink)
         {
@@ -216,6 +274,20 @@ impl<'f> Children<'f> {
                 },
                 Ok(None) => {},
                 Err(error) => failed = Some(error),
+            }
+        }
+        if let Item::Presentation = parent.item()
+            && kinds.contains(Kind::Theme)
+        {
+            match parent.file().reader().theme() {
+                Ok(Some(theme)) => extra.push(Node::element_node(
+                    parent.file(),
+                    parent.steps(),
+                    crate::node::PathStep::new(Kind::Theme.name()),
+                    super::elements::Element::Theme(Arc::new(theme)),
+                )),
+                Ok(None) => {},
+                Err(error) => failed = Some(error.into()),
             }
         }
         if let Item::Paragraph(paragraph) = parent.item()

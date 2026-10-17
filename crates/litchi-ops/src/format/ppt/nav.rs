@@ -52,9 +52,41 @@ impl<'f> Nav<'f> {
 
         match (parent.item(), kind) {
             (Item::Presentation, Kind::Slide) => self.slide(step.select),
+            (Item::Presentation, Kind::Theme) => {
+                let theme = self.file.reader().theme()?;
+                Ok(match ordinal(step.select, usize::from(theme.is_some())) {
+                    Some(Some(_)) => match theme {
+                        Some(theme) => Lookup::Found(Node::element_node(
+                            self.file,
+                            parent.steps(),
+                            PathStep::new(Kind::Theme.name()),
+                            super::elements::Element::Theme(std::sync::Arc::new(theme)),
+                        )),
+                        None => Lookup::Missing,
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Item::Slide(slide), Kind::Notes) => self.notes(slide.position, step.select),
             (Item::Slide(slide), Kind::Comment) => {
                 self.comment(parent, slide.position, step.select)
+            },
+            (Item::Slide(slide), Kind::Chart) => {
+                let charts = super::elements::slide_charts(self.file, slide.position)?;
+                Ok(match ordinal(step.select, charts.len()) {
+                    Some(Some(index)) => Lookup::Found(chart_node(
+                        parent,
+                        slide.position,
+                        index,
+                        charts
+                            .into_iter()
+                            .nth(index)
+                            .ok_or_else(|| missing_slide(slide.position))?,
+                    )),
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
             },
             (Item::Shape(shape), Kind::Paragraph) => self.paragraph(parent, shape, step.select),
             (Item::Shape(shape), Kind::Row | Kind::Col) if shape.kind == Kind::Table => {
@@ -127,6 +159,10 @@ impl<'f> Nav<'f> {
                 },
                 _ => Ok(Lookup::NotApplicable),
             },
+            (
+                Item::Slide(_) | Item::Shape(_),
+                Kind::Ole | Kind::Video | Kind::Audio | Kind::Media,
+            ) => self.frame(parent, kind, step.select),
             (Item::Slide(_) | Item::Shape(_), Kind::Shape | Kind::Placeholder)
             | (
                 Item::Slide(_) | Item::Shape(_),
@@ -190,6 +226,50 @@ impl<'f> Nav<'f> {
             )),
             None => Lookup::Missing,
         })
+    }
+
+    /// An OLE or media picture frame by its ordinal among its kind.
+    fn frame(
+        &self,
+        parent: &Node<'f>,
+        kind: Kind,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let Some(source) = source_for(parent)? else {
+            return Ok(Lookup::NotApplicable);
+        };
+        let Some(direct) = source.direct() else {
+            return Ok(Lookup::NotApplicable);
+        };
+        let frames = super::elements::frames(self.file, direct, kind)?;
+        let index = match ordinal(select, frames.len()) {
+            Some(Some(index)) => index,
+            Some(None) => return Ok(Lookup::Missing),
+            None => return Ok(Lookup::NotApplicable),
+        };
+        let (position, program, linked) = frames
+            .into_iter()
+            .nth(index)
+            .ok_or_else(|| missing_slide(0))?;
+        let (Some(roots), Some(path)) = (source.roots(), source.child_path(position)) else {
+            return Ok(Lookup::NotApplicable);
+        };
+        Ok(Lookup::Found(Node::element_node(
+            self.file,
+            parent.steps(),
+            PathStep::at(kind.name(), Position::new(index)),
+            super::elements::Element::Frame {
+                shape: ShapeItem {
+                    slide: parent.slide_position().unwrap_or(0),
+                    kind: Kind::Picture,
+                    source: roots,
+                    path,
+                },
+                kind,
+                program,
+                linked,
+            },
+        )))
     }
 
     /// A table row or column by its ordinal.
@@ -604,6 +684,24 @@ pub(crate) fn run_node<'f>(
             run,
             body,
             piece,
+        },
+    )
+}
+
+/// The node of the chart at `index` on `slide`.
+pub(crate) fn chart_node<'f>(
+    slide_node: &Node<'f>,
+    slide: usize,
+    index: usize,
+    chart: super::elements::ChartSummary,
+) -> Node<'f> {
+    Node::element_node(
+        slide_node.file(),
+        slide_node.steps(),
+        PathStep::at(Kind::Chart.name(), Position::new(index)),
+        super::elements::Element::Chart {
+            slide,
+            chart: std::sync::Arc::new(chart),
         },
     )
 }

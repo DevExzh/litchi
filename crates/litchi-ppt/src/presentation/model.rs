@@ -358,6 +358,23 @@ impl Presentation {
         &self.inner.slide_directory
     }
 
+    /// The theme of the first main master that carries a `PowerPoint` 2007
+    /// `RoundTripThemeAtom` (record 0323); `None` for a presentation saved
+    /// without one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a master's round-trip records or the theme part
+    /// are malformed.
+    pub fn theme(&self) -> Result<Option<crate::theme::Theme>> {
+        for metadata in self.powerpoint12_main_master_metadata()? {
+            if let Some(package) = &metadata.theme_package {
+                return crate::theme::from_package(package).map(Some);
+            }
+        }
+        Ok(None)
+    }
+
     /// Parse `PowerPoint` 12 round-trip metadata for every main master slide.
     ///
     /// The returned values follow the main-master order in the `PowerPoint` document stream.

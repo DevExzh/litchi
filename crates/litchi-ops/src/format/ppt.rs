@@ -88,6 +88,66 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
+            element: "ole",
+            context: "object-storage",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F8 PPT OLE object writes",
+        reason: "embedding an OLE object needs a new ExOleObjStg storage, an ExOleEmbedContainer and a picture frame with its preview; OLE frames are read (progId, linked, frame) only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "ole",
+            context: "object-storage",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F8 PPT OLE object writes",
+        reason: "OLE frame geometry and object replacement are not written; the frame is read only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "media",
+            context: "media-objects",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F9 PPT media writes",
+        reason: "a movie or sound needs an external-media object, its sound collection entry and a media picture frame; media frames are read only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "media",
+            context: "media-objects",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F9 PPT media writes",
+        reason: "media frame geometry and playback are not written through the media element; the frame is read only",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "theme",
+            context: "theme-package",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F10 PPT theme writes",
+        reason: "the theme is an OPC package inside each master's RoundTripThemeAtom; re-encoding it (and the masters' legacy color schemes that PowerPoint 97-2003 reads) is not modeled",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "chart",
+            context: "graph-object",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F7 PPT chart series and axes",
+        reason: "the embedded Graph object's chart stream is read through MS-OGRAPH; chart, series and axis writes are not integrated",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
             element: "run",
             context: "text-positions",
         },

@@ -171,6 +171,8 @@ pub mod text_ruler;
 pub mod text_run;
 pub mod text_si_exception;
 pub mod text_special_info;
+/// The `PowerPoint` 2007 theme a presentation carries (record 0323).
+pub mod theme;
 #[cfg(feature = "vba-inspection")]
 pub mod vba_info;
 pub mod view_set_info;
