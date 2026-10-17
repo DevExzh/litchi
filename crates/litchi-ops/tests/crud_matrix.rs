@@ -273,6 +273,9 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp",
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/comments.odp",
+            // Record 0328: hyperlinks, line breaks, columns, video and audio,
+            // equations and chart series and axes (generated).
+            "unified-ops/0294/parts.odp",
         ],
     },
     Spec {

@@ -1158,6 +1158,7 @@ pub(crate) const ABSENT: &[&str] = &[
     "instrText",
     "permStart",
     "ptab",
+    "sdt",
     "series",
     "theme",
 ];

@@ -3964,10 +3964,10 @@ odp	picture	edit	supported		ok tx.set
 odp	picture	batch	supported		ok set item
 odp	picture	create	supported		ok format
 odp	picture	save	supported		ok format
-odp	table	get	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
-odp	table	find	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
+odp	table	get	supported		ok 3 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
+odp	table	find	supported		ok 3 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
 odp	table	query	supported		ok matches in odf/odp/tdf105502.odp
-odp	table	view	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
+odp	table	view	supported		ok 3 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
 odp	table	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1] {"name":"Litchi"}
 odp	table	add	n/a	add not offered for this element	-
 odp	table	remove	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1]
@@ -3977,10 +3977,10 @@ odp	table	edit	supported		ok tx.set
 odp	table	batch	supported		ok set item
 odp	table	create	supported		ok format
 odp	table	save	supported		ok format
-odp	tr	get	supported		ok 5 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
-odp	tr	find	supported		ok 5 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
+odp	tr	get	supported		ok 6 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
+odp	tr	find	supported		ok 6 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
 odp	tr	query	supported		ok matches in odf/odp/tdf105502.odp
-odp	tr	view	supported		ok 5 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
+odp	tr	view	supported		ok 6 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
 odp	tr	set	n/a	set not offered for this element	-
 odp	tr	add	n/a	add not offered for this element	-
 odp	tr	remove	n/a	remove not offered for this element	-
@@ -4003,10 +4003,10 @@ odp	tc	edit	supported		ok tx.set
 odp	tc	batch	supported		ok set item
 odp	tc	create	supported		ok format
 odp	tc	save	supported		ok format
-odp	chart	get	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
-odp	chart	find	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
+odp	chart	get	supported		ok 2 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
+odp	chart	find	supported		ok 2 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
 odp	chart	query	supported		ok matches in libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp
-odp	chart	view	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
+odp	chart	view	supported		ok 2 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
 odp	chart	set	supported		ok `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1] {"name":"Litchi"}
 odp	chart	add	n/a	add not offered for this element	-
 odp	chart	remove	supported		ok `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
@@ -4042,58 +4042,58 @@ odp	connector	edit	supported		ok tx.set
 odp	connector	batch	supported		ok set item
 odp	connector	create	supported		ok format
 odp	connector	save	supported		ok format
-odp	ole	get	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
-odp	ole	find	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
+odp	ole	get	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
+odp	ole	find	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
 odp	ole	query	supported		ok matches in odf/odp/tdf169979.odp
-odp	ole	view	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
+odp	ole	view	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
 odp	ole	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/ole[1] {"name":"Litchi"}
 odp	ole	add	n/a	add not offered for this element	-
 odp	ole	remove	supported		ok `odf/odp/tdf169979.odp` /slide[1]/ole[1]
-odp	ole	move	format-verb		unreached
-odp	ole	swap	format-verb		unreached
+odp	ole	move	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/ole[1] /slide[1]/ole[2]
+odp	ole	swap	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/ole[1] /slide[1]/ole[2]
 odp	ole	edit	supported		ok tx.set
 odp	ole	batch	supported		ok set item
 odp	ole	create	supported		ok format
 odp	ole	save	supported		ok format
-odp	media	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
-odp	media	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
+odp	media	get	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
+odp	media	find	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
 odp	media	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp
-odp	media	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
+odp	media	view	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
 odp	media	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1] {"name":"Litchi"}
 odp	media	add	n/a	add not offered for this element	-
 odp	media	remove	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
-odp	media	move	format-verb		unreached
-odp	media	swap	format-verb		unreached
+odp	media	move	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/media[1] /slide[1]/media[2]
+odp	media	swap	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/media[1] /slide[1]/media[2]
 odp	media	edit	supported		ok tx.set
 odp	media	batch	supported		ok set item
 odp	media	create	supported		ok format
 odp	media	save	supported		ok format
-odp	video	get	gap	M6 ODP media typing	unreached
-odp	video	find	gap	M6 ODP media typing	unreached
-odp	video	query	gap	M6 ODP media typing	unreached
-odp	video	view	gap	M6 ODP media typing	unreached
-odp	video	set	gap	M6 ODP media typing	unreached
-odp	video	add	gap	M6 ODP media typing	-
-odp	video	remove	gap	M6 ODP media typing	unreached
-odp	video	move	gap	M6 ODP media typing	unreached
-odp	video	swap	gap	M6 ODP media typing	unreached
-odp	video	edit	gap	M6 ODP media typing	-
-odp	video	batch	gap	M6 ODP media typing	-
-odp	video	create	gap	M6 ODP media typing	ok format
-odp	video	save	gap	M6 ODP media typing	ok format
-odp	audio	get	gap	M6 ODP media typing	unreached
-odp	audio	find	gap	M6 ODP media typing	unreached
-odp	audio	query	gap	M6 ODP media typing	unreached
-odp	audio	view	gap	M6 ODP media typing	unreached
-odp	audio	set	gap	M6 ODP media typing	unreached
-odp	audio	add	gap	M6 ODP media typing	-
-odp	audio	remove	gap	M6 ODP media typing	unreached
-odp	audio	move	gap	M6 ODP media typing	unreached
-odp	audio	swap	gap	M6 ODP media typing	unreached
-odp	audio	edit	gap	M6 ODP media typing	-
-odp	audio	batch	gap	M6 ODP media typing	-
-odp	audio	create	gap	M6 ODP media typing	ok format
-odp	audio	save	gap	M6 ODP media typing	ok format
+odp	video	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp
+odp	video	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	set	n/a	set not offered for this element	-
+odp	video	add	n/a	add not offered for this element	-
+odp	video	remove	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	move	format-verb		unreached
+odp	video	swap	format-verb		unreached
+odp	video	edit	n/a	edit not offered for this element	-
+odp	video	batch	n/a	batch not offered for this element	-
+odp	video	create	supported		ok format
+odp	video	save	supported		ok format
+odp	audio	get	supported		ok 1 instances, first `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	find	supported		ok 1 instances, first `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	audio	view	supported		ok 1 instances, first `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	set	n/a	set not offered for this element	-
+odp	audio	add	n/a	add not offered for this element	-
+odp	audio	remove	supported		ok `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	move	format-verb		unreached
+odp	audio	swap	format-verb		unreached
+odp	audio	edit	n/a	edit not offered for this element	-
+odp	audio	batch	n/a	batch not offered for this element	-
+odp	audio	create	supported		ok format
+odp	audio	save	supported		ok format
 odp	paragraph	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
 odp	paragraph	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
 odp	paragraph	query	supported		ok matches in odf/odp/tdf105502.odp
@@ -4114,38 +4114,38 @@ odp	run	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/
 odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
 odp	run	add	n/a	add not offered for this element	-
 odp	run	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1]
-odp	run	move	format-verb		unreached
-odp	run	swap	format-verb		unreached
+odp	run	move	format-verb		refused unsupported_capability
+odp	run	swap	format-verb		refused unsupported_capability
 odp	run	edit	supported		ok tx.set
 odp	run	batch	supported		ok set item
 odp	run	create	supported		ok format
 odp	run	save	supported		ok format
-odp	linebreak	get	gap	M6 ODP inline controls	unreached
-odp	linebreak	find	gap	M6 ODP inline controls	unreached
-odp	linebreak	query	gap	M6 ODP inline controls	unreached
-odp	linebreak	view	gap	M6 ODP inline controls	unreached
-odp	linebreak	set	gap	M6 ODP inline controls	unreached
-odp	linebreak	add	gap	M6 ODP inline controls	-
-odp	linebreak	remove	gap	M6 ODP inline controls	unreached
-odp	linebreak	move	gap	M6 ODP inline controls	unreached
-odp	linebreak	swap	gap	M6 ODP inline controls	unreached
-odp	linebreak	edit	gap	M6 ODP inline controls	-
-odp	linebreak	batch	gap	M6 ODP inline controls	-
-odp	linebreak	create	gap	M6 ODP inline controls	ok format
-odp	linebreak	save	gap	M6 ODP inline controls	ok format
-odp	hyperlink	get	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	find	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	query	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	view	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	set	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	add	gap	M6 ODP hyperlink nodes	-
-odp	hyperlink	remove	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	move	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	swap	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	edit	gap	M6 ODP hyperlink nodes	-
-odp	hyperlink	batch	gap	M6 ODP hyperlink nodes	-
-odp	hyperlink	create	gap	M6 ODP hyperlink nodes	ok format
-odp	hyperlink	save	gap	M6 ODP hyperlink nodes	ok format
+odp	linebreak	get	supported		ok 4 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[2]/linebreak[1]
+odp	linebreak	find	supported		ok 4 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[2]/linebreak[1]
+odp	linebreak	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	linebreak	view	supported		ok 4 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[2]/linebreak[1]
+odp	linebreak	set	n/a	set not offered for this element	-
+odp	linebreak	add	supported		ok /slide[1]/shape[1]/paragraph[1]/linebreak[1] on `create() + add slide + add shape` under /slide[1]/shape[1]/paragraph[1] {}
+odp	linebreak	remove	supported		ok `create() + add slide + add shape + add linebreak` /slide[1]/shape[1]/paragraph[1]/linebreak[1]
+odp	linebreak	move	format-verb		refused unsupported_capability
+odp	linebreak	swap	format-verb		refused unsupported_capability
+odp	linebreak	edit	n/a	edit not offered for this element	-
+odp	linebreak	batch	n/a	batch not offered for this element	-
+odp	linebreak	create	supported		ok format
+odp	linebreak	save	supported		ok format
+odp	hyperlink	get	supported		ok 7 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[1]/run[2]/hyperlink
+odp	hyperlink	find	supported		ok 7 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[1]/run[2]/hyperlink
+odp	hyperlink	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	hyperlink	view	supported		ok 7 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[1]/run[2]/hyperlink
+odp	hyperlink	set	supported		ok `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink {"link":"7"}
+odp	hyperlink	add	supported		ok /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink on `create() + add slide + add shape` under /slide[1]/shape[1]/paragraph[1]/run[1] {"link":"Litchi","tooltip":"Litchi"}
+odp	hyperlink	remove	supported		ok `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink
+odp	hyperlink	move	format-verb		unreached
+odp	hyperlink	swap	format-verb		unreached
+odp	hyperlink	edit	supported		ok tx.set
+odp	hyperlink	batch	supported		ok set item
+odp	hyperlink	create	supported		ok format
+odp	hyperlink	save	supported		ok format
 odp	notes	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/notes
 odp	notes	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/notes
 odp	notes	query	supported		ok matches in odf/odp/tdf105502.odp
@@ -4172,19 +4172,19 @@ odp	comment	edit	n/a	edit not offered for this element	-
 odp	comment	batch	n/a	batch not offered for this element	-
 odp	comment	create	supported		ok format
 odp	comment	save	supported		ok format
-odp	equation	get	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	find	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	query	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	view	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	set	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	add	gap	M6 ODP formula objects (litchi-odf-formula)	-
-odp	equation	remove	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	move	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	swap	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	edit	gap	M6 ODP formula objects (litchi-odf-formula)	-
-odp	equation	batch	gap	M6 ODP formula objects (litchi-odf-formula)	-
-odp	equation	create	gap	M6 ODP formula objects (litchi-odf-formula)	ok format
-odp	equation	save	gap	M6 ODP formula objects (litchi-odf-formula)	ok format
+odp	equation	get	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	find	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	equation	view	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	set	n/a	set not offered for this element	-
+odp	equation	add	n/a	add not offered for this element	-
+odp	equation	remove	supported		ok `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	move	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/equation[1] /slide[1]/equation[2]
+odp	equation	swap	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/equation[1] /slide[1]/equation[2]
+odp	equation	edit	n/a	edit not offered for this element	-
+odp	equation	batch	n/a	batch not offered for this element	-
+odp	equation	create	supported		ok format
+odp	equation	save	supported		ok format
 odp	slideMaster	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slideMaster[1]
 odp	slideMaster	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slideMaster[1]
 odp	slideMaster	query	supported		ok matches in odf/odp/tdf105502.odp
@@ -4250,45 +4250,45 @@ odp	animation	edit	gap	M6 ODP animation nodes	-
 odp	animation	batch	gap	M6 ODP animation nodes	-
 odp	animation	create	gap	M6 ODP animation nodes	ok format
 odp	animation	save	gap	M6 ODP animation nodes	ok format
-odp	series	get	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	find	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	query	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	view	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	set	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	add	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	series	remove	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	move	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	swap	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	edit	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	series	batch	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	series	create	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	series	save	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	axis	get	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	find	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	query	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	view	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	set	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	add	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	axis	remove	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	move	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	swap	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	edit	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	axis	batch	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	axis	create	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	axis	save	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	col	get	gap	M6 ODP table columns	unreached
-odp	col	find	gap	M6 ODP table columns	unreached
-odp	col	query	gap	M6 ODP table columns	unreached
-odp	col	view	gap	M6 ODP table columns	unreached
-odp	col	set	gap	M6 ODP table columns	unreached
-odp	col	add	gap	M6 ODP table columns	-
-odp	col	remove	gap	M6 ODP table columns	unreached
-odp	col	move	gap	M6 ODP table columns	unreached
-odp	col	swap	gap	M6 ODP table columns	unreached
-odp	col	edit	gap	M6 ODP table columns	-
-odp	col	batch	gap	M6 ODP table columns	-
-odp	col	create	gap	M6 ODP table columns	ok format
-odp	col	save	gap	M6 ODP table columns	ok format
+odp	series	get	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
+odp	series	find	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
+odp	series	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	series	view	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
+odp	series	set	n/a	set not offered for this element	-
+odp	series	add	n/a	add not offered for this element	-
+odp	series	remove	n/a	remove not offered for this element	-
+odp	series	move	format-verb		refused unsupported_capability
+odp	series	swap	format-verb		refused unsupported_capability
+odp	series	edit	n/a	edit not offered for this element	-
+odp	series	batch	n/a	batch not offered for this element	-
+odp	series	create	supported		ok format
+odp	series	save	supported		ok format
+odp	axis	get	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/axis[1]
+odp	axis	find	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/axis[1]
+odp	axis	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	axis	view	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/axis[1]
+odp	axis	set	n/a	set not offered for this element	-
+odp	axis	add	n/a	add not offered for this element	-
+odp	axis	remove	n/a	remove not offered for this element	-
+odp	axis	move	format-verb		refused unsupported_capability
+odp	axis	swap	format-verb		refused unsupported_capability
+odp	axis	edit	n/a	edit not offered for this element	-
+odp	axis	batch	n/a	batch not offered for this element	-
+odp	axis	create	supported		ok format
+odp	axis	save	supported		ok format
+odp	col	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/col[1]
+odp	col	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/col[1]
+odp	col	query	supported		ok matches in odf/odp/tdf105502.odp
+odp	col	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/col[1]
+odp	col	set	n/a	set not offered for this element	-
+odp	col	add	n/a	add not offered for this element	-
+odp	col	remove	n/a	remove not offered for this element	-
+odp	col	move	format-verb		refused unsupported_capability
+odp	col	swap	format-verb		refused unsupported_capability
+odp	col	edit	n/a	edit not offered for this element	-
+odp	col	batch	n/a	batch not offered for this element	-
+odp	col	create	supported		ok format
+odp	col	save	supported		ok format
 odg	drawing	get	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	find	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	query	n/a	query not offered for this element	-

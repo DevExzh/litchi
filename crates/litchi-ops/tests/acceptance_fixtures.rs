@@ -350,6 +350,113 @@ fn odt_parts(mimetype: &str) -> Vec<u8> {
     writer.finish_to_bytes().unwrap()
 }
 
+/// The namespaces of the ODP elements fixture, beyond [`XMLNS`].
+const ODP_XMLNS: &str = concat!(
+    r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+    r#"xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0""#
+);
+
+/// A two-slide presentation with every element record 0328 reads: a text
+/// hyperlink with a title, line breaks, shape click actions (a URL, the
+/// next page, a `draw:a` link), a table with declared columns, a video and
+/// an audio plugin, a formula subdocument and an inline formula, and a chart
+/// subdocument with two axes and two series.
+fn odp_elements() -> Vec<u8> {
+    let frame = |name: &str, y: u32| {
+        format!(r#"draw:name="{name}" svg:x="1cm" svg:y="{y}cm" svg:width="6cm" svg:height="1cm""#)
+    };
+    let content = format!(
+        concat!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content {xmlns} {odp}>"#,
+            r#"<office:automatic-styles>"#,
+            r#"<style:style style:name="co1" style:family="table-column"><style:table-column-properties style:column-width="4cm"/></style:style>"#,
+            r#"<style:style style:name="co2" style:family="table-column"><style:table-column-properties style:column-width="2.5cm"/></style:style>"#,
+            r#"</office:automatic-styles><office:body><office:presentation>"#,
+            r#"<draw:page draw:name="One" draw:master-page-name="Default">"#,
+            r#"<draw:frame {text}><draw:text-box>"#,
+            r#"<text:p>Visit <text:a xlink:type="simple" xlink:href="https://example.com/" office:title="Example">example</text:a> now</text:p>"#,
+            r#"<text:p>Line one<text:line-break/>Line two<text:line-break/>Line three</text:p>"#,
+            r#"</draw:text-box></draw:frame>"#,
+            r#"<draw:custom-shape {button}><office:event-listeners><presentation:event-listener script:event-name="dom:click" presentation:action="show" xlink:href="https://example.org/" xlink:type="simple" xlink:show="embed" xlink:actuate="onRequest"/></office:event-listeners><text:p>Go</text:p><draw:enhanced-geometry draw:type="rectangle"/></draw:custom-shape>"#,
+            r#"<draw:custom-shape {next}><office:event-listeners><presentation:event-listener script:event-name="dom:click" presentation:action="next-page"/></office:event-listeners><text:p>Next</text:p><draw:enhanced-geometry draw:type="rectangle"/></draw:custom-shape>"#,
+            r#"<draw:a xlink:type="simple" xlink:href="https://example.net/"><draw:frame {linked}><draw:text-box><text:p>Linked box</text:p></draw:text-box></draw:frame></draw:a>"#,
+            r#"<draw:custom-shape {plain}><text:p>Plain</text:p><draw:enhanced-geometry draw:type="ellipse"/></draw:custom-shape>"#,
+            r#"<draw:frame {grid}><table:table><table:table-column table:style-name="co1" table:number-columns-repeated="2"/><table:table-column table:style-name="co2"/><table:table-row><table:table-cell><text:p>a</text:p></table:table-cell><table:table-cell><text:p>b</text:p></table:table-cell><table:table-cell><text:p>c</text:p></table:table-cell></table:table-row></table:table></draw:frame>"#,
+            r#"<draw:frame {movie}><draw:plugin xlink:href="Media/clip.mp4" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad" draw:mime-type="application/vnd.sun.star.media"><draw:param draw:name="Loop" draw:value="true"/><draw:param draw:name="Mute" draw:value="false"/></draw:plugin></draw:frame>"#,
+            r#"<draw:frame {sound}><draw:plugin xlink:href="Media/tone.wav" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad" draw:mime-type="audio/x-wav"/></draw:frame>"#,
+            r#"<draw:frame {formula}><draw:object xlink:href="./Object 1" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>"#,
+            r#"<draw:frame {inline}><draw:object><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>y</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="StarMath 5.0">y = 2</annotation></semantics></math></draw:object></draw:frame>"#,
+            r#"<draw:frame presentation:class="chart" {chart}><draw:object xlink:href="./Object 2" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>"#,
+            r#"</draw:page>"#,
+            r#"<draw:page draw:name="Two" draw:master-page-name="Default"><draw:frame {title}><draw:text-box><text:p>Second</text:p></draw:text-box></draw:frame></draw:page>"#,
+            r#"</office:presentation></office:body></office:document-content>"#
+        ),
+        xmlns = XMLNS,
+        odp = ODP_XMLNS,
+        text = frame("Text", 1),
+        button = frame("Button", 3),
+        next = frame("Next", 5),
+        linked = frame("Linked", 7),
+        plain = frame("Plain", 9),
+        grid = frame("Grid", 11),
+        movie = frame("Movie", 13),
+        sound = frame("Sound", 15),
+        formula = frame("Formula", 17),
+        inline = frame("InlineFormula", 18),
+        chart = frame("Chart", 19),
+        title = frame("Title2", 1),
+    );
+    let styles = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles {XMLNS}><office:styles/><office:master-styles><style:master-page style:name="Default"/></office:master-styles></office:document-styles>"#
+    );
+    let formula = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><math xmlns="http://www.w3.org/1998/Math/MathML" display="block">"#,
+        r#"<semantics><mrow><mi>E</mi><mo>=</mo><mi>m</mi><msup><mi>c</mi><mn>2</mn></msup></mrow>"#,
+        r#"<annotation encoding="StarMath 5.0">E = m c^2</annotation></semantics></math>"#
+    );
+    let chart = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" "#,
+        r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">"#,
+        r#"<office:body><office:chart><chart:chart chart:class="chart:bar" svg:width="8cm" svg:height="6cm">"#,
+        r#"<chart:title><text:p>Sales</text:p></chart:title>"#,
+        r#"<chart:plot-area table:cell-range-address="local-table.$A$1:.$C$3">"#,
+        r#"<chart:axis chart:dimension="x" chart:name="primary-x"><chart:title><text:p>Quarter</text:p></chart:title><chart:categories table:cell-range-address="local-table.$A$2:.$A$3"/></chart:axis>"#,
+        r#"<chart:axis chart:dimension="y" chart:name="primary-y"/>"#,
+        r#"<chart:series chart:values-cell-range-address="local-table.$B$2:.$B$3" chart:label-cell-address="local-table.$B$1" chart:class="chart:bar"><chart:data-point chart:repeated="2"/></chart:series>"#,
+        r#"<chart:series chart:values-cell-range-address="local-table.$C$2:.$C$3" chart:label-cell-address="local-table.$C$1"/>"#,
+        r#"</chart:plot-area></chart:chart></office:chart></office:body></office:document-content>"#
+    );
+    let mut writer = PackageWriter::new();
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.presentation")
+        .unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    writer.add_file("styles.xml", styles.as_bytes()).unwrap();
+    writer
+        .add_manifest_directory("Object 1/", "application/vnd.oasis.opendocument.formula")
+        .unwrap();
+    writer
+        .add_file_with_media_type("Object 1/content.xml", formula.as_bytes(), "text/xml")
+        .unwrap();
+    writer
+        .add_manifest_directory("Object 2/", "application/vnd.oasis.opendocument.chart")
+        .unwrap();
+    writer
+        .add_file_with_media_type("Object 2/content.xml", chart.as_bytes(), "text/xml")
+        .unwrap();
+    writer
+        .add_file_with_media_type("Media/clip.mp4", b"litchi video", "video/mp4")
+        .unwrap();
+    writer
+        .add_file_with_media_type("Media/tone.wav", b"litchi audio", "audio/x-wav")
+        .unwrap();
+    writer.finish_to_bytes().unwrap()
+}
+
 /// Every generated fixture: file name and bytes.
 fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
     vec![
@@ -360,6 +467,7 @@ fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
         ("table.xlsb", xlsb_table()),
         ("comments.odp", odp_comments()),
         ("layers.odg", odg_layers()),
+        ("parts.odp", odp_elements()),
         (
             "parts.odt",
             odt_parts("application/vnd.oasis.opendocument.text"),

@@ -12,6 +12,7 @@
 pub(crate) mod children;
 mod nav;
 mod node;
+mod parts;
 mod registry;
 mod spec;
 pub(crate) mod views;
@@ -58,6 +59,8 @@ struct OdpState {
     masters: OnceLock<Vec<litchi_odp::master::Summary>>,
     layouts: OnceLock<Vec<litchi_odp::layout::Layout>>,
     annotations: OnceLock<Vec<litchi_odp::annotation::Info>>,
+    /// The formula objects and charts of record 0328, read on first use.
+    parts: OnceLock<parts::Index>,
     /// The package a source-backed owner materializes for its first write.
     materialized: OnceLock<litchi_odp::Package>,
 }
@@ -162,6 +165,7 @@ impl Odp {
             masters: OnceLock::new(),
             layouts: OnceLock::new(),
             annotations: OnceLock::new(),
+            parts: OnceLock::new(),
             materialized: OnceLock::new(),
         }))
     }
@@ -198,6 +202,7 @@ impl Odp {
                 masters: OnceLock::new(),
                 layouts: OnceLock::new(),
                 annotations: OnceLock::new(),
+                parts: OnceLock::new(),
                 materialized: OnceLock::new(),
             },
         };
@@ -410,6 +415,28 @@ impl Odp {
         let annotations =
             litchi_odp::annotation::inventory(self.content_xml()?).map_err(core_error)?;
         Ok(self.0.annotations.get_or_init(|| annotations))
+    }
+
+    /// The formula objects and charts of record 0328, read on first use.
+    pub(crate) fn parts(&self) -> Result<&parts::Index> {
+        if let Some(index) = self.0.parts.get() {
+            return Ok(index);
+        }
+        let index = parts::Index::build(self)?;
+        Ok(self.0.parts.get_or_init(|| index))
+    }
+
+    /// One package member's bytes (an embedded object's part), or `None`
+    /// when the package has no such member; a flat document has none.
+    pub(crate) fn member(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        match &self.0.owner {
+            OdpOwner::Eager { presentation, .. } => {
+                presentation.member_data(path).map_err(core_error)
+            },
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => presentation.member_data(path).map_err(core_error),
+            OdpOwner::Flat(_) => Ok(None),
+        }
     }
 
     /// The immutable package writes start from: the eager owner, or a

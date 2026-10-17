@@ -126,8 +126,130 @@ pub(crate) fn set_with_limits<'p, 'v>(
         return set_metadata(file, &props, limits);
     }
     let nodes = resolve_nodes(file, &target, limits)?;
+    if nodes.iter().any(|node| node.element() == Kind::Hyperlink) {
+        let changes = plan_links(file, &nodes, &props)?;
+        return commit_changes(file, &changes, limits);
+    }
     let plan = plan_set(&nodes, &props, limits)?;
     commit_changes(file, &plan.changes, limits)
+}
+
+/// The `link` and `tooltip` a hyperlink write assigns (record 0328).
+struct LinkValues {
+    link: Option<String>,
+    tooltip: Option<String>,
+}
+
+fn link_values(props: &Props<'_>) -> Result<LinkValues> {
+    let mut values = LinkValues {
+        link: None,
+        tooltip: None,
+    };
+    for (key, value) in props.iter() {
+        let slot = match key.as_str().to_ascii_lowercase().as_str() {
+            "link" | "url" | "href" => &mut values.link,
+            "tooltip" => &mut values.tooltip,
+            _ => {
+                return Err(Error::new(
+                    Code::UnsupportedProperty,
+                    "an ODP hyperlink writes `link` and `tooltip`",
+                )
+                .with_format(FileFormat::Odp)
+                .with_property(key.as_str().to_owned()));
+            },
+        };
+        *slot = Some(text_value(value, "link")?);
+    }
+    if values.link.is_none() && values.tooltip.is_none() {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "the ODP hyperlink write has no writable property",
+        )
+        .with_format(FileFormat::Odp));
+    }
+    Ok(values)
+}
+
+fn link_refusal(message: &'static str) -> Error {
+    Error::new(Code::InvalidValue, message)
+        .with_format(FileFormat::Odp)
+        .with_property("link")
+}
+
+/// The scene change that sets a shape's click to `link` (`none` removes
+/// it).
+fn shape_click_change(
+    file: &Odp,
+    object: &litchi_odp::scene::ObjectRef,
+    link: &str,
+) -> Result<Change> {
+    let click = if link.eq_ignore_ascii_case("none") {
+        None
+    } else {
+        Some(super::parts::shape_action(file.scene()?, link).map_err(link_refusal)?)
+    };
+    Ok(Change::SetShapeClick {
+        object: object.clone(),
+        click,
+    })
+}
+
+/// Plan hyperlink sets: a shape's click action, a link run's target and
+/// title (record 0328).
+fn plan_links(file: &Odp, nodes: &[Node<'_>], props: &Props<'_>) -> Result<Vec<Change>> {
+    let values = link_values(props)?;
+    let mut changes = Vec::new();
+    for node in nodes {
+        match node.item() {
+            Item::ShapeLink(object) => {
+                if values.tooltip.is_some() {
+                    return Err(Error::new(
+                        Code::UnsupportedCapability,
+                        "an ODP shape's click action has no tooltip; set a link run's",
+                    )
+                    .with_format(FileFormat::Odp)
+                    .with_property("tooltip"));
+                }
+                if let Some(link) = &values.link {
+                    changes.push(shape_click_change(file, object, link)?);
+                }
+            },
+            Item::RunLink(story, paragraph, run) => {
+                let href = match values.link.as_deref() {
+                    Some(link) if link.eq_ignore_ascii_case("none") => None,
+                    Some(link) => {
+                        super::parts::check_url(link).map_err(link_refusal)?;
+                        Some(link.to_owned())
+                    },
+                    None => node
+                        .scene()
+                        .story(story)
+                        .and_then(|story| story.paragraphs().get(*paragraph))
+                        .and_then(|paragraph| paragraph.runs().get(*run))
+                        .and_then(|run| run.href().map(str::to_owned)),
+                };
+                let title = values
+                    .tooltip
+                    .as_ref()
+                    .map(|tooltip| (!tooltip.is_empty()).then(|| tooltip.clone()));
+                changes.push(Change::SetRunLink {
+                    story: story.clone(),
+                    paragraph: *paragraph,
+                    run: *run,
+                    href,
+                    title,
+                });
+            },
+            _ => {
+                return Err(Error::new(
+                    Code::InvalidSelector,
+                    "an ODP set cannot combine hyperlinks with other elements",
+                )
+                .with_format(FileFormat::Odp));
+            },
+        }
+    }
+    Ok(changes)
 }
 
 /// Plan a set on resolved nodes.
@@ -672,12 +794,85 @@ pub(crate) fn add_with_limits(
             steps.push(crate::node::PathStep::at("paragraph", Position::new(index)));
             Ok((commit, owned_path(&steps)))
         },
+        (Item::Object(object, Kind::Shape), "hyperlink" | "hlink") => {
+            let values = link_values(node.props())?;
+            if values.tooltip.is_some() {
+                return Err(Error::new(
+                    Code::UnsupportedCapability,
+                    "an ODP shape's click action has no tooltip; add the link to a run instead",
+                )
+                .with_format(FileFormat::Odp)
+                .with_property("tooltip"));
+            }
+            let Some(link) = values.link.filter(|link| !link.eq_ignore_ascii_case("none")) else {
+                return Err(missing_link());
+            };
+            let shape = scene.object(object).ok_or_else(|| {
+                Error::new(Code::InternalError, "the ODP shape vanished").with_format(FileFormat::Odp)
+            })?;
+            if litchi_odp::scene::parts::shape_click(file.content_xml()?, shape).is_some() {
+                return Err(Error::new(
+                    Code::InvalidArgument,
+                    "the ODP shape already has a click action; set its hyperlink instead",
+                )
+                .with_format(FileFormat::Odp));
+            }
+            let change = shape_click_change(file, object, &link)?;
+            let commit = commit_changes(file, &[change], limits)?;
+            let mut steps = parent.steps().to_vec();
+            steps.push(crate::node::PathStep::new("hyperlink"));
+            Ok((commit, owned_path(&steps)))
+        },
+        (Item::Run(story, paragraph, run), "hyperlink" | "hlink") => {
+            let values = link_values(node.props())?;
+            let Some(link) = values.link.filter(|link| !link.eq_ignore_ascii_case("none")) else {
+                return Err(missing_link());
+            };
+            super::parts::check_url(&link).map_err(link_refusal)?;
+            let commit = commit_changes(
+                file,
+                &[Change::LinkRun {
+                    story: story.clone(),
+                    paragraph: *paragraph,
+                    run: *run,
+                    href: link,
+                    title: values.tooltip.filter(|tooltip| !tooltip.is_empty()),
+                }],
+                limits,
+            )?;
+            let mut steps = parent.steps().to_vec();
+            steps.push(crate::node::PathStep::new("hyperlink"));
+            Ok((commit, owned_path(&steps)))
+        },
+        (Item::Paragraph(story, paragraph), "linebreak" | "br") => {
+            if let Some((key, _)) = node.props().iter().next() {
+                return Err(add_property(key.as_str(), "a new ODP line break takes no properties"));
+            }
+            let count = super::parts::line_break_count(file, scene, story, *paragraph)?;
+            let commit = commit_changes(
+                file,
+                &[Change::InsertLineBreak {
+                    story: story.clone(),
+                    paragraph: *paragraph,
+                }],
+                limits,
+            )?;
+            let mut steps = parent.steps().to_vec();
+            steps.push(crate::node::PathStep::at("linebreak", Position::new(count)));
+            Ok((commit, owned_path(&steps)))
+        },
         _ => Err(Error::new(
             Code::UnsupportedElement,
-            "ODP add supports a slide under /, a shape (text box) under a slide, and a paragraph under a text story",
+            "ODP add supports a slide under /, a shape (text box) under a slide, a paragraph under a text story, a hyperlink under a shape or run, and a line break under a paragraph",
         )
         .with_format(FileFormat::Odp)),
     }
+}
+
+fn missing_link() -> Error {
+    Error::new(Code::MissingProperty, "an ODP hyperlink needs a `link`")
+        .with_format(FileFormat::Odp)
+        .with_property("link")
 }
 
 fn owned_path(steps: &[crate::node::PathStep<'_>]) -> crate::path::Path<'static> {
@@ -878,9 +1073,58 @@ fn removal(scene: &Scene, node: &Node<'_>) -> Result<(Change, std::ops::Range<us
                 .ok_or_else(missing)?
                 .range(),
         ),
+        Item::ShapeLink(object) => {
+            let shape = scene.object(object).ok_or_else(missing)?;
+            if litchi_odp::scene::parts::shape_click(node.file().content_xml()?, shape).is_none() {
+                return Err(unsupported_target(
+                    "the ODP shape's hyperlink is its first link run's; remove that run's hyperlink",
+                ));
+            }
+            (
+                Change::SetShapeClick {
+                    object: object.clone(),
+                    click: None,
+                },
+                shape.range(),
+            )
+        },
+        Item::RunLink(story, paragraph, run) => (
+            Change::SetRunLink {
+                story: story.clone(),
+                paragraph: *paragraph,
+                run: *run,
+                href: None,
+                title: None,
+            },
+            scene
+                .story(story)
+                .and_then(|story| story.paragraphs().get(*paragraph))
+                .and_then(|paragraph| paragraph.runs().get(*run))
+                .ok_or_else(missing)?
+                .range(),
+        ),
+        Item::LineBreak(story, paragraph, index) => {
+            let paragraph_node = scene
+                .story(story)
+                .and_then(|story| story.paragraphs().get(*paragraph))
+                .ok_or_else(missing)?;
+            let range =
+                litchi_odp::scene::parts::line_breaks(node.file().content_xml()?, paragraph_node)
+                    .get(*index)
+                    .cloned()
+                    .ok_or_else(missing)?;
+            (
+                Change::RemoveLineBreak {
+                    story: story.clone(),
+                    paragraph: *paragraph,
+                    index: *index,
+                },
+                range,
+            )
+        },
         _ => {
             return Err(unsupported_target(
-                "ODP remove supports slides, drawing objects, paragraphs and runs",
+                "ODP remove supports slides, drawing objects, paragraphs, runs, hyperlinks and line breaks",
             ));
         },
     })

@@ -276,6 +276,131 @@ pub enum Change {
         /// The other page.
         second: usize,
     },
+    /// Set (`href: Some`) a link run's target, and optionally its
+    /// `office:title` (`title: Some(None)` removes it), or remove the link
+    /// (`href: None`), keeping its content (record 0328).
+    SetRunLink {
+        /// The story.
+        story: StoryRef,
+        /// Zero-based paragraph position.
+        paragraph: usize,
+        /// Zero-based run position: a [`super::RunKind::Link`] run.
+        run: usize,
+        /// The new `xlink:href`, or `None` to unwrap the link.
+        href: Option<String>,
+        /// The new `office:title`; `None` keeps the current one.
+        title: Option<Option<String>>,
+    },
+    /// Make a plain-text or span run a hyperlink: the run is wrapped in a
+    /// `text:a` to `href`, with an optional `office:title` (record 0328).
+    LinkRun {
+        /// The story.
+        story: StoryRef,
+        /// Zero-based paragraph position.
+        paragraph: usize,
+        /// Zero-based run position: a text or span run.
+        run: usize,
+        /// The link target.
+        href: String,
+        /// The link's `office:title`.
+        title: Option<String>,
+    },
+    /// Set (`Some`) or remove (`None`) what clicking an object does: its
+    /// click listener (`office:event-listeners`), or the `draw:a` it sits
+    /// in (record 0328).
+    SetShapeClick {
+        /// The object.
+        object: ObjectRef,
+        /// The new action.
+        click: Option<ShapeAction>,
+    },
+    /// Append a `text:line-break` to a paragraph (record 0328).
+    InsertLineBreak {
+        /// The story.
+        story: StoryRef,
+        /// Zero-based paragraph position.
+        paragraph: usize,
+    },
+    /// Remove one `text:line-break` of a paragraph
+    /// ([`super::parts::line_breaks`] order, record 0328).
+    RemoveLineBreak {
+        /// The story.
+        story: StoryRef,
+        /// Zero-based paragraph position.
+        paragraph: usize,
+        /// Zero-based line-break position.
+        index: usize,
+    },
+}
+
+/// What clicking a shape does ([`Change::SetShapeClick`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ShapeAction {
+    /// Open a URL (`presentation:action="show"`).
+    Url(String),
+    /// Go to the page with this `draw:name` (`show` with `#name`).
+    Page(String),
+    /// Go to the first page.
+    FirstPage,
+    /// Go to the last page.
+    LastPage,
+    /// Go to the next page.
+    NextPage,
+    /// Go to the previous page.
+    PreviousPage,
+    /// End the show.
+    Stop,
+}
+
+impl ShapeAction {
+    /// `presentation:action` and `xlink:href` of the action.
+    fn attributes(&self) -> (&'static str, Option<String>) {
+        match self {
+            Self::Url(url) => ("show", Some(url.clone())),
+            Self::Page(name) => ("show", Some(format!("#{name}"))),
+            Self::FirstPage => ("first-page", None),
+            Self::LastPage => ("last-page", None),
+            Self::NextPage => ("next-page", None),
+            Self::PreviousPage => ("previous-page", None),
+            Self::Stop => ("stop", None),
+        }
+    }
+}
+
+/// Where a new `office:event-listeners` goes in `object`: in a frame,
+/// after its content and before its glue points, image map, title,
+/// description and contour; in another shape, after its title and
+/// description (the ODF content order).
+fn listener_insertion(xml: &str, object: &Object) -> Result<usize> {
+    let open_end = object.start_tag.end;
+    let close_start = xml[object.range.clone()]
+        .rfind("</")
+        .map(|close| object.range.start + close)
+        .ok_or_else(|| invalid("an ODP drawing element has no end tag"))?;
+    let children = super::parts::direct_children(xml, object);
+    let frame = object.kind == ObjectKind::Frame;
+    if frame {
+        let late = [
+            "glue-point",
+            "image-map",
+            "title",
+            "desc",
+            "contour-polygon",
+            "contour-path",
+        ];
+        Ok(children
+            .iter()
+            .find(|(local, _)| late.contains(&local.as_str()))
+            .map_or(close_start, |(_, range)| range.start))
+    } else {
+        Ok(children
+            .iter()
+            .filter(|(local, _)| local == "title" || local == "desc")
+            .map(|(_, range)| range.end)
+            .max()
+            .unwrap_or(open_end))
+    }
 }
 
 /// A checked replacement fragment.
@@ -534,6 +659,278 @@ impl<'a> Planner<'a> {
             Change::RemovePage { page } => self.remove_page(*page),
             Change::MovePage { page, to } => self.move_page(*page, *to),
             Change::SwapPages { first, second } => self.swap_pages(*first, *second),
+            Change::SetRunLink {
+                story,
+                paragraph,
+                run,
+                href,
+                title,
+            } => self.set_run_link(story, *paragraph, *run, href.as_deref(), title.as_ref()),
+            Change::SetShapeClick { object, click } => self.set_shape_click(object, click.as_ref()),
+            Change::LinkRun {
+                story,
+                paragraph,
+                run,
+                href,
+                title,
+            } => self.link_run(story, *paragraph, *run, href, title.as_deref()),
+            Change::InsertLineBreak { story, paragraph } => {
+                self.insert_line_break(story, *paragraph)
+            },
+            Change::RemoveLineBreak {
+                story,
+                paragraph,
+                index,
+            } => {
+                let paragraph = self.paragraph(story, *paragraph)?;
+                let breaks = super::parts::line_breaks(self.xml, paragraph);
+                let range = breaks
+                    .get(*index)
+                    .cloned()
+                    .ok_or_else(|| missing("line break"))?;
+                self.push(range, Fragment::Delete);
+                Ok(())
+            },
+        }
+    }
+
+    /// The prefix the content root binds to `uri`.
+    fn root_prefix(&self, uri: &str, namespace: &str) -> Result<String> {
+        let start = self
+            .xml
+            .find('<')
+            .ok_or_else(|| invalid("ODP content has no root element"))?;
+        let mut cursor = start;
+        // Skip the declaration and comments to the root start tag.
+        while self.xml[cursor..].starts_with("<?") || self.xml[cursor..].starts_with("<!") {
+            let end = self.xml[cursor..]
+                .find('>')
+                .ok_or_else(|| invalid("ODP content prologue is malformed"))?;
+            cursor += end + 1;
+            cursor += self.xml[cursor..]
+                .find('<')
+                .ok_or_else(|| invalid("ODP content has no root element"))?;
+        }
+        let end = self.xml[cursor..]
+            .find('>')
+            .ok_or_else(|| invalid("ODP content root is malformed"))?;
+        let root = StartTag::parse(&self.xml[cursor..=cursor + end])?;
+        root.prefix_of(uri).map(str::to_owned).ok_or_else(|| {
+            unsupported(format!(
+                "the ODP content root does not bind the {namespace} namespace"
+            ))
+        })
+    }
+
+    fn set_run_link(
+        &mut self,
+        story: &StoryRef,
+        paragraph: usize,
+        run: usize,
+        href: Option<&str>,
+        title: Option<&Option<String>>,
+    ) -> Result<()> {
+        let paragraph = self.paragraph(story, paragraph)?;
+        let run = paragraph.runs.get(run).ok_or_else(|| missing("run"))?;
+        if run.kind != RunKind::Link {
+            return Err(unsupported("the ODP run is not a hyperlink"));
+        }
+        let Some(href) = href else {
+            // Unwrap: delete the start and end tags, keep the content.
+            if run.content.is_empty() && run.start_tag.end == run.range.end {
+                self.push(run.range.clone(), Fragment::Delete);
+                return Ok(());
+            }
+            self.push(run.start_tag.clone(), Fragment::Delete);
+            self.push(run.content.end..run.range.end, Fragment::Delete);
+            return Ok(());
+        };
+        let raw = &self.xml[run.start_tag.clone()];
+        let tag = StartTag::parse(raw)?;
+        let href_key = match tag.key_of_local("href") {
+            Some(key) => key.to_owned(),
+            None => format!(
+                "{}:href",
+                self.root_prefix("http://www.w3.org/1999/xlink", "XLink")?
+            ),
+        };
+        if run.href.as_deref() != Some(href) {
+            self.tag(&run.start_tag.clone(), href_key, Some(href.to_owned()));
+        }
+        if let Some(title) = title {
+            let current = super::parts::link_title(self.xml, run);
+            if current.as_ref() != title.as_ref() {
+                let key = match tag.key_of_local("title") {
+                    Some(key) => key.to_owned(),
+                    None => format!(
+                        "{}:title",
+                        self.prefix(self.scene.prefixes.office.as_ref(), "office")?
+                    ),
+                };
+                self.tag(&run.start_tag.clone(), key, title.clone());
+            }
+        }
+        Ok(())
+    }
+
+    fn link_run(
+        &mut self,
+        story: &StoryRef,
+        paragraph: usize,
+        run: usize,
+        href: &str,
+        title: Option<&str>,
+    ) -> Result<()> {
+        let paragraph = self.paragraph(story, paragraph)?;
+        let run = paragraph.runs.get(run).ok_or_else(|| missing("run"))?;
+        if !matches!(run.kind, RunKind::Text | RunKind::Span) {
+            return Err(unsupported(
+                "only a plain-text or span ODP run can become a hyperlink",
+            ));
+        }
+        let text = self.text_prefix()?;
+        let xlink = self.root_prefix("http://www.w3.org/1999/xlink", "XLink")?;
+        let mut open = format!(
+            "<{text}:a {xlink}:type=\"simple\" {xlink}:href=\"{}\"",
+            escape_attribute(href)
+        );
+        if let Some(title) = title {
+            let office = self.prefix(self.scene.prefixes.office.as_ref(), "office")?;
+            open.push_str(&format!(" {office}:title=\"{}\"", escape_attribute(title)));
+        }
+        open.push('>');
+        let range = run.range.clone();
+        let markup = format!("{open}{}</{text}:a>", &self.xml[range.clone()]);
+        self.push(range, Fragment::Markup(markup));
+        Ok(())
+    }
+
+    fn insert_line_break(&mut self, story: &StoryRef, paragraph: usize) -> Result<()> {
+        let prefix = self.text_prefix()?;
+        let paragraph = self.paragraph(story, paragraph)?;
+        let markup = format!("<{prefix}:line-break/>");
+        match super::parts::line_break_insertion(paragraph) {
+            Some(offset) => self.push(offset..offset, Fragment::Markup(markup)),
+            None => {
+                let raw = &self.xml[paragraph.start_tag.clone()];
+                let open = open_tag(raw)?;
+                let qname = paragraph_qname(raw)?;
+                self.push(
+                    paragraph.range.clone(),
+                    Fragment::Markup(format!("{open}{markup}</{qname}>")),
+                );
+            },
+        }
+        Ok(())
+    }
+
+    fn set_shape_click(
+        &mut self,
+        reference: &ObjectRef,
+        click: Option<&ShapeAction>,
+    ) -> Result<()> {
+        let object = self.object(reference)?;
+        let current = super::parts::shape_click(self.xml, object);
+        if let Some(current) = &current {
+            if current.is_wrapper() {
+                return self.set_wrapper_click(object, current, click);
+            }
+        }
+        if let (Some(current), Some(click)) = (&current, click) {
+            let (action, href) = click.attributes();
+            if current.action() == Some(action) && current.href() == href.as_deref() {
+                return Ok(());
+            }
+        }
+        let listener = |planner: &Self, click: &ShapeAction| -> Result<String> {
+            let presentation =
+                planner.prefix(planner.scene.prefixes.presentation.as_ref(), "presentation")?;
+            let script = planner
+                .root_prefix("urn:oasis:names:tc:opendocument:xmlns:script:1.0", "script")?;
+            let (action, href) = click.attributes();
+            let mut out = format!(
+                "<{presentation}:event-listener {script}:event-name=\"dom:click\" {presentation}:action=\"{action}\""
+            );
+            if let Some(href) = href {
+                let xlink = planner.root_prefix("http://www.w3.org/1999/xlink", "XLink")?;
+                out.push_str(&format!(
+                    " {xlink}:href=\"{}\" {xlink}:type=\"simple\" {xlink}:show=\"embed\" {xlink}:actuate=\"onRequest\"",
+                    escape_attribute(&href)
+                ));
+            }
+            out.push_str("/>");
+            Ok(out)
+        };
+        match (current, click) {
+            (None, None) => Ok(()),
+            (Some(current), None) => {
+                let range = match current.container() {
+                    Some((container, 1)) => container,
+                    _ => current
+                        .listener()
+                        .ok_or_else(|| missing("click listener"))?,
+                };
+                self.push(range, Fragment::Delete);
+                Ok(())
+            },
+            (Some(current), Some(click)) => {
+                let range = current
+                    .listener()
+                    .ok_or_else(|| missing("click listener"))?;
+                let markup = listener(self, click)?;
+                self.push(range, Fragment::Markup(markup));
+                Ok(())
+            },
+            (None, Some(click)) => {
+                if object.empty {
+                    return Err(unsupported(
+                        "an empty ODP drawing element cannot gain a click action",
+                    ));
+                }
+                let office = self.prefix(self.scene.prefixes.office.as_ref(), "office")?;
+                let markup = format!(
+                    "<{office}:event-listeners>{}</{office}:event-listeners>",
+                    listener(self, click)?
+                );
+                let offset = listener_insertion(self.xml, object)?;
+                self.push(offset..offset, Fragment::Markup(markup));
+                Ok(())
+            },
+        }
+    }
+
+    /// Set or remove the click of an object a `draw:a` holds.
+    fn set_wrapper_click(
+        &mut self,
+        object: &Object,
+        current: &super::parts::Click,
+        click: Option<&ShapeAction>,
+    ) -> Result<()> {
+        let (start_tag, whole) =
+            super::parts::wrapper_ranges(self.xml, object).ok_or_else(|| missing("draw:a link"))?;
+        match click {
+            None => {
+                self.push(whole, Fragment::Relocated(object.range.clone()));
+                Ok(())
+            },
+            Some(ShapeAction::Url(url)) => {
+                if current.href() == Some(url.as_str()) {
+                    return Ok(());
+                }
+                let tag = StartTag::parse(&self.xml[start_tag.clone()])?;
+                let key = match tag.key_of_local("href") {
+                    Some(key) => key.to_owned(),
+                    None => format!(
+                        "{}:href",
+                        self.root_prefix("http://www.w3.org/1999/xlink", "XLink")?
+                    ),
+                };
+                self.tag(&start_tag, key, Some(url.clone()));
+                Ok(())
+            },
+            Some(_) => Err(unsupported(
+                "a shape a draw:a link holds takes a URL; remove the link to give it another action",
+            )),
         }
     }
 

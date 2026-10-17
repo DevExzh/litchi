@@ -25,7 +25,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
 | odt | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 29 | 25 |
 | ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
-| odp | 30 | 170 | 170 | 0 | 0 | 143 | 39 | 6 | 12 |
+| odp | 30 | 228 | 228 | 0 | 0 | 39 | 69 | 12 | 22 |
 | odg | 4 | 33 | 33 | 0 | 0 | 0 | 11 | 4 | 2 |
 | odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 |
 | odi | 3 | 24 | 24 | 0 | 0 | 2 | 7 | 0 | 0 |
@@ -419,7 +419,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## odp
 
-- fixtures: `create()`, `odf/odp/tdf105502.odp`, `odf/odp/tdf169979.odp`, `odf/corpus/impress-basic.odp`, `odf/odp/text-in-image.odp`, `odf/odp/cellspan.odp`, `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp`, `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp`, `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp`, `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp`, `unified-ops/0294/comments.odp`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add shape + add paragraph`
+- fixtures: `create()`, `odf/odp/tdf105502.odp`, `odf/odp/tdf169979.odp`, `odf/corpus/impress-basic.odp`, `odf/odp/text-in-image.odp`, `odf/odp/cellspan.odp`, `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp`, `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp`, `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp`, `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp`, `unified-ops/0294/comments.odp`, `unified-ops/0294/parts.odp`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add shape + add paragraph`, `create() + add slide + add shape + add linebreak`, `create() + add slide + add shape + add hyperlink`
 - document views on `odf/odp/tdf105502.odp`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -435,25 +435,25 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | chart | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | group | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | connector | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| ole | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| media | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| video | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| audio | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| ole | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
+| media | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
+| video | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
+| audio | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| run | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| linebreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| run | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
+| linebreak | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| equation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| equation | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
 | slideMaster | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | slideLayout | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | notesMaster | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | noteSlide | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | animation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| series | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| axis | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| col | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| series | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| axis | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| col | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## odg
 

@@ -39,7 +39,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6a2731d888a494e6e9b2cdcb95c7dc3e2d6434b0872a612b4acc8d8a14f93cf` |
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `ae58459a816d8f5e9589778be23054de447115fe445e805eda0bb7ac6fee9445` |
 | golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `2dbc45d7715d8f0a5d4fd1fa10b56381da186823f19872a9dc8642af7577a853` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `358dabe30ca61a98bec5da7ace7ba00d4a8bfb23aa7fc5ce1fef6e7d176ff439` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `65dcb04b53ca5141a425e42bd1d06e974a8ecdc340f01d1914ec96043a4086c8` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `d1c48fe2ba724c013f55f0997bb31713f35c6e178e3dfdda4f1f7d81a6490faf` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d84a027ace50689549f78d7d9d6662782f76ea58436a8dbac99da253ace7952f` |
@@ -97,7 +97,7 @@ Elements:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 34 |
-| odp | 21 | 8 | 0 | 0 | 4 | 1 | 6 |
+| odp | 28 | 5 | 0 | 0 | 0 | 1 | 6 |
 | ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | odt | 31 | 5 | 0 | 0 | 8 | 2 | 5 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 34 |
@@ -123,7 +123,7 @@ Property reads:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 97 | 2 | 80 | 0 | 118 | 0 | 390 | 92 |
+| odp | 114 | 2 | 56 | 0 | 119 | 0 | 396 | 108 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
 | odt | 112 | 0 | 165 | 0 | 173 | 1 | 510 | 55 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -149,7 +149,7 @@ Property writes:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 9 | 58 | 494 | 0 | 44 | 174 |
+| odp | 11 | 58 | 492 | 0 | 44 | 190 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
 | odt | 15 | 34 | 747 | 0 | 31 | 189 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -9024,19 +9024,19 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | OfficeCLI element | Litchi element | Status | Follow-up |
 |---|---|---|---|
 | animation | animation | gap | M6 ODP animation nodes |
-| chart-axis | axis | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | series | gap | M6 ODP chart CRUD (litchi_odp::charts) |
+| chart-axis | axis | supported |  |
+| chart-series | series | supported |  |
 | chart | chart | supported |  |
 | comment | comment | supported |  |
 | connector | connector | supported |  |
 | diagram | slide | supported |  |
-| equation | equation | gap | M6 ODP formula objects (litchi-odf-formula) |
+| equation | equation | supported |  |
 | group | group | supported |  |
-| hyperlink | hyperlink | gap | M6 ODP hyperlink nodes |
-| linebreak | linebreak | gap | M6 ODP inline controls |
-| media | audio | gap | M6 ODP media typing |
-| model3d |  | missing |  |
-| modernComment |  | missing |  |
+| hyperlink | hyperlink | supported |  |
+| linebreak | linebreak | supported |  |
+| media | audio | supported |  |
+| model3d |  | gap | none: a PresentationML-only concept |
+| modernComment |  | gap | none: a PresentationML-only concept |
 | notes | notes | supported |  |
 | ole | ole | supported |  |
 | paragraph | paragraph | supported |  |
@@ -9050,15 +9050,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidelayout | shape | supported |  |
 | slidemaster | shape | supported |  |
 | cell | tc | supported |  |
-| column | col | gap | M6 ODP table columns |
+| column | col | supported |  |
 | row | tr | supported |  |
 | table | table | supported |  |
 | textbox | shape | supported |  |
-| theme |  | missing |  |
+| theme |  | gap | none: a PresentationML-only concept |
 | transition | slide | supported |  |
-| zoom |  | missing |  |
+| zoom |  | gap | none: a PresentationML-only concept |
 |  | media | litchi-only |  |
-|  | video | litchi-only | M6 ODP media typing |
+|  | video | litchi-only |  |
 |  | slideMaster | litchi-only |  |
 |  | slideLayout | litchi-only |  |
 |  | notesMaster | litchi-only | M6 ODP notes master |
@@ -9084,49 +9084,57 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | animation | `easeout` | number | --g |  | element gap | — | M6 ODP animation nodes |
 | animation | `motionPath` | string | --g |  | element gap | — | M6 ODP animation nodes |
 | animation | `chartBuild` | enum | asg |  | element gap | gap | M6 ODP animation nodes |
-| chart-axis | `dispUnits` | enum | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `majorUnit` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `minorUnit` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `axisFont` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `axisMax` | number | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `axisMin` | number | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `axisNumFmt` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `axisOrientation` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `axisTitle` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `format` | string | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `labelOffset` | number | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `labelRotation` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `logBase` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `majorGridlines` | bool | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `max` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `min` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `minorGridlines` | bool | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `tickLabelSkip` | number | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `title` | string | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-axis | `visible` | bool | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `x` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `categories` | string | a-g |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `alpha` | number | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `outlineColor` | color | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `categoriesRef` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `color` | color | asg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `dataLabels.numFmt` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `dataLabels.separator` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `errBars` | string | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `invertIfNeg` | string | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `lineDash` | enum | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `lineWidth` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `marker` | string | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `markerSize` | number | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `markerColor` | string | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `name` | string | asg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `nameRef` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `scatterStyle` | string | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `secondaryAxis` | bool | --g |  | element gap | — | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `smooth` | string | -sg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `values` | string | asg |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `bubbleSize` | string | a-g |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
-| chart-series | `bubbleSizeRef` | string | a-g |  | element gap | gap | M6 ODP chart CRUD (litchi_odp::charts) |
+| chart-axis | `dispUnits` | enum | -sg |  | missing | gap |  |
+| chart-axis | `majorUnit` | number | -sg |  | missing | gap |  |
+| chart-axis | `minorUnit` | number | -sg |  | missing | gap |  |
+| chart-axis | `axisFont` | string | --g |  | missing | — |  |
+| chart-axis | `axisMax` | number | --g |  | missing | — |  |
+| chart-axis | `axisMin` | number | --g |  | missing | — |  |
+| chart-axis | `axisNumFmt` | string | --g |  | missing | — |  |
+| chart-axis | `axisOrientation` | string | --g |  | missing | — |  |
+| chart-axis | `axisTitle` | string | --g |  | missing | — |  |
+| chart-axis | `format` | string | -sg |  | missing | gap |  |
+| chart-axis | `labelOffset` | number | --g |  | missing | — |  |
+| chart-axis | `labelRotation` | number | -sg |  | missing | gap |  |
+| chart-axis | `logBase` | number | -sg |  | missing | gap |  |
+| chart-axis | `majorGridlines` | bool | -sg |  | missing | gap |  |
+| chart-axis | `max` | number | -sg |  | missing | gap |  |
+| chart-axis | `min` | number | -sg |  | missing | gap |  |
+| chart-axis | `minorGridlines` | bool | -sg |  | missing | gap |  |
+| chart-axis | `tickLabelSkip` | number | --g |  | missing | — |  |
+| chart-axis | `title` | string | -sg | --g | supported | gap |  |
+| chart-axis | `visible` | bool | -sg |  | missing | gap |  |
+| chart-axis | `role` | string |  | --g | litchi-only | — |  |
+| chart-axis | `dimension` | string |  | --g | litchi-only | — |  |
+| chart-axis | `name` | string |  | --g | litchi-only | — |  |
+| chart-axis | `categories` | string |  | --g | litchi-only | — |  |
+| chart-axis | `style` | string |  | --g | litchi-only | — |  |
+| chart-series | `x` | string | --g |  | missing | — |  |
+| chart-series | `categories` | string | a-g |  | missing | gap |  |
+| chart-series | `alpha` | number | --g |  | missing | — |  |
+| chart-series | `outlineColor` | color | --g |  | missing | — |  |
+| chart-series | `categoriesRef` | string | --g |  | missing | — |  |
+| chart-series | `color` | color | asg |  | missing | gap |  |
+| chart-series | `dataLabels.numFmt` | string | --g |  | missing | — |  |
+| chart-series | `dataLabels.separator` | string | --g |  | missing | — |  |
+| chart-series | `errBars` | string | -sg |  | missing | gap |  |
+| chart-series | `invertIfNeg` | string | -sg |  | missing | gap |  |
+| chart-series | `lineDash` | enum | -sg |  | missing | gap |  |
+| chart-series | `lineWidth` | number | -sg |  | missing | gap |  |
+| chart-series | `marker` | string | -sg |  | missing | gap |  |
+| chart-series | `markerSize` | number | -sg |  | missing | gap |  |
+| chart-series | `markerColor` | string | -sg |  | missing | gap |  |
+| chart-series | `name` | string | asg |  | missing | gap |  |
+| chart-series | `nameRef` | string | --g | --g | supported | — |  |
+| chart-series | `scatterStyle` | string | --g |  | missing | — |  |
+| chart-series | `secondaryAxis` | bool | --g |  | missing | — |  |
+| chart-series | `smooth` | string | -sg |  | missing | gap |  |
+| chart-series | `values` | string | asg | --g | supported | gap |  |
+| chart-series | `bubbleSize` | string | a-g |  | missing | gap |  |
+| chart-series | `bubbleSizeRef` | string | a-g |  | missing | gap |  |
+| chart-series | `chartType` | string |  | --g | litchi-only | — |  |
+| chart-series | `axis` | string |  | --g | litchi-only | — |  |
+| chart-series | `pointCount` | int |  | --g | litchi-only | — |  |
 | chart | `direction` | string | -s- |  | write-only | gap |  |
 | chart | `id` | number | a-g |  | missing | gap |  |
 | chart | `zorder` | number | a-g | --g | supported | gap |  |
@@ -9294,12 +9302,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | diagram | `slideNumber` | int |  | --g | litchi-only | — |  |
 | diagram | `title` | string |  | --g | litchi-only | — |  |
 | diagram | `master` | string |  | --g | litchi-only | — |  |
-| equation | `id` | number | a-g |  | element gap | gap | M6 ODP formula objects (litchi-odf-formula) |
-| equation | `formula` | string | asg |  | element gap | gap | M6 ODP formula objects (litchi-odf-formula) |
-| equation | `x` | length | asg |  | element gap | gap | M6 ODP formula objects (litchi-odf-formula) |
-| equation | `y` | length | asg |  | element gap | gap | M6 ODP formula objects (litchi-odf-formula) |
-| equation | `width` | length | asg |  | element gap | gap | M6 ODP formula objects (litchi-odf-formula) |
-| equation | `height` | length | asg |  | element gap | gap | M6 ODP formula objects (litchi-odf-formula) |
+| equation | `id` | number | a-g |  | missing | gap |  |
+| equation | `formula` | string | asg | --g | supported | gap |  |
+| equation | `x` | length | asg | --g | supported | gap |  |
+| equation | `y` | length | asg | --g | supported | gap |  |
+| equation | `width` | length | asg | --g | supported | gap |  |
+| equation | `height` | length | asg | --g | supported | gap |  |
+| equation | `name` | string |  | --g | litchi-only | — |  |
 | group | `shapes` | string | a-- |  | write-only | gap |  |
 | group | `ungroup` | boolean | -s- |  | write-only | gap |  |
 | group | `name` | string | asg | -sg | supported | partial |  |
@@ -9310,32 +9319,39 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | group | `height` | length | -sg |  | missing | gap |  |
 | group | `keepAspect` | boolean | -s- |  | write-only | gap |  |
 | group | `alt` | string |  | --g | litchi-only | — |  |
-| hyperlink | `link` | string | asg |  | element gap | gap | M6 ODP hyperlink nodes |
-| hyperlink | `tooltip` | string | asg |  | element gap | gap | M6 ODP hyperlink nodes |
-| media | `src` | string | as- |  | element gap | gap | M6 ODP media typing |
-| media | `poster` | string | as- |  | element gap | gap | M6 ODP media typing |
-| media | `x` | length | asg |  | element gap | gap | M6 ODP media typing |
-| media | `y` | length | asg |  | element gap | gap | M6 ODP media typing |
-| media | `width` | length | asg |  | element gap | gap | M6 ODP media typing |
-| media | `height` | length | asg |  | element gap | gap | M6 ODP media typing |
-| media | `volume` | int | asg |  | element gap | gap | M6 ODP media typing |
-| media | `autoPlay` | bool | asg |  | element gap | gap | M6 ODP media typing |
-| media | `loop` | bool | asg |  | element gap | gap | M6 ODP media typing |
-| media | `trimStart` | string | asg |  | element gap | gap | M6 ODP media typing |
-| media | `trimEnd` | string | asg |  | element gap | gap | M6 ODP media typing |
-| model3d | `src` | string | as- |  | write-only | gap |  |
-| model3d | `x` | length | asg |  | missing | gap |  |
-| model3d | `y` | length | asg |  | missing | gap |  |
-| model3d | `width` | length | asg |  | missing | gap |  |
-| model3d | `height` | length | asg |  | missing | gap |  |
-| model3d | `rotation` | string | asg |  | missing | gap |  |
-| modernComment | `author` | string | asg |  | missing | gap |  |
-| modernComment | `initials` | string | asg |  | missing | gap |  |
-| modernComment | `text` | string | asg |  | missing | gap |  |
-| modernComment | `resolved` | bool | asg |  | missing | gap |  |
-| modernComment | `created` | string | asg |  | missing | gap |  |
-| modernComment | `parent` | string | a-g |  | missing | gap |  |
-| modernComment | `id` | string | --g |  | missing | — |  |
+| hyperlink | `link` | string | asg | asg | supported | supported |  |
+| hyperlink | `tooltip` | string | asg | asg | supported | supported |  |
+| media | `src` | string | as- |  | write-only | gap |  |
+| media | `poster` | string | as- |  | write-only | gap |  |
+| media | `x` | length | asg | --g | supported | gap |  |
+| media | `y` | length | asg | --g | supported | gap |  |
+| media | `width` | length | asg | --g | supported | gap |  |
+| media | `height` | length | asg | --g | supported | gap |  |
+| media | `volume` | int | asg |  | missing | gap |  |
+| media | `autoPlay` | bool | asg |  | missing | gap |  |
+| media | `loop` | bool | asg | --g | supported | gap |  |
+| media | `trimStart` | string | asg |  | missing | gap |  |
+| media | `trimEnd` | string | asg |  | missing | gap |  |
+| media | `name` | string |  | --g | litchi-only | — |  |
+| media | `alt` | string |  | --g | litchi-only | — |  |
+| media | `source` | string |  | --g | litchi-only | — |  |
+| media | `zorder` | int |  | --g | litchi-only | — |  |
+| media | `mediaType` | string |  | --g | litchi-only | — |  |
+| media | `mimeType` | string |  | --g | litchi-only | — |  |
+| media | `mute` | bool |  | --g | litchi-only | — |  |
+| model3d | `src` | string | as- |  | element gap | gap | none: a PresentationML-only concept |
+| model3d | `x` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| model3d | `y` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| model3d | `width` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| model3d | `height` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| model3d | `rotation` | string | asg |  | element gap | gap | none: a PresentationML-only concept |
+| modernComment | `author` | string | asg |  | element gap | gap | none: a PresentationML-only concept |
+| modernComment | `initials` | string | asg |  | element gap | gap | none: a PresentationML-only concept |
+| modernComment | `text` | string | asg |  | element gap | gap | none: a PresentationML-only concept |
+| modernComment | `resolved` | bool | asg |  | element gap | gap | none: a PresentationML-only concept |
+| modernComment | `created` | string | asg |  | element gap | gap | none: a PresentationML-only concept |
+| modernComment | `parent` | string | a-g |  | element gap | gap | none: a PresentationML-only concept |
+| modernComment | `id` | string | --g |  | element gap | — | none: a PresentationML-only concept |
 | notes | `text` | string | asg | -sg | supported | partial |  |
 | notes | `direction` | enum | as- |  | write-only | gap |  |
 | notes | `lang` | string | as- |  | write-only | gap |  |
@@ -9744,8 +9760,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `border.tl2br` | string | asg |  | missing | gap |  |
 | cell | `border.top` | string | -sg |  | missing | gap |  |
 | cell | `border.tr2bl` | string | asg |  | missing | gap |  |
-| column | `width` | length | asg |  | element gap | gap | M6 ODP table columns |
-| column | `text` | string | a-- |  | element gap | gap | M6 ODP table columns |
+| column | `width` | length | asg | --g | supported | gap |  |
+| column | `text` | string | a-- |  | supported | gap | the node's text |
 | row | `cols` | int | a-- |  | write-only | gap |  |
 | row | `height` | length | asg |  | missing | gap |  |
 | table | `id` | number | a-g |  | missing | gap |  |
@@ -9810,25 +9826,25 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | textbox | `isTitle` | bool |  | --g | litchi-only | — |  |
 | textbox | `style` | string |  | --g | litchi-only | — |  |
 | textbox | `underline` | bool |  | -sg | litchi-only | litchi-only |  |
-| theme | `headingFont` | string | -sg |  | missing | gap |  |
-| theme | `bodyFont` | string | -sg |  | missing | gap |  |
-| theme | `headingFont.ea` | string | -sg |  | missing | gap |  |
-| theme | `headingFont.cs` | string | -sg |  | missing | gap |  |
-| theme | `bodyFont.ea` | string | -sg |  | missing | gap |  |
-| theme | `bodyFont.cs` | string | -sg |  | missing | gap |  |
-| theme | `dk1` | color | -sg |  | missing | gap |  |
-| theme | `lt1` | color | -sg |  | missing | gap |  |
-| theme | `dk2` | color | -sg |  | missing | gap |  |
-| theme | `lt2` | color | -sg |  | missing | gap |  |
-| theme | `accent1` | color | -sg |  | missing | gap |  |
-| theme | `accent2` | color | -sg |  | missing | gap |  |
-| theme | `accent3` | color | -sg |  | missing | gap |  |
-| theme | `accent4` | color | -sg |  | missing | gap |  |
-| theme | `accent5` | color | -sg |  | missing | gap |  |
-| theme | `accent6` | color | -sg |  | missing | gap |  |
-| theme | `hyperlink` | color | -sg |  | missing | gap |  |
-| theme | `followedhyperlink` | color | -sg |  | missing | gap |  |
-| theme | `name` | string | -sg |  | missing | gap |  |
+| theme | `headingFont` | string | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `bodyFont` | string | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `headingFont.ea` | string | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `headingFont.cs` | string | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `bodyFont.ea` | string | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `bodyFont.cs` | string | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `dk1` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `lt1` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `dk2` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `lt2` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `accent1` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `accent2` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `accent3` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `accent4` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `accent5` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `accent6` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `hyperlink` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `followedhyperlink` | color | -sg |  | element gap | gap | none: a PresentationML-only concept |
+| theme | `name` | string | -sg |  | element gap | gap | none: a PresentationML-only concept |
 | transition | `transition` | enum | -sg |  | missing | gap |  |
 | transition | `advanceTime` | string | -sg |  | missing | gap |  |
 | transition | `advanceClick` | bool | -sg |  | missing | gap |  |
@@ -9839,14 +9855,14 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | transition | `title` | string |  | --g | litchi-only | — |  |
 | transition | `layout` | string |  | --g | litchi-only | — |  |
 | transition | `master` | string |  | --g | litchi-only | — |  |
-| zoom | `target` | int | asg |  | missing | gap |  |
-| zoom | `x` | length | asg |  | missing | gap |  |
-| zoom | `y` | length | asg |  | missing | gap |  |
-| zoom | `width` | length | asg |  | missing | gap |  |
-| zoom | `height` | length | asg |  | missing | gap |  |
-| zoom | `name` | string | asg |  | missing | gap |  |
-| zoom | `returnToParent` | bool | asg |  | missing | gap |  |
-| zoom | `transitionDur` | int | asg |  | missing | gap |  |
+| zoom | `target` | int | asg |  | element gap | gap | none: a PresentationML-only concept |
+| zoom | `x` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| zoom | `y` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| zoom | `width` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| zoom | `height` | length | asg |  | element gap | gap | none: a PresentationML-only concept |
+| zoom | `name` | string | asg |  | element gap | gap | none: a PresentationML-only concept |
+| zoom | `returnToParent` | bool | asg |  | element gap | gap | none: a PresentationML-only concept |
+| zoom | `transitionDur` | int | asg |  | element gap | gap | none: a PresentationML-only concept |
 
 ### Contextual operation gaps
 

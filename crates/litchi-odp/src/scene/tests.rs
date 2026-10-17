@@ -802,3 +802,189 @@ fn formatting_resolves_through_common_styles() {
     // A document without office:styles has none.
     assert_eq!(CommonStyles::parse(&xml).unwrap(), CommonStyles::default());
 }
+
+/// A page with the record-0328 elements: a link run, line breaks, a click
+/// listener, a `draw:a` link, a plain shape, declared columns, a plugin and
+/// an inline formula.
+fn elements() -> String {
+    let head = HEAD.replace(
+        "xmlns:presentation=",
+        concat!(
+            r#"xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" "#,
+            r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+            r#"xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" "#,
+            r#"xmlns:presentation="#
+        ),
+    );
+    let head = head.replace(
+        "<office:body>",
+        concat!(
+            r#"<office:automatic-styles><style:style style:name="co1" style:family="table-column">"#,
+            r#"<style:table-column-properties style:column-width="3cm"/></style:style></office:automatic-styles>"#,
+            r#"<office:body>"#
+        ),
+    );
+    format!(
+        "{head}{}{TAIL}",
+        concat!(
+            r#"<draw:page draw:name="One">"#,
+            r#"<draw:frame draw:name="Text"><draw:text-box>"#,
+            r#"<text:p>See <text:a xlink:type="simple" xlink:href="https://a.example/" office:title="A">a</text:a> and b</text:p>"#,
+            r#"<text:p>One<text:line-break/>Two<text:span>x<text:line-break/>y</text:span></text:p>"#,
+            r#"</draw:text-box></draw:frame>"#,
+            r#"<draw:custom-shape draw:name="Button"><office:event-listeners><presentation:event-listener script:event-name="dom:click" presentation:action="show" xlink:href="https://b.example/"/></office:event-listeners><text:p>Go</text:p></draw:custom-shape>"#,
+            r#"<draw:a xlink:type="simple" xlink:href="https://c.example/"><draw:frame draw:name="Linked"><draw:text-box><text:p>Box</text:p></draw:text-box></draw:frame></draw:a>"#,
+            r#"<draw:custom-shape draw:name="Plain"><svg:title>Alt</svg:title><text:p>Plain</text:p></draw:custom-shape>"#,
+            r#"<draw:frame draw:name="Grid"><table:table><table:table-column table:style-name="co1" table:number-columns-repeated="2"/><table:table-row><table:table-cell><text:p>a</text:p></table:table-cell><table:table-cell><text:p>b</text:p></table:table-cell></table:table-row></table:table></draw:frame>"#,
+            r#"<draw:frame draw:name="Movie"><draw:plugin xlink:href="Media/m.webm" draw:mime-type="application/vnd.sun.star.media"><draw:param draw:name="Loop" draw:value="true"/></draw:plugin></draw:frame>"#,
+            r#"<draw:frame draw:name="F"><draw:object><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>z</mi><annotation encoding="StarMath 5.0">z</annotation></semantics></math></draw:object></draw:frame>"#,
+            r#"</draw:page><draw:page draw:name="Two"/>"#,
+        )
+    )
+}
+
+#[test]
+fn parts_read_links_breaks_columns_media_and_formulas() {
+    let xml = elements();
+    let scene = Scene::parse(&xml).unwrap();
+    let objects = scene.pages()[0].objects();
+    let story = objects[0].story().unwrap();
+    let link = &story.paragraphs()[0].runs()[1];
+    assert_eq!(link.kind(), RunKind::Link);
+    assert_eq!(parts::link_title(&xml, link).as_deref(), Some("A"));
+    // Breaks inside the span count; the paragraph has two.
+    assert_eq!(parts::line_breaks(&xml, &story.paragraphs()[1]).len(), 2);
+    let click = parts::shape_click(&xml, &objects[1]).unwrap();
+    assert_eq!(click.action(), Some("show"));
+    assert_eq!(click.href(), Some("https://b.example/"));
+    let wrapped = parts::shape_click(&xml, &objects[2]).unwrap();
+    assert!(wrapped.is_wrapper());
+    assert_eq!(wrapped.href(), Some("https://c.example/"));
+    assert!(parts::shape_click(&xml, &objects[3]).is_none());
+    let table = objects[4].table().unwrap();
+    let columns = parts::table_columns(&xml, table);
+    assert_eq!(columns.len(), 1);
+    assert_eq!(columns[0].repeat(), 2);
+    let styles = scene.automatic_styles(&xml).unwrap();
+    assert_eq!(columns[0].width(&xml, &styles).as_deref(), Some("3cm"));
+    let plugin = parts::plugin(&xml, &objects[5]).unwrap();
+    assert_eq!(plugin.media_kind(), Some(parts::MediaKind::Video));
+    assert_eq!(plugin.parameter("loop"), Some("true"));
+    let math = parts::inline_math(&xml, &objects[6]).unwrap();
+    assert_eq!(parts::formula_text(math).as_deref(), Some("z"));
+}
+
+#[test]
+fn link_click_and_line_break_changes_splice_their_markup() {
+    let xml = elements();
+    let story = StoryRef::object(ObjectRef::new(0, 0));
+    // Retarget a link and drop its title.
+    let retargeted = apply(
+        &xml,
+        &[Change::SetRunLink {
+            story: story.clone(),
+            paragraph: 0,
+            run: 1,
+            href: Some("https://d.example/".to_owned()),
+            title: Some(None),
+        }],
+    );
+    assert!(
+        retargeted
+            .contains(r#"<text:a xlink:type="simple" xlink:href="https://d.example/">a</text:a>"#)
+    );
+    // Unwrap it.
+    let unwrapped = apply(
+        &xml,
+        &[Change::SetRunLink {
+            story: story.clone(),
+            paragraph: 0,
+            run: 1,
+            href: None,
+            title: None,
+        }],
+    );
+    assert!(unwrapped.contains("<text:p>See a and b</text:p>"));
+    // Link a plain run.
+    let linked = apply(
+        &xml,
+        &[Change::LinkRun {
+            story: story.clone(),
+            paragraph: 0,
+            run: 0,
+            href: "https://e.example/".to_owned(),
+            title: None,
+        }],
+    );
+    assert!(linked.contains(
+        r#"<text:p><text:a xlink:type="simple" xlink:href="https://e.example/">See </text:a>"#
+    ));
+    // Line breaks.
+    let added = apply(
+        &xml,
+        &[Change::InsertLineBreak {
+            story: story.clone(),
+            paragraph: 0,
+        }],
+    );
+    assert!(added.contains("and b<text:line-break/></text:p>"));
+    let removed = apply(
+        &xml,
+        &[Change::RemoveLineBreak {
+            story: story.clone(),
+            paragraph: 1,
+            index: 1,
+        }],
+    );
+    assert!(removed.contains("<text:span>xy</text:span>"));
+    // Click actions: retarget a listener, add one after the title, remove a
+    // draw:a link.
+    let retargeted = apply(
+        &xml,
+        &[Change::SetShapeClick {
+            object: ObjectRef::new(0, 1),
+            click: Some(ShapeAction::Page("Two".to_owned())),
+        }],
+    );
+    assert!(retargeted.contains(r##"presentation:action="show" xlink:href="#Two""##));
+    let added = apply(
+        &xml,
+        &[Change::SetShapeClick {
+            object: ObjectRef::new(0, 3),
+            click: Some(ShapeAction::NextPage),
+        }],
+    );
+    assert!(added.contains(concat!(
+        r#"<svg:title>Alt</svg:title><office:event-listeners><presentation:event-listener "#,
+        r#"script:event-name="dom:click" presentation:action="next-page"/></office:event-listeners><text:p>Plain"#
+    )));
+    let removed = apply(
+        &xml,
+        &[Change::SetShapeClick {
+            object: ObjectRef::new(0, 1),
+            click: None,
+        }],
+    );
+    assert!(removed.contains(r#"<draw:custom-shape draw:name="Button"><text:p>Go</text:p>"#));
+    let unwrapped = apply(
+        &xml,
+        &[Change::SetShapeClick {
+            object: ObjectRef::new(0, 2),
+            click: None,
+        }],
+    );
+    assert!(!unwrapped.contains("<draw:a"));
+    assert!(unwrapped.contains(r#"<draw:frame draw:name="Linked">"#));
+    // The same target is an exact no-op.
+    let scene = Scene::parse(&xml).unwrap();
+    let noop = plan(
+        &xml,
+        &scene,
+        &[Change::SetShapeClick {
+            object: ObjectRef::new(0, 1),
+            click: Some(ShapeAction::Url("https://b.example/".to_owned())),
+        }],
+    )
+    .unwrap();
+    assert!(noop.is_empty());
+}

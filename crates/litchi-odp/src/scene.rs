@@ -40,6 +40,7 @@
 
 mod change;
 mod markup;
+pub mod parts;
 mod scan;
 mod styles;
 #[cfg(test)]
@@ -50,7 +51,7 @@ use std::ops::Range;
 use litchi_core::Result;
 
 use change::Fragment;
-pub use change::{Attribute, Change, NewPage, NewTextBox, ObjectRef, Scope, StoryRef};
+pub use change::{Attribute, Change, NewPage, NewTextBox, ObjectRef, Scope, ShapeAction, StoryRef};
 pub use styles::{AutomaticStyle, AutomaticStyles, CommonStyles, TextProperties, TextPropertyEdit};
 
 /// Apply `changes` to the `content.xml` of `source` as checked splices.
