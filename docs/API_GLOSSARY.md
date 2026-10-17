@@ -2589,7 +2589,7 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 | `litchi_pptx::table::Table::grid_columns`; `opened::Edit::{set_table_column_width, insert_table_column, remove_table_column}` | adopted (0321) |
 | `litchi_pptx::hyperlinks::{Click, Link, Target}`; `Click::{of_shape, from_text, action, tooltip}` | adopted (0321) |
 | `litchi_pptx::slide::Slide::hyperlink`, `SourceSlide::hyperlink`, `source::Slide::hyperlink` | adopted (0321) |
-| `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted (0321); `set_shape_hyperlink` also writes a picture's or a group's `p:cNvPr` click (0325) |
 | `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted (0321) |
 | `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
 

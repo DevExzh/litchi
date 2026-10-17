@@ -162,6 +162,7 @@ impl TextValues {
             TextSetter::Fill => self.fill.is_some(),
             TextSetter::ShapeFill => self.shape_fill.is_some(),
             TextSetter::Geometry => self.geometry.is_some(),
+            TextSetter::Click(_) => false,
         }
     }
 
@@ -185,6 +186,14 @@ impl TextValues {
             Ok(owned)
         };
         match setter {
+            // Click actions are split off before text admission (record
+            // 0325) and written through the hyperlink verbs.
+            TextSetter::Click(_) => {
+                return Err(crate::Error::new(
+                    Code::InternalError,
+                    "a click action reached the text edit",
+                ));
+            },
             TextSetter::Text => {
                 let text = match value {
                     Some(Scalar::Text(text)) => text,

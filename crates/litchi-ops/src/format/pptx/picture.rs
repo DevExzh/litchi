@@ -116,6 +116,7 @@ impl Pptx {
         let mut name = None;
         let mut geometry = [None; 4];
         let mut assigned = 0_u32;
+        let mut click = super::links::ClickInput::default();
         for (key, value) in node.props().iter() {
             let (index, entry) = PICTURE_WRITE_TABLE
                 .resolve(key.as_str())
@@ -131,6 +132,7 @@ impl Pptx {
             assigned |= bit;
             entry.prepare(Operation::Add, value, |setter, scalar| {
                 match (setter, scalar) {
+                    (PictureSetter::Click(key), scalar) => click.stage(key, scalar, limits)?,
                     (PictureSetter::Src, Some(Scalar::Text(value))) => {
                         src = Some(value.to_owned());
                     },
@@ -144,7 +146,7 @@ impl Pptx {
                             PictureSetter::Y => 1,
                             PictureSetter::Width => 2,
                             PictureSetter::Height => 3,
-                            PictureSetter::Src | PictureSetter::Name => {
+                            PictureSetter::Src | PictureSetter::Name | PictureSetter::Click(_) => {
                                 unreachable!("text picture setters")
                             },
                         };
@@ -193,8 +195,13 @@ impl Pptx {
                 std::io::Cursor::new(package.to_bytes()?),
             )?),
         };
+        let link = click.for_add(self.slides_in_catalog()?)?;
         let mut edit = base.edit()?;
         edit.add_picture(slide, &name, &resource, bounds)?;
+        if let Some(link) = &link {
+            // The new picture is the last shape of the slide in pre-order.
+            let _ = edit.set_shape_hyperlink(slide, scene.len(), Some(link))?;
+        }
         let (target, patch) = edit.commit()?.into_parts();
         let target = Arc::new(target);
         let after = self.adopt_eager(Arc::clone(&target));

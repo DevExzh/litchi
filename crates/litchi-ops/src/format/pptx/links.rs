@@ -23,7 +23,7 @@ use litchi_core::selector::Path;
 use litchi_pptx::hyperlinks::{Click, Link, Target};
 
 use super::node::{Item, TextItem, TreeItem};
-use super::spec::{HYPERLINK_WRITE_TABLE, HyperlinkKey, Kind};
+use super::spec::{ClickKey, HYPERLINK_WRITE_TABLE, HyperlinkKey, Kind};
 use super::structure::{bound, error};
 use super::write::{Commit, Proof};
 use super::{Editable, Nav, Pptx, PptxOwner};
@@ -129,7 +129,7 @@ impl Pptx {
 
 /// A shape's hyperlink: its `p:cNvPr` click, else its first run's.
 pub(super) fn of_shape(file: &Pptx, tree: &TreeItem) -> Result<Option<LinkItem>> {
-    if tree.kind != Kind::Shape {
+    if !matches!(tree.kind, Kind::Shape | Kind::Placeholder) {
         return Ok(None);
     }
     let Some(slide) = tree.container.slide() else {
@@ -155,6 +155,39 @@ pub(super) fn of_shape(file: &Pptx, tree: &TreeItem) -> Result<Option<LinkItem>>
             owner: Owner::Shape(tree.clone()),
             link: Arc::new(link),
         }))
+}
+
+/// The click action of a picture or a group: its `p:cNvPr`'s (record 0325).
+pub(super) fn of_frame(file: &Pptx, tree: &TreeItem) -> Result<Option<LinkItem>> {
+    if !matches!(tree.kind, Kind::Picture | Kind::Group) {
+        return Ok(None);
+    }
+    let Some(slide) = tree.container.slide() else {
+        return Ok(None);
+    };
+    let Some(click) = Click::of_shape(tree.handle.view())? else {
+        return Ok(None);
+    };
+    Ok(file
+        .slide_hyperlink(slide as usize, &click)?
+        .map(|link| LinkItem {
+            owner: Owner::Shape(tree.clone()),
+            link: Arc::new(link),
+        }))
+}
+
+/// The `link` (or, with `tooltip`, the `tooltip`) value of a click action,
+/// as a shape, run, picture or group property reads it (record 0325).
+pub(super) fn click_value(link: Option<&Link>, tooltip: bool) -> Option<Value<'static>> {
+    let link = link?;
+    if tooltip {
+        return link
+            .tooltip
+            .as_ref()
+            .filter(|tip| !tip.is_empty())
+            .map(|tip| Value::Text(Cow::Owned(tip.clone())));
+    }
+    Some(Value::Text(Cow::Owned(link_text(link).into_owned())))
 }
 
 /// A run's hyperlink.
@@ -291,10 +324,13 @@ impl Pptx {
                 "master and layout hyperlinks are not editable",
             ));
         };
-        if tree.kind != Kind::Shape {
+        if !matches!(
+            tree.kind,
+            Kind::Shape | Kind::Placeholder | Kind::Picture | Kind::Group
+        ) {
             return Err(error(
                 Code::UnsupportedType,
-                "hyperlinks are written on shapes and their runs",
+                "hyperlinks are written on shapes, their runs, pictures and groups",
             ));
         }
         let shape = tree.handle.position().get();
@@ -425,6 +461,190 @@ impl Pptx {
         let node = crate::path::resolve::get(&Nav::new(self), path)?;
         Ok(match node.item() {
             Item::Hyperlink(item) => Some(item.clone()),
+            _ => None,
+        })
+    }
+}
+
+/// The `link` and `tooltip` of a shape, run, picture or group write, as
+/// given (record 0325); [`ClickInput::for_add`] and [`Pptx::try_set_click`]
+/// turn them into a click action.
+#[derive(Default)]
+pub(super) struct ClickInput {
+    link: Option<String>,
+    tooltip: Option<String>,
+}
+
+impl ClickInput {
+    /// Record one admitted `link` or `tooltip` value.
+    pub(super) fn stage(
+        &mut self,
+        key: ClickKey,
+        value: Option<Scalar<'_>>,
+        limits: &SemanticLimits,
+    ) -> Result<()> {
+        let text = match value {
+            Some(Scalar::Text(text) | Scalar::Token(text)) => text,
+            _ => "",
+        };
+        let staged = self
+            .link
+            .as_ref()
+            .map_or(0, String::len)
+            .saturating_add(self.tooltip.as_ref().map_or(0, String::len))
+            .saturating_add(text.len());
+        bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())?;
+        super::write::validate_text(text)?;
+        let slot = match key {
+            ClickKey::Link => &mut self.link,
+            ClickKey::Tooltip => &mut self.tooltip,
+        };
+        if slot.replace(text.to_owned()).is_some() {
+            return Err(error(
+                Code::InvalidArgument,
+                "a hyperlink property was assigned more than once",
+            ));
+        }
+        Ok(())
+    }
+
+    fn tooltip(&self) -> Option<String> {
+        self.tooltip.clone().filter(|tip| !tip.is_empty())
+    }
+
+    /// The click action an add writes: `link` with `tooltip`; a `tooltip`
+    /// without `link`, or `link=none`, adds none (OfficeCLI).
+    pub(super) fn for_add(&self, slides: usize) -> Result<Option<Link>> {
+        let Some(link) = &self.link else {
+            return Ok(None);
+        };
+        Ok(parse_link(link, slides)?.map(|target| Link {
+            target,
+            tooltip: self.tooltip(),
+        }))
+    }
+}
+
+/// Whether a property key is a click-action key of shapes, runs, pictures
+/// and groups.
+fn is_click_key(key: &str) -> bool {
+    key.eq_ignore_ascii_case("link") || key.eq_ignore_ascii_case("tooltip")
+}
+
+impl Pptx {
+    /// A `set` of `link` or `tooltip` on a shape, run, picture or group
+    /// (record 0325); `None` for other targets and payloads. The other
+    /// properties of the payload are set first, then the click action.
+    ///
+    /// - `link` replaces the click (`none` removes it) with the given
+    ///   `tooltip`, or none: on a shape, on its `p:cNvPr` and every run, as
+    ///   OfficeCLI's `ApplyShapeHyperlink`; on a run, the run's; on a picture
+    ///   or a group, its `p:cNvPr`'s.
+    /// - `tooltip` alone changes the tooltip of the existing click; a shape
+    ///   without one refuses (`missing_property`), as OfficeCLI does; a run,
+    ///   picture or group without one is left as it is.
+    pub(super) fn try_set_click(
+        &self,
+        target: &TargetArg<'_>,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
+        if target.path().is_none() || !props.iter().any(|(key, _)| is_click_key(key.as_str())) {
+            return Ok(None);
+        }
+        if self.click_owner(target)?.is_none() {
+            return Ok(None);
+        }
+        let mut click = ClickInput::default();
+        let mut rest = Props::with_capacity(props.len());
+        for (key, value) in props.iter() {
+            if !is_click_key(key.as_str()) {
+                rest.push(key.reborrow(), value.reborrow());
+                continue;
+            }
+            let (_, entry) = HYPERLINK_WRITE_TABLE
+                .resolve(key.as_str())
+                .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+            entry.prepare(Operation::Set, value, |key, scalar| {
+                let key = match key {
+                    HyperlinkKey::Link => ClickKey::Link,
+                    HyperlinkKey::Tooltip => ClickKey::Tooltip,
+                };
+                click.stage(key, scalar, limits)
+            })?;
+        }
+        let first = if rest.is_empty() {
+            None
+        } else {
+            Some(self.set_with_limits(target.clone(), rest, limits)?)
+        };
+        let file = first.as_ref().map_or(self, |commit| &commit.after);
+        let owner = file
+            .click_owner(target)?
+            .ok_or_else(|| error(Code::InternalError, "the click target moved"))?;
+        let current = match &owner {
+            Owner::Shape(tree) if matches!(tree.kind, Kind::Shape | Kind::Placeholder) => {
+                of_shape(file, tree)?
+            },
+            Owner::Shape(tree) => of_frame(file, tree)?,
+            Owner::Run(text) => of_run(file, text)?,
+        };
+        let link = match &click.link {
+            Some(link) => parse_link(link, file.slides_in_catalog()?)?.map(|target| Link {
+                target,
+                tooltip: click.tooltip(),
+            }),
+            None => match current {
+                Some(item) => Some(Link {
+                    target: item.link.target.clone(),
+                    tooltip: click.tooltip(),
+                }),
+                None if matches!(
+                    &owner,
+                    Owner::Shape(tree) if matches!(tree.kind, Kind::Shape | Kind::Placeholder)
+                ) =>
+                {
+                    return Err(error(
+                        Code::MissingProperty,
+                        "tooltip requires an existing hyperlink",
+                    )
+                    .with_property("link")
+                    .with_suggestion("set link in the same call"));
+                },
+                None => None,
+            },
+        };
+        bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+        let second = file.write_link(&owner, link.as_ref())?;
+        Ok(Some(match first {
+            None => second,
+            Some(first) => Commit {
+                after: second.after,
+                source: first.source,
+                target: second.target,
+                proof: second.proof,
+                operations: first.operations.saturating_add(second.operations),
+            },
+        }))
+    }
+
+    /// The shape, run, picture or group a path names; `None` for anything
+    /// else.
+    fn click_owner(&self, target: &TargetArg<'_>) -> Result<Option<Owner>> {
+        let Some(path) = target.path() else {
+            return Ok(None);
+        };
+        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        Ok(match node.item() {
+            Item::Tree(tree)
+                if matches!(
+                    tree.kind,
+                    Kind::Shape | Kind::Placeholder | Kind::Picture | Kind::Group
+                ) =>
+            {
+                Some(Owner::Shape(tree.clone()))
+            },
+            Item::Run(text) => Some(Owner::Run(text.clone())),
             _ => None,
         })
     }

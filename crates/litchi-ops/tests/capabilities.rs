@@ -676,6 +676,8 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "align"
                 | "fill"
                 | "geometry"
+                | "link"
+                | "tooltip"
         ),
         "paragraph" => matches!(
             property,
@@ -683,8 +685,18 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
         ),
         "run" => matches!(
             property,
-            "font.latin" | "size" | "bold" | "italic" | "color" | "text" | "font"
+            "font.latin"
+                | "size"
+                | "bold"
+                | "italic"
+                | "color"
+                | "text"
+                | "font"
+                | "link"
+                | "tooltip"
         ),
+        // The click action (record 0325).
+        "picture" | "group" => matches!(property, "link" | "tooltip"),
         "tc" => matches!(
             property,
             "fill" | "text" | "bold" | "italic" | "size" | "color" | "font" | "align"
@@ -780,7 +792,7 @@ fn pptx_reports_selection_and_structural_writes() {
             let picture_add = element.name() == "picture"
                 && matches!(
                     property.name(),
-                    "src" | "name" | "x" | "y" | "width" | "height"
+                    "src" | "name" | "x" | "y" | "width" | "height" | "link" | "tooltip"
                 );
             let comment_add = element.name() == "comment"
                 && matches!(
@@ -807,10 +819,11 @@ fn pptx_reports_selection_and_structural_writes() {
     ] {
         let operations = caps.element(kind).unwrap().operations();
         assert!(operations.remove, "{kind}");
-        // Charts (record 0270) and SmartArt (record 0284) are settable.
+        // Charts (record 0270) and SmartArt (record 0284) are settable, and
+        // pictures and groups take a click action (record 0325).
         assert_eq!(
             operations.set,
-            matches!(kind, "chart" | "smartart"),
+            matches!(kind, "chart" | "smartart" | "picture" | "group"),
             "{kind}"
         );
     }

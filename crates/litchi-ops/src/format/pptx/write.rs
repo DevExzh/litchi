@@ -70,6 +70,9 @@ pub(super) struct ShapeValues {
     pub(super) geometry: [Option<i64>; 4],
     /// Rich formatting for every paragraph and run of the text body.
     pub(super) format: text::TextValues,
+    /// Whether the payload assigns a click action (`link`, `tooltip`), which
+    /// the hyperlink verbs write (record 0325).
+    pub(super) click: bool,
 }
 
 impl ShapeValues {
@@ -104,6 +107,7 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
         text: None,
         geometry: [None; 4],
         format: text::TextValues::default(),
+        click: false,
     };
     // The PPTX table currently has fewer than 64 canonical entries.  A bit
     // set keeps duplicate aliases allocation-free on the successful path
@@ -140,7 +144,7 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
                         ShapeSetter::Y => 1,
                         ShapeSetter::Width => 2,
                         ShapeSetter::Height => 3,
-                        ShapeSetter::Text | ShapeSetter::Format(_) => {
+                        ShapeSetter::Text | ShapeSetter::Format(_) | ShapeSetter::Click(_) => {
                             unreachable!("shape text setter")
                         },
                     };
@@ -164,6 +168,7 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
                     values.text = Some(owned);
                 },
                 ShapeSetter::Format(setter) => values.format.stage(setter, value, limits)?,
+                ShapeSetter::Click(_) => values.click = true,
             }
             Ok(())
         })?;
@@ -226,6 +231,9 @@ impl Pptx {
             return Ok(commit);
         }
         if let Some(commit) = self.try_set_hyperlink(&target, &props, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_set_click(&target, &props, limits)? {
             return Ok(commit);
         }
         if let Some(commit) = self.try_set_chart(&target, &props, limits)? {
