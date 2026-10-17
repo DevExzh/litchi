@@ -217,8 +217,14 @@ fn tables_are_added_from_data_or_a_grid() {
         assert_eq!(text(&file, "/slide[1]/table[2]/tr[3]/tc[2]"), "");
         // The default grid is three by three; rows and cols widen data.
         let grid = file.add("/slide[1]", NewNode::new("table")).unwrap();
-        assert_eq!(prop(&grid.file, "/slide[1]/table[3]", "rows").as_deref(), Some("3"));
-        assert_eq!(prop(&grid.file, "/slide[1]/table[3]", "cols").as_deref(), Some("3"));
+        assert_eq!(
+            prop(&grid.file, "/slide[1]/table[3]", "rows").as_deref(),
+            Some("3")
+        );
+        assert_eq!(
+            prop(&grid.file, "/slide[1]/table[3]", "cols").as_deref(),
+            Some("3")
+        );
         assert_eq!(
             prop(&grid.file, "/slide[1]/table[3]", "name").as_deref(),
             Some("Table 3")
@@ -229,7 +235,10 @@ fn tables_are_added_from_data_or_a_grid() {
                 NewNode::new("table").prop("data", "a").prop("cols", 4),
             )
             .unwrap();
-        assert_eq!(prop(&wide.file, "/slide[1]/table[3]", "cols").as_deref(), Some("4"));
+        assert_eq!(
+            prop(&wide.file, "/slide[1]/table[3]", "cols").as_deref(),
+            Some("4")
+        );
         // The new table takes row and column edits.
         let more = grid
             .file
