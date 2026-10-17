@@ -86,6 +86,15 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx",
             "ooxml/docx/comment.docx",
             "libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx",
+            // Record 0319: notes, headers and footers, and numbering.
+            "ooxml/docx/footnotes.docx",
+            "ooxml/docx/endnotes.docx",
+            "ooxml/docx/headerFooter.docx",
+            "ooxml/docx/ComplexNumberedLists.docx",
+            // Record 0319: a bookmark, a text box and a watermark.
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
+            "libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx",
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx",
         ],
     },
     Spec {
@@ -122,6 +131,11 @@ const SPECS: &[Spec] = &[
             "ooxml/pptx/sample.pptx",
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/modern-comments.pptx",
+            // Record 0321: Office Math in a markup-compatibility choice, and
+            // embedded audio and video (Apache POI, Apache-2.0).
+            "libreoffice-core/oox/qa/unit/data/import-mce.pptx",
+            "poi/test-data/slideshow/EmbeddedAudio.pptx",
+            "poi/test-data/slideshow/EmbeddedVideo.pptx",
         ],
     },
     Spec {
@@ -373,6 +387,10 @@ struct Recipe {
 
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC";
 
+/// Inert media payloads (record 0321): the leaf stores them undecoded.
+const MP4: &str = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t";
+const MP3: &str = "data:audio/mpeg;base64,SUQzAwAAAAAAAA==";
+
 const RECIPES: &[Recipe] = &[
     // Record 0297: a Numbers merged range needs an A1 `ref` of two cells or
     // more inside the table's grid.
@@ -458,6 +476,32 @@ const RECIPES: &[Recipe] = &[
         fixture: "seed",
         parent: "/body/p[1]",
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
+        start: false,
+    },
+    // Record 0319: notes are anchored on a paragraph and need their text; a
+    // level is added to a definition by its ilvl.
+    Recipe {
+        format: "docx",
+        element: "footnote",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("text", "Note")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "endnote",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("text", "End")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "level",
+        fixture: "ooxml/docx/ComplexNumberedLists.docx",
+        parent: "/numbering/abstractNum[1]",
+        props: &[("ilvl", "8"), ("format", "decimal"), ("lvlText", "%9.")],
         start: false,
     },
     // Record 0295: DOCX SmartArt is added under a paragraph from an outline.
@@ -678,6 +722,31 @@ const RECIPES: &[Recipe] = &[
         fixture: "create() + add slide + add smartart",
         parent: "/slide[1]/smartart[1]",
         props: &[("text", "Learn")],
+        start: false,
+    },
+    // Record 0321: media is embedded with a poster image.
+    Recipe {
+        format: "pptx",
+        element: "video",
+        fixture: "create() + add slide",
+        parent: "/slide[1]",
+        props: &[("src", MP4), ("poster", PNG)],
+        start: false,
+    },
+    Recipe {
+        format: "pptx",
+        element: "audio",
+        fixture: "create() + add slide",
+        parent: "/slide[1]",
+        props: &[("src", MP3), ("poster", PNG)],
+        start: false,
+    },
+    Recipe {
+        format: "pptx",
+        element: "media",
+        fixture: "create() + add slide",
+        parent: "/slide[1]",
+        props: &[("src", MP4), ("poster", PNG)],
         start: false,
     },
     Recipe {

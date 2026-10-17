@@ -126,6 +126,33 @@ impl Story {
         })
     }
 
+    /// The story's text as OfficeCLI reads a header or footer: the text of
+    /// its runs' `w:t` elements, concatenated without paragraph separators
+    /// (record 0319); alternate-content fallbacks are skipped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed.
+    pub fn run_text(&self) -> Result<String> {
+        crate::part_scan::run_text(&self.xml_bytes, &[])
+    }
+
+    /// Construct a story over a shared XML allocation (a part payload read
+    /// once and kept by its owner).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is not a bounded header or footer.
+    pub fn from_shared_bytes(xml_bytes: Arc<Vec<u8>>, kind: Kind) -> Result<Self> {
+        let role = codec::validate(&xml_bytes)?;
+        Ok(Self {
+            xml_bytes,
+            semantic: Arc::new(OnceLock::new()),
+            role,
+            kind,
+        })
+    }
+
     /// Construct a story by sharing the XML allocation owned by an OPC part.
     pub(crate) fn from_part(part: &dyn Part, kind: Kind) -> Result<Self> {
         let role = codec::validate(part.blob())?;

@@ -2515,6 +2515,19 @@ check_capabilities!(crate::format::doc::SPEC);
 #[cfg(feature = "docx")]
 check_capabilities!(crate::format::docx::SPEC);
 
+/// The DOCX part elements `set`, `add` and `remove` write (record 0319).
+#[cfg(feature = "docx")]
+const DOCX_PART_WRITES: &[&str] = &[
+    "style",
+    "abstractNum",
+    "num",
+    "level",
+    "header",
+    "footer",
+    "footnote",
+    "endnote",
+];
+
 #[cfg(feature = "xlsx")]
 check_capabilities!(crate::format::xlsx::SPEC);
 
@@ -2777,13 +2790,18 @@ impl Element {
         let settable = {
             #[cfg(feature = "docx")]
             {
-                self.adapter == Adapter::Docx
+                (self.adapter == Adapter::Docx
                     && self.retains_source != Some(false)
                     && matches!(
                         self.data().canonical,
                         "p" | "r" | "hyperlink" | "tc" | "chart"
                     )
-                    && readable
+                    && readable)
+                    || (self.adapter == Adapter::Docx
+                        && self.retains_source != Some(false)
+                        && (DOCX_PART_WRITES.contains(&self.data().canonical)
+                            || self.data().canonical == "tab")
+                        && readable)
             }
             #[cfg(not(feature = "docx"))]
             {
@@ -2822,17 +2840,7 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Pptx
                 && self.retains_source != Some(false)
-                && matches!(
-                    self.data().canonical,
-                    "slide"
-                        | "shape"
-                        | "placeholder"
-                        | "chart"
-                        | "series"
-                        | "axis"
-                        | "smartart"
-                        | "node"
-                )
+                && crate::format::pptx::SETTABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "ppt")]
         let settable = settable
@@ -2903,8 +2911,10 @@ impl Element {
                 && self.retains_source != Some(false)
                 && match self.data().canonical {
                     "slide" => self.pptx_slide_add == Some(true),
-                    "shape" | "chart" | "smartart" | "node" => self.pptx_shape_add == Some(true),
-                    _ => false,
+                    name => {
+                        crate::format::pptx::SHAPE_ADDABLE.contains(&name)
+                            && self.pptx_shape_add == Some(true)
+                    },
                 }
                 && readable);
         #[cfg(not(feature = "pptx"))]
@@ -2915,7 +2925,10 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "picture" | "chart" | "smartart")
+                && (matches!(
+                    self.data().canonical,
+                    "picture" | "chart" | "smartart" | "tab" | "break"
+                ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
         let add = add
@@ -2978,19 +2991,8 @@ impl Element {
             || (self.adapter == Adapter::Pptx
                 && self.retains_source != Some(false)
                 && ((self.data().canonical == "slide" && self.pptx_slide_remove == Some(true))
-                    || (matches!(
-                        self.data().canonical,
-                        "shape"
-                            | "placeholder"
-                            | "picture"
-                            | "table"
-                            | "chart"
-                            | "group"
-                            | "connector"
-                            | "smartart"
-                            | "node"
-                            | "ole"
-                    ) && self.pptx_shape_remove == Some(true)))
+                    || (crate::format::pptx::REMOVABLE.contains(&self.data().canonical)
+                        && self.pptx_shape_remove == Some(true)))
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let remove = structural;
@@ -3000,7 +3002,10 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "tc" | "sdt" | "chart")
+                && (matches!(
+                    self.data().canonical,
+                    "tc" | "sdt" | "chart" | "tab" | "break"
+                ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
         let remove = remove
@@ -3151,23 +3156,10 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         } else { props };
         #[cfg(feature = "pptx")]
         let props = if adapter == Adapter::Pptx {
-            match crate::path::navigate::ElementKind::name(element.kind) {
-                "shape" => crate::format::pptx::SHAPE_CAPABILITY_PROPS,
-                "placeholder" => crate::format::pptx::PLACEHOLDER_CAPABILITY_PROPS,
-                "slide" => crate::format::pptx::SLIDE_CAPABILITY_PROPS,
-                "paragraph" => crate::format::pptx::PARAGRAPH_CAPABILITY_PROPS,
-                "run" => crate::format::pptx::RUN_CAPABILITY_PROPS,
-                "tc" => crate::format::pptx::CELL_CAPABILITY_PROPS,
-                "notes" => crate::format::pptx::NOTES_CAPABILITY_PROPS,
-                "comment" => crate::format::pptx::COMMENT_CAPABILITY_PROPS,
-                "picture" => crate::format::pptx::PICTURE_CAPABILITY_PROPS,
-                "chart" => crate::format::pptx::CHART_CAPABILITY_PROPS,
-                "series" => crate::format::pptx::SERIES_CAPABILITY_PROPS,
-                "axis" => crate::format::pptx::AXIS_CAPABILITY_PROPS,
-                "smartart" => crate::format::pptx::SMARTART_CAPABILITY_PROPS,
-                "node" => crate::format::pptx::NODE_CAPABILITY_PROPS,
-                _ => props,
-            }
+            crate::format::pptx::capability_props(crate::path::navigate::ElementKind::name(
+                element.kind,
+            ))
+            .unwrap_or(props)
         } else {
             props
         };

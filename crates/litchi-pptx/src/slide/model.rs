@@ -336,6 +336,60 @@ impl<'a> Slide<'a> {
         Ok(Some(part.part().blob()))
     }
 
+    /// The Office Math equations of this slide's text, in document order
+    /// (record 0321), read from the slide's own XML (the shape scene reads
+    /// their picture fallbacks).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed slide XML or exceeded bounds.
+    pub fn equations(&self) -> Result<Vec<crate::shape::math::Equation>> {
+        crate::shape::math::equations(self.part.part().blob())
+    }
+
+    /// Resolve a click action of this slide's shapes or text through the
+    /// slide's relationships (record 0321): an external URL, a slide of the
+    /// presentation, or a relationship-free action. `None` when the click
+    /// names a relationship the slide lacks, or a part that is not a slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a malformed relationship target or
+    /// presentation slide list.
+    pub fn hyperlink(
+        &self,
+        click: &crate::hyperlinks::Click,
+    ) -> Result<Option<crate::hyperlinks::Link>> {
+        let rels = self.part.part().rels();
+        let package = self.package;
+        crate::hyperlinks::Link::resolve(
+            click,
+            |id| {
+                let Some(relationship) = rels.get(id) else {
+                    return Ok(None);
+                };
+                Ok(Some(if relationship.is_external() {
+                    (true, relationship.target_ref().to_owned())
+                } else {
+                    (false, relationship.target_partname()?.to_string())
+                }))
+            },
+            |part| {
+                let presentation = crate::parts::PresentationPart::from_package(package)?;
+                let rels = presentation.part().rels();
+                for (index, reference) in presentation.slide_references()?.iter().enumerate() {
+                    if let Some(relationship) = rels.get(reference.relationship_id())
+                        && !relationship.is_external()
+                        && relationship.target_partname()?.as_str() == part
+                    {
+                        return Ok(Some(litchi_core::Position::new(index)));
+                    }
+                }
+                Ok(None)
+            },
+        )
+    }
+
     /// The data-model XML of the SmartArt this slide relates through
     /// `relationship_id` (a SmartArt frame's `dgm:relIds/@r:dm`), or `None`
     /// when the slide has no such diagram-data relationship (record 0284).

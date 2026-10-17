@@ -37,6 +37,10 @@ use std::collections::HashSet;
 /// `stylesWithEffects` parts.
 pub mod effects;
 
+/// The located styles part: every style with its byte range, read and
+/// edited in place (record 0319).
+pub mod catalog;
+
 /// Semantic kind of a Word style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]

@@ -352,8 +352,10 @@ fn misses_and_foreign_axes_have_their_codes() {
         ("/body/p[text~=x]", Code::InvalidPath),
         // Pictures are read since record 0251d; the report has none.
         ("/body/p[1]/picture[1]", Code::PathNotFound),
-        ("/styles/Heading1", Code::UnsupportedCapability),
-        ("/numbering", Code::UnsupportedCapability),
+        // The report has no styles or numbering part (record 0319).
+        ("/styles/Heading1", Code::PathNotFound),
+        ("/numbering", Code::PathNotFound),
+        ("/theme", Code::UnsupportedCapability),
     ];
     for (at, code) in cases {
         let error = get(docx, at).expect_err(at);
@@ -602,12 +604,13 @@ fn query_diagnostics_and_refusals() {
             .code(),
         Code::UnsupportedPath
     );
+    // `styleName` is read since record 0319.
     let style_name = Query::parse("p[styleName=Title]").unwrap();
-    assert_eq!(
+    assert!(
         Plan::compile(&style_name, FileFormat::Docx)
-            .unwrap_err()
-            .code(),
-        Code::UnsupportedCapability
+            .unwrap()
+            .diagnostics()
+            .is_empty()
     );
 }
 
@@ -1068,8 +1071,88 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a SmartArt graphic")
         .into_file();
+    // And the marks (record 0319): a tab stop, a break, a bookmark, a
+    // simple field, a table of contents and a text box in the main story,
+    // and a watermark in a built document's header.
+    let marked = crate::open_bytes(package(
+        &format!(
+            r#"<w:document {NAMESPACES} xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><w:body><w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs></w:pPr><w:bookmarkStart w:id="1" w:name="Intro"/><w:r><w:t>One</w:t></w:r><w:bookmarkEnd w:id="1"/><w:r><w:br w:type="page"/></w:r><w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple></w:p><w:p><w:fldSimple w:instr=" TOC \o &quot;1-3&quot; \h "><w:r><w:t>Contents</w:t></w:r></w:fldSimple></w:p><w:p><w:r><w:drawing><wp:anchor><wp:extent cx="1828800" cy="914400"/><wp:docPr id="7" name="Box 7"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr id="7" name="Box 7"/><wps:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p><w:sectPr/></w:body></w:document>"#
+        ),
+        None,
+    ))
+    .expect("open the marked document");
+    let watermarked = {
+        let mut builder = litchi_docx::Builder::new().expect("builder");
+        builder
+            .document()
+            .expect("document")
+            .add_paragraph_with_text("Body");
+        builder
+            .document()
+            .expect("document")
+            .set_watermark(litchi_docx::Watermark::text("DRAFT"));
+        let mut package = builder.build().expect("build");
+        crate::open_bytes(package.to_bytes().expect("bytes"))
+            .expect("open the watermarked document")
+    };
+    // And the part elements (record 0319).
+    let parted = file
+        .add("/styles", crate::NewNode::new("style").prop("id", "Accent"))
+        .or_else(|_| file.add("/", crate::NewNode::new("style").prop("id", "Accent")))
+        .expect("add a style")
+        .into_file();
+    let parted = parted
+        .add("/numbering", crate::NewNode::new("abstractNum"))
+        .or_else(|_| parted.add("/", crate::NewNode::new("abstractNum")))
+        .expect("add a numbering definition")
+        .into_file();
+    let parted = parted
+        .add(
+            "/numbering",
+            crate::NewNode::new("num").prop("abstractNumId", 0),
+        )
+        .expect("add a numbering instance")
+        .into_file();
+    let parted = parted
+        .add("/", crate::NewNode::new("header").prop("text", "Head"))
+        .expect("add a header")
+        .into_file();
+    let parted = parted
+        .add("/", crate::NewNode::new("footer").prop("text", "Foot"))
+        .expect("add a footer")
+        .into_file();
+    let parted = parted
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("footnote").prop("text", "Note"),
+        )
+        .expect("add a footnote")
+        .into_file();
+    let parted = parted
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("endnote").prop("text", "End"),
+        )
+        .expect("add an endnote")
+        .into_file();
     let file_for = |name: &str| {
-        if matches!(name, "comments" | "comment") {
+        if matches!(
+            name,
+            "styles"
+                | "style"
+                | "numbering"
+                | "abstractNum"
+                | "num"
+                | "level"
+                | "header"
+                | "footer"
+                | "footnotes"
+                | "footnote"
+                | "endnotes"
+                | "endnote"
+        ) {
+            &parted
+        } else if matches!(name, "comments" | "comment") {
             &commented
         } else if name == "picture" {
             &pictured
@@ -1077,6 +1160,13 @@ fn capabilities_match_live_paths_queries_and_views() {
             &charted
         } else if name == "smartart" {
             &smartart
+        } else if matches!(
+            name,
+            "tab" | "break" | "bookmark" | "field" | "toc" | "textbox"
+        ) {
+            &marked
+        } else if name == "watermark" {
+            &watermarked
         } else {
             &file
         }
@@ -1086,7 +1176,15 @@ fn capabilities_match_live_paths_queries_and_views() {
             continue;
         }
         for (template, _) in element.paths() {
+            // Native identities need raw paths; they are checked elsewhere.
+            if template.contains("Id=") || template.contains("[@id=") {
+                continue;
+            }
             let path = template
+                .replace("<id or name>", "Accent")
+                .replace("[@type=T]", "[@type=default]")
+                .replace("[@name=X]", "[@name=Intro]")
+                .replace("[L]", "[1]")
                 .replace("[N]", "[1]")
                 .replace("[M]", "[1]")
                 .replace("[K]", "[1]")
@@ -1101,7 +1199,11 @@ fn capabilities_match_live_paths_queries_and_views() {
                 .unwrap_or_else(|error| panic!("{path}: {error}"));
             assert_eq!(node.kind(), element.name());
             for entry in node.view().format().unwrap() {
-                assert!(element.property(entry.key()).is_some());
+                assert!(
+                    element.property(entry.key()).is_some(),
+                    "{path}: {}",
+                    entry.key()
+                );
             }
         }
         if element.operations().query {

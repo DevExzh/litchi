@@ -21,15 +21,15 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `f20932a0760b8d4cffafe14e505399f6ed468ebecf69af15eba2bb3b371fae2e` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `f6a7361ed49a24501a09b237591b593e9ca8b6c9223b87c7a34801d414c08334` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `137339ca055080024cbcc80287ca72cd2eaf31d4c0d1a533c75b59784aabf8cb` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6036228da65ef4bd4889a861832909bfaf95d6fa316df17f2fd703ad232846e1` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `c5dce2f2b310342025a6297ff3e415e7df028f30672ef737694dd85446a5f266` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `319c2f64b082acd6ad4fd954c975e824a682e5c568335d00f08ff5ac0ef7d2ef` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `6e2e500f95906351dcaf6e50f85efc69db44d013202a0a1e2828da8c44650d1e` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `3f9933fcc82cdb5c6974246e4eff44efd2985093eaa5302abc7b1a3c6a387faa` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `4feb37072541ce3dc7ec1ebd0994aae5abc0facd72bf360055b72da7b3526369` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `2fdded1c92e64c56696c48a388dd03c27c4f6297468640ffa1133bd113bc8529` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `bcfba00773c28a5c08f4a081185dd93e258334c1e625a6e812ac48cac651beac` |
@@ -81,13 +81,13 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 14 | 21 | 0 | 0 | 9 | 2 | 6 |
+| docx | 31 | 4 | 0 | 0 | 9 | 2 | 6 |
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
 | rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 33 | 5 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 33 | 5 | 0 | 0 | 1 | 2 | 1 |
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
-| pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
+| pptx | 30 | 3 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 7 |
@@ -107,13 +107,13 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 174 | 3 | 283 | 0 | 155 | 2 | 344 | 118 |
+| docx | 291 | 2 | 58 | 0 | 232 | 2 | 376 | 165 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 552 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 159 | 430 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
-| pptx | 197 | 22 | 70 | 0 | 117 | 0 | 281 | 256 |
+| pptx | 226 | 22 | 30 | 0 | 120 | 0 | 289 | 262 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -133,13 +133,13 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 129 | 30 | 637 | 0 | 102 | 181 |
+| docx | 227 | 30 | 539 | 0 | 138 | 192 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 212 | 60 | 272 | 0 | 515 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
-| pptx | 86 | 28 | 447 | 0 | 140 | 242 |
+| pptx | 109 | 34 | 418 | 0 | 141 | 247 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -161,9 +161,9 @@ Property writes:
 
 | OfficeCLI element | Litchi element | Status | Follow-up |
 |---|---|---|---|
-| abstractNum | abstractNum | gap | L-DOCX-R6 (R4x) |
+| abstractNum | abstractNum | supported |  |
 | body | body | supported |  |
-| bookmark | bookmark | gap | R4x |
+| bookmark | bookmark | supported |  |
 | bookmarkEnd |  | missing |  |
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
@@ -171,22 +171,22 @@ Property writes:
 | comment | comment | supported |  |
 | diagram |  | missing |  |
 | document | document | supported |  |
-| endnote | endnote | gap | L-DOCX-R5 |
+| endnote | endnote | supported |  |
 | equation | equation | supported |  |
-| field | field | gap | R4x |
+| field | field | supported |  |
 | fieldChar |  | missing |  |
-| footer | footer | gap | L-DOCX-R5 |
-| footnote | footnote | gap | L-DOCX-R5 |
+| footer | footer | supported |  |
+| footnote | footnote | supported |  |
 | formfield | formfield | gap | R4x |
-| header | header | gap | L-DOCX-R5 |
+| header | header | supported |  |
 | hyperlink | hyperlink | supported |  |
 | instrText |  | missing |  |
-| level | level | gap | L-DOCX-R6 (R4x) |
+| level | level | supported |  |
 | markdown |  | out of scope | an add-time import format, not an element of the document |
-| num | num | gap | L-DOCX-R6 (R4x) |
-| numbering | numbering | gap | L-DOCX-R6 (R4x) |
+| num | num | supported |  |
+| numbering | numbering | supported |  |
 | ole | ole | gap | R4x |
-| pagebreak | break | gap | R4x |
+| pagebreak | break | supported |  |
 | paragraph | paragraph | supported |  |
 | permStart |  | missing |  |
 | picture | picture | supported |  |
@@ -197,18 +197,18 @@ Property writes:
 | sdt | sdt | supported |  |
 | section | section | supported |  |
 | shape | shape | gap | R4x |
-| style | style | gap | L-DOCX-R6 (R4x) |
-| styles | styles | gap | L-DOCX-R6 (R4x) |
-| tab | tab | gap | R4x |
+| style | style | supported |  |
+| styles | styles | supported |  |
+| tab | tab | supported |  |
 | cell | cell | supported |  |
 | column |  | missing |  |
 | row | row | supported |  |
 | table | table | supported |  |
-| textbox | textbox | gap | R4x |
-| toc | toc | gap | R4x |
-| watermark | watermark | gap | R4x |
-|  | footnotes | litchi-only | L-DOCX-R5 |
-|  | endnotes | litchi-only | L-DOCX-R5 |
+| textbox | textbox | supported |  |
+| toc | toc | supported |  |
+| watermark | watermark | supported |  |
+|  | footnotes | litchi-only |  |
+|  | endnotes | litchi-only |  |
 |  | comments | litchi-only |  |
 |  | settings | litchi-only | L-DOCX-R6 (R4x) |
 |  | theme | litchi-only | L-DOCX-R6 (R4x) |
@@ -218,31 +218,31 @@ Property writes:
 
 | Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
 |---|---|---|---|---|---|---|---|
-| abstractNum | `id` | int | a-g |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `type` | enum | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `name` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `styleLink` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `numStyleLink` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `format` | string | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `text` | string | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `start` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `indent` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.format` | string | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.text` | string | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.start` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.indent` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.hanging` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.justification` | enum | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.suff` | enum | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.font` | string | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.size` | font-size | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.color` | color | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.bold` | bool | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `level<N>.italic` | bool | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| abstractNum | `abstractNumId` | int | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| bookmark | `name` | string | asg |  | element gap | gap | R4x |
-| bookmark | `text` | string | a-- |  | element gap | gap | R4x |
-| bookmark | `id` | string | --g |  | element gap | — | R4x |
+| abstractNum | `id` | int | a-g |  | missing | gap |  |
+| abstractNum | `type` | enum | asg | asg | supported | supported |  |
+| abstractNum | `name` | string | asg | asg | supported | supported |  |
+| abstractNum | `styleLink` | string | asg | asg | supported | supported |  |
+| abstractNum | `numStyleLink` | string | asg | asg | supported | supported |  |
+| abstractNum | `format` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `text` | string | a-- | a-- | write-only | supported |  |
+| abstractNum | `start` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `indent` | int | a-- | a-- | write-only | supported |  |
+| abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.start` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.indent` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.hanging` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.justification` | enum | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.suff` | enum | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.font` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.size` | font-size | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.color` | color | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
+| bookmark | `name` | string | asg | --g | supported | gap |  |
+| bookmark | `text` | string | a-- |  | supported | gap | the node's text |
+| bookmark | `id` | string | --g | --g | supported | — |  |
 | bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
 | chart-axis | `axisFont` | string | --g |  | missing | — |  |
@@ -598,51 +598,62 @@ Property writes:
 | document | `theme.fontScheme` | string | --g |  | missing | — |  |
 | document | `theme.formatScheme` | string | --g |  | missing | — |  |
 | document | `theme.name` | string | --g |  | missing | — |  |
-| endnote | `text` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| endnote | `direction` | enum | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `align` | enum | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `font.cs` | string | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `font.ea` | string | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `font.latin` | string | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `bold.cs` | bool | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `italic.cs` | bool | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `size.cs` | font-size | as- |  | element gap | gap | L-DOCX-R5 |
-| endnote | `id` | number | --g |  | element gap | — | L-DOCX-R5 |
+| endnote | `text` | string | asg | asg | supported | supported |  |
+| endnote | `direction` | enum | as- |  | write-only | gap |  |
+| endnote | `align` | enum | as- |  | write-only | gap |  |
+| endnote | `font.cs` | string | as- |  | write-only | gap |  |
+| endnote | `font.ea` | string | as- |  | write-only | gap |  |
+| endnote | `font.latin` | string | as- |  | write-only | gap |  |
+| endnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| endnote | `id` | number | --g | --g | supported | — |  |
+| endnote | `font` | string |  | --g | litchi-only | — |  |
+| endnote | `size` | font-size |  | --g | litchi-only | — |  |
+| endnote | `bold` | bool |  | --g | litchi-only | — |  |
+| endnote | `italic` | bool |  | --g | litchi-only | — |  |
+| endnote | `color` | color |  | --g | litchi-only | — |  |
 | equation | `mode` | enum | asg | --g | supported | gap |  |
 | equation | `formula` | string | as- |  | supported | gap | the node's text |
-| field | `evaluated` | bool | --g |  | element gap | — | R4x |
-| field | `fieldType` | enum | asg |  | element gap | gap | R4x |
-| field | `name` | string | asg |  | element gap | gap | R4x |
-| field | `id` | string | asg |  | element gap | gap | R4x |
-| field | `expression` | string | as- |  | element gap | gap | R4x |
-| field | `trueText` | string | as- |  | element gap | gap | R4x |
-| field | `falseText` | string | as- |  | element gap | gap | R4x |
-| field | `hyperlink` | bool | as- |  | element gap | gap | R4x |
-| field | `format` | string | asg |  | element gap | gap | R4x |
-| field | `instruction` | string | asg |  | element gap | gap | R4x |
-| field | `vertAlign` | enum | a-- |  | element gap | gap | R4x |
-| field | `fldLock` | bool | a-g |  | element gap | gap | R4x |
+| field | `evaluated` | bool | --g | --g | supported | — |  |
+| field | `fieldType` | enum | asg | --g | supported | gap |  |
+| field | `name` | string | asg |  | missing | gap |  |
+| field | `id` | string | asg |  | missing | gap |  |
+| field | `expression` | string | as- |  | write-only | gap |  |
+| field | `trueText` | string | as- |  | write-only | gap |  |
+| field | `falseText` | string | as- |  | write-only | gap |  |
+| field | `hyperlink` | bool | as- |  | write-only | gap |  |
+| field | `format` | string | asg |  | missing | gap |  |
+| field | `instruction` | string | asg | --g | supported | gap |  |
+| field | `vertAlign` | enum | a-- |  | write-only | gap |  |
+| field | `fldLock` | bool | a-g | --g | supported | gap |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
-| footer | `type` | enum | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `text` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `align` | enum | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `direction` | enum | as- |  | element gap | gap | L-DOCX-R5 |
-| footer | `font` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `size` | font-size | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `bold` | bool | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `italic` | bool | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `color` | color | asg |  | element gap | gap | L-DOCX-R5 |
-| footer | `field` | enum | a-- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `text` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| footnote | `direction` | enum | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `align` | enum | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `font.cs` | string | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `font.ea` | string | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `font.latin` | string | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `bold.cs` | bool | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `italic.cs` | bool | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `size.cs` | font-size | as- |  | element gap | gap | L-DOCX-R5 |
-| footnote | `id` | number | --g |  | element gap | — | L-DOCX-R5 |
+| footer | `type` | enum | asg | asg | supported | supported |  |
+| footer | `text` | string | asg | asg | supported | supported |  |
+| footer | `align` | enum | asg | asg | supported | supported |  |
+| footer | `direction` | enum | as- | as- | write-only | supported |  |
+| footer | `font` | string | asg | asg | supported | supported |  |
+| footer | `size` | font-size | asg | asg | supported | supported |  |
+| footer | `bold` | bool | asg | asg | supported | supported |  |
+| footer | `italic` | bool | asg | asg | supported | supported |  |
+| footer | `color` | color | asg | asg | supported | supported |  |
+| footer | `field` | enum | a-- | a-- | write-only | supported |  |
+| footer | `underline` | enum |  | asg | litchi-only | litchi-only |  |
+| footnote | `text` | string | asg | asg | supported | supported |  |
+| footnote | `direction` | enum | as- |  | write-only | gap |  |
+| footnote | `align` | enum | as- |  | write-only | gap |  |
+| footnote | `font.cs` | string | as- |  | write-only | gap |  |
+| footnote | `font.ea` | string | as- |  | write-only | gap |  |
+| footnote | `font.latin` | string | as- |  | write-only | gap |  |
+| footnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| footnote | `id` | number | --g | --g | supported | — |  |
+| footnote | `font` | string |  | --g | litchi-only | — |  |
+| footnote | `size` | font-size |  | --g | litchi-only | — |  |
+| footnote | `bold` | bool |  | --g | litchi-only | — |  |
+| footnote | `italic` | bool |  | --g | litchi-only | — |  |
+| footnote | `color` | color |  | --g | litchi-only | — |  |
 | formfield | `type` | enum | asg |  | element gap | gap | R4x |
 | formfield | `name` | string | asg |  | element gap | gap | R4x |
 | formfield | `text` | string | asg |  | element gap | gap | R4x |
@@ -650,16 +661,17 @@ Property writes:
 | formfield | `default` | string | --g |  | element gap | — | R4x |
 | formfield | `enabled` | bool | --g |  | element gap | — | R4x |
 | formfield | `hasFormFieldData` | bool | --g |  | element gap | — | R4x |
-| header | `type` | enum | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `text` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `align` | enum | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `direction` | enum | as- |  | element gap | gap | L-DOCX-R5 |
-| header | `font` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `size` | font-size | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `bold` | bool | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `italic` | bool | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `color` | color | asg |  | element gap | gap | L-DOCX-R5 |
-| header | `field` | enum | a-- |  | element gap | gap | L-DOCX-R5 |
+| header | `type` | enum | asg | asg | supported | supported |  |
+| header | `text` | string | asg | asg | supported | supported |  |
+| header | `align` | enum | asg | asg | supported | supported |  |
+| header | `direction` | enum | as- | as- | write-only | supported |  |
+| header | `font` | string | asg | asg | supported | supported |  |
+| header | `size` | font-size | asg | asg | supported | supported |  |
+| header | `bold` | bool | asg | asg | supported | supported |  |
+| header | `italic` | bool | asg | asg | supported | supported |  |
+| header | `color` | color | asg | asg | supported | supported |  |
+| header | `field` | enum | a-- | a-- | write-only | supported |  |
+| header | `underline` | enum |  | asg | litchi-only | litchi-only |  |
 | hyperlink | `url` | string | asg | asg | supported | supported |  |
 | hyperlink | `anchor` | string | a-g | a-g | supported | supported |  |
 | hyperlink | `tooltip` | string | a-g | --g | supported | gap |  |
@@ -678,34 +690,44 @@ Property writes:
 | hyperlink | `strike` | bool |  | --g | litchi-only | — |  |
 | hyperlink | `highlight` | enum |  | --g | litchi-only | — |  |
 | instrText | `instruction` | string | -sg |  | missing | gap |  |
-| level | `ilvl` | int | a-g |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `format` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `lvlText` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `start` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `indent` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `hanging` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `justification` | enum | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `suff` | enum | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `lvlRestart` | int | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `isLgl` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `direction` | enum | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `font` | string | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `size` | font-size | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `color` | color | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `bold` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| level | `italic` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `id` | int | a-g |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `abstractNumId` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `format` | string | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `text` | string | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `indent` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `type` | enum | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `start` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `startOverride.<N>` | int | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `continue` | bool | a-- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| num | `numId` | int | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| numbering | `abstractNumCount` | number | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| numbering | `abstractNumId` | number | --g |  | element gap | — | L-DOCX-R6 (R4x) |
+| level | `ilvl` | int | a-g |  | missing | gap |  |
+| level | `format` | string | asg | asg | supported | supported |  |
+| level | `lvlText` | string | asg | asg | supported | supported |  |
+| level | `start` | int | asg | asg | supported | supported |  |
+| level | `indent` | int | asg | asg | supported | supported |  |
+| level | `hanging` | int | asg | asg | supported | supported |  |
+| level | `justification` | enum | asg | asg | supported | supported |  |
+| level | `suff` | enum | as- | asg | supported | supported |  |
+| level | `lvlRestart` | int | as- | asg | supported | supported |  |
+| level | `isLgl` | bool | as- | asg | supported | supported |  |
+| level | `direction` | enum | a-- |  | write-only | gap |  |
+| level | `font` | string | as- | asg | supported | supported |  |
+| level | `size` | font-size | as- | asg | supported | supported |  |
+| level | `color` | color | as- | asg | supported | supported |  |
+| level | `bold` | bool | as- | asg | supported | supported |  |
+| level | `italic` | bool | as- | asg | supported | supported |  |
+| num | `id` | int | a-g |  | missing | gap |  |
+| num | `abstractNumId` | int | asg | asg | supported | supported |  |
+| num | `format` | string | a-- |  | write-only | gap |  |
+| num | `text` | string | a-- |  | supported | gap | the node's text |
+| num | `indent` | int | a-- |  | write-only | gap |  |
+| num | `type` | enum | a-- |  | supported | gap | the node's text |
+| num | `start` | int | a-- | a-- | write-only | supported |  |
+| num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
+| num | `continue` | bool | a-- | a-- | write-only | supported |  |
+| num | `numId` | int | --g |  | missing | — |  |
+| num | `startOverride.0` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.1` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.2` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.3` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.4` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.5` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.6` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.7` | int |  | a-g | litchi-only | litchi-only |  |
+| num | `startOverride.8` | int |  | a-g | litchi-only | litchi-only |  |
+| numbering | `abstractNumCount` | number | --g | --g | supported | — |  |
+| numbering | `abstractNumId` | number | --g |  | missing | — |  |
+| numbering | `numCount` | int |  | --g | litchi-only | — |  |
 | ole | `objectType` | string | --g |  | element gap | — | R4x |
 | ole | `display` | string | --g |  | element gap | — | R4x |
 | ole | `relId` | string | --g |  | element gap | — | R4x |
@@ -718,8 +740,8 @@ Property writes:
 | ole | `src` | string | as- |  | element gap | gap | R4x |
 | ole | `oleKind` | enum | a-- |  | element gap | gap | R4x |
 | ole | `embedExt` | string | a-- |  | element gap | gap | R4x |
-| pagebreak | `type` | enum | a-g |  | element gap | gap | R4x |
-| pagebreak | `breakType` | enum | -sg |  | element gap | gap | R4x |
+| pagebreak | `type` | enum | a-g | a-- | write-only | supported |  |
+| pagebreak | `breakType` | enum | -sg | --g | supported | gap |  |
 | paragraph | `lineRule` | enum | asg | asg | supported | supported |  |
 | paragraph | `align` | enum | asg | asg | supported | supported |  |
 | paragraph | `style` | string | asg | asg | supported | supported |  |
@@ -727,10 +749,10 @@ Property writes:
 | paragraph | `spaceAfter` | length | asg | asg | supported | supported |  |
 | paragraph | `spaceBeforeAuto` | boolean | asg | asg | supported | supported |  |
 | paragraph | `spaceAfterAuto` | boolean | asg | asg | supported | supported |  |
-| paragraph | `listStyle` | enum | asg | -s- | write-only | partial |  |
+| paragraph | `listStyle` | enum | asg | -sg | supported | partial |  |
 | paragraph | `numId` | int | asg | asg | supported | supported |  |
 | paragraph | `numLevel` | int | asg | asg | supported | supported |  |
-| paragraph | `start` | int | as- | -s- | write-only | partial |  |
+| paragraph | `start` | int | as- | -sg | supported | partial |  |
 | paragraph | `bold` | bool | asg | a-- | write-only | partial |  |
 | paragraph | `italic` | bool | asg | a-- | write-only | partial |  |
 | paragraph | `font` | string | as- |  | write-only | gap |  |
@@ -795,7 +817,7 @@ Property writes:
 | paragraph | `effective.underline.src` | string | --g |  | missing | — |  |
 | paragraph | `effective.rtl` | bool | --g |  | missing | — |  |
 | paragraph | `effective.rtl.src` | string | --g |  | missing | — |  |
-| paragraph | `numFmt` | string | --g |  | gap | — | L-DOCX-R6 (R4x) |
+| paragraph | `numFmt` | string | --g | --g | supported | — |  |
 | paragraph | `fill` | color | asg |  | missing | gap |  |
 | paragraph | `shading.val` | string | -sg |  | missing | gap |  |
 | paragraph | `shading.fill` | string | -sg |  | missing | gap |  |
@@ -860,7 +882,8 @@ Property writes:
 | paragraph | `topLinePunct` | boolean | asg |  | missing | gap |  |
 | paragraph | `indent` | length | asg | asg | supported | supported |  |
 | paragraph | `text` | string | asg | as- | write-only | supported |  |
-| paragraph | `styleId` | string |  | --g | litchi-only | — |  |
+| paragraph | `styleId` | string |  | asg | litchi-only | litchi-only |  |
+| paragraph | `styleName` | string |  | asg | litchi-only | litchi-only |  |
 | paragraph | `font.ascii` | string |  | a-- | litchi-only | litchi-only |  |
 | paragraph | `font.hAnsi` | string |  | a-- | litchi-only | litchi-only |  |
 | paragraph | `font.hint` | enum |  | a-- | litchi-only | litchi-only |  |
@@ -1094,84 +1117,108 @@ Property writes:
 | shape | `line.width` | length | as- |  | element gap | gap | R4x |
 | shape | `line.style` | string | as- |  | element gap | gap | R4x |
 | shape | `alt` | string | a-- |  | element gap | gap | R4x |
-| style | `id` | string | a-g |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `name` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `type` | enum | a-g |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `basedOn` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `basedOn.path` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `next` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `linked` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `qFormat` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `uiPriority` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `semiHidden` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `unhideWhenUsed` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `locked` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `customStyle` | bool | a-g |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `align` | enum | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `spaceBefore` | length | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `spaceAfter` | length | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `spaceBeforeAuto` | boolean | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `spaceAfterAuto` | boolean | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `font` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `font.ea` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `font.cs` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `font.asciiTheme` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `font.hAnsiTheme` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `font.eaTheme` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `font.csTheme` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `size` | font-size | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `bold` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `italic` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `color` | color | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `underline` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `strike` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `dstrike` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `highlight` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `caps` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `smallCaps` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `vanish` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `rtl` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `vertAlign` | enum | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `charSpacing` | length | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `shading` | color | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `lineSpacing` | string | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `lineRule` | enum | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `contextualSpacing` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `outlineLvl` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `kinsoku` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `snapToGrid` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `wordWrap` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `autoSpaceDE` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `autoSpaceDN` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `bidi` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `direction` | enum | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `overflowPunct` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `topLinePunct` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `suppressAutoHyphens` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `suppressLineNumbers` | bool | as- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `keepNext` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `keepLines` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `pageBreakBefore` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `widowControl` | bool | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `pbdr` | string | -s- |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `numId` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `ilvl` | int | asg |  | element gap | gap | L-DOCX-R6 (R4x) |
-| style | `effective.alignment` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.alignment.src` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.direction` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.direction.src` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.highlight` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.lineSpacing` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.lineSpacing.src` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.spaceBefore` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.spaceBefore.src` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.spaceAfter` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.spaceAfter.src` | string | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| style | `effective.strike` | bool | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| styles | `count` | number | --g |  | element gap | — | L-DOCX-R6 (R4x) |
-| tab | `pos` | length | asg |  | element gap | gap | R4x |
-| tab | `val` | enum | asg |  | element gap | gap | R4x |
-| tab | `leader` | enum | asg |  | element gap | gap | R4x |
+| style | `id` | string | a-g | a-g | supported | supported |  |
+| style | `name` | string | asg | asg | supported | supported |  |
+| style | `type` | enum | a-g | a-g | supported | supported |  |
+| style | `basedOn` | string | asg | asg | supported | supported |  |
+| style | `basedOn.path` | string | --g | --g | supported | — |  |
+| style | `next` | string | asg | asg | supported | supported |  |
+| style | `linked` | string | asg | asg | supported | supported |  |
+| style | `qFormat` | bool | asg | asg | supported | supported |  |
+| style | `uiPriority` | int | asg | asg | supported | supported |  |
+| style | `semiHidden` | bool | asg | asg | supported | supported |  |
+| style | `unhideWhenUsed` | bool | asg | asg | supported | supported |  |
+| style | `locked` | bool | asg | asg | supported | supported |  |
+| style | `customStyle` | bool | a-g | a-g | supported | supported |  |
+| style | `align` | enum | asg | asg | supported | supported |  |
+| style | `spaceBefore` | length | asg | asg | supported | supported |  |
+| style | `spaceAfter` | length | asg | asg | supported | supported |  |
+| style | `spaceBeforeAuto` | boolean | asg | asg | supported | supported |  |
+| style | `spaceAfterAuto` | boolean | asg | asg | supported | supported |  |
+| style | `font` | string | asg | asg | supported | supported |  |
+| style | `font.ea` | string | asg | asg | supported | supported |  |
+| style | `font.cs` | string | asg | asg | supported | supported |  |
+| style | `font.asciiTheme` | string | asg | asg | supported | supported |  |
+| style | `font.hAnsiTheme` | string | asg | asg | supported | supported |  |
+| style | `font.eaTheme` | string | asg | asg | supported | supported |  |
+| style | `font.csTheme` | string | asg | asg | supported | supported |  |
+| style | `size` | font-size | asg | asg | supported | supported |  |
+| style | `bold` | bool | asg | asg | supported | supported |  |
+| style | `italic` | bool | asg | asg | supported | supported |  |
+| style | `color` | color | asg | asg | supported | supported |  |
+| style | `underline` | string | asg | asg | supported | supported |  |
+| style | `strike` | bool | asg | asg | supported | supported |  |
+| style | `dstrike` | bool | asg | asg | supported | supported |  |
+| style | `highlight` | string | asg | asg | supported | supported |  |
+| style | `caps` | bool | asg | asg | supported | supported |  |
+| style | `smallCaps` | bool | asg | asg | supported | supported |  |
+| style | `vanish` | bool | asg | asg | supported | supported |  |
+| style | `rtl` | bool | asg |  | missing | gap |  |
+| style | `vertAlign` | enum | asg |  | missing | gap |  |
+| style | `charSpacing` | length | asg | asg | supported | supported |  |
+| style | `shading` | color | asg |  | missing | gap |  |
+| style | `lineSpacing` | string | asg | asg | supported | supported |  |
+| style | `lineRule` | enum | asg | asg | supported | supported |  |
+| style | `contextualSpacing` | bool | asg | asg | supported | supported |  |
+| style | `outlineLvl` | int | asg | asg | supported | supported |  |
+| style | `kinsoku` | bool | asg |  | missing | gap |  |
+| style | `snapToGrid` | bool | as- |  | write-only | gap |  |
+| style | `wordWrap` | bool | as- |  | write-only | gap |  |
+| style | `autoSpaceDE` | bool | asg |  | missing | gap |  |
+| style | `autoSpaceDN` | bool | asg |  | missing | gap |  |
+| style | `bidi` | bool | asg |  | missing | gap |  |
+| style | `direction` | enum | asg | asg | supported | supported |  |
+| style | `overflowPunct` | bool | asg |  | missing | gap |  |
+| style | `topLinePunct` | bool | as- |  | write-only | gap |  |
+| style | `suppressAutoHyphens` | bool | as- |  | write-only | gap |  |
+| style | `suppressLineNumbers` | bool | as- |  | write-only | gap |  |
+| style | `keepNext` | bool | asg | asg | supported | supported |  |
+| style | `keepLines` | bool | asg | asg | supported | supported |  |
+| style | `pageBreakBefore` | bool | asg | asg | supported | supported |  |
+| style | `widowControl` | bool | asg | asg | supported | supported |  |
+| style | `pbdr` | string | -s- |  | write-only | gap |  |
+| style | `numId` | int | asg | asg | supported | supported |  |
+| style | `ilvl` | int | asg | asg | supported | supported |  |
+| style | `effective.alignment` | string | --g |  | missing | — |  |
+| style | `effective.alignment.src` | string | --g |  | missing | — |  |
+| style | `effective.direction` | string | --g |  | missing | — |  |
+| style | `effective.direction.src` | string | --g |  | missing | — |  |
+| style | `effective.highlight` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter.src` | string | --g |  | missing | — |  |
+| style | `effective.strike` | bool | --g |  | missing | — |  |
+| style | `default` | bool |  | --g | litchi-only | — |  |
+| style | `autoRedefine` | bool |  | asg | litchi-only | litchi-only |  |
+| style | `hidden` | bool |  | asg | litchi-only | litchi-only |  |
+| style | `font.ascii` | string |  | asg | litchi-only | litchi-only |  |
+| style | `font.hAnsi` | string |  | asg | litchi-only | litchi-only |  |
+| style | `size.cs` | font-size |  | asg | litchi-only | litchi-only |  |
+| style | `bold.cs` | bool |  | asg | litchi-only | litchi-only |  |
+| style | `italic.cs` | bool |  | asg | litchi-only | litchi-only |  |
+| style | `underline.color` | color |  | asg | litchi-only | litchi-only |  |
+| style | `superscript` | bool |  | asg | litchi-only | litchi-only |  |
+| style | `subscript` | bool |  | asg | litchi-only | litchi-only |  |
+| style | `lang.latin` | string |  | asg | litchi-only | litchi-only |  |
+| style | `lang.ea` | string |  | asg | litchi-only | litchi-only |  |
+| style | `lang.cs` | string |  | asg | litchi-only | litchi-only |  |
+| style | `spaceBeforeLines` | int |  | asg | litchi-only | litchi-only |  |
+| style | `spaceAfterLines` | int |  | asg | litchi-only | litchi-only |  |
+| style | `firstLineIndent` | length |  | asg | litchi-only | litchi-only |  |
+| style | `hangingIndent` | length |  | asg | litchi-only | litchi-only |  |
+| style | `leftIndent` | length |  | asg | litchi-only | litchi-only |  |
+| style | `rightIndent` | length |  | asg | litchi-only | litchi-only |  |
+| style | `firstLineChars` | int |  | asg | litchi-only | litchi-only |  |
+| style | `hangingChars` | int |  | asg | litchi-only | litchi-only |  |
+| style | `leftChars` | int |  | asg | litchi-only | litchi-only |  |
+| style | `rightChars` | int |  | asg | litchi-only | litchi-only |  |
+| styles | `count` | number | --g | --g | supported | — |  |
+| tab | `pos` | length | asg | asg | supported | supported |  |
+| tab | `val` | enum | asg | asg | supported | supported |  |
+| tab | `leader` | enum | asg | asg | supported | supported |  |
 | cell | `width` | string | asg | --g | supported | gap |  |
 | cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
 | cell | `font` | string | -sg |  | missing | gap |  |
@@ -1257,46 +1304,46 @@ Property writes:
 | table | `lastCol` | bool |  | --g | litchi-only | — |  |
 | table | `bandedRows` | bool |  | --g | litchi-only | — |  |
 | table | `bandedCols` | bool |  | --g | litchi-only | — |  |
-| textbox | `text` | string | a-- |  | element gap | gap | R4x |
-| textbox | `width` | length | as- |  | element gap | gap | R4x |
-| textbox | `height` | length | as- |  | element gap | gap | R4x |
-| textbox | `geometry` | string | as- |  | element gap | gap | R4x |
-| textbox | `wrap` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `hAlign` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `vAlign` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `hRelative` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `vRelative` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `anchor.x` | length | a-- |  | element gap | gap | R4x |
-| textbox | `anchor.y` | length | a-- |  | element gap | gap | R4x |
-| textbox | `fill` | color | as- |  | element gap | gap | R4x |
-| textbox | `fill.gradient` | string | a-- |  | element gap | gap | R4x |
-| textbox | `fill.opacity` | string | a-- |  | element gap | gap | R4x |
-| textbox | `line.color` | color | as- |  | element gap | gap | R4x |
-| textbox | `line.width` | length | as- |  | element gap | gap | R4x |
-| textbox | `line.style` | string | as- |  | element gap | gap | R4x |
-| textbox | `inset.left` | length | a-- |  | element gap | gap | R4x |
-| textbox | `inset.top` | length | a-- |  | element gap | gap | R4x |
-| textbox | `inset.right` | length | a-- |  | element gap | gap | R4x |
-| textbox | `inset.bottom` | length | a-- |  | element gap | gap | R4x |
-| textbox | `textDirection` | string | a-- |  | element gap | gap | R4x |
-| textbox | `textAnchor` | string | a-- |  | element gap | gap | R4x |
-| textbox | `autoFit` | bool | a-- |  | element gap | gap | R4x |
-| textbox | `rotation` | string | a-- |  | element gap | gap | R4x |
-| textbox | `shadow` | string | a-- |  | element gap | gap | R4x |
-| textbox | `alt` | string | a-- |  | element gap | gap | R4x |
-| toc | `levels` | string | asg |  | element gap | gap | R4x |
-| toc | `title` | string | asg |  | element gap | gap | R4x |
-| toc | `hyperlinks` | bool | asg |  | element gap | gap | R4x |
-| toc | `pageNumbers` | bool | asg |  | element gap | gap | R4x |
-| watermark | `text` | string | asg |  | element gap | gap | R4x |
-| watermark | `image` | string | as- |  | element gap | gap | R4x |
-| watermark | `color` | color | asg |  | element gap | gap | R4x |
-| watermark | `font` | string | asg |  | element gap | gap | R4x |
-| watermark | `rotation` | int | asg |  | element gap | gap | R4x |
-| watermark | `opacity` | string | asg |  | element gap | gap | R4x |
-| watermark | `size` | string | asg |  | element gap | gap | R4x |
-| watermark | `width` | string | asg |  | element gap | gap | R4x |
-| watermark | `height` | string | asg |  | element gap | gap | R4x |
+| textbox | `text` | string | a-- |  | supported | gap | the node's text |
+| textbox | `width` | length | as- |  | write-only | gap |  |
+| textbox | `height` | length | as- |  | write-only | gap |  |
+| textbox | `geometry` | string | as- | --g | supported | gap |  |
+| textbox | `wrap` | enum | a-- |  | write-only | gap |  |
+| textbox | `hAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `vAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `hRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `vRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `anchor.x` | length | a-- |  | write-only | gap |  |
+| textbox | `anchor.y` | length | a-- |  | write-only | gap |  |
+| textbox | `fill` | color | as- |  | write-only | gap |  |
+| textbox | `fill.gradient` | string | a-- |  | write-only | gap |  |
+| textbox | `fill.opacity` | string | a-- |  | write-only | gap |  |
+| textbox | `line.color` | color | as- |  | write-only | gap |  |
+| textbox | `line.width` | length | as- |  | write-only | gap |  |
+| textbox | `line.style` | string | as- |  | write-only | gap |  |
+| textbox | `inset.left` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.top` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.right` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.bottom` | length | a-- |  | write-only | gap |  |
+| textbox | `textDirection` | string | a-- |  | write-only | gap |  |
+| textbox | `textAnchor` | string | a-- |  | write-only | gap |  |
+| textbox | `autoFit` | bool | a-- |  | write-only | gap |  |
+| textbox | `rotation` | string | a-- |  | write-only | gap |  |
+| textbox | `shadow` | string | a-- |  | write-only | gap |  |
+| textbox | `alt` | string | a-- | --g | supported | gap |  |
+| toc | `levels` | string | asg | --g | supported | gap |  |
+| toc | `title` | string | asg |  | missing | gap |  |
+| toc | `hyperlinks` | bool | asg | --g | supported | gap |  |
+| toc | `pageNumbers` | bool | asg | --g | supported | gap |  |
+| watermark | `text` | string | asg | --g | supported | gap |  |
+| watermark | `image` | string | as- |  | write-only | gap |  |
+| watermark | `color` | color | asg | --g | supported | gap |  |
+| watermark | `font` | string | asg | --g | supported | gap |  |
+| watermark | `rotation` | int | asg | --g | supported | gap |  |
+| watermark | `opacity` | string | asg | --g | supported | gap |  |
+| watermark | `size` | string | asg | --g | supported | gap |  |
+| watermark | `width` | string | asg |  | missing | gap |  |
+| watermark | `height` | string | asg |  | missing | gap |  |
 
 ### Contextual operation gaps
 
@@ -6832,11 +6879,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | comment | comment | supported |  |
 | connector | connector | supported |  |
 | diagram | slide | supported |  |
-| equation | equation | gap | L-PPTX-R11 |
+| equation | equation | supported |  |
 | group | group | supported |  |
-| hyperlink | hyperlink | gap | M1-extended |
+| hyperlink | hyperlink | supported |  |
 | linebreak | linebreak | supported |  |
-| media | audio | gap | L-PPTX-R11 |
+| media | audio | supported |  |
 | model3d | model3d | gap | M1-extended |
 | modernComment | modernComment | supported |  |
 | notes | notes | supported |  |
@@ -6852,16 +6899,16 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidelayout | shape | supported |  |
 | slidemaster | shape | supported |  |
 | cell | tc | supported |  |
-| column | col | gap | L-PPTX-R8 |
+| column | col | supported |  |
 | row | tr | supported |  |
 | table | table | supported |  |
 | textbox | shape | supported |  |
-| theme | theme | gap | L-PPTX-R4 |
+| theme | theme | supported |  |
 | transition | slide | supported |  |
 | zoom | zoom | gap | M1-extended |
 |  | smartart | litchi-only |  |
-|  | video | litchi-only | L-PPTX-R11 |
-|  | media | litchi-only | L-PPTX-R11 |
+|  | video | litchi-only |  |
+|  | media | litchi-only |  |
 |  | slideMaster | litchi-only |  |
 |  | slideLayout | litchi-only |  |
 |  | reply | litchi-only |  |
@@ -7194,12 +7241,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | diagram | `hidden` | bool |  | asg | litchi-only | litchi-only |  |
 | diagram | `notes` | string |  | -s- | litchi-only | litchi-only |  |
 | diagram | `transition` | string |  | -s- | litchi-only | litchi-only |  |
-| equation | `id` | number | a-g |  | element gap | gap | L-PPTX-R11 |
-| equation | `formula` | string | asg |  | element gap | gap | L-PPTX-R11 |
-| equation | `x` | length | asg |  | element gap | gap | L-PPTX-R11 |
-| equation | `y` | length | asg |  | element gap | gap | L-PPTX-R11 |
-| equation | `width` | length | asg |  | element gap | gap | L-PPTX-R11 |
-| equation | `height` | length | asg |  | element gap | gap | L-PPTX-R11 |
+| equation | `id` | number | a-g |  | missing | gap |  |
+| equation | `formula` | string | asg | --g | supported | gap |  |
+| equation | `x` | length | asg |  | missing | gap |  |
+| equation | `y` | length | asg |  | missing | gap |  |
+| equation | `width` | length | asg |  | missing | gap |  |
+| equation | `height` | length | asg |  | missing | gap |  |
 | group | `shapes` | string | a-- |  | write-only | gap |  |
 | group | `ungroup` | boolean | -s- |  | write-only | gap |  |
 | group | `name` | string | asg | --g | supported | gap |  |
@@ -7213,19 +7260,25 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | group | `rotation` | number |  | --g | litchi-only | — |  |
 | group | `flipH` | bool |  | --g | litchi-only | — |  |
 | group | `flipV` | bool |  | --g | litchi-only | — |  |
-| hyperlink | `link` | string | asg |  | element gap | gap | M1-extended |
-| hyperlink | `tooltip` | string | asg |  | element gap | gap | M1-extended |
-| media | `src` | string | as- |  | element gap | gap | L-PPTX-R11 |
-| media | `poster` | string | as- |  | element gap | gap | L-PPTX-R11 |
-| media | `x` | length | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `y` | length | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `width` | length | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `height` | length | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `volume` | int | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `autoPlay` | bool | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `loop` | bool | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `trimStart` | string | asg |  | element gap | gap | L-PPTX-R11 |
-| media | `trimEnd` | string | asg |  | element gap | gap | L-PPTX-R11 |
+| hyperlink | `link` | string | asg | asg | supported | supported |  |
+| hyperlink | `tooltip` | string | asg | asg | supported | supported |  |
+| media | `src` | string | as- | a-- | write-only | partial |  |
+| media | `poster` | string | as- | a-- | write-only | partial |  |
+| media | `x` | length | asg | a-g | supported | partial |  |
+| media | `y` | length | asg | a-g | supported | partial |  |
+| media | `width` | length | asg | a-g | supported | partial |  |
+| media | `height` | length | asg | a-g | supported | partial |  |
+| media | `volume` | int | asg |  | missing | gap |  |
+| media | `autoPlay` | bool | asg |  | missing | gap |  |
+| media | `loop` | bool | asg |  | missing | gap |  |
+| media | `trimStart` | string | asg | --g | supported | gap |  |
+| media | `trimEnd` | string | asg | --g | supported | gap |  |
+| media | `name` | string |  | a-g | litchi-only | litchi-only |  |
+| media | `alt` | string |  | --g | litchi-only | — |  |
+| media | `rotation` | number |  | --g | litchi-only | — |  |
+| media | `flipH` | bool |  | --g | litchi-only | — |  |
+| media | `flipV` | bool |  | --g | litchi-only | — |  |
+| media | `zorder` | int |  | --g | litchi-only | — |  |
 | model3d | `src` | string | as- |  | element gap | gap | M1-extended |
 | model3d | `x` | length | asg |  | element gap | gap | M1-extended |
 | model3d | `y` | length | asg |  | element gap | gap | M1-extended |
@@ -7701,8 +7754,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `border.tl2br` | string | asg |  | missing | gap |  |
 | cell | `border.top` | string | -sg |  | missing | gap |  |
 | cell | `border.tr2bl` | string | asg |  | missing | gap |  |
-| column | `width` | length | asg |  | element gap | gap | L-PPTX-R8 |
-| column | `text` | string | a-- |  | element gap | gap | L-PPTX-R8 |
+| column | `width` | length | asg | asg | supported | supported |  |
+| column | `text` | string | a-- | a-- | write-only | supported |  |
 | row | `cols` | int | a-- |  | write-only | gap |  |
 | row | `height` | length | asg |  | gap | gap | L-PPTX-R8 |
 | table | `id` | number | a-g |  | missing | gap |  |
@@ -7779,25 +7832,25 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | textbox | `marginLeft` | length |  | --g | litchi-only | — |  |
 | textbox | `marginRight` | length |  | --g | litchi-only | — |  |
 | textbox | `geometry` | string |  | as- | litchi-only | litchi-only |  |
-| theme | `headingFont` | string | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `bodyFont` | string | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `headingFont.ea` | string | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `headingFont.cs` | string | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `bodyFont.ea` | string | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `bodyFont.cs` | string | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `dk1` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `lt1` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `dk2` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `lt2` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `accent1` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `accent2` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `accent3` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `accent4` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `accent5` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `accent6` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `hyperlink` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `followedhyperlink` | color | -sg |  | element gap | gap | L-PPTX-R4 |
-| theme | `name` | string | -sg |  | element gap | gap | L-PPTX-R4 |
+| theme | `headingFont` | string | -sg | -sg | supported | supported |  |
+| theme | `bodyFont` | string | -sg | -sg | supported | supported |  |
+| theme | `headingFont.ea` | string | -sg | -sg | supported | supported |  |
+| theme | `headingFont.cs` | string | -sg | -sg | supported | supported |  |
+| theme | `bodyFont.ea` | string | -sg | -sg | supported | supported |  |
+| theme | `bodyFont.cs` | string | -sg | -sg | supported | supported |  |
+| theme | `dk1` | color | -sg | -sg | supported | supported |  |
+| theme | `lt1` | color | -sg | -sg | supported | supported |  |
+| theme | `dk2` | color | -sg | -sg | supported | supported |  |
+| theme | `lt2` | color | -sg | -sg | supported | supported |  |
+| theme | `accent1` | color | -sg | -sg | supported | supported |  |
+| theme | `accent2` | color | -sg | -sg | supported | supported |  |
+| theme | `accent3` | color | -sg | -sg | supported | supported |  |
+| theme | `accent4` | color | -sg | -sg | supported | supported |  |
+| theme | `accent5` | color | -sg | -sg | supported | supported |  |
+| theme | `accent6` | color | -sg | -sg | supported | supported |  |
+| theme | `hyperlink` | color | -sg | -sg | supported | supported |  |
+| theme | `followedhyperlink` | color | -sg | -sg | supported | supported |  |
+| theme | `name` | string | -sg | -sg | supported | supported |  |
 | transition | `transition` | enum | -sg | -s- | write-only | supported |  |
 | transition | `advanceTime` | string | -sg |  | missing | gap |  |
 | transition | `advanceClick` | bool | -sg |  | missing | gap |  |

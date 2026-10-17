@@ -146,10 +146,23 @@ pub fn store(
     value: &List,
     conformance: Conformance,
 ) -> Result<()> {
+    store_with(package, slide_name, value, conformance, false)
+}
+
+/// [`store`], or, with `append`, add the pictures after the slide's
+/// existing media (record 0321). The caller chooses shape IDs, relationship
+/// IDs and part names that are free on the slide; collisions are refused.
+pub(crate) fn store_with(
+    package: &mut OpcPackage,
+    slide_name: &PackURI,
+    value: &List,
+    conformance: Conformance,
+    append: bool,
+) -> Result<()> {
     validate_value(value, true)?;
     let slide = package.get_part(slide_name)?;
     require_slide(slide)?;
-    if !parse(slide.blob())?.pictures.is_empty() {
+    if !append && !parse(slide.blob())?.pictures.is_empty() {
         return Err(invalid("slide already contains media pictures"));
     }
     if document_conformance(slide.blob())? != conformance {

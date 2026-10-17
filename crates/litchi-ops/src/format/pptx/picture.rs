@@ -29,7 +29,7 @@ fn allocation(source: std::collections::TryReserveError) -> crate::Error {
 }
 
 /// The image content type and file extension of `data`, by signature.
-fn classify(data: &[u8]) -> Option<(&'static str, &'static str)> {
+pub(super) fn classify(data: &[u8]) -> Option<(&'static str, &'static str)> {
     if data.starts_with(b"\x89PNG\r\n\x1a\n") {
         Some(("image/png", "png"))
     } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
@@ -46,7 +46,7 @@ fn classify(data: &[u8]) -> Option<(&'static str, &'static str)> {
 }
 
 /// Read a picture source: a base64 `data:` URI or a local file path.
-fn read_source(src: &str, maximum: usize) -> Result<Vec<u8>> {
+pub(super) fn read_source(src: &str, maximum: usize) -> Result<Vec<u8>> {
     if let Some(rest) = src.strip_prefix("data:") {
         let (header, payload) = rest.split_once(',').ok_or_else(|| {
             error(

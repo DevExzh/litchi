@@ -2527,6 +2527,36 @@ through common styles, a run over its paragraph.
 | --- | --- | --- |
 | `litchi_xls::WorksheetDefect::{ZoomLevel, SharedFormulaFlag}`, `Defect::Worksheet` | Excel-compatible repairs under every `Leniency`: a WINDOW2 zoom outside `10..=400` reads as the default; a stale `fShrFmla` on a formula with its own tokens is ignored | ✅ 0316 |
 
+## DOCX located parts: styles, numbering, headers, footers and notes (record 0319)
+
+L-DOCX-R5/R6. Owned, source-located catalogs read a part once and keep
+every entry's byte range, so a read answers the typed direct-property keys
+and an edit splices the raw part. They are owner-neutral: both owners and
+the eager `Edit` return the same catalog type. Edit verbs stage on the eager
+package-bound `document::Edit` and travel in its `Patch` as graph changes
+and main-story element replacements; no new transaction family is
+introduced. Native identifiers (`w:styleId`, `w:abstractNumId`, `w:numId`,
+note `w:id`) are the selectors these verbs take, as `remove_comment(id)`
+does.
+
+| Name | Notes | Status |
+|---|---|---|
+| `styles::catalog::{Catalog, Entry, Flag}` | `Catalog::{from_xml, xml, entries, get, resolve, paragraph_properties, run_properties, is_strict}`; `resolve` matches an id or a display name | ✅ 0319 |
+| `styles::catalog::{NewStyle, StyleChange}` | `with_*` builders; an inner `None` removes an element | ✅ 0319 |
+| `Edit::{style_catalog, add_style, set_style, remove_style}` | | ✅ 0319 |
+| `numbering::catalog::{Catalog, AbstractNum, Num, Lvl}` | `Catalog::{abstract_nums, nums, abstract_num, num, level_of, format_of, level_paragraph_properties, level_run_properties, next_abstract_num_id, next_num_id}`; `Lvl` is named after `w:lvl` (the typed `numbering::Level` stays the parsed model) | ✅ 0319 |
+| `numbering::catalog::{LevelChange, AbstractNumChange, NewNum, NewLevel, NewAbstractNum}` | | ✅ 0319 |
+| `Edit::{numbering_catalog, set_level, set_abstract_num, set_num_definition, add_num, add_abstract_num, add_level, remove_num, remove_abstract_num, remove_level}` | | ✅ 0319 |
+| `header_footer::catalog::Entry` | role, relationship identifier and part name, in relationship order | ✅ 0319 |
+| `header_footer::Story::from_shared_bytes` | | ✅ 0319 |
+| `document::NewStory`; `Edit::{header_footer_entries, add_header_footer, remove_header_footer, set_header_footer_kind, set_story_text, format_story}` | | ✅ 0319 |
+| `document::{NewNote, NoteKind}`; `Edit::{add_note_at, set_note_text, remove_note}` | | ✅ 0319 |
+| `footnote::Note::{footnotes_from_xml, endnotes_from_xml}` | | ✅ 0319 |
+| `Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml}` and `source_backed::Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml, footnotes, endnotes}` | both owners | ✅ 0319 |
+| `document::ElementStep::SectionProperties` | the body-final `w:sectPr`, position 0, first step only | ✅ 0319 |
+| `Edit::insert_break_at(paragraph, at, RunBreakType) -> Position` | a new run holding one `w:br`, before direct run `at` or appended; returns the new run's position (record 0319, P1 marks) | ✅ 0319 |
+| `source_backed::Document::{bookmarks, text_boxes}` | the main story's bookmarks and text boxes, as the eager `Document` reads them | ✅ 0319 |
+
 ## XLSX worksheet feature families (record 0320)
 
 Five scoped families publish worksheet features through immutable
@@ -2543,6 +2573,27 @@ staging returns the source package (an exact no-op keeps every byte).
 | `litchi_xlsx::workbook::comments::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_comments, apply_comments}` | `Edit::{comments, set, add, remove}` (`add` refuses an annotated cell and returns the row-major position); splices notes and their VML note shapes, keeping the other notes' bytes | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::drawing::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{drawing_elements, edit_drawings, apply_drawings}` | `Edit::{elements, add_picture, add_shape, set, remove}`; read model `Element`, `ElementKind`, `Placement`, `Marker`, `Image`, `Fill`, `Line`, `Font`, `Align`, `VerticalAlign`; specs `PictureSpec`, `ShapeSpec`, `Change` | ✅ 0320; family registered in the gate |
 | `litchi_xlsx::Worksheet::comments`, `SourceWorksheet::{comments, page_breaks, drawing_elements}` | reads on both owners | ✅ 0320 |
+
+## PPTX theme, columns, hyperlinks, media, equations, masters and layouts (record 0321)
+
+New verbs live on the primary `opened::Edit` (no new transaction family);
+reads live on the owners and slide views that already answer charts and
+SmartArt. Slide hyperlink targets are semantic (`Target::{Url, Slide,
+Action}`); the authored relationship ID of a `Click` stays crate-private.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::Package::theme`, `SourceBackedPresentation::theme`, `shape::theme::presentation_theme` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{theme, set_theme_colors, set_theme_fonts}` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_master_name, set_layout_name, set_master_shape_text, set_layout_shape_text}` | adopted (0321) |
+| `litchi_pptx::table::Table::grid_columns`; `opened::Edit::{set_table_column_width, insert_table_column, remove_table_column}` | adopted (0321) |
+| `litchi_pptx::hyperlinks::{Click, Link, Target}`; `Click::{of_shape, from_text, action, tooltip}` | adopted (0321) |
+| `litchi_pptx::slide::Slide::hyperlink`, `SourceSlide::hyperlink`, `source::Slide::hyperlink` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted (0321) |
+| `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted (0321) |
+| `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
+
+See [0321](unified-ops/0321-pptx-element-gaps.md).
 
 ## XLSB worksheet feature families (record 0322)
 

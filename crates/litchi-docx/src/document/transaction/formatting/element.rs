@@ -60,6 +60,9 @@ pub enum ElementStep {
     /// A block or inline `w:sdt`. A later step selects a child of its single
     /// `w:sdtContent`.
     ContentControl(Position),
+    /// The body-final `w:sectPr`: only position 0, and only as the first
+    /// step (record 0319).
+    SectionProperties(Position),
 }
 
 impl ElementStep {
@@ -73,6 +76,7 @@ impl ElementStep {
             Self::Row(_) => b"tr",
             Self::Cell(_) => b"tc",
             Self::ContentControl(_) => b"sdt",
+            Self::SectionProperties(_) => b"sectPr",
         }
     }
 
@@ -86,7 +90,8 @@ impl ElementStep {
             | Self::Table(position)
             | Self::Row(position)
             | Self::Cell(position)
-            | Self::ContentControl(position) => position,
+            | Self::ContentControl(position)
+            | Self::SectionProperties(position) => position,
         }
     }
 
@@ -99,6 +104,7 @@ impl ElementStep {
             Self::Row(_) => Self::Row(position),
             Self::Cell(_) => Self::Cell(position),
             Self::ContentControl(_) => Self::ContentControl(position),
+            Self::SectionProperties(_) => Self::SectionProperties(position),
         }
     }
 
@@ -131,6 +137,7 @@ impl ElementStep {
             Self::Row(_) => "tr",
             Self::Cell(_) => "tc",
             Self::ContentControl(_) => "sdt",
+            Self::SectionProperties(_) => "sectPr",
         };
         (name, self.position().get())
     }
@@ -144,6 +151,7 @@ impl ElementStep {
             "tr" => Self::Row(position),
             "tc" => Self::Cell(position),
             "sdt" => Self::ContentControl(position),
+            "sectPr" => Self::SectionProperties(position),
             _ => return None,
         })
     }
@@ -571,6 +579,12 @@ fn locate(snapshot: &Snapshot, path: &[ElementStep]) -> Result<Located> {
                 checked_start(range, "content control")?,
                 checked_end(range, "content control")?,
             )
+        },
+        ElementStep::SectionProperties(position) if position.get() == 0 && rest.is_empty() => {
+            let body = super::body_of_snapshot(snapshot)?;
+            let index = body.section.ok_or_else(not_found)?;
+            let child = body.children.get(index).ok_or_else(not_found)?;
+            (child.start, child.end)
         },
         _ => return Err(not_found()),
     };
@@ -1633,6 +1647,93 @@ impl Edit {
         after.extend_from_slice(&reference);
         after.extend_from_slice(&base[end..]);
         self.replace_element(paragraph, &before, &Arc::new(after))
+    }
+
+    /// The exact bytes of the body-final section properties, with the
+    /// namespace bindings in scope there, or `None` when the body has none
+    /// (record 0319).
+    pub(crate) fn body_section(
+        &self,
+    ) -> Result<Option<(Arc<Vec<u8>>, crate::part_scan::Bindings)>> {
+        let path = [ElementStep::SectionProperties(Position::new(0))];
+        let located = match locate(&self.projected, &path) {
+            Ok(located) => located,
+            Err(_) => return Ok(None),
+        };
+        let inherited = bindings_at(self.projected.xml_bytes(), located.start)?;
+        Ok(Some((self.element_bytes(located)?, inherited)))
+    }
+
+    /// Replace the body-final section properties' exact bytes `before` with
+    /// `after` (record 0319).
+    pub(crate) fn replace_body_section(
+        &mut self,
+        before: &Arc<Vec<u8>>,
+        after: &Arc<Vec<u8>>,
+    ) -> Result<&mut Self> {
+        self.replace_element(
+            &ElementPath::new([ElementStep::SectionProperties(Position::new(0))]),
+            before,
+            after,
+        )
+    }
+
+    /// Append body-final section properties to a body that has none (record
+    /// 0319).
+    pub(crate) fn append_body_section(&mut self, xml: &Arc<Vec<u8>>) -> Result<&mut Self> {
+        let (children, _) = container_children(&self.projected, &ElementPath::body())?;
+        if children.section.is_some() {
+            return Err(Error::SemanticPrecondition);
+        }
+        let at = Position::new(children.children.len());
+        self.insert_element(&ElementPath::body(), at, xml)
+    }
+
+    /// The projected main-document XML.
+    pub(crate) fn main_xml(&self) -> &[u8] {
+        self.projected.xml_bytes()
+    }
+
+    /// Insert one inline run's exact markup into the paragraph at
+    /// `paragraph` before its direct run `at` (after its last child for
+    /// `None`), and return its position among the paragraph's direct runs
+    /// (record 0319).
+    pub(crate) fn insert_run_markup_at(
+        &mut self,
+        paragraph: &ElementPath,
+        at: Option<Position>,
+        markup: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
+    ) -> Result<Position> {
+        self.insert_inline(paragraph, at, b"r", markup)
+    }
+
+    /// Remove every direct run of every paragraph of the main story that
+    /// holds a note reference (`footnoteReference` or `endnoteReference`,
+    /// by `local`) to note `id`. Returns whether anything changed (record
+    /// 0319).
+    pub(crate) fn strip_note_references(&mut self, local: &[u8], id: i64) -> Result<bool> {
+        self.ensure_unmanaged("remove_note")?;
+        let mut changed = false;
+        let families: [(usize, fn(Position) -> ElementStep); 3] = [
+            (self.projected.paragraphs.len(), ElementStep::Paragraph),
+            (self.projected.tables.len(), ElementStep::Table),
+            (
+                self.projected.block_controls.len(),
+                ElementStep::ContentControl,
+            ),
+        ];
+        for (count, step) in families {
+            for index in 0..count {
+                let path = ElementPath::new([step(Position::new(index))]);
+                let located = locate(&self.projected, path.steps())?;
+                let before = self.element_bytes(located)?;
+                if let Some(after) = without_note_references(&before, local, id)? {
+                    self.replace_element(&path, &before, &Arc::new(after))?;
+                    changed = true;
+                }
+            }
+        }
+        Ok(changed)
     }
 
     /// The largest comment identifier the main document's range markers and
@@ -2719,6 +2820,72 @@ fn scan_comment_markers(
 
 /// The fragment without comment `id`'s range markers and reference runs,
 /// or `None` when it holds none.
+/// `xml` without the runs that hold an element named `local` whose `id`
+/// attribute is `id`, or `None` when it has none (record 0319).
+fn without_note_references(xml: &[u8], local: &[u8], id: i64) -> Result<Option<Vec<u8>>> {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    let mut runs: Vec<(usize, bool)> = Vec::new();
+    let mut removals: Vec<(usize, usize)> = Vec::new();
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Word fragment offset overflow"))?;
+        let event = reader
+            .read_event()
+            .map_err(|_| Error::Document(crate::Error::Xml("invalid Word XML".into())))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Word fragment offset overflow"))?;
+        match event {
+            Event::Start(element) if element.local_name().as_ref() == b"r" => {
+                runs.push((start, false));
+            },
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == local =>
+            {
+                let matches = element
+                    .unchecked_attributes()
+                    .filter_map(std::result::Result::ok)
+                    .find(|attribute| attribute.key.local_name().as_ref() == b"id")
+                    .and_then(|attribute| {
+                        std::str::from_utf8(&attribute.value)
+                            .ok()?
+                            .trim()
+                            .parse::<i64>()
+                            .ok()
+                    })
+                    == Some(id);
+                if matches && let Some(run) = runs.last_mut() {
+                    run.1 = true;
+                }
+            },
+            Event::End(element) if element.local_name().as_ref() == b"r" => {
+                if let Some((run_start, true)) = runs.pop() {
+                    removals.push((run_start, end));
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if removals.is_empty() {
+        return Ok(None);
+    }
+    removals.sort_unstable();
+    let mut output = buffer(xml.len())?;
+    let mut cursor = 0usize;
+    for (start, end) in removals {
+        if start < cursor {
+            continue;
+        }
+        output.extend_from_slice(&xml[cursor..start]);
+        cursor = end;
+    }
+    output.extend_from_slice(&xml[cursor..]);
+    Ok(Some(output))
+}
+
 fn without_comment_markers(xml: &[u8], id: u32) -> Result<Option<Vec<u8>>> {
     let mut removals: Vec<(usize, usize)> = Vec::new();
     let mut references = Vec::new();

@@ -1,9 +1,15 @@
 //! Detached composition of ordinary presentation-domain edits.
 
 mod comments;
+mod links;
+mod masters;
+mod media;
 mod notes;
 mod smartart;
+mod table;
+mod theme;
 
+pub use media::MediaFile;
 pub use smartart::SmartArtParts;
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};

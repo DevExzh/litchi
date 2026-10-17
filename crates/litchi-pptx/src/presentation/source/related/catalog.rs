@@ -559,6 +559,40 @@ impl SourceBackedPresentation {
         finish_many_masters(&self.inner, pending)
     }
 
+    /// The presentation theme: the presentation part's own theme, else the
+    /// first slide master's (record 0321). `None` when there is neither.
+    /// Only the presentation part, at most one master part and the theme
+    /// part are read.
+    ///
+    /// # Errors
+    /// Returns typed source, execution, limit, relationship or XML errors.
+    pub fn theme(&self) -> Result<Option<litchi_drawingml::theme::Theme>> {
+        super::with_fences(&self.inner, || {
+            let presentation = presentation_part(&self.inner)?;
+            let target = match crate::shape::theme::package::theme_target(&presentation)? {
+                Some(target) => Some(target),
+                None => match master_targets(&self.inner, &presentation)?.first() {
+                    Some(master) => {
+                        let part = super::load_part(
+                            &self.inner,
+                            &master.part_uri,
+                            ct::PML_SLIDE_MASTER,
+                            MAX_MASTER_PART_BYTES,
+                        )?;
+                        crate::shape::theme::package::theme_target(&part)?
+                    },
+                    None => None,
+                },
+            };
+            let Some(target) = target else {
+                return Ok(None);
+            };
+            let part =
+                super::load_part(&self.inner, &target, ct::OFC_THEME, MAX_MASTER_PART_BYTES)?;
+            Ok(Some(litchi_drawingml::theme::codec::read(part.blob())?))
+        })
+    }
+
     /// Acquire one slide-master snapshot by its zero-based presentation position.
     ///
     /// # Errors
