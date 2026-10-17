@@ -2830,8 +2830,10 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Xlsb
                 && self.retains_source != Some(false)
-                && (matches!(self.data().canonical, "cell" | "range" | "sheet")
-                    || crate::format::xlsb::FEATURE_ELEMENTS.contains(&self.data().canonical))
+                && (matches!(
+                    self.data().canonical,
+                    "cell" | "range" | "sheet" | "namedrange"
+                ) || crate::format::xlsb::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xls")]
         let settable = settable
@@ -2941,7 +2943,7 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Xlsb
                 && self.retains_source != Some(false)
-                && (self.data().canonical == "sheet"
+                && (matches!(self.data().canonical, "sheet" | "namedrange")
                     || crate::format::xlsb::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "doc")]
@@ -3018,7 +3020,7 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Xlsb
                 && self.retains_source != Some(false)
-                && (matches!(self.data().canonical, "cell" | "sheet")
+                && (matches!(self.data().canonical, "cell" | "sheet" | "namedrange")
                     || crate::format::xlsb::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xls")]

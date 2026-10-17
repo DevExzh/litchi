@@ -816,6 +816,34 @@ const RECIPES: &[Recipe] = &[
         props: &[("src", MP4), ("poster", PNG)],
         start: false,
     },
+    // Record 0330: claims that agree with the registry. A picture needs
+    // its image and a legacy comment its author, both on a producer's
+    // slide; an XLSB defined name needs its name and a sheet-qualified
+    // reference.
+    Recipe {
+        format: "pptx",
+        element: "picture",
+        fixture: "ooxml/pptx/shapes.pptx",
+        parent: "/slide[1]",
+        props: &[("src", PNG), ("name", "Logo")],
+        start: false,
+    },
+    Recipe {
+        format: "pptx",
+        element: "comment",
+        fixture: "ooxml/pptx/shapes.pptx",
+        parent: "/slide[1]",
+        props: &[("author", "Ada"), ("text", "Check")],
+        start: false,
+    },
+    Recipe {
+        format: "xlsb",
+        element: "namedrange",
+        fixture: "create()",
+        parent: "/",
+        props: &[("name", "Totals"), ("ref", "Sheet1!$A$1:$B$2")],
+        start: false,
+    },
     Recipe {
         format: "xls",
         element: "row",

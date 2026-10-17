@@ -2774,10 +2774,15 @@ pub(crate) mod coalesce {
                 {
                     return Ok(None);
                 }
-                if props
-                    .iter()
-                    .any(|(key, _)| key.as_str().eq_ignore_ascii_case("merge"))
-                {
+                // Merges and cell hyperlinks (`link`, `tooltip`, `display`
+                // and their aliases) have their own ordinary set paths; the
+                // payload admission below does not know them (record 0330).
+                if props.iter().any(|(key, _)| {
+                    key.as_str().eq_ignore_ascii_case("merge")
+                        || super::super::spec::CELL_LINK_TABLE
+                            .lookup(key.as_str())
+                            .is_some()
+                }) {
                     return Ok(None);
                 }
                 let assignments = admit_properties_with_limits(props, limits)?;

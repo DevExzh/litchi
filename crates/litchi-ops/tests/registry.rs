@@ -102,3 +102,105 @@ fn registry_export_matches_capabilities() {
         }
     }
 }
+
+/// Every format this build enables.
+fn enabled_formats() -> impl Iterator<Item = FileFormat> {
+    [
+        (FileFormat::Doc, cfg!(feature = "doc")),
+        (FileFormat::Docx, cfg!(feature = "docx")),
+        (FileFormat::Ppt, cfg!(feature = "ppt")),
+        (FileFormat::Pptx, cfg!(feature = "pptx")),
+        (FileFormat::Rtf, cfg!(feature = "rtf")),
+        (FileFormat::Odt, cfg!(feature = "odt")),
+        (FileFormat::Xls, cfg!(feature = "xls")),
+        (FileFormat::Xlsb, cfg!(feature = "xlsb")),
+        (FileFormat::Xlsx, cfg!(feature = "xlsx")),
+        (FileFormat::Ods, cfg!(feature = "ods")),
+        (FileFormat::Odp, cfg!(feature = "odp")),
+        (FileFormat::Oth, cfg!(feature = "oth")),
+        (FileFormat::Odm, cfg!(feature = "odm")),
+        (FileFormat::Odg, cfg!(feature = "odg")),
+        (FileFormat::Odc, cfg!(feature = "odc")),
+        (FileFormat::Odi, cfg!(feature = "odi")),
+        (FileFormat::Odb, cfg!(feature = "odb")),
+        (FileFormat::Odf, cfg!(feature = "odf-formula")),
+        (FileFormat::Pages, cfg!(feature = "pages")),
+        (FileFormat::Keynote, cfg!(feature = "keynote")),
+        (FileFormat::Numbers, cfg!(feature = "numbers")),
+    ]
+    .into_iter()
+    .filter_map(|(format, enabled)| enabled.then_some(format))
+}
+
+/// An element's operation claims agree with its properties' flags (record
+/// 0330). Both come from the same spec tables, but through different
+/// lists, so they can drift; this is the rule that keeps them together:
+///
+/// 1. an element claims `set` exactly when at least one of its properties
+///    is settable (a `set` with no settable key could only be refused, and a
+///    settable key on an element without `set` is never offered);
+/// 2. an element with an addable property claims `add` (an element may
+///    claim `add` without any: a slide or a row is added bare);
+/// 3. an element that claims `add`, `set` or `remove` also claims `get`,
+///    and an element with a gap claims nothing and declares no writable
+///    property.
+///
+/// Contextual refusals (a selection, an owner state, one property) are
+/// operation or property gaps; they never turn an element claim off. The
+/// report checked is the format's default one ([`Capabilities::of`]); a
+/// file's report only narrows it by owner state.
+#[test]
+fn element_operations_agree_with_property_flags() {
+    use litchi_ops::capabilities::Capabilities;
+
+    let mut contradictions = Vec::new();
+    for format in enabled_formats() {
+        let capabilities = Capabilities::of(format);
+        for element in capabilities.elements() {
+            let operations = element.operations();
+            let settable: Vec<_> = element
+                .properties()
+                .filter(|p| p.set())
+                .map(|p| p.name())
+                .collect();
+            let addable: Vec<_> = element
+                .properties()
+                .filter(|p| p.add())
+                .map(|p| p.name())
+                .collect();
+            let name = element.name();
+            if operations.set && settable.is_empty() {
+                contradictions.push(format!(
+                    "{format:?} {name}: claims set without a settable property"
+                ));
+            }
+            if !operations.set && !settable.is_empty() {
+                contradictions.push(format!(
+                    "{format:?} {name}: settable {settable:?} without a set claim"
+                ));
+            }
+            if !operations.add && !addable.is_empty() {
+                contradictions.push(format!(
+                    "{format:?} {name}: addable {addable:?} without an add claim"
+                ));
+            }
+            if (operations.add || operations.set || operations.remove) && !operations.get {
+                contradictions.push(format!("{format:?} {name}: writes without get"));
+            }
+            if element.gap().is_some()
+                && (operations.add
+                    || operations.set
+                    || operations.remove
+                    || !settable.is_empty()
+                    || !addable.is_empty())
+            {
+                contradictions.push(format!("{format:?} {name}: a gap element claims writes"));
+            }
+        }
+    }
+    assert!(
+        contradictions.is_empty(),
+        "element claims contradict property flags:\n{}",
+        contradictions.join("\n")
+    );
+}

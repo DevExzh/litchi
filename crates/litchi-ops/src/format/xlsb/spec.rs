@@ -938,6 +938,19 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
 // not claim a read.  The values are the same gaps as XLSX's table, but the
 // reasons describe the XLSB leaf and its deferred binary parts.
 static GAPS: &[GapSpec] = &[
+    // Defined names are added, retargeted and removed (record 0261), but
+    // only the last name can go: removing an earlier one would renumber the
+    // name index every formula's name references use (record 0330).
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "namedrange",
+            context: "earlier-name",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "XLSB defined-name index renumbering (record 0330)",
+        reason: "only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references",
+    },
     property_gap(
         "workbook",
         "calc.mode",

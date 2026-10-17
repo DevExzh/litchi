@@ -26,7 +26,7 @@ Kinds:
 
 | Family | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 1552 | 0 | 26 | 51 | 4 | 0 | 0 | 20 | 20/20 |
+| excel | 1633 | 1553 | 0 | 25 | 51 | 4 | 0 | 0 | 20 | 20/20 |
 | excel/charts | 743 | 451 | 0 | 255 | 22 | 15 | 0 | 0 | 32 | 32/32 |
 | ppt | 310 | 129 | 32 | 37 | 141 | 2 | 1 | 0 | 10 | 12/12 |
 | ppt/charts | 735 | 318 | 113 | 402 | 14 | 1 | 0 | 0 | 28 | 28/28 |
@@ -38,7 +38,7 @@ Kinds:
 | ppt/textboxes | 132 | 50 | 10 | 17 | 65 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
 | word | 1133 | 661 | 3 | 185 | 211 | 36 | 40 | 0 | 24 | 32/32 |
-| **total** | **6431** | **3947** | **344** | **1179** | **663** | **201** | **441** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3948** | **344** | **1178** | **663** | **201** | **441** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -48,8 +48,8 @@ The format is the extension of the document each call names.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | docx | 949 | 511 | 0 | 182 | 180 | 36 | 40 | 0 | 22 | 30/30 |
 | pptx | 2959 | 1286 | 344 | 716 | 410 | 146 | 401 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 2150 | 0 | 281 | 73 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **3947** | **344** | **1179** | **663** | **201** | **441** | **0** | **177** | **200/200** |
+| xlsx | 2523 | 2151 | 0 | 280 | 73 | 19 | 0 | 0 | 56 | 56/56 |
+| **total** | **6431** | **3948** | **344** | **1178** | **663** | **201** | **441** | **0** | **177** | **200/200** |
 
 ## Deltas
 
@@ -401,7 +401,7 @@ The format is the extension of the document each call names.
 | add | picture | `skipped` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `ppt/pictures/pictures-basic.sh:294` |
 | add | picture | `skipped` | `compressionState` | 1 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:107` |
 | add | picture | `skipped` | `cropBottom` | 1 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:290` |
-| add | picture | `unsupported_capability` | - | 1 | registry: no add on picture | `ppt/pictures/pictures-basic.sh:97` |
+| add | picture | `unsupported_capability` | - | 1 | registry lists add; refused for this target (operation gap) | `ppt/pictures/pictures-basic.sh:97` |
 | add | shape | `warned` | `animation` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:276` |
 | add | shape | `warned` | `bevelBottom` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:158` |
 | add | shape | `warned` | `glow` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:178` |
@@ -471,7 +471,7 @@ The format is the extension of the document each call names.
 | set | tc | `skipped` | `colspan` | 1 | registry gap L-PPTX-R8; OfficeCLI documents it | `ppt/tables/tables-nested.sh:67` |
 | set | tc | `skipped` | `image` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:111` |
 | set | tc | `skipped` | `merge.right` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:123` |
-| set | tc | `unsupported_capability` | - | 1 | registry: no set on tc | `ppt/tables/tables-basic.sh:79` |
+| set | tc | `unsupported_capability` | - | 1 | registry lists set; refused for this target (operation gap) | `ppt/tables/tables-basic.sh:79` |
 | set | tc | `warned` | `image` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:203` |
 
 ## Element and property gaps: xlsx
@@ -632,10 +632,7 @@ The format is the extension of the document each call names.
 
 ## Bugs
 
-| Script line | Verb | Format | Element | Refusal | Detail | Note |
-|---|---|---|---|---|---|---|
-| `excel/cell-formatting.sh:158` | set | xlsx | A9 | `unsupported_property` | link | skipped link: the registry lists `link` as set-able |
-| `excel/cell-formatting.sh:158` | set | xlsx | A9 | `unsupported_property` | tooltip | skipped tooltip: the registry lists `tooltip` as set-able |
+None: every refusal is a recorded delta, a gap the registry agrees with, or a cascade.
 
 ## Passed calls the registry does not claim
 
@@ -647,7 +644,7 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1179 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1178 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
 | F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 131 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
@@ -658,7 +655,7 @@ None.
 
 | Script | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `excel/cell-formatting.sh` | 109 | 94 | 0 | 11 | 4 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/cell-formatting.sh` | 109 | 95 | 0 | 10 | 4 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts.sh` | 320 | 313 | 0 | 3 | 4 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-advanced.sh` | 17 | 10 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-area.sh` | 92 | 74 | 0 | 16 | 1 | 1 | 0 | 0 | 2 | 2/2 |
@@ -754,4 +751,4 @@ None.
 | `word/sections.sh` | 33 | 28 | 0 | 0 | 5 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 210 | 3 | 108 | 39 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **3947** | **344** | **1179** | **663** | **201** | **441** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3948** | **344** | **1178** | **663** | **201** | **441** | **0** | **177** | **200/200** |

@@ -2021,7 +2021,7 @@
         "text": {
           "type": "string",
           "clearable": true,
-          "add": true,
+          "add": false,
           "set": true,
           "get": false
         }

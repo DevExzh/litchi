@@ -524,6 +524,20 @@ const fn write_only(
     }
 }
 
+/// A write-only property that `set` writes and `add` does not seed: a cell's
+/// text, since a single cell is never added (rows bring their cells; record
+/// 0330).
+const fn set_only_text(setter: Setter) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new("text", ValueType::Text);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::Set(setter),
+        constraint: Constraint::None,
+        clear: true,
+    }
+}
+
 // `GetRootNode`: the core document properties.
 crate::registry::registry! {
     pub(crate) DOCUMENT_PROPS, DOCUMENT_REGISTRY: () {
@@ -772,7 +786,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("nowrap", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("hideMark", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("tcFitText", ValueType::Bool)),
-    write_only("text", ValueType::Text, Setter::CellText),
+    set_only_text(Setter::CellText),
     }
 }
 
