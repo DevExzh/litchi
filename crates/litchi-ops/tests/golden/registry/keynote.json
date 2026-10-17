@@ -774,8 +774,11 @@
       "format": "keynote",
       "element": "table",
       "parent": "slide",
+      "elementAliases": [
+        "tbl"
+      ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
@@ -795,47 +798,47 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "rows": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "cols": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "x": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "y": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "width": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "height": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -850,6 +853,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -1118,10 +1127,10 @@
       "subject": "operation",
       "verb": "add",
       "element": "table",
-      "context": "a new slide table",
+      "context": "a deck without a slide table",
       "code": "unsupported_capability",
-      "followUp": "record 0298 follow-up: Keynote slide-table creation",
-      "reason": "the Keynote leaf has no slide-table creation transaction"
+      "followUp": "record 0329 follow-up: a built-in table template",
+      "reason": "a new table copies the structure (styles, header counts, storage layout) of the deck's first slide table; a deck without one has none to copy"
     },
     {
       "subject": "operation",

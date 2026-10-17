@@ -157,15 +157,16 @@ const FRAME_PROPS: &[PropSpec] = &[
 ];
 
 const TABLE_PROPS: &[PropSpec] = &[
-    PropSpec::new("name", ValueType::Text),
-    PropSpec::new("rows", ValueType::Int),
-    PropSpec::new("cols", ValueType::Int),
-    PropSpec::new("x", POSITION),
-    PropSpec::new("y", POSITION),
-    PropSpec::new("width", EXTENT),
-    PropSpec::new("height", EXTENT),
+    readable_add("name", ValueType::Text),
+    readable_add("rows", ValueType::Int),
+    readable_add("cols", ValueType::Int),
+    readable_add("x", POSITION),
+    readable_add("y", POSITION),
+    readable_add("width", EXTENT),
+    readable_add("height", EXTENT),
     PropSpec::new("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
+    add_only("data", ValueType::Text),
 ];
 
 const ROW_PROPS: &[PropSpec] = &[];
@@ -231,9 +232,9 @@ static OPERATION_GAPS: [GapSpec; 9] = [
     operation_gap(
         "add",
         "table",
-        "a new slide table",
-        "record 0298 follow-up: Keynote slide-table creation",
-        "the Keynote leaf has no slide-table creation transaction",
+        "a deck without a slide table",
+        "record 0329 follow-up: a built-in table template",
+        "a new table copies the structure (styles, header counts, storage layout) of the deck's first slide table; a deck without one has none to copy",
     ),
     operation_gap(
         "remove",
@@ -396,7 +397,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         element(
             Kind::Table,
             "table",
-            &["table"],
+            &["table", "tbl"],
             &[Kind::Slide],
             &[Kind::Row],
             &["/slide[N]/table[N]"],
@@ -507,7 +508,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "picture",
         "tc",
     ],
-    addable: &["slide", "paragraph", "shape", "picture"],
+    addable: &["slide", "paragraph", "shape", "picture", "table"],
     removable: &[
         "slide",
         "paragraph",

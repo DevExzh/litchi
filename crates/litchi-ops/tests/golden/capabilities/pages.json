@@ -366,7 +366,7 @@
         "tbl"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
@@ -386,21 +386,27 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "rows": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "columns": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -694,10 +700,10 @@
       "subject": "operation",
       "verb": "add",
       "element": "tbl",
-      "context": "a new body table",
+      "context": "a document without a body table",
       "code": "unsupported_capability",
-      "followUp": "record 0299 follow-up: Pages body-table creation",
-      "reason": "the Pages leaf deletes body tables but has no table-creation transaction"
+      "followUp": "record 0329 follow-up: a built-in table template",
+      "reason": "a new body table copies the structure (styles, header counts, storage layout) of the document's first body table; a document without one has none to copy"
     },
     {
       "subject": "operation",

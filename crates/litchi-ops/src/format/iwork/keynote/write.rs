@@ -15,7 +15,7 @@ use litchi_core::selector::Path;
 use litchi_core::{FileFormat, Position};
 use litchi_keynote::slide::creation::LayoutSelector;
 use litchi_keynote::slide::drawable::{
-    Created, Geometry, Preset, Style, TableCellValue, TextSpan as DrawableSpan,
+    Created, Geometry, NewTable, Preset, Style, TableCellValue, TextSpan as DrawableSpan,
 };
 use litchi_keynote::slide::placeholder::Kind as Role;
 use litchi_keynote::{DrawableSelector, Package, SlideSelector, TextPosition, TextSpan};
@@ -112,12 +112,25 @@ pub(super) enum Add {
         name: String,
         geometry: Geometry,
     },
+    /// A table cloned from the deck's first slide table (record 0329).
+    Table { slide: usize, table: NewTable },
 }
 
 impl Add {
     pub(super) const fn slide(&self) -> usize {
         match self {
-            Self::Text { slide, .. } | Self::Image { slide, .. } => *slide,
+            Self::Text { slide, .. } | Self::Image { slide, .. } | Self::Table { slide, .. } => {
+                *slide
+            },
+        }
+    }
+
+    /// The element kind the new drawable reads as.
+    pub(super) const fn element(&self) -> &'static str {
+        match self {
+            Self::Text { .. } => "shape",
+            Self::Image { .. } => "picture",
+            Self::Table { .. } => "table",
         }
     }
 }
@@ -971,6 +984,9 @@ impl Pending {
                             name,
                             geometry,
                         } => edit.add_image(SlideSelector::index(*slide), bytes, name, *geometry),
+                        Add::Table { slide, table } => {
+                            edit.add_table(SlideSelector::index(*slide), table.clone())
+                        },
                     }
                     .map_err(at(*index))?;
                 }
@@ -1230,8 +1246,8 @@ fn add_gap(kind: &str) -> Error {
         format!("adding a Keynote `{kind}` is not supported yet"),
     )
     .with_suggestion(match kind {
-        "table" | "tr" | "tc" | "row" | "cell" => {
-            "follow-up: Keynote slide-table creation (record 0298)"
+        "tr" | "tc" | "row" | "cell" => {
+            "add a table with `rows`, `cols` and `data` (record 0329); row and column edits of slide tables are a follow-up"
         },
         "chart" => "follow-up: Keynote chart creation in the unified layer (record 0298)",
         "video" | "audio" => "follow-up: wire slide::movie and slide::audio creation (record 0298)",
@@ -1361,6 +1377,42 @@ pub(super) fn drawable_request(
             text,
         },
         element: "shape",
+    })
+}
+
+/// The default frame of a new table, in points.
+const DEFAULT_TABLE_FRAME: Geometry = Geometry::new(100.0, 100.0, 600.0, 200.0);
+
+/// Read a new table's request from `node`'s properties: the table keys
+/// (`rows`, `cols`, `name`, `data`) and the frame (`x`, `y`, `width`,
+/// `height`; record 0329).
+pub(super) fn table_request(slide: usize, node: &NewNode<'_>) -> Result<DrawableRequest> {
+    let mut request = super::super::write::TableRequest::default();
+    let mut geometry = DEFAULT_TABLE_FRAME;
+    for (key, value) in node.props().iter() {
+        match key.as_str() {
+            "x" => geometry.x = points(value, "x", false)?,
+            "y" => geometry.y = points(value, "y", false)?,
+            "width" => geometry.width = points(value, "width", true)?,
+            "height" => geometry.height = points(value, "height", true)?,
+            other => {
+                if !request.key(other, value)? {
+                    return Err(unwritable("table", other));
+                }
+            },
+        }
+    }
+    let (rows, columns, cells) = request.shape()?;
+    let mut table = NewTable::new(rows, columns, geometry);
+    if let Some(name) = request.name.take() {
+        table = table.with_name(name);
+    }
+    for (row, column, value) in cells {
+        table = table.with_cell(row, column, TableCellValue::Text(value));
+    }
+    Ok(DrawableRequest {
+        add: Add::Table { slide, table },
+        element: "table",
     })
 }
 
@@ -1506,7 +1558,7 @@ pub(crate) fn add(
             let path = Path::parse(&format!("/slide[{}]", destination + 1))?.into_owned();
             Ok((commit, path))
         },
-        ("slide", "shape" | "textbox" | "picture" | "image" | "img" | "pic") => {
+        ("slide", "shape" | "textbox" | "picture" | "image" | "img" | "pic" | "table" | "tbl") => {
             if !matches!(node.placement(), None | Some(Placement::End)) {
                 return Err(refusal(
                     Code::UnsupportedCapability,
@@ -1515,13 +1567,25 @@ pub(crate) fn add(
                 .with_suggestion("omit the placement, then `move` it in the z-order"));
             }
             let slide = parent_node.item().leaf()[0] as usize;
-            let request = drawable_request(slide, node, limits)?;
+            let request = if matches!(kind.as_str(), "table" | "tbl") {
+                table_request(slide, node)?
+            } else {
+                drawable_request(slide, node, limits)?
+            };
             let element = request.element;
             // A new drawable joins the end of its slide's drawables: its
             // ordinal among the slide's elements of its kind is their count.
+            // Tables count by kind, without building their contents.
+            let table = crate::path::navigate::ElementKind::ordinal(super::Kind::Table);
             let ordinal = parent_node
                 .child_nodes()
-                .filter(|child| child.item().type_name() == element)
+                .filter(|child| {
+                    if element == "table" {
+                        child.kind_ordinal() == table
+                    } else {
+                        child.kind_ordinal() != table && child.item().type_name() == element
+                    }
+                })
                 .count();
             let mut pending = Pending::default();
             pending.stage_add(request.add, 0);

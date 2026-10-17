@@ -33,6 +33,10 @@
 //!   first clip of `media-lifecycle-audio-remove-native.key`; leaf
 //!   `remove_slide_media`; unified `File::remove`). Their outputs are
 //!   compared byte for byte before timing.
+//! - record 0329: `table_add`, a 3 x 3 table on the table slide of
+//!   `table-discovery.key` (leaf `edit_slide_drawables` + `add_table`;
+//!   unified `File::add` of `tbl` with `rows` and `cols`); outputs compared
+//!   byte for byte before timing.
 //!
 //! Inputs (opened packages and files) are prepared outside the timed
 //! region; the unified legs include building the object tree on their first
@@ -50,7 +54,7 @@ use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 use litchi_keynote::slide::drawable::{
-    Geometry, Kind as DrawableKind, Style, TableCellValue, TextSpan as DrawableSpan,
+    Geometry, Kind as DrawableKind, NewTable, Style, TableCellValue, TextSpan as DrawableSpan,
 };
 use litchi_keynote::slide::placeholder::Kind as Role;
 use litchi_keynote::{DrawableSelector, Package, Position, SlideSelector, TextPosition, TextSpan};
@@ -282,6 +286,26 @@ fn main() {
             .to_bytes()
             .unwrap();
         assert!(leaf == unified, "table_cell outputs differ");
+    }
+    // Record 0329: the unified default frame of a new table.
+    let new_table = || NewTable::new(3, 3, Geometry::new(100.0, 100.0, 600.0, 200.0));
+    let table_slide_path = &*Box::leak(format!("/slide[{}]", table_slide + 1).into_boxed_str());
+    {
+        let source = table_package();
+        let mut edit = source.edit_slide_drawables();
+        edit.add_table(SlideSelector::index(table_slide), new_table())
+            .unwrap();
+        let leaf = leaf_bytes(edit.commit().unwrap().package());
+        let unified = table_file()
+            .add(
+                table_slide_path,
+                NewNode::new("tbl").prop("rows", 3).prop("cols", 3),
+            )
+            .unwrap()
+            .file
+            .to_bytes()
+            .unwrap();
+        assert!(leaf == unified, "table_add outputs differ");
     }
     let media_bytes =
         std::fs::read(test_data().join("iwork/keynote/media-lifecycle-audio-remove-native.key"))
@@ -647,6 +671,28 @@ fn main() {
             unified: Box::new(move |n| {
                 leg(n, table_file, |file| {
                     black_box(file.set(cell, props! { "text" => "Bench" }).unwrap());
+                })
+            }),
+        },
+        Scenario {
+            name: "table_add",
+            leaf: Box::new(move |n| {
+                leg(n, table_package, |package| {
+                    let mut edit = package.edit_slide_drawables();
+                    edit.add_table(SlideSelector::index(table_slide), new_table())
+                        .unwrap();
+                    drop(black_box(edit.commit().unwrap()));
+                })
+            }),
+            unified: Box::new(move |n| {
+                leg(n, table_file, |file| {
+                    black_box(
+                        file.add(
+                            table_slide_path,
+                            NewNode::new("tbl").prop("rows", 3).prop("cols", 3),
+                        )
+                        .unwrap(),
+                    );
                 })
             }),
         },
