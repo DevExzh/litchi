@@ -1948,6 +1948,261 @@ impl Edit {
         self.stage_spliced("conditional-format.edit", sheet, bytes)
     }
 
+    /// Add one conditional format to a sheet (record 0327); the formatting
+    /// it applies becomes a named cell style in `styles.xml`. Returns its
+    /// position among the sheet's conditional formats.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown sheet, an invalid rule, bounds, or
+    /// splice failure.
+    pub fn add_sheet_format(
+        &mut self,
+        sheet: &str,
+        format: &crate::model::conditional_format::Format,
+        style: &crate::advanced::sheet_features::FormatStyle,
+    ) -> Result<usize> {
+        let (bytes, position) = crate::advanced::sheet_features::add_format(
+            &self.candidate,
+            sheet,
+            format,
+            style,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_feature("conditional-format.add", sheet, bytes)?;
+        Ok(position)
+    }
+
+    /// Replace the conditional format at `index` of a sheet (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing format, an invalid rule, bounds, or
+    /// splice failure.
+    pub fn set_sheet_format(
+        &mut self,
+        sheet: &str,
+        index: usize,
+        format: &crate::model::conditional_format::Format,
+        style: &crate::advanced::sheet_features::FormatStyle,
+    ) -> Result<()> {
+        let bytes = crate::advanced::sheet_features::set_format(
+            &self.candidate,
+            sheet,
+            index,
+            format,
+            style,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_feature("conditional-format.set", sheet, bytes)
+    }
+
+    /// Remove the conditional format at `index` of a sheet (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing format, bounds, or splice failure.
+    pub fn remove_sheet_format(&mut self, sheet: &str, index: usize) -> Result<()> {
+        let bytes = crate::advanced::sheet_features::remove_format(
+            &self.candidate,
+            sheet,
+            index,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_feature("conditional-format.remove", sheet, bytes)
+    }
+
+    /// Add one content validation bound to cells of a sheet (record 0327);
+    /// returns its position among the sheet's validations.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown sheet, cells outside the written
+    /// grid, bounds, or splice failure.
+    pub fn add_sheet_validation(
+        &mut self,
+        sheet: &str,
+        spec: &crate::advanced::sheet_features::ValidationSpec,
+    ) -> Result<usize> {
+        let (bytes, position) = crate::advanced::sheet_features::add_validation(
+            &self.candidate,
+            sheet,
+            spec,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("content-validation.add", sheet, bytes)?;
+        Ok(position)
+    }
+
+    /// Replace the validation at `index` of a sheet (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing validation, one another sheet binds,
+    /// bounds, or splice failure.
+    pub fn set_sheet_validation(
+        &mut self,
+        sheet: &str,
+        index: usize,
+        spec: &crate::advanced::sheet_features::ValidationSpec,
+    ) -> Result<()> {
+        let bytes = crate::advanced::sheet_features::set_validation(
+            &self.candidate,
+            sheet,
+            index,
+            spec,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("content-validation.set", sheet, bytes)
+    }
+
+    /// Remove the validation at `index` of a sheet: its bindings, and its
+    /// definition when no other sheet binds it (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing validation, bounds, or splice failure.
+    pub fn remove_sheet_validation(&mut self, sheet: &str, index: usize) -> Result<()> {
+        let bytes = crate::advanced::sheet_features::remove_validation(
+            &self.candidate,
+            sheet,
+            index,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("content-validation.remove", sheet, bytes)
+    }
+
+    /// Set (or, with `None`, remove) the auto-filter database range of a
+    /// sheet, a zero-based inclusive `(first_row, first_column, last_row,
+    /// last_column)` rectangle (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unknown sheet, an ambiguous filter, bounds,
+    /// or splice failure.
+    pub fn set_sheet_auto_filter(
+        &mut self,
+        sheet: &str,
+        range: Option<(u32, u32, u32, u32)>,
+    ) -> Result<()> {
+        let bytes = crate::advanced::sheet_features::set_auto_filter(
+            &self.candidate,
+            sheet,
+            range,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("database-range.auto-filter", sheet, bytes)
+    }
+
+    /// Replace the manual page breaks of a sheet's rows (`rows`) or columns:
+    /// the zero-based indexes a break precedes (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an index outside the sheet's written grid,
+    /// bounds, or splice failure.
+    pub fn set_sheet_breaks(&mut self, sheet: &str, rows: bool, breaks: &[u32]) -> Result<()> {
+        let bytes = crate::advanced::sheet_features::set_breaks(
+            &self.candidate,
+            sheet,
+            rows,
+            breaks,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("page-break.set", sheet, bytes)
+    }
+
+    /// Add a cell-anchored custom shape, or a picture frame whose image is
+    /// `resource`, to a sheet (record 0327); returns its position among the
+    /// sheet's drawings of its kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a used name, invalid geometry, a resource that
+    /// differs from the frame's image path, a collision, bounds, or splice
+    /// failure.
+    pub fn add_sheet_drawing(
+        &mut self,
+        sheet: &str,
+        spec: &crate::advanced::sheet_features::DrawingSpec,
+        resource: Option<(Resource, Collision)>,
+    ) -> Result<usize> {
+        let mut candidate = self.clone();
+        match (&spec.image, resource) {
+            (Some(path), Some((resource, collision))) if *path == resource.path => {
+                candidate.put_resource(resource, collision)?;
+            },
+            (None, None) => {},
+            _ => return invalid("ODS drawing image and resource disagree"),
+        }
+        let (bytes, position) = crate::advanced::sheet_features::add_drawing(
+            &candidate.candidate,
+            sheet,
+            spec,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("drawing.add", &spec.name, bytes)?;
+        *self = candidate;
+        Ok(position)
+    }
+
+    /// Change the frame, end cell, name or alternative text of the drawing
+    /// at `index` among a sheet's drawings of `kind` (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing drawing, invalid geometry, a used
+    /// name, bounds, or splice failure.
+    pub fn set_sheet_drawing(
+        &mut self,
+        sheet: &str,
+        kind: crate::advanced::sheet_features::DrawingKind,
+        index: usize,
+        change: &crate::advanced::sheet_features::DrawingChange,
+    ) -> Result<()> {
+        let bytes = crate::advanced::sheet_features::set_drawing(
+            &self.candidate,
+            sheet,
+            kind,
+            index,
+            change,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("drawing.set", sheet, bytes)
+    }
+
+    /// Remove the drawing at `index` among a sheet's drawings of `kind`, and
+    /// a picture's image when nothing else references it (record 0327).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing drawing, bounds, or splice failure.
+    pub fn remove_sheet_drawing(
+        &mut self,
+        sheet: &str,
+        kind: crate::advanced::sheet_features::DrawingKind,
+        index: usize,
+    ) -> Result<()> {
+        let mut candidate = self.clone();
+        let (bytes, image) = crate::advanced::sheet_features::remove_drawing(
+            &candidate.candidate,
+            sheet,
+            kind,
+            index,
+            candidate.before.limits.package_bytes,
+        )?;
+        candidate.stage_spliced("drawing.remove", sheet, bytes)?;
+        if let Some(path) = image
+            && !path.contains("://")
+            && candidate.package.package().has_file(&path)?
+            && refuse_referenced_removal(&candidate.package, &path).is_ok()
+        {
+            candidate.remove_resource(&path)?;
+        }
+        *self = candidate;
+        Ok(())
+    }
+
     /// Replace or remove the typed sparkline-group catalog of one sheet.
     ///
     /// # Errors
@@ -2587,6 +2842,16 @@ impl Edit {
     fn stage_spliced(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
         if self.stage(op, target, candidate)? {
             self.spliced_parts.insert("content.xml".to_string());
+        }
+        Ok(())
+    }
+
+    /// Stage a candidate whose `content.xml` and `styles.xml` changes are
+    /// provenance splices.
+    fn stage_feature(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
+        if self.stage(op, target, candidate)? {
+            self.spliced_parts.insert("content.xml".to_string());
+            self.spliced_parts.insert("styles.xml".to_string());
         }
         Ok(())
     }

@@ -58,6 +58,19 @@ pub(crate) enum Item {
     Master(usize),
     /// A presentation page layout.
     Layout(usize),
+    /// A shape's hyperlink: its click action, else its first link run's
+    /// target (record 0328).
+    ShapeLink(ObjectRef),
+    /// A link run's hyperlink.
+    RunLink(StoryRef, usize, usize),
+    /// A paragraph's `text:line-break`.
+    LineBreak(StoryRef, usize, usize),
+    /// A declared table column.
+    Column(ObjectRef, usize),
+    /// A chart object's series.
+    Series(ObjectRef, usize),
+    /// A chart object's axis.
+    Axis(ObjectRef, usize),
 }
 
 /// The physical kind of a drawing object.
@@ -160,7 +173,14 @@ impl<'f> Node<'f> {
             Item::Object(object, _) | Item::Row(object, _) | Item::Cell(object, _, _) => {
                 Some(object.page)
             },
-            Item::Paragraph(story, _) | Item::Run(story, _, _) => Some(story.object.page),
+            Item::Paragraph(story, _)
+            | Item::Run(story, _, _)
+            | Item::RunLink(story, _, _)
+            | Item::LineBreak(story, _, _) => Some(story.object.page),
+            Item::ShapeLink(object)
+            | Item::Column(object, _)
+            | Item::Series(object, _)
+            | Item::Axis(object, _) => Some(object.page),
             Item::Comment(_) | Item::Presentation | Item::Master(_) | Item::Layout(_) => None,
         }
     }
@@ -168,8 +188,17 @@ impl<'f> Node<'f> {
     /// The drawing object a node addresses or belongs to.
     pub(crate) fn object(&self) -> Option<&'f Object> {
         let reference = match &self.item {
-            Item::Object(object, _) | Item::Row(object, _) | Item::Cell(object, _, _) => object,
-            Item::Paragraph(story, _) | Item::Run(story, _, _) => &story.object,
+            Item::Object(object, _)
+            | Item::Row(object, _)
+            | Item::Cell(object, _, _)
+            | Item::ShapeLink(object)
+            | Item::Column(object, _)
+            | Item::Series(object, _)
+            | Item::Axis(object, _) => object,
+            Item::Paragraph(story, _)
+            | Item::Run(story, _, _)
+            | Item::RunLink(story, _, _)
+            | Item::LineBreak(story, _, _) => &story.object,
             _ => return None,
         };
         self.scene.object(reference)
@@ -210,6 +239,11 @@ impl<'f> Node<'f> {
             Item::Comment(_) => Kind::Comment,
             Item::Master(_) => Kind::SlideMaster,
             Item::Layout(_) => Kind::SlideLayout,
+            Item::ShapeLink(_) | Item::RunLink(..) => Kind::Hyperlink,
+            Item::LineBreak(..) => Kind::LineBreak,
+            Item::Column(..) => Kind::Col,
+            Item::Series(..) => Kind::Series,
+            Item::Axis(..) => Kind::Axis,
         }
     }
 
@@ -277,6 +311,23 @@ impl<'f> Node<'f> {
                 .annotations()?
                 .get(*index)
                 .map(|info| Cow::Owned(annotation_text(info))),
+            Item::RunLink(story, paragraph, run) => self
+                .story(story)
+                .and_then(|story| story.paragraphs().get(*paragraph))
+                .and_then(|paragraph| paragraph.runs().get(*run))
+                .map(|run| Cow::Borrowed(run.text())),
+            Item::Object(reference, Kind::Equation) => self
+                .file
+                .parts()?
+                .formula(reference)
+                .map(|formula| Cow::Owned(formula.to_owned())),
+            Item::Axis(object, index) => self
+                .file
+                .parts()?
+                .chart(object)
+                .and_then(|chart| chart.axes.get(*index))
+                .and_then(|axis| axis.title.clone())
+                .map(Cow::Owned),
             _ => None,
         })
     }
@@ -374,7 +425,16 @@ impl<'f> Node<'f> {
                 .and_then(Object::table)
                 .and_then(|table| table.rows().get(*row))
                 .map_or(0, |row| row.cells().len()),
-            Item::Run(..) | Item::Comment(_) | Item::Master(_) | Item::Layout(_) => 0,
+            Item::Run(..)
+            | Item::Comment(_)
+            | Item::Master(_)
+            | Item::Layout(_)
+            | Item::ShapeLink(_)
+            | Item::RunLink(..)
+            | Item::LineBreak(..)
+            | Item::Column(..)
+            | Item::Series(..)
+            | Item::Axis(..) => 0,
         })
     }
 
@@ -507,6 +567,22 @@ enum PropValues<'a> {
     Comment(&'a litchi_odp::annotation::Info),
     Master(&'a litchi_odp::master::Summary),
     Layout(&'a litchi_odp::layout::Layout),
+    /// A video, audio or formula object (record 0328).
+    Special {
+        object: &'a Object,
+        reference: &'a ObjectRef,
+        kind: Kind,
+        file: &'a Odp,
+    },
+    /// A hyperlink: its `link` and `tooltip` (boxed, so the common
+    /// variants stay as small as they were).
+    Link(Box<(Option<String>, Option<String>)>),
+    /// A declared table column's width.
+    Column(Option<Length>),
+    /// A chart series.
+    Series(&'a super::parts::Series),
+    /// A chart axis.
+    Axis(&'a super::parts::Axis),
 }
 
 impl<'a> Props<'a> {
@@ -524,10 +600,53 @@ impl<'a> Props<'a> {
                 },
                 None => PropValues::None,
             },
+            Item::Object(reference, kind @ (Kind::Video | Kind::Audio | Kind::Equation)) => node
+                .object()
+                .map_or(PropValues::None, |object| PropValues::Special {
+                    object,
+                    reference,
+                    kind: *kind,
+                    file: node.file,
+                }),
             Item::Object(..) => node.object().map_or(PropValues::None, |object| {
                 let story = node.own_story().and_then(|story| scene.story(&story));
                 PropValues::Object(object, story, node.file)
             }),
+            Item::ShapeLink(_) | Item::RunLink(..) => {
+                let (link, tooltip) = link_values(node)?;
+                PropValues::Link(Box::new((link, tooltip)))
+            },
+            Item::Column(object, index) => {
+                let xml = node.file.content_xml()?;
+                let styles = node.file.automatic_styles()?;
+                let width = scene
+                    .object(object)
+                    .and_then(Object::table)
+                    .and_then(|table| {
+                        litchi_odp::scene::parts::table_columns(xml, table)
+                            .into_iter()
+                            .flat_map(|column| {
+                                std::iter::repeat_n(column.clone(), column.repeat() as usize)
+                            })
+                            .nth(*index)
+                    })
+                    .and_then(|column| column.width(xml, styles))
+                    .and_then(|width| Length::parse(width.trim()).ok());
+                PropValues::Column(width)
+            },
+            Item::Series(object, index) => node
+                .file
+                .parts()?
+                .chart(object)
+                .and_then(|chart| chart.series.get(*index))
+                .map_or(PropValues::None, PropValues::Series),
+            Item::Axis(object, index) => node
+                .file
+                .parts()?
+                .chart(object)
+                .and_then(|chart| chart.axes.get(*index))
+                .map_or(PropValues::None, PropValues::Axis),
+            Item::LineBreak(..) => PropValues::None,
             Item::Paragraph(story, index) => scene
                 .story(story)
                 .and_then(|story| story.paragraphs().get(*index))
@@ -658,10 +777,132 @@ impl<'a> Props<'a> {
                 "displayName" => text(layout.display_name.as_deref()),
                 _ => None,
             },
+            PropValues::Special {
+                object,
+                reference,
+                kind,
+                file,
+            } => special_value(file, reference, object, *kind, key),
+            PropValues::Link(link) => match key {
+                "link" => owned(link.0.clone()),
+                "tooltip" => owned(link.1.clone()),
+                _ => None,
+            },
+            PropValues::Column(width) => match key {
+                "width" => width.map(Value::Length),
+                _ => None,
+            },
+            PropValues::Series(series) => match key {
+                "values" => text(series.values.as_deref()),
+                "nameRef" => text(series.label.as_deref()),
+                "chartType" => text(series.class.as_deref()),
+                "axis" => text(series.axis.as_deref()),
+                "pointCount" => Some(count(series.points)),
+                _ => None,
+            },
+            PropValues::Axis(axis) => match key {
+                "role" => axis.role().map(|role| Value::Text(Cow::Borrowed(role))),
+                "title" => text(axis.title.as_deref()),
+                "dimension" => axis
+                    .dimension
+                    .map(|dimension| Value::Text(Cow::Borrowed(dimension))),
+                "name" => text(axis.name.as_deref()),
+                "categories" => text(axis.categories.as_deref()),
+                "style" => text(axis.style.as_deref()),
+                _ => None,
+            },
         }
     }
 }
 
+/// A video, audio or formula object's value: the frame keys, then the
+/// media or the formula.
+fn special_value<'a>(
+    file: &'a Odp,
+    reference: &ObjectRef,
+    object: &'a Object,
+    kind: Kind,
+    key: &str,
+) -> Option<Value<'a>> {
+    if let Some(value) = object_value(object, key) {
+        return Some(value);
+    }
+    if kind == Kind::Equation {
+        return match key {
+            "formula" => file
+                .parts()
+                .ok()?
+                .formula(reference)
+                .map(|formula| Value::Text(Cow::Owned(formula.to_owned()))),
+            _ => None,
+        };
+    }
+    let plugin = litchi_odp::scene::parts::plugin(file.content_xml().ok()?, object)?;
+    let flag = |name: &str| {
+        plugin
+            .parameter(name)
+            .map(|value| Value::Bool(value.eq_ignore_ascii_case("true")))
+    };
+    match key {
+        "mediaType" => Some(Value::Text(Cow::Borrowed(if kind == Kind::Video {
+            "video"
+        } else {
+            "audio"
+        }))),
+        "mimeType" => plugin
+            .mime_type()
+            .map(|mime| Value::Text(Cow::Owned(mime.to_owned()))),
+        "loop" => flag("Loop"),
+        "mute" => flag("Mute"),
+        _ => None,
+    }
+}
+
+/// A hyperlink node's `link` and `tooltip`: a shape's click action (a URL,
+/// `slide[N]` or a jump name), else its first link run's; a link run's
+/// target and `office:title`.
+fn link_values(node: &Node<'_>) -> Result<(Option<String>, Option<String>)> {
+    let xml = node.file.content_xml()?;
+    let scene = node.scene;
+    let run_values = |run: &litchi_odp::scene::Run| {
+        (
+            run.href().map(str::to_owned),
+            litchi_odp::scene::parts::link_title(xml, run),
+        )
+    };
+    Ok(match &node.item {
+        Item::RunLink(story, paragraph, run) => scene
+            .story(story)
+            .and_then(|story| story.paragraphs().get(*paragraph))
+            .and_then(|paragraph| paragraph.runs().get(*run))
+            .map_or((None, None), run_values),
+        Item::ShapeLink(object) => {
+            let Some(shape) = scene.object(object) else {
+                return Ok((None, None));
+            };
+            if let Some(click) = litchi_odp::scene::parts::shape_click(xml, shape) {
+                (super::parts::click_link(scene, &click), None)
+            } else {
+                shape
+                    .story()
+                    .and_then(first_link_run)
+                    .map_or((None, None), run_values)
+            }
+        },
+        _ => (None, None),
+    })
+}
+
+/// The first link run of a story.
+pub(crate) fn first_link_run(story: &Story) -> Option<&litchi_odp::scene::Run> {
+    story
+        .paragraphs()
+        .iter()
+        .flat_map(|paragraph| paragraph.runs())
+        .find(|run| run.kind() == litchi_odp::scene::RunKind::Link)
+}
+
+#[inline]
 fn object_value<'a>(object: &'a Object, key: &str) -> Option<Value<'a>> {
     let text = |value: Option<&'a str>| value.map(|value| Value::Text(Cow::Borrowed(value)));
     match key {

@@ -89,8 +89,14 @@ fn missing_gaps_and_absent_concepts_are_typed() {
         Code::PathNotFound
     );
     assert!(file.find("/slide[9]").unwrap().is_none());
+    // Record 0328: video frames are typed media, so a slide without one
+    // has no `video[1]`; animations remain a gap.
     assert_eq!(
         file.get("/slide[1]/video[1]").unwrap_err().code(),
+        Code::PathNotFound
+    );
+    assert_eq!(
+        file.get("/slide[1]/animation[1]").unwrap_err().code(),
         Code::UnsupportedCapability
     );
     assert_eq!(

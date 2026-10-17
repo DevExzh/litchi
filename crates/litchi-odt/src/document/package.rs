@@ -197,6 +197,20 @@ impl Document {
         get_file(self, path)
     }
 
+    /// Read one package member, or `None` when the package has no member
+    /// at `path` (the counterpart of
+    /// [`crate::SourceBackedDocument::member_data`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the member exists but cannot be read.
+    pub fn member_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        if !self.state.package.has_file(path)? {
+            return Ok(None);
+        }
+        get_file(self, path).map(Some)
+    }
+
     // Ordinary paragraph edits should use `Document::edit()` and commit an
     // immutable transaction. `MutableDocument` remains the compatibility
     // surface for structural families that have not migrated yet.

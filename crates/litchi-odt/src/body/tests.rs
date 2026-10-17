@@ -321,3 +321,310 @@ fn text_fields_are_listed_and_rewritten() {
     assert_eq!(title.text(), "A & B");
     assert_eq!(fields.len(), names.len());
 }
+
+fn unified_fixture(name: &str) -> Vec<u8> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/unified-ops/0294")
+        .join(name);
+    std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+}
+
+#[test]
+fn parts_read_lists_regions_fields_contents_shapes_objects_and_columns() {
+    let package = Package::from_bytes(&unified_fixture("parts.odt")).unwrap();
+    let document = package.document().unwrap();
+    let body = document.body().unwrap();
+    let parts = Parts::build(body).unwrap();
+    let view = parts.view(body);
+
+    // List styles: the common one first, then the automatic one.
+    let lists: Vec<_> = view.list_styles().collect();
+    assert_eq!(lists.len(), 2);
+    assert_eq!(lists[0].name().as_deref(), Some("Numbering_20_123"));
+    assert_eq!(lists[0].display_name().as_deref(), Some("Numbering 123"));
+    assert_eq!(lists[0].part(), StylePart::Common);
+    let levels: Vec<_> = lists[0].levels().collect();
+    assert_eq!(levels.len(), 2);
+    assert_eq!(levels[0].kind(), parts::ListLevelKind::Number);
+    assert_eq!(levels[0].start_value(), Some(3));
+    assert_eq!(levels[0].prefix().as_deref(), Some("("));
+    assert_eq!(levels[0].suffix().as_deref(), Some(")"));
+    assert_eq!(levels[0].label_followed_by().as_deref(), Some("space"));
+    assert_eq!(levels[0].text_align().as_deref(), Some("end"));
+    assert_eq!(levels[0].margin_left().as_deref(), Some("0.635cm"));
+    assert_eq!(levels[0].bold(), Some(true));
+    assert_eq!(levels[1].level(), 2);
+    assert_eq!(levels[1].display_levels(), Some(2));
+    assert_eq!(levels[1].space_before().as_deref(), Some("1.27cm"));
+    assert_eq!(lists[1].part(), StylePart::Automatic);
+    assert_eq!(
+        lists[1].level(1).unwrap().bullet_char().as_deref(),
+        Some("•")
+    );
+    assert_eq!(
+        lists[1].level(1).unwrap().font().as_deref(),
+        Some("OpenSymbol")
+    );
+    assert_eq!(view.list_style("L1").unwrap().index(), 1);
+
+    // Master-page regions in declaration order.
+    let regions: Vec<_> = view.regions().collect();
+    let kinds: Vec<_> = regions.iter().map(|region| region.kind()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            parts::RegionKind::Header,
+            parts::RegionKind::HeaderLeft,
+            parts::RegionKind::Footer,
+            parts::RegionKind::HeaderFirst,
+            parts::RegionKind::Footer,
+        ]
+    );
+    assert_eq!(regions[0].text().unwrap(), "Top 1");
+    assert_eq!(regions[0].master_name().as_deref(), Some("Standard"));
+    assert_eq!(regions[3].master_name().as_deref(), Some("Landscape"));
+    assert!(regions[0].displayed());
+    assert!(!regions[4].displayed());
+
+    // Fields, tables of contents, shapes, objects and columns.
+    let names: Vec<_> = fields(body).unwrap().iter().map(TextField::name).collect();
+    assert_eq!(
+        names,
+        vec!["page-number", "page-count", "date", "title", "chapter"]
+    );
+    let tocs: Vec<_> = view.tables_of_contents().collect();
+    assert_eq!(tocs.len(), 1);
+    assert_eq!(tocs[0].name().as_deref(), Some("Contents1"));
+    assert_eq!(tocs[0].outline_level(), Some(3));
+    assert!(tocs[0].links() && tocs[0].page_numbers());
+    assert_eq!(tocs[0].title().as_deref(), Some("Contents"));
+    assert_eq!(tocs[0].text().unwrap(), "Parts\t1");
+    let shapes: Vec<_> = view.shapes().collect();
+    assert_eq!(shapes.len(), 2);
+    assert_eq!(shapes[0].geometry(), "star5");
+    assert_eq!(shapes[0].fill_color().as_deref(), Some("#ff0000"));
+    assert_eq!(shapes[0].text().unwrap(), "Starred");
+    assert_eq!(shapes[1].geometry(), "rect");
+    assert_eq!(shapes[1].width().as_deref(), Some("2cm"));
+    let objects: Vec<_> = view.objects().collect();
+    assert_eq!(objects.len(), 2);
+    assert_eq!(objects[0].href().as_deref(), Some("./Object 1"));
+    assert_eq!(
+        parts::formula_text(objects[1].inline_math().unwrap()).as_deref(),
+        Some("x + 1")
+    );
+    let formula = document.get_file("Object 1/content.xml").unwrap();
+    assert_eq!(
+        parts::formula_text(std::str::from_utf8(&formula).unwrap()).as_deref(),
+        Some("a^2 + b^2 = c^2")
+    );
+    let table = body
+        .root()
+        .children()
+        .find(|node| node.kind() == Kind::Table)
+        .unwrap();
+    let widths: Vec<_> = view
+        .columns(table)
+        .map(|column| column.width().unwrap().into_owned())
+        .collect();
+    assert_eq!(widths, vec!["3cm", "3cm", "4.5cm"]);
+
+    // Tab stops of the paragraph's automatic style.
+    let paragraph = body
+        .root()
+        .children()
+        .find(|node| node.style_name().as_deref() == Some("P1"))
+        .unwrap();
+    let stops = parts::tab_stops(paragraph);
+    assert_eq!(stops.len(), 2);
+    assert_eq!(stops[0].position(), "2.5cm");
+    assert_eq!(stops[0].kind(), "left");
+    assert_eq!(stops[1].kind(), "right");
+    assert_eq!(stops[1].leader_style(), Some("dotted"));
+}
+
+#[test]
+fn parts_index_real_writer_documents() {
+    for name in [
+        "corpus/writer-header-footer.odt",
+        "corpus/writer-table-of-contents.odt",
+        "corpus/writer-definition-lists.odt",
+        "corpus/writer-user-fields.odt",
+        "odt/shape-text-in-paragraph.odt",
+        "corpus/writer-table.odt",
+    ] {
+        let Ok(package) = Package::from_bytes(&fixture(name)) else {
+            continue;
+        };
+        let document = package.document().unwrap();
+        let body = document.body().unwrap();
+        let parts = Parts::build(body).unwrap();
+        let view = parts.view(body);
+        for region in view.regions() {
+            region.text().unwrap();
+        }
+        for toc in view.tables_of_contents() {
+            toc.text().unwrap();
+        }
+        for shape in view.shapes() {
+            shape.text().unwrap();
+        }
+        if name.ends_with("header-footer.odt") {
+            let texts: Vec<_> = view
+                .regions()
+                .map(|region| region.text().unwrap())
+                .collect();
+            assert_eq!(texts, vec!["Header\t1\tTest", "Footer\t1\tBottom"]);
+        }
+        if name.ends_with("table-of-contents.odt") {
+            assert_eq!(view.tables_of_contents().len(), 1);
+        }
+    }
+}
+
+#[test]
+fn paragraph_formatting_rewrites_the_one_paragraph_properties() {
+    // Record 0328: formatting a paragraph whose automatic style already has
+    // paragraph properties rewrites them; the copy no longer gains a second
+    // `style:paragraph-properties`.
+    let package = built();
+    let align = |value: &str| {
+        let mut edit = ParagraphPropertyEdit::new();
+        edit.align = Some(value.to_owned());
+        edit
+    };
+    let once = commit(&package, |edit, body| {
+        let paragraph = body.root().children().nth(1).unwrap();
+        edit.set_paragraph_properties(paragraph.id(), &align("center"))
+            .unwrap();
+    });
+    let twice = commit(&once, |edit, body| {
+        let paragraph = body.root().children().nth(1).unwrap();
+        edit.set_paragraph_properties(paragraph.id(), &align("right"))
+            .unwrap();
+    });
+    let document = twice.document().unwrap();
+    let body = document.body().unwrap();
+    let paragraph = body.root().children().nth(1).unwrap();
+    let style = paragraph.automatic_style().unwrap();
+    assert_eq!(style.xml().matches("paragraph-properties").count(), 1);
+    assert_eq!(paragraph.paragraph_properties().align(), Some("right"));
+}
+
+#[test]
+fn tab_stops_replace_the_declared_ones() {
+    let package = built();
+    let mut first = ParagraphPropertyEdit::new();
+    let mut right = TabStopEdit::new("10cm");
+    right.kind = Some("right".to_owned());
+    right.leader_style = Some("dotted".to_owned());
+    right.leader_text = Some(".".to_owned());
+    first.tab_stops = Some(vec![TabStopEdit::new("2.5cm"), right]);
+    first.align = Some("center".to_owned());
+    let once = commit(&package, |edit, body| {
+        let paragraph = body.root().children().nth(1).unwrap();
+        edit.set_paragraph_properties(paragraph.id(), &first)
+            .unwrap();
+    });
+    let stops_of = |package: &Package| -> Vec<(String, String)> {
+        let document = package.document().unwrap();
+        let body = document.body().unwrap();
+        let paragraph = body.root().children().nth(1).unwrap();
+        parts::tab_stops(paragraph)
+            .iter()
+            .map(|stop| (stop.position().to_owned(), stop.kind().to_owned()))
+            .collect()
+    };
+    assert_eq!(
+        stops_of(&once),
+        vec![
+            ("2.5cm".to_owned(), "left".to_owned()),
+            ("10cm".to_owned(), "right".to_owned())
+        ]
+    );
+    // A second edit of the derived style replaces the list in place.
+    let mut second = ParagraphPropertyEdit::new();
+    second.tab_stops = Some(vec![TabStopEdit::new("3cm")]);
+    let twice = commit(&once, |edit, body| {
+        let paragraph = body.root().children().nth(1).unwrap();
+        edit.set_paragraph_properties(paragraph.id(), &second)
+            .unwrap();
+    });
+    assert_eq!(
+        stops_of(&twice),
+        vec![("3cm".to_owned(), "left".to_owned())]
+    );
+    let document = twice.document().unwrap();
+    let body = document.body().unwrap();
+    let paragraph = body.root().children().nth(1).unwrap();
+    assert_eq!(paragraph.paragraph_properties().align(), Some("center"));
+    let xml = paragraph.automatic_style().unwrap().xml();
+    assert_eq!(xml.matches("<style:tab-stops").count(), 1);
+    // An empty list declares none.
+    let mut clear = ParagraphPropertyEdit::new();
+    clear.tab_stops = Some(Vec::new());
+    let cleared = commit(&twice, |edit, body| {
+        let paragraph = body.root().children().nth(1).unwrap();
+        edit.set_paragraph_properties(paragraph.id(), &clear)
+            .unwrap();
+    });
+    assert!(stops_of(&cleared).is_empty());
+    // Invalid stops are refused at staging.
+    let mut bad = ParagraphPropertyEdit::new();
+    bad.tab_stops = Some(vec![TabStopEdit::new("ten")]);
+    let mut edit = cleared.edit();
+    let document = cleared.document().unwrap();
+    let body = document.body().unwrap();
+    let paragraph = body.root().children().nth(1).unwrap();
+    assert!(edit.set_paragraph_properties(paragraph.id(), &bad).is_err());
+}
+
+#[test]
+fn region_text_replaces_header_and_footer_paragraphs() {
+    let package = Package::from_bytes(&unified_fixture("parts.odt")).unwrap();
+    let region_text = |package: &Package, index: usize| -> String {
+        let document = package.document().unwrap();
+        let body = document.body().unwrap();
+        let parts = Parts::build(body).unwrap();
+        parts
+            .view(body)
+            .regions()
+            .nth(index)
+            .unwrap()
+            .text()
+            .unwrap()
+    };
+    let edited = {
+        let document = package.document().unwrap();
+        let body = document.body().unwrap();
+        let parts = Parts::build(body).unwrap();
+        let regions: Vec<_> = parts.view(body).regions().collect();
+        let mut edit = package.edit();
+        // The first header holds a page-number field: refused, not dropped.
+        let refused = edit.set_region_text(&regions[0], "x");
+        assert!(matches!(refused, Err(litchi_core::Error::Unsupported(_))));
+        let mut edit = package.edit();
+        edit.set_region_text(&regions[1], "New even\ttop").unwrap();
+        edit.set_region_text(&regions[2], "New  bottom").unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    assert_eq!(region_text(&edited, 1), "New even\ttop");
+    assert_eq!(region_text(&edited, 2), "New  bottom");
+    assert_eq!(region_text(&edited, 0), "Top 1");
+    // content.xml kept its bytes.
+    assert_eq!(
+        edited.document().unwrap().get_file("content.xml").unwrap(),
+        package.document().unwrap().get_file("content.xml").unwrap()
+    );
+    // Setting the shown text is an exact no-op.
+    let again = {
+        let document = edited.document().unwrap();
+        let body = document.body().unwrap();
+        let parts = Parts::build(body).unwrap();
+        let region = parts.view(body).regions().nth(1).unwrap();
+        let mut edit = edited.edit();
+        edit.set_region_text(&region, "New even\ttop").unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    assert_eq!(again.as_bytes(), edited.as_bytes());
+}

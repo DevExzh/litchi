@@ -20,18 +20,18 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | pptx | 37 | 279 | 279 | 0 | 0 | 65 | 73 | 2 | 40 |
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
-| xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
+| xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 |
 | ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
-| rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
-| odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
-| ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
-| odp | 30 | 170 | 170 | 0 | 0 | 143 | 39 | 6 | 12 |
+| rtf | 28 | 214 | 214 | 0 | 0 | 0 | 94 | 2 | 14 |
+| odt | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 29 | 25 |
+| ods | 26 | 166 | 166 | 0 | 0 | 117 | 21 | 2 | 14 |
+| odp | 30 | 228 | 228 | 0 | 0 | 39 | 69 | 12 | 22 |
 | odg | 4 | 33 | 33 | 0 | 0 | 0 | 11 | 4 | 2 |
 | odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 |
 | odi | 3 | 24 | 24 | 0 | 0 | 2 | 7 | 0 | 0 |
 | odb | 4 | 36 | 36 | 0 | 0 | 2 | 6 | 4 | 0 |
-| oth | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
-| odm | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
+| oth | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
+| odm | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 11 | 91 | 91 | 0 | 0 | 0 | 30 | 2 | 14 |
 | keynote | 16 | 132 | 123 | 0 | 9 | 0 | 44 | 16 | 4 |
@@ -236,7 +236,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## xls
 
-- fixtures: `create()`, `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`, `ole/xls/SimpleWithColours.xls`, `ole/xls/WithExtendedStyles.xls`, `libreoffice-core/sc/qa/unit/data/xls/formats.xls`, `ole/xls/SimpleWithAutofilter.xls`, `create() + add sheet`, `create() + add row`, `create() + add column`
+- fixtures: `create()`, `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`, `ole/xls/SimpleWithColours.xls`, `ole/xls/WithExtendedStyles.xls`, `libreoffice-core/sc/qa/unit/data/xls/formats.xls`, `ole/xls/SimpleWithAutofilter.xls`, `ole/xls/SimpleWithComments.xls`, `ole/xls/SimpleWithImages.xls`, `ole/xls/WithConditionalFormatting.xls`, `ole/xls/WithHyperlink.xls`, `ole/xls/SimpleWithPageBreaks.xls`, `create() + add sheet`, `create() + add row`, `create() + add column`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
 - document views on `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -249,23 +249,23 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | column | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | table | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | namedrange | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| comment | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | chart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | series | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | axis | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | pivottable | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slicer | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | sparkline | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| dataValidation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| conditionalFormatting | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| autofilter | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| dataValidation | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| conditionalFormatting | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| autofilter | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | mergeCell | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| picture | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| shape | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| rowbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| colbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| rowbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| colbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | run | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 
 ## ppt
@@ -314,7 +314,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## rtf
 
-- fixtures: `create()`, `seed`, `rtf/testDefaultEncodingParse.rtf`, `rtf/column-break.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf`, `rtf/test437Encoding.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf`, `libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf`, `rtf/hyperlink.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf`, `seed + add paragraph`, `seed + add paragraph + add run`
+- fixtures: `create()`, `seed`, `rtf/testDefaultEncodingParse.rtf`, `rtf/column-break.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf`, `rtf/test437Encoding.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf`, `libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf`, `rtf/hyperlink.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf`, `unified-ops/0294/parts.rtf`, `seed + add paragraph`, `seed + add paragraph + add run`, `rtf/testDefaultEncodingParse.rtf + add tab`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -340,10 +340,17 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | num | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | level | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| section | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| bookmark | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
+| field | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| toc | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| textbox | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 
 ## odt
 
-- fixtures: `create()`, `odf/corpus/writer-header-footer.odt`, `odf/corpus/writer-table.odt`, `odf/corpus/writer-definition-lists.odt`, `odf/corpus/writer-images-frames.odt`, `odf/corpus/writer-table-of-contents.odt`, `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- fixtures: `create()`, `odf/corpus/writer-header-footer.odt`, `odf/corpus/writer-table.odt`, `odf/corpus/writer-definition-lists.odt`, `odf/corpus/writer-images-frames.odt`, `odf/corpus/writer-table-of-contents.odt`, `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt`, `unified-ops/0294/parts.odt`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `odf/corpus/writer-header-footer.odt`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -370,10 +377,22 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| num | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| level | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| field | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| equation | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## ods
 
-- fixtures: `create()`, `seed`, `odf/corpus/calc-formulas.ods`, `odf/corpus/calc-two-sheets.ods`, `odfdo/tests/samples/simple_table_named_range.ods`, `odf/ods/grid-padding-package.ods`, `seed + add sheet`, `create() + add row`, `odf/corpus/calc-two-sheets.ods + add namedrange`, `odf/corpus/calc-two-sheets.ods + add comment`
+- fixtures: `create()`, `seed`, `odf/corpus/calc-formulas.ods`, `odf/corpus/calc-two-sheets.ods`, `odfdo/tests/samples/simple_table_named_range.ods`, `odf/ods/grid-padding-package.ods`, `seed + add sheet`, `create() + add row`, `odf/corpus/calc-two-sheets.ods + add namedrange`, `odf/corpus/calc-two-sheets.ods + add comment`, `odf/corpus/calc-two-sheets.ods + add dataValidation`, `odf/corpus/calc-two-sheets.ods + add conditionalFormatting`, `odf/corpus/calc-two-sheets.ods + add autofilter`, `odf/corpus/calc-two-sheets.ods + add hyperlink`, `odf/corpus/calc-two-sheets.ods + add picture`, `odf/corpus/calc-two-sheets.ods + add shape`, `odf/corpus/calc-two-sheets.ods + add rowbreak`, `odf/corpus/calc-two-sheets.ods + add colbreak`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -393,21 +412,21 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | pivottable | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slicer | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | sparkline | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| dataValidation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| conditionalFormatting | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| autofilter | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| dataValidation | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| conditionalFormatting | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| autofilter | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | mergeCell | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
-| picture | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| shape | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| rowbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| colbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| rowbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| colbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | run | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 
 ## odp
 
-- fixtures: `create()`, `odf/odp/tdf105502.odp`, `odf/odp/tdf169979.odp`, `odf/corpus/impress-basic.odp`, `odf/odp/text-in-image.odp`, `odf/odp/cellspan.odp`, `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp`, `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp`, `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp`, `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp`, `unified-ops/0294/comments.odp`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add shape + add paragraph`
+- fixtures: `create()`, `odf/odp/tdf105502.odp`, `odf/odp/tdf169979.odp`, `odf/corpus/impress-basic.odp`, `odf/odp/text-in-image.odp`, `odf/odp/cellspan.odp`, `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp`, `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp`, `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp`, `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp`, `unified-ops/0294/comments.odp`, `unified-ops/0294/parts.odp`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add shape + add paragraph`, `create() + add slide + add shape + add linebreak`, `create() + add slide + add shape + add hyperlink`
 - document views on `odf/odp/tdf105502.odp`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -423,25 +442,25 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | chart | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | group | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | connector | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| ole | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| media | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| video | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| audio | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| ole | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
+| media | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
+| video | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
+| audio | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| run | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
-| linebreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| run | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
+| linebreak | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| equation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| equation | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
 | slideMaster | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | slideLayout | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | notesMaster | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | noteSlide | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | animation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| series | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| axis | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| col | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| series | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| axis | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| col | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## odg
 
@@ -492,7 +511,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## oth
 
-- fixtures: `create()`, `unified-ops/0294/frames.oth`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- fixtures: `create()`, `unified-ops/0294/frames.oth`, `unified-ops/0294/parts.oth`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `unified-ops/0294/frames.oth`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -507,7 +526,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | listItem | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | n/a | ok | ok | ok | ok | n/a | n/a | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | section | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | frame | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
@@ -519,10 +538,22 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| num | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| level | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| field | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| equation | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## odm
 
-- fixtures: `create()`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`, `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm`, `unified-ops/0294/frames.odm`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`
+- fixtures: `create()`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`, `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm`, `unified-ops/0294/frames.odm`, `unified-ops/0294/parts.odm`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -537,7 +568,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | listItem | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | n/a | ok | ok | ok | ok | n/a | n/a | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | section | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | frame | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
@@ -549,6 +580,18 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| num | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| level | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| field | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| toc | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| tab | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| equation | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 
 ## odf
 

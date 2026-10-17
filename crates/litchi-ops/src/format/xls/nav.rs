@@ -104,11 +104,14 @@ impl<'f> Nav<'f> {
 
     fn in_sheet(
         self,
-        sheet: &Sheet<'_>,
+        sheet: &Sheet<'f>,
         kind: Kind,
         select: Select<'_>,
     ) -> Result<Lookup<Node<'f>, GapSpec>> {
         let position = sheet.position;
+        if super::features::is_feature(kind) {
+            return super::features::lookup(self.file, sheet, kind, select);
+        }
         if !sheet.handle.is_grid()
             && matches!(kind, Kind::Cell | Kind::Range | Kind::Row | Kind::Column)
         {
@@ -353,23 +356,14 @@ impl<'f> Navigate<'f> for Nav<'f> {
     const FORMAT: FileFormat = FileFormat::Xls;
     const ABSENT: &'static [&'static str] = &[
         "table",
-        "comment",
         "chart",
         "series",
         "axis",
         "pivottable",
         "slicer",
         "sparkline",
-        "dataValidation",
-        "cf",
-        "autofilter",
-        "hyperlink",
         "mergeCell",
-        "picture",
-        "shape",
         "ole",
-        "rowbreak",
-        "colbreak",
         "run",
     ];
 
@@ -433,6 +427,12 @@ impl<'f> Navigate<'f> for Nav<'f> {
                         .sum();
                     out.kind("col", count);
                 },
+                (Item::Sheet(sheet), kind) if super::features::is_feature(kind) => {
+                    out.kind(
+                        super::features::step_name(kind),
+                        super::features::list(self.file, sheet, kind)?.len(),
+                    );
+                },
                 _ => {},
             }
             Ok(())
@@ -467,6 +467,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
                 ))),
                 Item::Sheet(_) => node.sheet_name()?.map(Cow::Owned),
                 Item::NamedRange(_) => node.named_range_text()?.map(Cow::Owned),
+                Item::Feature(feature) => feature.text().map(|text| Cow::Owned(text.into_owned())),
                 Item::Workbook | Item::Range(_) => None,
             })
         })

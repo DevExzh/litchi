@@ -6,6 +6,7 @@
 pub(crate) mod children;
 mod nav;
 mod node;
+mod parts;
 mod spec;
 mod stories;
 pub(crate) mod views;

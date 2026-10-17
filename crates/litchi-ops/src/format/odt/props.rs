@@ -17,7 +17,26 @@ pub(crate) enum Props<'a> {
     Body(Kind, LeafNodeRef<'a>),
     Style(StyleRef<'a>),
     Metadata(Box<Metadata>),
+    /// A part of record 0328.
+    Part(PartRef<'a>),
     Empty,
+}
+
+/// A part node's handle and part, with a `Debug` that omits content.
+#[derive(Clone, Copy)]
+pub(crate) struct PartRef<'a> {
+    odt: &'a super::Odt,
+    kind: Kind,
+    part: super::node::Part,
+}
+
+impl std::fmt::Debug for PartRef<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PartRef")
+            .field("kind", &self.kind)
+            .finish_non_exhaustive()
+    }
 }
 
 /// A leaf node with a `Debug` that omits authored content.
@@ -48,6 +67,11 @@ impl<'a> Props<'a> {
                 None => Self::Empty,
             },
             Target::Style(style) => Self::Style(StyleRef(style)),
+            Target::Part(part) => Self::Part(PartRef {
+                odt: node.odt,
+                kind: node.kind,
+                part,
+            }),
             Target::Synthetic if node.kind == Kind::Metadata => {
                 Self::Metadata(Box::new(node.odt.metadata()?.unwrap_or_default()))
             },
@@ -61,6 +85,7 @@ impl<'a> Props<'a> {
             Self::Body(kind, leaf) => body_value(*kind, leaf.0, index),
             Self::Style(style) => style_value(style.0, index),
             Self::Metadata(metadata) => metadata_value(metadata, index),
+            Self::Part(part) => super::parts::value(part.odt, part.kind, part.part, index),
             Self::Empty => None,
         }
     }

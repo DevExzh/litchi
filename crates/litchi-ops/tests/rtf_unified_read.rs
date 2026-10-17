@@ -111,14 +111,16 @@ fn native_substories_are_read_and_unprojected_concepts_stay_pending() {
     assert_eq!(text(&file, "/header[1]/p[1]"), "Not body");
     assert_eq!(file.query("header").unwrap().count(), 1);
     assert_eq!(file.query("p").unwrap().count(), 4);
+    // Record 0328 reads shapes as body children, not paragraph children;
+    // equations stay a capability gap.
     assert_eq!(
         file.get("/body/p[1]/shape[1]").unwrap_err().code(),
-        Code::UnsupportedCapability
+        Code::UnsupportedPath
     );
     assert!(
         file.capabilities()
             .gaps()
-            .any(|gap| gap.subject() == litchi_ops::capabilities::Subject::Element("shape"))
+            .any(|gap| gap.subject() == litchi_ops::capabilities::Subject::Element("equation"))
     );
 }
 

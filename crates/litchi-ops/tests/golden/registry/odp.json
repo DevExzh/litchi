@@ -1034,6 +1034,10 @@
         {
           "element": "audio",
           "pathSegment": "audio"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
         }
       ],
       "properties": {
@@ -1319,20 +1323,99 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/video[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP media typing",
-        "reason": "ODF draw:plugin frames are exposed as media; the scene does not classify their MIME type"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mediaType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mimeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "loop": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mute": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1345,20 +1428,99 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/audio[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP media typing",
-        "reason": "ODF draw:plugin frames are exposed as media; the scene does not classify their MIME type"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mediaType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mimeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "loop": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mute": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1481,6 +1643,12 @@
           "/slide[N]/shape[N]/paragraph[N]/run[N]"
         ]
       },
+      "children": [
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        }
+      ],
       "properties": {
         "style": {
           "type": "string",
@@ -1556,11 +1724,11 @@
         "br"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1568,36 +1736,57 @@
         ]
       },
       "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP inline controls",
-        "reason": "text:line-break is projected as a newline in paragraph and run text, not as a node"
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
       "format": "odp",
       "element": "hyperlink",
-      "parent": "shape",
+      "parent": [
+        "shape",
+        "run"
+      ],
       "elementAliases": [
         "hlink"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/slide[N]/shape[N]/hyperlink"
+          "/slide[N]/shape[N]/hyperlink",
+          "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP hyperlink nodes",
-        "reason": "text:a links are exposed as runs with a `link` property; shape-level draw:a links are not nodes"
+      "properties": {
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1730,7 +1919,10 @@
     {
       "format": "odp",
       "element": "equation",
-      "parent": "slide",
+      "parent": [
+        "slide",
+        "group"
+      ],
       "elementAliases": [
         "formula",
         "math"
@@ -1738,20 +1930,63 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/slide[N]/equation[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP formula objects (litchi-odf-formula)",
-        "reason": "embedded ODF formula objects are listed as ole frames; their MathML is not projected"
+      "properties": {
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1917,8 +2152,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1926,11 +2161,44 @@
           "/slide[N]/chart[N]/series[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP chart CRUD (litchi_odp::charts)",
-        "reason": "chart series of embedded chart objects are not projected through the unified adapter"
+      "properties": {
+        "values": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "nameRef": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "chartType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "axis": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "pointCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1940,20 +2208,60 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
         "positional": [
+          "/slide[N]/chart[N]/axis[N]",
           "/slide[N]/chart[N]/axis[@role=ROLE]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP chart CRUD (litchi_odp::charts)",
-        "reason": "chart axes of embedded chart objects are not projected through the unified adapter"
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "dimension": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1966,8 +2274,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1975,15 +2283,53 @@
           "/slide[N]/table[N]/col[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M6 ODP table columns",
-        "reason": "table columns are counted on the table node (`cols`) but are not nodes"
+      "properties": {
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     }
   ],
   "gaps": [
+    {
+      "subject": "element",
+      "element": "theme",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
+    {
+      "subject": "element",
+      "element": "modernComment",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
+    {
+      "subject": "element",
+      "element": "model3d",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
+    {
+      "subject": "element",
+      "element": "zoom",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
     {
       "subject": "operation",
       "verb": "set",

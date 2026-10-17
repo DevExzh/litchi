@@ -29,6 +29,7 @@ use crate::value::{LengthSpec, Scalar, ValueType};
 pub(crate) mod coalesce;
 mod destination;
 mod find;
+mod marks;
 pub(crate) mod removal;
 
 /// The native proof and immutable endpoints of one RTF write.
@@ -161,6 +162,22 @@ pub(crate) fn add_with_limits<'p, 'n>(
             .with_format(FileFormat::Rtf));
         }
         return add_run_with_limits(file, parent, node, limits);
+    }
+    if node.kind().eq_ignore_ascii_case("tab") {
+        let paragraph = parent
+            .body_paragraph()
+            .and(parent.paragraph_position())
+            .filter(|_| parent.element_kind() == super::Kind::Paragraph)
+            .ok_or_else(|| {
+                Error::new(
+                    Code::UnsupportedType,
+                    "RTF tab stops can only be added directly under a body paragraph",
+                )
+                .with_format(FileFormat::Rtf)
+            })?;
+        // Tab stops are kept in position order, as ODT keeps them; a
+        // placement does not reorder them.
+        return marks::add_tab(file, paragraph.get(), node.props(), limits);
     }
     if parent.element_kind() != super::Kind::Body {
         return Err(Error::new(
@@ -505,6 +522,9 @@ pub(crate) fn set_with_limits<'p, 'v>(
             )
             .with_format(FileFormat::Rtf));
         },
+        MutationTargets::Mark(targets) => {
+            return marks::set(file, targets.as_slice(), &props, limits);
+        },
         MutationTargets::Paragraph(positions) => positions,
     };
     let positions = positions.as_slice();
@@ -653,6 +673,7 @@ enum MutationKind {
     Run,
     Destination,
     Picture,
+    Mark,
 }
 
 enum MutationTargets {
@@ -663,6 +684,9 @@ enum MutationTargets {
     Destination(Batch<destination::Target>),
     /// Native picture indices.
     Picture(Batch<usize>),
+    /// Sections, bookmarks, fields, tables of contents and tab stops
+    /// (record 0328).
+    Mark(Batch<marks::Target>),
 }
 
 /// The mutation family of `node`, or `None` when it is not a mutation target.
@@ -671,6 +695,11 @@ fn mutation_kind(node: &Node<'_>) -> Option<MutationKind> {
         super::Kind::Paragraph if node.body_paragraph().is_some() => Some(MutationKind::Paragraph),
         super::Kind::Run => Some(MutationKind::Run),
         super::Kind::Picture => Some(MutationKind::Picture),
+        super::Kind::Section
+        | super::Kind::Bookmark
+        | super::Kind::Field
+        | super::Kind::Toc
+        | super::Kind::Tab => marks::Target::of(node).map(|_| MutationKind::Mark),
         _ => destination::Target::of(node).map(|_| MutationKind::Destination),
     }
 }
@@ -692,6 +721,7 @@ fn resolve_mutation_targets(
     let mut runs = Vec::new();
     let mut destinations = Vec::new();
     let mut pictures = Vec::new();
+    let mut mark_targets = Vec::new();
 
     let mut append = |node: Node<'_>| -> Result<()> {
         let Some(current) = mutation_kind(&node) else {
@@ -725,6 +755,7 @@ fn resolve_mutation_targets(
                 destination::append(&mut destinations, &node, maximum)?;
             },
             MutationKind::Picture => destination::append_picture(&mut pictures, &node, maximum)?,
+            MutationKind::Mark => marks::append(&mut mark_targets, &node, maximum)?,
         }
         selected(node);
         Ok(())
@@ -768,6 +799,9 @@ fn resolve_mutation_targets(
                     Some(MutationTargets::Picture(Batch::One(index)))
                 },
                 _ => None,
+            },
+            Some(MutationKind::Mark) => {
+                marks::Target::of(&node).map(|target| MutationTargets::Mark(Batch::One(target)))
             },
             None => None,
         };
@@ -817,6 +851,11 @@ fn resolve_mutation_targets(
             pictures.sort_unstable();
             pictures.dedup();
             Ok(MutationTargets::Picture(Batch::Many(pictures)))
+        },
+        Some(MutationKind::Mark) if !mark_targets.is_empty() => {
+            mark_targets.sort_unstable();
+            mark_targets.dedup();
+            Ok(MutationTargets::Mark(Batch::Many(mark_targets)))
         },
         Some(_) | None => Err(Error::new(
             Code::ZeroMatches,
@@ -1144,6 +1183,9 @@ pub(crate) fn remove_with_limits<'p>(
     let positions = match targets {
         MutationTargets::Picture(indices) => {
             return destination::remove_pictures(file, indices.as_slice(), limits);
+        },
+        MutationTargets::Mark(targets) => {
+            return marks::remove(file, targets.as_slice(), limits);
         },
         MutationTargets::Destination(_) => {
             return Err(Error::new(

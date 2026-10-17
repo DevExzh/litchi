@@ -44,6 +44,9 @@ pub(super) enum Item<'f> {
     Column(ColumnItem),
     /// The defined name at this index of the workbook's non-macro names.
     NamedRange(usize),
+    /// A worksheet feature: a note, hyperlink, picture, shape, conditional
+    /// format, validation, auto-filter or page break (record 0327).
+    Feature(std::sync::Arc<super::features::Feature>),
 }
 
 /// The workbook's non-macro defined names, through the eager reader.
@@ -134,6 +137,11 @@ impl<'f> Node<'f> {
             item: Item::Sheet(sheet),
             sheet: position,
         }
+    }
+
+    /// An element of the worksheet at `sheet`, for a sibling module.
+    pub(super) fn in_sheet_item(file: &'f Xls, sheet: usize, item: Item<'f>) -> Self {
+        Self::in_sheet(file, sheet, item)
     }
 
     fn in_sheet(file: &'f Xls, sheet: usize, item: Item<'f>) -> Self {
@@ -248,6 +256,7 @@ impl<'f> Node<'f> {
             Item::Row(row) => PathStep::at("row", Position::new(row.index as usize)),
             Item::Column(column) => PathStep::column("col", column.index),
             Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
+            Item::Feature(feature) => feature.step(),
         })
     }
 
@@ -260,6 +269,7 @@ impl<'f> Node<'f> {
             Item::Row(_) => Kind::Row,
             Item::Column(_) => Kind::Column,
             Item::NamedRange(_) => Kind::NamedRange,
+            Item::Feature(ref feature) => feature.kind,
         }
     }
 
@@ -381,6 +391,12 @@ impl<'f> Node<'f> {
                 };
                 (NAMED_RANGE_PROPS, Props::NamedRange { name, scope })
             },
+            Item::Feature(feature) => {
+                let sheet = SheetHandle::at(self.file, self.sheet)?
+                    .map(|handle| handle.name().to_owned())
+                    .unwrap_or_default();
+                (feature.table(), Props::Feature(feature, sheet))
+            },
         };
         Ok(Format::new(table, Source::Xls(props)))
     }
@@ -418,6 +434,8 @@ pub(crate) enum Props<'a> {
         name: &'a litchi_xls::DefinedName,
         scope: Option<Cow<'a, str>>,
     },
+    /// A worksheet feature and its worksheet's name (record 0327).
+    Feature(&'a super::features::Feature, String),
 }
 
 pub(crate) struct CellProps<'a> {
@@ -445,6 +463,7 @@ impl fmt::Debug for Props<'_> {
             Self::Row(_) => "Row",
             Self::Column(_) => "Column",
             Self::NamedRange { .. } => "NamedRange",
+            Self::Feature(..) => "Feature",
         };
         formatter.debug_tuple("Props").field(&name).finish()
     }
@@ -471,6 +490,7 @@ impl<'a> Props<'a> {
                 },
             },
             Self::Cell(cell) => cell.get(CellKey::at(index)?),
+            Self::Feature(feature, sheet) => feature.value(index, sheet),
             Self::Row(row) => row.and_then(|layout| row_value(layout, RowKey::at(index)?)),
             Self::Column(column) => {
                 column.and_then(|layout| column_value(layout, ColumnKey::at(index)?))
@@ -664,6 +684,7 @@ impl<'f> Project<'f> for Node<'f> {
                 )?)),
                 Item::Sheet(_) => self.sheet_name()?.map(Cow::Owned),
                 Item::NamedRange(_) => self.named_range_text()?.map(Cow::Owned),
+                Item::Feature(feature) => feature.text(),
                 Item::Workbook | Item::Range(_) => None,
             })
         })
@@ -681,6 +702,7 @@ impl<'f> Project<'f> for Node<'f> {
                 Item::NamedRange(_) => self
                     .named_range_text()?
                     .map(|text| Preview::Text(Cow::Owned(text))),
+                Item::Feature(feature) => feature.preview(),
             })
         })
     }
@@ -689,7 +711,7 @@ impl<'f> Project<'f> for Node<'f> {
         self.file.finish(|| {
             let count = match &self.item {
                 Item::Workbook => super::nav::tab_count(self.file)?,
-                Item::NamedRange(_) => 0,
+                Item::NamedRange(_) | Item::Feature(_) => 0,
                 Item::Cell(_) | Item::Range(_) | Item::Column(_) => {
                     if matches!(self.item, Item::Range(_)) {
                         Children::count(self, options)?

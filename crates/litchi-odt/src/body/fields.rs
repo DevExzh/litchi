@@ -44,6 +44,71 @@ const FIELDS: [&str; 26] = [
     "file-name",
 ];
 
+/// Every `text:*` field element [`fields`] lists (record 0328): the
+/// [`text_fields`] set, then the variable, reference, sequence, chapter,
+/// sender, template, database and conditional fields.
+const ALL_FIELDS: [&str; 59] = [
+    "date",
+    "time",
+    "page-number",
+    "page-count",
+    "page-continuation",
+    "title",
+    "subject",
+    "description",
+    "keywords",
+    "initial-creator",
+    "creator",
+    "author-name",
+    "author-initials",
+    "creation-date",
+    "creation-time",
+    "modification-date",
+    "modification-time",
+    "print-date",
+    "print-time",
+    "word-count",
+    "character-count",
+    "paragraph-count",
+    "table-count",
+    "image-count",
+    "object-count",
+    "file-name",
+    "editing-cycles",
+    "editing-duration",
+    "printed-by",
+    "user-defined",
+    "variable-set",
+    "variable-get",
+    "variable-input",
+    "user-field-get",
+    "user-field-input",
+    "sequence",
+    "expression",
+    "text-input",
+    "page-variable-set",
+    "page-variable-get",
+    "placeholder",
+    "chapter",
+    "template-name",
+    "sheet-name",
+    "sender-firstname",
+    "sender-lastname",
+    "sender-initials",
+    "sender-company",
+    "sender-email",
+    "sender-title",
+    "bookmark-ref",
+    "reference-ref",
+    "sequence-ref",
+    "note-ref",
+    "conditional-text",
+    "hidden-text",
+    "database-display",
+    "database-name",
+    "execute-macro",
+];
+
 /// One text field of the body.
 #[derive(Debug, Clone)]
 pub struct TextField<'a> {
@@ -55,6 +120,39 @@ pub struct TextField<'a> {
 }
 
 impl<'a> TextField<'a> {
+    /// The field element of `body` at `range` (a [`Self::range`] of a field
+    /// [`fields`] listed), or `None` when no field element spans exactly
+    /// those bytes.
+    #[must_use]
+    pub fn at(body: Body<'a>, range: Range<usize>) -> Option<Self> {
+        let content = body.content();
+        let element = content.get(range.clone())?;
+        let tag_end = xml::tag_end(element.as_bytes(), 0)?;
+        let start_tag = &element[..tag_end];
+        let qualified = xml::tag_name(start_tag);
+        let (ns, local) = body.prefixes().resolve(qualified.as_bytes())?;
+        if ns != Ns::Text {
+            return None;
+        }
+        let name = ALL_FIELDS
+            .iter()
+            .copied()
+            .find(|name| name.as_bytes() == local)?;
+        let inner = if start_tag.ends_with("/>") {
+            ""
+        } else {
+            let close = element.rfind("</")?;
+            element.get(tag_end..close)?
+        };
+        Some(Self {
+            name,
+            range,
+            start_tag,
+            content: inner,
+            body,
+        })
+    }
+
     /// The element's local name: `date`, `page-number`, `title`, ...
     #[must_use]
     pub const fn name(&self) -> &'a str {
@@ -112,6 +210,22 @@ impl<'a> TextField<'a> {
 ///
 /// Returns an error for malformed body markup.
 pub fn text_fields(body: Body<'_>) -> Result<Vec<TextField<'_>>> {
+    scan(body, &FIELDS)
+}
+
+/// Every text field of `body` in document order — the [`text_fields`] set
+/// and the variable, reference, sequence, chapter, sender, template,
+/// database and conditional fields — tracked-change records left out. A
+/// field inside another field is not listed.
+///
+/// # Errors
+///
+/// Returns an error for malformed body markup.
+pub fn fields(body: Body<'_>) -> Result<Vec<TextField<'_>>> {
+    scan(body, &ALL_FIELDS)
+}
+
+fn scan<'a>(body: Body<'a>, names: &'static [&'static str]) -> Result<Vec<TextField<'a>>> {
     let root = body.root();
     debug_assert_eq!(root.kind(), Kind::Body);
     let content = body.content();
@@ -147,7 +261,7 @@ pub fn text_fields(body: Body<'_>) -> Result<Vec<TextField<'_>>> {
                 }
                 if open.is_none()
                     && let Some((Ns::Text, local)) = resolved
-                    && let Some(name) = FIELDS.iter().find(|name| name.as_bytes() == local)
+                    && let Some(name) = names.iter().find(|name| name.as_bytes() == local)
                 {
                     open = Some((name, before, after, depth));
                 }
@@ -158,7 +272,7 @@ pub fn text_fields(body: Body<'_>) -> Result<Vec<TextField<'_>>> {
                 }
                 let qualified = tag.name();
                 if let Some((Ns::Text, local)) = prefixes.resolve(qualified.as_ref())
-                    && let Some(name) = FIELDS.iter().find(|name| name.as_bytes() == local)
+                    && let Some(name) = names.iter().find(|name| name.as_bytes() == local)
                 {
                     fields.push(TextField {
                         name,

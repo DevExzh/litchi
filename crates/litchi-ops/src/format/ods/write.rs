@@ -98,6 +98,8 @@ enum Target {
         sheet: u32,
         rect: (u32, u32, u32, u32),
     },
+    /// A worksheet feature, written through `feature_write` (record 0327).
+    Feature(u32),
 }
 
 impl Target {
@@ -129,6 +131,7 @@ impl Target {
                 sheet,
                 rect: merge.rect,
             },
+            Item::Feature(_) => Self::Feature(sheet),
         }
     }
 
@@ -143,6 +146,7 @@ impl Target {
             Self::Name(_) => Kind::NamedRange,
             Self::Comment(_) => Kind::Comment,
             Self::Merge { .. } => Kind::MergeCell,
+            Self::Feature(_) => Kind::Hyperlink,
         }
     }
 }
@@ -250,6 +254,10 @@ impl Ods {
                 limits.max_operations(),
             ));
         }
+        if let Some(commit) = super::feature_write::try_set(self, &target, &props, limits)? {
+            self.check_source()?;
+            return Ok(commit);
+        }
         let result = if super::metadata::is_target(&target) && !is_sheet_property(&props) {
             super::metadata::set(self, &props, limits)
         } else {
@@ -273,6 +281,10 @@ impl Ods {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         self.admit_edit()?;
+        if let Some(commit) = super::feature_write::try_remove(self, &target, limits)? {
+            self.check_source()?;
+            return Ok(commit);
+        }
         let targets = resolve(self, &target, limits)?;
         let result = remove_targets(self, &targets, limits);
         self.check_source()?;
@@ -1365,6 +1377,29 @@ fn add(
     limits: &SemanticLimits,
 ) -> Result<(Commit, Path<'static>)> {
     let kind = node.kind();
+    if let Some((feature, implied)) = super::feature_write::feature_kind(kind, node.props()) {
+        let parent = match parent {
+            Target::Sheet(sheet) => super::feature_write::Parent {
+                sheet,
+                reference: None,
+            },
+            Target::Cell { sheet, row, column } => super::feature_write::Parent {
+                sheet,
+                reference: Some((row, column, row, column)),
+            },
+            Target::Range { sheet, rect } => super::feature_write::Parent {
+                sheet,
+                reference: Some(rect),
+            },
+            _ => {
+                return Err(refusal(
+                    Code::UnsupportedType,
+                    "worksheet features are added under a worksheet, a cell or a range",
+                ));
+            },
+        };
+        return super::feature_write::add(file, &parent, feature, implied, node, limits);
+    }
     if kind.eq_ignore_ascii_case("sheet") || kind.eq_ignore_ascii_case("worksheet") {
         return add_sheet(file, parent, node, limits);
     }

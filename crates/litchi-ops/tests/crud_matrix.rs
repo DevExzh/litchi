@@ -184,6 +184,13 @@ const SPECS: &[Spec] = &[
             "ole/xls/WithExtendedStyles.xls",
             "libreoffice-core/sc/qa/unit/data/xls/formats.xls",
             "ole/xls/SimpleWithAutofilter.xls",
+            // Record 0327: notes, pictures, conditional formats, hyperlinks
+            // and page breaks of producer workbooks (Apache POI, Apache-2.0).
+            "ole/xls/SimpleWithComments.xls",
+            "ole/xls/SimpleWithImages.xls",
+            "ole/xls/WithConditionalFormatting.xls",
+            "ole/xls/WithHyperlink.xls",
+            "ole/xls/SimpleWithPageBreaks.xls",
         ],
     },
     Spec {
@@ -227,6 +234,9 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf",
             "libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf",
             "libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf",
+            // Record 0328: sections, bookmarks, fields, a table of contents,
+            // tab stops, a shape and a text box (hand-written).
+            "unified-ops/0294/parts.rtf",
         ],
     },
     Spec {
@@ -240,6 +250,10 @@ const SPECS: &[Spec] = &[
             "odf/corpus/writer-images-frames.odt",
             "odf/corpus/writer-table-of-contents.odt",
             "libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt",
+            // Record 0328: headers and footers, numbering, fields, a table of
+            // contents, tab stops, shapes, equations and table columns
+            // (generated, test-data/unified-ops/0294).
+            "unified-ops/0294/parts.odt",
         ],
     },
     Spec {
@@ -269,6 +283,9 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp",
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/comments.odp",
+            // Record 0328: hyperlinks, line breaks, columns, video and audio,
+            // equations and chart series and axes (generated).
+            "unified-ops/0294/parts.odp",
         ],
     },
     Spec {
@@ -314,6 +331,8 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/frames.oth",
+            // Record 0328: the ODT parts fixture as a web template.
+            "unified-ops/0294/parts.oth",
         ],
     },
     Spec {
@@ -325,6 +344,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm",
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/frames.odm",
+            // Record 0328: the ODT parts fixture as a master document.
+            "unified-ops/0294/parts.odm",
         ],
     },
     Spec {
@@ -751,6 +772,88 @@ const RECIPES: &[Recipe] = &[
         props: &[("col", "4")],
         start: false,
     },
+    // Record 0327: the XLS worksheet features take the XLSX recipes (a CF
+    // fill is a palette color in BIFF8).
+    Recipe {
+        format: "xls",
+        element: "comment",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("ref", "B2"), ("text", "note"), ("author", "Ann")],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "hyperlink",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("ref", "A1"), ("url", "https://example.test/")],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "picture",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[(
+            "src",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+        )],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "shape",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("geometry", "rect"), ("text", "box")],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "conditionalFormatting",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[
+            ("type", "cellIs"),
+            ("ref", "A1:A9"),
+            ("value", "5"),
+            ("fill", "FF0000"),
+        ],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "dataValidation",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("type", "list"), ("ref", "A1:A9"), ("formula1", "a,b")],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "autofilter",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("range", "A1:C9")],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "rowbreak",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("row", "10")],
+        start: false,
+    },
+    Recipe {
+        format: "xls",
+        element: "colbreak",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("col", "4")],
+        start: false,
+    },
     Recipe {
         format: "pptx",
         element: "slide",
@@ -874,6 +977,79 @@ const RECIPES: &[Recipe] = &[
         fixture: "odf/corpus/calc-two-sheets.ods",
         parent: "/sheet1/B2",
         props: &[("text", "check"), ("author", "Reviewer")],
+        start: false,
+    },
+    // Record 0327: the ODS worksheet features take the XLSX recipes.
+    Recipe {
+        format: "ods",
+        element: "hyperlink",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[("ref", "A1"), ("url", "https://example.test/")],
+        start: false,
+    },
+    Recipe {
+        format: "ods",
+        element: "picture",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[(
+            "src",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+        )],
+        start: false,
+    },
+    Recipe {
+        format: "ods",
+        element: "shape",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[("geometry", "rect"), ("text", "box")],
+        start: false,
+    },
+    Recipe {
+        format: "ods",
+        element: "conditionalFormatting",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[
+            ("type", "cellIs"),
+            ("ref", "A1:A9"),
+            ("value", "5"),
+            ("fill", "FF0000"),
+        ],
+        start: false,
+    },
+    Recipe {
+        format: "ods",
+        element: "dataValidation",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[("type", "list"), ("ref", "A1:A2"), ("formula1", "a,b")],
+        start: false,
+    },
+    Recipe {
+        format: "ods",
+        element: "autofilter",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[("range", "A1:C3")],
+        start: false,
+    },
+    Recipe {
+        format: "ods",
+        element: "rowbreak",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[("row", "2")],
+        start: false,
+    },
+    Recipe {
+        format: "ods",
+        element: "colbreak",
+        fixture: "odf/corpus/calc-two-sheets.ods",
+        parent: "/sheet1",
+        props: &[("col", "2")],
         start: false,
     },
     Recipe {

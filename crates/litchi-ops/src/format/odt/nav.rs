@@ -102,6 +102,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     ))
                 }))
             },
+            (_, kind) if kind.is_part() => self.part(parent, kind, step.select),
             (_, kind) => {
                 if let (Target::Body(body, _), Select::None | Select::Ordinal(_) | Select::Last) =
                     (parent.target, step.select)
@@ -189,6 +190,165 @@ impl<'f> Navigate<'f> for Nav<'f> {
     }
 }
 
+/// The index `select` picks among `count` children: `None` when the select
+/// does not apply, `Some(None)` when it picks nothing.
+fn pick(select: Select<'_>, count: usize) -> Option<Option<usize>> {
+    Some(match select {
+        Select::None => (count > 0).then_some(0),
+        Select::Ordinal(position) => (position.get() < count).then_some(position.get()),
+        Select::Last => count.checked_sub(1),
+        Select::Number(number) => number.checked_sub(1).filter(|index| *index < count),
+        _ => return None,
+    })
+}
+
+/// The single value `select` names for identity `key`: `None` when it
+/// names no identity, `Some(None)` when it names another key or the
+/// stacked values disagree.
+fn identity<'s>(select: Select<'s>, key: &str) -> Option<Option<&'s str>> {
+    let Select::Identity(identities) = select else {
+        return None;
+    };
+    let mut wanted = None;
+    for (identity, value) in identities.iter() {
+        if !identity.key.eq_ignore_ascii_case(key) || wanted.is_some_and(|held| held != value) {
+            return Some(None);
+        }
+        wanted = Some(value);
+    }
+    Some(wanted)
+}
+
+impl<'f> Nav<'f> {
+    /// Resolve one step to a part of record 0328 under `parent`.
+    fn part(
+        &self,
+        parent: &Node<'f>,
+        kind: Kind,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, crate::node::spec::GapSpec>> {
+        use super::node::Part;
+        use super::parts;
+        let odt = self.doc;
+        let found = |index: Option<usize>, part: &dyn Fn(usize) -> Part| {
+            index.map_or(Lookup::Missing, |index| {
+                Lookup::Found(parts::node(parent, kind, part(index), index))
+            })
+        };
+        let count = |value: usize| u32::try_from(value).unwrap_or(u32::MAX);
+        Ok(match (parent.kind, parent.target, kind) {
+            (Kind::Document, _, Kind::Header | Kind::Footer) => {
+                let regions = parts::regions(odt, kind == Kind::Header)?;
+                let index = match identity(select, "type") {
+                    Some(Some(wanted)) => {
+                        let mut index = None;
+                        for (ordinal, region) in regions.iter().enumerate() {
+                            if parts::region_type_of(odt, *region)?
+                                .is_some_and(|held| held.eq_ignore_ascii_case(wanted))
+                            {
+                                index = Some(ordinal);
+                                break;
+                            }
+                        }
+                        index
+                    },
+                    Some(None) => return Ok(Lookup::NotApplicable),
+                    None => match pick(select, regions.len()) {
+                        Some(index) => index,
+                        None => return Ok(Lookup::NotApplicable),
+                    },
+                };
+                found(index, &|index| Part::Region(regions[index]))
+            },
+            (Kind::Document, _, Kind::Numbering) => {
+                match select {
+                    Select::None | Select::Last => {},
+                    Select::Ordinal(position) if position.get() == 0 => {},
+                    Select::Ordinal(_) => return Ok(Lookup::Missing),
+                    _ => return Ok(Lookup::NotApplicable),
+                }
+                found((parts::list_count(odt)? > 0).then_some(0), &|_| {
+                    Part::Numbering
+                })
+            },
+            (Kind::Numbering, _, Kind::AbstractNum | Kind::Num) => {
+                let lists = parts::list_count(odt)?;
+                let index = match identity(select, "id") {
+                    Some(Some(wanted)) => wanted
+                        .trim()
+                        .parse::<usize>()
+                        .ok()
+                        .filter(|index| *index < lists),
+                    Some(None) => return Ok(Lookup::NotApplicable),
+                    None => match pick(select, lists) {
+                        Some(index) => index,
+                        None => return Ok(Lookup::NotApplicable),
+                    },
+                };
+                found(index, &|index| Part::List(count(index)))
+            },
+            (Kind::AbstractNum, Target::Part(Part::List(list)), Kind::Level) => {
+                let levels = parts::level_count(odt, list)?;
+                let index = match identity(select, "ilvl") {
+                    Some(Some(wanted)) => match wanted.trim().parse::<u16>() {
+                        Ok(ilvl) => parts::level_by_ilvl(odt, list, ilvl)?,
+                        Err(_) => return Ok(Lookup::NotApplicable),
+                    },
+                    Some(None) => return Ok(Lookup::NotApplicable),
+                    None => match pick(select, levels) {
+                        Some(index) => index,
+                        None => return Ok(Lookup::NotApplicable),
+                    },
+                };
+                found(index, &|index| Part::Level(list, count(index)))
+            },
+            (Kind::Document, _, Kind::Field | Kind::Toc) => {
+                let total = if kind == Kind::Field {
+                    parts::field_count(odt)?
+                } else {
+                    parts::toc_count(odt)?
+                };
+                let Some(index) = pick(select, total) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                if kind == Kind::Field {
+                    found(index, &|index| Part::Field(count(index)))
+                } else {
+                    found(index, &|index| Part::Toc(count(index)))
+                }
+            },
+            (Kind::Body, _, Kind::Shape | Kind::Equation) => {
+                let total = if kind == Kind::Shape {
+                    parts::shape_count(odt)?
+                } else {
+                    parts::equation_count(odt)?
+                };
+                let Some(index) = pick(select, total) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                if kind == Kind::Shape {
+                    found(index, &|index| Part::Shape(count(index)))
+                } else {
+                    found(index, &|index| Part::Equation(count(index)))
+                }
+            },
+            (Kind::Paragraph | Kind::Heading, Target::Body(_, id), Kind::Tab) => {
+                let Some(index) = pick(select, parts::tab_count(odt, id)?) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                found(index, &|index| Part::Tab(id, count(index)))
+            },
+            (Kind::Table, Target::Body(_, id), Kind::Column) => {
+                let Some(index) = pick(select, parts::column_count(odt, id)?) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                found(index, &|index| Part::Column(id, count(index)))
+            },
+            _ => Lookup::NotApplicable,
+        })
+    }
+}
+
 impl<'f> Inspect<'f> for Nav<'f> {
     const SPEC: &'static FormatSpec<Kind> = &SPEC;
     const TOP: &'static [Kind] = &[Kind::Body];
@@ -217,6 +377,9 @@ impl<'f> Inspect<'f> for Nav<'f> {
         // A body element none of whose child elements projects to one of
         // `kinds` lists no such children (record 0280): a paragraph of runs
         // when the walk looks for paragraphs. Every other node is entered.
+        if super::parts::has_part_children(node.kind, kinds) {
+            return false;
+        }
         match node.target {
             Target::Body(body, id) => body.node(id).is_some_and(|node| {
                 node.children()
@@ -235,7 +398,9 @@ impl<'f> Inspect<'f> for Nav<'f> {
     ) -> fmt::Result {
         use crate::path::navigate::ElementKind;
         let step = match kind {
-            Kind::Body | Kind::Styles | Kind::Metadata => PathStep::new(kind.name()),
+            Kind::Body | Kind::Styles | Kind::Metadata | Kind::Numbering => {
+                PathStep::new(kind.name())
+            },
             Kind::Style => match node.style_name() {
                 Some(name) => return fmt::Display::fmt(&PathStep::new(name), out),
                 None => PathStep::at(kind.name(), ordinal),

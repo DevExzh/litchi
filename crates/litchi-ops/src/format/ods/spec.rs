@@ -128,10 +128,17 @@ pub(crate) enum CommentKey {
     Author,
     Text,
     Date,
+    AnchoredTo,
 }
 
 impl CommentKey {
-    const ALL: [Self; 4] = [Self::Ref, Self::Author, Self::Text, Self::Date];
+    const ALL: [Self; 5] = [
+        Self::Ref,
+        Self::Author,
+        Self::Text,
+        Self::Date,
+        Self::AnchoredTo,
+    ];
 
     pub(crate) fn at(index: usize) -> Option<Self> {
         Self::ALL.get(index).copied()
@@ -139,12 +146,14 @@ impl CommentKey {
 }
 
 /// A cell annotation (`office:annotation`): its anchor cell, `dc:creator`,
-/// plain text and `dc:date` (OfficeCLI's comment keys plus the date).
+/// plain text, `dc:date` and the path of its cell (OfficeCLI's comment keys
+/// plus the date).
 pub(crate) static COMMENT_PROPS: &[PropSpec] = &[
     PropSpec::new("ref", ValueType::Text),
     PropSpec::new("author", ValueType::Text),
     PropSpec::new("text", ValueType::Text),
     PropSpec::new("date", ValueType::Text),
+    PropSpec::new("anchoredTo", ValueType::Text),
 ];
 
 /// A merged span: its A1 range.
@@ -402,7 +411,7 @@ static RANGE_CAPABILITY_PROPS: [PropSpec; RANGE_PROPS.len() + CELL_WRITE_PROPS.l
     range_capability_array();
 static SHEET_CAPABILITY_PROPS: [PropSpec; 1] = merged(SHEET_PROPS, SHEET_WRITE_PROPS);
 static NAME_CAPABILITY_PROPS: [PropSpec; 3] = merged(NAMED_RANGE_PROPS, NAME_WRITE_PROPS);
-static COMMENT_CAPABILITY_PROPS: [PropSpec; 4] = merged(COMMENT_PROPS, COMMENT_WRITE_PROPS);
+static COMMENT_CAPABILITY_PROPS: [PropSpec; 5] = merged(COMMENT_PROPS, COMMENT_WRITE_PROPS);
 
 /// The capability projection of one element's properties, when it differs
 /// from the read table.
@@ -477,50 +486,10 @@ static SPARKLINE_GAP: GapSpec = gap(
     FOLLOW_UP,
     "ODS sparkline groups are read by the leaf but not projected into unified nodes yet",
 );
-static VALIDATION_GAP: GapSpec = gap(
-    "dataValidation",
-    FOLLOW_UP,
-    "ODS content validations are read by the leaf but not projected into unified nodes yet",
-);
-static CF_GAP: GapSpec = gap(
-    "conditionalFormatting",
-    FOLLOW_UP,
-    "ODS conditional formats are read by the leaf but not projected into unified nodes yet",
-);
-static AUTOFILTER_GAP: GapSpec = gap(
-    "autofilter",
-    FOLLOW_UP,
-    "ODS auto-filters live on database ranges, which are not projected yet",
-);
-static HYPERLINK_GAP: GapSpec = gap(
-    "hyperlink",
-    FOLLOW_UP,
-    "ODS cell hyperlinks are reported as the cell `link` property, not as nodes",
-);
-static PICTURE_GAP: GapSpec = gap(
-    "picture",
-    FOLLOW_UP,
-    "ODS drawing frames are read by the leaf but not projected into unified nodes yet",
-);
-static SHAPE_GAP: GapSpec = gap(
-    "shape",
-    FOLLOW_UP,
-    "ODS drawing shapes are read by the leaf but not projected into unified nodes yet",
-);
 static OLE_GAP: GapSpec = gap(
     "ole",
     FOLLOW_UP,
     "ODS embedded objects are read by the leaf but not projected into unified nodes yet",
-);
-static ROW_BREAK_GAP: GapSpec = gap(
-    "rowbreak",
-    FOLLOW_UP,
-    "ODS manual row breaks live in row styles, which are not projected yet",
-);
-static COL_BREAK_GAP: GapSpec = gap(
-    "colbreak",
-    FOLLOW_UP,
-    "ODS manual column breaks live in column styles, which are not projected yet",
 );
 static RUN_GAP: GapSpec = gap(
     "run",
@@ -575,16 +544,31 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_gap(&workbook::SPEC.elements[12], &PIVOT_GAP),
     with_gap(&workbook::SPEC.elements[13], &SLICER_GAP),
     with_gap(&workbook::SPEC.elements[14], &SPARKLINE_GAP),
-    with_gap(&workbook::SPEC.elements[15], &VALIDATION_GAP),
-    with_gap(&workbook::SPEC.elements[16], &CF_GAP),
-    with_gap(&workbook::SPEC.elements[17], &AUTOFILTER_GAP),
-    with_gap(&workbook::SPEC.elements[18], &HYPERLINK_GAP),
+    with_props(
+        &workbook::SPEC.elements[15],
+        super::features::VALIDATION_PROPS,
+    ),
+    with_props(&workbook::SPEC.elements[16], super::features::CF_PROPS),
+    with_props(
+        &workbook::SPEC.elements[17],
+        super::features::AUTOFILTER_PROPS,
+    ),
+    with_props(
+        &workbook::SPEC.elements[18],
+        super::features::HYPERLINK_PROPS,
+    ),
     with_props(&workbook::SPEC.elements[19], MERGE_PROPS),
-    with_gap(&workbook::SPEC.elements[20], &PICTURE_GAP),
-    with_gap(&workbook::SPEC.elements[21], &SHAPE_GAP),
+    with_props(&workbook::SPEC.elements[20], super::features::PICTURE_PROPS),
+    with_props(&workbook::SPEC.elements[21], super::features::SHAPE_PROPS),
     with_gap(&workbook::SPEC.elements[22], &OLE_GAP),
-    with_gap(&workbook::SPEC.elements[23], &ROW_BREAK_GAP),
-    with_gap(&workbook::SPEC.elements[24], &COL_BREAK_GAP),
+    with_props(
+        &workbook::SPEC.elements[23],
+        super::features::ROW_BREAK_PROPS,
+    ),
+    with_props(
+        &workbook::SPEC.elements[24],
+        super::features::COL_BREAK_PROPS,
+    ),
     with_gap(&workbook::SPEC.elements[25], &RUN_GAP),
 ];
 
@@ -683,10 +667,38 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
 
 check_format_spec!(SPEC);
 
-/// Elements whose properties the unified ODS writer sets.
-pub(crate) const SETTABLE: &[&str] = &["cell", "range", "sheet", "namedrange", "comment"];
+/// Elements whose properties the unified ODS writer sets (the worksheet
+/// features of record 0327 included).
+pub(crate) const SETTABLE: &[&str] = &[
+    "cell",
+    "range",
+    "sheet",
+    "namedrange",
+    "comment",
+    "hyperlink",
+    "picture",
+    "shape",
+    "cf",
+    "dataValidation",
+    "autofilter",
+    "rowbreak",
+    "colbreak",
+];
 /// Elements the unified ODS writer adds.
-pub(crate) const ADDABLE: &[&str] = &["sheet", "row", "namedrange", "comment"];
+pub(crate) const ADDABLE: &[&str] = &[
+    "sheet",
+    "row",
+    "namedrange",
+    "comment",
+    "hyperlink",
+    "picture",
+    "shape",
+    "cf",
+    "dataValidation",
+    "autofilter",
+    "rowbreak",
+    "colbreak",
+];
 /// Elements the unified ODS writer removes.
 pub(crate) const REMOVABLE: &[&str] = &[
     "cell",
@@ -696,6 +708,14 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "namedrange",
     "comment",
     "mergeCell",
+    "hyperlink",
+    "picture",
+    "shape",
+    "cf",
+    "dataValidation",
+    "autofilter",
+    "rowbreak",
+    "colbreak",
 ];
 
 const fn operation_gap(
