@@ -2594,3 +2594,23 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 | `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
 
 See [0321](unified-ops/0321-pptx-element-gaps.md).
+
+## DOC styles, lists, hyperlinks, bookmarks, tabs and sections (record 0324)
+
+The primary `doc::Edit` gains the record-0324 verbs; each stages one
+MS-DOC structure (a paragraph's PAPX, the main story and its `PlcffldMom`
+markers, `SttbfBkmk`/`PlcfBkf`/`PlcfBkl`, or one section's SEPX) and keeps
+every other byte. Native indexes (`istd`, field begin CP) are the selectors
+these verbs take; the unified layer resolves style ids and names.
+
+| Name | Notes | Status |
+|---|---|---|
+| `Edit::set_paragraph_style(Position, u16)` | applies a paragraph style by `istd`; refuses a non-paragraph slot (`Refusal::StyleNotFound`) | ✅ 0324 |
+| `body_text::CharacterValue::Style(u16)`, `CharacterValueProperty::Style` | `sprmCIstd` through `set_character_value`; index 10 clears it | ✅ 0324 |
+| `Edit::{paragraph_tabs, set_paragraph_tabs}` | effective stops in, one `sprmPChgTabsPapx` out | ✅ 0324 |
+| `body_text::{HyperlinkInsert, FieldPart}`, `TextTarget::Field { start, part }` | a field's instruction or result as a text target | ✅ 0324 |
+| `Edit::{insert_hyperlink, remove_field}` | a whole `HYPERLINK` field in, a whole field (nested ones included) out | ✅ 0324 |
+| `Edit::{bookmarks, add_bookmark, rename_bookmark, remove_bookmark}` | standard bookmarks by name | ✅ 0324 |
+| `body_text::SectionValue`, `Edit::set_section_values(Position, &[SectionValue])` | typed `sprmS*` page setup | ✅ 0324 |
+| `body_text::ChangeRef::{ParagraphStyle, ParagraphTabs, Field, Bookmark, Section}` | patch change descriptors; the durable envelope refuses them | ✅ 0324 |
+| `body_text::Refusal::{StyleNotFound, InvalidProperty, FieldNotFound, BookmarkName, BookmarkNotFound, SectionNotFound}` | | ✅ 0324 |

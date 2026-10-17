@@ -575,6 +575,88 @@ impl Edit {
             .map_err(Error::from)
     }
 
+    /// Apply paragraph style `istd` to one ordinary main-story paragraph
+    /// (record 0324).
+    pub fn set_paragraph_style(&mut self, position: Position, istd: u16) -> Result<()> {
+        self.inner
+            .set_paragraph_style(position, istd)
+            .map_err(Error::from)
+    }
+
+    /// The effective tab stops of one ordinary main-story paragraph.
+    pub fn paragraph_tabs(&self, position: Position) -> Result<Vec<crate::parts::pap::TabStop>> {
+        self.inner.paragraph_tabs(position).map_err(Error::from)
+    }
+
+    /// Set the tab stops of one ordinary main-story paragraph.
+    pub fn set_paragraph_tabs(
+        &mut self,
+        position: Position,
+        stops: &[crate::parts::pap::TabStop],
+    ) -> Result<()> {
+        self.inner
+            .set_paragraph_tabs(position, stops)
+            .map_err(Error::from)
+    }
+
+    /// Insert a `HYPERLINK` field into one ordinary main-story paragraph,
+    /// before UTF-16 offset `offset` of its text.
+    pub fn insert_hyperlink(
+        &mut self,
+        position: Position,
+        offset: u32,
+        link: &body_text::HyperlinkInsert,
+    ) -> Result<()> {
+        self.inner
+            .insert_hyperlink(position, offset, link)
+            .map_err(Error::from)
+    }
+
+    /// Remove the whole main-story field that begins at `start_cp`.
+    pub fn remove_field(&mut self, start_cp: u32) -> Result<()> {
+        self.inner.remove_field(start_cp).map_err(Error::from)
+    }
+
+    /// The standard bookmarks, as (name, start CP, end CP) in start order.
+    pub fn bookmarks(&self) -> Result<Vec<(String, u32, u32)>> {
+        self.inner.bookmarks().map_err(Error::from)
+    }
+
+    /// Add a standard bookmark over a UTF-16 range of one ordinary
+    /// main-story paragraph.
+    pub fn add_bookmark(
+        &mut self,
+        name: &str,
+        position: Position,
+        start: u32,
+        end: u32,
+    ) -> Result<()> {
+        self.inner
+            .add_bookmark(name, position, start, end)
+            .map_err(Error::from)
+    }
+
+    /// Rename the standard bookmark named exactly `from` to `to`.
+    pub fn rename_bookmark(&mut self, from: &str, to: &str) -> Result<()> {
+        self.inner.rename_bookmark(from, to).map_err(Error::from)
+    }
+
+    /// Remove the standard bookmark named exactly `name`.
+    pub fn remove_bookmark(&mut self, name: &str) -> Result<()> {
+        self.inner.remove_bookmark(name).map_err(Error::from)
+    }
+
+    /// Set page-setup values on one section.
+    pub fn set_section_values(
+        &mut self,
+        section: Position,
+        values: &[body_text::SectionValue],
+    ) -> Result<()> {
+        self.inner
+            .set_section_values(section, values)
+            .map_err(Error::from)
+    }
+
     /// Insert one ordinary main-story paragraph before `position`, or after
     /// the last one when `position` is the paragraph count.
     pub fn insert_paragraph(&mut self, position: Position, text: &str) -> Result<()> {
