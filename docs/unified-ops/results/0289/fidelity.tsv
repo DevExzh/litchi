@@ -401,6 +401,7 @@ libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf	rtf	e
 libreoffice-core/sw/qa/writerfilter/rtftok/data/floating-table.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	value-exact	paragraph move+back: 410 -> 423 bytes, first difference at 88
 libreoffice-core/sw/qa/writerfilter/rtftok/data/floattable-tbl-overlap.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: the spliced paragraph segments do not parse as RTF
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt	odt	exact		byte-exact	/metadata author	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/alternativeText.fodp	odp	exact		byte-exact	/slide[1] name	none	
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm	odm	exact		value-exact	/metadata author: 22304 -> 20649 bytes, first difference at 7	value-exact	tab add+remove: 22304 -> 20682 bytes, first difference at 7
@@ -414,6 +415,7 @@ libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	odt
 libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg	odg	exact		byte-exact	/page[1] name	-	
 libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
 libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14503 -> 13672 bytes, first difference at 7	value-exact	tab add+remove: 14503 -> 13717 bytes, first difference at 7
+libreoffice-core/xmloff/qa/unit/data/theme.fodp	odp	exact		byte-exact	/slide[1] name	byte-exact	linebreak add+remove
 libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg	odg	exact		value-exact	/page[1] name: 32729 -> 31132 bytes, first difference at 7	-	
 libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt	odt	exact		value-exact	/metadata author: 11023 -> 9087 bytes, first difference at 7	value-exact	tab add+remove: 11023 -> 9142 bytes, first difference at 7
 libreoffice-core/xmlsecurity/qa/unit/signing/data/odb_signed_macros.odb	odb	exact		none		-	

@@ -27,7 +27,7 @@ was refused (typed), `none` nothing to move.
 | odf | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odg | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 9 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 |
-| odp | 22 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 15 | 0 | 2 | 2 | 1 | 2 | 8 | 0 | 0 | 0 | 12 |
+| odp | 24 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 15 | 0 | 2 | 2 | 1 | 3 | 8 | 0 | 0 | 0 | 13 |
 | ods | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odt | 71 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 32 | 30 | 0 | 0 | 8 | 1 | 0 | 23 | 0 | 30 | 14 | 4 |
 | oth | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
@@ -38,7 +38,7 @@ was refused (typed), `none` nothing to move.
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 112 | 3 | 0 | 0 | 4 | 0 | 92 | 5 | 0 | 0 | 22 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 995 | 0 | 0 | 0 | 7 | 0 | 0 | 15 | 327 | 467 | 0 | 5 | 117 | 76 | 152 | 255 | 0 | 38 | 113 | 173 |
+| **all** | 997 | 0 | 0 | 0 | 7 | 0 | 0 | 15 | 329 | 467 | 0 | 5 | 117 | 76 | 153 | 255 | 0 | 38 | 113 | 174 |
 
 ## Office-extension files the unified layer does not open
 
@@ -47,7 +47,7 @@ was refused (typed), `none` nothing to move.
 | doc | corrupt_file ×5, unsupported_format ×5 |
 | docx | corrupt_file ×2 |
 | fodg | corrupt_file ×2 |
-| fodp | corrupt_file ×3 |
+| fodp | corrupt_file ×1 |
 | fods | corrupt_file ×2 |
 | odt | corrupt_file ×1 |
 | rtf | corrupt_file ×14, unsupported_format ×1 |
