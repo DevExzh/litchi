@@ -438,6 +438,9 @@ pub(super) fn lookup<'f>(
     kind: Kind,
     select: Select<'_>,
 ) -> Result<Lookup<Node<'f>, GapSpec>> {
+    if kind == Kind::Comment {
+        return comment(file, sheet, select);
+    }
     let mut features = list(file, sheet, kind)?;
     let index = match select {
         Select::Ordinal(position) => Some(position.get()),
@@ -453,6 +456,55 @@ pub(super) fn lookup<'f>(
         )),
         None => Lookup::Missing,
     })
+}
+
+/// [`lookup`] of a note: the notes are ordered row-major by their cells
+/// alone, and only the selected one is copied (record 0326). The order is
+/// [`list`]'s: its stable sort keeps equal cells in part order, as the
+/// part index does here.
+fn comment<'f>(
+    file: &'f Xlsx,
+    sheet: &Sheet,
+    select: Select<'_>,
+) -> Result<Lookup<Node<'f>, GapSpec>> {
+    let comments = if sheet.handle.is_grid() {
+        sheet.handle.comments()?
+    } else {
+        None
+    };
+    let entries: Vec<_> = comments
+        .as_ref()
+        .map(|comments| comments.iter().collect())
+        .unwrap_or_default();
+    let index = match select {
+        Select::Ordinal(position) => Some(position.get()),
+        Select::None => Some(0),
+        Select::Last => entries.len().checked_sub(1),
+        _ => return Ok(Lookup::NotApplicable),
+    };
+    let Some(index) = index.filter(|index| *index < entries.len()) else {
+        return Ok(Lookup::Missing);
+    };
+    let mut order: Vec<((u32, u32), usize)> = entries
+        .iter()
+        .enumerate()
+        .map(|(at, (reference, _))| (row_major(reference), at))
+        .collect();
+    let (_, &mut (_, at), _) = order.select_nth_unstable(index);
+    let (reference, comment) = entries[at];
+    Ok(Lookup::Found(Node::new_feature(
+        file,
+        sheet.position,
+        Feature {
+            kind: Kind::Comment,
+            index: u32::try_from(index).unwrap_or(u32::MAX),
+            data: Data::Comment(Note {
+                reference: reference.to_owned(),
+                author: comment.author.clone(),
+                text: comment.text.clone(),
+            }),
+        },
+    )))
 }
 
 impl<'f> Node<'f> {
