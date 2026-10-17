@@ -94,7 +94,7 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual([v.rule for v in verdicts], ["G1", "D7"])
 
     def test_warned_calls_and_their_skipped_properties(self):
-        calls = [call(result="warned", detail="style,colour,+2")]
+        calls = [call(result="warned", detail="style,colour,font.{bold,size}")]
         regs = {"docx": registry([PARAGRAPH, CHART])}
         (verdict,) = corpus.classify(calls, regs)
         self.assertEqual((verdict.kind, verdict.rule), ("warned", "F3"))
@@ -104,21 +104,32 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual([v.rule for _, v in skipped], [
             "docx|add|paragraph|warned|style",
             "docx|add|paragraph|warned|colour",
-            "docx|add|paragraph|warned|(more)",
+            "docx|add|paragraph|warned|font.bold",
+            "docx|add|paragraph|warned|font.size",
         ])
         # Skipping a property the registry claims is a bug.
         (bug,) = corpus.skipped_verdicts([call(result="warned", detail="align")], regs)
         self.assertEqual(bug[1].kind, "bug")
+
+    def test_skipped_lists_are_complete(self):
+        # Record 0339: the outcome lists every skipped name; a `head.{...}`
+        # group stands for consecutive names sharing a first segment.
+        self.assertEqual(corpus.expand_skipped("title.{font,size},fill,a.{b.c,d}"),
+                         ["title.font", "title.size", "fill", "a.b.c", "a.d"])
+        self.assertEqual(corpus.expand_skipped(""), [])
+        # A list truncated by the old 48-character bound is refused.
+        with self.assertRaises(SystemExit):
+            corpus.expand_skipped("style,+2", "word/x.sh:3")
 
     def test_failure_after_skipping_is_a_gap_not_a_bug(self):
         # Record 0271: a warn-mode add whose data came only from skipped keys
         # fails with `missing_property`; the skipped keys are the gap.
         (row,) = corpus.parse(
             "@ word/x.sh\n3\tadd\tdocx\tchart\tmissing_property\t"
-            "data;skipped:style,colour,+2\t-\n")
-        self.assertEqual((row.detail, row.after_skip), ("data", "style,colour,+2"))
+            "data;skipped:style,series1.{name,values}\t-\n")
+        self.assertEqual((row.detail, row.after_skip), ("data", "style,series1.{name,values}"))
         self.assertTrue(row.refused and row.failed_after_skipping)
-        self.assertEqual(row.skipped(), ["style", "colour", "+2"])
+        self.assertEqual(row.skipped(), ["style", "series1.name", "series1.values"])
         regs = {"docx": registry([PARAGRAPH, CHART])}
         (verdict,) = corpus.classify([row], regs)
         self.assertEqual((verdict.kind, verdict.rule), ("gap", "F3b"))
@@ -232,7 +243,6 @@ class DispositionTests(unittest.TestCase):
         self.assertEqual((inherited.entry, inherited.via), ("breadth", "delta `paragraph.align`"))
         self.assertEqual(found.group("docx|set|paragraph|warned|bold").entry, "own")
         self.assertEqual(found.group("docx|set|paragraph|warned|shade").disposition, "deferred-P1")
-        self.assertEqual(found.group("docx|set|paragraph|warned|(more)").via, corpus.UNVERIFIED)
         g1 = corpus.RULES_BY_ID["G1"]
         self.assertEqual(found.rule(g1, call(verb="validate")).ref, "WP5")
         self.assertIsNone(found.rule(g1, call(verb="raw-set")).disposition)
@@ -269,7 +279,7 @@ class DispositionTests(unittest.TestCase):
             call(),                                                  # passed
             call(verb="dump", result="usage", detail="dump"),        # G1: planned, open
             call(verb="remove", result="invalid_argument"),          # G4: deferred, accounted
-            call(result="warned", detail="style,+2"),                # unverified
+            call(result="warned", detail="style,shade"),             # shade: no disposition
             call(verb="validate", result="usage", script="word/later.sh"),  # outside the subset
             call(kind="chart", result="unsupported_element"),        # no disposition: open
             call(verb="set", result="path_not_found", target="p"),   # cascade of the chart add
@@ -286,7 +296,7 @@ class DispositionTests(unittest.TestCase):
                                   ("add", "open"), ("add", "open"), ("set", "open")])
         blockers = [corpus.blocker(found_classes) for _, state, found_classes in subset.lines if state == "open"]
         self.assertEqual(blockers[0], "planned WP5")
-        self.assertTrue(blockers[1].startswith("unverified"))
+        self.assertEqual(blockers[1], "no disposition (`docx|add|paragraph|warned|shade`)")
         self.assertEqual(blockers[2], "no disposition (`docx|add|chart|unsupported_element|`)")
         self.assertEqual(blockers[3], blockers[2])  # the cascade carries its root's class
         rendered = corpus.render(calls, verdicts, "abc", classes=found, subset=subset)
