@@ -93,6 +93,9 @@ pub(super) enum Value {
     SmartArt(Arc<super::smartart::SmartArtValue>),
     /// A styles, numbering, story or note element (record 0319).
     Part(super::parts::PartValue),
+    /// A tab stop, break, bookmark, field, table of contents, watermark or
+    /// text box (record 0319).
+    Mark(Arc<super::marks::MarkValue>),
 }
 
 /// One direct child of a block container: the container's index and the

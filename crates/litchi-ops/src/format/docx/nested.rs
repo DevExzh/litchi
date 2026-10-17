@@ -230,6 +230,14 @@ impl Docx {
         {
             return self.remove_parts(editor, nodes);
         }
+        // Tab stops and breaks (record 0319).
+        if !nodes.is_empty()
+            && nodes
+                .iter()
+                .all(|node| super::marks::is_mark_kind(node.element_kind()))
+        {
+            return self.remove_marks(editor, nodes);
+        }
         let mut paths = Vec::with_capacity(nodes.len());
         let mut comments = Vec::new();
         for node in nodes {

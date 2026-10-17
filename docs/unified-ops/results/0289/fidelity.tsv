@@ -281,6 +281,7 @@ libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf90153.docx	docx	exact		byte-ex
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	docx	exact		byte-exact	/styles/Normal name	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTOCFlag_u.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx	docx	exact		byte-exact	/styles/Normal name	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx	docx	exact		byte-exact	/styles/Normal name	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
 libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	docx	exact		byte-exact	/styles/Normal name	-	

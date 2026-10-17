@@ -165,6 +165,10 @@ fn ordinary_reports_hide_native_selection_fields() {
             // Record 0319: styles, numbering, headers, footers and notes.
             "style" | "abstractNum" | "num" | "level" | "header" | "footer" | "footnote"
             | "endnote" => (true, true, true),
+            // Record 0319: tab stops are set, added and removed; breaks
+            // are added and removed.
+            "tab" => (true, true, true),
+            "break" => (false, true, true),
             _ => (false, false, false),
         };
         assert_eq!(operations.set, set, "{} set", element.name());
@@ -306,8 +310,16 @@ fn ordinary_reports_hide_native_selection_fields() {
                     | "footer"
                     | "footnote"
                     | "endnote"
+                    | "tab"
+                    | "break"
+                    | "bookmark"
+                    | "field"
+                    | "toc"
+                    | "watermark"
+                    | "textbox"
             ) {
-                // Record 0319: the part registries declare each key.
+                // Record 0319: the part and mark registries declare each
+                // key.
                 assert!(
                     property.set() || property.add() || property.get(),
                     "{} {}",

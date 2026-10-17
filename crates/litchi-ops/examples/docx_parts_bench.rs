@@ -1,5 +1,5 @@
 //! Paired DOCX timing for the part elements of record 0319: styles,
-//! numbering levels, headers and notes.
+//! numbering levels, headers and notes, and the tab stop and break marks.
 //!
 //! Each write case times one edit against the same immutable opened owner:
 //! the leaf leg stages the `litchi_docx::document::Edit` catalog verb and
@@ -29,6 +29,8 @@ use litchi_docx::header_footer::{Kind as StoryKind, Role};
 use litchi_docx::numbering::ListKind;
 #[cfg(feature = "docx")]
 use litchi_docx::numbering::catalog::LevelChange;
+#[cfg(feature = "docx")]
+use litchi_docx::properties::Twips;
 #[cfg(feature = "docx")]
 use litchi_docx::styles::Type;
 #[cfg(feature = "docx")]
@@ -153,6 +155,33 @@ fn main() -> Outcome<()> {
         || Ok(file.set("/body/p[151]", props! { "style" => "heading 1" })?),
     )?);
 
+    cases.push(write(
+        "tab_set",
+        || {
+            let mut edit = package.edit()?;
+            edit.format_paragraph(Position::new(4), |paragraph| {
+                if let Some(stop) = paragraph.tabs.as_mut().and_then(|tabs| tabs.first_mut()) {
+                    stop.position = Twips(4320);
+                }
+            })?;
+            Ok(edit.commit()?.into_package())
+        },
+        || Ok(file.set("/body/p[5]/tab[1]", props! { "pos" => 4320 })?),
+    )?);
+    cases.push(write(
+        "break_add",
+        || {
+            let mut edit = package.edit()?;
+            edit.insert_break_at(
+                &ElementPath::new([ElementStep::Paragraph(Position::new(9))]),
+                None,
+                litchi_docx::RunBreakType::Page,
+            )?;
+            Ok(edit.commit()?.into_package())
+        },
+        || Ok(file.add("/body/p[10]", NewNode::new("break"))?.into_file()),
+    )?);
+
     // Warm reads: the handle has read its parts once.
     let catalog = package.style_catalog()?.ok_or("styles")?;
     let _ = file.get("/styles/Heading1")?.view().format()?.count();
@@ -196,10 +225,26 @@ fn main() -> Outcome<()> {
             Ok(())
         },
     )?);
+    let _ = file.get("/body/p[5]/tab[1]")?.view().format()?.count();
+    cases.push(read(
+        "tab_get_format",
+        || {
+            let document = package.document()?;
+            let paragraph = document.body_paragraph(Position::new(4))?.ok_or("p[5]")?;
+            let tabs = paragraph.direct_properties()?.tabs.ok_or("tabs")?;
+            black_box(tabs.first().copied());
+            Ok(())
+        },
+        || {
+            let node = file.get("/body/p[5]/tab[1]")?;
+            black_box(node.view().format()?.count());
+            Ok(())
+        },
+    )?);
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
-            "fixture": "Builder document: 200 paragraphs, table-alignment.docx styles, a list, a header",
+            "fixture": "Builder document: 200 paragraphs, table-alignment.docx styles, a list, a tab stop, a header",
             "rounds": ROUNDS,
             "iterations": ITERATIONS,
             "cases": cases,
@@ -339,6 +384,12 @@ fn fixture() -> Outcome<Vec<u8>> {
         numbering.id = Some(list.num_id());
         numbering.level = Some(0);
         paragraph.numbering = Some(numbering);
+    })?;
+    edit.format_paragraph(Position::new(4), |paragraph| {
+        paragraph.tabs = Some(vec![litchi_docx::properties::TabStop::new(
+            litchi_docx::properties::TabKind::Left,
+            Twips(720),
+        )]);
     })?;
     edit.add_header_footer(Role::Header, StoryKind::Primary, &NewStory::new("Header"))?;
     let source = std::fs::read(

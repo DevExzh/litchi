@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `543f91abd500a355329b35bf18e9ff08e96e336422fa79f1a974f58e8bc7a3d7` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `509b34c035180f90d5d1f36f3dcd37b65751f9a5ea3e3d740dd737b91a4b24f3` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `137339ca055080024cbcc80287ca72cd2eaf31d4c0d1a533c75b59784aabf8cb` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6036228da65ef4bd4889a861832909bfaf95d6fa316df17f2fd703ad232846e1` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `728daa474cf4f13235a7d82ad19802d4a051195be4bdc6b73dc462cabea8b957` |
@@ -81,7 +81,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 24 | 11 | 0 | 0 | 9 | 2 | 6 |
+| docx | 31 | 4 | 0 | 0 | 9 | 2 | 6 |
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
 | rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 11 | 27 | 0 | 0 | 1 | 2 | 1 |
@@ -107,7 +107,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 268 | 2 | 118 | 0 | 201 | 2 | 370 | 165 |
+| docx | 291 | 2 | 58 | 0 | 232 | 2 | 376 | 165 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 135 | 16 | 328 | 0 | 69 | 1 | 142 | 152 |
@@ -133,7 +133,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 223 | 30 | 543 | 0 | 138 | 192 |
+| docx | 227 | 30 | 539 | 0 | 138 | 192 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 54 | 42 | 448 | 0 | 156 | 143 |
@@ -163,7 +163,7 @@ Property writes:
 |---|---|---|---|
 | abstractNum | abstractNum | supported |  |
 | body | body | supported |  |
-| bookmark | bookmark | gap | R4x |
+| bookmark | bookmark | supported |  |
 | bookmarkEnd |  | missing |  |
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
@@ -173,7 +173,7 @@ Property writes:
 | document | document | supported |  |
 | endnote | endnote | supported |  |
 | equation | equation | supported |  |
-| field | field | gap | R4x |
+| field | field | supported |  |
 | fieldChar |  | missing |  |
 | footer | footer | supported |  |
 | footnote | footnote | supported |  |
@@ -186,7 +186,7 @@ Property writes:
 | num | num | supported |  |
 | numbering | numbering | supported |  |
 | ole | ole | gap | R4x |
-| pagebreak | break | gap | R4x |
+| pagebreak | break | supported |  |
 | paragraph | paragraph | supported |  |
 | permStart |  | missing |  |
 | picture | picture | supported |  |
@@ -199,14 +199,14 @@ Property writes:
 | shape | shape | gap | R4x |
 | style | style | supported |  |
 | styles | styles | supported |  |
-| tab | tab | gap | R4x |
+| tab | tab | supported |  |
 | cell | cell | supported |  |
 | column |  | missing |  |
 | row | row | supported |  |
 | table | table | supported |  |
-| textbox | textbox | gap | R4x |
-| toc | toc | gap | R4x |
-| watermark | watermark | gap | R4x |
+| textbox | textbox | supported |  |
+| toc | toc | supported |  |
+| watermark | watermark | supported |  |
 |  | footnotes | litchi-only |  |
 |  | endnotes | litchi-only |  |
 |  | comments | litchi-only |  |
@@ -240,9 +240,9 @@ Property writes:
 | abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
-| bookmark | `name` | string | asg |  | element gap | gap | R4x |
-| bookmark | `text` | string | a-- |  | element gap | gap | R4x |
-| bookmark | `id` | string | --g |  | element gap | — | R4x |
+| bookmark | `name` | string | asg | --g | supported | gap |  |
+| bookmark | `text` | string | a-- |  | supported | gap | the node's text |
+| bookmark | `id` | string | --g | --g | supported | — |  |
 | bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
 | chart-axis | `axisFont` | string | --g |  | missing | — |  |
@@ -615,18 +615,18 @@ Property writes:
 | endnote | `color` | color |  | --g | litchi-only | — |  |
 | equation | `mode` | enum | asg | --g | supported | gap |  |
 | equation | `formula` | string | as- |  | supported | gap | the node's text |
-| field | `evaluated` | bool | --g |  | element gap | — | R4x |
-| field | `fieldType` | enum | asg |  | element gap | gap | R4x |
-| field | `name` | string | asg |  | element gap | gap | R4x |
-| field | `id` | string | asg |  | element gap | gap | R4x |
-| field | `expression` | string | as- |  | element gap | gap | R4x |
-| field | `trueText` | string | as- |  | element gap | gap | R4x |
-| field | `falseText` | string | as- |  | element gap | gap | R4x |
-| field | `hyperlink` | bool | as- |  | element gap | gap | R4x |
-| field | `format` | string | asg |  | element gap | gap | R4x |
-| field | `instruction` | string | asg |  | element gap | gap | R4x |
-| field | `vertAlign` | enum | a-- |  | element gap | gap | R4x |
-| field | `fldLock` | bool | a-g |  | element gap | gap | R4x |
+| field | `evaluated` | bool | --g | --g | supported | — |  |
+| field | `fieldType` | enum | asg | --g | supported | gap |  |
+| field | `name` | string | asg |  | missing | gap |  |
+| field | `id` | string | asg |  | missing | gap |  |
+| field | `expression` | string | as- |  | write-only | gap |  |
+| field | `trueText` | string | as- |  | write-only | gap |  |
+| field | `falseText` | string | as- |  | write-only | gap |  |
+| field | `hyperlink` | bool | as- |  | write-only | gap |  |
+| field | `format` | string | asg |  | missing | gap |  |
+| field | `instruction` | string | asg | --g | supported | gap |  |
+| field | `vertAlign` | enum | a-- |  | write-only | gap |  |
+| field | `fldLock` | bool | a-g | --g | supported | gap |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
 | footer | `type` | enum | asg | asg | supported | supported |  |
 | footer | `text` | string | asg | asg | supported | supported |  |
@@ -740,8 +740,8 @@ Property writes:
 | ole | `src` | string | as- |  | element gap | gap | R4x |
 | ole | `oleKind` | enum | a-- |  | element gap | gap | R4x |
 | ole | `embedExt` | string | a-- |  | element gap | gap | R4x |
-| pagebreak | `type` | enum | a-g |  | element gap | gap | R4x |
-| pagebreak | `breakType` | enum | -sg |  | element gap | gap | R4x |
+| pagebreak | `type` | enum | a-g | a-- | write-only | supported |  |
+| pagebreak | `breakType` | enum | -sg | --g | supported | gap |  |
 | paragraph | `lineRule` | enum | asg | asg | supported | supported |  |
 | paragraph | `align` | enum | asg | asg | supported | supported |  |
 | paragraph | `style` | string | asg | asg | supported | supported |  |
@@ -1216,9 +1216,9 @@ Property writes:
 | style | `leftChars` | int |  | asg | litchi-only | litchi-only |  |
 | style | `rightChars` | int |  | asg | litchi-only | litchi-only |  |
 | styles | `count` | number | --g | --g | supported | — |  |
-| tab | `pos` | length | asg |  | element gap | gap | R4x |
-| tab | `val` | enum | asg |  | element gap | gap | R4x |
-| tab | `leader` | enum | asg |  | element gap | gap | R4x |
+| tab | `pos` | length | asg | asg | supported | supported |  |
+| tab | `val` | enum | asg | asg | supported | supported |  |
+| tab | `leader` | enum | asg | asg | supported | supported |  |
 | cell | `width` | string | asg | --g | supported | gap |  |
 | cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
 | cell | `font` | string | -sg |  | missing | gap |  |
@@ -1304,46 +1304,46 @@ Property writes:
 | table | `lastCol` | bool |  | --g | litchi-only | — |  |
 | table | `bandedRows` | bool |  | --g | litchi-only | — |  |
 | table | `bandedCols` | bool |  | --g | litchi-only | — |  |
-| textbox | `text` | string | a-- |  | element gap | gap | R4x |
-| textbox | `width` | length | as- |  | element gap | gap | R4x |
-| textbox | `height` | length | as- |  | element gap | gap | R4x |
-| textbox | `geometry` | string | as- |  | element gap | gap | R4x |
-| textbox | `wrap` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `hAlign` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `vAlign` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `hRelative` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `vRelative` | enum | a-- |  | element gap | gap | R4x |
-| textbox | `anchor.x` | length | a-- |  | element gap | gap | R4x |
-| textbox | `anchor.y` | length | a-- |  | element gap | gap | R4x |
-| textbox | `fill` | color | as- |  | element gap | gap | R4x |
-| textbox | `fill.gradient` | string | a-- |  | element gap | gap | R4x |
-| textbox | `fill.opacity` | string | a-- |  | element gap | gap | R4x |
-| textbox | `line.color` | color | as- |  | element gap | gap | R4x |
-| textbox | `line.width` | length | as- |  | element gap | gap | R4x |
-| textbox | `line.style` | string | as- |  | element gap | gap | R4x |
-| textbox | `inset.left` | length | a-- |  | element gap | gap | R4x |
-| textbox | `inset.top` | length | a-- |  | element gap | gap | R4x |
-| textbox | `inset.right` | length | a-- |  | element gap | gap | R4x |
-| textbox | `inset.bottom` | length | a-- |  | element gap | gap | R4x |
-| textbox | `textDirection` | string | a-- |  | element gap | gap | R4x |
-| textbox | `textAnchor` | string | a-- |  | element gap | gap | R4x |
-| textbox | `autoFit` | bool | a-- |  | element gap | gap | R4x |
-| textbox | `rotation` | string | a-- |  | element gap | gap | R4x |
-| textbox | `shadow` | string | a-- |  | element gap | gap | R4x |
-| textbox | `alt` | string | a-- |  | element gap | gap | R4x |
-| toc | `levels` | string | asg |  | element gap | gap | R4x |
-| toc | `title` | string | asg |  | element gap | gap | R4x |
-| toc | `hyperlinks` | bool | asg |  | element gap | gap | R4x |
-| toc | `pageNumbers` | bool | asg |  | element gap | gap | R4x |
-| watermark | `text` | string | asg |  | element gap | gap | R4x |
-| watermark | `image` | string | as- |  | element gap | gap | R4x |
-| watermark | `color` | color | asg |  | element gap | gap | R4x |
-| watermark | `font` | string | asg |  | element gap | gap | R4x |
-| watermark | `rotation` | int | asg |  | element gap | gap | R4x |
-| watermark | `opacity` | string | asg |  | element gap | gap | R4x |
-| watermark | `size` | string | asg |  | element gap | gap | R4x |
-| watermark | `width` | string | asg |  | element gap | gap | R4x |
-| watermark | `height` | string | asg |  | element gap | gap | R4x |
+| textbox | `text` | string | a-- |  | supported | gap | the node's text |
+| textbox | `width` | length | as- |  | write-only | gap |  |
+| textbox | `height` | length | as- |  | write-only | gap |  |
+| textbox | `geometry` | string | as- | --g | supported | gap |  |
+| textbox | `wrap` | enum | a-- |  | write-only | gap |  |
+| textbox | `hAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `vAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `hRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `vRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `anchor.x` | length | a-- |  | write-only | gap |  |
+| textbox | `anchor.y` | length | a-- |  | write-only | gap |  |
+| textbox | `fill` | color | as- |  | write-only | gap |  |
+| textbox | `fill.gradient` | string | a-- |  | write-only | gap |  |
+| textbox | `fill.opacity` | string | a-- |  | write-only | gap |  |
+| textbox | `line.color` | color | as- |  | write-only | gap |  |
+| textbox | `line.width` | length | as- |  | write-only | gap |  |
+| textbox | `line.style` | string | as- |  | write-only | gap |  |
+| textbox | `inset.left` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.top` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.right` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.bottom` | length | a-- |  | write-only | gap |  |
+| textbox | `textDirection` | string | a-- |  | write-only | gap |  |
+| textbox | `textAnchor` | string | a-- |  | write-only | gap |  |
+| textbox | `autoFit` | bool | a-- |  | write-only | gap |  |
+| textbox | `rotation` | string | a-- |  | write-only | gap |  |
+| textbox | `shadow` | string | a-- |  | write-only | gap |  |
+| textbox | `alt` | string | a-- | --g | supported | gap |  |
+| toc | `levels` | string | asg | --g | supported | gap |  |
+| toc | `title` | string | asg |  | missing | gap |  |
+| toc | `hyperlinks` | bool | asg | --g | supported | gap |  |
+| toc | `pageNumbers` | bool | asg | --g | supported | gap |  |
+| watermark | `text` | string | asg | --g | supported | gap |  |
+| watermark | `image` | string | as- |  | write-only | gap |  |
+| watermark | `color` | color | asg | --g | supported | gap |  |
+| watermark | `font` | string | asg | --g | supported | gap |  |
+| watermark | `rotation` | int | asg | --g | supported | gap |  |
+| watermark | `opacity` | string | asg | --g | supported | gap |  |
+| watermark | `size` | string | asg | --g | supported | gap |  |
+| watermark | `width` | string | asg |  | missing | gap |  |
+| watermark | `height` | string | asg |  | missing | gap |  |
 
 ### Contextual operation gaps
 

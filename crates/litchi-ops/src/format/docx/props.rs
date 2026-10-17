@@ -54,6 +54,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         Value::Comment(comment) => Some(Cow::Owned(comment_text(comment)?)),
         Value::SmartArt(smartart) => Some(Cow::Owned(super::smartart::smartart_text(smartart))),
         Value::Part(value) => super::parts::text(node.docx, *value)?.map(Cow::Owned),
+        Value::Mark(mark) => super::marks::text(mark).map(Cow::Owned),
         Value::Picture(_) | Value::Chart(_) => None,
         Value::Document
         | Value::Body(_)
@@ -138,6 +139,7 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
                 + usize::from(super::nav::has_comments(node.docx)?)
         },
         Value::Part(value) => super::parts::child_count(node.docx, *value)?,
+        Value::Mark(_) => 0,
         Value::Comments => super::nav::comments(node.docx)?.len(),
         Value::Body(lock) => match lock.get() {
             Some(blocks) => listed_blocks(blocks),
@@ -244,6 +246,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         Value::Chart(chart) => Props::Chart(node.docx, Arc::clone(chart)),
         Value::SmartArt(smartart) => Props::SmartArt(Arc::clone(smartart)),
         Value::Part(value) => Props::Part(super::parts::props(node.docx, *value)?),
+        Value::Mark(mark) => Props::Mark(Arc::clone(mark)),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
     };
     let invalid = match &props {
@@ -267,6 +270,12 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
     // A part element's semantic identity (`type`) is an ordinary property;
     // its native identifiers (`id`, `ilvl`) are raw-only, as list ids are
     // for RTF (record 0319).
+    if let Props::Mark(_) = &props {
+        return Ok(Format::new(
+            super::marks::table(node.kind),
+            Source::Docx(props),
+        ));
+    }
     if let Props::Part(_) = &props {
         let hidden: &'static [&'static str] = match node.kind {
             Kind::AbstractNum | Kind::Num => &["id"],
@@ -350,6 +359,9 @@ pub(crate) enum Props<'a> {
     SmartArt(Arc<super::smartart::SmartArtValue>),
     /// A styles, numbering, story or note element (record 0319).
     Part(super::parts::PartProps<'a>),
+    /// A tab stop, break, bookmark, field, table of contents, watermark or
+    /// text box (record 0319).
+    Mark(Arc<super::marks::MarkValue>),
 }
 
 impl<'a> Props<'a> {
@@ -376,6 +388,7 @@ impl<'a> Props<'a> {
             Self::Chart(docx, chart) => super::chart::chart_value(docx, chart, index),
             Self::SmartArt(smartart) => super::smartart::smartart_value(smartart, index),
             Self::Part(part) => part.get(index),
+            Self::Mark(mark) => super::marks::value(mark, index),
         }
     }
 }
@@ -398,6 +411,7 @@ impl std::fmt::Debug for Props<'_> {
             Self::Chart(..) => "Props::Chart",
             Self::SmartArt(_) => "Props::SmartArt",
             Self::Part(_) => "Props::Part",
+            Self::Mark(_) => "Props::Mark",
         })
     }
 }
@@ -1178,6 +1192,22 @@ fn sdt_value<'a>(sdt: &SdtProps, index: usize) -> Option<NodeValue<'a>> {
 fn view_kinds(kind: Kind) -> KindSet<Kind> {
     match kind {
         Kind::Paragraph => KindSet::of(Kind::Run),
+        // Bookmarks, fields, tables of contents, the watermark and text
+        // boxes are reached by path and query, not listed (record 0319).
+        Kind::Document => KindSet::of(Kind::Body)
+            .with(Kind::Styles)
+            .with(Kind::Header)
+            .with(Kind::Footer)
+            .with(Kind::Numbering)
+            .with(Kind::Footnotes)
+            .with(Kind::Endnotes)
+            .with(Kind::Comments)
+            .with(Kind::SmartArt),
+        Kind::Body => KindSet::of(Kind::Paragraph)
+            .with(Kind::Table)
+            .with(Kind::Sdt)
+            .with(Kind::Equation)
+            .with(Kind::Section),
         _ => KindSet::ALL,
     }
 }

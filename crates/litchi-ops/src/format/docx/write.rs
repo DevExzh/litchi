@@ -238,6 +238,11 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
+        // Tab stops (record 0319).
+        let editor = match self.try_set_marks(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
         let controls = command_text && crate::batch::has_text_controls(&props);
         if controls
             && nodes

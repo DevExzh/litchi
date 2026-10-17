@@ -323,6 +323,64 @@ impl<P: Clone> Edit<P> {
         self.inner.insert_run_at(owner, at, new_run)
     }
 
+    /// Insert a run holding one break of `kind` into the paragraph at
+    /// `paragraph`, before its direct run `at` (after its last child for
+    /// `None`), and return the run's position among the paragraph's direct
+    /// runs (record 0319).
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::RunBreakType;
+    /// use litchi_docx::document::{ElementPath, ElementStep};
+    ///
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("Before");
+    /// let package = builder.build()?;
+    /// let mut edit = package.edit()?;
+    /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
+    /// edit.insert_break_at(&paragraph, None, RunBreakType::Page)?;
+    /// let next = edit.commit()?.into_package();
+    /// let runs = next.document()?.paragraphs()?[0].runs()?;
+    /// assert_eq!(runs.len(), 2);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    /// Returns a typed selection, field or resource refusal without changing
+    /// the staged document.
+    pub fn insert_break_at(
+        &mut self,
+        paragraph: &super::ElementPath,
+        at: Option<Position>,
+        kind: crate::RunBreakType,
+    ) -> Result<Position> {
+        let value = match kind {
+            crate::RunBreakType::Page => Some("page"),
+            crate::RunBreakType::Column => Some("column"),
+            crate::RunBreakType::TextWrapping => None,
+        };
+        self.inner.insert_run_markup_at(paragraph, at, |prefix| {
+            let prefix = String::from_utf8_lossy(prefix);
+            let q = |local: &str| {
+                if prefix.is_empty() {
+                    local.to_owned()
+                } else {
+                    format!("{prefix}:{local}")
+                }
+            };
+            Ok(match value {
+                Some(value) => format!(
+                    r#"<{r}><{br} {ty}="{value}"/></{r}>"#,
+                    r = q("r"),
+                    br = q("br"),
+                    ty = q("type"),
+                ),
+                None => format!("<{r}><{br}/></{r}>", r = q("r"), br = q("br")),
+            }
+            .into_bytes())
+        })
+    }
+
     /// Insert a paragraph into the body, a cell or a block content control.
     ///
     /// See [`super::snapshot::Edit::insert_paragraph_at`].

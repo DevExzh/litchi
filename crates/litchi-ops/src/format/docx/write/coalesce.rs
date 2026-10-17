@@ -51,6 +51,7 @@ impl Docx {
             if nodes.iter().any(|node| {
                 node.element_kind() == crate::format::docx::Kind::Chart
                     || super::super::parts::is_part_kind(node.element_kind())
+                    || super::super::marks::is_mark_kind(node.element_kind())
             }) {
                 return Ok(None);
             }

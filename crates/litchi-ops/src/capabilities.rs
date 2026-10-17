@@ -2799,7 +2799,8 @@ impl Element {
                     && readable)
                     || (self.adapter == Adapter::Docx
                         && self.retains_source != Some(false)
-                        && DOCX_PART_WRITES.contains(&self.data().canonical)
+                        && (DOCX_PART_WRITES.contains(&self.data().canonical)
+                            || self.data().canonical == "tab")
                         && readable)
             }
             #[cfg(not(feature = "docx"))]
@@ -2930,8 +2931,10 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && (matches!(self.data().canonical, "picture" | "chart" | "smartart")
-                    || DOCX_PART_WRITES.contains(&self.data().canonical))
+                && (matches!(
+                    self.data().canonical,
+                    "picture" | "chart" | "smartart" | "tab" | "break"
+                ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
         let add = add
@@ -3015,8 +3018,10 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && (matches!(self.data().canonical, "tc" | "sdt" | "chart")
-                    || DOCX_PART_WRITES.contains(&self.data().canonical))
+                && (matches!(
+                    self.data().canonical,
+                    "tc" | "sdt" | "chart" | "tab" | "break"
+                ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
         let remove = remove

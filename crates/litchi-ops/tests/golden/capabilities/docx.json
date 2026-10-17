@@ -165,6 +165,22 @@
         {
           "element": "smartart",
           "pathSegment": "smartart"
+        },
+        {
+          "element": "bookmark",
+          "pathSegment": "bookmark"
+        },
+        {
+          "element": "field",
+          "pathSegment": "field"
+        },
+        {
+          "element": "toc",
+          "pathSegment": "toc"
+        },
+        {
+          "element": "watermark",
+          "pathSegment": "watermark"
         }
       ],
       "properties": {
@@ -266,6 +282,10 @@
         {
           "element": "section",
           "pathSegment": "section"
+        },
+        {
+          "element": "textbox",
+          "pathSegment": "textbox"
         }
       ],
       "properties": {},
@@ -314,6 +334,14 @@
         {
           "element": "chart",
           "pathSegment": "chart"
+        },
+        {
+          "element": "tab",
+          "pathSegment": "tab"
+        },
+        {
+          "element": "break",
+          "pathSegment": "break"
         }
       ],
       "properties": {
@@ -3602,35 +3630,53 @@
     {
       "format": "docx",
       "element": "bookmark",
-      "parent": "paragraph",
+      "parent": "document",
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
         "stable": [
           "/bookmark[@name=X]"
+        ],
+        "positional": [
+          "/bookmark[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "bookmarks have no located reader yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "id": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
       "format": "docx",
       "element": "field",
-      "parent": "paragraph",
+      "parent": "document",
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -3638,11 +3684,38 @@
           "/field[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "fields have no located reader yet"
+      "properties": {
+        "fieldType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "instruction": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fldLock": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "evaluated": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -4557,15 +4630,15 @@
     {
       "format": "docx",
       "element": "toc",
-      "parent": "body",
+      "parent": "document",
       "elementAliases": [
         "tableofcontents"
       ],
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -4573,11 +4646,32 @@
           "/toc[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "tables of contents have no located reader yet"
+      "properties": {
+        "levels": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlinks": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "pageNumbers": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -4610,8 +4704,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -4619,34 +4713,88 @@
           "/watermark"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "watermarks live in header stories, which have no node adapter yet"
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
       "format": "docx",
       "element": "textbox",
-      "parent": "paragraph",
+      "parent": "body",
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
         "positional": [
-          "/body/p[N]/textbox[M]"
+          "/body/textbox[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "text boxes have no located reader yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -4681,22 +4829,49 @@
         "pagebreak"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/body/p[N]/break[M]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "breaks are read as run content, not addressed yet"
+      "properties": {
+        "breakType": {
+          "type": "enum",
+          "values": [
+            "page",
+            "column",
+            "textWrapping",
+            "line"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "page",
+            "column",
+            "textWrapping",
+            "line"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -4704,22 +4879,62 @@
       "element": "tab",
       "parent": "paragraph",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/body/p[N]/tab[M]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "tab characters are read as run content, not addressed yet"
+      "properties": {
+        "pos": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "val": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "decimal",
+            "bar",
+            "clear",
+            "num",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leader": {
+          "type": "enum",
+          "values": [
+            "none",
+            "dot",
+            "heavy",
+            "hyphen",
+            "middleDot",
+            "underscore"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -4815,20 +5030,6 @@
     },
     {
       "subject": "element",
-      "element": "bookmark",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "bookmarks have no located reader yet"
-    },
-    {
-      "subject": "element",
-      "element": "field",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "fields have no located reader yet"
-    },
-    {
-      "subject": "element",
       "element": "formfield",
       "code": "unsupported_capability",
       "followUp": "R4x",
@@ -4843,13 +5044,6 @@
     },
     {
       "subject": "element",
-      "element": "toc",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "tables of contents have no located reader yet"
-    },
-    {
-      "subject": "element",
       "element": "revision",
       "code": "unsupported_capability",
       "followUp": "R4x",
@@ -4857,38 +5051,10 @@
     },
     {
       "subject": "element",
-      "element": "watermark",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "watermarks live in header stories, which have no node adapter yet"
-    },
-    {
-      "subject": "element",
-      "element": "textbox",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "text boxes have no located reader yet"
-    },
-    {
-      "subject": "element",
       "element": "shape",
       "code": "unsupported_capability",
       "followUp": "R4x",
       "reason": "drawing shapes have no located reader yet"
-    },
-    {
-      "subject": "element",
-      "element": "break",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "breaks are read as run content, not addressed yet"
-    },
-    {
-      "subject": "element",
-      "element": "tab",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "tab characters are read as run content, not addressed yet"
     },
     {
       "subject": "property",

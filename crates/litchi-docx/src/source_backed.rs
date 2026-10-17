@@ -3861,6 +3861,34 @@ impl Document {
         Ok(fields)
     }
 
+    /// Return the bookmarks of the main story in document order, as
+    /// [`crate::Document::bookmarks`] does (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bookmark markup is malformed.
+    pub fn bookmarks(&self) -> Result<Vec<crate::bookmark::Bookmark>> {
+        self.check_selective_operation("document bookmarks")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        crate::bookmark::Bookmark::extract_from_document(xml)
+    }
+
+    /// Return the text boxes of the main story in document order, as
+    /// [`crate::Document::text_boxes`] does (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the drawing markup is malformed.
+    pub fn text_boxes(&self) -> Result<Vec<crate::textbox::TextBox>> {
+        self.check_selective_operation("document text boxes")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        crate::textbox::load_text_boxes(xml)
+    }
+
     /// Return the drawing objects of the main-story paragraphs in document
     /// order.
     ///

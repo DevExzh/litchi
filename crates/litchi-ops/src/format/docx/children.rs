@@ -47,6 +47,11 @@ enum Source {
         /// Whether the comments part follows (the root's listing).
         root: bool,
     },
+    /// Marks of the parent, then the parent's other children (record 0319).
+    Marks {
+        children: Box<super::marks::Children>,
+        then: Box<Source>,
+    },
     /// The root's comments part, when the document has one.
     CommentsRoot,
     /// The root's SmartArt graphics, read when the first is needed
@@ -182,6 +187,15 @@ impl<'f> Children<'f> {
             },
             _ => Source::Done,
         };
+        // Tab stops, breaks and the document-wide marks come first when a
+        // query asks for them (record 0319).
+        let source = match super::marks::Children::of(parent, kinds) {
+            Some(marks) => Source::Marks {
+                children: Box::new(marks),
+                then: Box::new(source),
+            },
+            None => source,
+        };
         Ok(Self {
             docx: parent.docx,
             address: parent.child_address(),
@@ -208,6 +222,12 @@ impl<'f> Children<'f> {
                         Value::Body(std::sync::OnceLock::new()),
                         self.address.with(Step::new(Kind::Body, 0)),
                     )));
+                },
+                Source::Marks { children, then } => match children.next_node(self.docx) {
+                    Some(item) => return Some(item),
+                    None => {
+                        self.source = std::mem::replace(then.as_mut(), Source::Done);
+                    },
                 },
                 Source::Parts { children, root } => match children.next_node(self.docx) {
                     Some(item) => return Some(item),

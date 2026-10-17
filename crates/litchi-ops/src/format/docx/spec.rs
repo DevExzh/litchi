@@ -95,9 +95,9 @@ pub enum Kind {
     Settings,
     /// The theme part (gap).
     Theme,
-    /// A bookmark (gap).
+    /// A bookmark (record 0319).
     Bookmark,
-    /// A field (gap).
+    /// A field (record 0319).
     Field,
     /// A legacy form field (gap).
     FormField,
@@ -107,19 +107,19 @@ pub enum Kind {
     Chart,
     /// An embedded OLE object (gap).
     Ole,
-    /// A table of contents (gap).
+    /// A table of contents (record 0319).
     Toc,
     /// A tracked revision (gap).
     Revision,
-    /// A watermark (gap).
+    /// The watermark (record 0319).
     Watermark,
-    /// A text box (gap).
+    /// A text box (record 0319).
     TextBox,
     /// A drawing shape (gap).
     Shape,
-    /// A break (gap).
+    /// A run break (record 0319).
     Break,
-    /// A tab character (gap).
+    /// A paragraph tab stop (record 0319).
     Tab,
     /// A SmartArt graphic, addressed document-wide (record 0295).
     SmartArt,
@@ -190,6 +190,7 @@ impl Kind {
                 | Self::Numbering
                 | Self::Footnotes
                 | Self::Endnotes
+                | Self::Watermark
         )
     }
 }
@@ -861,17 +862,10 @@ macro_rules! gaps {
 gaps! {
     SETTINGS_GAP: "settings", "L-DOCX-R6 (R4x)", "the settings part has no node adapter yet";
     THEME_GAP: "theme", "L-DOCX-R6 (R4x)", "the theme part has no node adapter yet";
-    BOOKMARK_GAP: "bookmark", "R4x", "bookmarks have no located reader yet";
-    FIELD_GAP: "field", "R4x", "fields have no located reader yet";
     FORM_FIELD_GAP: "formfield", "R4x", "legacy form fields have no located reader yet";
     OLE_GAP: "ole", "R4x", "embedded objects have no located reader yet";
-    TOC_GAP: "toc", "R4x", "tables of contents have no located reader yet";
     REVISION_GAP: "revision", "R4x", "tracked revisions have no located reader yet";
-    WATERMARK_GAP: "watermark", "R4x", "watermarks live in header stories, which have no node adapter yet";
-    TEXT_BOX_GAP: "textbox", "R4x", "text boxes have no located reader yet";
     SHAPE_GAP: "shape", "R4x", "drawing shapes have no located reader yet";
-    BREAK_GAP: "break", "R4x", "breaks are read as run content, not addressed yet";
-    TAB_GAP: "tab", "R4x", "tab characters are read as run content, not addressed yet";
 }
 
 /// An element spec with the fields most kinds share.
@@ -956,6 +950,10 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     K::Endnotes,
                     K::Comments,
                     K::SmartArt,
+                    K::Bookmark,
+                    K::Field,
+                    K::Toc,
+                    K::Watermark,
                 ],
                 &["/"],
                 DOCUMENT_PROPS,
@@ -965,7 +963,14 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "body",
                 &["body"],
                 &[K::Document],
-                &[K::Paragraph, K::Table, K::Sdt, K::Equation, K::Section],
+                &[
+                    K::Paragraph,
+                    K::Table,
+                    K::Sdt,
+                    K::Equation,
+                    K::Section,
+                    K::TextBox,
+                ],
                 &["/body"],
                 &[],
             ),
@@ -975,7 +980,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     "paragraph",
                     &["p", "paragraph"],
                     CONTAINERS,
-                    &[K::Run, K::Hyperlink, K::Chart],
+                    &[K::Run, K::Hyperlink, K::Chart, K::Tab, K::Break],
                     &[
                         "/body/p[N]",
                         "/body/p[@paraId=X]",
@@ -1237,21 +1242,26 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/theme"],
                 &THEME_GAP,
             ),
-            gap(
-                K::Bookmark,
-                "bookmark",
-                &["bookmark"],
-                &[K::Paragraph],
-                &["/bookmark[@name=X]"],
-                &BOOKMARK_GAP,
+            identities(
+                element(
+                    K::Bookmark,
+                    "bookmark",
+                    &["bookmark"],
+                    &[K::Document],
+                    &[],
+                    &["/bookmark[N]", "/bookmark[@name=X]"],
+                    super::marks::BOOKMARK_PROPS,
+                ),
+                &["name"],
             ),
-            gap(
+            element(
                 K::Field,
                 "field",
                 &["field"],
-                &[K::Paragraph],
+                &[K::Document],
+                &[],
                 &["/field[N]"],
-                &FIELD_GAP,
+                super::marks::FIELD_PROPS,
             ),
             gap(
                 K::FormField,
@@ -1287,13 +1297,14 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/body/p[N]/ole[M]"],
                 &OLE_GAP,
             ),
-            gap(
+            element(
                 K::Toc,
                 "toc",
                 &["tableofcontents", "toc"],
-                &[K::Body],
+                &[K::Document],
+                &[],
                 &["/toc[N]"],
-                &TOC_GAP,
+                super::marks::TOC_PROPS,
             ),
             gap(
                 K::Revision,
@@ -1303,21 +1314,23 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/revision[N]"],
                 &REVISION_GAP,
             ),
-            gap(
+            element(
                 K::Watermark,
                 "watermark",
                 &["watermark"],
                 &[K::Document],
+                &[],
                 &["/watermark"],
-                &WATERMARK_GAP,
+                super::marks::WATERMARK_PROPS,
             ),
-            gap(
+            element(
                 K::TextBox,
                 "textbox",
                 &["textbox"],
-                &[K::Paragraph],
-                &["/body/p[N]/textbox[M]"],
-                &TEXT_BOX_GAP,
+                &[K::Body],
+                &[],
+                &["/body/textbox[N]"],
+                super::marks::TEXT_BOX_PROPS,
             ),
             gap(
                 K::Shape,
@@ -1327,21 +1340,23 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/body/p[N]/shape[M]"],
                 &SHAPE_GAP,
             ),
-            gap(
+            element(
                 K::Break,
                 "break",
                 &["br", "break", "pagebreak"],
                 &[K::Paragraph],
+                &[],
                 &["/body/p[N]/break[M]"],
-                &BREAK_GAP,
+                super::marks::BREAK_PROPS,
             ),
-            gap(
+            element(
                 K::Tab,
                 "tab",
                 &["tab"],
                 &[K::Paragraph],
+                &[],
                 &["/body/p[N]/tab[M]"],
-                &TAB_GAP,
+                super::marks::TAB_PROPS,
             ),
             element(
                 K::SmartArt,

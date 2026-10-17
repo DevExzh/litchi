@@ -582,7 +582,9 @@ class _NodeView(TypedDict):
     """The canonical path; ``File.get(path)`` returns the same node."""
     type: str
     """OfficeCLI's element type: "paragraph", "run", "table", "cell", "row",
-    "sheet", "workbook", ..."""
+    "sheet", "workbook", ...; Word parts and marks too: "style", "level",
+    "header", "footer", "footnote", "endnote", "tab", "break", "bookmark",
+    "field", "toc", "watermark", "textbox"."""
     text: NotRequired[str]
     """The element's text."""
     preview: NotRequired[str]

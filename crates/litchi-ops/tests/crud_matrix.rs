@@ -91,6 +91,10 @@ const SPECS: &[Spec] = &[
             "ooxml/docx/endnotes.docx",
             "ooxml/docx/headerFooter.docx",
             "ooxml/docx/ComplexNumberedLists.docx",
+            // Record 0319: a bookmark, a text box and a watermark.
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
+            "libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx",
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx",
         ],
     },
     Spec {

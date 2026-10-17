@@ -1071,6 +1071,30 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a SmartArt graphic")
         .into_file();
+    // And the marks (record 0319): a tab stop, a break, a bookmark, a
+    // simple field, a table of contents and a text box in the main story,
+    // and a watermark in a built document's header.
+    let marked = crate::open_bytes(package(
+        &format!(
+            r#"<w:document {NAMESPACES} xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><w:body><w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs></w:pPr><w:bookmarkStart w:id="1" w:name="Intro"/><w:r><w:t>One</w:t></w:r><w:bookmarkEnd w:id="1"/><w:r><w:br w:type="page"/></w:r><w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple></w:p><w:p><w:fldSimple w:instr=" TOC \o &quot;1-3&quot; \h "><w:r><w:t>Contents</w:t></w:r></w:fldSimple></w:p><w:p><w:r><w:drawing><wp:anchor><wp:extent cx="1828800" cy="914400"/><wp:docPr id="7" name="Box 7"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr id="7" name="Box 7"/><wps:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p><w:sectPr/></w:body></w:document>"#
+        ),
+        None,
+    ))
+    .expect("open the marked document");
+    let watermarked = {
+        let mut builder = litchi_docx::Builder::new().expect("builder");
+        builder
+            .document()
+            .expect("document")
+            .add_paragraph_with_text("Body");
+        builder
+            .document()
+            .expect("document")
+            .set_watermark(litchi_docx::Watermark::text("DRAFT"));
+        let mut package = builder.build().expect("build");
+        crate::open_bytes(package.to_bytes().expect("bytes"))
+            .expect("open the watermarked document")
+    };
     // And the part elements (record 0319).
     let parted = file
         .add("/styles", crate::NewNode::new("style").prop("id", "Accent"))
@@ -1136,6 +1160,13 @@ fn capabilities_match_live_paths_queries_and_views() {
             &charted
         } else if name == "smartart" {
             &smartart
+        } else if matches!(
+            name,
+            "tab" | "break" | "bookmark" | "field" | "toc" | "textbox"
+        ) {
+            &marked
+        } else if name == "watermark" {
+            &watermarked
         } else {
             &file
         }
@@ -1152,6 +1183,7 @@ fn capabilities_match_live_paths_queries_and_views() {
             let path = template
                 .replace("<id or name>", "Accent")
                 .replace("[@type=T]", "[@type=default]")
+                .replace("[@name=X]", "[@name=Intro]")
                 .replace("[L]", "[1]")
                 .replace("[N]", "[1]")
                 .replace("[M]", "[1]")
