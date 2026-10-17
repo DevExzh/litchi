@@ -298,10 +298,10 @@ What happened to the 38 WP16 lines:
 **Fidelity** (`results/0289/fidelity.*`): open, then empty edit, then save
 keeps every byte (300 of 300 rows exact, unchanged). The harness probes
 the first settable property of each document, which is now a root
-document property (`/ author`, `/ title`). So 136 single-set rows moved
-from byte-exact to value-exact: reverting a metadata set rewrites
-`docProps`. Seven DOCX files that refused the old probe (protected
-styles) now pass it.
+document property (`/ author`, `/ title`). So 122 single-set rows moved
+from byte-exact to value-exact, because reverting a metadata set rewrites
+`docProps`. Another 14 rows refused the old probe and now pass the new
+one: 7 DOCX (protected styles), 5 XLSX and 2 PPTX.
 
 **Goldens.** Re-blessed in both feature sets. The changed rows are:
 
