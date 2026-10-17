@@ -104,6 +104,9 @@ impl Container {
         match self {
             #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
             Self::Opc { format, package } => {
+                if let Some(part) = relationships(package, spec) {
+                    return Ok(part);
+                }
                 let name = super::parts::resolve(package, *format, spec)?;
                 let part = package.get_part(&name)?;
                 Ok(Part {
@@ -164,6 +167,32 @@ const fn is_odf(format: FileFormat) -> bool {
     )
 }
 
+/// A relationships member (`/_rels/.rels`, `/word/_rels/document.xml.rels`):
+/// the package keeps relationships apart from parts, so the member is
+/// serialized from its parsed relationships.
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+fn relationships(package: &litchi_opc::OpcPackage, spec: &str) -> Option<Part> {
+    const RELATIONSHIPS: &str = "application/vnd.openxmlformats-package.relationships+xml";
+    let lower = spec.to_ascii_lowercase();
+    if !lower.ends_with(".rels") {
+        return None;
+    }
+    let rels = if lower == "/_rels/.rels" {
+        package.rels()
+    } else {
+        let (directory, file) = spec.rsplit_once("/_rels/")?;
+        let source =
+            litchi_opc::PackURI::new(format!("{directory}/{}", file.strip_suffix(".rels")?))
+                .ok()?;
+        package.part_metadata(&source)?.rels()
+    };
+    Some(Part {
+        name: spec.to_owned(),
+        content_type: RELATIONSHIPS.to_owned(),
+        bytes: rels.to_xml().into_bytes(),
+    })
+}
+
 /// Index published OPC bytes without copying them.
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 pub(super) fn open_opc(bytes: Vec<u8>) -> Result<litchi_opc::OpcPackage> {
@@ -208,6 +237,6 @@ fn odf_member(archive: &litchi_odf_common::package::Archive<'_>, spec: &str) -> 
 /// `path_not_found` for a part name or alias the package does not hold.
 pub(super) fn part_not_found() -> Error {
     Error::new(Code::PathNotFound, "the package has no such part").with_suggestion(
-        "list the part names with `parts` (CLI: `litchi raw <file> --list`), or use an alias such as /document, /styles, /slide[1] or /Sheet1",
+        "list the part names with `parts` (CLI: `litchi raw <file>`), or use an alias such as /document, /styles, /slide[1] or /Sheet1",
     )
 }

@@ -386,3 +386,25 @@ fn raw_layer_verbs_answer_by_package() {
         }
     }
 }
+
+/// A chart's embedded workbook carries the workbook's own content type, as
+/// Word writes it; validation accepts it (record 0336).
+#[cfg(feature = "docx")]
+#[test]
+fn docx_with_a_chart_validates() {
+    let file = crate::create(FileFormat::Docx).unwrap();
+    let file = file
+        .add("/body", crate::NewNode::new("paragraph"))
+        .unwrap()
+        .file;
+    let chart = crate::NewNode::new("chart")
+        .with_props(crate::props! {
+            "chartType" => "column",
+            "data" => "East:1,2;West:3,4",
+            "categories" => "Q1,Q2",
+        })
+        .unwrap();
+    let file = file.add("/body/p[1]", chart).unwrap().file;
+    let validation = file.validate().unwrap();
+    assert!(validation.is_valid(), "{:?}", validation.report());
+}
