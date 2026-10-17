@@ -481,6 +481,7 @@ impl Slide<'_> {
                     let Ok(column) = column_positions.binary_search(&cell_anchor.left()) else {
                         continue;
                     };
+                    table.set_cell_id(row, column, cell.id());
                     table.set_cell_text(
                         row,
                         column,
@@ -488,6 +489,7 @@ impl Slide<'_> {
                     );
                 }
 
+                table.set_grid(row_positions, column_positions);
                 Ok(Some(ShapeEnum::Table(table)))
             },
 

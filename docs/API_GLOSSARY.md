@@ -2608,3 +2608,5 @@ ElementNotFound, InvalidElementValue}` name the element refusals.
 | `litchi_ppt::comments::{NewComment, CommentChange, DateTime}` | `DateTime::{parse, day_of_week}`; no ambient clock: an absent date is an all-zero `SYSTEMTIME` | ✅ 0323 |
 | `Edit::{add_comment, set_comment, remove_comment}` (and on `slide_order::Transaction`) | `add_comment` returns the comment's `Position`; the author's next index raises a document-level author seed | ✅ 0323 |
 | `slide_order::Refusal::{UnsupportedElement, ElementNotFound, InvalidElementValue}` | | ✅ 0323 |
+| `Edit::set_table_cell_text(target, row, column, text)` (and on `slide_order::Transaction`) | a cell's shape text under the shape-text closure rules; an empty PowerPoint cell gains its first `TextCharsAtom` | ✅ 0323 |
+| `shapes::shape_enum::TableShape::{cell_shape_id, row_heights, column_widths}` | the grid read from the table group's cell anchors, in master units | ✅ 0323 |

@@ -587,6 +587,19 @@ impl Edit {
         self.stage(1, |inner| inner.remove_comment(position, comment))
     }
 
+    /// Replace the text of one table cell (record 0323).
+    pub fn set_table_cell_text(
+        &mut self,
+        target: Target,
+        row: Position,
+        column: Position,
+        text: &str,
+    ) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_table_cell_text(target, row, column, text)
+        })
+    }
+
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;

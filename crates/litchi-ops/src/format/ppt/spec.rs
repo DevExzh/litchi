@@ -304,6 +304,17 @@ pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
     length("y", LengthSpec::POSITION),
 ];
 
+/// A table row (record 0323): a band of the table group's cell shapes; its
+/// height is the distance to the next row's top.
+const ROW_PROPS: &[PropSpec] = &[length("height", LengthSpec::EXTENT)];
+
+/// A table cell (record 0323): one cell shape; its text is the node's text
+/// member and `text` a write-only registry key, as for paragraphs.
+const CELL_PROPS: &[PropSpec] = &[];
+
+/// A table column (record 0323): its width.
+const COLUMN_PROPS: &[PropSpec] = &[length("width", LengthSpec::EXTENT)];
+
 /// A paragraph of a shape's text body: the text between paragraph marks. Its
 /// text is the node's text member, as for PPTX paragraphs; `text` is a
 /// write-only registry key.
@@ -381,16 +392,6 @@ const fn property_gap(
     }
 }
 
-static ROW_GAP: GapSpec = element_gap(
-    "tr",
-    "M1-extended",
-    "the legacy PPT table projection exposes dimensions and cell text but no row nodes",
-);
-static CELL_GAP: GapSpec = element_gap(
-    "tc",
-    "M1-extended",
-    "the legacy PPT table projection exposes cell text through the table node only",
-);
 static CHART_GAP: GapSpec = element_gap(
     "chart",
     "M1-extended",
@@ -490,11 +491,6 @@ static AXIS_GAP: GapSpec = element_gap(
     "axis",
     "M1-extended",
     "legacy PPT chart axes are not exposed as nodes",
-);
-static COL_GAP: GapSpec = element_gap(
-    "col",
-    "M1-extended",
-    "legacy PPT table columns have no separate node projection",
 );
 static NOTE_SLIDE_GAP: GapSpec = element_gap(
     "noteSlide",
@@ -627,23 +623,25 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/table[N]"],
             TABLE_PROPS,
         ),
-        gap(
+        element(
             Kind::Row,
             "tr",
             &["row", "tr"],
             &[Kind::Table],
             &[Kind::Cell],
+            &[],
             &["/slide[N]/table[N]/tr[N]"],
-            &ROW_GAP,
+            ROW_PROPS,
         ),
-        gap(
+        element(
             Kind::Cell,
             "tc",
             &["cell", "tc"],
             &[Kind::Row],
             &[],
+            &[],
             &["/slide[N]/table[N]/tr[N]/tc[N]"],
-            &CELL_GAP,
+            CELL_PROPS,
         ),
         gap(
             Kind::Chart,
@@ -880,14 +878,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/chart[N]/axis[@role=ROLE]"],
             &AXIS_GAP,
         ),
-        gap(
+        element(
             Kind::Col,
             "col",
             &["col", "column"],
             &[Kind::Table],
             &[],
+            &[],
             &["/slide[N]/table[N]/col[N]"],
-            &COL_GAP,
+            COLUMN_PROPS,
         ),
         gap(
             Kind::NoteSlide,
@@ -1062,6 +1061,13 @@ pub(crate) const NOTES_CAPABILITY_PROPS: &[PropSpec] = &NOTES_WRITE_TABLE.readab
 pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
     crate::registry::Table::new(text_write_entries(false), []);
 pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
+
+/// The cell registry (record 0323): the write-only `text` key.
+pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
+    crate::registry::Table::new(text_write_entries(false), []);
+pub(crate) const CELL_CAPABILITY_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
+
+const _: () = assert!(CELL_PROPS.is_empty());
 
 /// Comment assignments (record 0323), as the PPTX comment registry: `text`,
 /// `x` and `y` are settable; `author` (required), `initials` and `date` are

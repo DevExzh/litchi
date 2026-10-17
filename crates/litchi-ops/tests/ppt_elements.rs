@@ -199,3 +199,101 @@ fn comment_noops_and_refusals_are_typed() {
     );
     assert_eq!(source.to_bytes().unwrap(), before);
 }
+
+const TABLES: &str = "poi/test-data/slideshow/bug61881.ppt";
+
+/// A deck with a title and a 2x3 table authored by the native builder.
+fn table_deck() -> Vec<u8> {
+    let mut writer = litchi_ppt::writer::Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer.add_textbox(slide, 10, 10, 240, 40, "Title").unwrap();
+    let mut table = litchi_ppt::writer::Table::new(2, 3).unwrap();
+    for (row, texts) in [["A1", "B1", "C1"], ["A2", "B2", "C2"]].iter().enumerate() {
+        for (column, text) in texts.iter().enumerate() {
+            table.set_cell_text(row, column, *text).unwrap();
+        }
+    }
+    writer.add_table(slide, 72, 120, table).unwrap();
+    let mut output = std::io::Cursor::new(Vec::new());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
+    output.into_inner()
+}
+
+#[test]
+fn table_rows_cells_and_columns_read_like_pptx() {
+    let deck = eager(&table_deck());
+    assert_eq!(text(&deck, "/slide[1]/table[1]/tr[2]/tc[3]"), "C2");
+    assert_eq!(text(&deck, "/slide[1]/table[1]/row[1]/cell[1]"), "A1");
+    assert!(prop(&deck, "/slide[1]/table[1]/tr[1]", "height").is_some());
+    assert!(prop(&deck, "/slide[1]/table[1]/col[2]", "width").is_some());
+    assert_eq!(
+        deck.get("/slide[1]/table[1]/tr[3]").unwrap_err().code(),
+        Code::PathNotFound
+    );
+    assert_eq!(
+        deck.get("/slide[1]/table[1]/col[4]").unwrap_err().code(),
+        Code::PathNotFound
+    );
+    assert_eq!(
+        paths(&deck, "/slide[1]/table[1] > tr"),
+        ["/slide[1]/table[1]/tr[1]", "/slide[1]/table[1]/tr[2]"]
+    );
+    assert_eq!(paths(&deck, "tc").len(), 6);
+
+    let powerpoint = eager(&fixture(TABLES));
+    assert_eq!(paths(&powerpoint, "/slide[11]/table[1] > tr").len(), 5);
+    assert_eq!(text(&powerpoint, "/slide[11]/table[1]/tr[1]/tc[1]"), "");
+}
+
+#[test]
+fn table_cell_text_set_round_trips_and_layout_edits_are_refused() {
+    each_owner(&table_deck(), |source| {
+        let before = source.to_bytes().unwrap();
+        let changed = source
+            .set(
+                "/slide[1]/table[1]/tr[1]/tc[2]",
+                props! { "text" => "A longer cell text" },
+            )
+            .expect("cell text");
+        let read = reopen(&changed);
+        assert_eq!(
+            text(&read, "/slide[1]/table[1]/tr[1]/tc[2]"),
+            "A longer cell text"
+        );
+        assert_eq!(text(&read, "/slide[1]/table[1]/tr[1]/tc[1]"), "A1");
+        assert_eq!(text(&read, "/slide[1]/table[1]/tr[2]/tc[2]"), "B2");
+        assert_eq!(text(&read, "/slide[1]/shape[1]"), "Title");
+        assert_eq!(source.to_bytes().unwrap(), before);
+
+        let noop = source
+            .edit(|edit| edit.set("/slide[1]/table[1]/tr[2]/tc[1]", props! { "text" => "A2" }))
+            .unwrap();
+        assert!(noop.patch.is_noop());
+
+        for refused in [
+            source
+                .add("/slide[1]/table[1]", NewNode::new("row"))
+                .unwrap_err(),
+            source
+                .add("/slide[1]/table[1]", NewNode::new("column"))
+                .unwrap_err(),
+            source.remove("/slide[1]/table[1]/tr[1]").unwrap_err(),
+            source.remove("/slide[1]/table[1]/col[1]").unwrap_err(),
+        ] {
+            assert_eq!(refused.code(), Code::UnsupportedCapability);
+        }
+    });
+
+    // PowerPoint-authored empty cells gain their first text atom.
+    let powerpoint = eager(&fixture(TABLES));
+    let changed = powerpoint
+        .set(
+            "/slide[11]/table[1]/tr[2]/tc[1]",
+            props! { "text" => "filled" },
+        )
+        .unwrap();
+    assert_eq!(
+        text(&reopen(&changed), "/slide[11]/table[1]/tr[2]/tc[1]"),
+        "filled"
+    );
+}

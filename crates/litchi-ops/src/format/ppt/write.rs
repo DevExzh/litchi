@@ -25,6 +25,7 @@ use super::spec::{
 use super::{Nav, Ppt};
 use crate::error::{Code, Error, Result};
 use crate::path::PathArg;
+use crate::path::navigate::ElementKind as _;
 use crate::placement::Placement;
 use crate::props::{IntoProps, Props};
 use crate::registry::Operation;
@@ -112,6 +113,12 @@ enum TargetIdentity {
         slide: usize,
         index: usize,
     },
+    Cell {
+        slide: usize,
+        shape: usize,
+        row: usize,
+        column: usize,
+    },
     Paragraph {
         slide: usize,
         shape: usize,
@@ -169,6 +176,17 @@ pub(crate) fn set_with_limits<'p, 'v>(
         }
         return elements::set_comments(file, &nodes, &props, limits);
     }
+    if nodes
+        .first()
+        .is_some_and(|node| node.element() == Kind::Cell)
+    {
+        if nodes.iter().any(|node| node.element() != Kind::Cell) {
+            return Err(unsupported_target(
+                "one PPT write cannot mix table cells with other targets",
+            ));
+        }
+        return elements::set_cells(file, &nodes, &props, limits);
+    }
     let plans = build_plans(nodes, &props, limits)?;
     let native = stage_plans(file, plans, limits)?;
     file.check_source()?;
@@ -199,6 +217,12 @@ pub(crate) fn remove_with_limits(
             ));
         }
         return elements::remove_comments(file, &nodes, limits);
+    }
+    if nodes
+        .iter()
+        .any(|node| matches!(node.element(), Kind::Row | Kind::Col | Kind::Cell))
+    {
+        return Err(elements::table_layout_refusal("remove"));
     }
     let mut positions = slide_targets(nodes, limits)?;
     admit_structural_targets(positions.len(), limits)?;
@@ -231,6 +255,12 @@ pub(crate) fn add_with_limits(
     let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
     if node.kind().eq_ignore_ascii_case("comment") {
         return elements::add_comment(file, &parent, &node, limits);
+    }
+    if matches!(
+        Kind::from_name(&node.kind().to_ascii_lowercase()),
+        Some(Kind::Row | Kind::Col | Kind::Cell)
+    ) {
+        return Err(elements::table_layout_refusal("add"));
     }
     if parent.element() != Kind::Presentation {
         return Err(Error::new(
@@ -620,6 +650,21 @@ fn append_node<'f>(
             },
             _ => return Err(unsupported_target("comment target has no comment")),
         },
+        Kind::Cell => match (node.native_shape_target(), node.element_item()) {
+            (Some(target), Some(super::elements::Element::Cell { row, column, .. })) => {
+                TargetIdentity::Cell {
+                    slide: target.slide().get(),
+                    shape: target.shape().get(),
+                    row: *row,
+                    column: *column,
+                }
+            },
+            _ => {
+                return Err(unsupported_target(
+                    "nested PPT group table writes are not integrated",
+                ));
+            },
+        },
         Kind::Paragraph => {
             let (Some(target), Some(paragraph)) =
                 (node.native_shape_target(), node.paragraph_index())
@@ -782,7 +827,7 @@ fn build_plans(
 }
 
 /// Admit the one `text` property of a notes or paragraph write.
-fn admit_text_prop<const N: usize, const A: usize>(
+pub(super) fn admit_text_prop<const N: usize, const A: usize>(
     props: &Props<'_>,
     table: &crate::registry::Table<TextSetter, N, A>,
     limits: &SemanticLimits,
@@ -1389,7 +1434,7 @@ fn invalid_query() -> Error {
     .with_format(FileFormat::Ppt)
 }
 
-fn unsupported_target(message: &'static str) -> Error {
+pub(super) fn unsupported_target(message: &'static str) -> Error {
     Error::new(Code::UnsupportedCapability, message).with_format(FileFormat::Ppt)
 }
 

@@ -409,6 +409,13 @@ pub struct TableShape {
     columns: usize,
     /// Table cells (row-major order)
     cells: Vec<Vec<String>>,
+    /// The `OfficeArt` shape ID of each cell's shape, when read from a
+    /// drawing (record 0323).
+    cell_ids: Vec<Vec<Option<u32>>>,
+    /// The top of each row and the left of each column, in master units,
+    /// when read from a drawing.
+    row_tops: Vec<i32>,
+    column_lefts: Vec<i32>,
     /// Left coordinate
     left: i32,
     /// Top coordinate
@@ -432,6 +439,9 @@ impl TableShape {
             rows,
             columns,
             cells,
+            cell_ids: Vec::new(),
+            row_tops: Vec::new(),
+            column_lefts: Vec::new(),
             left: 0,
             top: 0,
             width: 0,
@@ -446,6 +456,45 @@ impl TableShape {
         if let Some(cell) = self.cells.get_mut(row).and_then(|cells| cells.get_mut(col)) {
             *cell = text;
         }
+    }
+
+    pub(crate) fn set_cell_id(&mut self, row: usize, col: usize, id: u32) {
+        if self.cell_ids.is_empty() {
+            self.cell_ids = vec![vec![None; self.columns]; self.rows];
+        }
+        if let Some(cell) = self
+            .cell_ids
+            .get_mut(row)
+            .and_then(|cells| cells.get_mut(col))
+        {
+            *cell = Some(id);
+        }
+    }
+
+    pub(crate) fn set_grid(&mut self, row_tops: Vec<i32>, column_lefts: Vec<i32>) {
+        self.row_tops = row_tops;
+        self.column_lefts = column_lefts;
+    }
+
+    /// The `OfficeArt` shape ID of the cell shape at `row`, `col` (record
+    /// 0323); `None` for a covered cell or a table not read from a drawing.
+    #[must_use]
+    pub fn cell_shape_id(&self, row: usize, col: usize) -> Option<u32> {
+        self.cell_ids.get(row)?.get(col).copied().flatten()
+    }
+
+    /// The height of each row in master units (1/576 inch): the distance to
+    /// the next row's top, the last to the table's bottom (record 0323).
+    /// Empty for a table not read from a drawing.
+    #[must_use]
+    pub fn row_heights(&self) -> Vec<i32> {
+        extents(&self.row_tops, self.top.saturating_add(self.height))
+    }
+
+    /// The width of each column in master units, as [`Self::row_heights`].
+    #[must_use]
+    pub fn column_widths(&self) -> Vec<i32> {
+        extents(&self.column_lefts, self.left.saturating_add(self.width))
     }
 
     pub(crate) fn set_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
@@ -538,6 +587,23 @@ impl TableShape {
     pub(crate) fn mark_source_bound(&mut self) {
         self.source_bound = true;
     }
+}
+
+/// The extent of each grid band from its start to the next start, the last
+/// to `end`.
+fn extents(starts: &[i32], end: i32) -> Vec<i32> {
+    starts
+        .iter()
+        .enumerate()
+        .map(|(index, start)| {
+            starts
+                .get(index + 1)
+                .copied()
+                .unwrap_or(end)
+                .saturating_sub(*start)
+                .max(0)
+        })
+        .collect()
 }
 
 /// Group shape containing other shapes.

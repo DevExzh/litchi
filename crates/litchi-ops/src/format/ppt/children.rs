@@ -45,6 +45,14 @@ enum State {
         next: usize,
         counters: [usize; COUNTER_COUNT],
     },
+    /// A query walk's rows of one table (`row: None`) or cells of one row.
+    Bands {
+        parent: Arc<[crate::node::PathStep<'static>]>,
+        shape: ShapeItem,
+        row: Option<usize>,
+        next: usize,
+        end: usize,
+    },
     /// The paragraphs of one text shape.
     Paragraphs {
         parent: Arc<[crate::node::PathStep<'static>]>,
@@ -125,6 +133,35 @@ impl<'f> Children<'f> {
     /// children, then a slide's notes.
     pub(crate) fn walk(parent: &Node<'f>, kinds: KindSet<Kind>) -> Self {
         let mut children = Self::of(parent, kinds);
+        // Rows and their cells are walked by queries, not listed by views,
+        // so existing views keep their shape (record 0323).
+        match parent.item() {
+            Item::Shape(shape) if shape.kind == Kind::Table && kinds.contains(Kind::Row) => {
+                if let Ok(table) = super::elements::table(parent) {
+                    children.state = State::Bands {
+                        parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                        shape: shape.clone(),
+                        row: None,
+                        next: 0,
+                        end: table.rows(),
+                    };
+                }
+            },
+            Item::Element(element) if kinds.contains(Kind::Cell) => {
+                if let super::elements::Element::Row { shape, row } = element.as_ref()
+                    && let Ok(table) = super::elements::table(parent)
+                {
+                    children.state = State::Bands {
+                        parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                        shape: shape.clone(),
+                        row: Some(*row),
+                        next: 0,
+                        end: table.columns(),
+                    };
+                }
+            },
+            _ => {},
+        }
         if let Item::Slide(slide) = parent.item() {
             if kinds.contains(Kind::Notes) {
                 children.notes = Some(slide.position);
@@ -244,6 +281,29 @@ impl<'f> Children<'f> {
     fn step_state(&mut self, state: State) -> Result<Option<Node<'f>>> {
         match state {
             State::Done => Ok(None),
+            State::Bands {
+                parent,
+                shape,
+                row,
+                next,
+                end,
+            } => {
+                if next >= end {
+                    return Ok(None);
+                }
+                let node = match row {
+                    None => super::nav::band_node(self.file, &parent, &shape, Kind::Row, next),
+                    Some(row) => super::nav::cell_node(self.file, &parent, &shape, row, next),
+                };
+                self.state = State::Bands {
+                    parent,
+                    shape,
+                    row,
+                    next: next + 1,
+                    end,
+                };
+                Ok(Some(node))
+            },
             State::Paragraphs {
                 parent,
                 shape,

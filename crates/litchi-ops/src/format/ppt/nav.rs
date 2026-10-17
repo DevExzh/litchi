@@ -57,6 +57,15 @@ impl<'f> Nav<'f> {
                 self.comment(parent, slide.position, step.select)
             },
             (Item::Shape(shape), Kind::Paragraph) => self.paragraph(parent, shape, step.select),
+            (Item::Shape(shape), Kind::Row | Kind::Col) if shape.kind == Kind::Table => {
+                self.table_band(parent, shape, kind, step.select)
+            },
+            (Item::Element(element), Kind::Cell) => match element.as_ref() {
+                super::elements::Element::Row { shape, row } => {
+                    self.cell(parent, shape, *row, step.select)
+                },
+                _ => Ok(Lookup::NotApplicable),
+            },
             (Item::Slide(_) | Item::Shape(_), Kind::Shape | Kind::Placeholder)
             | (
                 Item::Slide(_) | Item::Shape(_),
@@ -119,6 +128,47 @@ impl<'f> Nav<'f> {
                     .ok_or_else(|| missing_slide(slide))?,
             )),
             None => Lookup::Missing,
+        })
+    }
+
+    /// A table row or column by its ordinal.
+    fn table_band(
+        &self,
+        parent: &Node<'f>,
+        shape: &ShapeItem,
+        kind: Kind,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let table = super::elements::table(parent)?;
+        let count = if kind == Kind::Row {
+            table.rows()
+        } else {
+            table.columns()
+        };
+        Ok(match ordinal(select, count) {
+            Some(Some(index)) => {
+                Lookup::Found(band_node(self.file, parent.steps(), shape, kind, index))
+            },
+            Some(None) => Lookup::Missing,
+            None => Lookup::NotApplicable,
+        })
+    }
+
+    /// A row's cell by its ordinal.
+    fn cell(
+        &self,
+        parent: &Node<'f>,
+        shape: &ShapeItem,
+        row: usize,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let count = super::elements::table(parent)?.columns();
+        Ok(match ordinal(select, count) {
+            Some(Some(column)) => {
+                Lookup::Found(cell_node(self.file, parent.steps(), shape, row, column))
+            },
+            Some(None) => Lookup::Missing,
+            None => Lookup::NotApplicable,
         })
     }
 
@@ -235,7 +285,17 @@ impl<'f> Nav<'f> {
             Item::Presentation => {
                 out.kind(Kind::Slide.name(), self.file.reader().slide_count());
             },
-            Item::Notes(_) | Item::Paragraph(_) | Item::Element(_) => {},
+            Item::Notes(_) | Item::Paragraph(_) => {},
+            Item::Element(element) => {
+                if let super::elements::Element::Row { .. } = element.as_ref() {
+                    out.kind(Kind::Cell.name(), super::elements::table(parent)?.columns());
+                }
+            },
+            Item::Shape(shape) if shape.kind == Kind::Table => {
+                let table = super::elements::table(parent)?;
+                out.kind(Kind::Row.name(), table.rows());
+                out.kind(Kind::Col.name(), table.columns());
+            },
             Item::Shape(_) if parent.shape().is_some_and(has_text_body) => {
                 let count = parent.shape().map_or(Ok(0), paragraph_count)?;
                 out.kind(Kind::Paragraph.name(), count);
@@ -430,6 +490,64 @@ pub(crate) fn comment_node<'f>(
             slide,
             index,
             comment: std::sync::Arc::new(comment),
+        },
+    )
+}
+
+/// The selected zero-based index among `count` siblings: `None` for a
+/// selector kind that does not address by position, `Some(None)` when absent.
+fn ordinal(select: Select<'_>, count: usize) -> Option<Option<usize>> {
+    Some(match select {
+        Select::None => (count > 0).then_some(0),
+        Select::Ordinal(position) => (position.get() < count).then_some(position.get()),
+        Select::Last => count.checked_sub(1),
+        _ => return None,
+    })
+}
+
+/// The node of a table's row or column.
+pub(crate) fn band_node<'f>(
+    file: &'f Ppt,
+    table_steps: &[PathStep<'static>],
+    shape: &ShapeItem,
+    kind: Kind,
+    index: usize,
+) -> Node<'f> {
+    let element = if kind == Kind::Row {
+        super::elements::Element::Row {
+            shape: shape.clone(),
+            row: index,
+        }
+    } else {
+        super::elements::Element::Column {
+            shape: shape.clone(),
+            column: index,
+        }
+    };
+    Node::element_node(
+        file,
+        table_steps,
+        PathStep::at(kind.name(), Position::new(index)),
+        element,
+    )
+}
+
+/// The node of one table cell under its row.
+pub(crate) fn cell_node<'f>(
+    file: &'f Ppt,
+    row_steps: &[PathStep<'static>],
+    shape: &ShapeItem,
+    row: usize,
+    column: usize,
+) -> Node<'f> {
+    Node::element_node(
+        file,
+        row_steps,
+        PathStep::at(Kind::Cell.name(), Position::new(column)),
+        super::elements::Element::Cell {
+            shape: shape.clone(),
+            row,
+            column,
         },
     )
 }

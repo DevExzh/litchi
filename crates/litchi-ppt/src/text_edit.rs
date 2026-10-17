@@ -3316,6 +3316,175 @@ pub(crate) fn replace_notes_text(
     }))
 }
 
+/// Rewrite the text of the shape with `OfficeArt` ID `shape_id` under the
+/// ordinary text-closure rules; `None` when the text is already equal.
+pub(crate) fn rewrite_shape_text_by_id(
+    slide: &[u8],
+    shape_id: u32,
+    replacement: &str,
+) -> Result<Option<Vec<u8>>> {
+    let atom = match inspect_slide(slide, shape_id) {
+        Ok(atom) => atom,
+        Err(Error::Refused(Refusal::NoTextAtom)) => {
+            return insert_text_atom(slide, shape_id, replacement);
+        },
+        Err(error) => return Err(error),
+    };
+    if atom.text == replacement {
+        return Ok(None);
+    }
+    let encoded = encode_replacement(replacement, atom.kind)?;
+    check_replacement(
+        atom.kind,
+        &atom.payload,
+        &encoded,
+        atom.can_resize,
+        &atom.pins,
+    )?;
+    rewrite_slide(slide, shape_id, atom.kind, &atom.payload, &encoded).map(Some)
+}
+
+/// Give an empty text body its first text atom (record 0323).
+///
+/// The shape's `ClientTextbox` must hold a `TextHeaderAtom` followed only by
+/// at most one each of `StyleTextPropAtom`, `TextSpecialInfoAtom` and
+/// `TextRulerAtom`: the records [`resize_dependency_closure_is_modeled`]
+/// admits. A `TextCharsAtom` is inserted after the header and the style and
+/// special-information runs grow from the paragraph mark alone to cover the
+/// new text. An empty replacement keeps the body.
+fn insert_text_atom(slide: &[u8], shape_id: u32, replacement: &str) -> Result<Option<Vec<u8>>> {
+    if replacement.is_empty() {
+        return Ok(None);
+    }
+    let encoded = encode_replacement(replacement, TextKind::Chars)?;
+    let units = text_units(TextKind::Chars, encoded.len())?;
+    let mut drawing_count = 0usize;
+    let mut matches = 0usize;
+    let rewritten = rewrite_ppt_record(slide, 0, &mut |record| {
+        if record_type(record)? != RecordType::PPDrawing as u16 {
+            return Ok(None);
+        }
+        drawing_count += 1;
+        let data = insert_into_officeart(
+            drawing_payload(record)?,
+            shape_id,
+            &encoded,
+            units,
+            0,
+            &mut matches,
+        )?;
+        rebuild(record, &data).map(Some).map_err(Into::into)
+    })?;
+    if drawing_count != 1 {
+        return Err(PackageError::Corrupted(
+            "selected slide has ambiguous PPDrawing ownership".into(),
+        )
+        .into());
+    }
+    match matches {
+        0 => Err(Error::Refused(Refusal::ShapeNotFound)),
+        1 => rewritten
+            .map(Some)
+            .ok_or(Error::Refused(Refusal::ShapeNotFound)),
+        _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+    }
+}
+
+fn insert_into_officeart(
+    record: &[u8],
+    shape_id: u32,
+    encoded: &[u8],
+    units: usize,
+    depth: usize,
+    matches: &mut usize,
+) -> Result<Vec<u8>> {
+    if depth >= 128 {
+        return Err(
+            PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
+        );
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id) {
+        *matches = matches.saturating_add(1);
+        let mut textboxes = 0usize;
+        let mut data = Vec::with_capacity(record.len().saturating_add(encoded.len() + 16));
+        for child in children(record)? {
+            let child = child?;
+            if record_type(child)? == OFFICEART_CLIENT_TEXTBOX {
+                textboxes += 1;
+                data.extend_from_slice(&insert_into_textbox(child, encoded, units)?);
+            } else {
+                data.extend_from_slice(child);
+            }
+        }
+        return match textboxes {
+            0 => Err(Error::Refused(Refusal::NoTextbox)),
+            1 => rebuild(record, &data).map_err(Into::into),
+            _ => Err(Error::Refused(Refusal::AmbiguousTextbox)),
+        };
+    }
+    if record_version(record)? != 0xF {
+        return Ok(record.to_vec());
+    }
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child in children(record)? {
+        data.extend_from_slice(&insert_into_officeart(
+            child?,
+            shape_id,
+            encoded,
+            units,
+            depth + 1,
+            matches,
+        )?);
+    }
+    rebuild(record, &data).map_err(Into::into)
+}
+
+fn insert_into_textbox(textbox: &[u8], encoded: &[u8], units: usize) -> Result<Vec<u8>> {
+    let records = children(textbox)?.collect::<PackageResult<Vec<_>>>()?;
+    let [header, rest @ ..] = records.as_slice() else {
+        return Err(Error::Refused(Refusal::NoTextAtom));
+    };
+    if record_type(header)? != RecordType::TextHeaderAtom as u16 {
+        return Err(Error::Refused(Refusal::NoTextAtom));
+    }
+    let resizable = [
+        RecordType::StyleTextPropAtom as u16,
+        RecordType::TextSpecInfoAtom as u16,
+        RecordType::TextRulerAtom as u16,
+    ];
+    let mut seen = [false; 3];
+    let mut data = Vec::with_capacity(textbox.len().saturating_add(encoded.len() + 8));
+    data.extend_from_slice(header);
+    let length = u32::try_from(encoded.len())
+        .map_err(|_err| PackageError::ResourceLimit("PPT text atom exceeds u32".into()))?;
+    data.extend_from_slice(&0_u16.to_le_bytes());
+    data.extend_from_slice(&(RecordType::TextCharsAtom as u16).to_le_bytes());
+    data.extend_from_slice(&length.to_le_bytes());
+    data.extend_from_slice(encoded);
+    for record in rest {
+        let kind = record_type(record)?;
+        let Some(slot) = resizable.iter().position(|candidate| *candidate == kind) else {
+            // Another record may hold a character position.
+            return Err(Error::Refused(Refusal::NoTextAtom));
+        };
+        if std::mem::replace(&mut seen[slot], true) {
+            return Err(Error::Refused(Refusal::NoTextAtom));
+        }
+        match slot {
+            0 => data.extend_from_slice(
+                &crate::StyleTextPropAtom::resize_single_run_record(record, 0, units)?
+                    .ok_or(Error::Refused(Refusal::DependencyClosure))?,
+            ),
+            1 => data.extend_from_slice(
+                &crate::TextSpecialInfoRuns::resize_single_run_record(record, 0, units)?
+                    .ok_or(Error::Refused(Refusal::DependencyClosure))?,
+            ),
+            _ => data.extend_from_slice(record),
+        }
+    }
+    rebuild(textbox, &data).map_err(Into::into)
+}
+
 fn require_batch_text_budget(
     replacement_bytes: usize,
     encoded_bytes: usize,

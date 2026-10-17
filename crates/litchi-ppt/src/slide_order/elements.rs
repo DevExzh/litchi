@@ -132,3 +132,77 @@ impl Transaction {
 fn missing_record() -> Error {
     PackageError::Corrupted("PPT element edit lost its selected record".into()).into()
 }
+
+impl Transaction {
+    /// The `OfficeArt` shape ID of the cell at `row`, `column` of the table
+    /// at `target` in the working artifact.
+    fn table_cell_shape_id(
+        &self,
+        target: crate::text_edit::Target,
+        row: Position,
+        column: Position,
+    ) -> Result<u32> {
+        let refusal = |element| Error::Refused(Refusal::ElementNotFound { element });
+        let presentation = self.working_presentation()?;
+        let projected = self.document.slides()?;
+        let persist_id = projected
+            .get(target.slide().get())
+            .ok_or(Error::Refused(Refusal::SlideNotFound {
+                position: target.slide(),
+            }))?
+            .persist_id();
+        let slide = presentation
+            .slides()?
+            .into_iter()
+            .find(|slide| slide.persist_id() == persist_id)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let shapes = slide.shapes()?;
+        let table = shapes
+            .get(target.shape().get())
+            .and_then(crate::shapes::ShapeEnum::as_table)
+            .ok_or_else(|| refusal("table"))?;
+        if row.get() >= table.rows() {
+            return Err(refusal("table row"));
+        }
+        if column.get() >= table.columns() {
+            return Err(refusal("table column"));
+        }
+        table
+            .cell_shape_id(row.get(), column.get())
+            .ok_or(Error::Refused(Refusal::UnsupportedElement {
+                element: "table cell",
+                reason: "the cell is covered by a merged cell",
+            }))
+    }
+
+    /// Replace the text of one table cell (record 0323).
+    ///
+    /// A legacy table is a group of cell shapes; the cell's shape text is
+    /// rewritten under the ordinary shape-text closure rules, so a changed
+    /// length refuses where the cell's text has several formatting runs or
+    /// other position-dependent records. Equal text is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an absent slide, table, row or column, a
+    /// merged-away cell, a cell without editable text, an unrepresentable
+    /// text, or a changed signed source.
+    pub fn set_table_cell_text(
+        &mut self,
+        target: crate::text_edit::Target,
+        row: Position,
+        column: Position,
+        text: &str,
+    ) -> Result<()> {
+        self.require_position(target.slide())?;
+        let shape_id = self.table_cell_shape_id(target, row, column)?;
+        self.stage_records(Some(target.slide()), false, |view| {
+            let slide = view.slide.ok_or_else(missing_record)?;
+            Ok(Replacement {
+                slide: crate::text_edit::rewrite_shape_text_by_id(slide.bytes, shape_id, text)?,
+                document: None,
+            })
+        })
+        .map(drop)
+    }
+}

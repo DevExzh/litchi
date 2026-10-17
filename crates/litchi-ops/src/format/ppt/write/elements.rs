@@ -12,8 +12,11 @@ use litchi_ppt::comments::{CommentChange, DateTime, NewComment};
 use super::super::Ppt;
 use super::super::elements::Element;
 use super::super::node::Node;
-use super::super::spec::{COMMENT_WRITE_TABLE, CommentSetter, Kind};
-use super::{WriteCommit, allocation, bound, finish_commit, master_from_emu, stage_structural};
+use super::super::spec::{CELL_WRITE_TABLE, COMMENT_WRITE_TABLE, CommentSetter, Kind};
+use super::{
+    WriteCommit, admit_text_prop, allocation, bound, finish_commit, master_from_emu,
+    stage_structural, unsupported_target,
+};
 use crate::error::{Code, Error, Result};
 use crate::placement::Placement;
 use crate::props::Props;
@@ -234,4 +237,53 @@ pub(super) fn add_comment(
             crate::path::Step::new("comment").with(crate::path::Predicate::Index(position)),
         ]),
     ))
+}
+
+/// The refusal of a table row, column or cell insertion or removal.
+///
+/// A legacy table is a group of cell shapes and border lines laid out by
+/// position; inserting or removing a band would re-lay out every cell and
+/// line after it and the group's anchor, which the leaf does not model.
+pub(super) fn table_layout_refusal(verb: &'static str) -> Error {
+    Error::new(
+        Code::UnsupportedCapability,
+        match verb {
+            "add" => "PPT table rows and columns cannot be inserted: the leaf does not re-lay out a table's cell shapes and border lines",
+            _ => "PPT table rows, columns and cells cannot be removed: the leaf does not re-lay out a table's cell shapes and border lines",
+        },
+    )
+    .with_format(FileFormat::Ppt)
+    .with_suggestion("set cell text instead; table layout edits remain a follow-up (record 0323)")
+}
+
+/// Set the text of every selected table cell in one native edit.
+pub(super) fn set_cells(
+    file: &Ppt,
+    nodes: &[Node<'_>],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    if props.is_empty() {
+        return finish_commit(file, stage_structural(file, 0, limits, |_| Ok(()))?, limits);
+    }
+    let text = admit_text_prop(props, &CELL_WRITE_TABLE, limits)?;
+    let mut targets = Vec::with_capacity(nodes.len());
+    for node in nodes {
+        let (Some(target), Some(Element::Cell { row, column, .. })) =
+            (node.native_shape_target(), node.element_item())
+        else {
+            return Err(unsupported_target(
+                "nested PPT group table writes are not integrated",
+            ));
+        };
+        targets.push((target, Position::new(*row), Position::new(*column)));
+    }
+    let native = stage_structural(file, targets.len(), limits, |edit| {
+        for (target, row, column) in targets {
+            edit.set_table_cell_text(target, row, column, &text)?;
+        }
+        Ok(())
+    })?;
+    file.check_source()?;
+    finish_commit(file, native, limits)
 }

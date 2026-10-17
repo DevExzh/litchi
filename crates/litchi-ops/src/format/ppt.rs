@@ -42,8 +42,9 @@ pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::SPEC;
 use spec::{
-    COMMENT_CAPABILITY_PROPS, NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS,
-    PLACEHOLDER_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS,
+    CELL_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS, NOTES_CAPABILITY_PROPS,
+    PARAGRAPH_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS,
+    SLIDE_CAPABILITY_PROPS,
 };
 
 /// PPT elements the unified `set` verb writes.
@@ -54,6 +55,7 @@ pub(crate) const SETTABLE: &[&str] = &[
     "notes",
     "paragraph",
     "comment",
+    "tc",
 ];
 
 /// PPT elements the unified `add` verb creates.
@@ -72,12 +74,63 @@ pub(crate) fn capability_props(name: &str) -> Option<&'static [PropSpec]> {
         "notes" => NOTES_CAPABILITY_PROPS,
         "paragraph" => PARAGRAPH_CAPABILITY_PROPS,
         "comment" => COMMENT_CAPABILITY_PROPS,
+        "tc" => CELL_CAPABILITY_PROPS,
         _ => return None,
     })
 }
 
 /// Operation gaps of the PPT write surface, listed in `capabilities()`.
 pub(crate) const WRITE_GAPS: &[GapSpec] = &[
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "tr",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "a legacy table is a group of positioned cell shapes and border lines; inserting a row would re-lay out every later cell, line and the group anchor, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "col",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "a legacy table is a group of positioned cell shapes and border lines; inserting a column would re-lay out every later cell, line and the group anchor, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "tr",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "removing a row would re-lay out the table group's later cells and border lines, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "col",
+            context: "table-layout",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F1 PPT table re-layout",
+        reason: "removing a column would re-lay out the table group's later cells and border lines, which the leaf does not model",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "tc",
+            context: "native-cell-text",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F2 PPT nested tables and rich cell text",
+        reason: "cell text follows the shape-text closure rules (a changed length refuses over several formatting runs or position-dependent records); tables inside groups and merged-away cells are refused",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "get",
