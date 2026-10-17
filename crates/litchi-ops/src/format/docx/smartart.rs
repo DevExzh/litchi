@@ -208,27 +208,40 @@ fn data_xml(docx: &Docx, diagram: &Diagram) -> Result<Vec<u8>> {
     docx.owner().finish(result)
 }
 
-/// The SmartArt graphics of the main document, in document order.
-pub(super) fn document_smartarts(docx: &Docx) -> Result<Vec<Diagram>> {
+/// The SmartArt graphics of the main document, in document order, read
+/// once per handle.
+pub(super) fn document_smartarts(docx: &Docx) -> Result<Arc<[Arc<SmartArtValue>]>> {
+    if let Some(graphics) = docx.parts().smartarts.get() {
+        return Ok(Arc::clone(graphics));
+    }
     let result = match docx.owner() {
         DocxOwner::Eager(package) => package.smart_arts().map_err(Error::from),
         DocxOwner::Source(package) => docx
             .promoted(package)
             .and_then(|package| package.smart_arts().map_err(Error::from)),
     };
-    docx.owner().finish(result)
+    let diagrams = docx.owner().finish(result)?;
+    let graphics: Arc<[Arc<SmartArtValue>]> = diagrams
+        .into_iter()
+        .enumerate()
+        .map(|(index, diagram)| {
+            Arc::new(SmartArtValue {
+                diagram,
+                ordinal: u32::try_from(index).unwrap_or(u32::MAX),
+                outline: OnceLock::new(),
+            })
+        })
+        .collect();
+    Ok(Arc::clone(docx.parts().smartarts.get_or_init(|| graphics)))
 }
 
-/// The node of the SmartArt graphic at `ordinal`.
-pub(super) fn smartart_node(docx: &Docx, ordinal: u32, diagram: Diagram) -> Node<'_> {
+/// The node of a SmartArt graphic.
+pub(super) fn smartart_node(docx: &Docx, smartart: Arc<SmartArtValue>) -> Node<'_> {
+    let ordinal = smartart.ordinal;
     Node::new(
         docx,
         Kind::SmartArt,
-        Value::SmartArt(Arc::new(SmartArtValue {
-            diagram,
-            ordinal,
-            outline: OnceLock::new(),
-        })),
+        Value::SmartArt(smartart),
         Address::root().with(Step::new(Kind::SmartArt, ordinal)),
     )
 }
@@ -327,23 +340,17 @@ pub(super) fn pick_document_smartart<'f>(
     select: &crate::path::navigate::Select<'_>,
 ) -> Result<crate::path::navigate::Lookup<Node<'f>, crate::node::spec::GapSpec>> {
     use crate::path::navigate::{Lookup, Select};
-    let diagrams = document_smartarts(docx)?;
+    let graphics = document_smartarts(docx)?;
     let picked = match *select {
         Select::None => Some(0),
         Select::Ordinal(position) => Some(position.get()),
-        Select::Last => diagrams.len().checked_sub(1),
+        Select::Last => graphics.len().checked_sub(1),
         _ => return Ok(Lookup::NotApplicable),
     };
-    Ok(
-        match picked.and_then(|index| Some((index, diagrams.into_iter().nth(index)?))) {
-            Some((index, diagram)) => Lookup::Found(smartart_node(
-                docx,
-                u32::try_from(index).unwrap_or(u32::MAX),
-                diagram,
-            )),
-            None => Lookup::Missing,
-        },
-    )
+    Ok(match picked.and_then(|index| graphics.get(index)) {
+        Some(smartart) => Lookup::Found(smartart_node(docx, Arc::clone(smartart))),
+        None => Lookup::Missing,
+    })
 }
 
 /// The layout token of a graphic: Litchi's name of a built-in layout, else
@@ -506,7 +513,7 @@ impl Docx {
         let commit = edit.commit(self)?;
         let ordinal = document_smartarts(commit.file())?
             .iter()
-            .position(|diagram| diagram.data_relationship_id == relationship)
+            .position(|graphic| graphic.diagram.data_relationship_id == relationship)
             .ok_or_else(|| error(Code::InternalError, "the added SmartArt did not read back"))?;
         let path = Path::from_steps(vec![
             PathStep::new("smartart").with(Predicate::Index(litchi_core::Position::new(ordinal))),

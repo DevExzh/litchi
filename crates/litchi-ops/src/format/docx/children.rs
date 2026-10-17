@@ -60,8 +60,8 @@ enum Source {
     /// (record 0295).
     SmartArtRoot,
     SmartArts {
-        diagrams: vec::IntoIter<litchi_docx::smartart::Diagram>,
-        next: u32,
+        graphics: Arc<[Arc<super::smartart::SmartArtValue>]>,
+        next: usize,
     },
     /// The comments of the comments part.
     Comments {
@@ -280,11 +280,8 @@ impl<'f> Children<'f> {
                         continue;
                     }
                     match super::smartart::document_smartarts(self.docx) {
-                        Ok(diagrams) => {
-                            self.source = Source::SmartArts {
-                                diagrams: diagrams.into_iter(),
-                                next: 0,
-                            };
+                        Ok(graphics) => {
+                            self.source = Source::SmartArts { graphics, next: 0 };
                         },
                         Err(error) => {
                             self.source = Source::Done;
@@ -301,13 +298,10 @@ impl<'f> Children<'f> {
                         self.address.with(step),
                     )));
                 },
-                Source::SmartArts { diagrams, next } => {
-                    let diagram = diagrams.next()?;
-                    let ordinal = *next;
+                Source::SmartArts { graphics, next } => {
+                    let graphic = Arc::clone(graphics.get(*next)?);
                     *next += 1;
-                    return Some(Ok(super::smartart::smartart_node(
-                        self.docx, ordinal, diagram,
-                    )));
+                    return Some(Ok(super::smartart::smartart_node(self.docx, graphic)));
                 },
                 Source::Comments { comments, next } => {
                     let comment = comments.next()?;

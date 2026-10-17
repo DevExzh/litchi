@@ -358,20 +358,35 @@ impl ChartValue {
         )
     }
 
-    /// The chart part's projection, read once.
+    /// The chart part's projection, read once per handle.
     pub(super) fn summary(&self, docx: &Docx) -> Result<Option<Arc<Summary>>> {
         if let Some(summary) = self.summary.get() {
             return Ok(summary.clone());
         }
         let id = self.chart.relationship_id();
-        let result = match docx.owner() {
-            DocxOwner::Eager(package) => package.chart_xml(id).map_err(Error::from),
-            DocxOwner::Source(package) => package.chart_xml(id).map_err(Error::from),
+        let cached = docx.parts().charts.lock().ok().and_then(|charts| {
+            charts
+                .iter()
+                .find(|(cached, _)| cached.as_ref() == id)
+                .map(|(_, summary)| summary.clone())
+        });
+        let summary = match cached {
+            Some(summary) => summary,
+            None => {
+                let result = match docx.owner() {
+                    DocxOwner::Eager(package) => package.chart_xml(id).map_err(Error::from),
+                    DocxOwner::Source(package) => package.chart_xml(id).map_err(Error::from),
+                };
+                let xml = docx.owner().finish(result)?;
+                let summary = xml
+                    .map(|xml| Summary::read(&xml).map(Arc::new))
+                    .transpose()?;
+                if let Ok(mut charts) = docx.parts().charts.lock() {
+                    charts.push((id.into(), summary.clone()));
+                }
+                summary
+            },
         };
-        let xml = docx.owner().finish(result)?;
-        let summary = xml
-            .map(|xml| Summary::read(&xml).map(Arc::new))
-            .transpose()?;
         let _ = self.summary.set(summary.clone());
         Ok(summary)
     }
