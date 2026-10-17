@@ -2,7 +2,11 @@
 
 - Status: implemented on `uo2/query-walker`, cut from `feat/unified-ops-api`
   at `30eed270b5`; trunk `db96990ff6` (records 0314, 0316–0321) merged at
-  `bfdd60d3c1` before the final measurement and gates.
+  `bfdd60d3c1` before the final measurement and gates; trunk `fde847fe90`
+  (record 0322, XLSB features) merged at `78d782b49c` after them, followed by
+  `cargo fmt --all --check`, the all-features clippy of `litchi-ops`, its
+  `--lib` tests (926), the query-corpus differential and the matrix
+  `--check` (exit 0 each).
 - Date: 2026-10-17
 - Input: record [0310](0310-miss-sweep.md) §2 groups G4–G9 and §7
   follow-ups; the 98 open misses of `tools/unified_bench_matrix.py`.
