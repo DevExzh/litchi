@@ -1732,19 +1732,19 @@ doc	run	get	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /b
 doc	run	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /body/p[1]/r[1]
 doc	run	query	supported		ok matches in ole/doc/documentProperties.doc
 doc	run	view	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /body/p[1]/r[1]
-doc	run	set	supported		ok `ole/doc/documentProperties.doc` /body/p[1]/r[1] {"text":"Litchi"}
+doc	run	set	supported		ok `ole/doc/Lists.doc + add hyperlink` /body/p[1]/r[1] {"text":"Litchi"}
 doc	run	add	n/a	add not offered for this element	-
-doc	run	remove	supported		ok `ole/doc/documentProperties.doc` /body/p[1]/r[1]
+doc	run	remove	supported		ok `ole/doc/Lists.doc + add hyperlink` /body/p[1]/r[1]
 doc	run	move	format-verb		refused unsupported_type
 doc	run	swap	format-verb		refused unsupported_type
 doc	run	edit	supported		ok tx.set
 doc	run	batch	supported		ok set item
 doc	run	create	supported		ok format
 doc	run	save	supported		ok format
-doc	table	get	supported		ok 2 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]
-doc	table	find	supported		ok 2 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]
+doc	table	get	supported		ok 3 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]
+doc	table	find	supported		ok 3 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]
 doc	table	query	supported		ok matches in ole/doc/table-merged-cells.doc
-doc	table	view	supported		ok 2 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]
+doc	table	view	supported		ok 3 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]
 doc	table	set	n/a	set not offered for this element	-
 doc	table	add	n/a	add not offered for this element	-
 doc	table	remove	n/a	remove not offered for this element	-
@@ -1754,10 +1754,10 @@ doc	table	edit	n/a	edit not offered for this element	-
 doc	table	batch	n/a	batch not offered for this element	-
 doc	table	create	supported		ok format
 doc	table	save	supported		ok format
-doc	row	get	supported		ok 7 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]/tr[1]
-doc	row	find	supported		ok 7 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]/tr[1]
+doc	row	get	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]/tr[1]
+doc	row	find	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]/tr[1]
 doc	row	query	supported		ok matches in ole/doc/table-merged-cells.doc
-doc	row	view	supported		ok 7 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]/tr[1]
+doc	row	view	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /body/tbl[1]/tr[1]
 doc	row	set	n/a	set not offered for this element	-
 doc	row	add	n/a	add not offered for this element	-
 doc	row	remove	n/a	remove not offered for this element	-
@@ -1780,28 +1780,28 @@ doc	cell	edit	n/a	edit not offered for this element	-
 doc	cell	batch	n/a	batch not offered for this element	-
 doc	cell	create	supported		ok format
 doc	cell	save	supported		ok format
-doc	header	get	supported		ok 1 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /header[1]
-doc	header	find	supported		ok 1 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /header[1]
+doc	header	get	supported		ok 4 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /header[1]
+doc	header	find	supported		ok 4 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /header[1]
 doc	header	query	supported		ok matches in poi/test-data/hpsf/TestNon4ByteBoundary.doc
-doc	header	view	supported		ok 1 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /header[1]
+doc	header	view	supported		ok 4 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /header[1]
 doc	header	set	n/a	set not offered for this element	-
 doc	header	add	n/a	add not offered for this element	-
 doc	header	remove	n/a	remove not offered for this element	-
-doc	header	move	format-verb		unreached
-doc	header	swap	format-verb		unreached
+doc	header	move	format-verb		refused unsupported_type
+doc	header	swap	format-verb		refused unsupported_type
 doc	header	edit	n/a	edit not offered for this element	-
 doc	header	batch	n/a	batch not offered for this element	-
 doc	header	create	supported		ok format
 doc	header	save	supported		ok format
-doc	footer	get	supported		ok 1 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /footer[1]
-doc	footer	find	supported		ok 1 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /footer[1]
+doc	footer	get	supported		ok 5 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /footer[1]
+doc	footer	find	supported		ok 5 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /footer[1]
 doc	footer	query	supported		ok matches in poi/test-data/hpsf/TestNon4ByteBoundary.doc
-doc	footer	view	supported		ok 1 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /footer[1]
+doc	footer	view	supported		ok 5 instances, first `poi/test-data/hpsf/TestNon4ByteBoundary.doc` /footer[1]
 doc	footer	set	n/a	set not offered for this element	-
 doc	footer	add	n/a	add not offered for this element	-
 doc	footer	remove	n/a	remove not offered for this element	-
-doc	footer	move	format-verb		unreached
-doc	footer	swap	format-verb		unreached
+doc	footer	move	format-verb		refused unsupported_type
+doc	footer	swap	format-verb		refused unsupported_type
 doc	footer	edit	n/a	edit not offered for this element	-
 doc	footer	batch	n/a	batch not offered for this element	-
 doc	footer	create	supported		ok format
@@ -1832,10 +1832,10 @@ doc	endnote	edit	n/a	edit not offered for this element	-
 doc	endnote	batch	n/a	batch not offered for this element	-
 doc	endnote	create	supported		ok format
 doc	endnote	save	supported		ok format
-doc	comments	get	supported		ok 2 instances, first `ole/doc/commented-table.doc` /comments
-doc	comments	find	supported		ok 2 instances, first `ole/doc/commented-table.doc` /comments
+doc	comments	get	supported		ok 3 instances, first `ole/doc/commented-table.doc` /comments
+doc	comments	find	supported		ok 3 instances, first `ole/doc/commented-table.doc` /comments
 doc	comments	query	supported		ok matches in ole/doc/commented-table.doc
-doc	comments	view	supported		ok 2 instances, first `ole/doc/commented-table.doc` /comments
+doc	comments	view	supported		ok 3 instances, first `ole/doc/commented-table.doc` /comments
 doc	comments	set	n/a	set not offered for this element	-
 doc	comments	add	n/a	add not offered for this element	-
 doc	comments	remove	n/a	remove not offered for this element	-
@@ -1845,10 +1845,10 @@ doc	comments	edit	n/a	edit not offered for this element	-
 doc	comments	batch	n/a	batch not offered for this element	-
 doc	comments	create	supported		ok format
 doc	comments	save	supported		ok format
-doc	comment	get	supported		ok 1 instances, first `ole/doc/commented-table.doc` /comments/comment[1]
-doc	comment	find	supported		ok 1 instances, first `ole/doc/commented-table.doc` /comments/comment[1]
+doc	comment	get	supported		ok 2 instances, first `ole/doc/commented-table.doc` /comments/comment[1]
+doc	comment	find	supported		ok 2 instances, first `ole/doc/commented-table.doc` /comments/comment[1]
 doc	comment	query	supported		ok matches in ole/doc/commented-table.doc
-doc	comment	view	supported		ok 1 instances, first `ole/doc/commented-table.doc` /comments/comment[1]
+doc	comment	view	supported		ok 2 instances, first `ole/doc/commented-table.doc` /comments/comment[1]
 doc	comment	set	n/a	set not offered for this element	-
 doc	comment	add	n/a	add not offered for this element	-
 doc	comment	remove	n/a	remove not offered for this element	-
@@ -1858,6 +1858,188 @@ doc	comment	edit	n/a	edit not offered for this element	-
 doc	comment	batch	n/a	batch not offered for this element	-
 doc	comment	create	supported		ok format
 doc	comment	save	supported		ok format
+doc	styles	get	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /styles
+doc	styles	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /styles
+doc	styles	query	supported		ok matches in create()
+doc	styles	view	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /styles
+doc	styles	set	n/a	set not offered for this element	-
+doc	styles	add	n/a	add not offered for this element	-
+doc	styles	remove	n/a	remove not offered for this element	-
+doc	styles	move	format-verb		unreached
+doc	styles	swap	format-verb		unreached
+doc	styles	edit	n/a	edit not offered for this element	-
+doc	styles	batch	n/a	batch not offered for this element	-
+doc	styles	create	supported		ok format
+doc	styles	save	supported		ok format
+doc	style	get	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /styles/Базовый
+doc	style	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /styles/Базовый
+doc	style	query	supported		ok matches in create()
+doc	style	view	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /styles/Базовый
+doc	style	set	n/a	set not offered for this element	-
+doc	style	add	n/a	add not offered for this element	-
+doc	style	remove	n/a	remove not offered for this element	-
+doc	style	move	format-verb		refused unsupported_type
+doc	style	swap	format-verb		refused unsupported_type
+doc	style	edit	n/a	edit not offered for this element	-
+doc	style	batch	n/a	batch not offered for this element	-
+doc	style	create	supported		ok format
+doc	style	save	supported		ok format
+doc	numbering	get	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /numbering
+doc	numbering	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /numbering
+doc	numbering	query	supported		ok matches in create()
+doc	numbering	view	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /numbering
+doc	numbering	set	n/a	set not offered for this element	-
+doc	numbering	add	n/a	add not offered for this element	-
+doc	numbering	remove	n/a	remove not offered for this element	-
+doc	numbering	move	format-verb		unreached
+doc	numbering	swap	format-verb		unreached
+doc	numbering	edit	n/a	edit not offered for this element	-
+doc	numbering	batch	n/a	batch not offered for this element	-
+doc	numbering	create	supported		ok format
+doc	numbering	save	supported		ok format
+doc	abstractNum	get	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/abstractNum[1]
+doc	abstractNum	find	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/abstractNum[1]
+doc	abstractNum	query	supported		ok matches in ole/doc/table-merged-cells.doc
+doc	abstractNum	view	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/abstractNum[1]
+doc	abstractNum	set	n/a	set not offered for this element	-
+doc	abstractNum	add	n/a	add not offered for this element	-
+doc	abstractNum	remove	n/a	remove not offered for this element	-
+doc	abstractNum	move	format-verb		refused unsupported_type
+doc	abstractNum	swap	format-verb		refused unsupported_type
+doc	abstractNum	edit	n/a	edit not offered for this element	-
+doc	abstractNum	batch	n/a	batch not offered for this element	-
+doc	abstractNum	create	supported		ok format
+doc	abstractNum	save	supported		ok format
+doc	num	get	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/num[1]
+doc	num	find	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/num[1]
+doc	num	query	supported		ok matches in ole/doc/table-merged-cells.doc
+doc	num	view	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/num[1]
+doc	num	set	n/a	set not offered for this element	-
+doc	num	add	n/a	add not offered for this element	-
+doc	num	remove	n/a	remove not offered for this element	-
+doc	num	move	format-verb		refused unsupported_type
+doc	num	swap	format-verb		refused unsupported_type
+doc	num	edit	n/a	edit not offered for this element	-
+doc	num	batch	n/a	batch not offered for this element	-
+doc	num	create	supported		ok format
+doc	num	save	supported		ok format
+doc	level	get	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/abstractNum[1]/level[1]
+doc	level	find	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/abstractNum[1]/level[1]
+doc	level	query	supported		ok matches in ole/doc/table-merged-cells.doc
+doc	level	view	supported		ok 8 instances, first `ole/doc/table-merged-cells.doc` /numbering/abstractNum[1]/level[1]
+doc	level	set	n/a	set not offered for this element	-
+doc	level	add	n/a	add not offered for this element	-
+doc	level	remove	n/a	remove not offered for this element	-
+doc	level	move	format-verb		refused unsupported_type
+doc	level	swap	format-verb		refused unsupported_type
+doc	level	edit	n/a	edit not offered for this element	-
+doc	level	batch	n/a	batch not offered for this element	-
+doc	level	create	supported		ok format
+doc	level	save	supported		ok format
+doc	hyperlink	get	supported		ok 8 instances, first `ole/doc/hyperlink.doc` /body/p[1]/hyperlink[1]
+doc	hyperlink	find	supported		ok 8 instances, first `ole/doc/hyperlink.doc` /body/p[1]/hyperlink[1]
+doc	hyperlink	query	supported		ok matches in ole/doc/hyperlink.doc
+doc	hyperlink	view	supported		ok 8 instances, first `ole/doc/hyperlink.doc` /body/p[1]/hyperlink[1]
+doc	hyperlink	set	supported		ok `ole/doc/Lists.doc + add hyperlink` /body/p[2]/hyperlink[1] {"url":"Litchi"}
+doc	hyperlink	add	supported		ok /body/p[2]/hyperlink[1] on `ole/doc/Lists.doc` under /body/p[2] {"url":"http://example.com/","text":"Litchi"}
+doc	hyperlink	remove	supported		ok `ole/doc/Lists.doc + add hyperlink` /body/p[2]/hyperlink[1]
+doc	hyperlink	move	format-verb		refused unsupported_type
+doc	hyperlink	swap	format-verb		refused unsupported_type
+doc	hyperlink	edit	supported		ok tx.set
+doc	hyperlink	batch	supported		ok set item
+doc	hyperlink	create	supported		ok format
+doc	hyperlink	save	supported		ok format
+doc	bookmark	get	supported		ok 8 instances, first `ole/doc/watermark.doc` /bookmark[1]
+doc	bookmark	find	supported		ok 8 instances, first `ole/doc/watermark.doc` /bookmark[1]
+doc	bookmark	query	supported		ok matches in ole/doc/watermark.doc
+doc	bookmark	view	supported		ok 8 instances, first `ole/doc/watermark.doc` /bookmark[1]
+doc	bookmark	set	supported		ok `create() + add paragraph + add bookmark` /bookmark[1] {"name":"7"}
+doc	bookmark	add	supported		ok /bookmark[1] on `create() + add paragraph` under / {"name":"Litchi"}
+doc	bookmark	remove	supported		ok `create() + add paragraph + add bookmark` /bookmark[1]
+doc	bookmark	move	format-verb		refused unsupported_type
+doc	bookmark	swap	format-verb		refused unsupported_type
+doc	bookmark	edit	supported		ok tx.set
+doc	bookmark	batch	supported		ok set item
+doc	bookmark	create	supported		ok format
+doc	bookmark	save	supported		ok format
+doc	field	get	supported		ok 8 instances, first `ole/doc/hyperlink.doc` /field[1]
+doc	field	find	supported		ok 8 instances, first `ole/doc/hyperlink.doc` /field[1]
+doc	field	query	supported		ok matches in ole/doc/hyperlink.doc
+doc	field	view	supported		ok 8 instances, first `ole/doc/hyperlink.doc` /field[1]
+doc	field	set	n/a	set not offered for this element	-
+doc	field	add	n/a	add not offered for this element	-
+doc	field	remove	n/a	remove not offered for this element	-
+doc	field	move	format-verb		refused unsupported_type
+doc	field	swap	format-verb		refused unsupported_type
+doc	field	edit	n/a	edit not offered for this element	-
+doc	field	batch	n/a	batch not offered for this element	-
+doc	field	create	supported		ok format
+doc	field	save	supported		ok format
+doc	toc	get	supported		ok 1 instances, first `ole/doc/watermark.doc` /toc[1]
+doc	toc	find	supported		ok 1 instances, first `ole/doc/watermark.doc` /toc[1]
+doc	toc	query	supported		ok matches in ole/doc/watermark.doc
+doc	toc	view	supported		ok 1 instances, first `ole/doc/watermark.doc` /toc[1]
+doc	toc	set	n/a	set not offered for this element	-
+doc	toc	add	n/a	add not offered for this element	-
+doc	toc	remove	n/a	remove not offered for this element	-
+doc	toc	move	format-verb		unreached
+doc	toc	swap	format-verb		unreached
+doc	toc	edit	n/a	edit not offered for this element	-
+doc	toc	batch	n/a	batch not offered for this element	-
+doc	toc	create	supported		ok format
+doc	toc	save	supported		ok format
+doc	section	get	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /section[1]
+doc	section	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /section[1]
+doc	section	query	supported		ok matches in create()
+doc	section	view	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /section[1]
+doc	section	set	supported		ok `create() + add paragraph` /section[1] {"type":"continuous"}
+doc	section	add	n/a	add not offered for this element	-
+doc	section	remove	n/a	remove not offered for this element	-
+doc	section	move	format-verb		refused unsupported_type
+doc	section	swap	format-verb		refused unsupported_type
+doc	section	edit	supported		ok tx.set
+doc	section	batch	supported		ok set item
+doc	section	create	supported		ok format
+doc	section	save	supported		ok format
+doc	tab	get	supported		ok 8 instances, first `ole/doc/watermark.doc` /body/p[3]/tab[1]
+doc	tab	find	supported		ok 8 instances, first `ole/doc/watermark.doc` /body/p[3]/tab[1]
+doc	tab	query	supported		ok matches in ole/doc/watermark.doc
+doc	tab	view	supported		ok 8 instances, first `ole/doc/watermark.doc` /body/p[3]/tab[1]
+doc	tab	set	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1] {"pos":"1"}
+doc	tab	add	supported		ok /body/p[1]/tab[1] on `create() + add paragraph` under /body/p[1] {"pos":"2","val":"left","leader":"none"}
+doc	tab	remove	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1]
+doc	tab	move	format-verb		refused unsupported_type
+doc	tab	swap	format-verb		refused unsupported_type
+doc	tab	edit	supported		ok tx.set
+doc	tab	batch	supported		ok set item
+doc	tab	create	supported		ok format
+doc	tab	save	supported		ok format
+doc	textbox	get	supported		ok 1 instances, first `unified-ops/0294/marks.doc` /body/textbox[1]
+doc	textbox	find	supported		ok 1 instances, first `unified-ops/0294/marks.doc` /body/textbox[1]
+doc	textbox	query	supported		ok matches in unified-ops/0294/marks.doc
+doc	textbox	view	supported		ok 1 instances, first `unified-ops/0294/marks.doc` /body/textbox[1]
+doc	textbox	set	n/a	set not offered for this element	-
+doc	textbox	add	n/a	add not offered for this element	-
+doc	textbox	remove	n/a	remove not offered for this element	-
+doc	textbox	move	format-verb		unreached
+doc	textbox	swap	format-verb		unreached
+doc	textbox	edit	n/a	edit not offered for this element	-
+doc	textbox	batch	n/a	batch not offered for this element	-
+doc	textbox	create	supported		ok format
+doc	textbox	save	supported		ok format
+doc	shape	get	supported		ok 6 instances, first `ole/doc/image-comment-at-char.doc` /body/shape[1]
+doc	shape	find	supported		ok 6 instances, first `ole/doc/image-comment-at-char.doc` /body/shape[1]
+doc	shape	query	supported		ok matches in ole/doc/image-comment-at-char.doc
+doc	shape	view	supported		ok 6 instances, first `ole/doc/image-comment-at-char.doc` /body/shape[1]
+doc	shape	set	n/a	set not offered for this element	-
+doc	shape	add	n/a	add not offered for this element	-
+doc	shape	remove	n/a	remove not offered for this element	-
+doc	shape	move	format-verb		refused unsupported_type
+doc	shape	swap	format-verb		refused unsupported_type
+doc	shape	edit	n/a	edit not offered for this element	-
+doc	shape	batch	n/a	batch not offered for this element	-
+doc	shape	create	supported		ok format
+doc	shape	save	supported		ok format
 xls	workbook	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /
 xls	workbook	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /
 xls	workbook	query	n/a	query not offered for this element	-

@@ -18,7 +18,7 @@ was refused (typed), `none` nothing to move.
 
 | format | exact | differs | refused | error | signed-exact | signed-differs | signed-error | locked | revert byte-exact | revert value-exact | revert mismatch | revert one-way | revert refused | revert none | structure byte-exact | structure value-exact | structure mismatch | structure one-way | structure refused | structure none |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| doc | 44 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 37 | 0 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
+| doc | 45 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 38 | 0 | 0 | 5 | 2 | 0 | 44 | 0 | 0 | 1 | 0 |
 | docx | 75 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 60 | 4 | 0 | 0 | 10 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | keynote | 57 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 55 | 0 | 0 | 0 | 0 | 0 | 14 | 0 | 0 | 42 | 0 |
 | numbers | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 40 | 0 | 0 | 0 | 0 | 0 | 38 | 0 | 1 | 1 | 0 |
@@ -38,7 +38,7 @@ was refused (typed), `none` nothing to move.
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 112 | 3 | 0 | 0 | 4 | 0 | 92 | 5 | 0 | 0 | 22 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 986 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 330 | 458 | 0 | 5 | 115 | 75 | 149 | 117 | 0 | 2 | 84 | 157 |
+| **all** | 987 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 330 | 459 | 0 | 5 | 116 | 74 | 149 | 161 | 0 | 2 | 85 | 157 |
 
 ## Office-extension files the unified layer does not open
 

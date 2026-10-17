@@ -1528,9 +1528,19 @@ impl Classify for litchi_doc::body_text::Error {
                 Class::of(Code::OutOfRange)
             },
             Self::Refused(Refusal::ResourceCollision { .. }) => Class::of(Code::DuplicateName),
-            Self::Refused(Refusal::ResourceNotFound { .. } | Refusal::FontNotFound) => {
-                Class::of(Code::NotFound)
-            },
+            Self::Refused(
+                Refusal::ResourceNotFound { .. }
+                | Refusal::FontNotFound
+                | Refusal::StyleNotFound
+                | Refusal::FieldNotFound
+                | Refusal::BookmarkNotFound,
+            ) => Class::of(Code::NotFound),
+            Self::Refused(Refusal::SectionNotFound) => Class::of(Code::OutOfRange),
+            Self::Refused(Refusal::BookmarkName) => Class::suggest(
+                Code::InvalidValue,
+                "name the bookmark with 1 through 39 letters, digits, `_`, `.` or `-`, unused by another bookmark",
+            ),
+            Self::Refused(Refusal::InvalidProperty) => Class::of(Code::InvalidValue),
             Self::Refused(Refusal::InvalidFontSize) => Class::of(Code::InvalidValue),
             Self::Refused(Refusal::SoleParagraph) => Class::of(Code::InvalidArgument),
             Self::Refused(Refusal::Encrypted) => Class::suggest(

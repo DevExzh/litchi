@@ -188,8 +188,13 @@ fn reads_reach_runs_tables_headers_notes_and_comments() {
         file.get("/body/tbl[2]").unwrap_err().code(),
         Code::PathNotFound
     );
+    // Record 0324 projects hyperlinks: this paragraph has none.
     assert_eq!(
         file.get("/body/p[2]/hyperlink[1]").unwrap_err().code(),
+        Code::PathNotFound
+    );
+    assert_eq!(
+        file.get("/body/p[2]/picture[1]").unwrap_err().code(),
         Code::UnsupportedCapability
     );
 }

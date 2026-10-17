@@ -40,6 +40,34 @@ pub enum Kind {
     Comments,
     /// A comment (`/comments/comment[N]`).
     Comment,
+    /// The stylesheet (`/styles`).
+    Styles,
+    /// A style (`/styles/<id or name>`).
+    Style,
+    /// The list tables (`/numbering`).
+    Numbering,
+    /// A list definition, an `LSTF` (`/numbering/abstractNum[N]`).
+    AbstractNum,
+    /// A list instance, an `LFO` (`/numbering/num[N]`).
+    Num,
+    /// A list level, an `LVL` (`/numbering/abstractNum[N]/level[L]`).
+    Level,
+    /// A main-story `HYPERLINK` field (`/body/p[N]/hyperlink[M]`).
+    Hyperlink,
+    /// A main-story bookmark (`/bookmark[N]`, `/bookmark[@name=X]`).
+    Bookmark,
+    /// A main-story field (`/field[N]`).
+    Field,
+    /// A main-story `TOC` field (`/toc[N]`).
+    Toc,
+    /// A section (`/section[N]`).
+    Section,
+    /// A paragraph tab stop (`/body/p[N]/tab[M]`).
+    Tab,
+    /// A main-story text box (`/body/textbox[N]`).
+    TextBox,
+    /// A main-story floating shape anchor (`/body/shape[N]`).
+    Shape,
 }
 
 impl Kind {
@@ -60,7 +88,29 @@ impl Kind {
             Self::Endnote => "endnote",
             Self::Comments => "comments",
             Self::Comment => "comment",
+            Self::Styles => "styles",
+            Self::Style => "style",
+            Self::Numbering => "numbering",
+            Self::AbstractNum => "abstractNum",
+            Self::Num => "num",
+            Self::Level => "level",
+            Self::Hyperlink => "hyperlink",
+            Self::Bookmark => "bookmark",
+            Self::Field => "field",
+            Self::Toc => "toc",
+            Self::Section => "section",
+            Self::Tab => "tab",
+            Self::TextBox => "textbox",
+            Self::Shape => "shape",
         }
+    }
+
+    /// Whether the kind is one of the main-story structure kinds the generic
+    /// views list. The parts and marks (styles, numbering, hyperlinks,
+    /// bookmarks, fields, sections, tab stops, text boxes and shapes) are
+    /// reached by path and query only, so every view stays as it was.
+    pub(crate) const fn is_structural(self) -> bool {
+        (self as u8) <= (Self::Comment as u8)
     }
 }
 
@@ -83,6 +133,20 @@ impl ElementKind for Kind {
             "endnote" => Some(Self::Endnote),
             "comments" => Some(Self::Comments),
             "comment" => Some(Self::Comment),
+            "styles" => Some(Self::Styles),
+            "style" => Some(Self::Style),
+            "numbering" => Some(Self::Numbering),
+            "abstractNum" | "abstractnum" => Some(Self::AbstractNum),
+            "num" => Some(Self::Num),
+            "level" | "lvl" => Some(Self::Level),
+            "hyperlink" => Some(Self::Hyperlink),
+            "bookmark" => Some(Self::Bookmark),
+            "field" => Some(Self::Field),
+            "toc" | "tableofcontents" => Some(Self::Toc),
+            "section" => Some(Self::Section),
+            "tab" => Some(Self::Tab),
+            "textbox" => Some(Self::TextBox),
+            "shape" => Some(Self::Shape),
             _ => None,
         }
     }
@@ -102,6 +166,20 @@ impl ElementKind for Kind {
             Self::Endnote => "endnote",
             Self::Comments => "comments",
             Self::Comment => "comment",
+            Self::Styles => "styles",
+            Self::Style => "style",
+            Self::Numbering => "numbering",
+            Self::AbstractNum => "abstractNum",
+            Self::Num => "num",
+            Self::Level => "level",
+            Self::Hyperlink => "hyperlink",
+            Self::Bookmark => "bookmark",
+            Self::Field => "field",
+            Self::Toc => "toc",
+            Self::Section => "section",
+            Self::Tab => "tab",
+            Self::TextBox => "textbox",
+            Self::Shape => "shape",
         }
     }
 
@@ -176,6 +254,18 @@ const READ_SET_ADD: Access = Access {
     add: true,
 };
 
+const READ_ADD: Access = Access {
+    get: true,
+    set: false,
+    add: true,
+};
+
+const ADD_ONLY: Access = Access {
+    get: false,
+    set: false,
+    add: true,
+};
+
 const fn prop(name: &'static str, ty: ValueType, access: Access) -> PropSpec {
     PropSpec {
         name,
@@ -214,7 +304,18 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     prop("size", ValueType::Length(LengthSpec::FONT_SIZE), SET_ONLY),
     prop("color", ValueType::Color(ColorContext::Word), SET_ONLY),
     prop("font", ValueType::Text, SET_ONLY),
+    // Record 0324: the paragraph style (`istd`) and its list binding.
+    prop("style", ValueType::Text, READ_SET),
+    prop("styleId", ValueType::Text, READ_SET),
+    prop("styleName", ValueType::Text, READ_SET),
+    prop("numFmt", ValueType::Text, Access::READ),
+    prop("listStyle", ValueType::Token(&LIST_STYLE), Access::READ),
+    prop("start", ValueType::Int, Access::READ),
+    prop("numLevel", ValueType::Int, Access::READ),
 ];
+
+/// A paragraph's list kind, as DOCX reports it.
+pub(crate) static LIST_STYLE: Tokens = Tokens::new("list style", &["bullet", "ordered"], &[]);
 
 /// Run properties, in [`super::node::NodeProps`] index order. Values are the
 /// reader's resolved run properties (direct formatting over the style chain).
@@ -231,6 +332,8 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
     prop("smallcaps", ValueType::Bool, Access::READ),
     prop("superscript", ValueType::Bool, Access::READ),
     prop("subscript", ValueType::Bool, Access::READ),
+    // Record 0324: the run's character style (`sprmCIstd`).
+    prop("rStyle", ValueType::Text, READ_SET),
 ];
 
 /// Table properties, in [`super::node::NodeProps`] index order.
@@ -267,6 +370,329 @@ pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
     prop("initials", ValueType::Text, Access::READ),
 ];
 
+/// A style's `type` (`StdfBase.stk`), under the `ST_StyleType` spelling.
+pub(crate) static STYLE_TYPE: Tokens = Tokens::new(
+    "style type",
+    &["paragraph", "character", "table", "numbering"],
+    &[("char", 1), ("para", 0)],
+);
+
+/// Highlight colors (`sprmCHighlight`), under the `ST_HighlightColor`
+/// spelling.
+pub(crate) static HIGHLIGHT: Tokens = Tokens::new(
+    "highlight",
+    &[
+        "none",
+        "black",
+        "blue",
+        "cyan",
+        "green",
+        "magenta",
+        "red",
+        "yellow",
+        "white",
+        "darkBlue",
+        "darkCyan",
+        "darkGreen",
+        "darkMagenta",
+        "darkRed",
+        "darkYellow",
+        "darkGray",
+        "lightGray",
+    ],
+    &[],
+);
+
+/// A list definition's kind (`LSTF.fSimpleList`, `LSTF.fHybrid`).
+pub(crate) static MULTI_LEVEL_TYPE: Tokens = Tokens::new(
+    "multi-level type",
+    &["hybridMultilevel", "multilevel", "singleLevel"],
+    &[("hybrid", 0), ("multi", 1), ("single", 2)],
+);
+
+/// A level's number alignment (`LVLF.jc`).
+pub(crate) static LEVEL_JUSTIFICATION: Tokens =
+    Tokens::new("level justification", &["left", "center", "right"], &[]);
+
+/// The character after a level's number (`LVLF.ixchFollow`).
+pub(crate) static LEVEL_SUFFIX: Tokens =
+    Tokens::new("level suffix", &["tab", "space", "nothing"], &[("none", 2)]);
+
+/// A tab stop's alignment (`TBD.jc`), under the `ST_TabJc` spelling.
+pub(crate) static TAB_VAL: Tokens = Tokens::new(
+    "tab alignment",
+    &["left", "center", "right", "decimal", "bar", "num"],
+    &[],
+);
+
+/// A tab stop's leader (`TBD.tlc`), under the `ST_TabTlc` spelling.
+pub(crate) static TAB_LEADER: Tokens = Tokens::new(
+    "tab leader",
+    &["none", "dot", "hyphen", "underscore", "heavy", "middleDot"],
+    &[],
+);
+
+/// A section's break kind (`sprmSBkc`), under the `ST_SectionMark` spelling.
+pub(crate) static SECTION_TYPE: Tokens = Tokens::new(
+    "section type",
+    &[
+        "continuous",
+        "nextColumn",
+        "nextPage",
+        "evenPage",
+        "oddPage",
+    ],
+    &[],
+);
+
+/// Page orientation (`sprmSBOrientation`).
+pub(crate) static ORIENTATION: Tokens = Tokens::new("orientation", &["portrait", "landscape"], &[]);
+
+/// Line numbering restart (`sprmSLnc`), OfficeCLI's `lineNumbers` values.
+pub(crate) static LINE_NUMBERS: Tokens = Tokens::new(
+    "line numbering",
+    &["restartPage", "restartSection", "continuous"],
+    &[],
+);
+
+/// A section's vertical alignment (`sprmSVjc`).
+pub(crate) static SECTION_VALIGN: Tokens = Tokens::new(
+    "vertical alignment",
+    &["top", "center", "both", "bottom"],
+    &[],
+);
+
+/// Text wrapping around a floating shape (`SPA.wr`).
+pub(crate) static SHAPE_WRAP: Tokens = Tokens::new(
+    "shape wrap",
+    &["topAndBottom", "none", "square", "tight", "through"],
+    &[],
+);
+
+/// A floating shape's horizontal origin (`SPA.bx`).
+pub(crate) static SHAPE_H_RELATIVE: Tokens =
+    Tokens::new("horizontal origin", &["margin", "page", "column"], &[]);
+
+/// A floating shape's vertical origin (`SPA.by`).
+pub(crate) static SHAPE_V_RELATIVE: Tokens =
+    Tokens::new("vertical origin", &["margin", "page", "paragraph"], &[]);
+
+/// Page and paragraph extents, printed as OfficeCLI prints extents.
+pub(crate) const EXTENT: LengthSpec = LengthSpec::EXTENT;
+
+const fn raw(name: &'static str, ty: ValueType) -> PropSpec {
+    PropSpec {
+        name,
+        ty,
+        access: Access::READ,
+        raw: true,
+        admission: crate::registry::Admission::NONE,
+    }
+}
+
+const fn read(name: &'static str, ty: ValueType) -> PropSpec {
+    prop(name, ty, Access::READ)
+}
+
+/// `/styles`: the number of styles.
+pub(crate) const STYLES_PROPS: &[PropSpec] = &[read("count", ValueType::Int)];
+
+/// A style, in the DOCX style order (record 0319): identity and UI flags,
+/// then the style's own character properties, then its own paragraph
+/// properties. Values are the style's direct `UPX` properties, never the
+/// inherited chain.
+pub(crate) const STYLE_PROPS: &[PropSpec] = &[
+    read("id", ValueType::Text),
+    read("name", ValueType::Text),
+    read("type", ValueType::Token(&STYLE_TYPE)),
+    read("default", ValueType::Bool),
+    read("basedOn", ValueType::Text),
+    read("next", ValueType::Text),
+    read("linked", ValueType::Text),
+    read("autoRedefine", ValueType::Bool),
+    read("hidden", ValueType::Bool),
+    read("qFormat", ValueType::Bool),
+    read("uiPriority", ValueType::Int),
+    read("semiHidden", ValueType::Bool),
+    read("unhideWhenUsed", ValueType::Bool),
+    read("locked", ValueType::Bool),
+    read("customStyle", ValueType::Bool),
+    read("font", ValueType::Text),
+    read("font.ea", ValueType::Text),
+    read("font.cs", ValueType::Text),
+    read("size", ValueType::Length(LengthSpec::FONT_SIZE)),
+    read("size.cs", ValueType::Length(LengthSpec::FONT_SIZE)),
+    read("bold", ValueType::Bool),
+    read("bold.cs", ValueType::Bool),
+    read("italic", ValueType::Bool),
+    read("italic.cs", ValueType::Bool),
+    read("color", ValueType::Color(ColorContext::Word)),
+    read("underline", ValueType::Token(&UNDERLINE)),
+    read("strike", ValueType::Bool),
+    read("dstrike", ValueType::Bool),
+    read("caps", ValueType::Bool),
+    read("smallCaps", ValueType::Bool),
+    read("vanish", ValueType::Bool),
+    read("highlight", ValueType::Token(&HIGHLIGHT)),
+    read("superscript", ValueType::Bool),
+    read("subscript", ValueType::Bool),
+    read("charSpacing", ValueType::Length(SIGNED_POINTS)),
+    read("align", ValueType::Token(&ALIGNMENT)),
+    read("spaceBefore", ValueType::Length(SPACING)),
+    read("spaceAfter", ValueType::Length(SPACING)),
+    read("firstLineIndent", ValueType::Length(SIGNED_POINTS)),
+    read("leftIndent", ValueType::Length(SIGNED_POINTS)),
+    read("rightIndent", ValueType::Length(SIGNED_POINTS)),
+    read("outlineLvl", ValueType::Int),
+    read("keepNext", ValueType::Bool),
+    read("keepLines", ValueType::Bool),
+    read("pageBreakBefore", ValueType::Bool),
+    read("widowControl", ValueType::Bool),
+    read("contextualSpacing", ValueType::Bool),
+];
+
+/// `/numbering`: the numbers of list definitions and instances.
+pub(crate) const NUMBERING_PROPS: &[PropSpec] = &[
+    read("abstractNumCount", ValueType::Int),
+    read("numCount", ValueType::Int),
+];
+
+/// A list definition (`LSTF`). Its `id` is the native index, a raw
+/// identity (record 0319 §3).
+pub(crate) const ABSTRACT_NUM_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    read("type", ValueType::Token(&MULTI_LEVEL_TYPE)),
+    read("name", ValueType::Text),
+];
+
+/// A list instance (`LFO`): the definition it uses and its start overrides.
+pub(crate) const NUM_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    read("abstractNumId", ValueType::Int),
+    read("startOverride.0", ValueType::Int),
+    read("startOverride.1", ValueType::Int),
+    read("startOverride.2", ValueType::Int),
+    read("startOverride.3", ValueType::Int),
+    read("startOverride.4", ValueType::Int),
+    read("startOverride.5", ValueType::Int),
+    read("startOverride.6", ValueType::Int),
+    read("startOverride.7", ValueType::Int),
+    read("startOverride.8", ValueType::Int),
+];
+
+/// A list level (`LVL`), in the DOCX level order.
+pub(crate) const LEVEL_PROPS: &[PropSpec] = &[
+    raw("ilvl", ValueType::Int),
+    read("start", ValueType::Int),
+    read("format", ValueType::Text),
+    read("lvlText", ValueType::Text),
+    read("justification", ValueType::Token(&LEVEL_JUSTIFICATION)),
+    read("suff", ValueType::Token(&LEVEL_SUFFIX)),
+    read("lvlRestart", ValueType::Int),
+    read("isLgl", ValueType::Bool),
+    read("indent", ValueType::Int),
+    read("hanging", ValueType::Int),
+    read("font", ValueType::Text),
+    read("size", ValueType::Length(LengthSpec::FONT_SIZE)),
+    read("color", ValueType::Color(ColorContext::Word)),
+    read("bold", ValueType::Bool),
+    read("italic", ValueType::Bool),
+];
+
+/// A `HYPERLINK` field: its instruction switches, then the formatting of
+/// its first result run, as DOCX reads a hyperlink's first run.
+pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
+    prop("url", ValueType::Text, READ_SET_ADD),
+    prop("anchor", ValueType::Text, READ_ADD),
+    prop("tooltip", ValueType::Text, READ_ADD),
+    read("tgtFrame", ValueType::Text),
+    read("font", ValueType::Text),
+    read("size", ValueType::Length(LengthSpec::FONT_SIZE)),
+    read("bold", ValueType::Bool),
+    read("italic", ValueType::Bool),
+    read("color", ValueType::Color(ColorContext::Word)),
+    read("underline", ValueType::Token(&UNDERLINE)),
+    read("strike", ValueType::Bool),
+    read("rStyle", ValueType::Text),
+    prop("text", ValueType::Text, READ_SET_ADD),
+];
+
+/// A bookmark: its name; `text` seeds a new bookmark's covered text.
+pub(crate) const BOOKMARK_PROPS: &[PropSpec] = &[
+    prop("name", ValueType::Text, READ_SET_ADD),
+    prop("text", ValueType::Text, ADD_ONLY),
+];
+
+/// A field: its type, instruction, lock and whether it has a result.
+pub(crate) const FIELD_PROPS: &[PropSpec] = &[
+    read("fieldType", ValueType::Text),
+    read("instruction", ValueType::Text),
+    read("fldLock", ValueType::Bool),
+    read("evaluated", ValueType::Bool),
+];
+
+/// A table of contents, from its `TOC` field's switches.
+pub(crate) const TOC_PROPS: &[PropSpec] = &[
+    read("levels", ValueType::Text),
+    read("hyperlinks", ValueType::Bool),
+    read("pageNumbers", ValueType::Bool),
+];
+
+/// A section's page setup, under OfficeCLI's section keys.
+pub(crate) const SECTION_PROPS: &[PropSpec] = &[
+    prop("type", ValueType::Token(&SECTION_TYPE), READ_SET),
+    prop("pageWidth", ValueType::Length(EXTENT), READ_SET),
+    prop("pageHeight", ValueType::Length(EXTENT), READ_SET),
+    prop("orientation", ValueType::Token(&ORIENTATION), READ_SET),
+    prop("marginTop", ValueType::Length(SIGNED_POINTS), READ_SET),
+    prop("marginBottom", ValueType::Length(SIGNED_POINTS), READ_SET),
+    prop("marginLeft", ValueType::Length(EXTENT), READ_SET),
+    prop("marginRight", ValueType::Length(EXTENT), READ_SET),
+    prop("marginHeader", ValueType::Length(EXTENT), READ_SET),
+    prop("marginFooter", ValueType::Length(EXTENT), READ_SET),
+    prop("marginGutter", ValueType::Length(EXTENT), READ_SET),
+    prop("columns", ValueType::Int, READ_SET),
+    prop("columnSpace", ValueType::Length(EXTENT), READ_SET),
+    read("columns.separator", ValueType::Bool),
+    prop("titlePage", ValueType::Bool, READ_SET),
+    read("pageNumFmt", ValueType::Text),
+    read("pageStart", ValueType::Int),
+    read("lineNumbers", ValueType::Token(&LINE_NUMBERS)),
+    read("lineNumberCountBy", ValueType::Int),
+    read("lineNumberDistance", ValueType::Int),
+    read("direction", ValueType::Token(&DIRECTION)),
+    read("rtlGutter", ValueType::Bool),
+    prop("vAlign", ValueType::Token(&SECTION_VALIGN), READ_SET),
+];
+
+/// Paragraph or section direction.
+pub(crate) static DIRECTION: Tokens = Tokens::new("direction", &["ltr", "rtl"], &[]);
+
+/// A paragraph tab stop: position in twips, alignment and leader.
+pub(crate) const TAB_PROPS: &[PropSpec] = &[
+    prop("pos", ValueType::Int, READ_SET_ADD),
+    prop("val", ValueType::Token(&TAB_VAL), READ_SET_ADD),
+    prop("leader", ValueType::Token(&TAB_LEADER), READ_SET_ADD),
+];
+
+/// A main-story text box: its anchor's extent; its story text is the text.
+pub(crate) const TEXT_BOX_PROPS: &[PropSpec] = &[
+    read("width", ValueType::Length(EXTENT)),
+    read("height", ValueType::Length(EXTENT)),
+];
+
+/// A floating shape's anchor (`FSPA`): extent, wrapping and origins.
+pub(crate) const SHAPE_PROPS: &[PropSpec] = &[
+    read("width", ValueType::Length(EXTENT)),
+    read("height", ValueType::Length(EXTENT)),
+    read("anchor.x", ValueType::Length(SIGNED_POINTS)),
+    read("anchor.y", ValueType::Length(SIGNED_POINTS)),
+    read("wrap", ValueType::Token(&SHAPE_WRAP)),
+    read("hRelative", ValueType::Token(&SHAPE_H_RELATIVE)),
+    read("vRelative", ValueType::Token(&SHAPE_V_RELATIVE)),
+    read("behindDoc", ValueType::Bool),
+];
+
 const DOCUMENT: ElementSpec<Kind> = ElementSpec {
     kind: Kind::Document,
     name: "document",
@@ -279,6 +705,12 @@ const DOCUMENT: ElementSpec<Kind> = ElementSpec {
         Kind::Footnote,
         Kind::Endnote,
         Kind::Comments,
+        Kind::Styles,
+        Kind::Numbering,
+        Kind::Bookmark,
+        Kind::Field,
+        Kind::Toc,
+        Kind::Section,
     ],
     identities: &[],
     paths: &["/"],
@@ -291,7 +723,7 @@ const BODY: ElementSpec<Kind> = ElementSpec {
     name: "body",
     aliases: &["body"],
     parents: &[Kind::Document],
-    children: &[Kind::Paragraph, Kind::Table],
+    children: &[Kind::Paragraph, Kind::Table, Kind::TextBox, Kind::Shape],
     identities: &[],
     paths: &["/body"],
     props: &[],
@@ -311,7 +743,7 @@ const PARAGRAPH: ElementSpec<Kind> = ElementSpec {
         Kind::Endnote,
         Kind::Comment,
     ],
-    children: &[Kind::Run],
+    children: &[Kind::Run, Kind::Hyperlink, Kind::Tab],
     identities: &[],
     paths: &[
         "/body/p[N]",
@@ -446,30 +878,249 @@ const COMMENT: ElementSpec<Kind> = ElementSpec {
     gap: None,
 };
 
+const fn element(
+    kind: Kind,
+    name: &'static str,
+    aliases: &'static [&'static str],
+    parents: &'static [Kind],
+    children: &'static [Kind],
+    identities: &'static [&'static str],
+    paths: &'static [&'static str],
+    props: &'static [PropSpec],
+) -> ElementSpec<Kind> {
+    ElementSpec {
+        kind,
+        name,
+        aliases,
+        parents,
+        children,
+        identities,
+        paths,
+        props,
+        gap: None,
+    }
+}
+
+const STYLES: ElementSpec<Kind> = element(
+    Kind::Styles,
+    "styles",
+    &["styles"],
+    &[Kind::Document],
+    &[Kind::Style],
+    &[],
+    &["/styles"],
+    STYLES_PROPS,
+);
+
+const STYLE: ElementSpec<Kind> = element(
+    Kind::Style,
+    "style",
+    &["style"],
+    &[Kind::Styles],
+    &[],
+    &[],
+    &["/styles/<id or name>"],
+    STYLE_PROPS,
+);
+
+const NUMBERING: ElementSpec<Kind> = element(
+    Kind::Numbering,
+    "numbering",
+    &["numbering"],
+    &[Kind::Document],
+    &[Kind::AbstractNum, Kind::Num],
+    &[],
+    &["/numbering"],
+    NUMBERING_PROPS,
+);
+
+const ABSTRACT_NUM: ElementSpec<Kind> = element(
+    Kind::AbstractNum,
+    "abstractNum",
+    &["abstractnum"],
+    &[Kind::Numbering],
+    &[Kind::Level],
+    &["id"],
+    &["/numbering/abstractNum[N]"],
+    ABSTRACT_NUM_PROPS,
+);
+
+const NUM: ElementSpec<Kind> = element(
+    Kind::Num,
+    "num",
+    &["num"],
+    &[Kind::Numbering],
+    &[],
+    &["id"],
+    &["/numbering/num[N]"],
+    NUM_PROPS,
+);
+
+const LEVEL: ElementSpec<Kind> = element(
+    Kind::Level,
+    "level",
+    &["level", "lvl"],
+    &[Kind::AbstractNum],
+    &[],
+    &["ilvl"],
+    &["/numbering/abstractNum[N]/level[L]"],
+    LEVEL_PROPS,
+);
+
+const HYPERLINK: ElementSpec<Kind> = element(
+    Kind::Hyperlink,
+    "hyperlink",
+    &["hyperlink"],
+    &[Kind::Paragraph],
+    &[],
+    &[],
+    &["/body/p[N]/hyperlink[M]"],
+    HYPERLINK_PROPS,
+);
+
+const BOOKMARK: ElementSpec<Kind> = element(
+    Kind::Bookmark,
+    "bookmark",
+    &["bookmark"],
+    &[Kind::Document],
+    &[],
+    &["name"],
+    &["/bookmark[N]", "/bookmark[@name=X]"],
+    BOOKMARK_PROPS,
+);
+
+const FIELD: ElementSpec<Kind> = element(
+    Kind::Field,
+    "field",
+    &["field"],
+    &[Kind::Document],
+    &[],
+    &[],
+    &["/field[N]"],
+    FIELD_PROPS,
+);
+
+const TOC: ElementSpec<Kind> = element(
+    Kind::Toc,
+    "toc",
+    &["tableofcontents", "toc"],
+    &[Kind::Document],
+    &[],
+    &[],
+    &["/toc[N]"],
+    TOC_PROPS,
+);
+
+const SECTION: ElementSpec<Kind> = element(
+    Kind::Section,
+    "section",
+    &["section"],
+    &[Kind::Document],
+    &[],
+    &[],
+    &["/section[N]"],
+    SECTION_PROPS,
+);
+
+const TAB: ElementSpec<Kind> = element(
+    Kind::Tab,
+    "tab",
+    &["tab"],
+    &[Kind::Paragraph],
+    &[],
+    &[],
+    &["/body/p[N]/tab[M]"],
+    TAB_PROPS,
+);
+
+const TEXT_BOX: ElementSpec<Kind> = element(
+    Kind::TextBox,
+    "textbox",
+    &["textbox"],
+    &[Kind::Body],
+    &[],
+    &[],
+    &["/body/textbox[N]"],
+    TEXT_BOX_PROPS,
+);
+
+const SHAPE: ElementSpec<Kind> = element(
+    Kind::Shape,
+    "shape",
+    &["shape"],
+    &[Kind::Body],
+    &[],
+    &[],
+    &["/body/shape[N]"],
+    SHAPE_PROPS,
+);
+
 /// The one static table shared by path resolution, query compilation and the
 /// node-view projection.
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     root: Kind::Document,
     elements: &[
-        DOCUMENT, BODY, PARAGRAPH, RUN, TABLE, ROW, CELL, HEADER, FOOTER, FOOTNOTE, ENDNOTE,
-        COMMENTS, COMMENT,
+        DOCUMENT,
+        BODY,
+        PARAGRAPH,
+        RUN,
+        TABLE,
+        ROW,
+        CELL,
+        HEADER,
+        FOOTER,
+        FOOTNOTE,
+        ENDNOTE,
+        COMMENTS,
+        COMMENT,
+        STYLES,
+        STYLE,
+        NUMBERING,
+        ABSTRACT_NUM,
+        NUM,
+        LEVEL,
+        HYPERLINK,
+        BOOKMARK,
+        FIELD,
+        TOC,
+        SECTION,
+        TAB,
+        TEXT_BOX,
+        SHAPE,
     ],
     // Concepts the native `litchi-doc` reader models but the unified adapter
     // does not yet project, under their OfficeCLI DOCX type names.
     gaps: &[
-        element_gap("hyperlink"),
-        element_gap("equation"),
-        element_gap("section"),
-        element_gap("style"),
-        element_gap("numbering"),
-        element_gap("bookmark"),
-        element_gap("field"),
-        element_gap("formfield"),
-        element_gap("picture"),
-        element_gap("ole"),
-        element_gap("revision"),
-        element_gap("textbox"),
-        element_gap("shape"),
+        element_gap(
+            "equation",
+            "record 0324 follow-up 4: DOC EQ fields and MTEF equation objects as `equation` nodes",
+        ),
+        element_gap(
+            "formfield",
+            "record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes",
+        ),
+        element_gap(
+            "picture",
+            "record 0324 follow-up 5: DOC inline and floating pictures as `picture` nodes",
+        ),
+        element_gap(
+            "ole",
+            "record 0324 follow-up 5: DOC embedded objects as `ole` nodes",
+        ),
+        element_gap(
+            "revision",
+            "record 0324 follow-up 2: DOC revision nodes and accept/reject (P2)",
+        ),
+        element_gap(
+            "watermark",
+            "record 0324 follow-up 6: the DOC header WordArt watermark",
+        ),
+        GapSpec {
+            subject: Subject::Element("sdt"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: content controls are DOCX-only",
+            reason: "Word 97-2003 binary documents have no structured document tags",
+        },
     ],
 };
 
@@ -480,11 +1131,19 @@ const _: () = assert!(
     "a query kind set holds 128 kinds"
 );
 
-const fn element_gap(element: &'static str) -> GapSpec {
+/// Elements the unified DOC writer sets (record 0324 adds hyperlinks,
+/// bookmarks, tab stops and sections).
+pub(crate) const SETTABLE: &[&str] = &["p", "r", "hyperlink", "bookmark", "tab", "section"];
+/// Elements the unified DOC writer creates.
+pub(crate) const ADDABLE: &[&str] = &["p", "hyperlink", "bookmark", "tab"];
+/// Elements the unified DOC writer removes.
+pub(crate) const REMOVABLE: &[&str] = &["p", "r", "hyperlink", "bookmark", "tab"];
+
+const fn element_gap(element: &'static str, follow_up: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Element(element),
         code: crate::Code::UnsupportedCapability,
-        follow_up: "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
+        follow_up,
         reason: "this native DOC concept is not yet projected into generic paths and queries",
     }
 }

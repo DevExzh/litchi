@@ -44,6 +44,10 @@ use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
 
+mod properties;
+
+pub(crate) use properties::BookmarkRange;
+
 /// Exact, deliberately narrow picture dependency closure shared with the
 /// ordinary body transaction. The wire blocks are accepted only after they
 /// match the crate's canonical singleton writer graph.

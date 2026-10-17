@@ -20,8 +20,12 @@
     reason = "the ordinary immutable DOC root uses checked conversions and propagated typed errors"
 )]
 
+mod properties;
 /// Positional, source-backed same-length Unicode paragraph edits.
 pub mod source;
+
+use properties::MarkChange;
+pub use properties::{FieldPart, HyperlinkInsert, SectionValue};
 
 use crate::DateTime;
 use crate::package::{Error as PackageError, OpenOptions as PackageOpenOptions};
@@ -298,6 +302,10 @@ pub enum TextTarget {
         start: u32,
         end: u32,
     },
+    /// The instruction or the cached result of the main-story field whose
+    /// begin mark is at CP `start` (record 0324). The part must hold no
+    /// nested field.
+    Field { start: u32, part: FieldPart },
 }
 
 impl TextTarget {
@@ -353,6 +361,9 @@ pub enum CharacterValue<'a> {
     /// table (`SttbfFfn`) names it. An absent name is refused, since adding a
     /// font-table entry is a resource change.
     Font(&'a str),
+    /// The character style (`sprmCIstd`), by stylesheet index. The default
+    /// character style (index 10) clears the direct style (record 0324).
+    Style(u16),
 }
 
 impl CharacterValue<'_> {
@@ -363,6 +374,7 @@ impl CharacterValue<'_> {
             Self::Size(_) => CharacterValueProperty::Size,
             Self::Color(_) => CharacterValueProperty::Color,
             Self::Font(_) => CharacterValueProperty::Font,
+            Self::Style(_) => CharacterValueProperty::Style,
         }
     }
 }
@@ -377,6 +389,8 @@ pub enum CharacterValueProperty {
     Color,
     /// ASCII font.
     Font,
+    /// Character style.
+    Style,
 }
 
 impl CharacterValueProperty {
@@ -385,6 +399,7 @@ impl CharacterValueProperty {
             Self::Size => "size",
             Self::Color => "color",
             Self::Font => "font",
+            Self::Style => "style",
         }
     }
 
@@ -394,6 +409,7 @@ impl CharacterValueProperty {
             Self::Size => &[SPRM_C_HPS],
             Self::Color => &[SPRM_C_ICO, SPRM_C_CV],
             Self::Font => &[SPRM_C_RG_FTC0],
+            Self::Style => &[SPRM_C_ISTD_VALUE],
         }
     }
 }
@@ -402,6 +418,7 @@ const SPRM_C_HPS: u16 = 0x4A43;
 const SPRM_C_ICO: u16 = 0x2A42;
 const SPRM_C_CV: u16 = 0x6870;
 const SPRM_C_RG_FTC0: u16 = 0x4A4F;
+const SPRM_C_ISTD_VALUE: u16 = 0x4A30;
 /// `FibRgFcLcb97` index of the font table, `SttbfFfn`.
 const FIB_INDEX_STTBF_FFN: usize = 15;
 
@@ -586,6 +603,19 @@ pub enum Refusal {
     /// strictly inside the replaced text; replacing the text would collapse
     /// that boundary.
     RangeBoundary { fib_index: usize },
+    /// The stylesheet has no style of the required kind at that index.
+    StyleNotFound,
+    /// A property value is outside what the DOC structure can store.
+    InvalidProperty,
+    /// No main-story field begins at the requested position.
+    FieldNotFound,
+    /// A bookmark name is empty, too long, holds other characters than
+    /// letters, digits, `_`, `.` and `-`, or is already used.
+    BookmarkName,
+    /// No standard bookmark has the requested name.
+    BookmarkNotFound,
+    /// The requested section is past the document's last section.
+    SectionNotFound,
 }
 
 /// What the CP-indexed FIB table `index` positions, for refusal messages
@@ -720,6 +750,23 @@ impl std::fmt::Display for Refusal {
                 "the replaced text holds a {} boundary (CP-indexed FIB table {fib_index}); replacing it would collapse that range",
                 cp_table_content(*fib_index)
             ),
+            Self::StyleNotFound => formatter
+                .write_str("the DOC stylesheet has no style of the required kind at that index"),
+            Self::InvalidProperty => {
+                formatter.write_str("the DOC property value is outside its stored range")
+            },
+            Self::FieldNotFound => {
+                formatter.write_str("no DOC main-story field begins at the requested position")
+            },
+            Self::BookmarkName => formatter.write_str(
+                "DOC bookmark names are 1 through 39 letters, digits, `_`, `.` or `-` and unique",
+            ),
+            Self::BookmarkNotFound => {
+                formatter.write_str("no DOC bookmark has the requested name")
+            },
+            Self::SectionNotFound => {
+                formatter.write_str("the DOC section position is out of range")
+            },
         }
     }
 }
@@ -2218,6 +2265,19 @@ impl Edit {
                 fragment.extend_from_slice(&SPRM_C_RG_FTC0.to_le_bytes());
                 fragment.extend_from_slice(&ftc.to_le_bytes());
             },
+            CharacterValue::Style(istd) => {
+                let sheet = self.editor.stylesheet().map_err(Error::Invalid)?;
+                if sheet
+                    .get(istd)
+                    .is_none_or(|style| style.kind != crate::parts::styles::StyleKind::Character)
+                {
+                    return Err(Error::Refused(Refusal::StyleNotFound));
+                }
+                if istd != 10 {
+                    fragment.extend_from_slice(&SPRM_C_ISTD_VALUE.to_le_bytes());
+                    fragment.extend_from_slice(&istd.to_le_bytes());
+                }
+            },
         }
         Ok(fragment)
     }
@@ -3381,6 +3441,36 @@ pub enum ChangeRef<'a> {
     },
     /// One ordinary main-story paragraph moved from `from` to `to`.
     ParagraphMove { from: Position, to: Position },
+    /// One paragraph style change, as stylesheet indexes (record 0324).
+    ParagraphStyle {
+        position: Position,
+        before: u16,
+        after: u16,
+    },
+    /// One paragraph tab-stop change, as effective stops.
+    ParagraphTabs {
+        position: Position,
+        before: &'a [crate::parts::pap::TabStop],
+        after: &'a [crate::parts::pap::TabStop],
+    },
+    /// One main-story field insertion or removal, at its begin mark.
+    Field {
+        start_cp: u32,
+        before_present: bool,
+        after_present: bool,
+    },
+    /// One standard bookmark change, as its CP range before and after.
+    Bookmark {
+        name: &'a str,
+        before: Option<(u32, u32)>,
+        after: Option<(u32, u32)>,
+    },
+    /// One section SEPX change, as its SPRMs before and after.
+    Section {
+        section: Position,
+        before: &'a [u8],
+        after: &'a [u8],
+    },
 }
 
 impl std::fmt::Debug for ChangeRef<'_> {
@@ -3479,6 +3569,51 @@ impl std::fmt::Debug for ChangeRef<'_> {
                 .field("from", from)
                 .field("to", to)
                 .finish(),
+            Self::ParagraphStyle {
+                position,
+                before,
+                after,
+            } => formatter
+                .debug_struct("ParagraphStyle")
+                .field("position", position)
+                .field("before", before)
+                .field("after", after)
+                .finish(),
+            Self::ParagraphTabs {
+                position,
+                before,
+                after,
+            } => formatter
+                .debug_struct("ParagraphTabs")
+                .field("position", position)
+                .field("before_stops", &before.len())
+                .field("after_stops", &after.len())
+                .finish(),
+            Self::Field {
+                start_cp,
+                before_present,
+                after_present,
+            } => formatter
+                .debug_struct("Field")
+                .field("start_cp", start_cp)
+                .field("before_present", before_present)
+                .field("after_present", after_present)
+                .finish(),
+            Self::Bookmark { before, after, .. } => formatter
+                .debug_struct("Bookmark")
+                .field("before", before)
+                .field("after", after)
+                .finish_non_exhaustive(),
+            Self::Section {
+                section,
+                before,
+                after,
+            } => formatter
+                .debug_struct("Section")
+                .field("section", section)
+                .field("before_bytes", &before.len())
+                .field("after_bytes", &after.len())
+                .finish(),
         }
     }
 }
@@ -3576,6 +3711,8 @@ enum Change {
         from: Position,
         to: Position,
     },
+    /// A record-0324 style, tab, field, bookmark or section change.
+    Mark(MarkChange),
 }
 
 impl Change {
@@ -3599,6 +3736,7 @@ impl Change {
             Self::Paragraph { .. } | Self::ParagraphMove { .. } => {
                 "story/main/structure".to_string()
             },
+            Self::Mark(change) => change.effect(),
         }
     }
 
@@ -3701,6 +3839,7 @@ impl Change {
                     && left_after == right_after
             },
             (left @ (Self::Paragraph { .. } | Self::ParagraphMove { .. }), right) => left == right,
+            (Self::Mark(left), Self::Mark(right)) => left == right,
             _ => false,
         }
     }
@@ -3794,6 +3933,7 @@ impl Change {
                 from: *from,
                 to: *to,
             },
+            Self::Mark(change) => change.as_ref(),
         }
     }
 
@@ -3879,6 +4019,7 @@ impl Change {
                 from: *to,
                 to: *from,
             },
+            Self::Mark(change) => Self::Mark(change.inverse()),
         }
     }
 }
@@ -4332,6 +4473,11 @@ fn durable_operation(
         Change::Paragraph { .. } | Change::ParagraphMove { .. } => {
             return Err(PatchError::InvalidText {
                 field: "DOC paragraph-structure durable patch",
+            });
+        },
+        Change::Mark(_) => {
+            return Err(PatchError::InvalidText {
+                field: "DOC style, tab, field, bookmark or section durable patch",
             });
         },
     };
@@ -4880,6 +5026,7 @@ fn apply_change_after(edit: &mut Edit, change: &Change) -> Result<()> {
         } => edit.remove_paragraph(*position),
         Change::Paragraph { .. } => Err(invalid_durable_patch("invalid paragraph transition")),
         Change::ParagraphMove { from, to } => edit.move_paragraph(*from, *to),
+        Change::Mark(change) => change.apply_after(edit),
         Change::Text { target, after, .. } => edit.replace_text(*target, after),
         Change::Format {
             target,
@@ -5077,6 +5224,7 @@ fn durable_target(target: TextTarget) -> String {
             "story/main/paragraph:{}/span:{start}-{end}",
             paragraph.get()
         ),
+        TextTarget::Field { start, part } => format!("body/field:{start}/{}", part.wire_name()),
     }
 }
 
@@ -5089,6 +5237,18 @@ fn parse_durable_target(target: &str) -> Result<TextTarget> {
     }
     if let Some(position) = target.strip_prefix("body/paragraph:") {
         return parse_position(position).map(TextTarget::body_paragraph);
+    }
+    if let Some(remainder) = target.strip_prefix("body/field:")
+        && let Some((start, part)) = remainder.split_once('/')
+    {
+        let part = match part {
+            "instruction" => FieldPart::Instruction,
+            "result" => FieldPart::Result,
+            _ => return Err(invalid_durable_patch("unknown DOC field part")),
+        };
+        let start = u32::try_from(parse_position(start)?.get())
+            .map_err(|_error| invalid_durable_patch("DOC field CP exceeds u32"))?;
+        return Ok(TextTarget::Field { start, part });
     }
     if let Some(remainder) = target.strip_prefix("story/main/paragraph:")
         && let Some((paragraph, span)) = remainder.split_once("/span:")
@@ -5172,9 +5332,10 @@ enum TargetCollection {
 fn target_story(target: TextTarget) -> Story {
     match target {
         TextTarget::StoryParagraph { story, .. } => story,
-        TextTarget::TableCell(_) | TextTarget::FieldResult(_) | TextTarget::BodySpan { .. } => {
-            Story::Main
-        },
+        TextTarget::TableCell(_)
+        | TextTarget::FieldResult(_)
+        | TextTarget::BodySpan { .. }
+        | TextTarget::Field { .. } => Story::Main,
     }
 }
 
@@ -5187,19 +5348,25 @@ fn resolve_target(editor: &RevisionEditor, target: TextTarget) -> Result<SourceS
     {
         return resolve_body_span(editor, target, paragraph, start, end);
     }
+    if let TextTarget::Field { start, part } = target {
+        return properties::field_span(editor, start, part);
+    }
     let spans = match target {
         TextTarget::StoryParagraph { story, .. } => {
             target_spans(editor, TargetCollection::Story(story))?
         },
         TextTarget::TableCell(_) => target_spans(editor, TargetCollection::TableCells)?,
         TextTarget::FieldResult(_) => target_spans(editor, TargetCollection::FieldResults)?,
-        TextTarget::BodySpan { .. } => return Err(Error::Refused(Refusal::TargetNotFound)),
+        TextTarget::BodySpan { .. } | TextTarget::Field { .. } => {
+            return Err(Error::Refused(Refusal::TargetNotFound));
+        },
     };
     let position = match target {
         TextTarget::StoryParagraph { position, .. }
         | TextTarget::TableCell(position)
         | TextTarget::FieldResult(position) => position,
         TextTarget::BodySpan { paragraph, .. } => paragraph,
+        TextTarget::Field { .. } => return Err(Error::Refused(Refusal::TargetNotFound)),
     };
     spans
         .get(position.get())
@@ -5543,6 +5710,14 @@ fn text_revision_intersects(editor: &RevisionEditor, start: u32, end: u32) -> Re
             ) && revision.start_cp < end
                 && start < revision.end_cp
         }))
+}
+
+/// The keyword of a field instruction, upper-cased.
+fn keyword_of(instruction: &str) -> Option<String> {
+    instruction
+        .split_whitespace()
+        .next()
+        .map(str::to_ascii_uppercase)
 }
 
 fn has_structural_content(text: &str) -> bool {

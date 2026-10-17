@@ -2617,3 +2617,24 @@ Positions are complete-catalog sheet positions.
 | `litchi_xlsb::drawing::edit::{…}`, `{Package, Workbook}::edit_drawings`, `Package::apply_drawings` | `Edit::{elements, add_picture, add_shape, set, remove}`; the XLSX drawing vocabulary with `Rgb = u32`; `ChartPart` (a frame's placement, name and chart markup) | ✅ 0322; family registered in the gate |
 | `litchi_xlsb::sheet::{Features, FeatureSet}`, `Workbook::{sheet_features, sheet_comments, drawing_elements, drawing_charts, differential_formats}`, `SourceBackedWorksheet::{features, comments, drawing_elements, drawing_charts}`, `SourceBackedWorkbook::differential_formats` | feature reads on both owners, without decoding cells; `FeatureSet` selects the kinds (only validations and formats render formulas) | ✅ 0322 |
 | `litchi_xlsx::{Worksheet, SourceWorksheet}::threaded_comments`, `litchi_xlsx::{Workbook, SourceBackedWorkbook}::people` | threaded-comment and people reads on both owners (record 0320 gap 3, reading only) | ✅ 0322 |
+
+## DOC styles, lists, hyperlinks, bookmarks, tabs and sections (record 0324)
+
+The primary `doc::Edit` gains the record-0324 verbs; each stages one
+MS-DOC structure (a paragraph's PAPX, the main story and its `PlcffldMom`
+markers, `SttbfBkmk`/`PlcfBkf`/`PlcfBkl`, or one section's SEPX) and keeps
+every other byte. Native indexes (`istd`, field begin CP) are the selectors
+these verbs take; the unified layer resolves style ids and names.
+
+| Name | Notes | Status |
+|---|---|---|
+| `Edit::set_paragraph_style(Position, u16)` | applies a paragraph style by `istd`; refuses a non-paragraph slot (`Refusal::StyleNotFound`) | ✅ 0324 |
+| `body_text::CharacterValue::Style(u16)`, `CharacterValueProperty::Style` | `sprmCIstd` through `set_character_value`; index 10 clears it | ✅ 0324 |
+| `Edit::{paragraph_tabs, set_paragraph_tabs}` | effective stops in, one `sprmPChgTabsPapx` out | ✅ 0324 |
+| `body_text::{HyperlinkInsert, FieldPart}`, `TextTarget::Field { start, part }` | a field's instruction or result as a text target | ✅ 0324 |
+| `Edit::{insert_hyperlink, remove_field}` | a whole `HYPERLINK` field in, a whole field (nested ones included) out | ✅ 0324 |
+| `Edit::{bookmarks, add_bookmark, rename_bookmark, remove_bookmark}` | standard bookmarks by name | ✅ 0324 |
+| `body_text::SectionValue`, `Edit::set_section_values(Position, &[SectionValue])` | typed `sprmS*` page setup | ✅ 0324 |
+| `body_text::ChangeRef::{ParagraphStyle, ParagraphTabs, Field, Bookmark, Section}` | patch change descriptors; the durable envelope refuses them | ✅ 0324 |
+| `body_text::Refusal::{StyleNotFound, InvalidProperty, FieldNotFound, BookmarkName, BookmarkNotFound, SectionNotFound}` | | ✅ 0324 |
+| `litchi_ops` DOC kinds `Styles`, `Style`, `Numbering`, `AbstractNum`, `Num`, `Level`, `Hyperlink`, `Bookmark`, `Field`, `Toc`, `Section`, `Tab`, `TextBox`, `Shape` | the DOCX element names and paths (`/styles/<id or name>`, `/numbering/abstractNum[N]/level[L]`, `/body/p[N]/hyperlink[M]`, `/bookmark[@name=X]`, `/field[N]`, `/toc[N]`, `/section[N]`, `/body/p[N]/tab[M]`, `/body/textbox[N]`, `/body/shape[N]`); a DOC style's id is its name without spaces and punctuation, each word of a built-in name capitalized | ✅ 0324 |

@@ -1,0 +1,3 @@
+270fd81f54b818604d30523272263b7df6d331e76a0bc4616ef20a8b8cf1e726  branch doc_parts_bench (cargo build --release -p litchi-ops --features doc --example doc_parts_bench; parts-trial-{1,2,3}.json)
+c83581134e7ebbce15629c3f240b6b472e1d834db7055c2fab11489312f6e6e4  branch doc_view_regression (cargo build --release -p litchi-ops --features doc --example doc_view_regression)
+99caa3a532319021fdf83fc540c97ffb07b2b8e822c8ac097767cc4dc92d6131  base db96990ff6 doc_view_regression (same command in a git archive of db96990ff6 with the example copied in)
