@@ -251,6 +251,124 @@ fn numbering_definitions_instances_and_levels_round_trip() {
 }
 
 #[test]
+fn level_keys_build_definitions_and_instances_in_one_call() {
+    // Record 0325: OfficeCLI's `level<N>.*` keys ("Mode A"), as
+    // numbering.sh lines 46, 160, 200 and 222 use them.
+    let file = litchi_ops::create(litchi_core::FileFormat::Docx).unwrap();
+    let added = file
+        .add(
+            "/numbering",
+            NewNode::new("abstractNum")
+                .prop("id", 100)
+                .prop("type", "hybridMultilevel")
+                .prop("level0.format", "decimal")
+                .prop("level0.text", "%1.")
+                .prop("level0.bold", true)
+                .prop("level0.color", "FF0000")
+                .prop("level0.size", 14)
+                .prop("level1.format", "lowerLetter")
+                .prop("level1.text", "%2)")
+                .prop("level1.italic", true)
+                .prop("level1.indent", 1440)
+                .prop("level2.format", "bullet")
+                .prop("level2.font", "Arial")
+                .prop("level2.hanging", 300)
+                .prop("level2.justification", "right")
+                .prop("level2.suff", "space"),
+        )
+        .unwrap_or_else(|error| panic!("abstractNum add: {error}"));
+    let definition = added.path.to_string();
+    for eager in [false, true] {
+        let file = reopen(&added.file, eager);
+        let level = |n: usize, key: &str| property(&file, &format!("{definition}/level[{n}]"), key);
+        assert_eq!(level(1, "format").as_deref(), Some("decimal"));
+        assert_eq!(level(1, "bold").as_deref(), Some("true"));
+        assert_eq!(level(1, "color").as_deref(), Some("#FF0000"));
+        assert_eq!(level(2, "lvlText").as_deref(), Some("%2)"));
+        assert_eq!(level(2, "indent").as_deref(), Some("1440"));
+        assert_eq!(level(2, "hanging").as_deref(), Some("360"));
+        assert_eq!(level(2, "italic").as_deref(), Some("true"));
+        assert_eq!(level(3, "format").as_deref(), Some("bullet"));
+        assert_eq!(level(3, "lvlText").as_deref(), Some("\u{25AA}"));
+        assert_eq!(level(3, "indent").as_deref(), Some("2160"));
+        assert_eq!(level(3, "hanging").as_deref(), Some("300"));
+        assert_eq!(level(3, "justification").as_deref(), Some("right"));
+        assert_eq!(level(3, "suff").as_deref(), Some("space"));
+        // Levels without keys keep the decimal, letter, Roman cycle.
+        assert_eq!(level(4, "format").as_deref(), Some("decimal"));
+        assert_eq!(level(4, "lvlText").as_deref(), Some("%4."));
+    }
+    // A bare level-0 key wins over its `level0.*` spelling.
+    let bare = file
+        .add(
+            "/numbering",
+            NewNode::new("abstractNum")
+                .prop("format", "upperRoman")
+                .prop("level0.format", "decimal")
+                .prop("level1.start", 3),
+        )
+        .unwrap();
+    let path = bare.path.to_string();
+    assert_eq!(
+        property(&bare.file, &format!("{path}/level[1]"), "format").as_deref(),
+        Some("upperRoman")
+    );
+    assert_eq!(
+        property(&bare.file, &format!("{path}/level[2]"), "start").as_deref(),
+        Some("3")
+    );
+    // `add num` without abstractNumId creates the definition too.
+    let num = added
+        .file
+        .add(
+            "/numbering",
+            NewNode::new("num")
+                .prop("level0.format", "upperRoman")
+                .prop("level0.text", "%1.")
+                .prop("level0.bold", true)
+                .prop("start", 4),
+        )
+        .unwrap_or_else(|error| panic!("num Mode A: {error}"));
+    let path = num.path.to_string();
+    let file = reopen(&num.file, true);
+    assert_eq!(
+        property(&file, &path, "startOverride.0").as_deref(),
+        Some("4")
+    );
+    let before = paths(&added.file, "abstractNum").len();
+    let definitions = paths(&file, "abstractNum");
+    assert_eq!(definitions.len(), before + 1);
+    let created = definitions.last().unwrap();
+    assert_eq!(
+        property(&file, &format!("{created}/level[1]"), "format").as_deref(),
+        Some("upperRoman")
+    );
+    assert_eq!(
+        property(&file, &format!("{created}/level[1]"), "start").as_deref(),
+        Some("4")
+    );
+    // Naming a definition and describing one is refused.
+    let error = added
+        .file
+        .add(
+            "/numbering",
+            NewNode::new("num")
+                .prop("abstractNumId", 100)
+                .prop("level0.format", "decimal"),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), Code::InvalidArgument);
+    let error = added
+        .file
+        .add(
+            "/numbering",
+            NewNode::new("abstractNum").prop("level9.format", "decimal"),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedProperty);
+}
+
+#[test]
 fn headers_and_footers_are_read_written_added_and_removed() {
     for eager in [false, true] {
         let file = open(eager, fixture("headerFooter.docx"));
@@ -372,4 +490,119 @@ fn the_root_lists_its_parts_in_officecli_order() {
     let styles = position("/styles").expect("styles");
     let header = position("/header[").expect("headers");
     assert!(body < styles && styles < header, "{children:?}");
+}
+
+#[test]
+fn story_paragraphs_and_runs_are_read_and_written() {
+    // Record 0325: `/header[N]/p[M]`, `/footer[N]/p[M]`, `/footnote[N]/p[M]`
+    // and `/endnote[N]/p[M]` with the body paragraph machinery.
+    let base = litchi_ops::create(litchi_core::FileFormat::Docx)
+        .unwrap()
+        .add("/body", NewNode::new("paragraph").prop("text", "Body"))
+        .unwrap()
+        .file
+        .add("/", NewNode::new("header").prop("text", "Top"))
+        .unwrap()
+        .file
+        .add("/", NewNode::new("footer").prop("text", "Bottom"))
+        .unwrap()
+        .file;
+    let added = base
+        .add(
+            "/body/p[1]",
+            NewNode::new("footnote").prop("text", "Note text"),
+        )
+        .unwrap();
+    let note = added.path.to_string();
+    let base = added.file;
+    for eager in [false, true] {
+        let file = reopen(&base, eager);
+        assert_eq!(text(&file, "/header[1]/p[1]"), "Top");
+        assert_eq!(text(&file, "/header[1]/p[1]/r[1]"), "Top");
+        assert_eq!(text(&file, "/footer[1]/p[1]"), "Bottom");
+        assert!(text(&file, &format!("{note}/p[1]")).contains("Note text"));
+        // Unscoped queries stay in the main story.
+        assert_eq!(paths(&file, "paragraph").len(), 1);
+
+        // set: text and formatting of a story paragraph and run.
+        let set = file
+            .set(
+                "/header[1]/p[1]",
+                props! { "text" => "Header text", "align" => "center" },
+            )
+            .unwrap_or_else(|error| panic!("header paragraph set: {error}"))
+            .set("/footer[1]/p[1]/r[1]", props! { "bold" => true })
+            .unwrap_or_else(|error| panic!("footer run set: {error}"));
+        let set = reopen(&set, eager);
+        assert_eq!(text(&set, "/header[1]/p[1]"), "Header text");
+        assert_eq!(text(&set, "/header[1]"), "Header text");
+        assert_eq!(
+            property(&set, "/header[1]/p[1]", "align").as_deref(),
+            Some("center")
+        );
+        assert_eq!(
+            property(&set, "/footer[1]/p[1]/r[1]", "bold").as_deref(),
+            Some("true")
+        );
+        // The main document is untouched.
+        assert_eq!(text(&set, "/body/p[1]"), text(&file, "/body/p[1]"));
+
+        // add: a paragraph under a header and a note, a run under a story
+        // paragraph.
+        let added = set
+            .add(
+                "/header[1]",
+                NewNode::new("paragraph").prop("text", "Second"),
+            )
+            .unwrap_or_else(|error| panic!("header paragraph add: {error}"));
+        assert_eq!(added.path.to_string(), "/header[1]/p[2]");
+        let added = added
+            .file
+            .add("/header[1]/p[2]", NewNode::new("run").prop("text", " line"))
+            .unwrap_or_else(|error| panic!("header run add: {error}"));
+        assert_eq!(added.path.to_string(), "/header[1]/p[2]/r[2]");
+        let added = added
+            .file
+            .add(
+                note.as_str(),
+                NewNode::new("paragraph").prop("text", "More"),
+            )
+            .unwrap_or_else(|error| panic!("note paragraph add: {error}"));
+        let file = reopen(&added.file, eager);
+        assert_eq!(text(&file, "/header[1]/p[2]"), "Second line");
+        assert_eq!(text(&file, &format!("{note}/p[2]")), "More");
+
+        // remove: a run and a paragraph; a story keeps its last paragraph.
+        let removed = file
+            .remove("/header[1]/p[2]/r[2]")
+            .unwrap()
+            .remove("/header[1]/p[1]")
+            .unwrap();
+        assert_eq!(text(&removed, "/header[1]/p[1]"), "Second");
+        let error = removed.remove("/header[1]/p[1]").unwrap_err();
+        assert_eq!(error.code(), Code::InvalidArgument);
+        // A note's first paragraph keeps its reference-mark run.
+        let noted = removed
+            .set(
+                format!("{note}/p[1]").as_str(),
+                props! { "text" => "Replaced" },
+            )
+            .unwrap();
+        assert_eq!(text(&noted, &format!("{note}/p[1]")), "Replaced");
+        assert_eq!(
+            noted
+                .get(format!("{note}/p[1]").as_str())
+                .unwrap()
+                .view()
+                .children()
+                .count(),
+            2
+        );
+        // An equal set is an exact no-op.
+        let bytes = removed.to_bytes().unwrap();
+        let same = removed
+            .set("/header[1]/p[1]", props! { "text" => "Second" })
+            .unwrap();
+        assert_eq!(same.to_bytes().unwrap(), bytes);
+    }
 }

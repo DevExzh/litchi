@@ -51,12 +51,18 @@ pub(crate) struct Cache {
     story_kinds: OnceLock<Vec<Option<StoryKind>>>,
     footnotes: OnceLock<Vec<Note>>,
     endnotes: OnceLock<Vec<Note>>,
+    /// The main story's bookmarks and fields, read on first use (record
+    /// 0325; the marks of record 0319).
+    pub(super) bookmarks: OnceLock<Vec<litchi_docx::bookmark::Bookmark>>,
+    pub(super) fields: OnceLock<Vec<litchi_docx::Field>>,
 }
 
 /// One header or footer part, with its payload read on first use.
 pub(crate) struct Story {
     part: StoryPart,
     xml: OnceLock<Arc<Vec<u8>>>,
+    /// The story's block index, built on first use (record 0325).
+    blocks: OnceLock<litchi_docx::Blocks>,
 }
 
 impl Story {
@@ -120,6 +126,7 @@ pub(super) fn stories(docx: &Docx) -> Result<&[Story]> {
         .map(|part| Story {
             part,
             xml: OnceLock::new(),
+            blocks: OnceLock::new(),
         })
         .collect();
     Ok(cache.stories.get_or_init(|| stories))
@@ -219,6 +226,79 @@ pub(super) fn notes(docx: &Docx, kind: litchi_docx::document::NoteKind) -> Resul
         },
     )?;
     Ok(lock.get_or_init(|| loaded))
+}
+
+/// The story the address step `kind[ordinal]` (a header, footer, footnote
+/// or endnote) names: its leaf key and its part value (record 0325).
+pub(super) fn story_of(
+    docx: &Docx,
+    kind: Kind,
+    ordinal: usize,
+) -> Result<(super::element::StoryKey, PartValue)> {
+    let missing = || internal("a DOCX story step is outside its story list");
+    match kind {
+        Kind::Header | Kind::Footer => {
+            let role = if kind == Kind::Header {
+                Role::Header
+            } else {
+                Role::Footer
+            };
+            let index = *role_stories(docx, role)?.get(ordinal).ok_or_else(missing)?;
+            let name = stories(docx)?
+                .get(index)
+                .ok_or_else(missing)?
+                .part()
+                .name()
+                .to_owned();
+            Ok((
+                super::element::StoryKey::Part(name),
+                PartValue::Story(ordinal_u32(index)),
+            ))
+        },
+        _ => {
+            let kind = note_kind(kind);
+            let id = notes(docx, kind)?.get(ordinal).ok_or_else(missing)?.id();
+            Ok((
+                super::element::StoryKey::Note(kind, id),
+                PartValue::Note(kind, ordinal_u32(ordinal)),
+            ))
+        },
+    }
+}
+
+fn ordinal_u32(index: usize) -> u32 {
+    u32::try_from(index).unwrap_or(u32::MAX)
+}
+
+/// The block index of a header, footer or note story (record 0325): its
+/// paragraphs and tables are addressed as `/header[N]/p[M]`, ...; `None` for
+/// other part values.
+pub(super) fn story_blocks(docx: &Docx, value: PartValue) -> Result<Option<litchi_docx::Blocks>> {
+    let blocks = match value {
+        PartValue::Story(index) => {
+            let story = stories(docx)?
+                .get(index as usize)
+                .ok_or_else(|| internal("a DOCX story index is outside the story list"))?;
+            if let Some(blocks) = story.blocks.get() {
+                docx.owner().check_source()?;
+                return Ok(Some(blocks.clone()));
+            }
+            let xml = story_xml(docx, index as usize)?;
+            let blocks =
+                litchi_docx::header_footer::Story::from_shared_bytes(xml, StoryKind::Primary)
+                    .and_then(|story| story.blocks())
+                    .map_err(Error::from)?;
+            story.blocks.get_or_init(|| blocks).clone()
+        },
+        PartValue::Note(kind, index) => notes(docx, kind)?
+            .get(index as usize)
+            .ok_or_else(|| internal("a DOCX note index is outside the note list"))?
+            .blocks()
+            .map_err(Error::from)?,
+        _ => return Ok(None),
+    };
+    docx.owner().check_source()?;
+    Ok(Some(blocks))
 }
 
 // ---------------------------------------------------------------------------
@@ -855,6 +935,9 @@ pub(crate) enum PartSetter {
     AbstractNum(AbstractKey),
     /// An instance value.
     Num(NumKey),
+    /// A `level<N>.*` key of a new definition (OfficeCLI's "Mode A",
+    /// record 0325): the value of level `level` (0–8).
+    LevelSeed { level: u8, key: SeedKey },
     /// A story's or note's text.
     Text,
     /// A story's section kind.
@@ -913,6 +996,20 @@ pub(crate) enum NumKey {
     /// `startOverride.N`, or `start` for level 0.
     StartOverride(u8),
     Continue,
+    /// A key of the definition a new instance creates without an
+    /// `abstractNumId` (OfficeCLI's "Mode A", record 0325).
+    Template(AbstractKey),
+}
+
+/// What a `level<N>.*` key sets on its level (record 0325).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SeedKey {
+    /// A level value (`format`, `text`, `start`, `indent`, `hanging`,
+    /// `justification`, `suff`).
+    Level(LevelKey),
+    /// A run property of the level's marker (`font`, `size`, `color`,
+    /// `bold`, `italic`).
+    Run(super::setters::Setter),
 }
 
 /// A style's `type`: `ST_StyleType`.
@@ -1052,6 +1149,81 @@ const fn run(
 
 use super::setters::Setter as S;
 
+/// A `level<N>.*` level value of a new definition: add only.
+const fn seed(
+    name: &'static str,
+    level: u8,
+    key: LevelKey,
+    ty: ValueType,
+    constraint: Constraint,
+) -> Entry<PartSetter> {
+    add_only(
+        name,
+        ty,
+        PartSetter::LevelSeed {
+            level,
+            key: SeedKey::Level(key),
+        },
+        constraint,
+    )
+}
+
+/// A `level<N>.*` marker run property of a new definition: add only.
+const fn seed_run(
+    name: &'static str,
+    level: u8,
+    from: &'static str,
+    setter: S,
+) -> Entry<PartSetter> {
+    let spec = RUN_PROPS[index_of(RUN_PROPS, from)];
+    let mut spec = PropSpec::new(name, spec.ty);
+    spec.access.get = false;
+    Entry {
+        spec,
+        access: Access::Add(PartSetter::LevelSeed {
+            level,
+            key: SeedKey::Run(setter),
+        }),
+        constraint: RUN_PROPS[index_of(RUN_PROPS, from)].admission.constraint,
+        clear: false,
+    }
+}
+
+/// A numbering table whose entries are followed by OfficeCLI's
+/// `level<N>.*` keys for levels 0–8 (record 0325).
+macro_rules! seeded_registry {
+    ($vis:vis $name:ident, $table:ident { $($entry:expr),* $(,)? }) => {
+        seeded_registry!(@build $vis $name, $table [$($entry),*] [0 1 2 3 4 5 6 7 8]);
+    };
+    (@build $vis:vis $name:ident, $table:ident [$($entry:expr),*] [$($n:literal)*]) => {
+        $vis const $table: crate::registry::Table<
+            PartSetter,
+            { [$(stringify!($entry)),*].len() + 12 * [$(stringify!($n)),*].len() },
+            0,
+        > = crate::registry::Table::new(
+            [
+                $($entry,)*
+                $(
+                    seed(concat!("level", $n, ".format"), $n, LevelKey::Format, ValueType::Text, Constraint::NotEmpty),
+                    seed(concat!("level", $n, ".text"), $n, LevelKey::Text, ValueType::Text, Constraint::None),
+                    seed(concat!("level", $n, ".start"), $n, LevelKey::Start, ValueType::Int, Constraint::Int { min: 0, max: 32_767 }),
+                    seed(concat!("level", $n, ".indent"), $n, LevelKey::Indent, ValueType::Int, Constraint::Int { min: -31_680, max: 31_680 }),
+                    seed(concat!("level", $n, ".hanging"), $n, LevelKey::Hanging, ValueType::Int, Constraint::Int { min: 0, max: 31_680 }),
+                    seed(concat!("level", $n, ".justification"), $n, LevelKey::Justification, ValueType::Token(&LEVEL_JUSTIFICATION), Constraint::None),
+                    seed(concat!("level", $n, ".suff"), $n, LevelKey::Suffix, ValueType::Token(&LEVEL_SUFFIX), Constraint::None),
+                    seed_run(concat!("level", $n, ".font"), $n, "font.latin", S::RunFontLatin),
+                    seed_run(concat!("level", $n, ".size"), $n, "size", S::RunSize),
+                    seed_run(concat!("level", $n, ".color"), $n, "color", S::RunColor),
+                    seed_run(concat!("level", $n, ".bold"), $n, "bold", S::RunBold),
+                    seed_run(concat!("level", $n, ".italic"), $n, "italic", S::RunItalic),
+                )*
+            ],
+            [],
+        );
+        $vis const $name: &[crate::node::spec::PropSpec] = &$table.readable();
+    };
+}
+
 // The style node, in `WordHandler.Query` `/styles/<id>` order: identity
 // and UI flags, then the run properties, then the paragraph properties.
 crate::registry::registry! {
@@ -1147,9 +1319,10 @@ crate::registry::registry! {
 }
 
 // `/numbering/abstractNum[@id=N]`, in its order; the level-0 seeds are
-// add-only, as OfficeCLI's bare `format`, `text`, `start` and `indent`.
-crate::registry::registry! {
-    pub(crate) ABSTRACT_NUM_PROPS, ABSTRACT_NUM_REGISTRY: PartSetter {
+// add-only, as OfficeCLI's bare `format`, `text`, `start` and `indent`, and
+// so are its `level<N>.*` keys (record 0325).
+seeded_registry! {
+    pub(crate) ABSTRACT_NUM_PROPS, ABSTRACT_NUM_REGISTRY {
     ra("id", ValueType::Int, PartSetter::AbstractNum(AbstractKey::Id), Constraint::Int { min: 0, max: i32::MAX as i64 }),
     rsa("type", ValueType::Token(&MULTI_LEVEL_TYPE), PartSetter::AbstractNum(AbstractKey::Type), Constraint::None),
     rsa("name", ValueType::Text, PartSetter::AbstractNum(AbstractKey::Name), Constraint::NotEmpty),
@@ -1162,9 +1335,11 @@ crate::registry::registry! {
     }
 }
 
-// `/numbering/num[@id=N]`.
-crate::registry::registry! {
-    pub(crate) NUM_PROPS, NUM_REGISTRY: PartSetter {
+// `/numbering/num[@id=N]`. Without an `abstractNumId`, the definition keys
+// and `level<N>.*` create the definition too (OfficeCLI's "Mode A", record
+// 0325).
+seeded_registry! {
+    pub(crate) NUM_PROPS, NUM_REGISTRY {
     ra("id", ValueType::Int, PartSetter::Num(NumKey::Id), Constraint::Int { min: 1, max: i32::MAX as i64 }),
     rsa("abstractNumId", ValueType::Int, PartSetter::Num(NumKey::AbstractNumId), Constraint::Int { min: 0, max: i32::MAX as i64 }),
     ra("startOverride.0", ValueType::Int, PartSetter::Num(NumKey::StartOverride(0)), Constraint::Int { min: 0, max: 32_767 }),
@@ -1178,6 +1353,13 @@ crate::registry::registry! {
     ra("startOverride.8", ValueType::Int, PartSetter::Num(NumKey::StartOverride(8)), Constraint::Int { min: 0, max: 32_767 }),
     add_only("start", ValueType::Int, PartSetter::Num(NumKey::StartOverride(0)), Constraint::Int { min: 0, max: 32_767 }),
     add_only("continue", ValueType::Bool, PartSetter::Num(NumKey::Continue), Constraint::None),
+    add_only("type", ValueType::Token(&MULTI_LEVEL_TYPE), PartSetter::Num(NumKey::Template(AbstractKey::Type)), Constraint::None),
+    add_only("name", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::Name)), Constraint::NotEmpty),
+    add_only("styleLink", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::StyleLink)), Constraint::NotEmpty),
+    add_only("numStyleLink", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::NumStyleLink)), Constraint::NotEmpty),
+    add_only("format", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::Seed(LevelKey::Format))), Constraint::NotEmpty),
+    add_only("text", ValueType::Text, PartSetter::Num(NumKey::Template(AbstractKey::Seed(LevelKey::Text))), Constraint::None),
+    add_only("indent", ValueType::Int, PartSetter::Num(NumKey::Template(AbstractKey::Seed(LevelKey::Indent))), Constraint::Int { min: -31_680, max: 31_680 }),
     }
 }
 

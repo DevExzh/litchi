@@ -1,5 +1,7 @@
 //! Field refresh primitives on the package-bound edit (record 0279).
 
+use litchi_core::Position;
+
 use super::super::Result;
 use super::super::transaction::fields::{Fields, Outcome, Update};
 use super::Edit;
@@ -35,5 +37,52 @@ impl<P: Clone> Edit<P> {
     /// edits refuse it as an unmanaged-only operation.
     pub fn refresh_fields(&mut self, fields: &Fields, updates: &[Update]) -> Result<Outcome> {
         self.inner.refresh_fields(fields, updates)
+    }
+
+    /// Insert a bookmark into the paragraph at `paragraph`; see
+    /// [`super::super::snapshot::Edit::insert_bookmark_at`] (record 0325).
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::document::{ElementPath, ElementStep};
+    ///
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("Before");
+    /// let package = builder.build()?;
+    /// let mut edit = package.edit()?;
+    /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
+    /// let id = edit.insert_bookmark_at(&paragraph, None, "Target", Some("here"))?;
+    /// assert_eq!(edit.fields()?.bookmarks()[0].id(), Some(id));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// As [`super::super::snapshot::Edit::insert_bookmark_at`].
+    pub fn insert_bookmark_at(
+        &mut self,
+        paragraph: &super::super::ElementPath,
+        at: Option<Position>,
+        name: &str,
+        text: Option<&str>,
+    ) -> Result<i64> {
+        self.inner.insert_bookmark_at(paragraph, at, name, text)
+    }
+
+    /// Insert a complex field into the paragraph at `paragraph`; see
+    /// [`super::super::snapshot::Edit::insert_field_at`] (record 0325).
+    ///
+    /// # Errors
+    ///
+    /// As [`super::super::snapshot::Edit::insert_field_at`].
+    pub fn insert_field_at(
+        &mut self,
+        paragraph: &super::super::ElementPath,
+        at: Option<Position>,
+        instruction: &str,
+        result: Option<&str>,
+    ) -> Result<Position> {
+        self.inner
+            .insert_field_at(paragraph, at, instruction, result)
     }
 }

@@ -525,3 +525,140 @@ fn star_queries_and_views_keep_their_shape() {
         .collect();
     assert!(!all.iter().any(|kind| kind == "equation"), "{all:?}");
 }
+
+#[path = "support/pptx_presentation.rs"]
+#[allow(dead_code, reason = "the shared fixture module serves several tests")]
+mod presentation;
+
+#[test]
+fn shape_run_picture_and_group_links_as_properties() {
+    // Record 0325: `link` and `tooltip` as properties (OfficeCLI's usual
+    // write path), on add and set, read back on both owners.
+    let file = two_slides()
+        .add(
+            "/slide[1]",
+            NewNode::new("shape")
+                .prop("text", "Go")
+                .prop("width", "1in")
+                .prop("height", "1in")
+                .prop("link", "https://example.com/a")
+                .prop("tooltip", "Open"),
+        )
+        .unwrap()
+        .file
+        .add(
+            "/slide[1]",
+            NewNode::new("picture")
+                .prop("src", PNG)
+                .prop("link", "slide[2]")
+                .prop("tooltip", "Next"),
+        )
+        .unwrap()
+        .file;
+    for file in owners(&file) {
+        assert_eq!(
+            prop(&file, "/slide[1]/shape[2]", "link").as_deref(),
+            Some("https://example.com/a")
+        );
+        assert_eq!(
+            prop(&file, "/slide[1]/shape[2]", "tooltip").as_deref(),
+            Some("Open")
+        );
+        // A shape-wide link is on every run too, as OfficeCLI writes it.
+        assert_eq!(
+            prop(&file, "/slide[1]/shape[2]/paragraph[1]/run[1]", "link").as_deref(),
+            Some("https://example.com/a")
+        );
+        assert_eq!(
+            prop(&file, "/slide[1]/picture[1]", "link").as_deref(),
+            Some("slide[2]")
+        );
+        assert_eq!(
+            prop(&file, "/slide[1]/picture[1]", "tooltip").as_deref(),
+            Some("Next")
+        );
+        assert_eq!(prop(&file, "/slide[1]/shape[1]", "link"), None);
+        // set: a named action with text in one call, then the tooltip alone.
+        let set = file
+            .set(
+                "/slide[1]/shape[1]",
+                props! { "text" => "Next", "link" => "nextslide" },
+            )
+            .unwrap();
+        assert_eq!(
+            prop(&set, "/slide[1]/shape[1]", "link").as_deref(),
+            Some("nextslide")
+        );
+        let tipped = set
+            .set("/slide[1]/shape[1]", props! { "tooltip" => "Advance" })
+            .unwrap();
+        assert_eq!(
+            prop(&tipped, "/slide[1]/shape[1]", "tooltip").as_deref(),
+            Some("Advance")
+        );
+        assert_eq!(
+            prop(&tipped, "/slide[1]/shape[1]", "link").as_deref(),
+            Some("nextslide")
+        );
+        // A run's own link; `none` removes a picture's.
+        let run = tipped
+            .set(
+                "/slide[2]/shape[1]/paragraph[1]/run[1]",
+                props! { "link" => "slide[1]", "tooltip" => "Back" },
+            )
+            .unwrap();
+        assert_eq!(
+            prop(&run, "/slide[2]/shape[1]/paragraph[1]/run[1]", "link").as_deref(),
+            Some("slide[1]")
+        );
+        let removed = run
+            .set("/slide[1]/picture[1]", props! { "link" => "none" })
+            .unwrap();
+        assert_eq!(prop(&removed, "/slide[1]/picture[1]", "link"), None);
+        // An equal link is an exact no-op.
+        let bytes = removed.to_bytes().unwrap();
+        let same = removed
+            .set(
+                "/slide[1]/shape[1]",
+                props! { "link" => "nextslide", "tooltip" => "Advance" },
+            )
+            .unwrap();
+        assert_eq!(same.to_bytes().unwrap(), bytes);
+        // Refusals leave the input unchanged.
+        let error = file
+            .set("/slide[2]/shape[1]", props! { "tooltip" => "x" })
+            .unwrap_err();
+        assert_eq!(error.code(), Code::MissingProperty);
+        let error = file
+            .set(
+                "/slide[1]/shape[1]",
+                props! { "link" => "javascript:alert(1)" },
+            )
+            .unwrap_err();
+        assert_eq!(error.code(), Code::InvalidValue);
+        assert_eq!(
+            file.to_bytes().unwrap(),
+            owners(&file)[0].to_bytes().unwrap()
+        );
+    }
+    // Groups take a link on their non-visual properties.
+    let deck = litchi_ops::open_bytes(presentation::bytes()).unwrap();
+    let linked = deck
+        .set(
+            "/slide[1]/group[1]",
+            props! { "link" => "https://example.com/g", "tooltip" => "Group" },
+        )
+        .unwrap();
+    for file in owners(&linked) {
+        assert_eq!(
+            prop(&file, "/slide[1]/group[1]", "link").as_deref(),
+            Some("https://example.com/g")
+        );
+        assert_eq!(
+            prop(&file, "/slide[1]/group[1]", "tooltip").as_deref(),
+            Some("Group")
+        );
+        // The group's members keep theirs.
+        assert_eq!(prop(&file, "/slide[1]/group[1]/shape[1]", "link"), None);
+    }
+}

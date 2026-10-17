@@ -6,7 +6,9 @@
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 pub mod chart;
+pub mod objects;
 pub mod shape;
+pub mod vml;
 
 use thiserror::Error;
 
@@ -29,6 +31,9 @@ pub enum Error {
     /// Shared OOXML attribute or character-reference decoding failed.
     #[error("SpreadsheetML drawing XML error: {0}")]
     Xml(#[from] litchi_ooxml_common::XmlError),
+    /// A package part or relationship could not be resolved.
+    #[error("SpreadsheetML drawing package error: {0}")]
+    Opc(#[from] litchi_opc::OpcError),
     /// `DrawingML` chart decoding or validation failed.
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),

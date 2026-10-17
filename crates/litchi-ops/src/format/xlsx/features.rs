@@ -82,6 +82,8 @@ pub(crate) struct Note {
     pub(super) reference: String,
     pub(super) author: String,
     pub(super) text: String,
+    /// The note's rich-text runs; empty for plain text.
+    pub(super) runs: Vec<xlsx::workbook::comments::TextRun>,
 }
 
 /// A conditional format and the formatting its first rule applies.
@@ -339,6 +341,7 @@ pub(super) fn list(file: &Xlsx, sheet: &Sheet, kind: Kind) -> Result<Vec<Feature
                             reference: reference.to_owned(),
                             author: comment.author.clone(),
                             text: comment.text.clone(),
+                            runs: comment.runs.clone(),
                         })
                         .collect()
                 })
@@ -567,6 +570,13 @@ pub(crate) enum CommentKey {
     Author,
     Text,
     AnchoredTo,
+    FontBold,
+    FontItalic,
+    FontUnderline,
+    FontSize,
+    FontColor,
+    FontName,
+    Runs,
 }
 
 keyed!(CommentKey, CommentKey, COMMENT_TABLE, COMMENT_PROPS, COMMENT_KEYS, [
@@ -574,7 +584,85 @@ keyed!(CommentKey, CommentKey, COMMENT_TABLE, COMMENT_PROPS, COMMENT_KEYS, [
     entry(read("author", TEXT), Access::SetAndAdd(CommentKey::Author)) => Author,
     entry(read("text", TEXT), Access::SetAndAdd(CommentKey::Text)) => Text,
     entry(read("anchoredTo", TEXT), Access::ReadOnly) => AnchoredTo,
+    entry(read("font.bold", BOOL), Access::SetAndAdd(CommentKey::FontBold)) => FontBold,
+    entry(read("font.italic", BOOL), Access::SetAndAdd(CommentKey::FontItalic)) => FontItalic,
+    entry(read("font.underline", TEXT), Access::SetAndAdd(CommentKey::FontUnderline)) => FontUnderline,
+    entry(read("font.size", FONT_SIZE), Access::SetAndAdd(CommentKey::FontSize)) => FontSize,
+    entry(read("font.color", SHEET_COLOR), Access::SetAndAdd(CommentKey::FontColor)) => FontColor,
+    entry(read("font.name", TEXT), Access::SetAndAdd(CommentKey::FontName)) => FontName,
+    entry(read("runs", TEXT), Access::SetAndAdd(CommentKey::Runs)) => Runs,
 ], []);
+
+/// The size and typeface Excel gives note text, which a note's single-run
+/// `font.size` and `font.name` leave unreported (as OfficeCLI does).
+pub(super) const NOTE_SIZE: f64 = 9.0;
+/// See [`NOTE_SIZE`].
+pub(super) const NOTE_FONT: &str = "Tahoma";
+
+/// The `RRGGBB` of an `AARRGGBB` run color.
+fn run_rgb(color: Option<&xlsx::workbook::comments::RunColor>) -> Option<xlsx::Rgb> {
+    match color? {
+        xlsx::workbook::comments::RunColor::Rgb(argb) => {
+            xlsx::Rgb::from_hex(argb.get(argb.len().checked_sub(6)?..)?).ok()
+        },
+        _ => None,
+    }
+}
+
+/// A note's runs as OfficeCLI's `runs` JSON array.
+fn runs_json(runs: &[xlsx::workbook::comments::TextRun]) -> String {
+    let items: Vec<serde_json::Value> = runs
+        .iter()
+        .map(|run| {
+            let font = &run.font;
+            let mut item = serde_json::Map::new();
+            item.insert("text".into(), run.text.clone().into());
+            for (key, on) in [
+                ("bold", font.bold),
+                ("italic", font.italic),
+                ("strike", font.strike),
+                (
+                    "superscript",
+                    font.vert_align.as_deref().map(|v| v == "superscript"),
+                ),
+                (
+                    "subscript",
+                    font.vert_align.as_deref().map(|v| v == "subscript"),
+                ),
+            ] {
+                if on == Some(true) {
+                    item.insert(key.into(), true.into());
+                }
+            }
+            if let Some(underline) = font.underline.as_deref().filter(|u| *u != "none") {
+                item.insert("underline".into(), underline.into());
+            }
+            if let Some(size) = font.size {
+                item.insert(
+                    "size".into(),
+                    format!("{}pt", crate::value::DotNetDouble(size)).into(),
+                );
+            }
+            if let Some(color) = run_rgb(font.color.as_ref()) {
+                item.insert(
+                    "color".into(),
+                    format!(
+                        "#{:02X}{:02X}{:02X}",
+                        color.red(),
+                        color.green(),
+                        color.blue()
+                    )
+                    .into(),
+                );
+            }
+            if let Some(name) = &font.name {
+                item.insert("font".into(), name.clone().into());
+            }
+            serde_json::Value::Object(item)
+        })
+        .collect();
+    serde_json::Value::Array(items).to_string()
+}
 
 fn comment_value(note: &Note, key: CommentKey) -> Option<Value<'_>> {
     match key {
@@ -583,6 +671,30 @@ fn comment_value(note: &Note, key: CommentKey) -> Option<Value<'_>> {
         CommentKey::Text => Some(text(&note.text)),
         // Read through `Feature::value`, which knows the sheet's name.
         CommentKey::AnchoredTo => None,
+        // Two or more runs read as `runs`; one run as its non-default
+        // `font.*` facets, as OfficeCLI reports them.
+        CommentKey::Runs => (note.runs.len() > 1).then(|| owned(runs_json(&note.runs))),
+        key => {
+            let [run] = note.runs.as_slice() else {
+                return None;
+            };
+            let font = &run.font;
+            match key {
+                CommentKey::FontBold => (font.bold == Some(true)).then_some(Value::Bool(true)),
+                CommentKey::FontItalic => (font.italic == Some(true)).then_some(Value::Bool(true)),
+                CommentKey::FontUnderline => {
+                    font.underline.as_deref().filter(|u| *u != "none").map(text)
+                },
+                CommentKey::FontSize => font.size.filter(|size| *size != NOTE_SIZE).map(points),
+                CommentKey::FontColor => run_rgb(font.color.as_ref()).map(rgb),
+                CommentKey::FontName => font
+                    .name
+                    .as_deref()
+                    .filter(|name| *name != NOTE_FONT)
+                    .map(text),
+                _ => None,
+            }
+        },
     }
 }
 

@@ -233,6 +233,11 @@ required-features = ["odt", "doc", "ods"]
 name              = "xlsx_features_bench"
 required-features = ["xlsx"]
 
+# Paired leaf-vs-unified OOXML write follow-up measurements (record 0325).
+[[example]]
+name              = "ooxml_followups_bench"
+required-features = ["docx", "pptx", "xlsx"]
+
 # Paired leaf-vs-unified XLSB worksheet feature measurements (record 0322).
 [[example]]
 name              = "xlsb_features_bench"
