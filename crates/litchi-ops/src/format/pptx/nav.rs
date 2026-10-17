@@ -674,7 +674,9 @@ impl<'f> Nav<'f> {
             (Item::Tree(tree), Kind::Hyperlink) if tree.kind == Kind::Shape => {
                 Ok(match pick_index(1, select) {
                     Pick::Index(_) => match super::links::of_shape(nav.file, tree)? {
-                        Some(item) => Lookup::Found(Node::new(nav.file, Item::Hyperlink(item))),
+                        Some(item) => {
+                            Lookup::Found(Node::new(nav.file, Item::Hyperlink(Box::new(item))))
+                        },
                         None => Lookup::Missing,
                     },
                     Pick::Missing => Lookup::Missing,
@@ -694,7 +696,9 @@ impl<'f> Nav<'f> {
             },
             (Item::Run(text), Kind::Hyperlink) => Ok(match pick_index(1, select) {
                 Pick::Index(_) => match super::links::of_run(nav.file, text)? {
-                    Some(item) => Lookup::Found(Node::new(nav.file, Item::Hyperlink(item))),
+                    Some(item) => {
+                        Lookup::Found(Node::new(nav.file, Item::Hyperlink(Box::new(item))))
+                    },
                     None => Lookup::Missing,
                 },
                 Pick::Missing => Lookup::Missing,

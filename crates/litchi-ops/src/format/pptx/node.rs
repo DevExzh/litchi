@@ -118,12 +118,15 @@ pub(super) enum Item {
     Reply(ReplyItem),
     /// The presentation theme (record 0321).
     Theme(super::theme::ThemeItem),
-    /// A table grid column (record 0321).
-    Column(super::columns::ColumnItem),
+    /// A table grid column (record 0321). Boxed, as are the other two
+    /// record 0321 elements, so the item stays as large as a text item and
+    /// every query that never names them moves no more bytes per node
+    /// (record 0326).
+    Column(Box<super::columns::ColumnItem>),
     /// A shape's or run's click action (record 0321).
-    Hyperlink(super::links::LinkItem),
+    Hyperlink(Box<super::links::LinkItem>),
     /// An Office Math equation (record 0321).
-    Equation(super::equations::EquationItem),
+    Equation(Box<super::equations::EquationItem>),
 }
 
 /// A slide: its position, and its scene and facts once a read needed them.
@@ -324,10 +327,19 @@ pub(super) struct TreeItem {
     pub(super) handle: Handle,
     pub(super) ordinal: u32,
     body: OnceLock<std::result::Result<Option<Arc<Body>>, Error>>,
-    /// A chart frame's chart part, read on first use (record 0270).
-    chart: OnceLock<std::result::Result<Option<Arc<Summary>>, Error>>,
-    /// A SmartArt frame's data model, read on first use (record 0284).
-    diagram: OnceLock<std::result::Result<Option<Arc<Outline>>, Error>>,
+    /// A chart frame's chart part (record 0270) or a SmartArt frame's data
+    /// model (record 0284), read on first use. One cell for both, since a
+    /// frame is one kind or the other: every node of a query is moved
+    /// several times, and a second cell made each move 24 bytes longer
+    /// (record 0326).
+    frame: OnceLock<std::result::Result<Option<FramePart>, Error>>,
+}
+
+/// What a chart or SmartArt frame's part reads as.
+#[derive(Clone)]
+enum FramePart {
+    Chart(Arc<Summary>),
+    Diagram(Arc<Outline>),
 }
 
 impl TreeItem {
@@ -338,8 +350,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -350,8 +361,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -368,8 +378,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -386,8 +395,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
-            chart: OnceLock::new(),
-            diagram: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 
@@ -418,8 +426,14 @@ impl TreeItem {
         if self.kind != Kind::Chart {
             return Ok(None);
         }
-        let read = self.chart.get_or_init(|| super::chart::summary(file, self));
-        read.clone()
+        let read = self.frame.get_or_init(|| {
+            super::chart::summary(file, self).map(|chart| chart.map(FramePart::Chart))
+        });
+        match read {
+            Ok(Some(FramePart::Chart(chart))) => Ok(Some(Arc::clone(chart))),
+            Ok(_) => Ok(None),
+            Err(error) => Err(error.clone()),
+        }
     }
 
     /// A SmartArt frame's data-model outline, read from its data part on
@@ -429,10 +443,14 @@ impl TreeItem {
         if self.kind != Kind::SmartArt {
             return Ok(None);
         }
-        let read = self
-            .diagram
-            .get_or_init(|| super::smartart::outline(file, self));
-        read.clone()
+        let read = self.frame.get_or_init(|| {
+            super::smartart::outline(file, self).map(|outline| outline.map(FramePart::Diagram))
+        });
+        match read {
+            Ok(Some(FramePart::Diagram(outline))) => Ok(Some(Arc::clone(outline))),
+            Ok(_) => Ok(None),
+            Err(error) => Err(error.clone()),
+        }
     }
 
     /// The placeholder type token of a `p:sp` with a `p:ph`, as OfficeCLI

@@ -1605,7 +1605,9 @@ fn int_text(text: Option<&str>) -> Option<NodeValue<'static>> {
 /// time so a `format` read does no name lookup.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum From {
-    Own,
+    /// The node's own key, by its position in the kind's own-key list
+    /// (record 0326: a read matches the position, not the name).
+    Own(u8),
     /// A run key; `font` falls back to the ASCII slot.
     Run(usize),
     Font,
@@ -1638,6 +1640,25 @@ const fn find(props: &[PropSpec], name: &str) -> Option<usize> {
     None
 }
 
+/// The run table's `font.latin`, which a part's `font` reads first.
+const FONT_LATIN: usize = match find(RUN_PROPS, "font.latin") {
+    Some(at) => at,
+    None => panic!("font.latin is a run key"),
+};
+
+/// The position of `name` in an own-key list, checked at compile time.
+const fn own_at(names: &[&str], name: &str) -> u8 {
+    let mut index = 0;
+    while index < names.len() {
+        if same(names[index], name) {
+            #[allow(clippy::cast_possible_truncation, reason = "own-key lists are short")]
+            return index as u8;
+        }
+        index += 1;
+    }
+    panic!("not an own key")
+}
+
 const fn listed(names: &[&str], name: &str) -> bool {
     let mut index = 0;
     while index < names.len() {
@@ -1654,23 +1675,23 @@ const fn listed(names: &[&str], name: &str) -> bool {
 /// paragraph table (`leftIndent` is `indent`; `direction` and `align` are
 /// paragraph keys).
 const fn sources<const N: usize>(table: &[PropSpec], own: &[&str]) -> [From; N] {
-    let mut sources = [From::Own; N];
+    let mut sources = [From::Own(u8::MAX); N];
     let mut index = 0;
     while index < N {
         let name = table[index].name;
         sources[index] = if listed(own, name) {
-            From::Own
+            From::Own(own_at(own, name))
         } else if same(name, "font") {
             From::Font
         } else if same(name, "direction") || same(name, "align") {
             match find(PARAGRAPH_PROPS, name) {
                 Some(at) => From::Paragraph(at),
-                None => From::Own,
+                None => From::Own(u8::MAX),
             }
         } else if same(name, "leftIndent") {
             match find(PARAGRAPH_PROPS, "indent") {
                 Some(at) => From::Paragraph(at),
-                None => From::Own,
+                None => From::Own(u8::MAX),
             }
         } else {
             let run_name = if same(name, "smallCaps") {
@@ -1682,7 +1703,7 @@ const fn sources<const N: usize>(table: &[PropSpec], own: &[&str]) -> [From; N] 
                 Some(at) => From::Run(at),
                 None => match find(PARAGRAPH_PROPS, name) {
                     Some(at) => From::Paragraph(at),
-                    None => From::Own,
+                    None => From::Own(u8::MAX),
                 },
             }
         };
@@ -1691,42 +1712,38 @@ const fn sources<const N: usize>(table: &[PropSpec], own: &[&str]) -> [From; N] 
     sources
 }
 
-const STYLE_SOURCES: [From; STYLE_PROPS.len()] = sources(
-    STYLE_PROPS,
-    &[
-        "id",
-        "name",
-        "type",
-        "default",
-        "basedOn",
-        "basedOn.path",
-        "next",
-        "linked",
-        "autoRedefine",
-        "hidden",
-        "qFormat",
-        "uiPriority",
-        "semiHidden",
-        "unhideWhenUsed",
-        "locked",
-        "customStyle",
-    ],
-);
-const LEVEL_SOURCES: [From; LEVEL_PROPS.len()] = sources(
-    LEVEL_PROPS,
-    &[
-        "ilvl",
-        "start",
-        "format",
-        "lvlText",
-        "justification",
-        "suff",
-        "lvlRestart",
-        "isLgl",
-        "indent",
-        "hanging",
-    ],
-);
+const STYLE_OWN: &[&str] = &[
+    "id",
+    "name",
+    "type",
+    "default",
+    "basedOn",
+    "basedOn.path",
+    "next",
+    "linked",
+    "autoRedefine",
+    "hidden",
+    "qFormat",
+    "uiPriority",
+    "semiHidden",
+    "unhideWhenUsed",
+    "locked",
+    "customStyle",
+];
+const STYLE_SOURCES: [From; STYLE_PROPS.len()] = sources(STYLE_PROPS, STYLE_OWN);
+const LEVEL_OWN: &[&str] = &[
+    "ilvl",
+    "start",
+    "format",
+    "lvlText",
+    "justification",
+    "suff",
+    "lvlRestart",
+    "isLgl",
+    "indent",
+    "hanging",
+];
+const LEVEL_SOURCES: [From; LEVEL_PROPS.len()] = sources(LEVEL_PROPS, LEVEL_OWN);
 const STORY_SOURCES: [From; STORY_PROPS.len()] = sources(STORY_PROPS, &["type", "text", "field"]);
 const NOTE_SOURCES: [From; NOTE_PROPS.len()] = sources(NOTE_PROPS, &["id", "text"]);
 
@@ -1737,13 +1754,12 @@ fn sourced<'a>(
     run: Option<&direct::Run>,
 ) -> Option<NodeValue<'a>> {
     match from {
-        From::Own => None,
+        From::Own(_) => None,
         From::Run(at) => super::props::run(run?, at),
         From::Paragraph(at) => super::props::paragraph_value(paragraph?, None, at),
         From::Font => {
             let run = run?;
-            let latin = find(RUN_PROPS, "font.latin")?;
-            super::props::run(run, latin).or_else(|| {
+            super::props::run(run, FONT_LATIN).or_else(|| {
                 // The ASCII slot when the ASCII and high-ANSI slots differ.
                 let fonts = run.fonts.as_ref()?;
                 fonts
@@ -1789,7 +1805,7 @@ impl<'a> PartProps<'a> {
                 run,
             } => story_value(*kind, text, paragraph.as_deref(), run.as_deref(), index),
             Self::Note { id, text, run } => match NOTE_SOURCES.get(index)? {
-                From::Own => match NOTE_PROPS.get(index)?.name {
+                From::Own(_) => match NOTE_PROPS.get(index)?.name {
                     "id" => Some(NodeValue::Int(i64::from(*id))),
                     "text" => Some(text_value(text)),
                     _ => None,
@@ -1807,34 +1823,48 @@ fn style_value<'a>(
     run: &direct::Run,
     index: usize,
 ) -> Option<NodeValue<'a>> {
-    let from = *STYLE_SOURCES.get(index)?;
-    if from != From::Own {
-        return sourced(from, Some(paragraph), Some(run));
-    }
+    let From::Own(own) = *STYLE_SOURCES.get(index)? else {
+        return sourced(*STYLE_SOURCES.get(index)?, Some(paragraph), Some(run));
+    };
     let catalog = docx.parts().styles.get()?.as_ref()?;
     let entry = catalog.entries().get(style)?;
-    let spec = STYLE_PROPS.get(index)?;
     let flag = |flag: Flag| entry.flag(flag).map(NodeValue::Bool);
-    match spec.name {
-        "id" => Some(text_value(entry.id())),
-        "name" => entry.name().map(text_value),
-        "type" => entry.kind().map(|kind| NodeValue::Token(kind.to_xml())),
-        "default" => entry.is_default().then_some(NodeValue::Bool(true)),
-        "basedOn" => entry.based_on().map(text_value),
-        "basedOn.path" => entry
+    const ID: u8 = own_at(STYLE_OWN, "id");
+    const NAME: u8 = own_at(STYLE_OWN, "name");
+    const TYPE: u8 = own_at(STYLE_OWN, "type");
+    const DEFAULT: u8 = own_at(STYLE_OWN, "default");
+    const BASED_ON: u8 = own_at(STYLE_OWN, "basedOn");
+    const BASED_ON_PATH: u8 = own_at(STYLE_OWN, "basedOn.path");
+    const NEXT: u8 = own_at(STYLE_OWN, "next");
+    const LINKED: u8 = own_at(STYLE_OWN, "linked");
+    const AUTO_REDEFINE: u8 = own_at(STYLE_OWN, "autoRedefine");
+    const HIDDEN: u8 = own_at(STYLE_OWN, "hidden");
+    const Q_FORMAT: u8 = own_at(STYLE_OWN, "qFormat");
+    const UI_PRIORITY: u8 = own_at(STYLE_OWN, "uiPriority");
+    const SEMI_HIDDEN: u8 = own_at(STYLE_OWN, "semiHidden");
+    const UNHIDE_WHEN_USED: u8 = own_at(STYLE_OWN, "unhideWhenUsed");
+    const LOCKED: u8 = own_at(STYLE_OWN, "locked");
+    const CUSTOM_STYLE: u8 = own_at(STYLE_OWN, "customStyle");
+    match own {
+        ID => Some(text_value(entry.id())),
+        NAME => entry.name().map(text_value),
+        TYPE => entry.kind().map(|kind| NodeValue::Token(kind.to_xml())),
+        DEFAULT => entry.is_default().then_some(NodeValue::Bool(true)),
+        BASED_ON => entry.based_on().map(text_value),
+        BASED_ON_PATH => entry
             .based_on()
             .map(|parent| NodeValue::Text(Cow::Owned(format!("/styles/{parent}")))),
-        "next" => entry.next().map(text_value),
-        "linked" => entry.link().map(text_value),
-        "autoRedefine" => flag(Flag::AutoRedefine),
-        "hidden" => flag(Flag::Hidden),
-        "qFormat" => flag(Flag::QuickFormat),
-        "uiPriority" => entry.ui_priority().map(NodeValue::Int),
-        "semiHidden" => flag(Flag::SemiHidden),
-        "unhideWhenUsed" => flag(Flag::UnhideWhenUsed),
-        "locked" => flag(Flag::Locked),
+        NEXT => entry.next().map(text_value),
+        LINKED => entry.link().map(text_value),
+        AUTO_REDEFINE => flag(Flag::AutoRedefine),
+        HIDDEN => flag(Flag::Hidden),
+        Q_FORMAT => flag(Flag::QuickFormat),
+        UI_PRIORITY => entry.ui_priority().map(NodeValue::Int),
+        SEMI_HIDDEN => flag(Flag::SemiHidden),
+        UNHIDE_WHEN_USED => flag(Flag::UnhideWhenUsed),
+        LOCKED => flag(Flag::Locked),
         // OfficeCLI always emits `customStyle`.
-        "customStyle" => Some(NodeValue::Bool(entry.custom().unwrap_or(false))),
+        CUSTOM_STYLE => Some(NodeValue::Bool(entry.custom().unwrap_or(false))),
         _ => None,
     }
 }
@@ -1885,24 +1915,37 @@ fn level_value<'a>(
     let catalog = docx.parts().numbering.get()?.as_ref()?;
     let level = catalog.abstract_nums().get(definition)?.levels().get(at)?;
     let indentation = paragraph.indentation.as_ref();
-    match LEVEL_PROPS.get(index)?.name {
-        "ilvl" => Some(NodeValue::Int(i64::from(level.ilvl()))),
-        "start" => int_text(level.start()),
-        "format" => level.format().map(text_value),
-        "lvlText" => level.text().map(text_value),
-        "justification" => level
+    let From::Own(own) = *LEVEL_SOURCES.get(index)? else {
+        return sourced(*LEVEL_SOURCES.get(index)?, None, Some(run));
+    };
+    const ILVL: u8 = own_at(LEVEL_OWN, "ilvl");
+    const START: u8 = own_at(LEVEL_OWN, "start");
+    const FORMAT: u8 = own_at(LEVEL_OWN, "format");
+    const LVL_TEXT: u8 = own_at(LEVEL_OWN, "lvlText");
+    const JUSTIFICATION: u8 = own_at(LEVEL_OWN, "justification");
+    const SUFF: u8 = own_at(LEVEL_OWN, "suff");
+    const LVL_RESTART: u8 = own_at(LEVEL_OWN, "lvlRestart");
+    const IS_LGL: u8 = own_at(LEVEL_OWN, "isLgl");
+    const INDENT: u8 = own_at(LEVEL_OWN, "indent");
+    const HANGING: u8 = own_at(LEVEL_OWN, "hanging");
+    match own {
+        ILVL => Some(NodeValue::Int(i64::from(level.ilvl()))),
+        START => int_text(level.start()),
+        FORMAT => level.format().map(text_value),
+        LVL_TEXT => level.text().map(text_value),
+        JUSTIFICATION => level
             .justification()
             .and_then(|value| LEVEL_JUSTIFICATION.get(value))
             .map(NodeValue::Token),
-        "suff" => level
+        SUFF => level
             .suffix()
             .and_then(|value| LEVEL_SUFFIX.get(value))
             .map(NodeValue::Token),
-        "lvlRestart" => int_text(level.restart()),
-        "isLgl" => level.legal().filter(|legal| *legal).map(NodeValue::Bool),
-        "indent" => indentation?.leading().map(|value| NodeValue::Int(value.0)),
-        "hanging" => indentation?.hanging.map(|value| NodeValue::Int(value.0)),
-        _ => sourced(*LEVEL_SOURCES.get(index)?, None, Some(run)),
+        LVL_RESTART => int_text(level.restart()),
+        IS_LGL => level.legal().filter(|legal| *legal).map(NodeValue::Bool),
+        INDENT => indentation?.leading().map(|value| NodeValue::Int(value.0)),
+        HANGING => indentation?.hanging.map(|value| NodeValue::Int(value.0)),
+        _ => None,
     }
 }
 
