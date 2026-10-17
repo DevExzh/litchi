@@ -59,6 +59,9 @@ fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Re
                     staged = staged.saturating_add(text.len());
                     bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())?;
                     validate_text(text)?;
+                    if matches!(setter, CommentSetter::Date) {
+                        validate_date(text)?;
+                    }
                     let owned = Some(text.to_owned());
                     match setter {
                         CommentSetter::Text => values.text = owned,
@@ -74,6 +77,24 @@ fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Re
         })?;
     }
     Ok(values)
+}
+
+/// A comment `date` is an XML `dateTime`, as the comments part requires;
+/// anything else is refused here rather than failing as a corrupt part when
+/// the edit serializes it (record 0330). The accepted forms are the leaf
+/// codec's.
+fn validate_date(value: &str) -> Result<()> {
+    if chrono::DateTime::parse_from_rfc3339(value).is_ok()
+        || chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
+    {
+        Ok(())
+    } else {
+        Err(error(
+            Code::InvalidValue,
+            "a comment date is an XML dateTime such as 2026-10-17T09:30:00Z",
+        )
+        .with_property("date"))
+    }
 }
 
 impl Pptx {
