@@ -45,7 +45,10 @@ impl<T> OneOrMany<T> {
 
     pub(super) fn push(&mut self, value: T) {
         match self {
-            Self::Zero => *self = Self::One(value),
+            Self::Zero => {
+                // `Zero` owns nothing: skip its drop glue (record 0326).
+                std::mem::forget(std::mem::replace(self, Self::One(value)));
+            },
             Self::Many(many) => many.push(value),
             Self::One(_) => {
                 let Self::One(first) = std::mem::replace(self, Self::Zero) else {
@@ -152,7 +155,9 @@ impl<T: Placeholder, const N: usize> Inline<T, N> {
 
     pub(super) fn push(&mut self, value: T) {
         if self.len < N {
-            self.inline[self.len] = value;
+            // The slot holds a placeholder, which owns nothing (`Placeholder`
+            // is allocation-free): skip its drop glue (record 0326).
+            std::mem::forget(std::mem::replace(&mut self.inline[self.len], value));
         } else {
             if self.len == N {
                 self.heap.reserve_exact(N * 2);

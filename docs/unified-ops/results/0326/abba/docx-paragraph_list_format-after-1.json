@@ -1,0 +1,93 @@
+{
+  "cases": [
+    {
+      "case": "style_set_bold",
+      "skipped": true
+    },
+    {
+      "case": "style_add",
+      "skipped": true
+    },
+    {
+      "case": "level_set_format",
+      "skipped": true
+    },
+    {
+      "case": "header_text",
+      "skipped": true
+    },
+    {
+      "case": "footnote_add",
+      "skipped": true
+    },
+    {
+      "case": "paragraph_style_by_name",
+      "skipped": true
+    },
+    {
+      "case": "tab_set",
+      "skipped": true
+    },
+    {
+      "case": "break_add",
+      "skipped": true
+    },
+    {
+      "case": "style_get_format",
+      "skipped": true
+    },
+    {
+      "case": "paragraph_list_format",
+      "leaf_median_ns": 1946.734375,
+      "leaf_samples_ns": [
+        1879.234375,
+        1899.53125,
+        1928.140625,
+        1931.890625,
+        1932.5,
+        1941.578125,
+        1942.515625,
+        1942.671875,
+        1944.703125,
+        1946.734375,
+        1949.0625,
+        1949.078125,
+        1952.203125,
+        1952.984375,
+        1956.890625,
+        1963.4375,
+        1970.328125,
+        2039.546875
+      ],
+      "ratio": 1.170397540753345,
+      "unified_median_ns": 2278.453125,
+      "unified_samples_ns": [
+        2262.34375,
+        2266.5625,
+        2273.125,
+        2274.078125,
+        2275.46875,
+        2275.484375,
+        2275.625,
+        2276.71875,
+        2277.515625,
+        2278.453125,
+        2278.609375,
+        2279.21875,
+        2295.015625,
+        2339.375,
+        2351.25,
+        2362.03125,
+        2365.640625,
+        2405.484375
+      ]
+    },
+    {
+      "case": "tab_get_format",
+      "skipped": true
+    }
+  ],
+  "fixture": "Builder document: 200 paragraphs, table-alignment.docx styles, a list, a tab stop, a header",
+  "iterations": 64,
+  "rounds": 9
+}

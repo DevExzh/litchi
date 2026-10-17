@@ -8,7 +8,7 @@ equivalence checks in `src/main.rs`).
 ```sh
 CARGO_NET_OFFLINE=true cargo build --release \
     --manifest-path tools/perf-baseline/unified-pptx-elements/Cargo.toml
-taskset -c 7 target/release/unified-pptx-elements-baseline --rounds 9 [--counts 1,50]
+taskset -c 7 target/release/unified-pptx-elements-baseline --rounds 9 [--counts 1,50] [--only ROUTE]
 ```
 
 The JSON report goes to standard output; record 0321 keeps two runs under

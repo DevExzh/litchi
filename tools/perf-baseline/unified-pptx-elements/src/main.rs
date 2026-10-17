@@ -333,6 +333,8 @@ fn case(route: Route, count: usize, rounds: usize) -> Result<Value> {
 fn main() -> Result<()> {
     let mut counts = DEFAULT_COUNTS.to_vec();
     let mut rounds = DEFAULT_ROUNDS;
+    // Record 0326: `--only ROUTE` runs one route (for callgrind).
+    let mut only: Option<String> = None;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -345,6 +347,7 @@ fn main() -> Result<()> {
                     .collect::<std::result::Result<_, _>>()?;
             },
             "--rounds" => rounds = args.next().ok_or("--rounds needs a value")?.parse()?,
+            "--only" => only = Some(args.next().ok_or("--only needs a route")?),
             other => return Err(format!("unknown argument {other}").into()),
         }
     }
@@ -353,6 +356,9 @@ fn main() -> Result<()> {
     }
     let mut results = Vec::new();
     for route in ROUTES {
+        if only.as_deref().is_some_and(|only| only != route.name()) {
+            continue;
+        }
         for (at, &count) in counts.iter().enumerate() {
             // The equation route reads one fixed deck.
             if route == Route::EquationGet && at > 0 {
