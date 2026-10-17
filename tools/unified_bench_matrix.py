@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0315 (`docs/unified-ops/02[4-9]*.md`, `03[01]*.md`)
+operations records 0249-0326 (`docs/unified-ops/02[4-9]*.md`, `03[0-2]*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -39,9 +39,9 @@ Conventions:
 * Before/after-build records (0250, 0263, 0268, 0289, 0290, 0293) compare
   builds, not unified with leaf: comparison "after/before", budget 1.05.
 
-Records 0285-0315 (record 0294 extended the tool to 0302; record 0306
+Records 0285-0326 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
-0305, 0309, 0310, 0311, 0312 and 0313 parsers; record 0315 its own) are collected
+0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315 and 0326 their own) are collected
 only when their record file is on this tree; the Markdown lists every
 record of that range, absent ones as "not on this tree", so the tool can
 be rerun unchanged after later merges.
@@ -982,7 +982,7 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 315)
+FOLLOW_RANGE = (285, 326)
 
 
 def record_file(record: str):
@@ -1290,6 +1290,9 @@ NUMBERS_SCEN = {
     "table_add": ("add (table)", "table add", SINGLE),
     "table_remove": ("remove (table)", "table remove", SINGLE),
     "table_move": ("move (table)", "table move within its sheet", SINGLE),
+    # Record 0314's routes, first parsed by record 0326.
+    "batch_1000_owned": ("batch set", "batch 1000, items copied outside the clock", BATCH),
+    "batch_1000_parsed": ("batch set", "batch 1000, paths parsed outside the clock", BATCH),
 }
 
 
@@ -1740,13 +1743,93 @@ def p0315():
     return out
 
 
+READ_0326 = (1.10, "1.10 (point read; records 0319-0322 counted a read above 10 % as a miss)", "read")
+IWORK_0326 = {
+    "batch_1000_parsed": ("batch set", "batch 1000, paths parsed outside the clock", BATCH),
+    "batch_10000_parsed": ("batch set", "batch 10000, paths parsed outside the clock", SCALING),
+}
+
+
+def paired_reads_0326(record, fmt, harness, paths, cases):
+    """Record 0326's element-read legs: `cases` maps a case name to its
+    scenario label; each file holds one JSON line (xlsx/xlsb feature
+    benches) or document (docx_parts_bench, unified-pptx-elements) per run."""
+    runs = {}
+    for p in paths:
+        text = p.read_text(encoding="utf-8").strip()
+        if not text:
+            continue
+        docs = []
+        if text.startswith("{\n") or text.startswith("{\r"):
+            docs = [json.loads(text)]
+        else:
+            docs = [json.loads(line) for line in text.splitlines() if line.strip()]
+        for d in docs:
+            for c in d.get("cases") or d.get("results") or [d]:
+                name = c.get("case") or c.get("scenario") or c.get("route")
+                if name not in cases or c.get("skipped"):
+                    continue
+                if "leaf_median_ns" in c:
+                    leaf, unified = c["leaf_median_ns"] / 1000, c["unified_median_ns"] / 1000
+                elif "native_median_ns" in c:
+                    leaf, unified = c["native_median_ns"] / 1000, c["unified_median_ns"] / 1000
+                else:
+                    leaf, unified = c["leaf_median_us"], c["unified_median_us"]
+                runs.setdefault(name, []).append((leaf, unified))
+    out = []
+    for name, label in cases.items():
+        items = runs.get(name, [])
+        if not items:
+            continue
+        out.append(row(record, fmt, "get", label, "",
+                       med(i[0] for i in items), med(i[1] for i in items),
+                       [i[1] / i[0] for i in items], READ_0326, f"{harness}:{name}",
+                       src(paths)))
+    return out
+
+
+@needs("0326")
+def p0326():
+    """Record 0326: the after legs of its B A A B run (`abba/`, base = trunk
+    16b800350b with the record's new path_parse_bench example, after = the
+    merged tree): the PPTX query routes, the iWork batch legs of record
+    0314 (text paths and `_parsed`), the RTF single-target typed and text
+    routes, and the element reads of records 0319-0322 it re-measures."""
+    base = RES / "0326" / "abba"
+    out = query_routes("0326", trials(base.glob("query-after-[0-9].jsonl")))
+    out += iwork_summary("0326", trials(base.glob("pages-after-*.jsonl")),
+                         lambda f, s: "10,000-paragraph document", IWORK_0326)
+    out += iwork_summary("0326", trials(base.glob("keynote-after-*.jsonl")),
+                         lambda f, s: "multi-slide.key", {**KEYNOTE_SCEN, **IWORK_0326})
+    numbers = trials(base.glob("numbers-after-*.json"))
+    out += numbers_docs("0326", [load_json(p)["scenarios"] for p in numbers], numbers)
+    for harness in ("unified-rtf-layout", "unified-rtf-batch-set"):
+        out += [r for r in rtf_tiny_runs("0326", harness,
+                                         trials(base.glob(f"{harness}-after-[0-9].json")))
+                if r["size"] in ("1 paragraphs", "1 targets")]
+    out += paired_reads_0326("0326", "docx", "docx_parts",
+                             trials(base.glob("docx-*-after-*.json")),
+                             {"style_get_format": "style get + format (/styles/Heading1)",
+                              "paragraph_list_format": "list paragraph get + format (/body/p[3])"})
+    out += paired_reads_0326("0326", "xlsx", "xlsx_features",
+                             trials(base.glob("xlsx-after-*.jsonl")),
+                             {"comment_get": "note get + first format entry (comment[20] of 40)"})
+    out += paired_reads_0326("0326", "xlsb", "xlsb_features",
+                             trials(base.glob("xlsb-after-*.jsonl")),
+                             {"comment_get": "note get + first format entry (comment[20] of 40)"})
+    out += paired_reads_0326("0326", "pptx", "pptx_elements",
+                             trials(base.glob("pptx-elements-after-*.json")),
+                             {"pptx_equation_get_v1": "equation get + format (/slide[1]/shape[1]/equation[1])"})
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
            p0306, p0309, p0310, p0311, p0312,
-           p0313, p0315]
+           p0313, p0315, p0326]
 
 
 # ---------------------------------------------------------------- merge
@@ -1929,7 +2012,7 @@ def to_md(rows, conflicts, agreements, cur):
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
       "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
       "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306; "
-      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; record 0315 its own.")
+      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; records 0315 and 0326 their own.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "
