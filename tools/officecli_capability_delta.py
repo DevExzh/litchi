@@ -150,7 +150,7 @@ UNMATCHED: dict[str, set[str]] = {
 
 # OfficeCLI elements outside the unified read surface, with the reason.
 OUT_OF_SCOPE: dict[str, str] = {
-    "raw": "the raw XML layer (`raw`/`raw-set` commands), not an element (design §3)",
+    "raw": "the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12)",
     "sort": "a set-only action that reorders rows, not an element (design §13 P1: sort)",
     "markdown": "an add-time import format, not an element of the document",
 }

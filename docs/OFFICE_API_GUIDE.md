@@ -873,6 +873,37 @@ if let File::Signed(signed) = litchi::open("contract.docx")? {
 }
 ```
 
+### Dump and the raw layer
+
+`file.dump()` writes a document out as an OfficeCLI v2 batch: replaying it
+with `batch` onto `litchi::create(format)` rebuilds the body, sheets or
+slides (record 0336). Content the write verbs cannot rebuild is listed in
+`Dump::warnings`, never dropped silently.
+
+```rust
+use litchi::BatchMode;
+
+let file = litchi::open("report.docx")?;
+let dump = file.dump()?;
+let copy = litchi::create(litchi::FileFormat::Docx)?.batch(dump.items(), BatchMode::Atomic)?;
+assert_eq!(copy.file.text()?, file.text()?);
+```
+
+The raw layer is the escape hatch for package parts (DOCX, XLSX, PPTX and
+XLSB; packaged ODF for reads): `parts()`, `raw("/document")` or any part
+name, `add_part(parent, NewPart)`, `raw_set(part, xpath, action, xml)` and a
+read-only structural `validate()`. Every raw write returns a new `File` and
+passes the package's XML publication audit first.
+
+```rust
+use litchi::raw::Action;
+
+let file = litchi::open("report.docx")?;
+let edited = file.raw_set("/document", "//w:body", Action::Prepend,
+    Some("<w:p><w:r><w:t>Draft</w:t></w:r></w:p>"))?;
+assert!(edited.file.validate()?.is_valid());
+```
+
 ### Errors, limits, and options
 
 Every unified failure is one `litchi::Error` with a stable `Code`

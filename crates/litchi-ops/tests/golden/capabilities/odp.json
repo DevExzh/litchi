@@ -61,6 +61,30 @@
     },
     "create": {
       "supported": true
+    },
+    "dump": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
+    },
+    "raw": {
+      "supported": true
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
+    },
+    "raw-set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
     }
   },
   "views": {

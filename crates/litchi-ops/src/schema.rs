@@ -239,7 +239,7 @@ const fn color_context(context: ColorContext) -> &'static str {
 }
 
 /// The JSON name of a format (its usual extension).
-const fn format_name(format: FileFormat) -> &'static str {
+pub(crate) const fn format_name(format: FileFormat) -> &'static str {
     match format {
         FileFormat::Doc => "doc",
         FileFormat::Docx => "docx",

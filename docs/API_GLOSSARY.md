@@ -891,6 +891,17 @@ source/protection/cancellation failures abort the whole batch. The DOCX core
 command subset is discoverable through `Verb::Batch`; contextual gaps retain
 follow-ups for command families and text/dump semantics not yet implemented.
 
+## Unified dump and raw layer (record 0336)
+
+| Concept | Canonical | Banned | Notes / status |
+|---|---|---|---|
+| Document as a replayable batch | `File::dump() -> batch::Dump` | `dump_batch`, `to_batch` | ✅ OfficeCLI v2 items (`meta` with `dumpVersion: 2` first); `Dump::{items, into_items, warnings}`; skipped content is one `unsupported_element` (or `unsupported_property`) warning per node, never silent. DOCX/ODT/RTF/DOC, XLSX/XLSB/ODS/XLS and PPTX (record 0336); other formats refuse `unsupported_capability` naming the format |
+| Package part listing / read | `File::parts() -> Vec<raw::PartInfo>`, `File::raw(part) -> raw::Part` | `raw_part`, `read_part`, `get_part` on `File` | ✅ OPC parts (DOCX, XLSX, PPTX, XLSB) and packaged ODF members, by part name or OfficeCLI alias; read from the published package (record 0336) |
+| Part addition | `File::add_part(parent, raw::NewPart) -> raw::AddedPart` | `insert_part`, `create_part` | ✅ `NewPart::{of_type, new, named}`; `AddedPart::{file, part, relationship_id}`; XML payloads pass the OPC publication audit (record 0336) |
+| XPath-addressed XML edit | `File::raw_set(part, xpath, raw::Action, xml) -> raw::Edited` | `raw_edit`, `xpath_set` | ✅ location-path subset; `Action::{Append, Prepend, InsertBefore, InsertAfter, Replace, Remove, SetAttr}` (`FromStr` takes OfficeCLI's spellings); spliced, then audited through `try_replace_owned_xml_part_bytes` (record 0336) |
+| Structural validation | `File::validate() -> raw::Validation` | `check`, `lint`, `verify` | ✅ `Validation::{format, report, is_valid, errors}` over `litchi_core::ValidateReport`; `raw::Error` when a validator cannot complete; OPC part-graph checks are `litchi_opc::validate_parts` (record 0336) |
+| Capability verbs | `Verb::{Dump, Raw, Validate, AddPart, RawSet}` (`dump`, `raw`, `validate`, `add-part`, `raw-set`) | — | ✅ record 0336; `Verb::ALL` has 23 verbs |
+
 ## XLSX unified creation and publication (record 0095)
 
 `create(FileFormat::Xlsx)` adopts the native `Package::new` owner directly

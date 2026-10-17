@@ -61,6 +61,21 @@
     },
     "create": {
       "supported": true
+    },
+    "dump": {
+      "supported": true
+    },
+    "raw": {
+      "supported": true
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": true
+    },
+    "raw-set": {
+      "supported": true
     }
   },
   "views": {
