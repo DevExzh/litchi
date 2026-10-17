@@ -103,6 +103,100 @@ fn notes_add_get_set_remove() {
 }
 
 #[test]
+fn note_fonts_and_rich_runs() {
+    // Record 0325: `font.*` writes one formatted run, `runs` a rich note.
+    let file = workbook()
+        .add(
+            "/Sheet1",
+            NewNode::new("comment")
+                .prop("ref", "B2")
+                .prop("text", "Bold red")
+                .prop("font.bold", true)
+                .prop("font.color", "FF0000")
+                .prop("font.size", "12pt"),
+        )
+        .unwrap()
+        .file
+        .add(
+            "/Sheet1",
+            NewNode::new("comment").prop("ref", "C3").prop(
+                "runs",
+                r#"[{"text":"Alice:","bold":true,"color":"0000FF"},{"text":" check","italic":true,"underline":"double","superscript":true}]"#,
+            ),
+        )
+        .unwrap()
+        .file;
+    for eager in [false, true] {
+        let file = reopen(&file, eager);
+        let get = |path: &str, key: &str| prop(&file, path, key);
+        assert_eq!(
+            get("/Sheet1/comment[1]", "text").as_deref(),
+            Some("Bold red")
+        );
+        assert_eq!(
+            get("/Sheet1/comment[1]", "font.bold").as_deref(),
+            Some("true")
+        );
+        assert_eq!(
+            get("/Sheet1/comment[1]", "font.color").as_deref(),
+            Some("#FF0000")
+        );
+        assert!(get("/Sheet1/comment[1]", "font.size").is_some());
+        // Excel's note typeface is not reported.
+        assert_eq!(get("/Sheet1/comment[1]", "font.name"), None);
+        assert_eq!(get("/Sheet1/comment[1]", "runs"), None);
+        assert_eq!(
+            get("/Sheet1/comment[2]", "text").as_deref(),
+            Some("Alice: check")
+        );
+        let runs = get("/Sheet1/comment[2]", "runs").unwrap();
+        assert!(
+            runs.starts_with(r#"[{"text":"Alice:","bold":true"#),
+            "{runs}"
+        );
+        assert!(runs.contains(r#""superscript":true"#), "{runs}");
+        assert!(runs.contains(r##""color":"#0000FF""##), "{runs}");
+        assert_eq!(get("/Sheet1/comment[2]", "font.bold"), None);
+        // `font.*` alone keeps the text and rebuilds one run.
+        let edited = file
+            .set("/Sheet1/comment[2]", props! { "font.italic" => true })
+            .unwrap();
+        assert_eq!(
+            prop(&edited, "/Sheet1/comment[2]", "text").as_deref(),
+            Some("Alice: check")
+        );
+        assert_eq!(
+            prop(&edited, "/Sheet1/comment[2]", "font.italic").as_deref(),
+            Some("true")
+        );
+        assert_eq!(prop(&edited, "/Sheet1/comment[2]", "runs"), None);
+        // Moving a rich note keeps its runs; an equal set is an exact no-op.
+        let moved = file
+            .set("/Sheet1/comment[2]", props! { "ref" => "D9" })
+            .unwrap();
+        assert!(prop(&moved, "/Sheet1/comment[2]", "runs").is_some());
+        let same = file
+            .set("/Sheet1/comment[2]", props! { "author" => "Author" })
+            .unwrap();
+        assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
+        // A new text alone writes plain text.
+        let plain = file
+            .set("/Sheet1/comment[1]", props! { "text" => "plain" })
+            .unwrap();
+        assert_eq!(prop(&plain, "/Sheet1/comment[1]", "font.bold"), None);
+    }
+    for bad in ["not json", "{}", "[1, 2]"] {
+        let error = workbook()
+            .add(
+                "/Sheet1",
+                NewNode::new("comment").prop("ref", "A1").prop("runs", bad),
+            )
+            .unwrap_err();
+        assert_eq!(error.code(), Code::InvalidValue, "{bad}");
+    }
+}
+
+#[test]
 fn hyperlinks_as_elements_and_cell_properties() {
     let file = workbook()
         .set(

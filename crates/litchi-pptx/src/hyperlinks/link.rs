@@ -65,6 +65,10 @@ impl Click {
     ///
     /// Returns an error for a malformed shape fragment.
     pub fn of_shape(shape: crate::shape::Shape<'_>) -> Result<Option<Self>> {
+        // Most shapes carry no click at all: skip the standalone parse.
+        if !mentions_click(shape.xml()?) {
+            return Ok(None);
+        }
         let fragment = shape.self_contained_xml()?;
         Ok(ShapeLinks::scan(&fragment)?.shape_click)
     }
@@ -430,6 +434,14 @@ impl ShapeLinks {
 enum Slot {
     NonVisual,
     Properties(usize, usize),
+}
+
+/// Whether shape markup names a click action anywhere (`hlinkClick`); a
+/// shape without one has no click to read.
+#[must_use]
+pub fn mentions_click(xml: &[u8]) -> bool {
+    const NEEDLE: &[u8] = b"hlinkClick";
+    xml.windows(NEEDLE.len()).any(|window| window == NEEDLE)
 }
 
 #[cfg(test)]

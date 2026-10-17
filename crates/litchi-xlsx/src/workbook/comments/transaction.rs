@@ -98,6 +98,13 @@ impl<'a> Transaction<'a> {
             u32::try_from(comments.authors.len() - 1)
                 .map_err(|_source| invalid("classic-comments author index exceeds u32"))?
         };
+        // A note keeping its text keeps its runs: this owner writes plain
+        // text, so only a changed text drops them.
+        let runs = previous
+            .as_ref()
+            .filter(|comment| comment.text == text)
+            .map(|comment| comment.runs.clone())
+            .unwrap_or_default();
         let replacement = Comment {
             cell_ref: cell_ref.clone(),
             author,
@@ -105,6 +112,7 @@ impl<'a> Transaction<'a> {
             text,
             guid: previous.as_ref().and_then(|comment| comment.guid.clone()),
             shape_id: previous.as_ref().and_then(|comment| comment.shape_id),
+            runs,
         };
         if previous.as_ref() == Some(&replacement) {
             return Ok(false);

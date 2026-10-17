@@ -328,7 +328,7 @@ impl Edit<Package> {
         Ok(self)
     }
 
-    fn notes_part(&self, kind: NoteKind) -> Result<(String, Vec<u8>)> {
+    pub(super) fn notes_part(&self, kind: NoteKind) -> Result<(String, Vec<u8>)> {
         let (name, _) = self
             .related_part(kind.relationship(self.inner.is_strict()))?
             .ok_or_else(not_found)?;
@@ -348,7 +348,7 @@ fn note_ids(tree: &Tree, kind: NoteKind) -> Vec<i64> {
 }
 
 /// The element index of note `id` of `kind`; separators never match.
-fn find_note(tree: &Tree, kind: NoteKind, id: u32) -> Option<usize> {
+pub(super) fn find_note(tree: &Tree, kind: NoteKind, id: u32) -> Option<usize> {
     tree.children(0).find(|child| {
         let element = &tree.elements[*child];
         element.is(kind.local_name().as_bytes())

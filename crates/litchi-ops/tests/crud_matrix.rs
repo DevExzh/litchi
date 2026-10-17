@@ -545,6 +545,32 @@ const RECIPES: &[Recipe] = &[
         props: &[("ilvl", "8"), ("format", "decimal"), ("lvlText", "%9.")],
         start: false,
     },
+    // Record 0325: bookmarks and fields go into a paragraph, a table of
+    // contents under the body.
+    Recipe {
+        format: "docx",
+        element: "bookmark",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("name", "Mark"), ("text", "here")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "field",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("fieldType", "page")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "toc",
+        fixture: "seed",
+        parent: "/body",
+        props: &[("levels", "1-3")],
+        start: false,
+    },
     // Record 0295: DOCX SmartArt is added under a paragraph from an outline.
     Recipe {
         format: "docx",

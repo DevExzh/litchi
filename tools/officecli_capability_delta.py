@@ -41,6 +41,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -529,6 +530,18 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
                 names.append(emitted[key])
             names = [normalize(name) for name in names]
             hit = next((litchi_keys[name] for name in names if name in litchi_keys), None)
+            # A `<N>` key (`level<N>.format`, `startOverride.<N>`) matches the
+            # registry's numbered spellings (`level0.format`, ...).
+            numbered = [
+                litchi_keys[key]
+                for name in names
+                if "<n>" in name
+                for key in sorted(litchi_keys)
+                if re.fullmatch(re.escape(name).replace("<n>", r"\d+"), key)
+            ]
+            if hit is None and numbered:
+                hit = numbered[0]
+                seen_litchi.update(numbered)
             gap = next(
                 (property_gaps[(normalize(target.name), name)] for name in names
                  if (normalize(target.name), name) in property_gaps),

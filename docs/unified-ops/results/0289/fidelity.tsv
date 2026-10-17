@@ -813,8 +813,8 @@ poi/test-data/slideshow/45543.ppt	ppt	exact		none		-
 poi/test-data/slideshow/45545_Comment.pptx	pptx	exact		value-exact	/slide[1]/shape[3] font: 308394 -> 308088 bytes, first difference at 13306	byte-exact	slide move+back
 poi/test-data/slideshow/54880_chinese.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/ArtisticEffectSample.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	byte-exact	slide move+back
-poi/test-data/slideshow/EmbeddedAudio.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
-poi/test-data/slideshow/EmbeddedVideo.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
+poi/test-data/slideshow/EmbeddedAudio.pptx	pptx	exact		value-exact	/slide[1]/picture[1] link: 90047 -> 90096 bytes, first difference at 1841	none	
+poi/test-data/slideshow/EmbeddedVideo.pptx	pptx	exact		value-exact	/slide[1]/picture[1] link: 201418 -> 201462 bytes, first difference at 1842	none	
 poi/test-data/slideshow/Password_Protected-56-hello.ppt	ppt	locked		-		-	
 poi/test-data/slideshow/Password_Protected-hello.ppt	ppt	locked		-		-	
 poi/test-data/slideshow/Password_Protected-np-hello.ppt	ppt	locked		-		-	
