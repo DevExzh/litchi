@@ -850,22 +850,49 @@
         "note"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/comment[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS comments are retained by the leaf but are not projected into unified nodes yet"
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1027,22 +1054,115 @@
         "validation"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/dataValidation[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS data validations are not projected into unified nodes yet"
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula1": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula2": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "allowBlank": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showError": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showInput": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "promptTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "prompt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "inCellDropdown": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1053,22 +1173,300 @@
         "cf"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/cf[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS conditional formats are not projected into unified nodes yet"
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "priority": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "stopIfTrue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dxfId": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rank": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "percent": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bottom": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "aboveAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "equalAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "stdDev": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "period": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showValue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midpoint": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "iconset": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "reverse": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "negativeColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS data-bar extensions",
+            "reason": "a BIFF8 CF12 data bar has a color, thresholds and lengths; negative and axis styling exist only in Office 2010 formats"
+          }
+        },
+        "axisColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS data-bar extensions",
+            "reason": "a BIFF8 CF12 data bar has a color, thresholds and lengths; negative and axis styling exist only in Office 2010 formats"
+          }
+        },
+        "axisPosition": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS data-bar extensions",
+            "reason": "a BIFF8 CF12 data bar has a color, thresholds and lengths; negative and axis styling exist only in Office 2010 formats"
+          }
+        },
+        "direction": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS data-bar extensions",
+            "reason": "a BIFF8 CF12 data bar has a color, thresholds and lengths; negative and axis styling exist only in Office 2010 formats"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1076,22 +1474,42 @@
       "element": "autofilter",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "stable": [
           "/<sheet>/autofilter"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS auto-filters are not projected into unified nodes yet"
+      "properties": {
+        "range": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "criteria0": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS auto-filter column criteria",
+            "reason": "XLS auto-filter column criteria (AutoFilter/AutoFilter12 records) are kept but not authored; the filter range is"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1099,22 +1517,59 @@
       "element": "hyperlink",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/hyperlink[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS hyperlinks are not projected into unified nodes yet"
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "url": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "location": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1153,22 +1608,211 @@
         "media"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/picture[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS drawings are not projected into unified nodes yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327: wontfix (format)",
+            "reason": "a legacy OfficeArt picture has a name and alternative text but no title"
+          }
+        },
+        "decorative": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchorMode": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contentType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fileSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "crop": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1176,22 +1820,284 @@
       "element": "shape",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/shape[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS drawing shapes are not projected into unified nodes yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "line": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "underline": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "drawing",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "align": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "valign": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "margin": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS shape text formatting",
+            "reason": "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font"
+          }
+        },
+        "gradientFill": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+            "reason": "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1227,22 +2133,49 @@
       "element": "rowbreak",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/rowbreak[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS row page breaks are not projected into unified nodes yet"
+      "properties": {
+        "row": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1250,22 +2183,49 @@
       "element": "colbreak",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/colbreak[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "legacy XLS column page breaks are not projected into unified nodes yet"
+      "properties": {
+        "col": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {

@@ -20,7 +20,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | pptx | 37 | 256 | 256 | 0 | 0 | 65 | 96 | 2 | 40 |
 | xlsb | 26 | 175 | 175 | 0 | 0 | 78 | 45 | 2 | 18 |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
-| xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
+| xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 |
 | ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
 | rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
 | odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
@@ -236,7 +236,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## xls
 
-- fixtures: `create()`, `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`, `ole/xls/SimpleWithColours.xls`, `ole/xls/WithExtendedStyles.xls`, `libreoffice-core/sc/qa/unit/data/xls/formats.xls`, `ole/xls/SimpleWithAutofilter.xls`, `create() + add sheet`, `create() + add row`, `create() + add column`
+- fixtures: `create()`, `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`, `ole/xls/SimpleWithColours.xls`, `ole/xls/WithExtendedStyles.xls`, `libreoffice-core/sc/qa/unit/data/xls/formats.xls`, `ole/xls/SimpleWithAutofilter.xls`, `ole/xls/SimpleWithComments.xls`, `ole/xls/SimpleWithImages.xls`, `ole/xls/WithConditionalFormatting.xls`, `ole/xls/WithHyperlink.xls`, `ole/xls/SimpleWithPageBreaks.xls`, `create() + add sheet`, `create() + add row`, `create() + add column`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
 - document views on `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -249,23 +249,23 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | column | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | table | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | namedrange | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| comment | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | chart | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | series | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | axis | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | pivottable | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | slicer | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | sparkline | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| dataValidation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| conditionalFormatting | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| autofilter | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| hyperlink | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| dataValidation | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| conditionalFormatting | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| autofilter | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | mergeCell | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| picture | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| shape | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| rowbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| colbreak | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| rowbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| colbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | run | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 
 ## ppt

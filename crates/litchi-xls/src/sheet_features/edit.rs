@@ -1030,6 +1030,23 @@ fn cf12_priority(payload: &[u8]) -> Option<u16> {
     (at + 2 <= payload.len()).then(|| u16_at(payload, at))
 }
 
+/// Compile a conditional-format or validation formula (text without a
+/// leading `=`) into BIFF8 tokens: same-sheet references, numbers, strings,
+/// operators and the built-in worksheet functions (not `CALL`,
+/// `REGISTER.ID` or `EXEC`; add-in functions such as `ISODD` are not
+/// built-in in BIFF8).
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] for a formula the tokenizer cannot encode.
+pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
+    let tokens = crate::writer::FormulaTokenizer::extended()
+        .tokenize(formula)
+        .map_err(|_| Error::Invalid("the formula cannot be encoded as BIFF8 tokens"))?;
+    crate::writer::formula::encode_ptg_tokens_by_arity(&tokens)
+        .map_err(|_| Error::Invalid("the formula cannot be encoded as BIFF8 tokens"))
+}
+
 /// Apply a patch to the exact package it was made from.
 pub(super) fn apply(package: &Package, patch: &Patch) -> Result<Package> {
     let bytes = package.to_bytes()?;

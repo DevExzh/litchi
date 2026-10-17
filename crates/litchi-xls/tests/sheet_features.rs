@@ -240,7 +240,7 @@ fn validations_add_set_remove() {
     assert_eq!(validations[0].formula1.as_deref(), Some("1"));
     assert_eq!(validations[0].formula2.as_deref(), Some("10"));
     assert_eq!(validations[0].prompt.as_deref(), Some("1 to 10"));
-    assert_eq!(validations[1].formula1.as_deref(), Some("a,b"));
+    assert_eq!(validations[1].formula1.as_deref(), Some("\"a,b\""));
     let mut edit = added.edit_sheet_features().unwrap();
     edit.remove_validation(0, 1).unwrap();
     edit.remove_validation(0, 0).unwrap();
@@ -801,4 +801,23 @@ fn write_every_feature() {
         .unwrap();
     let package = reopen(&edit.commit().unwrap().into_package());
     std::fs::write(out, package.to_bytes().unwrap()).unwrap();
+}
+
+#[test]
+fn formulas_compile_with_the_built_in_functions_only() {
+    use litchi_xls::sheet_features::edit::compile_formula;
+    // NOT and ISERROR take one argument (PtgFunc), SEARCH two or three
+    // (PtgFuncVar).
+    let tokens = compile_formula("NOT(ISERROR(SEARCH(\"x\",A1)))").unwrap();
+    assert_eq!(tokens.iter().filter(|byte| **byte == 0x41).count(), 2);
+    assert!(compile_formula("AND(A1>=DATE(YEAR(TODAY()),1,1),A1<5)").is_ok());
+    for refused in [
+        "CALL(\"x\")",
+        "REGISTER.ID(\"x\")",
+        "ISODD(A1)",
+        "NOT(1,2)",
+        "Sheet2!A1",
+    ] {
+        assert!(compile_formula(refused).is_err(), "{refused}");
+    }
 }

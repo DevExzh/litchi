@@ -165,6 +165,18 @@ impl Package {
         read::features(&stream, sheet, select).map_err(crate::package::Error::Reader)
     }
 
+    /// The workbook palette (`Palette`, or the default one), the colors a
+    /// conditional format's palette indexes name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the Workbook stream cannot be read.
+    pub fn palette(&self) -> crate::package::Result<crate::Palette> {
+        let stream = self.workbook_stream()?;
+        let globals = stream::Globals::parse(&stream).map_err(crate::package::Error::Reader)?;
+        Ok(read::palette(&stream, &globals))
+    }
+
     /// Start a worksheet-feature edit over this package.
     ///
     /// # Errors

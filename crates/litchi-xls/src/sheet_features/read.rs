@@ -332,7 +332,7 @@ pub(super) fn sheet_name(payload: &[u8]) -> Option<String> {
     })
 }
 
-fn palette(stream_bytes: &[u8], globals: &Globals) -> crate::Palette {
+pub(super) fn palette(stream_bytes: &[u8], globals: &Globals) -> crate::Palette {
     globals
         .first(stream::PALETTE)
         .and_then(|index| {
@@ -522,12 +522,7 @@ fn validation_of(payload: &[u8], rule: &crate::DataValidationRule) -> Validation
     let mut formula1 = render(rule.formula1());
     if list {
         // An explicit list renders as a quoted string with NUL separators.
-        formula1 = formula1.map(|value| {
-            value
-                .trim_start_matches('"')
-                .trim_end_matches('"')
-                .replace('\0', ",")
-        });
+        formula1 = formula1.map(|value| value.replace('\0', ","));
     }
     Validation {
         ranges: rule

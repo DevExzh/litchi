@@ -49,6 +49,11 @@ enum State<'f> {
         grid: Grid,
         rows: std::vec::IntoIter<u32>,
     },
+    /// A worksheet's features (record 0327).
+    Features {
+        sheet: usize,
+        items: std::vec::IntoIter<super::features::Feature>,
+    },
 }
 
 /// A positional worksheet's cells read through the leaf's cell cursor,
@@ -301,7 +306,7 @@ impl<'f> Children<'f> {
                     }
                 }
             },
-            Item::Cell(_) | Item::NamedRange(_) => State::Done,
+            Item::Cell(_) | Item::NamedRange(_) | Item::Feature(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
@@ -356,6 +361,26 @@ impl<'f> Children<'f> {
             Item::Workbook if kinds.contains(Kind::NamedRange) => State::Names {
                 next: 0,
                 count: super::node::defined_names(file)?.len(),
+            },
+            Item::Sheet(sheet)
+                if super::features::KINDS
+                    .iter()
+                    .any(|kind| kinds.contains(*kind))
+                    && !(kinds.contains(Kind::Cell)
+                        || kinds.contains(Kind::Column)
+                        || kinds.contains(Kind::Row)) =>
+            {
+                // A walk scoped to worksheet features lists them (record 0327).
+                let mut items = Vec::new();
+                for kind in super::features::KINDS {
+                    if kinds.contains(kind) {
+                        items.extend(super::features::list(file, sheet, kind)?);
+                    }
+                }
+                State::Features {
+                    sheet: sheet.position,
+                    items: items.into_iter(),
+                }
             },
             Item::Sheet(sheet) => {
                 let want = SheetWant {
@@ -481,6 +506,9 @@ impl<'f> Children<'f> {
                 Ok(Some(Node::new_cell(self.file, *sheet, at, source)))
             },
             State::SheetItems(items) => items.next(self.file),
+            State::Features { sheet, items } => Ok(items
+                .next()
+                .map(|feature| Node::new_feature(self.file, *sheet, feature))),
         }
     }
 }
