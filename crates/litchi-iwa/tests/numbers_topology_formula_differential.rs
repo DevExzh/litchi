@@ -237,11 +237,128 @@ fn cleared_source(package: &Package, sheet: usize, table: usize, op: Op) -> Opti
     write(&edit.commit().ok()?.into_package()).ok()
 }
 
+/// One A1 reference of a formula text: `(column absolute, column, row
+/// absolute, row)`, zero-based, and the byte after it.
+fn parse_reference(text: &str, start: usize) -> Option<((bool, u32, bool, u32), usize)> {
+    let bytes = text.as_bytes();
+    let mut cursor = start;
+    let column_absolute = bytes.get(cursor) == Some(&b'$');
+    if column_absolute {
+        cursor += 1;
+    }
+    let letters_start = cursor;
+    while cursor < bytes.len() && bytes[cursor].is_ascii_uppercase() {
+        cursor += 1;
+    }
+    let letters = &text[letters_start..cursor];
+    let row_absolute = bytes.get(cursor) == Some(&b'$');
+    if row_absolute {
+        cursor += 1;
+    }
+    let digits_start = cursor;
+    while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+        cursor += 1;
+    }
+    let digits = &text[digits_start..cursor];
+    let preceded = start > 0 && bytes[start - 1].is_ascii_alphanumeric();
+    let followed =
+        cursor < bytes.len() && (bytes[cursor].is_ascii_alphanumeric() || bytes[cursor] == b'(');
+    if letters.is_empty() || digits.is_empty() || preceded || followed {
+        return None;
+    }
+    let mut column = 0_u32;
+    for letter in letters.bytes() {
+        column = column * 26 + u32::from(letter - b'A' + 1);
+    }
+    let row = digits.parse::<u32>().ok()? - 1;
+    Some(((column_absolute, column - 1, row_absolute, row), cursor))
+}
+
+fn format_reference(
+    (column_absolute, column, row_absolute, row): (bool, u32, bool, u32),
+) -> String {
+    let mut name = String::new();
+    let mut value = column + 1;
+    while value > 0 {
+        let digit = (value - 1) % 26;
+        name.insert(0, char::from(b'A' + digit as u8));
+        value = (value - 1) / 26;
+    }
+    format!(
+        "{}{name}{}{}",
+        if column_absolute { "$" } else { "" },
+        if row_absolute { "$" } else { "" },
+        row + 1
+    )
+}
+
+/// Record 0329: every A1 reference of a local formula text after removing
+/// `physical`: a reference to it reads `#REF!`, a range that loses it
+/// shrinks, a range wholly on it reads `#REF!`.
+fn remove_text(text: &str, row_axis: bool, physical: u32) -> String {
+    let axis = |reference: (bool, u32, bool, u32)| if row_axis { reference.3 } else { reference.1 };
+    let with = |reference: (bool, u32, bool, u32), value: u32| {
+        if row_axis {
+            (reference.0, reference.1, reference.2, value)
+        } else {
+            (reference.0, value, reference.2, reference.3)
+        }
+    };
+    let shifted = |value: u32| if value > physical { value - 1 } else { value };
+    let mut output = String::new();
+    let mut index = 0;
+    while index < text.len() {
+        if let Some((first, after_first)) = parse_reference(text, index) {
+            if text.as_bytes().get(after_first) == Some(&b':')
+                && let Some((second, after_second)) = parse_reference(text, after_first + 1)
+            {
+                let (low, high) = (axis(first).min(axis(second)), axis(first).max(axis(second)));
+                if low == physical && high == physical {
+                    output.push_str("#REF!");
+                } else {
+                    let moved = |reference| {
+                        let value = axis(reference);
+                        with(
+                            reference,
+                            if value == physical && value == high {
+                                physical - 1
+                            } else if value == physical {
+                                physical
+                            } else {
+                                shifted(value)
+                            },
+                        )
+                    };
+                    output.push_str(&format_reference(moved(first)));
+                    output.push(':');
+                    output.push_str(&format_reference(moved(second)));
+                }
+                index = after_second;
+                continue;
+            }
+            if axis(first) == physical {
+                output.push_str("#REF!");
+            } else {
+                output.push_str(&format_reference(with(first, shifted(axis(first)))));
+            }
+            index = after_first;
+            continue;
+        }
+        let character = text[index..].chars().next().unwrap_or(' ');
+        output.push(character);
+        index += character.len_utf8();
+    }
+    output
+}
+
 /// Shift every A1 reference of a local formula text (no `::`) as the edit
 /// moves its target: `(row axis, physical index, insert)`.
 fn shift_text(text: &str, row_axis: bool, physical: u32, insert: bool) -> Option<String> {
     if text.contains("::") {
         return None;
+    }
+    if !insert {
+        return Some(remove_text(text, row_axis, physical));
     }
     let bytes = text.as_bytes();
     let mut output = String::new();
@@ -924,6 +1041,27 @@ fn leaf_topology_matches_the_host_editor_on_tables_with_formulas() -> TestResult
                                 "{formula_tag}: host refuses incoming references, leaf matches the oracle"
                             )
                         },
+                        (Err(host_error), Ok(leaf_bytes))
+                            if host_error.contains("a formula still references it")
+                                || host_error.contains("invalid IWA wire data") =>
+                        {
+                            // Record 0329: native Numbers writes `#REF!`
+                            // for a deleted reference; the host editor
+                            // refuses it (and, on one corpus table, fails
+                            // to rewrite its own clear). The leaf matches
+                            // the oracle.
+                            let expected = oracle_texts(source, sheet, table, op)?;
+                            let leaf_texts = formula_texts(leaf_bytes)?;
+                            if !expected.iter().all(|cell| leaf_texts.contains(cell)) {
+                                mismatches.push(format!(
+                                    "{name} table {} {op:?}: deleted: leaf {leaf_texts:?} oracle {expected:?}",
+                                    semantic.name()
+                                ));
+                            }
+                            format!(
+                                "{formula_tag}: host refuses deleted references, leaf writes #REF! and matches the oracle"
+                            )
+                        },
                         (Err(host_error), Ok(_)) => {
                             mismatches.push(format!(
                                 "{name} table {} {op:?}: host refused ({host_error}), leaf published",
@@ -1003,6 +1141,18 @@ fn leaf_topology_matches_the_host_editor_on_tables_with_formulas() -> TestResult
     assert!(count("packed: both ok") >= 40, "{summary:?}");
     assert!(
         count("plain: host refuses incoming references, leaf matches the oracle") >= 8,
+        "{summary:?}"
+    );
+    // Record 0329: removals the host refuses for a deleted reference write
+    // `#REF!`, and every removal the host publishes the leaf publishes too.
+    assert!(
+        count(
+            "formulas: host refuses deleted references, leaf writes #REF! and matches the oracle"
+        ) >= 8,
+        "{summary:?}"
+    );
+    assert!(
+        !summary.keys().any(|key| key.contains("host ok, leaf")),
         "{summary:?}"
     );
     Ok(())
