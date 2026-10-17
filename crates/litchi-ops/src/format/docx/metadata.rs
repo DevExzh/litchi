@@ -11,7 +11,7 @@
 use litchi_core::FileFormat;
 
 use super::write::{Commit, WorkEdit};
-use super::{Docx, DocxEditor, DocxOwner};
+use super::{Docx, DocxOwner};
 use crate::error::Result;
 use crate::format::metadata::{self, Scope};
 use crate::props::Props;
@@ -24,31 +24,48 @@ impl Docx {
         metadata::is_target(target) || (metadata::is_root(target) && !props.is_empty())
     }
 
-    /// Commit the admitted core-property assignments of `props`.
-    ///
-    /// `editor` is the handle's editor, built first so the signed,
-    /// unsigned-copy and retained-source policies of every DOCX write apply.
-    pub(super) fn set_metadata(&self, editor: DocxEditor, props: &Props<'_>) -> Result<Commit> {
+    /// Commit the admitted core-property assignments of `props`; the
+    /// handle's own edit policy applies (a signed document, one opened
+    /// without its source, an authorized signature removal).
+    fn commit_metadata(&self, props: &Props<'_>) -> Result<Docx> {
+        self.edit_policy()?;
         let assignments = metadata::admit_with(props, FileFormat::Docx, Scope::Core)?;
-        let package = match (editor, self.owner()) {
-            (DocxEditor::Unsigned(package), _) => *package,
-            (_, DocxOwner::Eager(package)) => package.clone(),
-            (_, DocxOwner::Source(package)) => self.promoted(package)?,
+        let package = if self.signature() == crate::format::signature::Signature::RemovalAuthorized
+        {
+            self.unsigned_package()?
+        } else {
+            match self.owner() {
+                DocxOwner::Eager(package) => package.clone(),
+                DocxOwner::Source(package) => self.promoted(package)?,
+            }
         };
         let mut edit = package.edit_metadata();
         edit.update(|value| assignments.apply(value));
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         self.owner().check_source()?;
-        // The transaction history keeps a main-document patch per step; a
-        // metadata step's is empty, and the coordinator compares the core
-        // properties of the endpoints to see the change (record 0338).
-        let file = if changed {
+        Ok(if changed {
             self.adopt_eager_package(commit.into_package())
         } else {
             // An equal value publishes nothing (record 0253's no-op rule).
             self.clone()
-        };
-        WorkEdit::from(file.edit()?)?.commit(&file)
+        })
+    }
+
+    /// [`Self::commit_metadata`] for single-operation `File::set`, which
+    /// keeps only the handle.
+    pub(super) fn set_metadata_file(&self, props: &Props<'_>) -> Result<Docx> {
+        self.commit_metadata(props)
+    }
+
+    /// [`Self::commit_metadata`] for a transaction, which keeps a
+    /// main-document patch per step: a metadata step's is the handle's own
+    /// editor committed empty (the main document is unchanged), and the
+    /// coordinator compares the endpoints' core properties to see the change
+    /// (record 0338).
+    pub(super) fn set_metadata(&self, props: &Props<'_>) -> Result<Commit> {
+        let file = self.commit_metadata(props)?;
+        let (patch, diagnostics) = WorkEdit::from(self.edit()?)?.commit_patch()?;
+        Ok(Commit::from_parts(file, patch, diagnostics))
     }
 }

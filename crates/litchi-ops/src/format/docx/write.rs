@@ -66,6 +66,20 @@ impl Commit {
     pub(super) const fn file(&self) -> &Docx {
         &self.file
     }
+
+    /// A commit from its parts, for a route that publishes outside the
+    /// main-document edit (record 0338: metadata).
+    pub(super) const fn from_parts(
+        file: Docx,
+        patch: litchi_docx::document::Patch,
+        diagnostics: litchi_docx::document::Diagnostics,
+    ) -> Self {
+        Self {
+            file,
+            patch,
+            diagnostics,
+        }
+    }
 }
 
 impl std::fmt::Debug for Commit {
@@ -226,19 +240,21 @@ impl Docx {
         // Build the editor first.  Besides refusing signed/read-only handles,
         // this makes an empty property list honor the same security policy as
         // a non-empty write.
-        let editor = self.edit()?;
-        // Core document properties on `/` or `/metadata` (record 0338).
+        // Core document properties on `/` or `/metadata` (record 0338); the
+        // metadata route applies the same edit policy without building a
+        // main-document editor.
         let props = if crate::format::metadata::is_target(target)
             || crate::format::metadata::is_root(target)
         {
             let props = Props::from_props(props)?;
             if Self::is_metadata_set(target, &props) {
-                return self.set_metadata(editor, &props).map(O::from_commit);
+                return O::metadata(self, &props);
             }
             Ok(props)
         } else {
             Err(props)
         };
+        let editor = self.edit()?;
         let nodes = self.resolve_targets(target)?;
         let props = match props {
             Ok(props) => props,
@@ -512,6 +528,9 @@ pub(super) trait Publish: Sized {
 
     /// A commit another route already made.
     fn from_commit(commit: Commit) -> Self;
+
+    /// A core-properties set on `source` (record 0338).
+    fn metadata(source: &Docx, props: &Props<'_>) -> Result<Self>;
 }
 
 impl Publish for Commit {
@@ -522,6 +541,10 @@ impl Publish for Commit {
     fn from_commit(commit: Commit) -> Self {
         commit
     }
+
+    fn metadata(source: &Docx, props: &Props<'_>) -> Result<Self> {
+        source.set_metadata(props)
+    }
 }
 
 impl Publish for Docx {
@@ -531,6 +554,10 @@ impl Publish for Docx {
 
     fn from_commit(commit: Commit) -> Self {
         commit.into_file()
+    }
+
+    fn metadata(source: &Docx, props: &Props<'_>) -> Result<Self> {
+        source.set_metadata_file(props)
     }
 }
 
@@ -1100,6 +1127,27 @@ impl WorkEdit {
                 Ok(source.adopt_source_package(package))
             },
         }
+    }
+
+    /// Commit and keep only the main-document patch and diagnostics.
+    pub(super) fn commit_patch(
+        self,
+    ) -> Result<(
+        litchi_docx::document::Patch,
+        litchi_docx::document::Diagnostics,
+    )> {
+        Ok(match self {
+            Self::Eager(edit) => {
+                let commit = edit.commit().map_err(Error::from)?;
+                let diagnostics = commit.diagnostics();
+                (commit.into_parts().1, diagnostics)
+            },
+            Self::Source(edit) => {
+                let commit = edit.commit().map_err(Error::from)?;
+                let diagnostics = commit.diagnostics();
+                (commit.into_parts().1, diagnostics)
+            },
+        })
     }
 
     pub(super) fn commit(self, source: &Docx) -> Result<Commit> {

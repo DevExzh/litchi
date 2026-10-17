@@ -1552,8 +1552,11 @@ impl Xlsx {
         };
         let source = self.editor()?;
         let mut edit = source.edit_drawings()?;
-        edit.set(sheet, kind, feature.index as usize, &change)
-            .map_err(authored)?;
+        // A `src`-only set leaves the anchor alone: no anchor rewrite.
+        if image.is_none() || change != Change::default() {
+            edit.set(sheet, kind, feature.index as usize, &change)
+                .map_err(authored)?;
+        }
         if let Some((bytes, content_type, extension)) = image {
             edit.replace_image(
                 sheet,

@@ -524,7 +524,8 @@ impl Xlsx {
         };
         let assignments = admit(props, Operation::Set)?;
         let (sheet, at, index) = (node.sheet_position(), run.at, run.index as usize);
-        self.edit_runs(sheet, at, |rich| {
+        let read = xlsx::RichText::clone(&run.rich);
+        self.edit_runs_with(sheet, at, false, Some(read), |rich| {
             let run = rich.run_mut(index).ok_or_else(|| {
                 Error::new(Code::PathNotFound, "the run is no longer in the cell")
             })?;
@@ -575,7 +576,8 @@ impl Xlsx {
             return Ok(None);
         };
         let (sheet, at, index) = (node.sheet_position(), run.at, run.index as usize);
-        self.edit_runs_with(sheet, at, true, |rich| {
+        let read = xlsx::RichText::clone(&run.rich);
+        self.edit_runs_with(sheet, at, true, Some(read), |rich| {
             rich.remove_run(index)
                 .map(drop)
                 .map_err(super::write::native_error)
@@ -591,21 +593,27 @@ impl Xlsx {
         at: Address,
         change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
     ) -> Result<Commit> {
-        self.edit_runs_with(sheet, at, false, change)
+        self.edit_runs_with(sheet, at, false, None, change)
     }
 
     /// [`Self::edit_runs`]; after a removal (`plain`), the runs left
     /// collapse as OfficeCLI's run removal does: none is empty text, one
     /// unformatted run is plain text.
+    /// `read` is the cell's runs as the resolved run node read them, so the
+    /// editor does not read them again.
     fn edit_runs_with(
         &self,
         sheet: usize,
         at: Address,
         plain: bool,
+        read: Option<xlsx::RichText>,
         change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
     ) -> Result<Commit> {
         let source = self.editor()?;
-        let mut rich = editable_runs(&source, sheet, at)?;
+        let mut rich = match read {
+            Some(rich) => rich,
+            None => editable_runs(&source, sheet, at)?,
+        };
         change(&mut rich)?;
         self.check_source()?;
         let mut edit = source.edit().map_err(super::write::native_error)?;
