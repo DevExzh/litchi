@@ -1,5 +1,13 @@
 //! Root-comment creation: the target table's comment list, its tile and
 //! the author storage may live in different members (record 0318).
+//!
+//! Record 0329: a comment on an empty cell in a row its tile does not store
+//! materialises the row; with several commenting authors, a new comment is
+//! the generated author's (reused when present, else appended to the author
+//! storage), so no present author is impersonated. A table without a comment
+//! list still takes its new list beside the table model: a member of its
+//! own needs a component registration the strict metadata codec does not
+//! write yet.
 
 use std::sync::Arc;
 
@@ -597,7 +605,34 @@ fn creation_graph(source: &Package, located: &Located, path: Path) -> Result<Cre
         });
     }
     if !authors.is_empty() {
-        return Err(Error::UnsupportedDependency { path });
+        // Several authors (record 0329): a new comment is the generated
+        // author's, reused when the package already holds it, else a new
+        // one joins the author storage. No present author is impersonated.
+        super::validate_comment_authors(source, &census, path)?;
+        for author in &authors {
+            let (decoded, _) = super::decode_comment_author(
+                source,
+                *author,
+                source.state.options.semantic().max_output_text_bytes(),
+                path,
+            )?;
+            if decoded.display_name() == Some(GENERATED_AUTHOR_NAME) {
+                return Ok(CreationGraph {
+                    list,
+                    model,
+                    author_identifier: *author,
+                    author_storage: None,
+                    create_author_storage: false,
+                });
+            }
+        }
+        return Ok(CreationGraph {
+            list,
+            model,
+            author_identifier: 0,
+            author_storage: Some(author_storage(source, path)?),
+            create_author_storage: false,
+        });
     }
     let author_storage = empty_author_storage(source, path)?;
     Ok(CreationGraph {
@@ -607,6 +642,32 @@ fn creation_graph(source: &Package, located: &Located, path: Path) -> Result<Cre
         author_storage,
         create_author_storage: author_storage.is_none(),
     })
+}
+
+/// The package's unique author storage.
+fn author_storage(source: &Package, path: Path) -> Result<MessageRoute, Error> {
+    let mut found = None;
+    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+        for (object_index, object) in component.archive().objects.iter().enumerate() {
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE {
+                    continue;
+                }
+                if found
+                    .replace(MessageRoute {
+                        component_index,
+                        object_index,
+                        message_index,
+                        message_type: message.type_,
+                    })
+                    .is_some()
+                {
+                    return Err(Error::InvalidSource { path });
+                }
+            }
+        }
+    }
+    found.ok_or(Error::UnsupportedDependency { path })
 }
 
 fn empty_author_storage(source: &Package, path: Path) -> Result<Option<MessageRoute>, Error> {
@@ -658,6 +719,17 @@ fn append_author_storage(
     let reference = canonical_reference(identifier, path)?;
     let data = append_repeated_length_delimited_field(message.data.as_slice(), 1, &reference)
         .map_err(|_| Error::InvalidSource { path })?;
+    let present: Vec<u64> =
+        litchi_iwa_common::wire::repeated_length_delimited_payloads(message.data.as_slice(), 1)
+            .map_err(|_| Error::InvalidSource { path })?
+            .into_iter()
+            .map(|payload| {
+                litchi_iwa_common::wire::repeated_varint_values(payload, 1)
+                    .ok()
+                    .and_then(|values| values.first().copied())
+                    .ok_or(Error::InvalidSource { path })
+            })
+            .collect::<Result<_, _>>()?;
     let object = archive
         .objects
         .get_mut(route.object_index)
@@ -668,6 +740,56 @@ fn append_author_storage(
         .get(route.message_index)
         .ok_or(Error::InvalidSource { path })?
         .clone();
+    if !present.is_empty() {
+        // A populated storage (record 0329, several authors): native
+        // storages list their authors in the payload only; this crate's
+        // carry the same list in the aggregate and one FieldInfo.
+        if info.object_references.is_empty() && info.field_infos.is_empty() {
+            object
+                .replace_message_preserving_header_with_limits(
+                    route.message_index,
+                    RawMessage {
+                        type_: route.message_type,
+                        data,
+                    },
+                    limits,
+                )
+                .map_err(|_| Error::InvalidSource { path })?;
+            return Ok(());
+        }
+        let [field] = info.field_infos.as_slice() else {
+            return Err(Error::UnsupportedDependency { path });
+        };
+        if info.object_references != present
+            || field.object_references != present
+            || field.path.as_slice() != [1]
+        {
+            return Err(Error::UnsupportedDependency { path });
+        }
+        let mut after = present.clone();
+        after.push(identifier);
+        object
+            .replace_message_transitioning_object_references_preserving_header_with_limits(
+                route.message_index,
+                RawMessage {
+                    type_: route.message_type,
+                    data,
+                },
+                ObjectReferenceTransition {
+                    aggregate_before: &present,
+                    aggregate_after: &after,
+                    fields: &[FieldObjectReferenceTransition {
+                        field_info_index: 0,
+                        expected_path: &[1],
+                        before: &present,
+                        after: &after,
+                    }],
+                },
+                limits,
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+        return Ok(());
+    }
     if !info.object_references.is_empty() || !info.field_infos.is_empty() {
         return Err(Error::InvalidSource { path });
     }

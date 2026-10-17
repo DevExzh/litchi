@@ -261,6 +261,17 @@ fn cell_comments_are_read_set_added_and_removed() {
         .remove(&format!("{commented}/comment"))
         .expect("remove the comment");
     assert_eq!(prop(&reopen(&removed), &commented, "comment"), None);
+    // Record 0329: an empty cell in a row its tile does not store takes a
+    // comment too.
+    let basic = read("basic.numbers");
+    let last = "/sheet[1]/table[1]/G22";
+    let commented_empty = basic
+        .set(last, props! { "comment" => "on an empty cell" })
+        .expect("comment an empty cell");
+    assert_eq!(
+        prop(&reopen(&commented_empty), last, "comment").as_deref(),
+        Some("on an empty cell")
+    );
 
     for file in [
         read("basic.numbers"),
