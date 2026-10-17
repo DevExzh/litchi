@@ -1185,7 +1185,7 @@ pub(crate) mod coalesce {
             limits: &SemanticLimits,
             source: Option<&litchi_xls::Edit>,
         ) -> Result<Option<Plan>> {
-            self.check_source()?;
+            self.check_outside_run(source)?;
             let result = (|| {
                 let Some(path) = target.path() else {
                     return Ok(None);
@@ -1253,7 +1253,7 @@ pub(crate) mod coalesce {
                     changed,
                 }))
             })();
-            self.check_source().and(result)
+            self.check_outside_run(source).and(result)
         }
 
         /// Admit a direct cell removal.  An absent coordinate is retained as
@@ -1267,13 +1267,27 @@ pub(crate) mod coalesce {
             self.remove_plan_with_source(target, limits, None)
         }
 
+        /// The plans' own source checks. A coalesced run (`source` is the
+        /// run's leaf edit) checks the source when it opens and around its
+        /// commit, and each item's resolution and leaf `source_cell` read
+        /// still observe the source, so a plan inside a run adds no check
+        /// of its own (record 0337: about five `fstat`s an item on a
+        /// file-backed owner).
+        fn check_outside_run(&self, source: Option<&litchi_xls::Edit>) -> Result<()> {
+            if source.is_some() {
+                Ok(())
+            } else {
+                self.check_source()
+            }
+        }
+
         fn remove_plan_with_source(
             &self,
             target: &TargetArg<'_>,
             limits: &SemanticLimits,
             source: Option<&litchi_xls::Edit>,
         ) -> Result<Option<Plan>> {
-            self.check_source()?;
+            self.check_outside_run(source)?;
             let result = (|| {
                 let Some(path) = target.path() else {
                     return Ok(None);
@@ -1310,7 +1324,7 @@ pub(crate) mod coalesce {
                     changed: target.present,
                 }))
             })();
-            self.check_source().and(result)
+            self.check_outside_run(source).and(result)
         }
     }
 
@@ -1376,7 +1390,8 @@ pub(crate) mod coalesce {
                 )
                 .with_format(FileFormat::Xls));
             }
-            self.base.check_source()?;
+            // Staging reads no source: the run checks it when it opens and
+            // around its commit (record 0337).
             self.items
                 .try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;
@@ -1421,7 +1436,6 @@ pub(crate) mod coalesce {
             self.staged_bytes = self.staged_bytes.saturating_add(plan.charge());
             let changed = plan.changed;
             self.items.push(Item { plan, index });
-            self.base.check_source()?;
             Ok(changed)
         }
 
@@ -1581,7 +1595,10 @@ pub(crate) mod coalesce {
             };
             (present, formula, current)
         };
-        file.check_source()?;
+        // Inside a run the leaf `source_cell` read above checked the source.
+        if source.is_none() {
+            file.check_source()?;
+        }
         Ok(Some((
             CellTarget {
                 sheet: node.sheet_position(),
