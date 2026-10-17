@@ -126,6 +126,22 @@ impl Story {
         })
     }
 
+    /// Construct a story over a shared XML allocation (a part payload read
+    /// once and kept by its owner).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is not a bounded header or footer.
+    pub fn from_shared_bytes(xml_bytes: Arc<Vec<u8>>, kind: Kind) -> Result<Self> {
+        let role = codec::validate(&xml_bytes)?;
+        Ok(Self {
+            xml_bytes,
+            semantic: Arc::new(OnceLock::new()),
+            role,
+            kind,
+        })
+    }
+
     /// Construct a story by sharing the XML allocation owned by an OPC part.
     pub(crate) fn from_part(part: &dyn Part, kind: Kind) -> Result<Self> {
         let role = codec::validate(part.blob())?;

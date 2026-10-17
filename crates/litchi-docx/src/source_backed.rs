@@ -1018,6 +1018,104 @@ impl Package {
         crate::comment::Comment::extract_from_payload(&payload)
     }
 
+    /// The styles part, located, or `None` when the document has none; only
+    /// the main part's relationships and the styles part are read (record
+    /// 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn style_catalog(&self) -> Result<Option<crate::styles::catalog::Catalog>> {
+        match self.related_xml("/styles")? {
+            Some(xml) => Ok(Some(crate::styles::catalog::Catalog::from_xml(xml)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// The numbering part, located, or `None` when the document has none;
+    /// only the main part's relationships and the numbering part are read
+    /// (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn numbering_catalog(&self) -> Result<Option<crate::numbering::catalog::Catalog>> {
+        match self.related_xml("/numbering")? {
+            Some(xml) => Ok(Some(crate::numbering::catalog::Catalog::from_xml(xml)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// The header and footer parts the main document relates, in
+    /// relationship order; only the main part's relationships are read
+    /// (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the relationships cannot
+    /// be read.
+    pub fn header_footer_entries(&self) -> Result<Vec<crate::header_footer::catalog::Entry>> {
+        let package = self.source_backed_package()?;
+        let main = package.main_document_part()?;
+        crate::header_footer::catalog::entries_of(main.rels())
+    }
+
+    /// The payload of part `name`, or `None` when the package has no such
+    /// part (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the name is invalid.
+    pub fn part_xml(&self, name: &str) -> Result<Option<Arc<Vec<u8>>>> {
+        let package = self.source_backed_package()?;
+        let uri = PackURI::new(name.to_owned()).map_err(Error::Invalid)?;
+        match package.part(&uri) {
+            Ok(part) => Ok(Some(part.data()?.into_arc()?)),
+            Err(_) => Ok(None),
+        }
+    }
+
+    /// The footnotes of the main document, in part order, without
+    /// separators; only the main part's relationships and the footnotes part
+    /// are read (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn footnotes(&self) -> Result<Vec<crate::footnote::Note>> {
+        match self.related_xml("/footnotes")? {
+            Some(xml) => crate::footnote::Note::footnotes_from_xml(xml),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// The endnotes of the main document, in part order, without
+    /// separators (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn endnotes(&self) -> Result<Vec<crate::footnote::Note>> {
+        match self.related_xml("/endnotes")? {
+            Some(xml) => crate::footnote::Note::endnotes_from_xml(xml),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// The payload of the first internal part the main part relates by a
+    /// relationship type ending in `suffix`.
+    fn related_xml(&self, suffix: &str) -> Result<Option<Arc<Vec<u8>>>> {
+        let package = self.source_backed_package()?;
+        let main = package.main_document_part()?;
+        let Some(relationship) = main.rels().iter().find(|relationship| {
+            !relationship.is_external() && relationship.reltype().ends_with(suffix)
+        }) else {
+            return Ok(None);
+        };
+        let target = relationship.target_partname()?;
+        Ok(Some(package.part(&target)?.data()?.into_arc()?))
+    }
+
     /// The header, footer, footnotes, endnotes and comments parts the main
     /// document relates, in relationship order, each once; only the main
     /// part's relationships are read (record 0285).

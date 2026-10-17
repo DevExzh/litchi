@@ -2526,3 +2526,31 @@ through common styles, a run over its paragraph.
 | Canonical name | Notes | Status |
 | --- | --- | --- |
 | `litchi_xls::WorksheetDefect::{ZoomLevel, SharedFormulaFlag}`, `Defect::Worksheet` | Excel-compatible repairs under every `Leniency`: a WINDOW2 zoom outside `10..=400` reads as the default; a stale `fShrFmla` on a formula with its own tokens is ignored | ✅ 0316 |
+
+## DOCX located parts: styles, numbering, headers, footers and notes (record 0319)
+
+L-DOCX-R5/R6. Owned, source-located catalogs read a part once and keep
+every entry's byte range, so a read answers the typed direct-property keys
+and an edit splices the raw part. They are owner-neutral: both owners and
+the eager `Edit` return the same catalog type. Edit verbs stage on the eager
+package-bound `document::Edit` and travel in its `Patch` as graph changes
+and main-story element replacements; no new transaction family is
+introduced. Native identifiers (`w:styleId`, `w:abstractNumId`, `w:numId`,
+note `w:id`) are the selectors these verbs take, as `remove_comment(id)`
+does.
+
+| Name | Notes | Status |
+|---|---|---|
+| `styles::catalog::{Catalog, Entry, Flag}` | `Catalog::{from_xml, xml, entries, get, resolve, paragraph_properties, run_properties, is_strict}`; `resolve` matches an id or a display name | ✅ 0319 |
+| `styles::catalog::{NewStyle, StyleChange}` | `with_*` builders; an inner `None` removes an element | ✅ 0319 |
+| `Edit::{style_catalog, add_style, set_style, remove_style}` | | ✅ 0319 |
+| `numbering::catalog::{Catalog, AbstractNum, Num, Lvl}` | `Catalog::{abstract_nums, nums, abstract_num, num, level_of, format_of, level_paragraph_properties, level_run_properties, next_abstract_num_id, next_num_id}`; `Lvl` is named after `w:lvl` (the typed `numbering::Level` stays the parsed model) | ✅ 0319 |
+| `numbering::catalog::{LevelChange, AbstractNumChange, NewNum, NewLevel, NewAbstractNum}` | | ✅ 0319 |
+| `Edit::{numbering_catalog, set_level, set_abstract_num, set_num_definition, add_num, add_abstract_num, add_level, remove_num, remove_abstract_num, remove_level}` | | ✅ 0319 |
+| `header_footer::catalog::Entry` | role, relationship identifier and part name, in relationship order | ✅ 0319 |
+| `header_footer::Story::from_shared_bytes` | | ✅ 0319 |
+| `document::NewStory`; `Edit::{header_footer_entries, add_header_footer, remove_header_footer, set_header_footer_kind, set_story_text, format_story}` | | ✅ 0319 |
+| `document::{NewNote, NoteKind}`; `Edit::{add_note_at, set_note_text, remove_note}` | | ✅ 0319 |
+| `footnote::Note::{footnotes_from_xml, endnotes_from_xml}` | | ✅ 0319 |
+| `Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml}` and `source_backed::Package::{style_catalog, numbering_catalog, header_footer_entries, part_xml, footnotes, endnotes}` | both owners | ✅ 0319 |
+| `document::ElementStep::SectionProperties` | the body-final `w:sectPr`, position 0, first step only | ✅ 0319 |

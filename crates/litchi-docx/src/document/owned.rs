@@ -12,15 +12,20 @@ mod chart;
 mod comments;
 mod fields;
 mod graph;
+mod notes;
 mod numbering;
 mod picture;
 mod smartart;
+mod stories;
+mod styles;
 mod substitute;
 pub use chart::{NewChart, chart_workbook};
 pub use comments::NewComment;
 pub use graph::HyperlinkTarget;
+pub use notes::{NewNote, NoteKind};
 pub use picture::NewPicture;
 pub use smartart::NewSmartArt;
+pub use stories::NewStory;
 pub(crate) use substitute::story_parts_of;
 
 /// An isolated main-document edit retaining its complete source package.
