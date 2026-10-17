@@ -14,14 +14,21 @@ pub(crate) enum FlagDefect {
     SharedWithoutPtgExp,
 }
 
-pub(crate) fn decode_flags(flags: u16, tokens: &[u8]) -> Result<Metadata> {
+/// Decodes the flags of a Formula record read under the strict profile.
+///
+/// `[MS-XLS]` 2.4.127 defines `fShrFmla` as whether the formula is part of
+/// a shared formula, and only such a formula's `rgce` MUST begin with
+/// `PtgExp`. A record whose bit is set but whose `rgce` is a complete token
+/// stream is not part of one: Excel writes such records (Apache POI's
+/// `FormulaRecordAggregate` documents and clears the stale flag; LibreOffice
+/// reads the tokens). The flag is ignored here, the bytes are kept, and the
+/// caller receives the [`FlagDefect`] to record (record 0316).
+pub(crate) fn decode_flags(flags: u16, tokens: &[u8]) -> Result<(Metadata, Option<FlagDefect>)> {
     let (metadata, defect) = decode_flags_preserving(flags, tokens)?;
-    if matches!(defect, Some(FlagDefect::SharedWithoutPtgExp)) {
-        return Err(invalid(
-            "shared Formula metadata requires a leading PtgExp token",
-        ));
+    if defect.is_some() {
+        return Ok((metadata.with_shared_formula(false), defect));
     }
-    Ok(metadata)
+    Ok((metadata, None))
 }
 
 pub(crate) fn decode_flags_preserving(

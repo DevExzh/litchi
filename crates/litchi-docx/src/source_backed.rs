@@ -1001,21 +1001,182 @@ impl Package {
     /// Returns an error when the source changed or the comments part is
     /// unreadable or malformed.
     pub fn comments(&self) -> Result<Vec<crate::comment::Comment>> {
-        let package = self.source_backed_package()?;
-        let main = package.main_document_part()?;
-        let Some(relationship) = main.rels().iter().find(|relationship| {
-            !relationship.is_external()
-                && matches!(
-                    relationship.reltype(),
-                    litchi_opc::constants::relationship_type::COMMENTS
-                        | litchi_opc::constants::relationship_type::STRICT_COMMENTS
-                )
-        }) else {
+        let target = self.with_main_relationships(|relationships| {
+            relationships
+                .iter()
+                .find(|relationship| is_comments_relationship(relationship))
+                .map(litchi_opc::rel::Relationship::target_partname)
+                .transpose()
+                .map_err(Error::from)
+        })?;
+        let Some(target) = target else {
             return Ok(Vec::new());
         };
-        let target = relationship.target_partname()?;
-        let payload = package.part(&target)?.data()?.into_arc()?;
+        let payload = self
+            .effective_part_xml(&target)?
+            .ok_or_else(|| Error::PartNotFound(target.as_str().to_owned()))?;
         crate::comment::Comment::extract_from_payload(&payload)
+    }
+
+    /// Whether the main document relates a comments part; retained edits
+    /// are included (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the relationships cannot
+    /// be read.
+    pub fn has_comments(&self) -> Result<bool> {
+        self.with_main_relationships(|relationships| {
+            Ok(relationships.iter().any(is_comments_relationship))
+        })
+    }
+
+    /// The styles part, located, or `None` when the document has none; only
+    /// the main part's relationships and the styles part are read (record
+    /// 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn style_catalog(&self) -> Result<Option<crate::styles::catalog::Catalog>> {
+        match self.related_xml("/styles")? {
+            Some(xml) => Ok(Some(crate::styles::catalog::Catalog::from_xml(xml)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// The numbering part, located, or `None` when the document has none;
+    /// only the main part's relationships and the numbering part are read
+    /// (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn numbering_catalog(&self) -> Result<Option<crate::numbering::catalog::Catalog>> {
+        match self.related_xml("/numbering")? {
+            Some(xml) => Ok(Some(crate::numbering::catalog::Catalog::from_xml(xml)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// The header and footer parts the main document relates, in
+    /// relationship order; only the main part's relationships are read
+    /// (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the relationships cannot
+    /// be read.
+    pub fn header_footer_entries(&self) -> Result<Vec<crate::header_footer::catalog::Entry>> {
+        self.with_main_relationships(crate::header_footer::catalog::entries_of)
+    }
+
+    /// The header and footer references of every section, in document
+    /// order, each with its role; only the main part is read (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the main part is not
+    /// well-formed.
+    pub fn header_footer_references(
+        &self,
+    ) -> Result<Vec<(crate::header_footer::Role, crate::section::Reference)>> {
+        let payload = match &self.effective {
+            Some(topology) => Arc::new(topology.main_document_part()?.data()?.as_bytes().to_vec()),
+            None => {
+                let package = self.source_backed_package()?;
+                let name = package.main_document_part()?.partname().clone();
+                package.part(&name)?.data()?.into_arc()?
+            },
+        };
+        crate::header_footer::catalog::references_of(&payload)
+    }
+
+    /// The payload of part `name`, or `None` when the package has no such
+    /// part (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the name is invalid.
+    pub fn part_xml(&self, name: &str) -> Result<Option<Arc<Vec<u8>>>> {
+        let uri = PackURI::new(name.to_owned()).map_err(Error::Invalid)?;
+        self.effective_part_xml(&uri)
+    }
+
+    /// The footnotes of the main document, in part order, without
+    /// separators; only the main part's relationships and the footnotes part
+    /// are read (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn footnotes(&self) -> Result<Vec<crate::footnote::Note>> {
+        match self.related_xml("/footnotes")? {
+            Some(xml) => crate::footnote::Note::footnotes_from_xml(xml),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// The endnotes of the main document, in part order, without
+    /// separators (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn endnotes(&self) -> Result<Vec<crate::footnote::Note>> {
+        match self.related_xml("/endnotes")? {
+            Some(xml) => crate::footnote::Note::endnotes_from_xml(xml),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// The payload of the first internal part the main part relates by a
+    /// relationship type ending in `suffix`.
+    fn related_xml(&self, suffix: &str) -> Result<Option<Arc<Vec<u8>>>> {
+        let target = self.with_main_relationships(|relationships| {
+            relationships
+                .iter()
+                .find(|relationship| {
+                    !relationship.is_external() && relationship.reltype().ends_with(suffix)
+                })
+                .map(litchi_opc::rel::Relationship::target_partname)
+                .transpose()
+                .map_err(Error::from)
+        })?;
+        match target {
+            Some(target) => self.effective_part_xml(&target),
+            None => Ok(None),
+        }
+    }
+
+    /// Run `read` over the main part's relationships as this owner's
+    /// effective graph has them: retained edits included (record 0319).
+    fn with_main_relationships<T>(
+        &self,
+        read: impl FnOnce(&litchi_opc::Relationships) -> Result<T>,
+    ) -> Result<T> {
+        match &self.effective {
+            Some(topology) => read(topology.main_document_part()?.rels()),
+            None => {
+                let package = self.source_backed_package()?;
+                read(package.main_document_part()?.rels())
+            },
+        }
+    }
+
+    /// The payload of part `uri` in this owner's effective graph, or `None`
+    /// when it has no such part (record 0319).
+    fn effective_part_xml(&self, uri: &PackURI) -> Result<Option<Arc<Vec<u8>>>> {
+        match &self.effective {
+            Some(topology) => match topology.part(uri) {
+                Ok(part) => Ok(Some(Arc::new(part.data()?.as_bytes().to_vec()))),
+                Err(_) => Ok(None),
+            },
+            None => match self.source_backed_package()?.part(uri) {
+                Ok(part) => Ok(Some(part.data()?.into_arc()?)),
+                Err(_) => Ok(None),
+            },
+        }
     }
 
     /// The header, footer, footnotes, endnotes and comments parts the main
@@ -2180,7 +2341,11 @@ impl Package {
                     if let Some(snapshot) =
                         self.memoized_main_snapshot(&raw, &source_lineage, source_version, partname)
                     {
-                        return Ok(snapshot);
+                        return Ok(self.with_retained_main_proof(snapshot, || {
+                            self.physical_package()
+                                .ok()
+                                .and_then(|package| package.xml_audit_proof(partname))
+                        }));
                     }
                     let snapshot = Snapshot::from_shared_xml_with_source_identity(
                         raw,
@@ -2189,7 +2354,11 @@ impl Package {
                         partname,
                     )?;
                     self.remember_main_snapshot(&snapshot);
-                    Ok(snapshot)
+                    Ok(self.with_retained_main_proof(snapshot, || {
+                        self.physical_package()
+                            .ok()
+                            .and_then(|package| package.xml_audit_proof(partname))
+                    }))
                 })();
                 snapshot?
             };
@@ -2202,6 +2371,33 @@ impl Package {
             .check_execution()
             .map_err(Error::from)?;
         result
+    }
+
+    /// `snapshot` with the source XML audit proof the OPC package retained
+    /// for its exact bytes, when it has none yet and `retained` finds one
+    /// (record 0317); the memo then keeps the proven snapshot.
+    ///
+    /// The proof is the package's own audit of these bytes (its indexed
+    /// proof of the original, or the proof an earlier commit's candidate
+    /// earned), so the preserving commit proves its candidate from it
+    /// without scanning the base again. A proof for any other allocation is
+    /// dropped by [`Snapshot::with_publication_proof`].
+    pub(super) fn with_retained_main_proof(
+        &self,
+        snapshot: Snapshot,
+        retained: impl FnOnce() -> Option<xml_minifier::audit::VerifiedSource>,
+    ) -> Snapshot {
+        if snapshot.publication_proof().is_some() {
+            return snapshot;
+        }
+        let Some(proof) = retained() else {
+            return snapshot;
+        };
+        let proven = snapshot.with_publication_proof(proof);
+        if proven.publication_proof().is_some() {
+            self.remember_main_snapshot(&proven);
+        }
+        proven
     }
 
     /// Keep `snapshot` as the unmanaged transaction snapshot memo.
@@ -3665,6 +3861,34 @@ impl Document {
         Ok(fields)
     }
 
+    /// Return the bookmarks of the main story in document order, as
+    /// [`crate::Document::bookmarks`] does (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bookmark markup is malformed.
+    pub fn bookmarks(&self) -> Result<Vec<crate::bookmark::Bookmark>> {
+        self.check_selective_operation("document bookmarks")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        crate::bookmark::Bookmark::extract_from_document(xml)
+    }
+
+    /// Return the text boxes of the main story in document order, as
+    /// [`crate::Document::text_boxes`] does (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the drawing markup is malformed.
+    pub fn text_boxes(&self) -> Result<Vec<crate::textbox::TextBox>> {
+        self.check_selective_operation("document text boxes")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        crate::textbox::load_text_boxes(xml)
+    }
+
     /// Return the drawing objects of the main-story paragraphs in document
     /// order.
     ///
@@ -3866,4 +4090,14 @@ impl Document {
         self.check_execution()?;
         Ok(snapshot)
     }
+}
+
+/// Whether `relationship` relates a comments part.
+fn is_comments_relationship(relationship: &litchi_opc::rel::Relationship) -> bool {
+    !relationship.is_external()
+        && matches!(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::COMMENTS
+                | litchi_opc::constants::relationship_type::STRICT_COMMENTS
+        )
 }

@@ -303,6 +303,15 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
                     text,
                 });
             }
+            if !values.format.is_empty() {
+                let story = node
+                    .own_story()
+                    .filter(|_| *kind == Kind::Shape)
+                    .ok_or_else(|| {
+                        unsupported_target("this ODP shape has no text story to format")
+                    })?;
+                format_story(node, &story, &values.format, plan)?;
+            }
             if let Some(name) = values.name {
                 plan.changes.push(Change::SetAttribute {
                     object: object.clone(),
@@ -375,11 +384,18 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
             }
         },
         Item::Cell(..) | Item::Notes(_) => {
+            let story = || {
+                node.own_story()
+                    .ok_or_else(|| unsupported_target("this ODP element has no text story"))
+            };
             if let Some(text) = values.text {
-                let story = node
-                    .own_story()
-                    .ok_or_else(|| unsupported_target("this ODP element has no text story"))?;
-                plan.changes.push(Change::SetStoryText { story, text });
+                plan.changes.push(Change::SetStoryText {
+                    story: story()?,
+                    text,
+                });
+            }
+            if !values.format.is_empty() {
+                format_story(node, &story()?, &values.format, plan)?;
             }
         },
         _ => {
@@ -389,6 +405,68 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
         },
     }
     Ok(())
+}
+
+/// Character formatting of a whole story (a shape, table cell or notes,
+/// record 0316): every paragraph takes it through its paragraph style, and
+/// every run whose own style chain sets a different value takes it too, so
+/// each run reads the new value.
+fn format_story(
+    node: &Node<'_>,
+    story: &StoryRef,
+    format: &TextPropertyEdit,
+    plan: &mut Plan,
+) -> Result<()> {
+    let paragraphs = node
+        .scene()
+        .story(story)
+        .ok_or_else(|| unsupported_target("this ODP element has no text story"))?
+        .paragraphs();
+    let styles = node.file().automatic_styles()?;
+    let common = node.file().common_styles()?;
+    for (index, paragraph) in paragraphs.iter().enumerate() {
+        plan.changes.push(Change::SetTextProperties {
+            story: story.clone(),
+            paragraph: index,
+            run: None,
+            properties: format.clone(),
+        });
+        for (run, item) in paragraph.runs().iter().enumerate() {
+            if overrides(&styles.resolve_run(common, item), format) {
+                plan.changes.push(Change::SetTextProperties {
+                    story: story.clone(),
+                    paragraph: index,
+                    run: Some(run),
+                    properties: format.clone(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Whether a run's own properties set a value `format` changes.
+fn overrides(own: &litchi_odp::scene::TextProperties, format: &TextPropertyEdit) -> bool {
+    let differs =
+        |set: Option<bool>, held: Option<bool>| set.zip(held).is_some_and(|(a, b)| a != b);
+    differs(format.bold, own.bold())
+        || differs(format.italic, own.italic())
+        || differs(format.underline, own.underline())
+        || format
+            .size
+            .as_deref()
+            .zip(own.size())
+            .is_some_and(|(set, held)| set != held)
+        || format
+            .color
+            .as_deref()
+            .zip(own.color())
+            .is_some_and(|(set, held)| !set.eq_ignore_ascii_case(held))
+        || format
+            .font
+            .as_deref()
+            .zip(own.font())
+            .is_some_and(|(set, held)| set != held)
 }
 
 /// Set `/metadata` through the leaf metadata family (record 0288).

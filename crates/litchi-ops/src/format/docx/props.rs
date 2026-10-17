@@ -53,6 +53,8 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
         Value::Comment(comment) => Some(Cow::Owned(comment_text(comment)?)),
         Value::SmartArt(smartart) => Some(Cow::Owned(super::smartart::smartart_text(smartart))),
+        Value::Part(value) => super::parts::text(node.docx, *value)?.map(Cow::Owned),
+        Value::Mark(mark) => super::marks::text(mark).map(Cow::Owned),
         Value::Picture(_) | Value::Chart(_) => None,
         Value::Document
         | Value::Body(_)
@@ -132,7 +134,12 @@ pub(super) fn style<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
 /// body whose blocks no request has read (M1-Δ1).
 pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
     let count = match &node.value {
-        Value::Document => 1 + usize::from(super::nav::has_comments(node.docx)?),
+        Value::Document => {
+            1 + super::parts::root_count(node.docx)?
+                + usize::from(super::nav::has_comments(node.docx)?)
+        },
+        Value::Part(value) => super::parts::child_count(node.docx, *value)?,
+        Value::Mark(_) => 0,
         Value::Comments => super::nav::comments(node.docx)?.len(),
         Value::Body(lock) => match lock.get() {
             Some(blocks) => listed_blocks(blocks),
@@ -175,6 +182,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
     let props = match &node.value {
         Value::Document => Props::Document(Box::new(node.docx.metadata()?.unwrap_or_default())),
         Value::Paragraph { paragraph, .. } => Props::Paragraph {
+            docx: node.docx,
             props: Box::new(paragraph.direct_properties()?),
             id: litchi_docx::document::raw::paragraph_ids(paragraph)?
                 .para_id()
@@ -237,6 +245,8 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         Value::Picture(picture) => Props::Picture(Arc::clone(picture)),
         Value::Chart(chart) => Props::Chart(node.docx, Arc::clone(chart)),
         Value::SmartArt(smartart) => Props::SmartArt(Arc::clone(smartart)),
+        Value::Part(value) => Props::Part(super::parts::props(node.docx, *value)?),
+        Value::Mark(mark) => Props::Mark(Arc::clone(mark)),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
     };
     let invalid = match &props {
@@ -257,8 +267,27 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         _ => false,
     };
     require_valid(invalid)?;
-    Ok(Format::new(node.kind.spec().props, Source::Docx(props))
-        .without(node.kind.spec().identities))
+    // A part element's semantic identity (`type`) is an ordinary property;
+    // its native identifiers (`id`, `ilvl`) are raw-only, as list ids are
+    // for RTF (record 0319).
+    if let Props::Mark(_) = &props {
+        return Ok(Format::new(
+            super::marks::table(node.kind),
+            Source::Docx(props),
+        ));
+    }
+    if let Props::Part(_) = &props {
+        let hidden: &'static [&'static str] = match node.kind {
+            Kind::AbstractNum | Kind::Num => &["id"],
+            Kind::Level => &["ilvl"],
+            _ => &[],
+        };
+        return Ok(
+            Format::new(super::parts::table(node.kind), Source::Docx(props)).without(hidden),
+        );
+    }
+    let table = node.kind.spec().props;
+    Ok(Format::new(table, Source::Docx(props)).without(node.kind.spec().identities))
 }
 
 /// Refuse malformed typed direct properties instead of reporting them as absent.
@@ -305,6 +334,9 @@ pub(crate) enum Props<'a> {
     Equation,
     Document(Box<Metadata>),
     Paragraph {
+        /// The handle the paragraph's style and list properties read the
+        /// styles and numbering parts through (record 0319).
+        docx: &'a super::Docx,
         props: Box<direct::Paragraph>,
         /// Validated native identifier, available only to raw query access.
         id: Option<String>,
@@ -325,6 +357,11 @@ pub(crate) enum Props<'a> {
     Chart(&'a super::Docx, Arc<super::chart::ChartValue>),
     /// A SmartArt graphic (record 0295).
     SmartArt(Arc<super::smartart::SmartArtValue>),
+    /// A styles, numbering, story or note element (record 0319).
+    Part(super::parts::PartProps<'a>),
+    /// A tab stop, break, bookmark, field, table of contents, watermark or
+    /// text box (record 0319).
+    Mark(Arc<super::marks::MarkValue>),
 }
 
 impl<'a> Props<'a> {
@@ -334,7 +371,12 @@ impl<'a> Props<'a> {
             Self::None => None,
             Self::Equation => (index == 0).then_some(NodeValue::Token("display")),
             Self::Document(metadata) => document(metadata, index),
-            Self::Paragraph { props, id } => paragraph_value(props, id.as_deref(), index),
+            Self::Paragraph { docx, props, id } => match index {
+                P_STYLE_NAME | P_NUM_FMT | P_LIST_STYLE | P_START => {
+                    super::parts::paragraph_part_value(docx, props, index)
+                },
+                _ => paragraph_value(props, id.as_deref(), index),
+            },
             Self::Run(props) => run(props, index),
             Self::Hyperlink { link, first } => hyperlink(link, first.as_deref(), index),
             Self::Table(table) => table_value(table, index),
@@ -345,6 +387,8 @@ impl<'a> Props<'a> {
             Self::Picture(picture) => picture_value(picture, index),
             Self::Chart(docx, chart) => super::chart::chart_value(docx, chart, index),
             Self::SmartArt(smartart) => super::smartart::smartart_value(smartart, index),
+            Self::Part(part) => part.get(index),
+            Self::Mark(mark) => super::marks::value(mark, index),
         }
     }
 }
@@ -366,6 +410,8 @@ impl std::fmt::Debug for Props<'_> {
             Self::Picture(_) => "Props::Picture",
             Self::Chart(..) => "Props::Chart",
             Self::SmartArt(_) => "Props::SmartArt",
+            Self::Part(_) => "Props::Part",
+            Self::Mark(_) => "Props::Mark",
         })
     }
 }
@@ -514,6 +560,10 @@ fn document<'a>(metadata: &Metadata, index: usize) -> Option<NodeValue<'a>> {
 const P_PARA_ID: usize = index_of(PARAGRAPH_PROPS, "paraId");
 const P_STYLE: usize = index_of(PARAGRAPH_PROPS, "style");
 const P_STYLE_ID: usize = index_of(PARAGRAPH_PROPS, "styleId");
+pub(super) const P_STYLE_NAME: usize = index_of(PARAGRAPH_PROPS, "styleName");
+pub(super) const P_NUM_FMT: usize = index_of(PARAGRAPH_PROPS, "numFmt");
+pub(super) const P_LIST_STYLE: usize = index_of(PARAGRAPH_PROPS, "listStyle");
+pub(super) const P_START: usize = index_of(PARAGRAPH_PROPS, "start");
 const P_ALIGN: usize = index_of(PARAGRAPH_PROPS, "align");
 const P_SPACE_BEFORE: usize = index_of(PARAGRAPH_PROPS, "spaceBefore");
 const P_SPACE_AFTER: usize = index_of(PARAGRAPH_PROPS, "spaceAfter");
@@ -541,7 +591,7 @@ const P_NUM_ID: usize = index_of(PARAGRAPH_PROPS, "numId");
 const P_NUM_LEVEL: usize = index_of(PARAGRAPH_PROPS, "numLevel");
 const P_OUTLINE_LEVEL: usize = index_of(PARAGRAPH_PROPS, "outlineLvl");
 
-fn paragraph_value<'a>(
+pub(super) fn paragraph_value<'a>(
     props: &direct::Paragraph,
     id: Option<&str>,
     index: usize,
@@ -675,7 +725,7 @@ const R_POSITION: usize = index_of(RUN_PROPS, "position");
 const R_CHAR_SPACING: usize = index_of(RUN_PROPS, "charSpacing");
 const R_STYLE: usize = index_of(RUN_PROPS, "rStyle");
 
-fn run<'a>(props: &direct::Run, index: usize) -> Option<NodeValue<'a>> {
+pub(super) fn run<'a>(props: &direct::Run, index: usize) -> Option<NodeValue<'a>> {
     let fonts = props.fonts.as_ref();
     let flag = |value: Option<bool>| value.map(NodeValue::Bool);
     // OfficeCLI collapses equal ASCII and high-ANSI slots into `font.latin`
@@ -1142,6 +1192,22 @@ fn sdt_value<'a>(sdt: &SdtProps, index: usize) -> Option<NodeValue<'a>> {
 fn view_kinds(kind: Kind) -> KindSet<Kind> {
     match kind {
         Kind::Paragraph => KindSet::of(Kind::Run),
+        // Bookmarks, fields, tables of contents, the watermark and text
+        // boxes are reached by path and query, not listed (record 0319).
+        Kind::Document => KindSet::of(Kind::Body)
+            .with(Kind::Styles)
+            .with(Kind::Header)
+            .with(Kind::Footer)
+            .with(Kind::Numbering)
+            .with(Kind::Footnotes)
+            .with(Kind::Endnotes)
+            .with(Kind::Comments)
+            .with(Kind::SmartArt),
+        Kind::Body => KindSet::of(Kind::Paragraph)
+            .with(Kind::Table)
+            .with(Kind::Sdt)
+            .with(Kind::Equation)
+            .with(Kind::Section),
         _ => KindSet::ALL,
     }
 }

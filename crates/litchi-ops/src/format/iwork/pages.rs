@@ -643,10 +643,11 @@ fn value_type(value: &litchi_pages::table::read::Value) -> &'static str {
 // ---------------------------------------------------------------------------
 
 /// Paragraph text sets waiting for one paragraph transaction per section:
-/// section → `(line, text)` in staging order. A batch stages in line order,
-/// so a list append is cheaper than a map insert per set (record 0302);
-/// [`Pending::flush`] orders each section's lines and keeps the last text
-/// of a repeated line, which is what a map keyed by line held.
+/// section → `(line, text)` in staging order (a list append is cheaper than
+/// a map insert per set, record 0302). [`Pending::flush`] stages every set
+/// in that order, repeated lines included: the leaf publishes a run of sets
+/// as one splice only where that equals publishing them one at a time
+/// (record 0314).
 #[derive(Debug, Default)]
 struct Pending(BTreeMap<usize, Vec<(usize, String)>>);
 
@@ -658,18 +659,12 @@ impl Pending {
     /// Commit the staged sets: one leaf paragraph transaction per section.
     fn flush(&mut self, chain: &mut Chain<Package>) -> Result<()> {
         let error = |error| failure(LeafError::PagesParagraphs(error));
-        for (section, mut lines) in std::mem::take(&mut self.0) {
-            // Stable: the sets of one line stay in staging order.
-            lines.sort_by_key(|(line, _)| *line);
+        for (section, lines) in std::mem::take(&mut self.0) {
             let mut edit = chain
                 .package
                 .edit_section_paragraphs(section)
                 .map_err(error)?;
-            for (at, (line, value)) in lines.iter().enumerate() {
-                if lines.get(at + 1).is_some_and(|(next, _)| next == line) {
-                    // A later set of the same line replaces this one.
-                    continue;
-                }
+            for (line, value) in &lines {
                 edit.set(Position::new(*line), value).map_err(error)?;
             }
             let commit = edit.commit().map_err(error)?;

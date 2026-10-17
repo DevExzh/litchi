@@ -7,6 +7,7 @@
 mod codec;
 mod model;
 mod package;
+mod summary;
 #[cfg(test)]
 mod tests;
 
@@ -17,7 +18,9 @@ pub use model::{
     Bookmark, Conformance, Data, Extension, ExtensionList, Fade, Kind, List, Picture, Poster,
     Resource, Transform, Trim,
 };
+pub(crate) use package::store_with;
 pub use package::{load, load as load_slide_media, store, store as store_slide_media};
+pub use summary::{Summary, summary};
 
 // These are crate-private seams shared by the XML and package layers and by
 // the in-module regression tests; they do not expand the external API.

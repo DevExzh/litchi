@@ -499,6 +499,29 @@ pub(super) fn set_text(
     .map_err(lift)
 }
 
+/// Whether splices within `hull` of the text storage `storage` publish
+/// what one combined splice publishes (record 0314).
+pub(super) fn storage_admits_combined_splice(
+    source: &super::Package,
+    storage: u64,
+    hull: std::ops::Range<usize>,
+) -> Result<bool, Error> {
+    let object = source
+        .required_object(storage, "Keynote drawable text storage")
+        .map_err(super::map_read_error)?;
+    let (_, payload) = unique_message(object, inventory::STORAGE).map_err(lift)?;
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_error| Error::InvalidSource)?;
+    let limits = rewrite_limits(source, archive_limits.max_message_bytes())?;
+    let boundaries = litchi_iwa_text_wire::storage_boundaries_with_limits(payload, limits)
+        .map_err(map_rewrite_error)?;
+    Ok(boundaries.admits_combined_splice(hull))
+}
+
 /// The text-rewrite bounds: the wire defaults narrowed by the package's
 /// semantic text limits and the archive's message ceiling.
 fn rewrite_limits(

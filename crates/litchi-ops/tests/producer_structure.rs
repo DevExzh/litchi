@@ -36,10 +36,17 @@ mod xls {
     /// Inserts a row and a column at the top of the first sheet and removes
     /// them again.
     fn round_trips(relative: &str) {
+        round_trips_sheet(relative, 1);
+    }
+
+    /// Inserts a row and a column at the top of sheet `sheet` and removes
+    /// them again: the inverse restores the input bytes.
+    fn round_trips_sheet(relative: &str, sheet: usize) {
         let (file, bytes) = input(relative);
+        let parent = format!("/sheet[{sheet}]");
         for kind in ["row", "column"] {
             let added = file
-                .add("/sheet[1]", NewNode::new(kind).at(Placement::Start))
+                .add(parent.as_str(), NewNode::new(kind).at(Placement::Start))
                 .unwrap_or_else(|error| panic!("{relative} {kind}: {error}"));
             assert_ne!(added.file.to_bytes().unwrap(), bytes, "{relative} {kind}");
             let removed = added.file.remove(&added.path).unwrap();
@@ -70,19 +77,15 @@ mod xls {
 
     #[test]
     fn leaf_refusals_name_their_cause() {
-        // A workbook-wide conditional format is still a typed refusal, and
-        // the message is the leaf's, not the code summary.
-        let (file, _) = input("ole/xls/WithConditionalFormatting.xls");
+        // A formula with ancillary RgbExtra data is still a typed refusal,
+        // and the message is the leaf's, not the code summary.
+        let (file, _) = input("ole/xls/FormulaEvalTestData.xls");
         let error = file
             .add("/sheet[1]", NewNode::new("row").at(Placement::Start))
             .map(drop)
-            .expect_err("conditional formats are not shifted");
+            .expect_err("RgbExtra formulas are not shifted");
         assert_eq!(error.code().as_str(), "unsupported_capability");
-        assert!(
-            error.message().contains("conditional format"),
-            "{}",
-            error.message()
-        );
+        assert!(error.message().contains("RgbExtra"), "{}", error.message());
     }
 
     /// Record 0308: producer constructs the shifts now handle.
@@ -127,18 +130,63 @@ mod xls {
     }
 
     #[test]
-    fn locked_drawing_anchors_are_refused() {
-        // A comment box anchored "don't move or size with cells".
-        let (file, _) = input("ole/xls/SimpleWithComments.xls");
+    fn locked_drawing_anchors_keep_their_place_over_default_rows() {
+        // Comment boxes anchored "don't move or size with cells" over rows
+        // of one height keep their cell coordinates (record 0316).
+        round_trips("ole/xls/SimpleWithComments.xls");
+    }
+
+    #[test]
+    fn locked_drawing_anchors_over_uneven_rows_are_refused() {
+        let (file, _) = input("libreoffice-core/chart2/qa/extras/data/xls/chart.xls");
         let error = file
             .add("/sheet[1]", NewNode::new("row").at(Placement::Start))
             .map(drop)
-            .expect_err("a position-locked anchor needs row sizes");
+            .expect_err("a position-locked anchor over uneven rows needs row sizes");
         assert!(
             error.message().contains("position-locked"),
             "{}",
             error.message()
         );
+    }
+
+    /// Record 0316: rule, array and table records, reader repairs and
+    /// embedded substreams.
+    #[test]
+    fn conditional_formats_and_validations_shift_with_their_formulas() {
+        // Absolute references in CF rules, and CFEx extensions.
+        round_trips("ole/xls/WithConditionalFormatting.xls");
+        // PtgRefN offsets in DV formulas.
+        round_trips("libreoffice-core/sc/qa/unit/data/xls/validation.xls");
+        // CondFmt12/CF12 icon sets, data bars and colour scales.
+        round_trips("poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls");
+    }
+
+    #[test]
+    fn repaired_worksheets_are_shifted() {
+        // WINDOW2 page-break zoom 1, read as the default zoom.
+        round_trips("ole/xls/SingleLetterRanges.xls");
+        // Stale fShrFmla flags on formulas with their own tokens.
+        round_trips_sheet("ole/xls/DateTimeToNumberTestCases.xls", 2);
+        // An empty sheet whose producer wrote a lone DBCELL.
+        round_trips_sheet("ole/xls/SimpleWithColours.xls", 2);
+    }
+
+    #[test]
+    fn embedded_chart_caches_are_not_cells() {
+        // The chart's Number and Label cache records were read as cells A1
+        // to A3 by the source-backed reader.
+        let (file, _) = input("ole/xls/WithFormattedGraphTitle.xls");
+        let text = file
+            .get("/sheet[1]/A1")
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .map(std::borrow::Cow::into_owned);
+        assert_eq!(text.as_deref(), Some("Some Text"));
+        round_trips("ole/xls/WithFormattedGraphTitle.xls");
+        round_trips_sheet("ole/xls/WithChart.xls", 2);
     }
 }
 

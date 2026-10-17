@@ -10,6 +10,9 @@
 //! - `batch_N`: N distinct cell values (leaf: one `edit_table_cells` with N
 //!   changes; unified: one atomic `File::batch` of N `set` items, coalesced
 //!   into one leaf commit);
+//! - record 0314: `batch_N_owned` (the batch items copied outside the
+//!   clock) and `batch_N_parsed` (one `File::edit` of the same assignments,
+//!   each path parsed once outside the clock);
 //! - `rename_sheet`: leaf `edit_names` + `rename_sheet`; unified `set` of the
 //!   sheet `name`;
 //! - `merge_add`: leaf `edit_table_merges` + `merge`; unified `add` of a
@@ -27,6 +30,11 @@
 //!   `col_remove` (the same row or column), and `cell_font` (leaf
 //!   `edit_table_cell_text_style` + bold on A3; unified `set` of
 //!   `font.bold`), on the grid fixture.
+//! - record 0318: `row_insert_formulas` (the `row_insert` pair on a
+//!   created workbook whose table holds formulas, so the leaf shifts their
+//!   coordinates; inserted before physical row 3) and `comment_set` (leaf
+//!   `set_table_cell_comment` on a stored cell of `basic.numbers`; unified
+//!   `set` of the cell's `comment`).
 //!
 //! Legs run in ABBA order per sample after a warm-up; outputs of every
 //! write scenario are compared byte for byte before timing (the merge by
@@ -321,6 +329,46 @@ mod enabled {
             Some(same),
             || time(|| leaf_batch(&leaf, &cells)),
             || time(|| unified_batch(&file, &items)),
+        ));
+        // Record 0314: the batch with its items copied outside the clock
+        // (`File::batch` takes them by value), and the same assignments in
+        // one `File::edit` with each path parsed once outside the clock.
+        scenarios.extend(abba(
+            format!("batch_{BATCH}_owned"),
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_batch(&leaf, &cells)),
+            || {
+                let (file, owned) = (&file, items.to_vec());
+                time(move || file.batch(owned, BatchMode::Atomic).expect("batch").file)
+            },
+        ));
+        let targets: Vec<litchi_ops::TargetArg<'_>> = items
+            .iter()
+            .map(|item| {
+                litchi_ops::TargetArg::parse(item.path.as_deref().expect("path")).expect("target")
+            })
+            .collect();
+        let unified_parsed = |file: &File| {
+            file.edit(|tx| {
+                for (target, (_, _, value)) in targets.iter().zip(&cells) {
+                    tx.set(target, props! { "value" => *value })?;
+                }
+                Ok(())
+            })
+            .expect("edit")
+            .file
+        };
+        let same_parsed = leaf_bytes(&leaf_batch(&leaf, &cells))
+            == unified_parsed(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            format!("batch_{BATCH}_parsed"),
+            GRID,
+            rounds,
+            Some(same_parsed),
+            || time(|| leaf_batch(&leaf, &cells)),
+            || time(|| unified_parsed(&file)),
         ));
 
         let formulas = fixture(FORMULAS);
@@ -700,6 +748,91 @@ mod enabled {
             Some(same),
             || time(|| leaf_font(&leaf)),
             || time(|| unified_font(&file)),
+        ));
+
+        // Record 0318: a row under formulas, and a cell comment.
+        let formula_package = {
+            let base = Package::new();
+            let mut edit = base.edit_table_cells(0, 0).expect("cells");
+            for (index, address) in ["B2", "C2", "B3", "C3", "B4", "C4"].into_iter().enumerate() {
+                edit = edit
+                    .set_a1(address, Input::number(index as f64).expect("finite"))
+                    .expect("value");
+            }
+            for (address, text) in [("D2", "B2+C3"), ("D3", "SUM($B$2:B4)"), ("D4", "B$3*$C3")] {
+                edit = edit
+                    .set_formula_a1(address, Expression::parse(text).expect("parse"))
+                    .expect("formula");
+            }
+            edit.commit().expect("formulas").into_package()
+        };
+        let formula_bytes = leaf_bytes(&formula_package);
+        let formula_file = litchi_ops::open_bytes(formula_bytes.clone()).expect("open formulas");
+        let formula_leaf = Package::from_bytes(&formula_bytes).expect("leaf formulas");
+        let leaf_formula_row = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .edit_table_topology(sheet, table)
+                .expect("edit")
+                .insert_row(RowInsertion::body(1))
+                .expect("insert")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_formula_row = |file: &File| {
+            file.add(
+                "/sheet[1]/table[1]",
+                NewNode::new("row").at(Placement::Position(litchi_ops::path::Position::new(2))),
+            )
+            .expect("add row")
+            .into_file()
+        };
+        let same = leaf_bytes(&leaf_formula_row(&formula_leaf))
+            == unified_formula_row(&formula_file)
+                .to_bytes()
+                .expect("bytes");
+        scenarios.extend(abba(
+            "row_insert_formulas",
+            "created workbook with formulas",
+            rounds,
+            Some(same),
+            || time(|| leaf_formula_row(&formula_leaf)),
+            || time(|| unified_formula_row(&formula_file)),
+        ));
+        let comment_leaf = Package::from_bytes(&formulas).expect("leaf basic");
+        let comment_file = litchi_ops::open_bytes(formulas.clone()).expect("open basic");
+        let stored = comment_leaf.sheets()[0]
+            .tables()
+            .next()
+            .and_then(|table| table.iter_cells().next())
+            .map(|cell| cell.position())
+            .expect("a stored cell");
+        let stored_path = format!(
+            "/sheet[1]/table[1]/{}{}",
+            char::from(b'A' + stored.column() as u8),
+            stored.row() + 1
+        );
+        let leaf_comment = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .set_table_cell_comment(sheet, table, stored, "bench")
+                .expect("comment")
+                .into_package()
+        };
+        let unified_comment = |file: &File| {
+            file.set(stored_path.as_str(), props! { "comment" => "bench" })
+                .expect("comment")
+        };
+        let same = leaf_bytes(&leaf_comment(&comment_leaf))
+            == unified_comment(&comment_file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "comment_set",
+            FORMULAS,
+            rounds,
+            Some(same),
+            || time(|| leaf_comment(&comment_leaf)),
+            || time(|| unified_comment(&comment_file)),
         ));
 
         let report = Report {

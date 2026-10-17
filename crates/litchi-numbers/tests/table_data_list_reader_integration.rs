@@ -1509,21 +1509,22 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
         Some(original.clone())
     );
 
-    let clear_error = package
-        .clear_table_cell_comment(sheet, table, position)
-        .expect_err("changed clear must be refused without graph cleanup");
-    assert!(matches!(
-        clear_error,
-        TableCellCommentError::UnsupportedDependency {
-            path: TableCellCommentPath::Cell {
-                sheet: 0,
-                table: 0,
-                row: 4,
-                column: 0,
-            },
-        }
-    ));
-    assert_eq!(bytes, original_bytes, "clear refusal mutated source bytes");
+    // The storage is registered in the package metadata's object-UUID map:
+    // the clear removes that registration with it (record 0318).
+    let cleared = package.clear_table_cell_comment(sheet, table, position)?;
+    assert_eq!(
+        cleared
+            .package()
+            .table_cell_comment(sheet, table, position)?,
+        None
+    );
+    let restored = cleared
+        .package()
+        .apply_table_cell_comment(&cleared.patch().inverse())?;
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes)?;
+    assert_eq!(restored_bytes, original_bytes);
+    assert_eq!(bytes, original_bytes, "the clear mutated the source bytes");
     assert_eq!(
         package.table_cell_comment(sheet, table, position)?,
         Some(original.clone()),

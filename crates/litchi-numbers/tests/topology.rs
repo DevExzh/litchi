@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use litchi_numbers::cell::Value;
+use litchi_numbers::formula::Expression;
 use litchi_numbers::table::cells::Input;
 use litchi_numbers::table::topology::{
     ColumnDeletion, ColumnInsertion, Error, RowDeletion, RowInsertion, Unsupported,
@@ -274,6 +275,81 @@ fn refusals_are_typed() -> TestResult {
         }
     }
     panic!("a sixth header row was accepted");
+}
+
+/// The formula texts of one table, by position.
+fn formulas(package: &Package, sheet: usize, table: usize) -> Vec<(u32, u32, String)> {
+    cells(package, sheet, table)
+        .into_iter()
+        .filter_map(|(row, column, value)| match value {
+            Value::Formula(text) => Some((row, column, text)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Record 0318: row and column edits move the formulas' references with
+/// their targets, and refuse removing a row a surviving formula reads.
+#[test]
+fn formula_references_follow_row_and_column_edits() -> TestResult {
+    let base = Package::new();
+    let mut edit = base.edit_table_cells(0, 0)?;
+    for (index, address) in ["B2", "C2", "D2", "B3", "C3", "D3", "B4", "C4", "D4"]
+        .into_iter()
+        .enumerate()
+    {
+        edit = edit.set_a1(address, Input::number(index as f64)?)?;
+    }
+    for (address, text) in [("E2", "B2+C3"), ("E3", "SUM($B$2:B4)"), ("E4", "B$3*$D3")] {
+        edit = edit.set_formula_a1(address, Expression::parse(text)?)?;
+    }
+    let package = edit.commit()?.into_package();
+    let source = bytes(&package)?;
+    assert_eq!(
+        formulas(&package, 0, 0),
+        [
+            (1, 4, "=(B2+C3)".to_owned()),
+            (2, 4, "=SUM($B$2:B4)".to_owned()),
+            (3, 4, "=(B$3*$D3)".to_owned()),
+        ]
+    );
+    // A body row before row 3 and a column before column C.
+    let commit = package
+        .edit_table_topology(0, 0)?
+        .insert_row(RowInsertion::body(1))?
+        .insert_column(ColumnInsertion::body(1))?
+        .commit()?;
+    assert_eq!(
+        formulas(commit.package(), 0, 0),
+        [
+            (1, 5, "=(B2+D4)".to_owned()),
+            (3, 5, "=SUM($B$2:B5)".to_owned()),
+            (4, 5, "=(B$4*$E4)".to_owned()),
+        ]
+    );
+    let restored = commit
+        .package()
+        .apply_table_topology(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
+    // Removing them again restores the texts.
+    let removed = commit
+        .package()
+        .edit_table_topology(0, 0)?
+        .remove_column(ColumnDeletion::body(1))?
+        .remove_row(RowDeletion::body(1))?
+        .commit()?;
+    assert_eq!(formulas(removed.package(), 0, 0), formulas(&package, 0, 0));
+    // Row 3 is read by every formula.
+    assert!(matches!(
+        package
+            .edit_table_topology(0, 0)?
+            .remove_row(RowDeletion::body(1))?
+            .commit(),
+        Err(Error::Unsupported {
+            reason: Unsupported::DeletedReference
+        })
+    ));
+    Ok(())
 }
 
 /// Every corpus table either takes a row and a column, and gives them back

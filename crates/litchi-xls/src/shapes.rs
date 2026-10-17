@@ -599,7 +599,7 @@ mod tests {
         let expected = SheetAnchor::new(
             crate::AnchorPoint::new(1, 2, -4, 3).unwrap(),
             crate::AnchorPoint::new(4, 7, 900, 200).unwrap(),
-            crate::AnchorBehavior::Size,
+            crate::AnchorBehavior::MoveWithoutResize,
         )
         .unwrap();
         let mut children = Vec::new();

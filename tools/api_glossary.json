@@ -2733,7 +2733,12 @@
       "families": [
         "litchi_xlsx::workbook::edit",
         "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit"
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::workbook::comments::edit",
+        "litchi_xlsx::drawing::edit"
       ]
     },
     {
@@ -3265,7 +3270,12 @@
       "families": [
         "litchi_xlsx::workbook::edit",
         "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit"
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::workbook::comments::edit",
+        "litchi_xlsx::drawing::edit"
       ]
     },
     {
@@ -4842,6 +4852,48 @@
           "name": "UserNamesTransaction",
           "scope": "litchi_xls::user_names",
           "replacement": "use Edit (record 0259)"
+        },
+        {
+          "name": "Fixed",
+          "scope": "litchi_xls::AnchorBehavior",
+          "replacement": "inverted fMove/fSize reading; use AnchorBehavior::MoveAndResize (record 0316)",
+          "recursive": false
+        },
+        {
+          "name": "Size",
+          "scope": "litchi_xls::AnchorBehavior",
+          "replacement": "inverted fMove/fSize reading; use AnchorBehavior::MoveWithoutResize (record 0316)",
+          "recursive": false
+        },
+        {
+          "name": "MoveAndSize",
+          "scope": "litchi_xls::AnchorBehavior",
+          "replacement": "inverted fMove/fSize reading; use AnchorBehavior::Absolute (record 0316)",
+          "recursive": false
+        },
+        {
+          "name": "Fixed",
+          "scope": "litchi_xls::drawing_metadata::AnchorBehavior",
+          "replacement": "inverted fMove/fSize reading; use AnchorBehavior::MoveAndResize (record 0316)",
+          "recursive": false
+        },
+        {
+          "name": "Size",
+          "scope": "litchi_xls::drawing_metadata::AnchorBehavior",
+          "replacement": "inverted fMove/fSize reading; use AnchorBehavior::MoveWithoutResize (record 0316)",
+          "recursive": false
+        },
+        {
+          "name": "MoveAndSize",
+          "scope": "litchi_xls::drawing_metadata::AnchorBehavior",
+          "replacement": "inverted fMove/fSize reading; use AnchorBehavior::Absolute (record 0316)",
+          "recursive": false
+        },
+        {
+          "name": "Behavior",
+          "scope": "litchi_xls::writer::shape",
+          "replacement": "use litchi_xls::AnchorBehavior, the one anchor-behaviour type (record 0316)",
+          "recursive": false
         }
       ],
       "families": [

@@ -8,6 +8,7 @@
   "format": {
     "style": "a3",
     "styleId": "a3",
+    "styleName": "Normal (Web)",
     "align": "justify",
     "spaceAfter": "12pt",
     "spaceAfterAuto": false

@@ -894,6 +894,46 @@ impl Slide {
         result
     }
 
+    /// The Office Math equations of this slide's text (record 0321); see
+    /// [`crate::slide::Slide::equations`]. Like charts, only a physical
+    /// source slide can answer them; a restored slide answers none.
+    pub fn equations(&self) -> Result<Vec<crate::shape::math::Equation>> {
+        self.package.check()?;
+        let result = match self.physical_source_slide() {
+            Some(slide) => slide.equations(),
+            None => Ok(Vec::new()),
+        };
+        self.package.check()?;
+        result
+    }
+
+    /// Resolve a click action of this slide's shapes or text (record
+    /// 0321); see [`crate::slide::Slide::hyperlink`]. A slide target is
+    /// reported at its position in this revision. Like charts, only a
+    /// physical source slide can answer `Some`.
+    pub fn hyperlink(
+        &self,
+        click: &crate::hyperlinks::Click,
+    ) -> Result<Option<crate::hyperlinks::Link>> {
+        self.package.check()?;
+        let result = match self.physical_source_slide() {
+            Some(slide) => slide.hyperlink(click).map(|link| {
+                link.and_then(|mut link| {
+                    if let crate::hyperlinks::Target::Slide(physical) = link.target {
+                        let logical = self.package.order.iter().position(|key| {
+                            self.package.physical.get(key).copied() == Some(physical.get())
+                        })?;
+                        link.target = crate::hyperlinks::Target::Slide(Position::new(logical));
+                    }
+                    Some(link)
+                })
+            }),
+            None => Ok(None),
+        };
+        self.package.check()?;
+        result
+    }
+
     /// The data-model XML of the SmartArt this slide relates through
     /// `relationship_id`, or `None` when it has no such diagram (record
     /// 0284). Like charts, only a physical source slide can answer `Some`.

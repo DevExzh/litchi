@@ -658,6 +658,57 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - Bench matrix parsers through 0313; the `unified-query` lockfile gains `memchr`.
   - Coordinator note: a leftover agent wait loop (`pgrep -f` matching its own command line) was killed; the agent rules now forbid that pattern.
   - Open (to 0315): walker and owned-node residual (G4–G6, about 50 misses), DOCX `Children::next` freshness (G7), XLS sheet-step cache (G8), RTF typed props (G9); Keynote bytes-open copy (G11).
+- Merged `iwork-batch` (0314):
+  - A corpus property test (`iwork_batch_equivalence.rs`) compares `File::edit`, atomic `File::batch` and chained `File::set`. It found real violations in all three formats, now fixed (about 8,000 sequences pass):
+    - Pages, a leaf data-loss bug: several paragraph sets combined into one splice dropped the paragraph-style entries between them. The commit now combines only what it can prove equal (new `litchi-iwa-text-wire` `StorageBoundaries`).
+    - Keynote and Numbers runs publish first wherever combining would differ. A failed Numbers run names the first failing item.
+  - Batch misses remain: Pages `batch_10000` 1.47 and `batch_1000` 1.08; Keynote `batch_1000` 1.07 (meets the bar with paths parsed outside the clock); Numbers 1.31. Most of what remains is path-text parsing (about 0.96 K instructions per item), handed to 0315. The Pages leaf at 10,000 items is 3.5% slower, the cost of the correctness check.
+  - Open (to 0318): Numbers comments (request 19), the formula-coordinate shift, Keynote/Pages table creation.
+- Merged `opc-proofs` (0317):
+  - The DOCX default-owner set takes litchi-opc's remembered proof: 409 → 23 µs (0.031× the leaf).
+  - Successor proofs carry derived boundary indexes, and the overlay keeps each revision's proof, so chained edits on a committed handle are proved edit by edit: set 416 → 25 µs, add 268 → 82 µs.
+  - Depth-3 indexes for PresentationML parts; PPTX set+write and add+write are 5% faster.
+  - Debug builds re-check every splice and every derived index against a full audit; randomized chain tests run at depths 2 and 3.
+  - Open: default-owner DOCX add +4.8% instructions (+1.0–1.6% wall); PPTX committed handles not chained; the first DOCX commit scans the original twice.
+- Merged `xls-odp-gaps` (0316):
+  - XLS `AnchorBehavior` is now `MoveAndResize`/`MoveWithoutResize`/`Absolute` (MS-XLS, POI). The duplicate writer enum is deleted and the old names are banned; written bytes are unchanged.
+  - XLS shifts handle CF/CF12/CFEx/DV formulas, 3-D references, Array/Table records and position-locked anchors over uniform rows. Byte-exact row/column round trips 227 → 254/253 of 305 sheets.
+  - XLS reader: WINDOW2 zoom, stale shared-formula flags and the AutoFilter "applied" flag are relaxed with typed defects. Embedded chart caches are no longer read as cells (94 XLS query digests re-blessed; fidelity structure byte-exact 80 → 92).
+  - ODP: whole-shape/cell/notes formatting, link and field run formatting, reads through common styles.
+  - Owner decision pending (not raised as blocking): the CONDFMT rule count > 3 and ShrFmla-order refusals are spec-strict and stay unless the owner relaxes them.
+  - Open: 11 sheets the token reader can't decode, form-control/AutoFilter objects, anchors over mixed row heights, ODP graphic-style inheritance.
+
+## Coordinator audit (2026-10-16): P0 surface against the delta table
+Checked against design §13 and the generated `officecli-capability-delta.md`: several **P0** items are still element-level gaps on tier-1 formats. The definition of done requires docx/xlsx/pptx to cover the P0 surface, so these come before further performance work:
+- DOCX: `styles`/`style` and `numbering`/`abstractNum`/`num`/`level` (L-DOCX-R6) → record 0319, together with P1 headers/footers and footnotes/endnotes (L-DOCX-R5).
+- XLSX: `comment` (L-XLSX-R5), `hyperlink`, `picture`/`shape` (L-XLSX-R7) → record 0320, together with P1 conditional formatting, validation, autofilter and breaks.
+- PPTX gaps are P1/P2 only (theme, media, equation, animation, zoom, model3d, hyperlink as an element).
+- XLSB, XLS and ODS lag XLSX element coverage by about 30 families each; they are queued after 0320, reusing its element design.
+
+- Merged `iwork-numbers2` (0318):
+  - Numbers row/column edits on tables with formulas: a wire-level port of the host editor's shift (`table_topology/shift.rs`), extended to cross-table and cross-sheet readers, packed edges and whole-row/column sentinels. It is byte-equal with the host on 48 formula cases, 318 tables without formulas and 53 packed-edge cases, and found a host-editor bug on shared formula entries.
+  - Numbers cell comments (request 19): per-table census, lists without FieldInfo, effective locators, a multi-member writer; all 35 corpus tables round trip. `File` reads, sets, adds and removes the cell `comment`.
+  - New routes `row_insert_formulas` 1.011 and `comment_set` 1.002 meet the bar; `open_get` 1.063–1.069 (+6 µs, within the 20 µs arm).
+  - Open: `#REF!` on deleted references, splitting shared formulas, cell-writer clears (21), comment edge cases (new member, `NeedSparse`, more than one author); Keynote/Pages table creation and notes run styles not started (plan in record §5).
+- Merged `xlsx-p0p1` (0320) — **XLSX P0 surface closed**:
+  - litchi-xlsx: five ADR 0034 edit families (conditional formatting, data validation, auto-filter, legacy notes, drawings) on one staged part engine with exact, reversible patches; note splices with VML shapes; fixed an empty `<cfRule/>` parse bug.
+  - Unified nodes under a sheet: `comment[N]`, `hyperlink[N]`, `picture[N]`, `shape[N]`, `cf[N]` (12 rule kinds), `dataValidation[N]`, `autofilter`, `rowbreak[N]`, `colbreak[N]`.
+  - OfficeCLI excel corpus: passed 1484 → 1552, gap 124 → 51, bug 0. Delta: XLSX elements supported 11 → 33 (gap 27 → 5: ole, pivottable, run, slicer, sparkline). CRUD checklist XLSX 92 → 191 cells, all ok.
+  - Performance: every write within 1.011× the leaf; `comment_get` 1.10 (+4 µs, sort and clone of the sheet's notes).
+  - Open (part to 0322): x14 CF styling, drawing effects, threaded comments, note runs, filter criteria, the prefixed-root validation/hyperlink writer conflict.
+- Merged `docx-p0p1` (0319) — **DOCX P0 surface closed**:
+  - Styles and numbering (`abstractNum`/`num`/`level`): read, set, add, remove; paragraph and run `style` set by id or display name (Δ4).
+  - Headers and footers by type, footnotes and endnotes (anchored add, set, remove), tabs, breaks: editable. Bookmarks, fields, TOC, watermark and text boxes: read.
+  - litchi-docx: style, numbering, header/footer and note catalogs with edit verbs; source-backed `bookmarks`/`text_boxes`. New fixture `textWatermark.docx` (18 KB, LibreOffice, provenance recorded).
+  - Word corpus gap 248 → 221; DOCX delta elements supported 14 → 31, gap 21 → 4 (formfield, ole, revision, shape). New corpus deltas D1b (positional `num` path) and D11.
+  - Writes within budget (max `footnote_add` 1.09). Reads `style_get_format` 1.22 (+1.1 µs) and `paragraph_list_format` 1.13 (+0.25 µs) miss.
+  - Open: bookmark/field/TOC writes, paragraphs inside headers/footers/notes, `levelN.*` shortcut keys, the two read misses.
+- Merged `pptx-p1` (0321):
+  - `/theme` (colour/font scheme read and set, exact no-op on equal values); master/layout `name` and direct-shape `text` sets; table `col[C]` get/add/set width/remove; shape and run hyperlinks (URL, `slide[N]`, named actions; unsafe schemes refused); media get/remove/add with a poster; equation `formula` read.
+  - New elements are reached by path or named query only, so views and `*` queries keep their shape.
+  - Delta PPTX elements 25/8 → 30/3 (animation, zoom, model3d deferred as P2); corpus pptx gap 416 → 410, passed unchanged.
+  - Writes 1.00–1.094× (column add on a one-slide deck); equation get 1.30× (+14 µs) is a recorded miss (F6).
+  - Open: F1 `link`/`tooltip` as shape/run properties; F2 equation writes; F3 media timing; F4 master/layout other props; F5 colWidths, defaultFont, mediaType.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
@@ -902,6 +953,10 @@ Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-ppt
 ## Awaiting owner decision
 
 - ~~ADR 0033 acceptance~~ — accepted 2026-10-04 (record 0006).
+- **Adopted defaults, awaiting owner confirmation (2026-10-17):**
+  - Record 0319: removing a DOCX `num` keeps the paragraphs' `numPr` references that point at it. OfficeCLI clears them, which edits paragraphs the caller did not name.
+  - Record 0319, corpus delta D11: re-adding a built-in DOCX style id is refused (typed) instead of upserted as OfficeCLI does.
+  - Record 0316: the XLS CONDFMT rule count > 3 and the out-of-place ShrFmla refusals stay spec-strict.
 
 ## 0016 — restart and glossary adoption (2026-10-08)
 

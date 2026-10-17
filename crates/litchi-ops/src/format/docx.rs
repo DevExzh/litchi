@@ -82,10 +82,12 @@ pub(crate) mod create;
 mod element;
 mod few;
 mod lists;
+mod marks;
 pub(crate) mod merge;
 mod nav;
 mod nested;
 mod node;
+mod parts;
 mod picture;
 mod props;
 mod publish;
@@ -145,6 +147,10 @@ pub(crate) struct DocxState {
     /// handle, so the index stays valid; a source-backed owner is not cached
     /// here, because its reads are fenced against the source.
     body: OnceLock<litchi_docx::Blocks>,
+    /// The styles, numbering, story and notes parts the unified adapter has
+    /// read (record 0319), each on first use. A source-backed owner's reads
+    /// through them are still fenced against the source.
+    parts: parts::Cache,
 }
 
 /// What a DOCX write starts from (M2).
@@ -369,6 +375,7 @@ impl Docx {
             markdown: OnceLock::new(),
             ooxml_limits: options.ooxml_limits.unwrap_or_default(),
             body: OnceLock::new(),
+            parts: parts::Cache::default(),
         }
     }
 
@@ -415,6 +422,11 @@ impl Docx {
     /// keeps the index stored first (both describe the same part).
     pub(crate) fn cache_body(&self, blocks: litchi_docx::Blocks) -> &litchi_docx::Blocks {
         self.0.body.get_or_init(|| blocks)
+    }
+
+    /// The part elements this handle has read (record 0319).
+    pub(crate) fn parts(&self) -> &parts::Cache {
+        &self.0.parts
     }
 
     /// The stable path origin captured by a path open, if any.

@@ -393,6 +393,30 @@ class PptxVerbTests(WriteAssertions):
         file = file.remove("/slide[1]/smartart[1]/node[2]")
         self.assertEqual(self.assertReopens(file).get(art, 0)["text"], "Plan\n\tSize\nLearn")
 
+    def test_record_0321_elements(self):
+        # Record 0321: theme, master and layout names, hyperlinks and media.
+        theme = self.file.set("/theme", {"accent1": "FF0000", "majorFont": "Georgia"})
+        view = self.assertReopens(theme).get("/theme", 0)["format"]
+        self.assertEqual((view["accent1"], view["headingFont"]), ("#FF0000", "Georgia"))
+        renamed = self.file.set("/slidemaster[1]", {"name": "Brand"})
+        self.assertEqual(renamed.get("/slidemaster[1]", 0)["format"]["name"], "Brand")
+        file, _ = self.file.add(self.first, "shape", {"text": "Docs", "width": "2in", "height": "1in"})
+        file, link = file.add("/slide[1]/shape[1]", "hyperlink", {"link": "slide[2]", "tooltip": "Next"})
+        self.assertEqual(link, "/slide[1]/shape[1]/hyperlink")
+        self.assertEqual(self.assertReopens(file).get(link, 0)["format"]["link"], "slide[2]")
+        file = file.remove(link)
+        self.assertEqual(len(list(file.query("hyperlink"))), 0)
+        png = (
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4"
+            "nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC"
+        )
+        mp4 = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t"
+        file, video = self.file.add(self.first, "video", {"src": mp4, "poster": png})
+        self.assertEqual(video, "/slide[1]/video[1]")
+        self.assertEqual(self.assertReopens(file).get(video, 0)["type"], "video")
+        error = raised(lambda: self.file.add(self.first, "video", {"src": mp4}))
+        self.assertError(error, L.PropertyError, "missing_property")
+
 
 class XlsbVerbTests(WriteAssertions):
     def test_cells_and_sheets(self):
@@ -600,6 +624,26 @@ class OdfObjectTests(WriteAssertions):
         self.assertEqual(reopened.get("/series[1]", 0)["format"]["values"], "local-table.B2:B5")
         image = L.create("odi").set("/frame[1]", {"x": "1cm", "y": "1cm", "width": "4cm", "height": "3cm"})
         self.assertEqual(self.assertReopens(image).get("/frame[1]", 0)["format"]["width"], "4cm")
+
+
+    def test_xlsx_worksheet_features(self):
+        """Record 0320: notes, conditional formats, validations and links."""
+        book = L.create("xlsx")
+        book, note = book.add("/Sheet1", "comment", {"ref": "B2", "text": "Check", "author": "Ann"})
+        self.assertEqual(note, "/sheet[1]/comment[1]")
+        book, rule = book.add(
+            "/Sheet1",
+            "conditionalformatting",
+            {"type": "cellIs", "ref": "A2:A11", "operator": "greaterThan", "value": "80", "fill": "C6EFCE"},
+        )
+        self.assertEqual(rule, "/sheet[1]/cf[1]")
+        book, _ = book.add("/Sheet1", "validation", {"type": "list", "ref": "C2:C9", "formula1": "a,b"})
+        book = book.set("/Sheet1/D4", {"value": "Repo", "link": "https://example.test/"})
+        reopened = self.assertReopens(book)
+        self.assertEqual(reopened.get("/Sheet1/comment[1]", 0)["format"]["author"], "Ann")
+        self.assertEqual(reopened.get("/Sheet1/cf[1]", 0)["format"]["type"], "cellIs")
+        self.assertEqual(reopened.get("/Sheet1/dataValidation[1]", 0)["format"]["formula1"], '"a,b"')
+        self.assertEqual(reopened.get("/Sheet1/hyperlink[1]", 0)["format"]["url"], "https://example.test/")
 
 
 class CapabilityAgreementTests(WriteAssertions):

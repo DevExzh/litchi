@@ -1,0 +1,74 @@
+Record 0316 measurements (release, taskset -c 9, shared 32-core host, load 3-6).
+
+Binaries (not committed; SHA-256):
+  before  1a57edd2927909b082bfc87910912f122a8a680634f3489ad8bfa0588a2977cc  base 30eed270b5 + examples/xls_odp_followups_bench.rs
+  after   55fc763c847a1bfa206d01a5890a9ece45b5d187c80f4a3b267447cd162e5276  first version (ea186b41d5)                      -> r1-*
+  after   ddb16286a190816b0cfa277bb1193513f15951f432898fe83e137121345a7372  lazy rebuild checks, gated rules/zoom, Arc<str>  -> r2-*
+  after   7b5a9e63be0efe55aa6ea4eda19496575196c4d398ec0607361a07716ae19834  borrowed style chains, merged trunk (5a118f742e) -> r3-run*
+  new     e7df53dc87e64d283f93eddfdd0e25fa1c2f6ba32a0603c55b9c56934d3b883e  examples/xls_odp_followups_new_bench.rs (5a118f742e) -> r3-new*
+Build: cargo build --release -p litchi-ops --features xls,odp --example xls_odp_followups_bench --example xls_odp_followups_new_bench
+Order: B A A B B A per round; 15 rounds after 3 warm-ups per scenario; new bench twice.
+
+== r1
+xls_complete_open_20k: before [5425.3308, 5398.91885, 5463.07165] after [5707.57365, 5589.80375, 5487.1491000000005] after/before 1.030
+xls_complete_open_formula_eval: before [1795.7285499999998, 1776.6899999999998, 1781.5425499999997] after [1784.2415, 1799.8211500000002, 1791.0247] after/before 1.005
+xls_source_visit_20k: before [897.4907500000002, 896.1708000000001, 876.79375] after [883.3362000000001, 907.1858500000001, 869.8397000000001] after/before 0.986
+xls_row_insert_10k native: before [10173.7524, 10117.0424, 10074.9028] after [10548.2902, 10383.9238, 10363.1162] after/before 1.026
+xls_row_insert_10k unified: before [10157.1064, 10095.4204, 10100.744999999999] after [10518.886, 10409.8458, 10355.0122] after/before 1.031
+xls_row_insert_10k ratio: before [0.9984, 0.9979, 1.0026] after [0.9972, 1.0025, 0.9992]
+xls_row_insert_images native: before [146.1402, 146.9882, 146.67275] after [147.7312, 148.1927, 145.77069999999998] after/before 1.007
+xls_row_insert_images unified: before [147.6317, 147.8092, 147.42875] after [148.9307, 149.40974999999997, 147.38819999999998] after/before 1.009
+xls_row_insert_images ratio: before [1.0102, 1.0056, 1.0052] after [1.0081, 1.0082, 1.0111]
+odp_scene_parse_200: before [496.67434999999995, 497.90290000000005, 501.9099499999999] after [487.28779999999995, 485.53635, 486.08935] after/before 0.976
+odp_run_read_200: before [238.49809999999997, 237.1391, 243.60319999999996] after [318.95550000000003, 322.7896, 316.05949999999996] after/before 1.337
+odp_run_format_200 native: before [1743.1182000000001, 1734.5842, 1756.8166] after [1779.4425999999999, 1744.8462000000004, 1740.7104] after/before 1.001
+odp_run_format_200 unified: before [1741.3282, 1739.7324, 1763.4786] after [1782.8644, 1744.7383999999997, 1742.1064] after/before 1.002
+odp_run_format_200 ratio: before [0.999, 1.003, 1.0038] after [1.0019, 0.9999, 1.0008]
+
+== r2
+xls_complete_open_20k: before [5468.3345, 5437.2967499999995, 5440.33575] after [5501.8763, 5525.69995, 5520.6646] after/before 1.015
+xls_complete_open_formula_eval: before [1792.6374500000002, 1794.7412, 1793.39715] after [1805.3310000000001, 1832.74055, 1823.6573] after/before 1.017
+xls_source_visit_20k: before [877.5381000000001, 900.4163500000001, 891.0477999999999] after [893.0261999999999, 913.7512999999999, 910.8964] after/before 1.022
+xls_row_insert_10k native: before [10101.2972, 10070.8986, 10058.8204] after [10137.6214, 10126.3836, 10119.1348] after/before 1.006
+xls_row_insert_10k unified: before [10126.767600000001, 10074.390599999999, 10098.518800000002] after [10163.0396, 10137.4536, 10112.0068] after/before 1.004
+xls_row_insert_10k ratio: before [1.0025, 1.0003, 1.0039] after [1.0025, 1.0011, 0.9993]
+xls_row_insert_images native: before [144.3597, 146.18019999999999, 146.25119999999998] after [147.33319999999998, 146.28320000000002, 149.08775] after/before 1.008
+xls_row_insert_images unified: before [145.9527, 147.50175000000002, 147.47525] after [148.23515, 147.8452, 149.66469999999998] after/before 1.005
+xls_row_insert_images ratio: before [1.011, 1.009, 1.0084] after [1.0061, 1.0107, 1.0039]
+odp_scene_parse_200: before [498.66685000000007, 497.26390000000004, 496.4904] after [504.07534999999996, 502.81585000000007, 504.76689999999996] after/before 1.014
+odp_run_read_200: before [244.36819999999997, 243.7712, 242.84920000000002] after [301.1825, 300.77139999999997, 302.28049999999996] after/before 1.236
+odp_run_format_200 native: before [1755.5942000000002, 1743.2766, 1753.6363999999999] after [1778.6524000000002, 1755.4081999999999, 1775.2086] after/before 1.012
+odp_run_format_200 unified: before [1759.9822, 1750.6643999999997, 1759.4786] after [1786.4324000000001, 1760.4884000000002, 1777.4406] after/before 1.010
+odp_run_format_200 ratio: before [1.0025, 1.0042, 1.0033] after [1.0044, 1.0029, 1.0013]
+
+== r3
+xls_complete_open_20k: before [5435.5833999999995, 5415.294100000001, 5370.6484] after [5503.9947, 5578.48785, 5500.912399999999] after/before 1.016
+xls_complete_open_formula_eval: before [1785.52065, 1787.8126500000003, 1783.6696] after [1790.51575, 1798.95965, 1781.0482499999998] after/before 1.003
+xls_source_visit_20k: before [895.4556, 893.6486000000001, 905.3206] after [875.6970500000001, 925.5027, 903.9892000000002] after/before 1.010
+xls_row_insert_10k native: before [10165.3406, 10075.505799999999, 10045.1816] after [10173.4566, 10114.6758, 10165.267] after/before 1.009
+xls_row_insert_10k unified: before [10122.6324, 10084.246, 10054.5858] after [10139.5704, 10124.668000000001, 10188.280999999999] after/before 1.005
+xls_row_insert_10k ratio: before [0.9958, 1.0009, 1.0009] after [0.9967, 1.001, 1.0023]
+xls_row_insert_images native: before [145.61464999999998, 146.70715, 146.96215] after [146.4727, 147.79465, 145.94515] after/before 0.998
+xls_row_insert_images unified: before [147.23565, 147.66815000000003, 148.04065] after [147.28715, 148.66514999999998, 147.4567] after/before 0.999
+xls_row_insert_images ratio: before [1.0111, 1.0066, 1.0073] after [1.0056, 1.0059, 1.0104]
+odp_scene_parse_200: before [498.1908, 495.54675, 495.0607999999999] after [486.97625000000005, 486.95475, 489.42474999999996] after/before 0.983
+odp_run_read_200: before [247.36010000000002, 235.769, 237.2711] after [224.346, 228.81910000000002, 230.29610000000002] after/before 0.964
+odp_run_format_200 native: before [2076.0134, 1736.2559999999999, 1735.4560000000001] after [1738.0657999999999, 1737.6598000000001, 1756.8342] after/before 1.001
+odp_run_format_200 unified: before [2077.7056, 1740.4018, 1740.334] after [1741.718, 1739.4058, 1762.282] after/before 1.001
+odp_run_format_200 ratio: before [1.0008, 1.0024, 1.0028] after [1.0021, 1.001, 1.0031]
+
+== r3-new
+r3-new1.jsonl xls_row_insert_owners_10k leaf 10551.2 unified 10536.3 ratio 0.999
+r3-new1.jsonl xls_row_insert_conditional_formats leaf 226.5 unified 228.4 ratio 1.008
+r3-new1.jsonl xls_row_insert_validations leaf 176.8 unified 177.8 ratio 1.006
+r3-new1.jsonl xls_row_insert_cf12 leaf 564.3 unified 567.4 ratio 1.005
+r3-new1.jsonl xls_row_insert_locked_anchors leaf 112.7 unified 114.4 ratio 1.016
+r3-new1.jsonl odp_shape_format_200 leaf 1950.2 unified 1954.7 ratio 1.002
+r3-new1.jsonl odp_shape_read_200 leaf 1086.2 unified 1181.4 ratio 1.088
+r3-new2.jsonl xls_row_insert_owners_10k leaf 10586.8 unified 10531.0 ratio 0.995
+r3-new2.jsonl xls_row_insert_conditional_formats leaf 227.0 unified 228.4 ratio 1.006
+r3-new2.jsonl xls_row_insert_validations leaf 176.6 unified 178.7 ratio 1.011
+r3-new2.jsonl xls_row_insert_cf12 leaf 559.7 unified 563.2 ratio 1.006
+r3-new2.jsonl xls_row_insert_locked_anchors leaf 112.9 unified 113.9 ratio 1.009
+r3-new2.jsonl odp_shape_format_200 leaf 1957.7 unified 1957.4 ratio 1.0
+r3-new2.jsonl odp_shape_read_200 leaf 1091.2 unified 1185.3 ratio 1.086

@@ -6,7 +6,7 @@
 //! path (record 0302). [`Few`] keeps that element inline and spills to a
 //! `Vec` from the second one on.
 
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 /// Zero elements, one inline, or two or more on the heap.
 #[derive(Debug, Clone)]
@@ -71,6 +71,16 @@ impl<T> Deref for Few<T> {
     fn deref(&self) -> &[T] {
         match self {
             Self::Zero => &[],
+            Self::One(one) => one,
+            Self::Many(many) => many,
+        }
+    }
+}
+
+impl<T> DerefMut for Few<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        match self {
+            Self::Zero => &mut [],
             Self::One(one) => one,
             Self::Many(many) => many,
         }

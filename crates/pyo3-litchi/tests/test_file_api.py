@@ -254,22 +254,23 @@ class NodeViewGoldenTests(unittest.TestCase):
                 self.assertSameView(file.get(path), golden(f"node_view/{expected}"))
                 self.assertSameView(file.find(path), golden(f"node_view/{expected}"))
 
-    def test_docx_story_gaps_refuse_as_capabilities_list(self):
-        # Headers and notes are listed gaps (L-DOCX-R5) on trunk; comments
-        # are read since record 0251c.
+    def test_docx_stories_are_read(self):
+        # Headers and notes were listed gaps (L-DOCX-R5) until record 0319.
         cases = (
-            ("ooxml/docx/headerFooter.docx", "/header[@type=default]", "header"),
-            ("ooxml/docx/footnotes.docx", "/footnote[1]", "footnote"),
+            ("ooxml/docx/headerFooter.docx", "/header[@type=default]", "header", "/header[2]"),
+            ("ooxml/docx/footnotes.docx", "/footnote[1]", "footnote", "/footnotes/footnote[1]"),
         )
-        for relative, path, element in cases:
+        for relative, path, element, canonical in cases:
             with self.subTest(path=path):
                 file = open_fixture(relative)
-                error = raised(lambda: file.get(path))
-                self.assertIs(type(error), L.UnsupportedError)
-                self.assertEqual(error.code, "unsupported_capability")
-                self.assertIn(f'"{element}"', error.message)
+                node = file.get(path)
+                self.assertEqual(node["type"], element)
+                self.assertEqual(node["path"], canonical)
+                self.assertTrue(node["text"])
                 elements = {entry["element"]: entry for entry in file.capabilities()["elements"]}
-                self.assertFalse(any(elements[element].get("operations", {}).values()))
+                operations = elements[element]["operations"]
+                for verb in ("get", "set", "add", "remove"):
+                    self.assertTrue(operations[verb], verb)
 
     def test_docx_comments_are_read(self):
         file = open_fixture("ooxml/docx/comment.docx")

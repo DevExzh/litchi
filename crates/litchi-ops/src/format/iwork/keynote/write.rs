@@ -143,6 +143,96 @@ pub(super) struct Pending {
     cells: BTreeMap<(usize, usize, u32, u32), (TableCellValue, usize)>,
     /// Placeholder visibility: (slide, TITLE or BODY) → (hidden, item).
     visibility: BTreeMap<(usize, usize), (bool, usize)>,
+    /// What the sets of each staged text touched (record 0314).
+    groups: BTreeMap<Text, TextGroup>,
+}
+
+/// The sets one text received in a run: its text before them, the region
+/// they touched, and the largest region the leaf admitted for one combined
+/// splice (record 0314).
+#[derive(Debug)]
+struct TextGroup {
+    base: String,
+    touched: Touched,
+    changed: bool,
+    admitted: Option<Touched>,
+}
+
+/// The region of a text its sets touched.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Touched {
+    /// Paragraphs `first..=last` of the base text.
+    Lines(usize, usize),
+    /// The whole text.
+    Whole,
+}
+
+impl Touched {
+    /// Whether `self` lies within `other`.
+    const fn within(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::Lines(a, b), Self::Lines(c, d)) => c <= a && b <= d,
+            (_, Self::Whole) => true,
+            (Self::Whole, Self::Lines(..)) => false,
+        }
+    }
+
+    const fn union(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Lines(a, b), Self::Lines(c, d)) => {
+                Self::Lines(if a < c { a } else { c }, if b > d { b } else { d })
+            },
+            _ => Self::Whole,
+        }
+    }
+}
+
+/// The UTF-16 region of `base` that `touched` covers, both ends inclusive.
+fn hull(base: &str, touched: Touched) -> Option<std::ops::Range<usize>> {
+    let (first, last) = match touched {
+        Touched::Whole => return Some(0..base.encode_utf16().count()),
+        Touched::Lines(first, last) => (first, last),
+    };
+    let mut unit = 0_usize;
+    let mut start = None;
+    for (line, paragraph) in base.split('\n').enumerate() {
+        if line == first {
+            start = Some(unit);
+        }
+        let end = unit + paragraph.encode_utf16().count();
+        if line == last {
+            return start.map(|start| start..end);
+        }
+        unit = end + 1;
+    }
+    None
+}
+
+/// Whether the leaf admits one combined splice over `hull` of `text`.
+fn leaf_admits(package: &Package, text: Text, hull: std::ops::Range<usize>) -> bool {
+    let slide = SlideSelector::index(text.slide);
+    match text.container {
+        TITLE | BODY => {
+            let role = if text.container == TITLE {
+                Role::Title
+            } else {
+                Role::Body
+            };
+            package
+                .edit_slide_text(slide, role)
+                .and_then(|edit| edit.admits_combined_splice(hull))
+                .unwrap_or(false)
+        },
+        NOTES => package
+            .edit_slide_notes(slide)
+            .and_then(|edit| edit.admits_combined_splice(hull))
+            .unwrap_or(false),
+        DRAWABLE => package
+            .edit_slide_drawables()
+            .text_admits_combined_splice(slide, DrawableSelector::index(text.drawable), hull)
+            .unwrap_or(false),
+        _ => false,
+    }
 }
 
 /// What publishing a pending set made.
@@ -371,6 +461,174 @@ impl Pending {
         self.texts.insert(text, (value, index));
     }
 
+    /// Record that a set touches `touched` of `text`; `value` is the text
+    /// (or paragraph text) it writes.
+    fn touch(&mut self, file: &Iwork, text: Text, touched: Touched, value: &str) -> Result<()> {
+        let current = self.current(file, text)?;
+        let group = match self.groups.entry(text) {
+            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::btree_map::Entry::Vacant(entry) => entry.insert(TextGroup {
+                base: current.clone(),
+                touched,
+                changed: false,
+                admitted: None,
+            }),
+        };
+        group.touched = group.touched.union(touched);
+        group.changed |= match touched {
+            Touched::Whole => current != value,
+            Touched::Lines(line, _) => current.split('\n').nth(line) != Some(value),
+        };
+        Ok(())
+    }
+
+    /// Whether setting `key` to `value` on `node` would bring a staged
+    /// scalar (a frame, a slide's or a placeholder's visibility) back to its
+    /// value in the run's base, or sets a staged table cell again: one at a
+    /// time those sets publish twice, joined they would publish nothing (or
+    /// the last only).
+    fn cancels(&self, node: &Node<'_>, key: &str, value: &PropValue<'_>) -> bool {
+        let item = node.item();
+        let [slide, slot, _, drawable] = item.leaf().map(|value| value as usize);
+        let base_flag = || match item.value("hidden") {
+            Some(crate::node::Value::Bool(flag)) => Some(*flag),
+            _ => None,
+        };
+        match (item.type_name(), key) {
+            ("slide", "hidden") => self.hidden.get(&slide).is_some_and(|(pending, _)| {
+                super::super::write::boolean(value, "hidden")
+                    .is_ok_and(|flag| Some(flag) == base_flag() && Some(*pending) != base_flag())
+            }),
+            ("placeholder", "hidden") => {
+                self.visibility
+                    .get(&(slide, slot))
+                    .is_some_and(|(pending, _)| {
+                        super::super::write::boolean(value, "hidden").is_ok_and(|flag| {
+                            Some(flag) == base_flag() && Some(*pending) != base_flag()
+                        })
+                    })
+            },
+            ("placeholder" | "shape" | "picture", "x" | "y" | "width" | "height" | "rotation") => {
+                let (Some((pending, _)), Some(base)) =
+                    (self.frames.get(&(slide, drawable)), frame_of(node))
+                else {
+                    return false;
+                };
+                let mut geometry = *pending;
+                let parsed = match key {
+                    "x" => points(value, "x", false).map(|v| geometry.x = v),
+                    "y" => points(value, "y", false).map(|v| geometry.y = v),
+                    "width" => points(value, "width", true).map(|v| geometry.width = v),
+                    "height" => points(value, "height", true).map(|v| geometry.height = v),
+                    _ => degrees(value).map(|v| geometry.rotation = Some(v)),
+                };
+                parsed.is_ok() && geometry == base && *pending != base
+            },
+            ("tc", _) => {
+                let [_, _, row, _] = item.leaf();
+                self.cells
+                    .keys()
+                    .any(|cell| cell.0 == slide && cell.1 == drawable && cell.2 == row)
+            },
+            _ => false,
+        }
+    }
+
+    /// Whether a set of `props` on `node` publishes, joined to the staged
+    /// changes, what it publishes after them on its own (record 0314):
+    /// `false` asks the caller to publish the staged changes first.
+    ///
+    /// A text that already holds a set takes another while one splice from
+    /// its base text to the result is what the sets publish one at a time:
+    /// the leaf admits the touched region, the text was not emptied, and the
+    /// sets do not cancel out. A text and the character properties of its
+    /// slide's runs never share a run.
+    pub(super) fn joins(&mut self, file: &Iwork, node: &Node<'_>, props: &Props<'_>) -> bool {
+        let item = node.item();
+        let line = item.leaf()[2] as usize;
+        for (key, value) in props.iter() {
+            let touched = match (item.type_name(), key.as_str()) {
+                ("placeholder" | "notes" | "shape", "text") => Touched::Whole,
+                ("paragraph", "text") => Touched::Lines(line, line),
+                ("run", _) => {
+                    let slide = item.leaf()[0] as usize;
+                    if self.texts.keys().any(|text| text.slide == slide) {
+                        return false;
+                    }
+                    continue;
+                },
+                _ => {
+                    if self.cancels(node, key.as_str(), value) {
+                        return false;
+                    }
+                    continue;
+                },
+            };
+            let Some(text) = Text::of(node) else {
+                continue;
+            };
+            if self.styles.keys().any(|style| style.0 == text.slide) {
+                return false;
+            }
+            let (Some(group), Some((current, _))) = (self.groups.get(&text), self.texts.get(&text))
+            else {
+                continue;
+            };
+            let written = match touched {
+                Touched::Whole => {
+                    super::super::write::text(value, "text").map(Option::unwrap_or_default)
+                },
+                Touched::Lines(..) => paragraph_text(value),
+            };
+            // A refused value is reported by staging.
+            let Ok(written) = written else {
+                continue;
+            };
+            if current.is_empty() && !group.base.is_empty() {
+                return false;
+            }
+            // The sets cancel out when this one brings the text back to its
+            // base: it writes the base's own text (or paragraph), and the
+            // rest of the text is the base's already.
+            let cancels = match touched {
+                Touched::Whole => written == group.base && *current != group.base,
+                Touched::Lines(line, _) => {
+                    group.base.split('\n').nth(line) == Some(written.as_str())
+                        && current.split('\n').nth(line) != Some(written.as_str())
+                        && current
+                            .split('\n')
+                            .zip(group.base.split('\n'))
+                            .enumerate()
+                            .all(|(at, (held, base))| at == line || held == base)
+                        && current.split('\n').count() == group.base.split('\n').count()
+                },
+            };
+            if cancels {
+                return false;
+            }
+            let union = group.touched.union(touched);
+            if group
+                .admitted
+                .is_some_and(|admitted| union.within(admitted))
+            {
+                continue;
+            }
+            let Some(region) = hull(&group.base, union) else {
+                return false;
+            };
+            let Some(package) = file.keynote() else {
+                return false;
+            };
+            if !leaf_admits(package, text, region) {
+                return false;
+            }
+            if let Some(group) = self.groups.get_mut(&text) {
+                group.admitted = Some(union);
+            }
+        }
+        true
+    }
+
     /// Stage one character property of a run of a text box, shape, or
     /// title or body placeholder: the run's characters in its drawable's
     /// text (records 0309, 0312).
@@ -541,6 +799,7 @@ impl Pending {
                 let text = Text::of(node)
                     .ok_or_else(|| refusal(Code::InternalError, "the text is missing"))?;
                 let value = super::super::write::text(value, "text")?.unwrap_or_default();
+                self.touch(file, text, Touched::Whole, &value)?;
                 self.stage_text(text, value, index);
             },
             ("paragraph", "text") => {
@@ -548,6 +807,7 @@ impl Pending {
                     .ok_or_else(|| refusal(Code::InternalError, "the text is missing"))?;
                 let value = paragraph_text(value)?;
                 let current = self.current(file, text)?;
+                self.touch(file, text, Touched::Lines(line, line), &value)?;
                 let mut lines = current.split('\n').collect::<Vec<_>>();
                 let slot = lines.get_mut(line).ok_or_else(|| {
                     refusal(Code::PathNotFound, "the paragraph is no longer in its text")
@@ -800,6 +1060,7 @@ impl Pending {
         self.styles.clear();
         self.cells.clear();
         self.adds.clear();
+        self.groups.clear();
         Ok(published)
     }
 }

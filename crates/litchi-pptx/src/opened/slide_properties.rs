@@ -61,7 +61,29 @@ pub(crate) fn stage_slide_properties(
     hidden: Option<bool>,
     max_output_bytes: usize,
 ) -> Result<Option<Vec<u8>>> {
-    let document = parse_document(xml)?;
+    stage_rooted_properties(xml, b"sld", name, hidden, max_output_bytes)
+}
+
+/// Stage a `p:cSld/@name` update of a slide master (`root` `sldMaster`) or
+/// slide layout (`sldLayout`) part, with the same lexical guarantees as a
+/// slide's (record 0321). An equal name returns `Ok(None)`.
+pub(crate) fn stage_common_slide_name(
+    xml: &[u8],
+    root: &[u8],
+    name: &str,
+    max_output_bytes: usize,
+) -> Result<Option<Vec<u8>>> {
+    stage_rooted_properties(xml, root, Some(name), None, max_output_bytes)
+}
+
+fn stage_rooted_properties(
+    xml: &[u8],
+    root: &[u8],
+    name: Option<&str>,
+    hidden: Option<bool>,
+    max_output_bytes: usize,
+) -> Result<Option<Vec<u8>>> {
+    let document = parse_rooted(xml, root)?;
     if let Some(value) = name
         && !value.chars().all(is_xml_char)
     {
@@ -156,7 +178,7 @@ pub(crate) fn stage_slide_properties(
     // Read the candidate back through the same rooted parser before
     // publishing it. This also proves that a newly inserted attribute uses
     // the source's namespace/root topology and XML lexical rules.
-    let staged = parse_document(&output)?;
+    let staged = parse_rooted(&output, root)?;
     if name_changed && staged.slide_name.as_deref() != name {
         return Err(invalid(
             "opened-presentation slide name did not round-trip semantically",
@@ -365,6 +387,10 @@ fn escape_attribute(value: &str, maximum: usize) -> Result<Vec<u8>> {
 }
 
 fn parse_document(xml: &[u8]) -> Result<Document> {
+    parse_rooted(xml, b"sld")
+}
+
+fn parse_rooted(xml: &[u8], root: &[u8]) -> Result<Document> {
     let origin = ReaderOrigin::of(xml);
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -407,8 +433,7 @@ fn parse_document(xml: &[u8]) -> Result<Document> {
                     root_count = root_count
                         .checked_add(1)
                         .ok_or_else(|| invalid("opened-presentation slide root count overflows"))?;
-                    if root_count != 1 || !is_pml(&resolved, element.local_name().as_ref(), b"sld")
-                    {
+                    if root_count != 1 || !is_pml(&resolved, element.local_name().as_ref(), root) {
                         return Err(invalid(
                             "opened-presentation slide properties require one p:sld root",
                         ));

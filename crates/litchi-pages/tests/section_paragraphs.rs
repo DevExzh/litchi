@@ -1,7 +1,8 @@
 //! Paragraph-level section transactions (record 0299): set, insert, remove,
-//! relocate and swap through `Package::edit_section_paragraphs`, coalesced
-//! into one section-text transaction when the change is one anchor-free
-//! splice, and exact inverses on every corpus file.
+//! relocate and swap through `Package::edit_section_paragraphs`; text sets
+//! coalesced into one section-text transaction where that publishes what
+//! they publish one at a time (record 0314), and exact inverses on every
+//! corpus file.
 
 use std::path::PathBuf;
 
@@ -59,10 +60,12 @@ fn paragraph_operations_round_trip_on_a_plain_section() -> TestResult {
         .relocate(at(2), at(0))?
         .swap(at(1), at(2))?;
     let commit = edit.commit()?;
+    // Record 0314: structural operations publish one transaction each, as
+    // committing them one at a time does.
     assert_eq!(
         commit.diagnostics().transactions(),
-        1,
-        "one coalesced splice"
+        5,
+        "one splice per operation"
     );
     let edited = commit.package();
     assert_eq!(
@@ -184,5 +187,79 @@ fn every_corpus_section_accepts_paragraph_set_and_insert_and_reverts_exactly() -
             assert_eq!(restored.package().to_bytes()?, bytes, "{name}");
         }
     }
+    Ok(())
+}
+
+/// Record 0314: a commit of several staged operations publishes exactly
+/// what committing each on its own, in order, publishes — on every corpus
+/// section, for sets of every paragraph, repeated sets, a set that cancels
+/// an earlier one, and a mix with an insertion. (One splice across the
+/// paragraphs used to drop the paragraph-style entries between them.)
+#[test]
+fn several_operations_publish_what_they_publish_one_at_a_time() -> TestResult {
+    let mut compared = 0;
+    for (name, bytes) in corpus()? {
+        let Ok(package) = Package::from_bytes(&bytes) else {
+            continue;
+        };
+        let Ok(paragraphs) = package.section_paragraphs(0_usize) else {
+            continue;
+        };
+        let count = paragraphs.len();
+        let last = count - 1;
+        let original = paragraphs[0].to_string();
+        let sequences: Vec<Vec<(usize, Option<String>)>> = vec![
+            (0..count)
+                .map(|line| (line, Some(format!("Set {line}"))))
+                .collect(),
+            vec![
+                (last, Some("B".into())),
+                (0, Some("A".into())),
+                (last, Some("C".into())),
+            ],
+            vec![(0, Some(String::new())), (0, Some("Again".into()))],
+            vec![(0, Some("Changed".into())), (0, Some(original.clone()))],
+            vec![
+                (0, Some("First".into())),
+                (count, None),
+                (last, Some("Last".into())),
+            ],
+        ];
+        for sequence in sequences {
+            let stage = |edit: &mut litchi_pages::section::paragraphs::Edit<'_>,
+                         (line, text): &(usize, Option<String>)|
+             -> Result<(), Error> {
+                match text {
+                    Some(text) => edit.set(at(*line), text).map(|_| ()),
+                    None => edit.insert(at(*line), "Inserted").map(|_| ()),
+                }
+            };
+            let mut edit = package.edit_section_paragraphs(0_usize)?;
+            let staged = sequence.iter().try_for_each(|item| stage(&mut edit, item));
+            let together = staged
+                .and_then(|()| edit.commit())
+                .map(|commit| commit.into_package());
+            let mut one_by_one = Ok(package.clone());
+            for item in &sequence {
+                one_by_one = one_by_one.and_then(|current| {
+                    let mut edit = current.edit_section_paragraphs(0_usize)?;
+                    stage(&mut edit, item)?;
+                    Ok(edit.commit()?.into_package())
+                });
+            }
+            match (together, one_by_one) {
+                (Ok(together), Ok(one_by_one)) => {
+                    assert!(
+                        together.to_bytes()? == one_by_one.to_bytes()?,
+                        "{name}: {sequence:?}"
+                    );
+                    compared += 1;
+                },
+                (Err(left), Err(right)) => assert_eq!(left, right, "{name}: {sequence:?}"),
+                (left, right) => panic!("{name}: {sequence:?}: {:?} {:?}", left.err(), right.err()),
+            }
+        }
+    }
+    assert!(compared >= 60, "{compared}");
     Ok(())
 }

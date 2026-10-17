@@ -178,11 +178,12 @@ fn grouped_child_shape(child: &ShapeGroupChild, shape_id: u32) -> Result<(Vec<u8
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::shape::{Anchor, Behavior, Rect};
+    use crate::AnchorBehavior;
+    use crate::writer::shape::{Anchor, Rect};
     use litchi_odraw::RecordKind;
 
     fn anchor() -> Anchor {
-        Anchor::cells(0, 0, 10, 6, Behavior::MoveAndSize).unwrap()
+        Anchor::cells(0, 0, 10, 6, AnchorBehavior::Absolute).unwrap()
     }
 
     fn config(group: &ShapeGroupWrite) -> GroupShapeConfig<'_> {

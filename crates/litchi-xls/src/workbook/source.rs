@@ -2939,6 +2939,22 @@ impl<'a> WorksheetScan<'a> {
         Ok(())
     }
 
+    /// Advances past an embedded substream whose BOF was just framed and
+    /// skipped, through its matching EOF (nested substreams included).
+    fn skip_embedded_substream(&mut self) -> Result<()> {
+        let mut depth = 1_usize;
+        while depth > 0 {
+            let frame = self.next_frame()?;
+            match frame.kind {
+                BOF => depth += 1,
+                EOF => depth -= 1,
+                _ => {},
+            }
+            self.skip_payload(&frame)?;
+        }
+        Ok(())
+    }
+
     /// Honours the caller's cooperative cancellation, twice per framed record.
     ///
     /// Most callers pass no execution context, and that case is a null test
@@ -3092,6 +3108,15 @@ fn scan_text_sheet(
             ));
         }
 
+        if frame.kind == BOF {
+            // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
+            // its data-cache Number and Label records are the chart's, not
+            // cells of this worksheet, as the eager parser reads them
+            // (records 0293, 0316).
+            scan.skip_payload(&frame)?;
+            scan.skip_embedded_substream()?;
+            continue;
+        }
         match frame.kind {
             0x0200 => {
                 let payload = scan.read_payload(&frame)?;
@@ -3742,6 +3767,15 @@ fn scan_worksheet_from<S: CellSink>(
             pending_formula = Some((formula, occurrence));
         }
 
+        if frame.kind == BOF {
+            // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
+            // its data-cache Number and Label records are the chart's, not
+            // cells of this worksheet, as the eager parser reads them
+            // (records 0293, 0316).
+            scan.skip_payload(&frame)?;
+            scan.skip_embedded_substream()?;
+            continue;
+        }
         match frame.kind {
             0x0006 => {
                 let payload = scan.read_payload(&frame)?;
