@@ -1,4 +1,6 @@
-//! Core document properties (`docProps/core.xml`) as a scoped transaction.
+//! Document properties as a scoped transaction: the core properties
+//! (`docProps/core.xml`), and the application (`docProps/app.xml`) and custom
+//! (`docProps/custom.xml`) properties the same edit can stage.
 //!
 //! [`Package::metadata`](crate::Package::metadata) reads the typed core
 //! properties, keeping a package without a core-properties part distinct from
@@ -13,6 +15,28 @@
 //! ([`litchi_ooxml_common::properties`]): the codec keeps the part's dialect,
 //! name and relationship identity, refuses shared or ambiguous graphs, and
 //! publishes nothing for a value equal to the stored one.
+//!
+//! [`Edit::set_app_props`] and [`Edit::set_custom_props`] stage the
+//! application and custom properties (record 0342). They are written by the
+//! shared engine's exact part patch ([`litchi_ooxml_common::properties::Patch`]):
+//! the application part is spliced, so every element the typed model does
+//! not carry keeps its bytes, and an unchanged value publishes nothing.
+//!
+//! ```
+//! use litchi_docx::Package;
+//!
+//! let package = Package::new()?;
+//! let mut edit = package.edit_metadata();
+//! let mut app = edit.app_props()?.unwrap_or_default();
+//! app.company = Some("Acme".to_owned());
+//! edit.set_app_props(Some(app));
+//! let next = edit.commit()?.into_package();
+//! assert_eq!(
+//!     next.app_props()?.and_then(|props| props.company),
+//!     Some("Acme".to_owned())
+//! );
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 //!
 //! ```
 //! use litchi_docx::Package;
@@ -33,6 +57,8 @@
 //! ```
 
 pub use litchi_core::Metadata;
+use litchi_ooxml_common::custom::Props as CustomProps;
+use litchi_ooxml_common::properties::{self as families, app};
 
 use crate::Package;
 
@@ -80,6 +106,10 @@ pub enum Error {
     /// The patch's base value does not match the package it is applied to.
     #[error("the metadata patch base does not match the package's core properties")]
     PatchConflict,
+    /// The application- or custom-properties part refused the staged value,
+    /// or its graph is invalid (record 0342).
+    #[error(transparent)]
+    Properties(#[from] families::Error),
     /// A staged value exceeds a metadata bound.
     #[error("metadata {kind} limit exceeded: {observed} > {maximum}")]
     Limit {
@@ -106,12 +136,15 @@ impl Diagnostics {
     }
 }
 
-/// A replayable core-properties change: the value the edit started from and
-/// the value it published. `None` is an absent core-properties part.
+/// A replayable document-properties change: the core-properties value the
+/// edit started from and the value it published (`None` is an absent
+/// core-properties part), and the exact part changes of the application and
+/// custom properties.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
     base: Option<Metadata>,
     target: Option<Metadata>,
+    parts: families::Patch,
 }
 
 impl Patch {
@@ -127,10 +160,16 @@ impl Patch {
         self.target.as_ref()
     }
 
+    /// The exact part changes of the application and custom properties.
+    #[must_use]
+    pub const fn parts(&self) -> &families::Patch {
+        &self.parts
+    }
+
     /// Whether applying the patch leaves every package byte unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.base == self.target
+        self.base == self.target && self.parts.is_noop()
     }
 
     /// The patch that restores the base value.
@@ -139,6 +178,7 @@ impl Patch {
         Self {
             base: self.target.clone(),
             target: self.base.clone(),
+            parts: self.parts.inverse(),
         }
     }
 }
@@ -200,6 +240,10 @@ pub struct Edit {
     source: Package,
     base: Option<Metadata>,
     staged: Option<Metadata>,
+    /// Staged application properties; `None` leaves the part untouched.
+    app: Option<Option<app::Props>>,
+    /// Staged custom properties; `None` leaves the part untouched.
+    custom: Option<CustomProps>,
 }
 
 impl Edit {
@@ -208,6 +252,8 @@ impl Edit {
             staged: base.clone(),
             source,
             base,
+            app: None,
+            custom: None,
         }
     }
 
@@ -236,6 +282,41 @@ impl Edit {
         self
     }
 
+    /// The staged application properties (`docProps/app.xml`): the staged
+    /// value, or the package's. `None` is an absent part.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Properties`] for an invalid application-properties
+    /// part or graph.
+    pub fn app_props(&self) -> Result<Option<app::Props>> {
+        match &self.app {
+            Some(staged) => Ok(staged.clone()),
+            None => self.source.app_props(),
+        }
+    }
+
+    /// Stage the complete application properties; `None` removes the part.
+    pub fn set_app_props(&mut self, props: Option<app::Props>) -> &mut Self {
+        self.app = Some(props);
+        self
+    }
+
+    /// The staged custom properties: the staged value, or the package's.
+    #[must_use]
+    pub fn custom_props(&self) -> &CustomProps {
+        self.custom
+            .as_ref()
+            .unwrap_or_else(|| self.source.custom_props())
+    }
+
+    /// Stage the complete custom properties; an empty collection removes the
+    /// part.
+    pub fn set_custom_props(&mut self, props: CustomProps) -> &mut Self {
+        self.custom = Some(props);
+        self
+    }
+
     /// Publish the staged value as a new package.
     ///
     /// An unchanged value returns a package that shares every part with the
@@ -244,14 +325,24 @@ impl Edit {
     /// # Errors
     ///
     /// Returns [`Error::Limit`] for an oversized text property,
-    /// [`Error::Signed`] for a change to a signed package, and
-    /// [`Error::Package`] when the codec or package graph refuses the value.
+    /// [`Error::Signed`] for a change to a signed package,
+    /// [`Error::Properties`] when the application or custom properties
+    /// cannot be written, and [`Error::Package`] when the codec or package
+    /// graph refuses the value.
     pub fn commit(self) -> Result<Commit> {
+        let parts = if self.app.is_some() || self.custom.is_some() {
+            self.source.property_parts_patch(self.app, self.custom)?
+        } else {
+            families::Patch::default()
+        };
         let patch = Patch {
             base: self.base,
             target: self.staged,
+            parts,
         };
-        let (package, changed) = self.source.publish_metadata(patch.target.as_ref())?;
+        let (package, changed) = self
+            .source
+            .publish_metadata(patch.target.as_ref(), &patch.parts)?;
         Ok(Commit {
             package,
             patch,
@@ -265,6 +356,8 @@ impl std::fmt::Debug for Edit {
         formatter
             .debug_struct("Edit")
             .field("present", &self.staged.is_some())
+            .field("app", &self.app.is_some())
+            .field("custom", &self.custom.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -380,6 +473,59 @@ mod tests {
             replayed.metadata().and_then(|props| props.title.as_deref()),
             Some("two")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn app_and_custom_props_publish_replay_and_invert() -> Result<()> {
+        let package = Package::new()?;
+        let original = package.clone().to_bytes()?;
+        let mut edit = package.edit_metadata();
+        let mut app = edit.app_props()?.unwrap_or_default();
+        app.company = Some("Acme".to_owned());
+        app.manager = Some("Dana".to_owned());
+        edit.set_app_props(Some(app));
+        let mut custom = edit.custom_props().clone();
+        custom
+            .insert("Reviewed", litchi_ooxml_common::custom::Value::Bool(true))
+            .map_err(families::Error::from)?;
+        edit.set_custom_props(custom);
+        let commit = edit.commit()?;
+        assert!(commit.diagnostics().changed());
+        assert!(!commit.patch().is_noop());
+        let (next, patch) = commit.into_parts();
+        let app = next.app_props()?.unwrap_or_default();
+        assert_eq!(app.company.as_deref(), Some("Acme"));
+        assert_eq!(app.manager.as_deref(), Some("Dana"));
+        assert_eq!(
+            next.custom_props().get("Reviewed"),
+            Some(&litchi_ooxml_common::custom::Value::Bool(true))
+        );
+        // The core properties are untouched, and the source is unchanged.
+        assert_eq!(next.metadata(), package.metadata());
+        assert_eq!(package.clone().to_bytes()?, original);
+        let reopened = Package::from_bytes(&next.clone().to_bytes()?)?;
+        assert_eq!(
+            reopened.app_props()?.and_then(|props| props.company),
+            Some("Acme".to_owned())
+        );
+        let replayed = package.apply_metadata(&patch)?;
+        assert_eq!(replayed.app_props()?, next.app_props()?);
+        let mut restored = next.apply_metadata(&patch.inverse())?;
+        assert_eq!(restored.to_bytes()?, original);
+        Ok(())
+    }
+
+    #[test]
+    fn unchanged_app_props_are_an_exact_noop() -> Result<()> {
+        let package = Package::new()?;
+        let mut edit = package.edit_metadata();
+        let app = edit.app_props()?;
+        edit.set_app_props(app);
+        edit.set_custom_props(package.custom_props().clone());
+        let commit = edit.commit()?;
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
         Ok(())
     }
 

@@ -17,7 +17,7 @@ use super::element::{
 use super::nav::{Nav, container_of};
 use super::node::{Node, Value};
 use super::spec::{Kind, ROW_REGISTRY, TABLE_REGISTRY};
-use super::structure::{NewKind, new_paragraph, new_run, resolve_path};
+use super::structure::{NewKind, new_paragraph_with_list, new_run, resolve_path};
 use super::write::{Commit, WorkEdit};
 use super::{Docx, DocxEditor};
 use crate::error::{Code, Error, Result};
@@ -42,10 +42,22 @@ impl Docx {
             (NewKind::Paragraph, Kind::Body | Kind::Cell | Kind::Sdt) => {
                 let container = container_path(parent)?;
                 let anchor = block_anchor(self, parent, &container, placement, None)?;
-                let paragraph = new_paragraph(node.props())?;
+                let (paragraph, list) = new_paragraph_with_list(node.props())?;
                 self.owner().check_source()?;
+                // A new list definition is a new part (record 0342).
+                let editor = if list.is_some() {
+                    self.eager_editor(editor)?
+                } else {
+                    editor
+                };
                 let mut edit = WorkEdit::from(editor)?;
                 let raw = edit.insert_paragraph_at(&container, anchor, &paragraph)?;
+                if let Some(list) = list {
+                    let WorkEdit::Eager(eager) = &mut edit else {
+                        return Err(refusal("lists need the owning package editor"));
+                    };
+                    super::lists::number_added(eager, &container, raw, list)?;
+                }
                 let commit = edit.commit(self)?;
                 let ordinal = visible_child(self, commit.file(), parent, Kind::Paragraph, raw)?;
                 Ok((commit, path_with(parent, Some((Kind::Paragraph, ordinal)))))
@@ -53,10 +65,16 @@ impl Docx {
             (NewKind::Table, Kind::Body | Kind::Cell | Kind::Sdt) => {
                 let container = container_path(parent)?;
                 let anchor = block_anchor(self, parent, &container, placement, None)?;
-                let table = new_table(node.props())?;
+                let (table, borders) = new_table(node.props())?;
                 self.owner().check_source()?;
                 let mut edit = WorkEdit::from(editor)?;
                 let raw = edit.insert_table_at(&container, anchor, &table)?;
+                // `border.*` (record 0342): the new table's borders.
+                if let Some(borders) = borders {
+                    edit.format_table_at(&container.child(ElementStep::Table(raw)), |table| {
+                        table.borders = Some(borders)
+                    })?;
+                }
                 let commit = edit.commit(self)?;
                 let ordinal = visible_child(self, commit.file(), parent, Kind::Table, raw)?;
                 Ok((commit, path_with(parent, Some((Kind::Table, ordinal)))))
@@ -638,8 +656,12 @@ pub(super) fn order_key(path: &ElementPath) -> Vec<(u8, usize)> {
 }
 
 /// A new table from the add properties: `rows`, `cols`, `data`, `style` and
-/// `colWidths`.
-fn new_table(props: &Props<'_>) -> Result<NewTable> {
+/// `colWidths`, and the borders `border.*` ask for (record 0342), which are
+/// written once the table is inserted.
+fn new_table(
+    props: &Props<'_>,
+) -> Result<(NewTable, Option<litchi_docx::properties::TableBorders>)> {
+    let mut borders = litchi_docx::properties::Table::default();
     let mut rows = None::<usize>;
     let mut columns = None::<usize>;
     let mut data = None::<Vec<Vec<String>>>;
@@ -660,6 +682,13 @@ fn new_table(props: &Props<'_>) -> Result<NewTable> {
                 };
                 use super::setters::Setter;
                 match setter {
+                    Setter::TableBorderAll
+                    | Setter::TableBorderTop
+                    | Setter::TableBorderBottom
+                    | Setter::TableBorderLeft
+                    | Setter::TableBorderRight
+                    | Setter::TableBorderHorizontal
+                    | Setter::TableBorderVertical => setter.apply_table(&mut borders, value)?,
                     Setter::TableRows => rows = Some(count(&text)?),
                     Setter::TableColumns => columns = Some(count(&text)?),
                     Setter::TableStyle => style = Some(text),
@@ -720,7 +749,7 @@ fn new_table(props: &Props<'_>) -> Result<NewTable> {
             table = table.with_cell_text(row, column, text);
         }
     }
-    Ok(table)
+    Ok((table, borders.borders))
 }
 
 /// A new hyperlink's target and run from its add properties: exactly one of

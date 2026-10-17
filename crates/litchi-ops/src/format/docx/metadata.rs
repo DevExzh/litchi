@@ -1,19 +1,20 @@
-//! DOCX core document properties on the root and `/metadata` (record 0338).
+//! DOCX document properties on the root and `/metadata` (records 0338 and
+//! 0342).
 //!
 //! A set on `/` (OfficeCLI's `set / title=...`) or on `/metadata` with
 //! root-metadata keys commits one leaf [`litchi_docx::metadata`]
-//! transaction, the core-properties family of record 0251. The leaf family
-//! wraps the core-properties part only, so application keys
-//! (`extended.company`, ...) and `custom.<name>` are refused with
-//! `unsupported_property` (record 0253 F3). As for XLSX and PPTX, a set never
-//! stamps `modified`.
+//! transaction: the core properties (record 0251), the application keys
+//! (`company`, `manager`, `template`, `application` and their `extended.*`
+//! spellings) and `custom.<name>` (record 0342). `contentType`, which no
+//! OOXML part stores, is refused with `unsupported_property`. As for XLSX
+//! and PPTX, a set never stamps `modified`.
 
 use litchi_core::FileFormat;
 
 use super::write::{Commit, WorkEdit};
 use super::{Docx, DocxOwner};
-use crate::error::Result;
-use crate::format::metadata::{self, Scope};
+use crate::error::{Code, Error, Result};
+use crate::format::metadata;
 use crate::props::Props;
 use crate::target::TargetArg;
 
@@ -24,12 +25,20 @@ impl Docx {
         metadata::is_target(target) || (metadata::is_root(target) && !props.is_empty())
     }
 
-    /// Commit the admitted core-property assignments of `props`; the
+    /// Commit the admitted document-property assignments of `props`; the
     /// handle's own edit policy applies (a signed document, one opened
     /// without its source, an authorized signature removal).
     fn commit_metadata(&self, props: &Props<'_>) -> Result<Docx> {
         self.edit_policy()?;
-        let assignments = metadata::admit_with(props, FileFormat::Docx, Scope::Core)?;
+        let assignments = metadata::admit(props, FileFormat::Docx)?;
+        if let Some(key) = assignments.unstored() {
+            return Err(Error::new(
+                Code::UnsupportedProperty,
+                "the format cannot store this metadata field",
+            )
+            .with_property(key)
+            .with_format(FileFormat::Docx));
+        }
         let package = if self.signature() == crate::format::signature::Signature::RemovalAuthorized
         {
             self.unsigned_package()?
@@ -40,8 +49,16 @@ impl Docx {
             }
         };
         let mut edit = package.edit_metadata();
-        edit.update(|value| assignments.apply(value));
-        let commit = edit.commit()?;
+        edit.update(|value| assignments.apply_core(value));
+        if assignments.has_app() {
+            let base = edit.app_props().map_err(native)?;
+            edit.set_app_props(Some(assignments.apply_app(base)));
+        }
+        if assignments.has_custom() {
+            let custom = assignments.apply_custom(edit.custom_props(), FileFormat::Docx)?;
+            edit.set_custom_props(custom);
+        }
+        let commit = edit.commit().map_err(native)?;
         let changed = commit.diagnostics().changed();
         self.owner().check_source()?;
         Ok(if changed {
@@ -67,5 +84,16 @@ impl Docx {
         let file = self.commit_metadata(props)?;
         let (patch, diagnostics) = WorkEdit::from(self.edit()?)?.commit_patch()?;
         Ok(Commit::from_parts(file, patch, diagnostics))
+    }
+}
+
+/// A leaf metadata error, with the application- and custom-properties
+/// failures mapped as for the other OOXML formats.
+fn native(error: litchi_docx::metadata::Error) -> Error {
+    match error {
+        litchi_docx::metadata::Error::Properties(error) => {
+            metadata::native_error(error, FileFormat::Docx)
+        },
+        error => Error::from(error),
     }
 }

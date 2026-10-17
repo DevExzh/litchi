@@ -1237,6 +1237,17 @@ impl Classify for litchi_docx::metadata::Error {
             Self::Signed => Class::of(Code::DocumentProtected),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::PatchConflict => Class::of(Code::IoError),
+            // Application and custom properties (record 0342).
+            Self::Properties(error) => Class::of(match error {
+                litchi_ooxml_common::properties::Error::Unsupported { .. } => {
+                    Code::UnsupportedProperty
+                },
+                litchi_ooxml_common::properties::Error::Invalid(_) => Code::InvalidValue,
+                litchi_ooxml_common::properties::Error::Limit { .. } => Code::LimitExceeded,
+                litchi_ooxml_common::properties::Error::Signed => Code::DocumentProtected,
+                litchi_ooxml_common::properties::Error::Conflict(_) => Code::ValidationError,
+                _ => Code::CorruptFile,
+            }),
             _ => Class::of(Code::InternalError),
         }
     }

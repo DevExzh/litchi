@@ -40,6 +40,32 @@ pub(crate) enum Setter {
     TableData,
     /// A new row's cell count.
     RowColumns,
+    /// Every table border but the diagonals: `border.all` (record 0342).
+    TableBorderAll,
+    /// A table's top border.
+    TableBorderTop,
+    /// A table's bottom border.
+    TableBorderBottom,
+    /// A table's left (leading) border.
+    TableBorderLeft,
+    /// A table's right (trailing) border.
+    TableBorderRight,
+    /// A table's inside horizontal border, between rows.
+    TableBorderHorizontal,
+    /// A table's inside vertical border, between columns.
+    TableBorderVertical,
+    /// A row's height, without a rule (`auto`, record 0342).
+    RowHeight,
+    /// A row's exact height.
+    RowHeightExact,
+    /// A row's minimum height.
+    RowHeightAtLeast,
+    /// Whether a row repeats as the table header.
+    RowHeader,
+    /// Whether a row stays on one page.
+    RowCantSplit,
+    /// Whether a row's end mark is hidden.
+    RowHidden,
     /// A paragraph's list kind (record 0251e); applied through the
     /// numbering part, not the paragraph's properties.
     ParagraphListStyle,
@@ -480,6 +506,254 @@ impl Setter {
             },
             _ => Err(unsupported("the setter does not target run properties")),
         }
+    }
+}
+
+/// One side of a table's borders.
+#[derive(Clone, Copy)]
+enum Side {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    Horizontal,
+    Vertical,
+}
+
+impl Setter {
+    /// Apply a table property (record 0342): the style and the borders.
+    pub(crate) fn apply_table(
+        self,
+        table: &mut direct::Table,
+        value: Option<Scalar<'_>>,
+    ) -> Result<()> {
+        let sides: &[Side] = match self {
+            Self::TableStyle => {
+                table.style = text(value)?.map(str::to_owned);
+                return Ok(());
+            },
+            Self::TableBorderAll => &[
+                Side::Top,
+                Side::Bottom,
+                Side::Left,
+                Side::Right,
+                Side::Horizontal,
+                Side::Vertical,
+            ],
+            Self::TableBorderTop => &[Side::Top],
+            Self::TableBorderBottom => &[Side::Bottom],
+            Self::TableBorderLeft => &[Side::Left],
+            Self::TableBorderRight => &[Side::Right],
+            Self::TableBorderHorizontal => &[Side::Horizontal],
+            Self::TableBorderVertical => &[Side::Vertical],
+            _ => return Err(unsupported("the setter does not target table properties")),
+        };
+        let border = text(value)?.map(parse_border).transpose()?;
+        let borders = table.borders.get_or_insert_default();
+        for side in sides {
+            // A side written with its Strict spelling keeps it.
+            let slot = match side {
+                Side::Top => &mut borders.top,
+                Side::Bottom => &mut borders.bottom,
+                Side::Left if borders.left.is_none() && borders.start.is_some() => {
+                    &mut borders.start
+                },
+                Side::Left => &mut borders.left,
+                Side::Right if borders.right.is_none() && borders.end.is_some() => &mut borders.end,
+                Side::Right => &mut borders.right,
+                Side::Horizontal => &mut borders.inside_horizontal,
+                Side::Vertical => &mut borders.inside_vertical,
+            };
+            *slot = border;
+        }
+        if table.borders == Some(direct::TableBorders::default()) {
+            table.borders = None;
+        }
+        Ok(())
+    }
+
+    /// Apply a row property (record 0342): the height and the header,
+    /// keep-together and hidden flags. A flag set to `false` is removed, as
+    /// OfficeCLI removes it.
+    pub(crate) fn apply_row(self, row: &mut direct::Row, value: Option<Scalar<'_>>) -> Result<()> {
+        let flag = |value: Option<Scalar<'_>>| Ok::<_, Error>(bool_value(value)?.filter(|on| *on));
+        match self {
+            Self::RowHeight | Self::RowHeightExact | Self::RowHeightAtLeast => {
+                let rule = match self {
+                    Self::RowHeightExact => Some(direct::HeightRule::Exact),
+                    Self::RowHeightAtLeast => Some(direct::HeightRule::AtLeast),
+                    _ => None,
+                };
+                row.height = text(value)?
+                    .map(|text| {
+                        let length = Length::parse_in(text.trim(), LengthContext::WordSpacing)
+                            .map_err(|_| {
+                                invalid("a row height is twips or a length such as 1cm")
+                            })?;
+                        Ok::<_, Error>(direct::Height::new(twips(length)?, rule))
+                    })
+                    .transpose()?;
+                Ok(())
+            },
+            Self::RowHeader => {
+                row.header = flag(value)?;
+                Ok(())
+            },
+            Self::RowCantSplit => {
+                row.cant_split = flag(value)?;
+                Ok(())
+            },
+            Self::RowHidden => {
+                row.hidden = flag(value)?;
+                Ok(())
+            },
+            _ => Err(unsupported("the setter does not target row properties")),
+        }
+    }
+}
+
+/// OfficeCLI's border value (`ParseBorderValue`): `STYLE[;SIZE[;COLOR[;SPACE]]]`
+/// or the CSS-like `SIZE STYLE COLOR`. A bare size is eighths of a point,
+/// `pt`, `cm` and `in` are converted; a missing size is 4 (12 for `thick`,
+/// none for `nil`).
+fn parse_border(value: &str) -> Result<direct::Border> {
+    let value = value.trim();
+    let (style, size, color, space) = if value.contains(';') {
+        let mut parts = value.split(';').map(str::trim);
+        let style = parts.next().unwrap_or_default();
+        let size = parts.next().filter(|part| !part.is_empty());
+        let color = parts.next().filter(|part| !part.is_empty());
+        let space = parts.next().filter(|part| !part.is_empty());
+        (style, size, color, space)
+    } else {
+        let (mut style, mut size, mut color) = (None, None, None);
+        for token in value.split_whitespace() {
+            if size.is_none() && border_size(token).is_ok() {
+                size = Some(token);
+            } else if color.is_none() && style.is_some() && hex(token).is_ok() {
+                color = Some(token);
+            } else if style.is_none() {
+                style = Some(token);
+            } else {
+                return Err(invalid("a border is STYLE;SIZE;COLOR or SIZE STYLE COLOR"));
+            }
+        }
+        (style.unwrap_or_default(), size, color, None)
+    };
+    let style = border_style(style)?;
+    let mut border = direct::Border::new(style);
+    border.size = match size {
+        Some(size) => Some(direct::EighthPoints(border_size(size)?)),
+        None if style.as_str() == "nil" => None,
+        None if style.as_str() == "thick" => Some(direct::EighthPoints(12)),
+        None => Some(direct::EighthPoints(4)),
+    };
+    border.color = color.map(hex).transpose()?;
+    border.space = space
+        .map(|space| {
+            space
+                .parse::<u32>()
+                .map(|space| direct::Points(i64::from(space)))
+                .map_err(|_| invalid("a border space is a whole number of points"))
+        })
+        .transpose()?;
+    Ok(border)
+}
+
+/// A border style, ASCII case-insensitively, with OfficeCLI's aliases.
+fn border_style(token: &str) -> Result<direct::BorderStyle> {
+    const LINES: [&str; 27] = [
+        "single",
+        "thick",
+        "double",
+        "dotted",
+        "dashed",
+        "dotDash",
+        "dotDotDash",
+        "triple",
+        "thinThickSmallGap",
+        "thickThinSmallGap",
+        "thinThickThinSmallGap",
+        "thinThickMediumGap",
+        "thickThinMediumGap",
+        "thinThickThinMediumGap",
+        "thinThickLargeGap",
+        "thickThinLargeGap",
+        "thinThickThinLargeGap",
+        "wave",
+        "doubleWave",
+        "dashSmallGap",
+        "dashDotStroked",
+        "threeDEmboss",
+        "threeDEngrave",
+        "outset",
+        "inset",
+        "none",
+        "nil",
+    ];
+    let lower = token.to_ascii_lowercase();
+    let canonical = match lower.as_str() {
+        "thin" => "single",
+        "medium" => "thick",
+        "wavy" => "wave",
+        "wavydouble" | "wavyheavy" => "doubleWave",
+        "3demboss" => "threeDEmboss",
+        "3dengrave" => "threeDEngrave",
+        _ => LINES
+            .iter()
+            .find(|line| line.eq_ignore_ascii_case(token))
+            .copied()
+            .unwrap_or(token),
+    };
+    direct::BorderStyle::from_xml(canonical).ok_or_else(|| invalid("unknown border style"))
+}
+
+/// A border width in eighths of a point.
+fn border_size(token: &str) -> Result<i64> {
+    if let Ok(eighths) = token.parse::<u32>() {
+        return Ok(i64::from(eighths));
+    }
+    let lower = token.to_ascii_lowercase();
+    let (number, per_unit) = if let Some(number) = lower.strip_suffix("pt") {
+        (number, 8.0)
+    } else if let Some(number) = lower.strip_suffix("cm") {
+        (number, 72.0 / 2.54 * 8.0)
+    } else if let Some(number) = lower.strip_suffix("in") {
+        (number, 72.0 * 8.0)
+    } else {
+        return Err(invalid(
+            "a border size is eighths of a point or a length such as 1pt",
+        ));
+    };
+    let number: f64 = number
+        .trim()
+        .parse()
+        .map_err(|_| invalid("a border size is eighths of a point or a length such as 1pt"))?;
+    let eighths = (number * per_unit).round();
+    if !(0.0..=f64::from(u32::MAX)).contains(&eighths) {
+        return Err(invalid("a border size is out of range"));
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "checked to be a whole number in u32 range above"
+    )]
+    Ok(eighths as i64)
+}
+
+/// A border colour: `auto` or six hexadecimal digits, with an optional `#`.
+fn hex(token: &str) -> Result<direct::HexColor> {
+    if token.eq_ignore_ascii_case("auto") {
+        return Ok(direct::HexColor::Auto);
+    }
+    let digits = token.strip_prefix('#').unwrap_or(token);
+    let byte = |index: usize| {
+        digits
+            .get(index..index + 2)
+            .and_then(|pair| u8::from_str_radix(pair, 16).ok())
+    };
+    match (digits.len(), byte(0), byte(2), byte(4)) {
+        (6, Some(red), Some(green), Some(blue)) => Ok(direct::HexColor::Rgb([red, green, blue])),
+        _ => Err(invalid("a border colour is six hexadecimal digits or auto")),
     }
 }
 

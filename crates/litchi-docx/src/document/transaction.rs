@@ -178,6 +178,10 @@ pub enum Refusal {
     /// so replacing the content's text would either keep that text or drop
     /// the object (record 0307).
     AlternateContentText,
+    /// The change names a property the operation does not write (record
+    /// 0342: a table edit writes its style and borders, a row edit its
+    /// height and flags).
+    UnmodelledProperty,
 }
 
 impl std::fmt::Display for Refusal {
@@ -220,6 +224,7 @@ impl std::fmt::Display for Refusal {
             Self::AlternateContentText => {
                 "content holds markup-compatibility alternate content (a text box) with its own text"
             },
+            Self::UnmodelledProperty => "the operation does not write the requested property",
         })
     }
 }

@@ -184,7 +184,10 @@ fn listed_blocks(blocks: &litchi_docx::Blocks) -> usize {
 /// The node's `format` entries.
 pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
     let props = match &node.value {
-        Value::Document => Props::Document(Box::new(node.docx.metadata()?.unwrap_or_default())),
+        Value::Document => Props::Document(
+            Box::new(node.docx.metadata()?.unwrap_or_default()),
+            node.docx.app_props()?.map(Box::new),
+        ),
         Value::Paragraph { paragraph, .. } => Props::Paragraph {
             docx: node.docx,
             props: Box::new(paragraph.direct_properties()?),
@@ -346,7 +349,12 @@ pub(crate) enum Props<'a> {
     None,
     /// A display equation: `mode` is `display`.
     Equation,
-    Document(Box<Metadata>),
+    /// The core properties and, when the part is present and valid, the
+    /// application properties (record 0342).
+    Document(
+        Box<Metadata>,
+        Option<Box<litchi_ooxml_common::properties::app::Props>>,
+    ),
     Paragraph {
         /// The handle the paragraph's style and list properties read the
         /// styles and numbering parts through (record 0319).
@@ -388,7 +396,9 @@ impl<'a> Props<'a> {
         match self {
             Self::None => None,
             Self::Equation => (index == 0).then_some(NodeValue::Token("display")),
-            Self::Document(metadata) => document(metadata, index),
+            Self::Document(metadata, app) => {
+                document(metadata, index).or_else(|| extended(app.as_deref()?, index))
+            },
             Self::Paragraph { docx, props, id } => match index {
                 P_STYLE_NAME | P_NUM_FMT | P_LIST_STYLE | P_START => {
                     super::parts::paragraph_part_value(docx, props, index)
@@ -423,7 +433,7 @@ impl std::fmt::Debug for Props<'_> {
         formatter.write_str(match self {
             Self::None => "Props::None",
             Self::Equation => "Props::Equation",
-            Self::Document(_) => "Props::Document",
+            Self::Document(..) => "Props::Document",
             Self::Paragraph { .. } => "Props::Paragraph",
             Self::Run(_) => "Props::Run",
             Self::Hyperlink { .. } => "Props::Hyperlink",
@@ -579,6 +589,43 @@ fn document<'a>(metadata: &Metadata, index: usize) -> Option<NodeValue<'a>> {
         _ => None,
     }
 }
+
+/// An `extended.*` key of the root: the application properties, as
+/// OfficeCLI's `ExtendedPropertiesHandler` reads them (record 0342).
+fn extended<'a>(
+    app: &litchi_ooxml_common::properties::app::Props,
+    index: usize,
+) -> Option<NodeValue<'a>> {
+    let text = |value: &Option<String>| value.as_deref().map(owned);
+    let int = |value: Option<i32>| value.map(|value| NodeValue::Int(i64::from(value)));
+    match index {
+        D_EXTENDED_TEMPLATE => text(&app.template),
+        D_EXTENDED_MANAGER => text(&app.manager),
+        D_EXTENDED_COMPANY => text(&app.company),
+        D_EXTENDED_APPLICATION => text(&app.application),
+        D_EXTENDED_APPLICATION_VERSION => text(&app.app_version),
+        D_EXTENDED_PAGES => int(app.pages),
+        D_EXTENDED_WORDS => int(app.words),
+        D_EXTENDED_CHARACTERS => int(app.characters),
+        D_EXTENDED_LINES => int(app.lines),
+        D_EXTENDED_PARAGRAPHS => int(app.paragraphs),
+        D_EXTENDED_TOTAL_TIME => int(app.total_time),
+        _ => None,
+    }
+}
+
+const D_EXTENDED_TEMPLATE: usize = index_of(DOCUMENT_PROPS, "extended.template");
+const D_EXTENDED_MANAGER: usize = index_of(DOCUMENT_PROPS, "extended.manager");
+const D_EXTENDED_COMPANY: usize = index_of(DOCUMENT_PROPS, "extended.company");
+const D_EXTENDED_APPLICATION: usize = index_of(DOCUMENT_PROPS, "extended.application");
+const D_EXTENDED_APPLICATION_VERSION: usize =
+    index_of(DOCUMENT_PROPS, "extended.applicationVersion");
+const D_EXTENDED_PAGES: usize = index_of(DOCUMENT_PROPS, "extended.pages");
+const D_EXTENDED_WORDS: usize = index_of(DOCUMENT_PROPS, "extended.words");
+const D_EXTENDED_CHARACTERS: usize = index_of(DOCUMENT_PROPS, "extended.characters");
+const D_EXTENDED_LINES: usize = index_of(DOCUMENT_PROPS, "extended.lines");
+const D_EXTENDED_PARAGRAPHS: usize = index_of(DOCUMENT_PROPS, "extended.paragraphs");
+const D_EXTENDED_TOTAL_TIME: usize = index_of(DOCUMENT_PROPS, "extended.totalTime");
 
 // ---------------------------------------------------------------------------
 // Paragraph

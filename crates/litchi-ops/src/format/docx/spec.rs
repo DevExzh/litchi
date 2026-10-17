@@ -515,6 +515,58 @@ const fn read_set(
     }
 }
 
+/// A property that `get` reads, `set` writes and `add` seeds, with no clear
+/// (record 0342: `listStyle` and `start` on a new paragraph).
+const fn read_set_add(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    crate::registry::Entry {
+        spec: PropSpec::new(name, ty),
+        access: crate::registry::Access::SetAndAdd(setter),
+        constraint,
+        clear: false,
+    }
+}
+
+/// A write-only property that `set` writes and `add` seeds (record 0342:
+/// table borders); `null` removes it.
+const fn write_set_add(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::SetAndAdd(setter),
+        constraint,
+        clear: true,
+    }
+}
+
+/// A write-only property that only `set` writes (record 0342: the row
+/// height rules, which read back as `height` and `height.rule`).
+const fn write_set(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::Set(setter),
+        constraint,
+        clear: true,
+    }
+}
+
 /// One write-only property declaration.  Text has a dedicated write handler
 /// but is intentionally absent from the read model; the appended registry
 /// row keeps all pre-existing paragraph/run read indices stable.
@@ -560,12 +612,25 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("revisionNumber", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("created", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("modified", ValueType::Text)),
+    // `ExtendedPropertiesHandler`: the application properties (record 0342).
+    crate::registry::Entry::read(PropSpec::new("extended.template", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("extended.manager", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("extended.company", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("extended.application", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("extended.applicationVersion", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("extended.pages", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("extended.words", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("extended.characters", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("extended.lines", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("extended.paragraphs", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("extended.totalTime", ValueType::Int)),
     }
 }
 
-/// The root's capability table: the core-property keys are settable,
-/// through the metadata writer on `/` and `/metadata` (record 0338). Same
-/// order as [`DOCUMENT_PROPS`], so reads index either.
+/// The root's capability table: the core-property keys and the settable
+/// application keys are settable, through the metadata writer on `/` and
+/// `/metadata` (records 0338 and 0342). Same order as [`DOCUMENT_PROPS`],
+/// so reads index either.
 pub(crate) static DOCUMENT_ROOT_PROPS: [PropSpec; DOCUMENT_PROPS.len()] =
     crate::format::metadata::root_capability(DOCUMENT_PROPS);
 
@@ -607,8 +672,9 @@ crate::registry::registry! {
     // Record 0319: the numbering part answers the paragraph's list format,
     // kind and start (record 0251e writes the kind and start).
     crate::registry::Entry::read(PropSpec::new("numFmt", ValueType::Text)),
-    read_set("listStyle", ValueType::Text, Setter::ParagraphListStyle, Constraint::NotEmpty),
-    read_set("start", ValueType::Int, Setter::ParagraphListStart, Constraint::Int { min: 0, max: 32_767 }),
+    // Record 0342: `add` creates or continues the list too.
+    read_set_add("listStyle", ValueType::Text, Setter::ParagraphListStyle, Constraint::NotEmpty),
+    read_set_add("start", ValueType::Int, Setter::ParagraphListStart, Constraint::Int { min: 0, max: 32_767 }),
     writable("outlineLvl", ValueType::Int, Setter::ParagraphOutlineLevel, Constraint::Int { min: 0, max: 9 }, true),
     write_only("text", ValueType::Text, Setter::ParagraphText),
     // A paragraph may carry one initial run.  Its direct run formatting is
@@ -738,7 +804,8 @@ crate::registry::registry! {
     pub(crate) TABLE_PROPS, TABLE_REGISTRY: Setter {
     read_add("cols", ValueType::Text, Setter::TableColumns, Constraint::NotEmpty),
     read_add("rows", ValueType::Text, Setter::TableRows, Constraint::NotEmpty),
-    read_add("style", ValueType::Text, Setter::TableStyle, Constraint::NotEmpty),
+    // Record 0342: the style is set too.
+    writable("style", ValueType::Text, Setter::TableStyle, Constraint::NotEmpty, false),
     crate::registry::Entry::read(PropSpec::new("rowBandSize", ValueType::Int)),
     crate::registry::Entry::read(PropSpec::new("colBandSize", ValueType::Int)),
     crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
@@ -762,6 +829,14 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("description", ValueType::Text)),
     read_add("colWidths", ValueType::Text, Setter::TableColumnWidths, Constraint::NotEmpty),
     add_only("data", ValueType::Text, Setter::TableData, Constraint::None),
+    // Record 0342: `ApplyTableBorders`, `STYLE;SIZE;COLOR[;SPACE]`.
+    write_set_add("border.all", ValueType::Text, Setter::TableBorderAll, Constraint::NotEmpty),
+    write_set_add("border.top", ValueType::Text, Setter::TableBorderTop, Constraint::NotEmpty),
+    write_set_add("border.bottom", ValueType::Text, Setter::TableBorderBottom, Constraint::NotEmpty),
+    write_set_add("border.left", ValueType::Text, Setter::TableBorderLeft, Constraint::NotEmpty),
+    write_set_add("border.right", ValueType::Text, Setter::TableBorderRight, Constraint::NotEmpty),
+    write_set_add("border.horizontal", ValueType::Text, Setter::TableBorderHorizontal, Constraint::NotEmpty),
+    write_set_add("border.vertical", ValueType::Text, Setter::TableBorderVertical, Constraint::NotEmpty),
     }
 }
 
@@ -769,11 +844,12 @@ crate::registry::registry! {
 // `dxa` unit there, grid counts strings.
 crate::registry::registry! {
     pub(crate) ROW_PROPS, ROW_REGISTRY: Setter {
-    crate::registry::Entry::read(PropSpec::new("height", ValueType::Text)),
+    // Record 0342: `height`, `header`, `cantSplit` and `hidden` are set.
+    read_set("height", ValueType::Text, Setter::RowHeight, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("height.rule", ValueType::Token(&HEIGHT_RULE))),
-    crate::registry::Entry::read(PropSpec::new("header", ValueType::Bool)),
-    crate::registry::Entry::read(PropSpec::new("cantSplit", ValueType::Bool)),
-    crate::registry::Entry::read(PropSpec::new("hidden", ValueType::Bool)),
+    read_set("header", ValueType::Bool, Setter::RowHeader, Constraint::None),
+    read_set("cantSplit", ValueType::Bool, Setter::RowCantSplit, Constraint::None),
+    read_set("hidden", ValueType::Bool, Setter::RowHidden, Constraint::None),
     crate::registry::Entry::read(PropSpec::new("rowAlign", ValueType::Token(&TABLE_ALIGN))),
     crate::registry::Entry::read(PropSpec::new("gridBefore", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("wBefore", ValueType::Text)),
@@ -781,6 +857,8 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("wAfter", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("cellSpacing", ValueType::Int)),
     add_only("cols", ValueType::Int, Setter::RowColumns, Constraint::Int { min: 1, max: 4096 }),
+    write_set("height.exact", ValueType::Text, Setter::RowHeightExact, Constraint::NotEmpty),
+    write_set("height.atLeast", ValueType::Text, Setter::RowHeightAtLeast, Constraint::NotEmpty),
     }
 }
 

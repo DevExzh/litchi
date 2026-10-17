@@ -46,6 +46,7 @@ use super::paragraph::{
 };
 use super::run::Run;
 use super::scan::{Resolution, Root, resolve, split};
+use super::table::{Height, Row, Table, TableBorders};
 use super::value::{
     Border, Color, Fonts, HexColor, Language, Shading, Sign, Unit, hex_byte, hex_color, integer,
     measure, on_off, text_scale,
@@ -198,6 +199,53 @@ const NUMBERING_TYPED: &[&str] = &["ilvl", "numId"];
 const BORDERS_ORDER: &[&str] = &["top", "left", "bottom", "right", "between", "bar"];
 /// The only child of `w:tabs`.
 const TABS_TYPED: &[&str] = &["tab"];
+/// `CT_TblPr` in schema order.
+const TABLE_ORDER: &[&str] = &[
+    "tblStyle",
+    "tblpPr",
+    "tblOverlap",
+    "bidiVisual",
+    "tblStyleRowBandSize",
+    "tblStyleColBandSize",
+    "tblW",
+    "jc",
+    "tblCellSpacing",
+    "tblInd",
+    "tblBorders",
+    "shd",
+    "tblLayout",
+    "tblCellMar",
+    "tblLook",
+    "tblCaption",
+    "tblDescription",
+    "tblPrChange",
+];
+/// `CT_TblBorders` in schema order, with the transitional `left`/`right`
+/// beside the `start`/`end` they spell; every side is typed.
+const TABLE_BORDERS_ORDER: &[&str] = &[
+    "top", "start", "left", "bottom", "end", "right", "insideH", "insideV",
+];
+/// `CT_TrPr` children in the order Word writes them (the schema admits any
+/// order), then the tracked-change markup.
+const ROW_ORDER: &[&str] = &[
+    "cnfStyle",
+    "divId",
+    "gridBefore",
+    "gridAfter",
+    "wBefore",
+    "wAfter",
+    "cantSplit",
+    "trHeight",
+    "tblHeader",
+    "tblCellSpacing",
+    "jc",
+    "hidden",
+    "ins",
+    "del",
+    "trPrChange",
+];
+/// What may precede `w:trPr` in a row (`CT_Row`).
+const ROW_LEADING: &[&str] = &["tblPrEx"];
 /// Elements that record a tracked change and must never be dropped.
 const TRACKED: &[&str] = &[
     "ins",
@@ -818,6 +866,116 @@ fn borders_plan(
             changes,
         },
     })
+}
+
+fn table_borders_plan(
+    current: Option<&TableBorders>,
+    target: &TableBorders,
+) -> Result<Plan, Refusal> {
+    let empty = TableBorders::default();
+    let current = current.unwrap_or(&empty);
+    let mut changes = Vec::new();
+    for (local, current, target) in [
+        ("top", &current.top, &target.top),
+        ("start", &current.start, &target.start),
+        ("left", &current.left, &target.left),
+        ("bottom", &current.bottom, &target.bottom),
+        ("end", &current.end, &target.end),
+        ("right", &current.right, &target.right),
+        (
+            "insideH",
+            &current.inside_horizontal,
+            &target.inside_horizontal,
+        ),
+        ("insideV", &current.inside_vertical, &target.inside_vertical),
+    ] {
+        field(&mut changes, local, current, target, border_plan)?;
+    }
+    Ok(Plan {
+        attributes: SmallVec::new(),
+        children: Children::Container {
+            order: TABLE_BORDERS_ORDER,
+            changes,
+        },
+    })
+}
+
+/// The `w:tblPr` changes from `current` to `target`. The style and the
+/// borders are written (record 0342); a change of any other property is
+/// refused.
+fn table_changes(current: &Table, target: &Table) -> Result<Vec<Change>, Refusal> {
+    let mut rest = target.clone();
+    rest.style.clone_from(&current.style);
+    rest.borders = current.borders;
+    if !same_table(&rest, current) {
+        return Err(Refusal::UnmodelledProperty);
+    }
+    let mut changes = Vec::new();
+    field(
+        &mut changes,
+        "tblStyle",
+        &current.style,
+        &target.style,
+        |style| Ok(single_value(Kind::Exact, text(style)?)),
+    )?;
+    if current.borders != target.borders {
+        changes.push(Change {
+            local: "tblBorders",
+            plan: target
+                .borders
+                .as_ref()
+                .map(|borders| table_borders_plan(current.borders.as_ref(), borders))
+                .transpose()?,
+            holds: Some(TABLE_BORDERS_ORDER),
+        });
+    }
+    Ok(changes)
+}
+
+fn height_plan(height: &Height) -> Result<Plan, Refusal> {
+    Ok(leaf([
+        value(
+            "val",
+            Kind::Measure(Unit::Twips, Sign::Unsigned),
+            measured(height.value.0, Sign::Unsigned)?,
+        ),
+        optional(
+            "hRule",
+            Kind::Exact,
+            height.rule.map(|rule| rule.as_str().to_owned()),
+        ),
+    ]))
+}
+
+/// The `w:trPr` changes from `current` to `target`. The flags `cantSplit`,
+/// `tblHeader` and `hidden` and the height are written (record 0342); a
+/// change of any other property is refused.
+fn row_changes(current: &Row, target: &Row) -> Result<Vec<Change>, Refusal> {
+    let mut rest = target.clone();
+    rest.cant_split = current.cant_split;
+    rest.height = current.height;
+    rest.header = current.header;
+    rest.hidden = current.hidden;
+    if !same_row(&rest, current) {
+        return Err(Refusal::UnmodelledProperty);
+    }
+    let mut changes = Vec::new();
+    toggle(
+        &mut changes,
+        "cantSplit",
+        current.cant_split,
+        target.cant_split,
+    );
+    field(
+        &mut changes,
+        "trHeight",
+        &current.height,
+        &target.height,
+        height_plan,
+    )?;
+    toggle(&mut changes, "tblHeader", current.header, target.header);
+    toggle(&mut changes, "hidden", current.hidden, target.hidden);
+    Ok(changes)
 }
 
 fn tabs_plan(tabs: &[TabStop], strict: bool) -> Result<Plan, Refusal> {
@@ -1992,13 +2150,15 @@ fn attribute_prefix(fragment: &Fragment, needed: bool) -> Result<&[u8], SpliceEr
 }
 
 /// Splice `changes` into the `container` child of a fragment's root,
-/// creating the container as the root's first child when it is absent.
+/// creating the container when it is absent: after the root's last
+/// WordprocessingML child named in `leading`, otherwise as its first child.
 fn splice(
     xml: &[u8],
     root_local: &[u8],
     container: &'static str,
     order: &'static [&'static str],
     nested: &[&[u8]],
+    leading: &[&str],
     changes: &[Change],
     inherited: &[(Option<Vec<u8>>, Vec<u8>)],
 ) -> Result<Vec<u8>, SpliceError> {
@@ -2047,9 +2207,16 @@ fn splice(
                 bytes: replacement,
             });
         } else {
+            let at = root
+                .children
+                .iter()
+                .filter(|node| leading.iter().any(|local| node.is(local)))
+                .map(|node| node.end)
+                .max()
+                .unwrap_or(root.tag_end);
             edits.push(Edit {
-                start: root.tag_end,
-                end: root.tag_end,
+                start: at,
+                end: at,
                 bytes,
             });
         }
@@ -2101,7 +2268,7 @@ pub(crate) fn splice_run(
     if changes.is_empty() {
         return Ok(None);
     }
-    let output = splice(xml, b"r", "rPr", RUN_ORDER, &[], &changes, inherited)?;
+    let output = splice(xml, b"r", "rPr", RUN_ORDER, &[], &[], &changes, inherited)?;
     if !same_run(&super::run::parse(&output, inherited)?, target) {
         return Err(
             Error::InvalidFormat("run property splice failed typed readback".into()).into(),
@@ -2134,12 +2301,98 @@ pub(crate) fn splice_paragraph(
         "pPr",
         PARAGRAPH_ORDER,
         &[b"numPr", b"pBdr", b"tabs", b"rPr"],
+        &[],
         &changes,
         inherited,
     )?;
     if !same_paragraph(&super::paragraph::parse(&output, inherited)?, target) {
         return Err(
             Error::InvalidFormat("paragraph property splice failed typed readback".into()).into(),
+        );
+    }
+    Ok(Some(output))
+}
+
+/// Whether two table property values state the same typed properties,
+/// ignoring which properties each reports as invalid.
+pub(crate) fn same_table(left: &Table, right: &Table) -> bool {
+    let mut left = left.clone();
+    left.invalid = right.invalid;
+    left == *right
+}
+
+/// Whether two row property values state the same typed properties,
+/// ignoring which properties each reports as invalid.
+pub(crate) fn same_row(left: &Row, right: &Row) -> bool {
+    let mut left = left.clone();
+    left.invalid = right.invalid;
+    left == *right
+}
+
+/// Rewrite one table fragment so that its direct properties read as
+/// `target`; see [`splice_run`]. Only the style (`w:tblStyle`) and the
+/// borders (`w:tblBorders`) are written (record 0342).
+pub(crate) fn splice_table(
+    xml: &[u8],
+    current: &Table,
+    target: &Table,
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Option<Vec<u8>>, SpliceError> {
+    if same_table(current, target) {
+        return Ok(None);
+    }
+    let changes = table_changes(current, target)?;
+    if changes.is_empty() {
+        return Ok(None);
+    }
+    let output = splice(
+        xml,
+        b"tbl",
+        "tblPr",
+        TABLE_ORDER,
+        &[b"tblBorders"],
+        &[],
+        &changes,
+        inherited,
+    )?;
+    if !same_table(&super::table::parse_table(&output, inherited)?, target) {
+        return Err(
+            Error::InvalidFormat("table property splice failed typed readback".into()).into(),
+        );
+    }
+    Ok(Some(output))
+}
+
+/// Rewrite one row fragment so that its direct properties read as
+/// `target`; see [`splice_run`]. The height and the `cantSplit`,
+/// `tblHeader` and `hidden` flags are written (record 0342); a new
+/// `w:trPr` follows the row's `w:tblPrEx`.
+pub(crate) fn splice_row(
+    xml: &[u8],
+    current: &Row,
+    target: &Row,
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Option<Vec<u8>>, SpliceError> {
+    if same_row(current, target) {
+        return Ok(None);
+    }
+    let changes = row_changes(current, target)?;
+    if changes.is_empty() {
+        return Ok(None);
+    }
+    let output = splice(
+        xml,
+        b"tr",
+        "trPr",
+        ROW_ORDER,
+        &[],
+        ROW_LEADING,
+        &changes,
+        inherited,
+    )?;
+    if !same_row(&super::table::parse_row(&output, inherited)?, target) {
+        return Err(
+            Error::InvalidFormat("row property splice failed typed readback".into()).into(),
         );
     }
     Ok(Some(output))
