@@ -1957,7 +1957,7 @@ fn rich_items(xml: &[u8]) -> Result<Box<[usize]>> {
 /// as `(local name, raw attributes)`; `None` when the item has no runs or
 /// holds what a run rewrite would drop (phonetic data, nested `rPr`
 /// markup, text outside the runs).
-fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichText>> {
+pub(crate) fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichText>> {
     use quick_xml::events::Event;
     let mut reader = quick_xml::Reader::from_reader(xml);
     let mut depth = 0usize;
@@ -1993,7 +1993,7 @@ fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichText>> {
 
 /// The runs of the inline string of cell `a1` in worksheet `xml` (record
 /// 0295), as [`rich_item`] reads an item. One scan of the worksheet part.
-fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText>> {
+pub(crate) fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText>> {
     use quick_xml::events::Event;
     let mut reader = quick_xml::Reader::from_reader(xml);
     let mut in_cell = false;
@@ -2107,7 +2107,7 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<crate::Rich
                     (2, 2 | 3) => place = 1,
                     (1, 1) => {
                         let decoded = raw::strings::decode_spreadsheet_text(&text)?;
-                        runs.push(crate::RichRun::new(
+                        runs.push(crate::RichRun::with_properties(
                             properties.take().map(Vec::into_boxed_slice),
                             decoded,
                         ));
@@ -2192,6 +2192,80 @@ mod rich_text_write_tests {
             panic!("a text cell");
         };
         assert_eq!(text.as_str(), "Bye world");
+        Ok(())
+    }
+
+    /// Typed run fonts (record 0338): reads of stored markup, changes that
+    /// keep the properties they do not name, and the source-backed read.
+    #[test]
+    fn run_fonts_read_and_change_in_place() -> crate::Result<()> {
+        use crate::style::{FontChange, FontColor, Script, Underline};
+        use crate::{Rgb, RichRun};
+
+        let item = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><r><rPr><b/><i val="0"/><sz val="11"/><color theme="1" tint="-0.25"/><rFont val="Calibri &amp; Co"/><family val="2"/><scheme val="minor"/></rPr><t>A</t></r><r><t>B</t></r></si></sst>"#;
+        let mut rich = super::rich_item(item, 0)?.expect("rich item");
+        let font = rich.runs()[0].font()?;
+        assert!(font.bold && !font.italic);
+        assert_eq!(font.size, Some(11.0));
+        assert_eq!(font.name.as_deref(), Some("Calibri & Co"));
+        assert_eq!(font.family, Some(2));
+        let color = font.color.expect("theme color");
+        assert_eq!(color.kind(), crate::style::FontColorKind::Theme(1));
+        assert_eq!(color.tint().map(|tint| tint.get()), Some(-0.25));
+        assert!(!rich.runs()[1].font()?.bold);
+
+        let run = rich.run_mut(0).expect("first run");
+        run.apply_font(
+            &FontChange::new()
+                .bold(None)
+                .underline(Some(Underline::Double))
+                .script(Some(Script::Superscript))
+                .color(Some(FontColor::rgb(Rgb::new(0xC0, 0, 0))))
+                .size(Some(14.5))?,
+        )?;
+        run.set_text("Z");
+        let font = run.font()?;
+        assert!(!font.bold);
+        assert_eq!(font.underline, Some(Underline::Double));
+        assert_eq!(font.script, Some(Script::Superscript));
+        assert_eq!(font.size, Some(14.5));
+        assert_eq!(font.family, Some(2), "an unnamed property is kept");
+        assert_eq!(font.name.as_deref(), Some("Calibri & Co"));
+        let mut plain = RichRun::new("C");
+        plain.apply_font(&FontChange::new().italic(Some(true)))?;
+        rich.insert_run(2, plain)?;
+        assert!(rich.insert_run(9, RichRun::new("x")).is_err());
+        assert_eq!(rich.remove_run(1)?.text(), "B");
+        assert_eq!(rich.text(), "ZC");
+
+        let mut edit = rich_workbook()?.edit()?;
+        edit.sheet("Sheet1")?
+            .expect("worksheet")
+            .set_rich_text("C3", rich.clone())?;
+        let bytes = edit.commit()?.into_package().to_bytes()?;
+        let reopened = Package::from_bytes(&bytes)?;
+        let read = reopened
+            .workbook()
+            .sheet("Sheet1")?
+            .expect("worksheet")
+            .rich_text("C3")?
+            .expect("runs");
+        assert_eq!(read, rich);
+        // The source-backed worksheet reads the same runs.
+        let source = crate::SourceBackedWorkbook::from_reader(std::io::Cursor::new(bytes))?;
+        let sheet = source.sheet("Sheet1")?.expect("worksheet");
+        assert_eq!(sheet.rich_text("C3")?, Some(rich));
+        assert_eq!(
+            sheet.rich_text("A1")?.map(|rich| rich.text()),
+            Some("x".to_owned())
+        );
+        assert_eq!(sheet.rich_text("Z9")?, None);
+        // Removing every property leaves an unformatted run.
+        let mut run = RichRun::new("y");
+        run.apply_font(&FontChange::new().bold(Some(true)))?;
+        assert!(run.is_formatted());
+        run.apply_font(&FontChange::new().bold(None))?;
+        assert!(!run.is_formatted());
         Ok(())
     }
 }

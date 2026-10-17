@@ -111,6 +111,17 @@ pub(super) enum Item {
     /// A worksheet feature: a note, hyperlink, picture, shape, conditional
     /// format, validation, auto-filter or page break (record 0320).
     Feature(Arc<super::features::Feature>),
+    /// A rich-text run of a cell (record 0338).
+    Run(RunItem),
+}
+
+/// A rich-text run: its cell, its position among the cell's runs, and the
+/// cell's runs as read.
+#[derive(Clone)]
+pub(super) struct RunItem {
+    pub(super) at: Address,
+    pub(super) index: u32,
+    pub(super) rich: Arc<xlsx::RichText>,
 }
 
 /// A worksheet chart read from its part: the chart's position on the sheet,
@@ -742,6 +753,23 @@ impl<'f> Node<'f> {
         Self::in_sheet(file, sheet, item)
     }
 
+    /// The run at `index` of the cell `at` of the worksheet at `sheet`
+    /// (record 0338).
+    pub(super) fn new_run(
+        file: &'f Xlsx,
+        sheet: usize,
+        at: Address,
+        index: usize,
+        rich: Arc<xlsx::RichText>,
+    ) -> Self {
+        let item = Item::Run(RunItem {
+            at,
+            index: position_u32(index),
+            rich,
+        });
+        Self::in_sheet(file, sheet, item)
+    }
+
     /// The defined name at `index`, `/namedrange[N]`.
     pub(super) fn new_named_range(file: &'f Xlsx, index: usize) -> Self {
         Self {
@@ -806,6 +834,7 @@ impl<'f> Node<'f> {
             Item::Series(chart) => PathStep::at("series", Position::new(chart.child as usize)),
             Item::Axis(chart) => PathStep::at("axis", Position::new(chart.child as usize)),
             Item::Feature(feature) => feature.step(),
+            Item::Run(run) => PathStep::at("run", Position::new(run.index as usize)),
         })
     }
 
@@ -841,6 +870,7 @@ impl<'f> Node<'f> {
             Item::Series(_) => Kind::Series,
             Item::Axis(_) => Kind::Axis,
             Item::Feature(ref feature) => feature.kind,
+            Item::Run(_) => Kind::Run,
         }
     }
 
@@ -1023,6 +1053,13 @@ impl<'f> Node<'f> {
                 Props::Feature(feature, sheet_name(file, self.sheet_position())),
             ),
             Item::Axis(chart) => (super::chart::AXIS_PROPS, Props::Axis(chart.clone())),
+            Item::Run(run) => match run.run() {
+                Some(value) => (
+                    super::runs::RUN_PROPS,
+                    Props::Run(Box::new(value.font().map_err(Error::from)?)),
+                ),
+                None => return Ok(Format::empty()),
+            },
             Item::NamedRange(index) => match defined_names(file).get(*index) {
                 Some(name) => (
                     NAMED_RANGE_PROPS,
@@ -1184,6 +1221,12 @@ impl<'f> Project<'f> for Node<'f> {
                 step,
             ])
             .unwrap_or(NodePath::ROOT),
+            (Item::Run(run), Some(step)) => NodePath::inline(&[
+                PathStep::at("sheet", Position::new(self.sheet_position())),
+                PathStep::cell(run.at.column().get(), run.at.row().get()),
+                step,
+            ])
+            .unwrap_or(NodePath::ROOT),
             (_, Some(step)) => NodePath::short(
                 PathStep::at("sheet", Position::new(self.sheet_position())),
                 Some(step),
@@ -1207,6 +1250,7 @@ impl<'f> Project<'f> for Node<'f> {
                     })
                 }),
                 Item::Feature(feature) => feature.text(),
+                Item::Run(run) => run.run().map(|run| Cow::Borrowed(run.text())),
                 Item::Workbook
                 | Item::Sheet(_)
                 | Item::Range(_)
@@ -1253,6 +1297,9 @@ impl<'f> Project<'f> for Node<'f> {
                     .map(|title| Preview::Text(Cow::Borrowed(title))),
                 Item::Series(_) | Item::Axis(_) => None,
                 Item::Feature(feature) => feature.preview(),
+                Item::Run(run) => run
+                    .run()
+                    .map(|run| Preview::Text(Cow::Borrowed(run.text()))),
             })
         })
     }
@@ -1269,7 +1316,8 @@ impl<'f> Project<'f> for Node<'f> {
                 | Item::NamedRange(_)
                 | Item::Series(_)
                 | Item::Axis(_)
-                | Item::Feature(_) => 0,
+                | Item::Feature(_)
+                | Item::Run(_) => 0,
                 Item::Chart(chart) => {
                     let summary = chart.summary()?;
                     summary.series.len() + summary.axes.len()
@@ -1431,6 +1479,8 @@ pub(crate) enum Props<'a> {
     Axis(ChartItem),
     /// A worksheet feature and its worksheet's name (record 0320).
     Feature(&'a super::features::Feature, &'a str),
+    /// A rich-text run's font (record 0338).
+    Run(Box<xlsx::style::stylesheet::font::Font>),
 }
 
 /// What a cell's keys read.
@@ -1455,6 +1505,7 @@ impl fmt::Debug for Props<'_> {
             Self::Series(_) => "Series",
             Self::Axis(_) => "Axis",
             Self::Feature(..) => "Feature",
+            Self::Run(_) => "Run",
         };
         f.debug_tuple("Props").field(&name).finish()
     }
@@ -1487,6 +1538,7 @@ impl<'a> Props<'a> {
             Self::Series(ref item) => super::chart::series_value(item, index).map(owned),
             Self::Axis(ref item) => super::chart::axis_value(item, index).map(owned),
             Self::Feature(feature, sheet) => feature.value(index, sheet),
+            Self::Run(ref font) => super::runs::value(font, index).map(owned),
             Self::NamedRange { name, scope } => match NamedRangeKey::at(index)? {
                 NamedRangeKey::Name => Some(Value::Text(Cow::Borrowed(&name.name))),
                 NamedRangeKey::Ref => Some(Value::Text(Cow::Borrowed(&name.reference))),
@@ -1925,8 +1977,26 @@ fn rgb_color(value: xlsx::Rgb) -> Color {
     Color::rgba(value.red(), value.green(), value.blue(), value.alpha())
 }
 
+/// A run font color as a value: an RGB or theme base (record 0338).
+pub(super) fn font_color_value(
+    color: &xlsx::style::stylesheet::font::FontColor,
+) -> Option<Value<'static>> {
+    let tint = color.tint().map(|tint| tint.get());
+    match color.kind() {
+        xlsx::style::FontColorKind::Rgb(value) => Some(Value::Color(rgb_color(value))),
+        xlsx::style::FontColorKind::Theme(index) => {
+            let slot = Color::theme(ThemeSlot::from_index(index)?);
+            Some(Value::Color(match tint {
+                Some(tint) => slot.with_spreadsheet_tint(tint)?,
+                None => slot,
+            }))
+        },
+        _ => None,
+    }
+}
+
 /// A length of `points`, rounded to the nearest EMU.
-fn points(points: f64) -> Length {
+pub(super) fn points(points: f64) -> Length {
     #[allow(
         clippy::cast_possible_truncation,
         reason = "font sizes and row heights are a few hundred points at most"

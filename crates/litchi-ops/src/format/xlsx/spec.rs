@@ -60,7 +60,7 @@ pub(crate) const MERGE_WRITE_PROPS: &[PropSpec] = &MERGE_WRITE_TABLE.readable();
 /// latter removes the local underline element.  The textual boolean and short token
 /// spellings are the OfficeCLI cell aliases and are canonicalized here before
 /// native font admission.
-static XLSX_UNDERLINE: Tokens = Tokens::new(
+pub(super) static XLSX_UNDERLINE: Tokens = Tokens::new(
     "underline",
     &[
         "single",
@@ -273,19 +273,34 @@ pub(crate) enum CellSetter {
     BorderDiagonalColor,
     BorderDiagonalUp,
     BorderDiagonalDown,
+    /// The cell type (record 0338): `string`, `number`, `boolean`, `date`,
+    /// `error` or `richtext`.
+    Type,
+    /// Rich-text runs, a JSON array (record 0338).
+    Runs,
+    /// The address of an added cell (record 0338); add-only.
+    Ref,
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
+/// The cell `type` an `add` or `set` writes (record 0338), with OfficeCLI's
+/// short spellings (`ExcelHandler.Set.Cells.cs`).
+pub(crate) static CELL_TYPE: Tokens = Tokens::new(
+    "cell type",
+    &["string", "number", "boolean", "date", "error", "richtext"],
+    &[("bool", 2), ("err", 4), ("num", 1), ("rich", 5), ("str", 0)],
+);
+
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 54, 42> = Table::new(
     [
         Entry {
             spec: write_only("value", ValueType::Scalar),
-            access: Access::Set(CellSetter::Value),
+            access: Access::SetAndAdd(CellSetter::Value),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("formula", ValueType::Text),
-            access: Access::Set(CellSetter::Formula),
+            access: Access::SetAndAdd(CellSetter::Formula),
             constraint: Constraint::None,
             clear: true,
         },
@@ -297,37 +312,37 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
         },
         Entry {
             spec: PropSpec::new("font.bold", ValueType::Bool),
-            access: Access::Set(CellSetter::Bold),
+            access: Access::SetAndAdd(CellSetter::Bold),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.italic", ValueType::Bool),
-            access: Access::Set(CellSetter::Italic),
+            access: Access::SetAndAdd(CellSetter::Italic),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("strike", ValueType::Bool),
-            access: Access::Set(CellSetter::Strike),
+            access: Access::SetAndAdd(CellSetter::Strike),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("underline", ValueType::Token(&XLSX_UNDERLINE)),
-            access: Access::Set(CellSetter::Underline),
+            access: Access::SetAndAdd(CellSetter::Underline),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.name", ValueType::Text),
-            access: Access::Set(CellSetter::FontName),
+            access: Access::SetAndAdd(CellSetter::FontName),
             constraint: Constraint::NotEmpty,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.size", ValueType::Length(LengthSpec::FONT_SIZE)),
-            access: Access::Set(CellSetter::FontSize),
+            access: Access::SetAndAdd(CellSetter::FontSize),
             constraint: Constraint::Length {
                 min: Length::ZERO,
                 max: Length::from_points(409),
@@ -336,61 +351,61 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
         },
         Entry {
             spec: PropSpec::new("superscript", ValueType::Bool),
-            access: Access::Set(CellSetter::Superscript),
+            access: Access::SetAndAdd(CellSetter::Superscript),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("subscript", ValueType::Bool),
-            access: Access::Set(CellSetter::Subscript),
+            access: Access::SetAndAdd(CellSetter::Subscript),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.color", ValueType::Color(ColorContext::Spreadsheet)),
-            access: Access::Set(CellSetter::FontColor),
+            access: Access::SetAndAdd(CellSetter::FontColor),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.outline", ValueType::Bool),
-            access: Access::Set(CellSetter::FontOutline),
+            access: Access::SetAndAdd(CellSetter::FontOutline),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.shadow", ValueType::Bool),
-            access: Access::Set(CellSetter::FontShadow),
+            access: Access::SetAndAdd(CellSetter::FontShadow),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.condense", ValueType::Bool),
-            access: Access::Set(CellSetter::FontCondense),
+            access: Access::SetAndAdd(CellSetter::FontCondense),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.extend", ValueType::Bool),
-            access: Access::Set(CellSetter::FontExtend),
+            access: Access::SetAndAdd(CellSetter::FontExtend),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.charset", ValueType::Int),
-            access: Access::Set(CellSetter::FontCharset),
+            access: Access::SetAndAdd(CellSetter::FontCharset),
             constraint: Constraint::Int { min: 0, max: 255 },
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.family", ValueType::Int),
-            access: Access::Set(CellSetter::FontFamily),
+            access: Access::SetAndAdd(CellSetter::FontFamily),
             constraint: Constraint::Int { min: 0, max: 5 },
             clear: true,
         },
         Entry {
             spec: PropSpec::new("font.scheme", ValueType::Token(&workbook::FONT_SCHEME)),
-            access: Access::Set(CellSetter::FontScheme),
+            access: Access::SetAndAdd(CellSetter::FontScheme),
             constraint: Constraint::None,
             clear: true,
         },
@@ -399,25 +414,25 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "alignment.horizontal",
                 ValueType::Token(&workbook::HORIZONTAL),
             ),
-            access: Access::Set(CellSetter::AlignmentHorizontal),
+            access: Access::SetAndAdd(CellSetter::AlignmentHorizontal),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("alignment.vertical", ValueType::Token(&workbook::VERTICAL)),
-            access: Access::Set(CellSetter::AlignmentVertical),
+            access: Access::SetAndAdd(CellSetter::AlignmentVertical),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("alignment.wrapText", ValueType::Bool),
-            access: Access::Set(CellSetter::AlignmentWrapText),
+            access: Access::SetAndAdd(CellSetter::AlignmentWrapText),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("alignment.textRotation", ValueType::Int),
-            access: Access::Set(CellSetter::AlignmentTextRotation),
+            access: Access::SetAndAdd(CellSetter::AlignmentTextRotation),
             // OfficeCLI accepts 0..=180 and the stacked sentinel 255.  The
             // discontiguous 181..=254 gap is rejected during admission.
             constraint: Constraint::Int { min: 0, max: 255 },
@@ -425,13 +440,13 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
         },
         Entry {
             spec: PropSpec::new("alignment.indent", ValueType::Int),
-            access: Access::Set(CellSetter::AlignmentIndent),
+            access: Access::SetAndAdd(CellSetter::AlignmentIndent),
             constraint: Constraint::Int { min: 0, max: 255 },
             clear: true,
         },
         Entry {
             spec: PropSpec::new("alignment.shrinkToFit", ValueType::Bool),
-            access: Access::Set(CellSetter::AlignmentShrinkToFit),
+            access: Access::SetAndAdd(CellSetter::AlignmentShrinkToFit),
             constraint: Constraint::None,
             clear: true,
         },
@@ -440,13 +455,13 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "alignment.readingOrder",
                 ValueType::Token(&workbook::READING_ORDER),
             ),
-            access: Access::Set(CellSetter::AlignmentReadingOrder),
+            access: Access::SetAndAdd(CellSetter::AlignmentReadingOrder),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("alignment.relativeIndent", ValueType::Int),
-            access: Access::Set(CellSetter::AlignmentRelativeIndent),
+            access: Access::SetAndAdd(CellSetter::AlignmentRelativeIndent),
             // The Open XML SDK schema declares this as Int32Value and adds no
             // narrower validator.  The adapter performs the i64 -> i32 check
             // after registry admission.
@@ -455,67 +470,67 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
         },
         Entry {
             spec: PropSpec::new("alignment.justifyLastLine", ValueType::Bool),
-            access: Access::Set(CellSetter::AlignmentJustifyLastLine),
+            access: Access::SetAndAdd(CellSetter::AlignmentJustifyLastLine),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("protection.locked", ValueType::Bool),
-            access: Access::Set(CellSetter::ProtectionLocked),
+            access: Access::SetAndAdd(CellSetter::ProtectionLocked),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("protection.hidden", ValueType::Bool),
-            access: Access::Set(CellSetter::ProtectionHidden),
+            access: Access::SetAndAdd(CellSetter::ProtectionHidden),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("quotePrefix", ValueType::Bool),
-            access: Access::Set(CellSetter::QuotePrefix),
+            access: Access::SetAndAdd(CellSetter::QuotePrefix),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("numberformat", ValueType::Text),
-            access: Access::Set(CellSetter::NumberFormat),
+            access: Access::SetAndAdd(CellSetter::NumberFormat),
             constraint: Constraint::NotEmpty,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("fill", ValueType::Text),
-            access: Access::Set(CellSetter::Fill),
+            access: Access::SetAndAdd(CellSetter::Fill),
             constraint: Constraint::NotEmpty,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("fillPattern", ValueType::Token(&workbook::FILL_PATTERN)),
-            access: Access::Set(CellSetter::FillPattern),
+            access: Access::SetAndAdd(CellSetter::FillPattern),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("fillBg", ValueType::Color(ColorContext::Spreadsheet)),
-            access: Access::Set(CellSetter::FillBg),
+            access: Access::SetAndAdd(CellSetter::FillBg),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border", ValueType::Token(&XLSX_BORDER_LINE)),
-            access: Access::Set(CellSetter::BorderAll),
+            access: Access::SetAndAdd(CellSetter::BorderAll),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.all", ValueType::Token(&XLSX_BORDER_LINE)),
-            access: Access::Set(CellSetter::BorderAll),
+            access: Access::SetAndAdd(CellSetter::BorderAll),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.color", ValueType::Color(ColorContext::Spreadsheet)),
-            access: Access::Set(CellSetter::BorderAllColor),
+            access: Access::SetAndAdd(CellSetter::BorderAllColor),
             constraint: Constraint::None,
             clear: true,
         },
@@ -524,13 +539,13 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "border.all.color",
                 ValueType::Color(ColorContext::Spreadsheet),
             ),
-            access: Access::Set(CellSetter::BorderAllColor),
+            access: Access::SetAndAdd(CellSetter::BorderAllColor),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.left", ValueType::Token(&XLSX_BORDER_LINE)),
-            access: Access::Set(CellSetter::BorderLeft),
+            access: Access::SetAndAdd(CellSetter::BorderLeft),
             constraint: Constraint::None,
             clear: true,
         },
@@ -539,13 +554,13 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "border.left.color",
                 ValueType::Color(ColorContext::Spreadsheet),
             ),
-            access: Access::Set(CellSetter::BorderLeftColor),
+            access: Access::SetAndAdd(CellSetter::BorderLeftColor),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.right", ValueType::Token(&XLSX_BORDER_LINE)),
-            access: Access::Set(CellSetter::BorderRight),
+            access: Access::SetAndAdd(CellSetter::BorderRight),
             constraint: Constraint::None,
             clear: true,
         },
@@ -554,13 +569,13 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "border.right.color",
                 ValueType::Color(ColorContext::Spreadsheet),
             ),
-            access: Access::Set(CellSetter::BorderRightColor),
+            access: Access::SetAndAdd(CellSetter::BorderRightColor),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.top", ValueType::Token(&XLSX_BORDER_LINE)),
-            access: Access::Set(CellSetter::BorderTop),
+            access: Access::SetAndAdd(CellSetter::BorderTop),
             constraint: Constraint::None,
             clear: true,
         },
@@ -569,13 +584,13 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "border.top.color",
                 ValueType::Color(ColorContext::Spreadsheet),
             ),
-            access: Access::Set(CellSetter::BorderTopColor),
+            access: Access::SetAndAdd(CellSetter::BorderTopColor),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.bottom", ValueType::Token(&XLSX_BORDER_LINE)),
-            access: Access::Set(CellSetter::BorderBottom),
+            access: Access::SetAndAdd(CellSetter::BorderBottom),
             constraint: Constraint::None,
             clear: true,
         },
@@ -584,13 +599,13 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "border.bottom.color",
                 ValueType::Color(ColorContext::Spreadsheet),
             ),
-            access: Access::Set(CellSetter::BorderBottomColor),
+            access: Access::SetAndAdd(CellSetter::BorderBottomColor),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.diagonal", ValueType::Token(&XLSX_BORDER_LINE)),
-            access: Access::Set(CellSetter::BorderDiagonal),
+            access: Access::SetAndAdd(CellSetter::BorderDiagonal),
             constraint: Constraint::None,
             clear: true,
         },
@@ -599,21 +614,39 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
                 "border.diagonal.color",
                 ValueType::Color(ColorContext::Spreadsheet),
             ),
-            access: Access::Set(CellSetter::BorderDiagonalColor),
+            access: Access::SetAndAdd(CellSetter::BorderDiagonalColor),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.diagonalUp", ValueType::Bool),
-            access: Access::Set(CellSetter::BorderDiagonalUp),
+            access: Access::SetAndAdd(CellSetter::BorderDiagonalUp),
             constraint: Constraint::None,
             clear: true,
         },
         Entry {
             spec: PropSpec::new("border.diagonalDown", ValueType::Bool),
-            access: Access::Set(CellSetter::BorderDiagonalDown),
+            access: Access::SetAndAdd(CellSetter::BorderDiagonalDown),
             constraint: Constraint::None,
             clear: true,
+        },
+        Entry {
+            spec: PropSpec::new("type", ValueType::Token(&CELL_TYPE)),
+            access: Access::SetAndAdd(CellSetter::Type),
+            constraint: Constraint::None,
+            clear: false,
+        },
+        Entry {
+            spec: write_only("runs", ValueType::Text),
+            access: Access::SetAndAdd(CellSetter::Runs),
+            constraint: Constraint::None,
+            clear: false,
+        },
+        Entry {
+            spec: write_only("ref", ValueType::Text),
+            access: Access::Add(CellSetter::Ref),
+            constraint: Constraint::None,
+            clear: false,
         },
     ],
     [
@@ -784,6 +817,11 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
         Alias {
             name: "border.diagonal.style",
             entry: 47,
+        },
+        // OfficeCLI's alias of `ref` (`cell.json`).
+        Alias {
+            name: "address",
+            entry: 53,
         },
     ],
 );
@@ -963,6 +1001,8 @@ const fn range_capability_array() -> [PropSpec; RANGE_PROPS.len() + CELL_WRITE_P
     while write_index < write_props.len() {
         let mut prop = write_props[write_index];
         prop.access.get = false;
+        // A range is not added (record 0338: cell properties are addable).
+        prop.access.add = false;
         props[RANGE_PROPS.len() + write_index] = prop;
         write_index += 1;
     }
@@ -1023,6 +1063,11 @@ const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len() + 2] {
 }
 
 pub(crate) static SHEET_CAPABILITY_PROPS: &[PropSpec] = &sheet_capability_array();
+
+/// The workbook root's capability table: its document-property keys are
+/// settable on `/` through the metadata writer (record 0338).
+pub(crate) static WORKBOOK_CAPABILITY_PROPS: [PropSpec; WORKBOOK_PROPS.len()] =
+    crate::format::metadata::root_capability(WORKBOOK_PROPS);
 
 /// Row assignments supported by the native worksheet layout editor.
 ///
@@ -1393,10 +1438,13 @@ static XLSX_ELEMENTS: [ElementSpec<Kind>; 26] = [
     ),
     feature(23, super::features::ROW_BREAK_PROPS),
     feature(24, super::features::COL_BREAK_PROPS),
-    with_props(
-        &workbook::SPEC.elements[25],
-        workbook::SPEC.elements[25].props,
-    ),
+    // Rich-text runs of a cell (record 0338).
+    ElementSpec {
+        props: super::runs::RUN_PROPS,
+        gap: None,
+        paths: &["/<sheet>/<A1>/run[N]"],
+        ..workbook::SPEC.elements[25]
+    },
 ];
 
 /// XLSX's format specification, with native range merge readback.  The
@@ -1432,9 +1480,11 @@ mod tests {
             .iter()
             .find(|property| property.name == "formula")
             .expect("formula capability");
-        assert!(!value.access.get && value.access.set && !value.access.add);
+        // Record 0338: an added cell takes the payload setters; `clear` is
+        // set-only.
+        assert!(!value.access.get && value.access.set && value.access.add);
         assert!(!clear.access.get && clear.access.set && !clear.access.add);
-        assert!(formula.access.get && formula.access.set && !formula.access.add);
+        assert!(formula.access.get && formula.access.set && formula.access.add);
     }
 
     #[test]

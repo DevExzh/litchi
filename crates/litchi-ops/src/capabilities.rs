@@ -2804,6 +2804,7 @@ impl Element {
                             | "comment"
                             | "smartart"
                             | "node"
+                            | "document"
                     )
                     && readable)
                     || (self.adapter == Adapter::Docx
@@ -2832,7 +2833,16 @@ impl Element {
                 && self.retains_source != Some(false)
                 && (matches!(
                     self.data().canonical,
-                    "cell" | "range" | "sheet" | "row" | "col" | "chart" | "series" | "axis"
+                    "workbook"
+                        | "cell"
+                        | "range"
+                        | "sheet"
+                        | "row"
+                        | "col"
+                        | "chart"
+                        | "series"
+                        | "axis"
+                        | "run"
                 ) || crate::format::xlsx::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
@@ -2913,7 +2923,7 @@ impl Element {
         let structural = structural
             || (self.adapter == Adapter::Xlsx
                 && self.retains_source != Some(false)
-                && (matches!(self.data().canonical, "sheet" | "chart")
+                && (matches!(self.data().canonical, "sheet" | "chart" | "run")
                     || crate::format::xlsx::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "pptx")]
@@ -2930,6 +2940,13 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let add = structural;
+        // XLSX cells are added, not removed: a cell is cleared (record 0338).
+        #[cfg(feature = "xlsx")]
+        let add = add
+            || (self.adapter == Adapter::Xlsx
+                && self.retains_source != Some(false)
+                && self.data().canonical == "cell"
+                && readable);
         // DOCX pictures (records 0251d, 0335), charts (record 0283) and
         // SmartArt graphics and nodes (records 0295, 0335) are addable and
         // removable.
@@ -3160,6 +3177,7 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         #[cfg(feature = "xlsx")]
         let props = if adapter == Adapter::Xlsx {
             match crate::path::navigate::ElementKind::name(element.kind) {
+                "workbook" => &crate::format::xlsx::WORKBOOK_CAPABILITY_PROPS,
                 "cell" => crate::format::xlsx::CELL_CAPABILITY_PROPS,
                 "range" => crate::format::xlsx::RANGE_CAPABILITY_PROPS,
                 "sheet" => crate::format::xlsx::SHEET_CAPABILITY_PROPS,

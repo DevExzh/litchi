@@ -19,7 +19,7 @@ was refused (typed), `none` nothing to move.
 | format | exact | differs | refused | error | signed-exact | signed-differs | signed-error | locked | revert byte-exact | revert value-exact | revert mismatch | revert one-way | revert refused | revert none | structure byte-exact | structure value-exact | structure mismatch | structure one-way | structure refused | structure none |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | doc | 45 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 38 | 0 | 0 | 5 | 2 | 0 | 44 | 0 | 0 | 1 | 0 |
-| docx | 75 | 0 | 0 | 0 | 3 | 0 | 0 | 4 | 60 | 4 | 0 | 0 | 10 | 1 | 0 | 56 | 0 | 6 | 13 | 0 |
+| docx | 75 | 0 | 0 | 0 | 3 | 0 | 0 | 4 | 6 | 65 | 0 | 0 | 3 | 1 | 0 | 56 | 0 | 6 | 13 | 0 |
 | keynote | 58 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 56 | 0 | 0 | 0 | 0 | 0 | 14 | 0 | 0 | 43 | 0 |
 | numbers | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 40 | 0 | 0 | 0 | 0 | 0 | 38 | 0 | 1 | 1 | 0 |
 | odb | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -33,12 +33,12 @@ was refused (typed), `none` nothing to move.
 | oth | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
 | pages | 33 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 |
 | ppt | 31 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 31 | 0 | 0 | 0 | 0 | 0 | 0 |
-| pptx | 81 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 71 | 7 | 0 | 1 | 2 | 0 | 11 | 0 | 0 | 0 | 1 | 69 |
+| pptx | 81 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 1 | 79 | 0 | 1 | 0 | 0 | 11 | 0 | 0 | 0 | 1 | 69 |
 | rtf | 163 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 62 | 37 | 17 | 39 | 0 | 1 | 18 | 88 |
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 112 | 3 | 0 | 0 | 4 | 0 | 92 | 5 | 0 | 0 | 22 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 |
-| xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 997 | 0 | 0 | 0 | 7 | 0 | 0 | 15 | 329 | 467 | 0 | 5 | 117 | 76 | 153 | 255 | 0 | 38 | 113 | 174 |
+| xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 2 | 176 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **all** | 997 | 0 | 0 | 0 | 7 | 0 | 0 | 15 | 207 | 603 | 0 | 5 | 103 | 76 | 153 | 255 | 0 | 38 | 113 | 174 |
 
 ## Office-extension files the unified layer does not open
 
@@ -138,5 +138,5 @@ was refused (typed), `none` nothing to move.
 - `ooxml/docx/table-alignment.docx` (docx): exact ; structure one-way: picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
 - `ooxml/docx/table-indent.docx` (docx): exact ; structure one-way: picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
 - `poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx` (docx): exact ; structure one-way: picture+comment add+set+remove: the inverse is refused: unsupported_capability: OPC error: owned OPC source preservation is unavailable: ...
-- `poi/test-data/slideshow/bug62513.pptx` (pptx): exact ; revert one-way: /slidemaster[1]/slidelayout[1] name: the set back is refused: unsupported_capability: PPTX OPC error: owned OPC source preservation is un...
+- `poi/test-data/slideshow/bug62513.pptx` (pptx): exact ; revert one-way: / title: the set back is refused: unsupported_capability: PPTX OPC error: owned OPC source preservation is unavailable: source ZIP framin...
 - `poi/test-data/spreadsheet/49609.xlsx` (xlsx): exact ; revert one-way: /sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...

@@ -593,6 +593,10 @@ impl Xlsx {
         let mut origin = [0_u32; 2];
         let mut span = [8_u32, 15];
         let mut assigned = shared::Assigned::default();
+        // `series{N}.values` given as a cell range, on any sheet (record
+        // 0338): the series number and the range's absolute reference.
+        let mut references: Vec<(usize, String, &'static str)> = Vec::new();
+        let mut numbers: Vec<usize> = Vec::new();
         for (key, value) in node.props().iter() {
             let (index, entry) = CHART_WRITE_TABLE
                 .resolve(key.as_str())
@@ -640,15 +644,28 @@ impl Xlsx {
                     ChartSetter::Width => span[0] = int(scalar),
                     ChartSetter::Height => span[1] = int(scalar),
                     ChartSetter::Format(key) => props.format(key, scalar)?,
-                    ChartSetter::Numbered(number) => props.numbered_series(
-                        usize::from(number) + 1,
-                        &text(scalar).unwrap_or_default(),
-                    )?,
-                    ChartSetter::Dotted(number, field) => props.dotted_series(
-                        usize::from(number) + 1,
-                        field,
-                        &text(scalar).unwrap_or_default(),
-                    )?,
+                    ChartSetter::Numbered(number) => {
+                        numbers.push(usize::from(number) + 1);
+                        props.numbered_series(
+                            usize::from(number) + 1,
+                            &text(scalar).unwrap_or_default(),
+                        )?;
+                    },
+                    ChartSetter::Dotted(number, field) => {
+                        let number = usize::from(number) + 1;
+                        let value = text(scalar).unwrap_or_default();
+                        if field != shared::SeriesField::Color {
+                            numbers.push(number);
+                        }
+                        if field == shared::SeriesField::Values && is_range(&value) {
+                            let (values, reference) =
+                                self.series_range(sheet, &value, entry.spec.name)?;
+                            references.push((number, reference, entry.spec.name));
+                            props.dotted_series(number, field, &values)?;
+                        } else {
+                            props.dotted_series(number, field, &value)?;
+                        }
+                    },
                 }
                 Ok(())
             })?;
@@ -666,7 +683,39 @@ impl Xlsx {
             },
             None => None,
         };
+        if !references.is_empty() {
+            let kind = props.variant.map_or(
+                litchi_drawingml::chart::authoring::Kind::Column,
+                |variant| variant.kind,
+            );
+            if binding.is_some()
+                || !matches!(
+                    kind,
+                    litchi_drawingml::chart::authoring::Kind::Column
+                        | litchi_drawingml::chart::authoring::Kind::Bar
+                        | litchi_drawingml::chart::authoring::Kind::Line
+                        | litchi_drawingml::chart::authoring::Kind::Area
+                        | litchi_drawingml::chart::authoring::Kind::Pie
+                        | litchi_drawingml::chart::authoring::Kind::Doughnut
+                        | litchi_drawingml::chart::authoring::Kind::Radar
+                        | litchi_drawingml::chart::authoring::Kind::Combo
+                )
+            {
+                return Err(error(
+                    Code::UnsupportedCapability,
+                    "a series bound to a cell range is authored for category charts without dataRange",
+                )
+                .with_property(references[0].2)
+                .with_suggestion("give the values inline (1,2,3), or bind a worksheet range with dataRange"));
+            }
+        }
+        numbers.sort_unstable();
+        numbers.dedup();
         let mut spec = props.into_spec()?;
+        for (number, reference, _) in references {
+            let index = numbers.iter().position(|held| *held == number).unwrap_or(0);
+            spec = spec.with_series_reference(index, reference, None);
+        }
         if let Some(binding) = binding {
             spec = spec.with_binding(binding);
             spec.validate().map_err(|error| {
@@ -702,6 +751,90 @@ impl Xlsx {
                 Step::new("chart").with(Predicate::Index(Position::new(index))),
             ]),
         ))
+    }
+
+    /// Read the values of a `series{N}.values` cell range (`Sheet1!B2:B13`,
+    /// `'My Data'!$C$1:$C$4` or `B2:B5` on the chart's sheet; record 0338):
+    /// the values as inline text the shared admission parses, and the
+    /// range's absolute reference the chart refers to. The range is one row
+    /// or one column; a cell without a number reads as 0, as `dataRange`.
+    fn series_range(
+        &self,
+        sheet: usize,
+        range: &str,
+        key: &'static str,
+    ) -> Result<(String, String)> {
+        let invalid = |message: &'static str| {
+            Error::new(Code::InvalidValue, message)
+                .with_property(key)
+                .with_format(FileFormat::Xlsx)
+        };
+        let range = range.trim();
+        let (sheet_name, cells) = match range.rsplit_once('!') {
+            Some((name, cells)) => {
+                let name = name.trim();
+                let name = match name
+                    .strip_prefix('\'')
+                    .and_then(|name| name.strip_suffix('\''))
+                {
+                    Some(quoted) => quoted.replace("''", "'"),
+                    None => name.to_owned(),
+                };
+                (name, cells)
+            },
+            None => (super::node::sheet_name(self, sheet).to_owned(), range),
+        };
+        let rect = cells
+            .replace('$', "")
+            .parse::<xlsx::Rect>()
+            .map_err(|_| invalid("the series range is not an A1 range"))?;
+        let (first_row, first_column) = (rect.start().row().get(), rect.start().column().get());
+        let (last_row, last_column) = (
+            rect.end().0.saturating_sub(1),
+            rect.end().1.saturating_sub(1),
+        );
+        if first_row != last_row && first_column != last_column {
+            return Err(invalid("the series range is one row or one column"));
+        }
+        let package = self.editor()?;
+        let workbook = package.workbook();
+        let worksheet = workbook
+            .sheet(sheet_name.as_str())?
+            .ok_or_else(|| invalid("the series range names no worksheet"))?;
+        let mut values = Vec::new();
+        for row in first_row..=last_row {
+            for column in first_column..=last_column {
+                let address = xlsx::Address::at(row, column)
+                    .map_err(|_| invalid("the series range is outside the worksheet"))?;
+                let number = match worksheet.cell(address)?.stored() {
+                    Some(xlsx::Cell::Value(value)) => cell_value(value).1,
+                    Some(xlsx::Cell::Formula(formula)) => formula
+                        .cached()
+                        .and_then(|cache| cell_value(cache.value()).1),
+                    _ => None,
+                };
+                values.push(number.unwrap_or(0.0).to_string());
+            }
+        }
+        let column = |index: u32| litchi_drawingml::chart::authoring::column_name(index as usize);
+        let reference = if first_row == last_row && first_column == last_column {
+            format!(
+                "{}!${}${}",
+                quote_sheet(worksheet.name()),
+                column(first_column),
+                first_row + 1
+            )
+        } else {
+            format!(
+                "{}!${}${}:${}${}",
+                quote_sheet(worksheet.name()),
+                column(first_column),
+                first_row + 1,
+                column(last_column),
+                last_row + 1
+            )
+        };
+        Ok((values.join(","), reference))
     }
 
     /// Read `Sheet!A1:E13`: series names in the first row, categories in the
@@ -980,6 +1113,42 @@ impl Xlsx {
         let target = native.commit()?.into_package();
         let after = self.adopt_workbook(target.clone());
         Ok(Some(Commit::from_metadata(after, source, target)))
+    }
+}
+
+/// Whether a series value is a cell range (`Sheet1!B2:B5`, `B2:B5`), as
+/// the shared admission tells one from inline values.
+fn is_range(text: &str) -> bool {
+    let text = text.trim();
+    if text.contains('!') {
+        return true;
+    }
+    let mut cells = text.split(':');
+    let cell = |part: Option<&str>| {
+        part.is_some_and(|part| {
+            let part = part.trim().replace('$', "");
+            let letters = part.bytes().take_while(u8::is_ascii_alphabetic).count();
+            letters > 0
+                && part.len() > letters
+                && part.bytes().skip(letters).all(|byte| byte.is_ascii_digit())
+        })
+    };
+    cell(cells.next()) && cell(cells.next()) && cells.next().is_none()
+}
+
+/// A sheet name in a formula reference: quoted unless it is a plain name.
+fn quote_sheet(name: &str) -> String {
+    let plain = name
+        .chars()
+        .next()
+        .is_some_and(|first| first.is_alphabetic() || first == '_')
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '.');
+    if plain {
+        name.to_owned()
+    } else {
+        format!("'{}'", name.replace('\'', "''"))
     }
 }
 

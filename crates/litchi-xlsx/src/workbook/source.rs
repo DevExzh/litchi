@@ -987,6 +987,36 @@ impl SourceWorksheet {
         self.finish_result(value)
     }
 
+    /// The rich-text runs of the cell at `at`, as
+    /// [`Worksheet::rich_text`](crate::Worksheet::rich_text) reads them
+    /// (record 0338): an inline rich string, or a shared-string item with
+    /// runs; `None` for any other cell. The worksheet's grid is parsed, and
+    /// the worksheet or shared-string part is scanned once.
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cells or the part holding the
+    /// runs, and a changed source.
+    pub fn rich_text<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<crate::RichText>> {
+        let address = at.into().resolve()?;
+        let result = (|| {
+            let (inline, shared) = match self.store()?.entry(address) {
+                Some(entry) => (entry.inline_rich, entry.shared_string),
+                None => return Ok(None),
+            };
+            if inline {
+                let data = self.owner.package.part(&self.data.part_uri)?.data()?;
+                return crate::workbook::model::inline_rich(data.as_bytes(), &address.a1());
+            }
+            let (Some(index), Some(uri)) = (shared, self.owner.shared_strings_uri.as_ref()) else {
+                return Ok(None);
+            };
+            let data = self.owner.package.part(uri)?.data()?;
+            crate::workbook::model::rich_item(data.as_bytes(), index)
+        })();
+        self.finish_result(result)
+    }
+
     /// Whether a cell read of this worksheet streams its part instead of
     /// reading the parsed grid.
     ///

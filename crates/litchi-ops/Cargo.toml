@@ -143,6 +143,7 @@ memchr              = { workspace = true } # Markdown HTML escaping; find/replac
 serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
 
 [dev-dependencies]
+proptest = "1.5" # PathArg display fixed point (record 0338 F2)
 tempfile = { workspace = true }
 zip      = { version = "8", default-features = false, features = ["deflate"] }
 

@@ -444,6 +444,15 @@ const MP4: &str = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t";
 const MP3: &str = "data:audio/mpeg;base64,SUQzAwAAAAAAAA==";
 
 const RECIPES: &[Recipe] = &[
+    // Record 0338: an added XLSX cell names its address and a value.
+    Recipe {
+        format: "xlsx",
+        element: "cell",
+        fixture: "create()",
+        parent: "/sheet[1]",
+        props: &[("ref", "H8"), ("value", "added")],
+        start: false,
+    },
     // Record 0324: a DOC hyperlink names exactly one of `url` and `anchor`.
     Recipe {
         format: "doc",
@@ -2639,6 +2648,11 @@ fn adr_rows(
     candidates: &[Candidate],
     extra: &mut dyn FnMut(&Candidate) -> Vec<Candidate>,
 ) -> Vec<AdrObserved> {
+    // Node sets before document-root sets, so item 1 of the atomic batch
+    // names a missing sibling of a real node.
+    let mut ordered: Vec<Candidate> = candidates.to_vec();
+    ordered.sort_by_key(|candidate| candidate.path == "/");
+    let candidates = ordered.as_slice();
     let none = |what: &str| AdrObserved::Failed(format!("no changing set {what}"));
     let atomic = candidates.first().map_or_else(
         || none("to batch"),

@@ -535,6 +535,23 @@ impl RichText {
         }
     }
 
+    /// The runs `runs`, in order (record 0338). Writing needs at least one.
+    ///
+    /// ```
+    /// use litchi_xlsx::{FontChange, RichRun, RichText};
+    ///
+    /// let mut bold = RichRun::new("Bold");
+    /// bold.apply_font(&FontChange::new().bold(Some(true)))?;
+    /// let rich = RichText::new(vec![bold, RichRun::new(" plain")]);
+    /// assert_eq!(rich.text(), "Bold plain");
+    /// assert!(rich.runs()[0].font()?.bold);
+    /// # Ok::<(), litchi_xlsx::Error>(())
+    /// ```
+    #[must_use]
+    pub fn new(runs: Vec<RichRun>) -> Self {
+        Self { runs }
+    }
+
     pub(crate) fn from_runs(runs: Vec<RichRun>) -> Self {
         Self { runs }
     }
@@ -543,6 +560,39 @@ impl RichText {
     #[must_use]
     pub fn runs(&self) -> &[RichRun] {
         &self.runs
+    }
+
+    /// The run at `index`, to change it in place (record 0338).
+    pub fn run_mut(&mut self, index: usize) -> Option<&mut RichRun> {
+        self.runs.get_mut(index)
+    }
+
+    /// Insert `run` before position `index` (`runs().len()` appends).
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for an index past the end.
+    pub fn insert_run(&mut self, index: usize, run: RichRun) -> Result<()> {
+        if index > self.runs.len() {
+            return Err(invalid("rich-text run index is out of range"));
+        }
+        self.runs
+            .try_reserve(1)
+            .map_err(|source| allocation("rich-text runs", source))?;
+        self.runs.insert(index, run);
+        Ok(())
+    }
+
+    /// Remove and return the run at `index`.
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for an index past the last run.
+    pub fn remove_run(&mut self, index: usize) -> Result<RichRun> {
+        if index >= self.runs.len() {
+            return Err(invalid("rich-text run index is out of range"));
+        }
+        Ok(self.runs.remove(index))
     }
 
     /// The visible text: every run's text, joined.
@@ -580,7 +630,19 @@ impl RichText {
 }
 
 impl RichRun {
-    pub(crate) fn new(properties: Option<Box<[(Box<str>, Box<str>)]>>, text: String) -> Self {
+    /// An unformatted run holding `text` (record 0338).
+    #[must_use]
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            properties: None,
+            text: text.into(),
+        }
+    }
+
+    pub(crate) fn with_properties(
+        properties: Option<Box<[(Box<str>, Box<str>)]>>,
+        text: String,
+    ) -> Self {
         Self { properties, text }
     }
 
@@ -590,10 +652,340 @@ impl RichRun {
         &self.text
     }
 
+    /// Replace the run's text, keeping its properties (record 0338).
+    pub fn set_text(&mut self, text: impl Into<String>) {
+        self.text = text.into();
+    }
+
     /// Whether the run carries run properties (`rPr`).
     #[must_use]
     pub fn is_formatted(&self) -> bool {
         self.properties.is_some()
+    }
+
+    /// The run's typed font, read from its run properties (record 0338):
+    /// `rFont` is the font name, and an absent property is the default (no
+    /// flag, no value). Properties the [`Font`] model has no field for
+    /// (`outline`, `shadow`, `condense`, `extend`) are not read.
+    ///
+    /// [`Font`]: crate::style::stylesheet::font::Font
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for a property value that is not its
+    /// `SpreadsheetML` lexical form.
+    pub fn font(&self) -> Result<crate::style::stylesheet::font::Font> {
+        rich_font::read(self.properties.as_deref().unwrap_or_default())
+    }
+
+    /// Apply `change` to the run's properties (record 0338): each property
+    /// the change mentions is replaced (`Some`) or removed (`None`); the
+    /// others, and properties the change has no setter for, keep their
+    /// markup. A new property is placed in Excel's run-property order.
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for a value the change cannot spell.
+    pub fn apply_font(&mut self, change: &crate::style::FontChange) -> Result<()> {
+        let mut properties = self.properties.take().map(Vec::from).unwrap_or_default();
+        let result = rich_font::apply(&mut properties, change);
+        self.properties = (!properties.is_empty()).then(|| properties.into_boxed_slice());
+        result
+    }
+}
+
+/// Typed reads and writes of a rich-text run's `rPr` children (record
+/// 0338), kept as `(local name, raw attributes)` pairs.
+mod rich_font {
+    use litchi_core::xml::escape_xml;
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+
+    use crate::error::{Result, invalid};
+    use crate::style::FontChange;
+    use crate::style::stylesheet::border::Tint;
+    use crate::style::stylesheet::font::{
+        Font, FontColor, FontColorKind, Scheme, Script, Underline,
+    };
+
+    /// Excel's order of run properties, used to place a new one.
+    const ORDER: [&str; 15] = [
+        "b",
+        "i",
+        "strike",
+        "condense",
+        "extend",
+        "outline",
+        "shadow",
+        "u",
+        "vertAlign",
+        "sz",
+        "color",
+        "rFont",
+        "family",
+        "charset",
+        "scheme",
+    ];
+
+    type Property = (Box<str>, Box<str>);
+
+    /// The attributes of one property, unescaped.
+    fn attributes(raw: &str) -> Result<Vec<(String, String)>> {
+        let xml = format!("<x {raw}/>");
+        let mut reader = quick_xml::Reader::from_str(&xml);
+        let Ok(Event::Empty(element)) = reader.read_event() else {
+            return Err(invalid("malformed rich-text run property attributes"));
+        };
+        let mut out = Vec::new();
+        for attribute in element.checked_attributes() {
+            let attribute = attribute
+                .map_err(|error| invalid(format!("rich-text run property attribute: {error}")))?;
+            let name = String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned();
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| invalid(format!("rich-text run property value: {error}")))?
+                .into_owned();
+            out.push((name, value));
+        }
+        Ok(out)
+    }
+
+    fn value<'a>(attributes: &'a [(String, String)], name: &str) -> Option<&'a str> {
+        attributes
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+
+    fn flag(attributes: &[(String, String)], name: &str) -> Result<bool> {
+        match value(attributes, "val") {
+            None | Some("1" | "true") => Ok(true),
+            Some("0" | "false") => Ok(false),
+            Some(other) => Err(invalid(format!(
+                "invalid run property {name} value '{other}'"
+            ))),
+        }
+    }
+
+    fn number(attributes: &[(String, String)], name: &str) -> Result<Option<u32>> {
+        value(attributes, "val")
+            .map(|text| {
+                text.parse()
+                    .map_err(|_| invalid(format!("invalid run property {name} value '{text}'")))
+            })
+            .transpose()
+    }
+
+    pub(super) fn read(properties: &[Property]) -> Result<Font> {
+        let mut font = Font::new();
+        for (name, raw) in properties {
+            let attributes = attributes(raw)?;
+            match &**name {
+                "b" => font.bold = flag(&attributes, name)?,
+                "i" => font.italic = flag(&attributes, name)?,
+                "strike" => font.strike = flag(&attributes, name)?,
+                "u" => {
+                    let token = value(&attributes, "val").unwrap_or("single");
+                    font.underline = Some(
+                        token
+                            .parse::<Underline>()
+                            .map_err(|error| invalid(error.to_string()))?,
+                    );
+                },
+                "vertAlign" => {
+                    font.script = match value(&attributes, "val") {
+                        Some("baseline") => Some(Script::Baseline),
+                        Some("superscript") => Some(Script::Superscript),
+                        Some("subscript") => Some(Script::Subscript),
+                        other => {
+                            return Err(invalid(format!(
+                                "invalid run vertAlign value '{}'",
+                                other.unwrap_or_default()
+                            )));
+                        },
+                    };
+                },
+                "sz" => {
+                    let text = value(&attributes, "val").unwrap_or_default();
+                    let size: f64 = text
+                        .parse()
+                        .map_err(|_| invalid(format!("invalid run font size '{text}'")))?;
+                    if !size.is_finite() || size <= 0.0 {
+                        return Err(invalid(format!("invalid run font size '{text}'")));
+                    }
+                    font.size = Some(size);
+                },
+                "color" => font.color = Some(color(&attributes)?),
+                "rFont" => font.name = value(&attributes, "val").map(str::to_owned),
+                "family" => font.family = number(&attributes, name)?,
+                "charset" => font.charset = number(&attributes, name)?,
+                "scheme" => {
+                    font.scheme = value(&attributes, "val")
+                        .map(|token| {
+                            token
+                                .parse::<Scheme>()
+                                .map_err(|error| invalid(error.to_string()))
+                        })
+                        .transpose()?;
+                },
+                _ => {},
+            }
+        }
+        Ok(font)
+    }
+
+    fn color(attributes: &[(String, String)]) -> Result<FontColor> {
+        let tint = value(attributes, "tint")
+            .map(|text| {
+                text.parse::<f64>()
+                    .ok()
+                    .and_then(|tint| Tint::new(tint).ok())
+                    .ok_or_else(|| invalid(format!("invalid run color tint '{text}'")))
+            })
+            .transpose()?;
+        let mut color = if let Some(rgb) = value(attributes, "rgb") {
+            FontColor::rgb(
+                rgb.parse()
+                    .map_err(|error| invalid(format!("invalid run RGB color '{rgb}': {error}")))?,
+            )
+        } else if let Some(theme) = value(attributes, "theme") {
+            FontColor::theme(
+                theme
+                    .parse()
+                    .map_err(|_| invalid(format!("invalid run theme color '{theme}'")))?,
+            )
+        } else if let Some(indexed) = value(attributes, "indexed") {
+            FontColor::indexed(
+                indexed
+                    .parse()
+                    .map_err(|_| invalid(format!("invalid run indexed color '{indexed}'")))?,
+            )
+        } else if matches!(value(attributes, "auto"), Some("1" | "true")) {
+            FontColor::automatic()
+        } else {
+            FontColor::default_base()
+        };
+        if let Some(tint) = tint {
+            color = color.with_tint(tint);
+        }
+        Ok(color)
+    }
+
+    fn val(text: &str) -> Box<str> {
+        format!("val=\"{}\"", escape_xml(text)).into_boxed_str()
+    }
+
+    fn flag_value(value: bool) -> Box<str> {
+        if value {
+            Box::default()
+        } else {
+            "val=\"0\"".into()
+        }
+    }
+
+    fn color_value(color: &FontColor) -> Result<Box<str>> {
+        let mut xml = String::new();
+        crate::style::stylesheet::writer::write_font_color(&mut xml, "color", color)?;
+        let inner = xml
+            .strip_prefix("<color")
+            .and_then(|rest| rest.strip_suffix("/>"))
+            .unwrap_or_default()
+            .trim();
+        if matches!(color.kind(), FontColorKind::Default) && inner.is_empty() {
+            return Ok(Box::default());
+        }
+        Ok(inner.into())
+    }
+
+    /// Replace (`Some`) or remove (`None`) the property `name`.
+    fn put(properties: &mut Vec<Property>, name: &str, value: Option<Box<str>>) {
+        let existing = properties.iter().position(|(held, _)| &**held == name);
+        properties.retain(|(held, _)| &**held != name);
+        let Some(value) = value else {
+            return;
+        };
+        let at = existing.unwrap_or_else(|| {
+            let rank = ORDER
+                .iter()
+                .position(|item| *item == name)
+                .unwrap_or(ORDER.len());
+            properties
+                .iter()
+                .position(|(held, _)| {
+                    ORDER
+                        .iter()
+                        .position(|item| *item == &**held)
+                        .is_some_and(|other| other > rank)
+                })
+                .unwrap_or(properties.len())
+        });
+        let at = at.min(properties.len());
+        properties.insert(at, (name.into(), value));
+    }
+
+    pub(super) fn apply(properties: &mut Vec<Property>, change: &FontChange) -> Result<()> {
+        for (name, value) in [
+            ("b", change.bold_change()),
+            ("i", change.italic_change()),
+            ("strike", change.strike_change()),
+            ("condense", change.condense_change()),
+            ("extend", change.extend_change()),
+            ("outline", change.outline_change()),
+            ("shadow", change.shadow_change()),
+        ] {
+            if let Some(value) = value {
+                put(properties, name, value.map(flag_value));
+            }
+        }
+        if let Some(value) = change.underline_change() {
+            put(
+                properties,
+                "u",
+                value.map(|underline| match underline {
+                    Underline::Single => Box::default(),
+                    other => val(other.as_str()),
+                }),
+            );
+        }
+        if let Some(value) = change.script_change() {
+            put(
+                properties,
+                "vertAlign",
+                value.map(|script| val(script.as_str())),
+            );
+        }
+        if let Some(value) = change.size_change() {
+            put(properties, "sz", value.map(|size| val(&size.to_string())));
+        }
+        if let Some(value) = change.color_change() {
+            let value = value.map(color_value).transpose()?;
+            put(properties, "color", value);
+        }
+        if let Some(value) = change.name_change() {
+            put(properties, "rFont", value.map(val));
+        }
+        if let Some(value) = change.family_change() {
+            put(
+                properties,
+                "family",
+                value.map(|family| val(&family.to_string())),
+            );
+        }
+        if let Some(value) = change.charset_change() {
+            put(
+                properties,
+                "charset",
+                value.map(|charset| val(&charset.to_string())),
+            );
+        }
+        if let Some(value) = change.scheme_change() {
+            put(
+                properties,
+                "scheme",
+                value.map(|scheme| val(scheme.as_str())),
+            );
+        }
+        Ok(())
     }
 }
 

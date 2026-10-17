@@ -389,6 +389,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 (Item::Chart(chart), Kind::Series | Kind::Axis) => {
                     chart_child(self.file, parent, chart, step.kind, step.select)
                 },
+                (Item::Cell(_), Kind::Run) => super::runs::lookup(self.file, parent, step.select),
                 _ => Ok(Lookup::NotApplicable),
             }
         })
@@ -488,6 +489,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
                     .map(|name| Cow::Borrowed(name.name.as_str())),
                 Item::Chart(chart) => chart.summary()?.title.as_deref().map(Cow::Borrowed),
                 Item::Feature(feature) => feature.text(),
+                Item::Run(run) => run.run().map(|run| Cow::Borrowed(run.text())),
                 Item::Workbook | Item::Range(_) | Item::Series(_) | Item::Axis(_) => None,
             })
         })

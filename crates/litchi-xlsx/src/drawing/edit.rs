@@ -292,6 +292,135 @@ impl Edit<'_> {
         }
     }
 
+    /// Replace the image of the picture at `index` among the worksheet's
+    /// pictures (record 0338): the bytes become a new media part with
+    /// `content_type` and `extension`, the picture's image relationship is
+    /// retargeted to it, and the old media part is removed once nothing
+    /// refers to it. The picture's anchor, names and geometry keep their
+    /// bytes. Returns whether anything changed: the same bytes and content
+    /// type are an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing picture, an invalid image, a picture
+    /// whose image relationship another object shares (replacing it would
+    /// change both), or a signed workbook.
+    ///
+    /// ```
+    /// use litchi_xlsx::Package;
+    /// use litchi_xlsx::drawing::edit::{Marker, PictureSpec, Placement};
+    ///
+    /// # fn main() -> Result<(), litchi_xlsx::Error> {
+    /// let placement = Placement::TwoCell { from: Marker::cell(0, 0), to: Marker::cell(2, 2) };
+    /// let spec = PictureSpec {
+    ///     placement,
+    ///     name: "Picture 1".into(),
+    ///     description: None,
+    ///     title: None,
+    ///     image: b"first".to_vec(),
+    ///     content_type: "image/png".into(),
+    ///     extension: "png".into(),
+    ///     rotation: None,
+    ///     flip_h: false,
+    ///     flip_v: false,
+    /// };
+    /// let blank = Package::new()?;
+    /// let mut edit = blank.edit_drawings()?;
+    /// edit.add_picture(0, &spec)?;
+    /// let package = edit.commit()?.into_package();
+    /// let mut edit = package.edit_drawings()?;
+    /// assert!(edit.replace_image(0, 0, b"second".to_vec(), "image/jpeg", "jpeg")?);
+    /// let after = edit.commit()?.into_package();
+    /// let image = after.drawing_elements(0)?[0].image.clone().expect("image");
+    /// assert_eq!(image.content_type, "image/jpeg");
+    /// assert_eq!(image.size, 6);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn replace_image(
+        &mut self,
+        sheet: usize,
+        index: usize,
+        image: Vec<u8>,
+        content_type: &str,
+        extension: &str,
+    ) -> Result<bool> {
+        LimitKind::ImageBytes.check(image.len())?;
+        if !content_type.starts_with("image/")
+            || extension.is_empty()
+            || !extension.bytes().all(|b| b.is_ascii_alphanumeric())
+        {
+            return Err(invalid(
+                "a picture needs an image content type and extension",
+            ));
+        }
+        let drawing = self.existing_drawing(sheet)?;
+        let elements = self.elements(sheet)?;
+        let picture = elements
+            .iter()
+            .filter(|element| element.kind == ElementKind::Picture)
+            .nth(index)
+            .ok_or_else(|| invalid("the worksheet has no such picture"))?;
+        let old = picture
+            .image
+            .as_ref()
+            .ok_or_else(|| invalid("the picture has no embedded image"))?
+            .part
+            .clone();
+        let old = PackURI::new(&old).map_err(|error| invalid(error.to_string()))?;
+        {
+            let part = self.staged.opc().get_part(&old)?;
+            if part.blob() == image.as_slice() && part.content_type() == content_type {
+                return Ok(false);
+            }
+        }
+        // The relationships only this picture names; its image is the one
+        // that targets the old media part.
+        let released =
+            objects::detach(self.staged.blob(&drawing)?, ElementKind::Picture, index)?.released;
+        let relationship = {
+            let part = self.staged.opc().get_part(&drawing)?;
+            released.into_iter().find(|id| {
+                part.rels().get(id).is_some_and(|relationship| {
+                    !relationship.is_external()
+                        && relationship.reltype() == rt::IMAGE
+                        && relationship.target_partname().ok().as_ref() == Some(&old)
+                })
+            })
+        }
+        .ok_or_else(|| {
+            invalid(
+                "the picture shares its image with another object; replacing it would change both",
+            )
+        })?;
+        let media = self
+            .staged
+            .free_name("/xl/media/image", &format!(".{extension}"))?;
+        let opc = self.staged.opc_mut()?;
+        opc.add_part(Box::new(BlobPart::new(
+            media.clone(),
+            content_type.to_owned(),
+            image,
+        )));
+        opc.get_part_mut(&drawing)?
+            .rels_mut()
+            .retarget(&relationship, media.relative_ref(drawing.base_uri()))?;
+        self.staged.touch(&media);
+        self.staged.touch(&drawing);
+        let opc = self.staged.opc_mut()?;
+        let referenced = opc.iter_parts().any(|part| {
+            part.rels().iter().any(|relationship| {
+                !relationship.is_external()
+                    && relationship.target_partname().ok().as_ref() == Some(&old)
+            })
+        });
+        if !referenced {
+            opc.remove_part(&old);
+            self.staged.touch(&old);
+        }
+        Ok(true)
+    }
+
     /// Remove the element at `index` among the worksheet's elements of
     /// `kind`, with its relationships and the parts only it refers to.
     ///

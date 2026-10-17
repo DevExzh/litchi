@@ -74,7 +74,8 @@ fn misses_and_refusals_carry_one_code_each() {
         ("/Data/pivottable[1]", Code::UnsupportedCapability),
         ("/Data/validation[1]", Code::PathNotFound),
         ("/Data/sparkline[1]", Code::UnsupportedCapability),
-        ("/Data/A1/run[1]", Code::UnsupportedCapability),
+        // Record 0338: runs are read; this cell has none.
+        ("/Data/A1/run[1]", Code::PathNotFound),
         ("/slide[1]", Code::UnsupportedPath),
         ("/body/p[1]", Code::UnsupportedPath),
         ("/Data/namedrange[1]", Code::UnsupportedPath),

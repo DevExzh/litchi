@@ -29,9 +29,9 @@ Evidence: `crud-adr0008.tsv`.
 
 | format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused | atomic failure | patch inverse | composition |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| docx | 44 | 343 | 343 | 0 | 0 | 78 | 75 | 8 | 44 | ok | ok | ok |
-| xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 | ok | ok | ok |
-| pptx | 37 | 293 | 293 | 0 | 0 | 65 | 59 | 2 | 42 | ok | ok | ok |
+| docx | 44 | 346 | 346 | 0 | 0 | 78 | 72 | 8 | 44 | ok | ok | ok |
+| xlsx | 26 | 206 | 206 | 0 | 0 | 65 | 25 | 2 | 20 | ok | ok | ok |
+| pptx | 37 | 296 | 296 | 0 | 0 | 65 | 56 | 2 | 42 | ok | ok | ok |
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 | ok | ok | ok |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 | ok | ok | ok |
 | xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 | ok | ok | ok |
@@ -61,7 +61,7 @@ Evidence: `crud-adr0008.tsv`.
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| document | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| document | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | body | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | run | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
@@ -108,7 +108,7 @@ Evidence: `crud-adr0008.tsv`.
 
 ## xlsx
 
-- fixtures: `create()`, `ooxml/xlsx/DataValidationListTooLong.xlsx`, `poi/test-data/spreadsheet/47889.xlsx`, `ooxml/xlsx/column_style.xlsx`, `ooxml/xlsx/ExcelTables.xlsx`, `ooxml/xlsx/named-ranges-global.xlsx`, `ooxml/xlsx/SimpleScatterChart.xlsx`, `libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx`, `create() + add sheet`, `create() + add comment`, `create() + add chart`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
+- fixtures: `create()`, `ooxml/xlsx/DataValidationListTooLong.xlsx`, `poi/test-data/spreadsheet/47889.xlsx`, `ooxml/xlsx/column_style.xlsx`, `ooxml/xlsx/ExcelTables.xlsx`, `ooxml/xlsx/named-ranges-global.xlsx`, `ooxml/xlsx/SimpleScatterChart.xlsx`, `libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx`, `create() + add sheet`, `create() + add cell`, `create() + add comment`, `create() + add chart`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`, `create() + add sheet + add run`
 - document views on `ooxml/xlsx/DataValidationListTooLong.xlsx`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 - ADR 0008 atomic failure: ok, `create() + add sheet` batch [set /sheet[1] {"name":"Litchi"}, set /sheet[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
 - ADR 0008 patch inverse: ok, `create() + add sheet` set /sheet[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 2700 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
@@ -116,9 +116,9 @@ Evidence: `crud-adr0008.tsv`.
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| workbook | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| workbook | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | sheet | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | ok | n/a | refused | refused | ok | ok | ok | ok |
 | range | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | column | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
@@ -141,7 +141,7 @@ Evidence: `crud-adr0008.tsv`.
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | rowbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | colbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
-| run | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| run | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 
 ## pptx
 
@@ -153,7 +153,7 @@ Evidence: `crud-adr0008.tsv`.
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| presentation | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| presentation | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | placeholder | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
@@ -531,8 +531,8 @@ Evidence: `crud-adr0008.tsv`.
 
 - fixtures: `create()`, `odf/odc-producer-evidence/odfdom-created.odc`, `odf/odc-producer-evidence/odfdom-resaved.odc`, `create() + add axis`, `create() + add series`, `create() + add legend`
 - document views on `odf/odc-producer-evidence/odfdom-created.odc`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
-- ADR 0008 atomic failure: ok, `create() + add axis` batch [set / {"title":"Litchi"}, set /missing[9999]] refused `invalid_path` naming item 1; snapshot, its file and two refused save destinations unchanged
-- ADR 0008 patch inverse: ok, `create() + add axis` set / {"title":"Litchi"}: the patch replays onto its source, the inverse restores the exact 812 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 atomic failure: ok, `create() + add axis` batch [set /axis[1] {"name":"Litchi"}, set /axis[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add axis` set /axis[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 812 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
 - ADR 0008 composition: ok, `create() + add axis` set /axis[1] {"name":"Litchi"} and set /axis[2] {"name":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -665,8 +665,8 @@ Evidence: `crud-adr0008.tsv`.
 
 - fixtures: `create()`, `odf/native-resave/source/font-styles.odf`, `libreoffice-core/starmath/qa/extras/data/tdf151842.odf`, `create() + add element`
 - document views on `odf/native-resave/source/font-styles.odf`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
-- ADR 0008 atomic failure: ok, `odf/native-resave/source/font-styles.odf` batch [set / {"starmath":"Litchi"}, set /missing[9999]] refused `invalid_path` naming item 1; snapshot, its file and two refused save destinations unchanged
-- ADR 0008 patch inverse: ok, `odf/native-resave/source/font-styles.odf` set / {"starmath":"Litchi"}: the patch replays onto its source, the inverse restores the exact 6311 source bytes (the input file's bytes), the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 atomic failure: ok, `create() + add element` batch [set /element[2] {"text":"Litchi"}, set /element[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add element` set /element[2] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 640 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
 - ADR 0008 composition: ok, `create() + add element` set /element[2] {"text":"Litchi"} and set /element[3] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |

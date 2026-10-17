@@ -2781,3 +2781,26 @@ transaction family is introduced.
 | DOCX `comment` set (`author`, `initials`, `date`, `text`); `parentId` and `done` property gaps (follow-up 0335-F2) | a reply or resolution key is refused (`unsupported_capability`) on add and set | ✅ 0335 |
 | DOCX `smartart` set (`layout`, `text`) and remove; `node` element (`/smartart[N]/node[K]`, nested; `level`, write-only `text`) | the PPTX `node` vocabulary of record 0284 | ✅ 0335 |
 | DOCX `series` (`/body/p[N]/chart[M]/series[K]`, `/chart[N]/series[K]`; `name`, `values`, `categories`, `color`) and `axis` (`.../axis[@role=ROLE]`, `.../axis[N]`; `role`, `title`, `min`, `max`) | the PPTX and XLSX `chart-series` and `chart-axis` vocabulary | ✅ 0335 |
+
+## XLSX P0 residue, root metadata and two correctness fixes (record 0338)
+
+XLSX rich-text runs get a typed read and change surface over the existing
+`RichText`/`RichRun` pair (record 0295); a picture's image is replaced in the
+drawing edit; a chart series can refer to a range anywhere in the workbook.
+The unified layer routes OfficeCLI's root metadata spelling (`set / title=…`)
+to the metadata writers. No banned name is introduced.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_xlsx::RichText::{new, run_mut, insert_run, remove_run}` | build runs, change one in place, insert or remove one | ✅ 0338 |
+| `litchi_xlsx::RichRun::{new, set_text, font, apply_font}` | an unformatted run; its text; its `rPr` read as the stylesheet `Font`; a `FontChange` applied in place (unnamed properties keep their markup) | ✅ 0338 |
+| `litchi_xlsx::SourceWorksheet::rich_text` | the source-backed counterpart of `Worksheet::rich_text` | ✅ 0338 |
+| `litchi_xlsx::drawing::edit::Edit::replace_image` | a picture's image as a new media part, its relationship retargeted, the old part removed once unreferenced | ✅ 0338 |
+| `litchi_drawingml::chart::authoring::Spec::with_series_reference` | per-series values (and categories) references, overriding the `Binding` for that series | ✅ 0338 |
+| XLSX `run` element (`/<sheet>/<A1>/run[N]`, alias `r[N]`; `text`, `bold`, `italic`, `strike`, `underline`, `superscript`, `subscript`, `size`, `color`, `font`) | get, query, set, add, remove | ✅ 0338 |
+| XLSX cell `type`, `runs`, `ref`; cell `add` under a sheet, row or cell | `type` converts the value (or the stored one); `runs` is a JSON array; `ref` (alias `address`) is add-only | ✅ 0338 |
+| DOCX, XLSX and PPTX root `set` of document properties | routed to the `/metadata` writer; DOCX writes the core properties (`litchi_docx::metadata`) | ✅ 0338 |
+| `litchi_ops::PathArg` `Display` | a fixed point of `PathArg::parse`: a relative first step that would read as sheet notation is quoted | behaviour (0338) |
+| workspace `serde_json` `float_roundtrip` | JSON numbers decode correctly rounded | behaviour (0338) |
+
+See [0338](unified-ops/0338-xlsx-p0-root-metadata-json-paths.md).
