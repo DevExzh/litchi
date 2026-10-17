@@ -28,19 +28,19 @@ Every delta, named gap and element/property group carries a disposition (`tools/
 
 | Family | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 1567 | 0 | 20 | 42 | 4 | 0 | 0 | 20 | 20/20 |
-| excel/charts | 743 | 454 | 0 | 258 | 16 | 15 | 0 | 0 | 32 | 32/32 |
-| ppt | 310 | 131 | 32 | 35 | 141 | 2 | 1 | 0 | 10 | 12/12 |
-| ppt/charts | 735 | 318 | 113 | 402 | 14 | 1 | 0 | 0 | 28 | 28/28 |
-| ppt/ole | 26 | 19 | 2 | 0 | 5 | 0 | 2 | 0 | 6 | 6/6 |
-| ppt/pictures | 68 | 36 | 5 | 0 | 2 | 24 | 6 | 0 | 2 | 2/2 |
-| ppt/shapes | 220 | 106 | 19 | 94 | 20 | 0 | 0 | 0 | 8 | 8/8 |
-| ppt/tables | 457 | 358 | 33 | 90 | 9 | 0 | 0 | 0 | 14 | 14/14 |
-| ppt/templates | 452 | 27 | 0 | 152 | 52 | 119 | 102 | 0 | 11 | 24/24 |
-| ppt/textboxes | 132 | 90 | 10 | 40 | 2 | 0 | 0 | 0 | 4 | 4/4 |
-| ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
-| word | 1133 | 662 | 3 | 198 | 197 | 36 | 40 | 0 | 24 | 32/32 |
-| **total** | **6431** | **4275** | **344** | **1295** | **509** | **201** | **151** | **0** | **177** | **200/200** |
+| excel | 1633 | 1580 | 0 | 20 | 29 | 4 | 0 | 0 | 20 | 20/20 |
+| excel/charts | 743 | 470 | 0 | 258 | 0 | 15 | 0 | 0 | 32 | 32/32 |
+| ppt | 310 | 180 | 32 | 35 | 92 | 2 | 1 | 0 | 10 | 12/12 |
+| ppt/charts | 735 | 332 | 113 | 402 | 0 | 1 | 0 | 0 | 28 | 28/28 |
+| ppt/ole | 26 | 20 | 2 | 0 | 4 | 0 | 2 | 0 | 6 | 6/6 |
+| ppt/pictures | 68 | 37 | 5 | 0 | 1 | 24 | 6 | 0 | 2 | 2/2 |
+| ppt/shapes | 220 | 110 | 19 | 94 | 16 | 0 | 0 | 0 | 8 | 8/8 |
+| ppt/tables | 457 | 365 | 33 | 90 | 2 | 0 | 0 | 0 | 14 | 14/14 |
+| ppt/templates | 452 | 33 | 0 | 152 | 46 | 119 | 102 | 0 | 11 | 24/24 |
+| ppt/textboxes | 132 | 92 | 10 | 40 | 0 | 0 | 0 | 0 | 4 | 4/4 |
+| ppt/transitions | 522 | 516 | 127 | 6 | 0 | 0 | 0 | 0 | 18 | 18/18 |
+| word | 1133 | 678 | 3 | 198 | 181 | 36 | 40 | 0 | 24 | 32/32 |
+| **total** | **6431** | **4413** | **344** | **1295** | **371** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -48,16 +48,16 @@ The format is the extension of the document each call names.
 
 | Format | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| docx | 949 | 512 | 0 | 194 | 167 | 36 | 40 | 0 | 22 | 30/30 |
-| pptx | 2959 | 1595 | 344 | 823 | 284 | 146 | 111 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 2168 | 0 | 278 | 58 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **4275** | **344** | **1295** | **509** | **201** | **151** | **0** | **177** | **200/200** |
+| docx | 949 | 528 | 0 | 194 | 151 | 36 | 40 | 0 | 22 | 30/30 |
+| pptx | 2959 | 1688 | 344 | 823 | 191 | 146 | 111 | 0 | 99 | 114/114 |
+| xlsx | 2523 | 2197 | 0 | 278 | 29 | 19 | 0 | 0 | 56 | 56/56 |
+| **total** | **6431** | **4413** | **344** | **1295** | **371** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## v1-scope subset (design §14)
 
 Design §14 requires the v1-scope subset of the corpus green, with every remaining delta recorded. The subset is every counted line of the scripts whose tier (`corpusScripts` in `tools/officecli_dispositions.json`) is P0 or v1 (design §13). A line is **accounted** when every gap class it carries (its delta, named gap or element/property group; each property a warned call skipped; for a cascade, the refused call it follows) is `wontfix`, `deferred-P1`, `deferred-P2` or `out-of-scope`, and **open** otherwise (a `planned` class, a bug or a class without a disposition). The subset is green when no line is open.
 
-**Status: red.** 3443 v1 lines: 2204 passed, 1171 accounted, 68 open.
+**Status: red.** 3443 v1 lines: 2261 passed, 1171 accounted, 11 open.
 
 Script tiers:
 
@@ -78,22 +78,21 @@ Script tiers:
 
 | Family | v1 lines | passed | wontfix | deferred-P1 | deferred-P2 | out-of-scope | open |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| excel | 454 | 436 | 4 | 8 | 0 | 0 | 6 |
-| excel/charts | 743 | 454 | 5 | 268 | 0 | 0 | 16 |
-| ppt | 12 | 4 | 0 | 7 | 0 | 0 | 1 |
-| ppt/charts | 735 | 318 | 1 | 402 | 0 | 0 | 14 |
-| ppt/pictures | 68 | 36 | 0 | 15 | 0 | 16 | 1 |
-| ppt/shapes | 124 | 50 | 0 | 72 | 0 | 0 | 2 |
-| ppt/tables | 457 | 358 | 0 | 91 | 0 | 0 | 8 |
-| ppt/textboxes | 132 | 90 | 0 | 40 | 0 | 0 | 2 |
-| word | 718 | 458 | 30 | 212 | 0 | 0 | 18 |
-| **total** | **3443** | **2204** | **40** | **1115** | **0** | **16** | **68** |
+| excel | 454 | 442 | 4 | 8 | 0 | 0 | 0 |
+| excel/charts | 743 | 470 | 5 | 268 | 0 | 0 | 0 |
+| ppt | 12 | 5 | 0 | 7 | 0 | 0 | 0 |
+| ppt/charts | 735 | 332 | 1 | 402 | 0 | 0 | 0 |
+| ppt/pictures | 68 | 37 | 0 | 15 | 0 | 16 | 0 |
+| ppt/shapes | 124 | 52 | 0 | 72 | 0 | 0 | 0 |
+| ppt/tables | 457 | 365 | 0 | 91 | 0 | 0 | 1 |
+| ppt/textboxes | 132 | 92 | 0 | 40 | 0 | 0 | 0 |
+| word | 718 | 466 | 30 | 212 | 0 | 0 | 10 |
+| **total** | **3443** | **2261** | **40** | **1115** | **0** | **16** | **11** |
 
 Open v1 lines by what blocks them (the first class that does not account for the line):
 
 | Blocked by | Lines | Examples |
 |---|---:|---|
-| planned WP5 | 57 | `excel/cell-formatting.sh:199`, `excel/charts.sh:213`, `excel/charts.sh:214` |
 | planned WP4 | 9 | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154`, `word/tables.sh:189` |
 | planned 0253 | 1 | `word/document-formatting.sh:28` |
 | planned 0333 | 1 | `ppt/tables/tables-nested.sh:86` |
@@ -120,7 +119,7 @@ Open v1 lines by what blocks them (the first class that does not account for the
 
 | Id | Gap | OfficeCLI | Litchi | Lines | Examples | Disposition | Reason |
 |---|---|---|---|---:|---|---|---|
-| G1 | Missing verbs | the raw layer (`validate`, `raw`, `raw-set`, `add-part`, design §12) and `dump` (the verbs the corpus calls are counted per verb in the dispositions below) | absent from `litchi-ops`, the CLI and Python (audit WP5; record 0015 W10). `import`, `evaluate`, `recalculate` (record 0266), `merge` (record 0274) and `refresh` (record 0279) have landed and are not in this class | 138 | `excel/cell-formatting.sh:199`, `excel/charts.sh:213`, `excel/charts.sh:214` | `add-part` (1): planned WP5 (raw-layer-verbs); `dump` (1): planned WP5 (raw-layer-verbs); `raw-set` (48): planned WP5 (raw-layer-verbs); `validate` (88): planned WP5 (raw-layer-verbs) |  |
+| G1 | Missing verbs | an OfficeCLI verb the `litchi` CLI does not have (counted per verb in the dispositions below) | absent from `litchi-ops`, the CLI and Python. The raw layer (`validate`, `raw`, `raw-set`, `add-part`) and `dump` landed in record 0336; `import`, `evaluate`, `recalculate` (record 0266), `merge` (record 0274) and `refresh` (record 0279) earlier; none of them is in this class | 0 |  |  |  |
 | G2 | Copying an element (`add --from`) | `add <file> <parent> --from <path>` clones an element | the CLI passes `--from` (record 0265); `File::apply` refuses it: "add-from copying is not integrated" (record 0256 F6) | 40 | `ppt/templates/styles/brand--aura-coffee/build.sh:58`, `ppt/templates/styles/brand--aura-coffee/build.sh:75`, `ppt/templates/styles/brand--aura-coffee/build.sh:104` | deferred-P1 0256 (element-copy) | copying an element (`add --from`, record 0256 F6) is not in §13's tiers; cross-document copy is P2 |
 | G3 | Find and replace on `set` | `set --find T --replace R` (or `--prop find=`/`replace=`) rewrites matching text | the CLI maps the options to `find=`/`replace=` props (record 0265); record 0273 integrates the engine for DOCX, PPTX, XLSX and RTF, and record 0285 extends it to DOCX headers, footers, notes, comments and field results and PPTX table cells and notes; regular expressions (`regex=true`, record 0010 Q3), tracked-change finds, XLSX rich-text cells and the other formats remain refused | 0 |  |  |  |
 | G4 | Revision-tracked removal (`remove --prop`) | `remove` takes `--prop revision.author=...` to record a tracked deletion | the CLI passes the props (record 0265); `remove` admits no props (invalid_argument) | 2 | `word/revisions.sh:123`, `word/revisions.sh:202` | deferred-P2 0256 (tracked-removal) | revision-tracked removal belongs to tracked-change workflows (§13 P2) |
@@ -875,106 +874,106 @@ None.
 | F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 73 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
 | F6 | `add --from`, find/replace on `set`, `remove --shift`, `get --save` | 40 |
-| D6 | missing verbs (`validate`, `raw-set`, `add-part`, `dump`) | 138 |
+| D6 | missing verbs (the raw layer and `dump` landed in record 0336) | 0 |
 
 ## Summary by script
 
 | Script | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `excel/cell-formatting.sh` | 109 | 107 | 0 | 1 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts.sh` | 320 | 313 | 0 | 3 | 4 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-advanced.sh` | 17 | 10 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-area.sh` | 92 | 74 | 0 | 16 | 1 | 1 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bar.sh` | 82 | 57 | 0 | 20 | 1 | 4 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-basic.sh` | 102 | 76 | 0 | 25 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-boxwhisker.sh` | 13 | 6 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bubble.sh` | 24 | 10 | 0 | 13 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-column.sh` | 102 | 77 | 0 | 24 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-combo.sh` | 23 | 8 | 0 | 13 | 1 | 1 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-extended.sh` | 28 | 13 | 0 | 14 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-histogram.sh` | 37 | 7 | 0 | 28 | 1 | 1 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-line.sh` | 108 | 75 | 0 | 32 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-pie.sh` | 18 | 6 | 0 | 4 | 1 | 7 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-radar.sh` | 23 | 8 | 0 | 13 | 1 | 1 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-scatter.sh` | 33 | 11 | 0 | 21 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-stock.sh` | 18 | 6 | 0 | 11 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-waterfall.sh` | 23 | 10 | 0 | 12 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/conditional-formatting.sh` | 165 | 163 | 0 | 1 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/data-validation.sh` | 88 | 87 | 0 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/pivot-tables.sh` | 586 | 568 | 0 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/shapes.sh` | 62 | 57 | 0 | 4 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/sheet-settings.sh` | 104 | 96 | 0 | 7 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/slicers.sh` | 60 | 54 | 0 | 0 | 6 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/sparklines.sh` | 114 | 106 | 0 | 0 | 8 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/workbook-settings.sh` | 25 | 16 | 0 | 4 | 1 | 4 | 0 | 0 | 2 | 2/2 |
-| `ppt/3d-model.sh` | 35 | 1 | 0 | 8 | 26 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/animations.sh` | 119 | 61 | 1 | 13 | 45 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-3d.sh` | 50 | 23 | 8 | 26 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-advanced.sh` | 61 | 24 | 8 | 36 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-area.sh` | 51 | 18 | 8 | 31 | 1 | 1 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-bar.sh` | 52 | 19 | 8 | 32 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-bubble.sh` | 52 | 18 | 8 | 33 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-column.sh` | 53 | 20 | 8 | 32 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-combo.sh` | 53 | 26 | 8 | 26 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-doughnut.sh` | 51 | 27 | 8 | 23 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-line.sh` | 52 | 21 | 8 | 30 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-pie.sh` | 51 | 27 | 8 | 23 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-radar.sh` | 51 | 24 | 8 | 26 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-scatter.sh` | 58 | 27 | 9 | 30 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-stock.sh` | 53 | 22 | 8 | 30 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-waterfall.sh` | 47 | 22 | 8 | 24 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/diagram.sh` | 72 | 48 | 23 | 0 | 23 | 0 | 1 | 0 | 0 | 2/2 |
-| `ppt/ole/ole-embed.sh` | 26 | 19 | 2 | 0 | 5 | 0 | 2 | 0 | 6 | 6/6 |
-| `ppt/pictures/pictures-basic.sh` | 68 | 36 | 5 | 0 | 2 | 24 | 6 | 0 | 2 | 2/2 |
-| `ppt/presentation-settings.sh` | 12 | 4 | 1 | 6 | 2 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/presentation.sh` | 52 | 8 | 6 | 0 | 44 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-basic.sh` | 66 | 21 | 5 | 43 | 2 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-connectors.sh` | 55 | 38 | 4 | 2 | 15 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-effects.sh` | 41 | 18 | 5 | 22 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-typography.sh` | 58 | 29 | 5 | 27 | 2 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-basic.sh` | 73 | 58 | 5 | 13 | 2 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-borders.sh` | 55 | 37 | 3 | 17 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-financial.sh` | 75 | 70 | 4 | 4 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-merged.sh` | 63 | 55 | 2 | 7 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-nested.sh` | 63 | 35 | 4 | 26 | 2 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-rows-cols.sh` | 84 | 74 | 4 | 9 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-styled.sh` | 44 | 29 | 11 | 14 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/cell-formatting.sh` | 109 | 108 | 0 | 1 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts.sh` | 320 | 317 | 0 | 3 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-advanced.sh` | 17 | 11 | 0 | 6 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-area.sh` | 92 | 75 | 0 | 16 | 0 | 1 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bar.sh` | 82 | 58 | 0 | 20 | 0 | 4 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-basic.sh` | 102 | 77 | 0 | 25 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-boxwhisker.sh` | 13 | 7 | 0 | 6 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bubble.sh` | 24 | 11 | 0 | 13 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-column.sh` | 102 | 78 | 0 | 24 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-combo.sh` | 23 | 9 | 0 | 13 | 0 | 1 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-extended.sh` | 28 | 14 | 0 | 14 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-histogram.sh` | 37 | 8 | 0 | 28 | 0 | 1 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-line.sh` | 108 | 76 | 0 | 32 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-pie.sh` | 18 | 7 | 0 | 4 | 0 | 7 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-radar.sh` | 23 | 9 | 0 | 13 | 0 | 1 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-scatter.sh` | 33 | 12 | 0 | 21 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-stock.sh` | 18 | 7 | 0 | 11 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-waterfall.sh` | 23 | 11 | 0 | 12 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/conditional-formatting.sh` | 165 | 164 | 0 | 1 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/data-validation.sh` | 88 | 88 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/pivot-tables.sh` | 586 | 569 | 0 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/shapes.sh` | 62 | 58 | 0 | 4 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/sheet-settings.sh` | 104 | 97 | 0 | 7 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/slicers.sh` | 60 | 55 | 0 | 0 | 5 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/sparklines.sh` | 114 | 107 | 0 | 0 | 7 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/workbook-settings.sh` | 25 | 17 | 0 | 4 | 0 | 4 | 0 | 0 | 2 | 2/2 |
+| `ppt/3d-model.sh` | 35 | 2 | 0 | 8 | 25 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/animations.sh` | 119 | 62 | 1 | 13 | 44 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-3d.sh` | 50 | 24 | 8 | 26 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-advanced.sh` | 61 | 25 | 8 | 36 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-area.sh` | 51 | 19 | 8 | 31 | 0 | 1 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-bar.sh` | 52 | 20 | 8 | 32 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-bubble.sh` | 52 | 19 | 8 | 33 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-column.sh` | 53 | 21 | 8 | 32 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-combo.sh` | 53 | 27 | 8 | 26 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-doughnut.sh` | 51 | 28 | 8 | 23 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-line.sh` | 52 | 22 | 8 | 30 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-pie.sh` | 51 | 28 | 8 | 23 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-radar.sh` | 51 | 25 | 8 | 26 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-scatter.sh` | 58 | 28 | 9 | 30 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-stock.sh` | 53 | 23 | 8 | 30 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-waterfall.sh` | 47 | 23 | 8 | 24 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/diagram.sh` | 72 | 49 | 23 | 0 | 22 | 0 | 1 | 0 | 0 | 2/2 |
+| `ppt/ole/ole-embed.sh` | 26 | 20 | 2 | 0 | 4 | 0 | 2 | 0 | 6 | 6/6 |
+| `ppt/pictures/pictures-basic.sh` | 68 | 37 | 5 | 0 | 1 | 24 | 6 | 0 | 2 | 2/2 |
+| `ppt/presentation-settings.sh` | 12 | 5 | 1 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/presentation.sh` | 52 | 52 | 6 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-basic.sh` | 66 | 22 | 5 | 43 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-connectors.sh` | 55 | 39 | 4 | 2 | 14 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-effects.sh` | 41 | 19 | 5 | 22 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-typography.sh` | 58 | 30 | 5 | 27 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-basic.sh` | 73 | 59 | 5 | 13 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-borders.sh` | 55 | 38 | 3 | 17 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-financial.sh` | 75 | 71 | 4 | 4 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-merged.sh` | 63 | 56 | 2 | 7 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-nested.sh` | 63 | 36 | 4 | 26 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-rows-cols.sh` | 84 | 75 | 4 | 9 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-styled.sh` | 44 | 30 | 11 | 14 | 0 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/templates/styles/brand--aura-coffee-dark/build.sh` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/brand--aura-coffee/build.sh` | 13 | 2 | 0 | 1 | 6 | 0 | 4 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/future--2050-vision/build.sh` | 43 | 2 | 0 | 32 | 5 | 0 | 4 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/brand--aura-coffee/build.sh` | 13 | 3 | 0 | 1 | 5 | 0 | 4 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/future--2050-vision/build.sh` | 43 | 3 | 0 | 32 | 4 | 0 | 4 | 0 | 1 | 2/2 |
 | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh` | 11 | 1 | 0 | 2 | 4 | 0 | 4 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/lifestyle--cat-secret-life/build.sh` | 121 | 7 | 0 | 27 | 9 | 0 | 78 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/lifestyle--cat-secret-life/build.sh` | 121 | 8 | 0 | 27 | 8 | 0 | 78 | 0 | 1 | 2/2 |
 | `ppt/templates/styles/lifestyle--feline-report/build_ppt.sh` | 18 | 1 | 0 | 17 | 0 | 0 | 0 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/product--geminicli-timetravel/build.sh` | 130 | 7 | 0 | 6 | 6 | 111 | 0 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/product--geminicli-timetravel/build.sh` | 130 | 8 | 0 | 6 | 5 | 111 | 0 | 0 | 1 | 2/2 |
 | `ppt/templates/styles/productivity--attention-budget/build.sh` | 15 | 1 | 0 | 2 | 6 | 0 | 6 | 0 | 1 | 2/2 |
 | `ppt/templates/styles/science--alien-guide/build.sh` | 65 | 1 | 0 | 62 | 2 | 0 | 0 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/science--space-exploration/build.sh` | 15 | 1 | 0 | 0 | 7 | 1 | 6 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/science--space-exploration/build.sh` | 15 | 2 | 0 | 0 | 6 | 1 | 6 | 0 | 1 | 2/2 |
 | `ppt/templates/styles/science--time-travel/build.sh` | 2 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 2/2 |
-| `ppt/templates/styles/tech--wildlife-company/build.sh` | 17 | 2 | 0 | 2 | 7 | 6 | 0 | 0 | 1 | 2/2 |
-| `ppt/textboxes/textboxes-advanced.sh` | 81 | 50 | 6 | 30 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/textboxes/textboxes-basic.sh` | 51 | 40 | 4 | 10 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-bands.sh` | 85 | 84 | 21 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-basic.sh` | 26 | 25 | 6 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-directional.sh` | 101 | 100 | 25 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-dynamic.sh` | 101 | 100 | 25 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-modern.sh` | 77 | 76 | 19 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-morph.sh` | 21 | 16 | 4 | 4 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-random.sh` | 17 | 16 | 4 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-shapes.sh` | 57 | 56 | 14 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-timing.sh` | 37 | 34 | 9 | 2 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/video.sh` | 20 | 9 | 1 | 8 | 1 | 2 | 0 | 0 | 2 | 2/2 |
-| `word/charts.sh` | 46 | 37 | 0 | 8 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/content-controls.sh` | 21 | 11 | 0 | 0 | 9 | 0 | 1 | 0 | 2 | 2/2 |
-| `word/diagram.sh` | 50 | 26 | 0 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/document-formatting.sh` | 17 | 6 | 0 | 10 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/fields.sh` | 39 | 33 | 0 | 3 | 1 | 2 | 0 | 0 | 2 | 2/2 |
-| `word/formulas.sh` | 171 | 90 | 0 | 0 | 81 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/numbering.sh` | 70 | 38 | 0 | 0 | 4 | 28 | 0 | 0 | 1 | 2/2 |
-| `word/paragraph-formatting.sh` | 78 | 54 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/pictures.sh` | 31 | 24 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/revisions.sh` | 73 | 35 | 0 | 15 | 17 | 6 | 0 | 0 | 2 | 2/2 |
-| `word/run-formatting.sh` | 80 | 56 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/sections.sh` | 33 | 28 | 0 | 1 | 4 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/tables.sh` | 357 | 210 | 3 | 109 | 38 | 0 | 0 | 0 | 6 | 6/6 |
-| `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **4275** | **344** | **1295** | **509** | **201** | **151** | **0** | **177** | **200/200** |
+| `ppt/templates/styles/tech--wildlife-company/build.sh` | 17 | 3 | 0 | 2 | 6 | 6 | 0 | 0 | 1 | 2/2 |
+| `ppt/textboxes/textboxes-advanced.sh` | 81 | 51 | 6 | 30 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/textboxes/textboxes-basic.sh` | 51 | 41 | 4 | 10 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-bands.sh` | 85 | 85 | 21 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-basic.sh` | 26 | 26 | 6 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-directional.sh` | 101 | 101 | 25 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-dynamic.sh` | 101 | 101 | 25 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-modern.sh` | 77 | 77 | 19 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-morph.sh` | 21 | 17 | 4 | 4 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-random.sh` | 17 | 17 | 4 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-shapes.sh` | 57 | 57 | 14 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-timing.sh` | 37 | 35 | 9 | 2 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/video.sh` | 20 | 10 | 1 | 8 | 0 | 2 | 0 | 0 | 2 | 2/2 |
+| `word/charts.sh` | 46 | 38 | 0 | 8 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/content-controls.sh` | 21 | 12 | 0 | 0 | 8 | 0 | 1 | 0 | 2 | 2/2 |
+| `word/diagram.sh` | 50 | 27 | 0 | 0 | 23 | 0 | 0 | 0 | 0 | 2/2 |
+| `word/document-formatting.sh` | 17 | 7 | 0 | 10 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/fields.sh` | 39 | 34 | 0 | 3 | 0 | 2 | 0 | 0 | 2 | 2/2 |
+| `word/formulas.sh` | 171 | 91 | 0 | 0 | 80 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/numbering.sh` | 70 | 39 | 0 | 0 | 3 | 28 | 0 | 0 | 1 | 2/2 |
+| `word/paragraph-formatting.sh` | 78 | 55 | 0 | 23 | 0 | 0 | 0 | 0 | 0 | 2/2 |
+| `word/pictures.sh` | 31 | 25 | 0 | 6 | 0 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/revisions.sh` | 73 | 36 | 0 | 15 | 16 | 6 | 0 | 0 | 2 | 2/2 |
+| `word/run-formatting.sh` | 80 | 57 | 0 | 23 | 0 | 0 | 0 | 0 | 0 | 2/2 |
+| `word/sections.sh` | 33 | 29 | 0 | 1 | 3 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/tables.sh` | 357 | 211 | 3 | 109 | 37 | 0 | 0 | 0 | 6 | 6/6 |
+| `word/textbox.sh` | 67 | 17 | 0 | 0 | 11 | 0 | 39 | 0 | 1 | 2/2 |
+| **total** | **6431** | **4413** | **344** | **1295** | **371** | **201** | **151** | **0** | **177** | **200/200** |

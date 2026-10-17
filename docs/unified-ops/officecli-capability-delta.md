@@ -179,14 +179,14 @@ Element gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 2 | 5 | 2 | 0 | 4 | 0 |
-| doc | 1 | 11 | 1 | 0 | 4 | 0 |
-| rtf | 1 | 11 | 1 | 0 | 4 | 0 |
-| xlsx | 1 | 2 | 4 | 0 | 0 | 0 |
-| xlsb | 1 | 3 | 4 | 0 | 0 | 0 |
-| xls | 8 | 0 | 4 | 0 | 0 | 0 |
-| pptx | 1 | 0 | 3 | 0 | 1 | 0 |
-| ppt | 1 | 6 | 3 | 0 | 1 | 0 |
+| docx | 1 | 5 | 2 | 0 | 5 | 0 |
+| doc | 0 | 11 | 1 | 0 | 5 | 0 |
+| rtf | 0 | 11 | 1 | 0 | 5 | 0 |
+| xlsx | 0 | 2 | 4 | 0 | 1 | 0 |
+| xlsb | 0 | 3 | 4 | 0 | 1 | 0 |
+| xls | 7 | 0 | 4 | 0 | 1 | 0 |
+| pptx | 0 | 0 | 3 | 0 | 2 | 0 |
+| ppt | 0 | 6 | 3 | 0 | 2 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -195,9 +195,9 @@ Element gap rows:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 1 | 2 | 3 | 0 | 1 | 0 |
-| ods | 8 | 0 | 4 | 0 | 0 | 0 |
-| odt | 1 | 9 | 1 | 0 | 4 | 0 |
+| odp | 0 | 2 | 3 | 0 | 2 | 0 |
+| ods | 7 | 0 | 4 | 0 | 1 | 0 |
+| odt | 0 | 9 | 1 | 0 | 5 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -232,7 +232,7 @@ All gap rows by tier:
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
 | P0 | 32 | 0 | 0 | 0 | 4 | 0 |
-| P1 | 445 | 6031 | 0 | 0 | 44 | 0 |
+| P1 | 434 | 6031 | 0 | 0 | 55 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -254,7 +254,7 @@ properties share its entry unless an entry names the property):
 | docx-breadth | deferred | 0332 | 575 | `delta:docx:*` | DOCX P1/P2 surface and formatting breadth beyond §13 P0 |
 | xlsx-breadth | deferred | 0332 | 370 | `delta:xlsx:*` | XLSX P1/P2 surface and formatting breadth beyond §13 P0 |
 | pptx-breadth | deferred | 0332 | 471 | `delta:pptx:*` | PPTX P1/P2 surface and formatting breadth beyond §13 P0 |
-| raw-layer | planned | WP5 | 11 | `delta:*:raw` | the raw XML layer (`raw`, `raw-set`, `add-part`, `validate`): design §12, audit WP5 |
+| raw-layer | out-of-scope | 0336 | 11 | `delta:*:raw` | the raw XML layer is the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336: OOXML parts, packaged ODF reads), not an element of the node tree |
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
 | docx-p0-residue | planned | WP4 | 8 | `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:hyperlink.*`, `delta:docx:table.style` | DOCX P0/v1 residue: table columns, table and row writes, style and list application (chart series and axes, comment set and picture set/remove closed in record 0335) |
@@ -303,7 +303,7 @@ properties share its entry unless an entry names the property):
 | permStart |  | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | picture | picture | supported |  |  |  |
 | ptab |  | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | revision | revision | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
 | run | run | supported |  |  |  |
 | sdt | sdt | supported |  |  |  |
@@ -407,7 +407,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | permStart |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
 | picture | run | supported |  |  |  |
 | ptab |  | gap | P1 | deferred-P1 0324 (doc-family) | record 0324 (deferred-P1) |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | revision |  | gap | P2 | deferred-P2 0324 (doc-family) | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
 | run | run | supported |  |  |  |
 | sdt |  | gap | P1 | deferred-P1 0324 (doc-family) | none: content controls are DOCX-only |
@@ -479,7 +479,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | permStart |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1) |
 | picture | picture | supported |  |  |  |
 | ptab |  | gap | P1 | deferred-P1 0328 (rtf-family) | record 0328 (deferred-P1) |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | revision |  | gap | P2 | deferred-P2 0328 (rtf-family) | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
 | run | run | supported |  |  |  |
 | sdt |  | gap | P1 | deferred-P1 0328 (rtf-family) | none: content controls are DOCX-only |
@@ -575,7 +575,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |  |  |
 | pivottable | pivottable | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
 | range | range | supported |  |  |  |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
 | run | run | supported |  |  |  |
@@ -658,7 +658,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |  |  |
 | pivottable | pivottable | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
 | range | range | supported |  |  |  |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
 | run | run | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
@@ -745,7 +745,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |  |  |
 | pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
 | range | range | supported |  |  |  |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
 | run | run | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
@@ -813,7 +813,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |  |  |
 | placeholder | placeholder | supported |  |  |  |
 | presentation | presentation | supported |  |  |  |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | slide | slide | supported |  |  |  |
@@ -885,7 +885,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |  |  |
 | placeholder | placeholder | supported |  |  |  |
 | presentation | presentation | supported |  |  |  |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | slide | slide | supported |  |  |  |
@@ -1196,7 +1196,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |  |  |
 | placeholder | placeholder | supported |  |  |  |
 | presentation | presentation | supported |  |  |  |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | slide | slide | supported |  |  |  |
@@ -1267,7 +1267,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |  |  |
 | pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
 | range | range | supported |  |  |  |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
 | run | run | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
@@ -1342,7 +1342,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | permStart |  | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
 | picture | picture | supported |  |  |  |
 | ptab |  | gap | P1 | deferred-P1 0328 (odt-family) | none: not an OpenDocument text element (record 0339) |
-| raw |  | out of scope | P1 | planned WP5 (raw-layer) | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | revision |  | gap | P2 | deferred-P2 0328 (odt-family) | record 0328 follow-up: ODT tracked changes as revision nodes (P2) |
 | run | run | supported |  |  |  |
 | sdt |  | gap | P1 | deferred-P1 0328 (odt-family) | none: content controls are DOCX-only |

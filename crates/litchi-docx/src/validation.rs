@@ -719,7 +719,10 @@ fn relationship_target_content_type_matches(reltype: &str, content_type: &str) -
         return content_type == ct::OFC_OLE_OBJECT;
     }
     if is_office_relationship(reltype, rt::PACKAGE, "package") {
-        return content_type == ct::OFC_PACKAGE;
+        // An embedded package names its own format: Word types a chart's
+        // embedded workbook `spreadsheetml.sheet`, not the generic package
+        // type (record 0336).
+        return content_type == ct::OFC_PACKAGE || is_embedded_package_content_type(content_type);
     }
     if reltype == rt::VBA_PROJECT {
         return content_type == ct::OFC_VBA_PROJECT;
@@ -761,6 +764,19 @@ fn is_known_active_x_relationship(reltype: &str) -> bool {
                 "control" | "activeXControlBinary" | "activeXControl" | "activeX"
             )
         })
+}
+
+fn is_embedded_package_content_type(value: &str) -> bool {
+    matches!(
+        value,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            | "application/vnd.ms-excel.sheet.macroEnabled.12"
+            | "application/vnd.ms-excel.sheet.binary.macroEnabled.12"
+            | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            | "application/vnd.ms-word.document.macroEnabled.12"
+            | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            | "application/vnd.ms-powerpoint.presentation.macroEnabled.12"
+    )
 }
 
 fn is_image_content_type(value: &str) -> bool {

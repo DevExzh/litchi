@@ -784,3 +784,46 @@ impl ReadAt for MutatingSource {
         ))
     }
 }
+
+/// `validate_parts` reports a dangling internal relationship and a malformed
+/// XML part, and nothing for a well-formed package (record 0336).
+#[test]
+fn part_validation_reports_dangling_targets_and_malformed_xml() {
+    let clean = package_bytes(CONTENT_TYPES, ROOT_RELS, b"<document/>");
+    let package = litchi_opc::OpcPackage::from_bytes(&clean).unwrap();
+    let report = litchi_opc::validate_parts(&package, ValidationLimits::default()).unwrap();
+    assert!(report.is_complete());
+    assert!(report.issues().is_empty());
+
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
+    writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
+    writer
+        .write_stored("word/document.xml", b"<document><p></document>")
+        .unwrap();
+    writer
+        .write_stored(
+            "word/_rels/document.xml.rels",
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>"#,
+        )
+        .unwrap();
+    let broken = writer.finish_to_bytes().unwrap();
+    let package = litchi_opc::OpcPackage::from_bytes(&broken).unwrap();
+    let report = litchi_opc::validate_parts(&package, ValidationLimits::default()).unwrap();
+    let codes: Vec<&str> = report.issues().iter().map(|issue| issue.code()).collect();
+    assert!(
+        codes.contains(&"opc.relationship.target_missing"),
+        "{codes:?}"
+    );
+    assert!(codes.contains(&"opc.xml.malformed"), "{codes:?}");
+    assert!(report.has_errors());
+    let dangling = report
+        .issues()
+        .iter()
+        .find(|issue| issue.code() == "opc.relationship.target_missing")
+        .unwrap();
+    assert_eq!(dangling.locations()[0].part(), Some("/word/document.xml"));
+    assert_eq!(dangling.locations()[0].path(), Some("rId7"));
+}

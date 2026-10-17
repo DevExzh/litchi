@@ -140,6 +140,7 @@ litchi-xls          = { workspace = true, optional = true }
 litchi-xlsb         = { workspace = true, optional = true }
 litchi-xlsx         = { workspace = true, optional = true }
 memchr              = { workspace = true } # Markdown HTML escaping; find/replace literal search
+quick-xml           = { workspace = true } # Raw layer: part addressing and `raw_set` splices (record 0336)
 serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
 
 [dev-dependencies]
@@ -247,3 +248,13 @@ required-features = ["docx", "pptx", "xlsx"]
 [[example]]
 name              = "xlsb_features_bench"
 required-features = ["xlsb"]
+
+# `File::dump` against a read-only traversal (record 0336).
+[[example]]
+name              = "dump_bench"
+required-features = ["docx", "xlsx", "pptx"]
+
+# `File::dump` round trips over corpus files and built documents (record 0336).
+[[test]]
+name              = "dump_round_trip"
+required-features = ["docx", "xlsx", "xlsb", "pptx", "ods", "odt", "rtf", "doc", "xls", "ppt", "odp", "odg"]

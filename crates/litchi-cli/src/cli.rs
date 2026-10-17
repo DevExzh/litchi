@@ -81,6 +81,23 @@ pub(crate) enum Command {
     /// fields, PPTX slide numbers and dates, workbook formula caches
     /// (record 0279).
     Refresh(crate::refresh::Refresh),
+    /// Write the document out as a replayable OfficeCLI v2 batch (a JSON
+    /// array `batch` reads; record 0336).
+    Dump(Dump),
+    /// Print a package part's XML, or list the parts (record 0336).
+    Raw(Raw),
+    /// Edit the XML of one part at every element an XPath matches
+    /// (OfficeCLI `raw-set`; record 0336).
+    #[command(name = "raw-set")]
+    RawSet(RawSet),
+    /// Add a package part with its content type and relationship, and print
+    /// its relationship id (OfficeCLI `add-part`; record 0336).
+    #[command(name = "add-part")]
+    AddPart(AddPart),
+    /// Check the package structure read-only: ingress, content types,
+    /// relationships and their targets, XML well-formedness and the format
+    /// owner's checks. Exits 1 when an error is found (record 0336).
+    Validate(Validate),
 }
 
 /// What `set`, `add` and `batch` do with a property the target does not
@@ -317,6 +334,88 @@ pub(crate) struct Schema {
     /// The format whose registry to print, for example docx.
     #[arg(value_name = "TYPE")]
     pub(crate) format: String,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct Dump {
+    /// The document.
+    pub(crate) file: PathBuf,
+    /// The subtree to dump; only `/`, the whole document, is supported.
+    #[arg(default_value = "/")]
+    pub(crate) path: String,
+    /// The output format; only `batch`.
+    #[arg(long, value_name = "FORMAT", default_value = "batch")]
+    pub(crate) format: String,
+    /// Write the batch to this file instead of standard output (`-` is
+    /// standard output).
+    #[arg(long, short = 'o', value_name = "FILE")]
+    pub(crate) out: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct Raw {
+    /// The document.
+    pub(crate) file: PathBuf,
+    /// The part: a part name (`/word/document.xml`) or an alias
+    /// (`/document`, `/styles`, `/slide[1]`, `/Sheet1`, `/content`).
+    /// Without it, the parts are listed.
+    pub(crate) part: Option<String>,
+    /// Write the part's bytes to this file instead of printing them.
+    #[arg(long, short = 'o', value_name = "FILE")]
+    pub(crate) out: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct RawSet {
+    /// The document.
+    pub(crate) file: PathBuf,
+    /// The part: a part name or an alias, as for `raw`.
+    pub(crate) part: String,
+    /// The XPath of the elements to edit, for example `//w:body`.
+    #[arg(long, value_name = "XPATH")]
+    pub(crate) xpath: String,
+    /// append, prepend, insertbefore, insertafter, replace, remove or
+    /// setattr.
+    #[arg(long, value_name = "ACTION")]
+    pub(crate) action: String,
+    /// The XML fragment, or `name=value` for setattr.
+    #[arg(long, value_name = "XML")]
+    pub(crate) xml: Option<String>,
+    #[command(flatten)]
+    pub(crate) output: Output,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct AddPart {
+    /// The document.
+    pub(crate) file: PathBuf,
+    /// The part the new one is related from: a part name or alias, or `/`
+    /// for the package itself.
+    pub(crate) parent: String,
+    /// The part type: chart, header or footer (OfficeCLI's), or custom with
+    /// `--content-type`, `--relationship`, `--name` and `--data`.
+    #[arg(long = "type", value_name = "TYPE")]
+    pub(crate) kind: String,
+    /// The new part's name (required for custom parts).
+    #[arg(long, value_name = "PART")]
+    pub(crate) name: Option<String>,
+    /// A custom part's content type.
+    #[arg(long, value_name = "TYPE")]
+    pub(crate) content_type: Option<String>,
+    /// A custom part's relationship type.
+    #[arg(long, value_name = "URI")]
+    pub(crate) relationship: Option<String>,
+    /// A file holding a custom part's payload.
+    #[arg(long, value_name = "FILE")]
+    pub(crate) data: Option<PathBuf>,
+    #[command(flatten)]
+    pub(crate) output: Output,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct Validate {
+    /// The document.
+    pub(crate) file: PathBuf,
 }
 
 #[cfg(test)]
