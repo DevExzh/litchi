@@ -773,6 +773,13 @@ impl<'a> ParagraphFormat<'a> {
         crate::edit::ParagraphLayout::from_raw(self.raw)
     }
 
+    /// Custom tab stops in declaration order (`\\txN` with its alignment
+    /// and leader controls, record 0328).
+    #[must_use]
+    pub fn tab_stops(self) -> &'a [crate::TabStop] {
+        self.raw.tab_stops.as_slice()
+    }
+
     /// Local paragraph alignment.
     #[must_use]
     pub const fn alignment(self) -> Alignment {

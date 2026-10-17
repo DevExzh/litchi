@@ -384,7 +384,11 @@ fn native_object(
 }
 
 /// Append `drawable` to the slide's owned drawables and z-order (front).
-fn attach(workspace: &mut Workspace<'_>, slide: u64, drawable: u64) -> Result<(), StructureError> {
+pub(super) fn attach(
+    workspace: &mut Workspace<'_>,
+    slide: u64,
+    drawable: u64,
+) -> Result<(), StructureError> {
     let wire = workspace.wire;
     let limits = workspace.archive_limits();
     let object = workspace.require(slide)?;

@@ -186,6 +186,9 @@ impl<'f> Nav<'f> {
                 })
             },
             (Kind::Comment, select) => self.comment(position, &sheet.name, select)?,
+            (kind, select) if super::features::is_feature(kind) => {
+                super::features::lookup(self.file, position, kind, select)?
+            },
             (Kind::MergeCell, select) => {
                 let merges = sheet_index(self.file, position)?.merges();
                 let ordinal = match select {
@@ -302,6 +305,12 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     .count();
                 out.kind("comment", count);
             },
+            (Item::Sheet(_), kind) if super::features::is_feature(kind) => {
+                out.kind(
+                    super::features::step_name(kind),
+                    super::features::count(self.file, parent.sheet_position(), kind)?,
+                );
+            },
             _ => {},
         }
         Ok(())
@@ -337,6 +346,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
                 .comment()?
                 .map(|entry| Cow::Owned(entry.annotation().text())),
             Item::Merge(merge) => Some(Cow::Owned(super::node::joined_text(node, merge.rect)?)),
+            Item::Feature(feature) => feature.text().map(|text| Cow::Owned(text.into_owned())),
             Item::Workbook | Item::Range(_) => None,
         })
     }

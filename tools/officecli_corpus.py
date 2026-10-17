@@ -29,12 +29,24 @@ those rows and classifies every call that did not pass:
   claims is still a bug, and any other unexplained failure stays a bug;
 - **bug**: anything else.
 
+Every delta, named gap and element/property group carries a disposition from
+``tools/officecli_dispositions.json`` (record 0332, shared with
+``tools/officecli_capability_delta.py``): a group whose element or property
+OfficeCLI's help schema names inherits the capability delta's disposition
+for that row unless a corpus entry names the property. The file also gives
+every script a design §13 tier; the scripts of tier P0 or v1 form the
+v1-scope subset (design §14), reported green when every line passes or
+carries only wontfix, deferred or out-of-scope classes, red otherwise.
+
 It writes ``docs/unified-ops/officecli-corpus-deltas.md``: the summary per
-script family, per format and per script, the deltas, the gaps with their
-registry follow-ups, the bugs, and the record 0256 follow-ups the corpus
-hits. ``--check`` regenerates it in memory and fails when the committed file
-differs, or when any call is a panic or ``internal_error`` (the Rust test
-refuses those before they can be recorded)::
+script family, per format and per script, the v1-scope subset, the deltas,
+the gaps with their registry follow-ups and dispositions, the bugs, and the
+record 0256 follow-ups the corpus hits. ``--check`` regenerates it in memory
+and fails when the committed file differs, when any call is a panic or
+``internal_error`` (the Rust test refuses those before they can be
+recorded), when a class has no valid disposition (a P0 or v1 class is never
+deferred or wontfix, a recorded delta is wontfix or out-of-scope), or when
+a ``corpus:`` disposition or tier key or a script key matches nothing::
 
     LITCHI_BLESS=1 cargo test -p litchi-cli --test officecli_corpus
     python3 tools/officecli_corpus.py           # or --check
@@ -60,19 +72,24 @@ REPO = Path(__file__).resolve().parent.parent
 OUTCOMES = Path("crates/litchi-cli/tests/officecli_corpus/outcomes.tsv")
 SHIM = Path("crates/litchi-cli/tests/officecli_corpus/officecli")
 REGISTRY = Path("crates/litchi-ops/tests/golden/registry")
-HELP = Path("test-data/officecli/schemas/help")
+VENDORED = Path("test-data/officecli")
+HELP = VENDORED / "schemas" / "help"
 UPSTREAM_COMMIT = Path("test-data/officecli/UPSTREAM_COMMIT")
 OUTPUT = Path("docs/unified-ops/officecli-corpus-deltas.md")
 
 FORMATS = ("docx", "xlsx", "pptx")
 LITCHI_VERBS = {
     "create", "get", "query", "view", "set", "add", "remove", "move", "swap",
-    "batch", "capabilities", "schema",
+    "batch", "capabilities", "schema", "import", "evaluate", "recalculate", "merge",
+    "refresh",
 }
 # Separates a failed call's own property from the properties it skipped.
 SKIPPED_SEPARATOR = ";skipped:"
 CASCADE_CODES = {"path_not_found", "missing_argument", "unsupported_path", "out_of_range"}
 FATAL = {"panic", "internal_error", "timeout", "lost"}
+# The property name a skipped list's `+N` count stands for: the outcome's
+# 48-character detail bound left those names out.
+MORE = "(more)"
 
 # OfficeCLI element words (`--type`, path steps) that name a registry
 # element differently.
@@ -258,6 +275,8 @@ class Verdict:
     kind: str  # passed, warned, resident, delta, gap, cascade, bug
     rule: str  # rule id or a group key
     note: str = ""
+    # A cascade's root: the index of the refused `add` or `batch` it follows.
+    root: int | None = None
 
 
 @dataclass
@@ -407,10 +426,11 @@ RULES: list[Rule] = [
     ),
     When(
         "G1", "gap", "Missing verbs",
-        "`validate`, `raw-set`, `raw`, `add-part`, `dump` (and `import`, `merge`, "
-        "`refresh`, `help`, ...)",
-        "absent from the CLI: `litchi-ops` has no API for them yet "
-        "(record 0256 D6; record 0015 §2.3; Phase E)",
+        "the raw layer (`validate`, `raw`, `raw-set`, `add-part`, design §12) and `dump` "
+        "(the verbs the corpus calls are counted per verb in the dispositions below)",
+        "absent from `litchi-ops`, the CLI and Python (audit WP5; record 0015 W10). "
+        "`import`, `evaluate`, `recalculate` (record 0266), `merge` (record 0274) and "
+        "`refresh` (record 0279) have landed and are not in this class",
         lambda c, e: c.result == "usage" and c.verb not in LITCHI_VERBS,
     ),
     When(
@@ -526,10 +546,19 @@ def cross_check(call: Call, registry: Registry | None) -> Verdict:
     return Verdict("gap", key, f"registry: no {op or verb} on {element['element']}")
 
 
+def last_failed_add(indices: list[int], calls: list[Call]) -> int | None:
+    """The index of the latest refused ``add`` or ``batch`` among ``indices``."""
+    for index in reversed(indices):
+        if calls[index].refused and calls[index].verb in ("add", "batch"):
+            return index
+    return None
+
+
 def classify(calls: list[Call], registries: dict[str, Registry]) -> list[Verdict]:
     verdicts = []
     earlier_by_script: dict[str, list[Call]] = defaultdict(list)
-    for call in calls:
+    indices_by_script: dict[str, list[int]] = defaultdict(list)
+    for position, call in enumerate(calls):
         earlier = earlier_by_script[call.script]
         verdict = None
         if call.result in FATAL:
@@ -544,7 +573,8 @@ def classify(calls: list[Call], registries: dict[str, Registry]) -> list[Verdict
                     verdict = Verdict(rule.kind, rule.id)
                     break
         if verdict is None and call.result in CASCADE_CODES and failed_add(earlier):
-            verdict = Verdict("cascade", "after a refused add or batch")
+            verdict = Verdict("cascade", "after a refused add or batch",
+                              root=last_failed_add(indices_by_script[call.script], calls))
         if verdict is None and (
             call.result.startswith("unsupported_") or call.result == "unsupported_property"
         ):
@@ -556,6 +586,7 @@ def classify(calls: list[Call], registries: dict[str, Registry]) -> list[Verdict
             verdict = Verdict("bug", "untriaged", f"{call.result} {call.detail}".strip())
         verdicts.append(verdict)
         earlier.append(call)
+        indices_by_script[call.script].append(position)
     return verdicts
 
 
@@ -680,32 +711,342 @@ def unclaimed(calls: list[Call], registries: dict[str, Registry]) -> list[tuple[
     return found
 
 
-def skipped_verdicts(calls: list[Call],
-                     loaded: dict[str, Registry] | None) -> list[tuple[Call, Verdict]]:
-    """One verdict per property a warned call (or a call that failed after
+def call_skipped(call: Call, loaded: dict[str, Registry] | None) -> list[tuple[Call, Verdict]]:
+    """One verdict per property one warned call (or a call that failed after
     skipping) skipped, cross-checked as if the call had been refused for it;
     the group key's refusal is `warned` (or `skipped`)."""
     found = []
-    for call in calls:
-        refusal = "|skipped|" if call.failed_after_skipping else "|warned|"
-        for name in call.skipped():
-            if name.startswith("+"):
-                name = "(more)"
-            refused = Call(call.script, call.line, call.verb, call.fmt, call.kind,
-                           "unsupported_property", name, call.target)
-            verdict = cross_check(refused, (loaded or {}).get(call.fmt))
-            if verdict.kind == "bug":
-                verdict = Verdict("bug", verdict.rule, f"skipped {name}: {verdict.note}")
-                found.append((refused, verdict))
-                continue
-            key = verdict.rule.replace("|unsupported_property|", refusal, 1)
-            found.append((call, Verdict(verdict.kind, key, verdict.note)))
+    refusal = "|skipped|" if call.failed_after_skipping else "|warned|"
+    for name in call.skipped():
+        if name.startswith("+"):
+            name = MORE
+        refused = Call(call.script, call.line, call.verb, call.fmt, call.kind,
+                       "unsupported_property", name, call.target)
+        verdict = cross_check(refused, (loaded or {}).get(call.fmt))
+        if verdict.kind == "bug":
+            verdict = Verdict("bug", verdict.rule, f"skipped {name}: {verdict.note}")
+            found.append((refused, verdict))
+            continue
+        key = verdict.rule.replace("|unsupported_property|", refusal, 1)
+        found.append((call, Verdict(verdict.kind, key, verdict.note)))
     return found
+
+
+def skipped_verdicts(calls: list[Call],
+                     loaded: dict[str, Registry] | None) -> list[tuple[Call, Verdict]]:
+    """``call_skipped`` for every call, in order."""
+    return [pair for call in calls for pair in call_skipped(call, loaded)]
+
+
+Resolution = capability_delta.Resolution
+# A `(more)` group hides the properties the detail bound left out, so no
+# disposition can account for it.
+UNVERIFIED = "unverified"
+
+
+class CorpusDispositions:
+    """Dispositions of the corpus gap classes (record 0332).
+
+    A named class (a ``RULES`` entry; ``G1`` per verb) is keyed
+    ``corpus:<id>`` (``corpus:G1|<verb>``). An element or property group is
+    keyed ``corpus:<format>|<verb>|<element>|<refusal>|<property>``. A group
+    whose property (or element) OfficeCLI's schema names takes the
+    disposition of that row of the capability delta, unless a corpus entry
+    names the property literally; otherwise a corpus entry classifies it."""
+
+    def __init__(self, dispositions: "capability_delta.Dispositions",
+                 deltas: list, loaded: dict[str, Registry]):
+        self.dispositions = dispositions
+        self.registries = loaded
+        self.elements: dict[tuple[str, str], Resolution] = {}
+        self.properties: dict[tuple[str, str, str], Resolution] = {}
+        for delta in deltas:
+            for index, row in enumerate(delta.elements):
+                resolution = (delta.element_dispositions or [None] * len(delta.elements))[index]
+                if row[0] and resolution is not None:
+                    self.elements[(delta.name, row[0])] = resolution
+            for index, row in enumerate(delta.properties):
+                resolution = (delta.property_dispositions or [None] * len(delta.properties))[index]
+                if resolution is not None:
+                    self.properties[(delta.name, row[0], row[1])] = resolution
+        self.cache: dict[str, Resolution] = {}
+
+    def officecli_names(self, fmt: str, element: str, prop: str) -> tuple[str | None, str | None]:
+        """The OfficeCLI element and canonical property a group names."""
+        registry = self.registries.get(fmt)
+        schema = registry.officecli.get(word(element)) if registry and element else None
+        if schema is None:
+            return None, None
+        if not prop:
+            return schema.name, None
+        wanted = word(prop)
+        for name, spec in schema.properties.items():
+            aliases = spec.get("aliases", []) if isinstance(spec, dict) else []
+            if wanted in {word(name), *map(word, aliases if isinstance(aliases, list) else [])}:
+                return schema.name, name
+        return schema.name, None
+
+    def tier(self, key: str, fmt: str, element: str | None, prop: str | None) -> str:
+        tier = self.dispositions.keyed_tier(f"corpus:{key}")
+        if tier is None and element:
+            tier = self.dispositions.tier(fmt, element, prop, mark=False)
+        return tier or ""
+
+    def group(self, key: str) -> Resolution:
+        if key in self.cache:
+            return self.cache[key]
+        fmt, verb, element, refusal, prop = key.split("|", 4)
+        if prop == MORE:
+            resolution = Resolution(None, "", via=UNVERIFIED)
+        else:
+            schema, canonical = self.officecli_names(fmt, element, prop)
+            literal = dict(where=lambda pattern: capability_delta.specificity(pattern)[0] > 0)
+            own = self.dispositions.entries.best(f"corpus:{key}", mark=False, **literal) if prop else None
+            inherited = None
+            if own is None and schema is not None:
+                if canonical is not None:
+                    inherited = self.properties.get((fmt, schema, canonical))
+                elif not prop:
+                    inherited = self.elements.get((fmt, schema))
+            if inherited is not None and inherited.disposition is not None:
+                where = f"{schema}.{canonical}" if canonical else schema
+                resolution = Resolution(inherited.disposition, inherited.tier, inherited.ref,
+                                        inherited.entry, inherited.reason, via=f"delta `{where}`")
+            else:
+                tier = self.tier(key, fmt, schema or element, canonical or prop or None)
+                resolution = (self.dispositions.resolve(f"corpus:{key}", tier)
+                              or Resolution(None, tier))
+        self.cache[key] = resolution
+        return resolution
+
+    def rule(self, rule: Rule, call: Call | None = None) -> Resolution:
+        key = f"{rule.id}|{call.verb}" if rule.id == "G1" and call is not None else rule.id
+        if key in self.cache:
+            return self.cache[key]
+        tier = "" if rule.kind == "delta" else (self.dispositions.keyed_tier(f"corpus:{key}") or "")
+        resolution = self.dispositions.resolve(f"corpus:{key}", tier) or Resolution(None, tier)
+        self.cache[key] = resolution
+        return resolution
+
+
+RULES_BY_ID = {rule.id: rule for rule in RULES}
+
+
+def line_classes(index: int, calls: list[Call], verdicts: list[Verdict],
+                 classes: CorpusDispositions, loaded: dict[str, Registry] | None,
+                 seen: frozenset = frozenset()) -> list[tuple[str, Resolution | None]]:
+    """The gap classes one call that did not pass carries, with their
+    dispositions (None: a bug). A cascade carries its root's classes."""
+    call, verdict = calls[index], verdicts[index]
+    found: list[tuple[str, Resolution | None]] = []
+    if verdict.kind == "bug":
+        return [("bug", None)]
+    if verdict.kind == "cascade":
+        if verdict.root is None or verdict.root in seen:
+            return [("cascade without a root", None)]
+        return line_classes(verdict.root, calls, verdicts, classes, loaded, seen | {index})
+    if verdict.rule in RULES_BY_ID and verdict.rule != "F3b":
+        rule = RULES_BY_ID[verdict.rule]
+        name = f"G1|{call.verb}" if rule.id == "G1" else rule.id
+        found.append((name, classes.rule(rule, call)))
+    elif "|" in verdict.rule:
+        found.append((verdict.rule, classes.group(verdict.rule)))
+    if verdict.kind == "warned" or call.failed_after_skipping:
+        for _, skipped in call_skipped(call, loaded):
+            if skipped.kind == "bug":
+                found.append(("bug", None))
+            else:
+                found.append((skipped.rule, classes.group(skipped.rule)))
+    return found or [("unclassified", None)]
+
+
+@dataclass
+class Subset:
+    """The v1-scope corpus subset (record 0332)."""
+
+    scripts: dict[str, str]  # script -> tier
+    lines: list[tuple[int, str, list]]  # (call index, state, classes)
+
+    @property
+    def green(self) -> bool:
+        return all(state != "open" for _, state, _ in self.lines)
+
+
+def v1_subset(calls: list[Call], verdicts: list[Verdict], classes: CorpusDispositions,
+              loaded: dict[str, Registry] | None) -> Subset:
+    """Every counted line of a script whose tier is P0 or v1: passed, or
+    accounted (each class it carries is wontfix, deferred or out-of-scope),
+    or open."""
+    scripts: dict[str, str] = {}
+    for call in calls:
+        if call.script not in scripts:
+            scripts[call.script] = classes.dispositions.script_tier(call.script) or ""
+    lines = []
+    for index, (call, verdict) in enumerate(zip(calls, verdicts)):
+        if scripts[call.script] not in capability_delta.V1_TIERS:
+            continue
+        if call.readback or verdict.kind == "resident" or verdict.rule == "D5":
+            continue
+        if call.passed:
+            lines.append((index, "passed", []))
+            continue
+        found = line_classes(index, calls, verdicts, classes, loaded)
+        accounted = all(resolution is not None and resolution.accounted for _, resolution in found)
+        lines.append((index, "accounted" if accounted else "open", found))
+    return Subset(scripts, lines)
+
+
+def blocker(found: list[tuple[str, Resolution | None]]) -> str:
+    """Why an open line is open: the first class that does not account for it."""
+    for name, resolution in found:
+        if resolution is None:
+            return "bug"
+        if resolution.accounted:
+            continue
+        if resolution.via == UNVERIFIED:
+            return "unverified: skipped properties beyond the outcome's 48-character detail bound"
+        if resolution.disposition is None:
+            return f"no disposition (`{name}`)"
+        return f"{resolution.disposition} {resolution.ref}".strip()
+    return "unclassified"
+
+
+def account(found: list[tuple[str, Resolution | None]]) -> str:
+    """The column an accounted line counts in: its most deferred class."""
+    values = {resolution.disposition for _, resolution in found if resolution is not None}
+    for value in ("deferred-P2", "deferred-P1", "wontfix", "out-of-scope"):
+        if value in values:
+            return value
+    return "out-of-scope"
+
+
+def corpus_problems(calls: list[Call], verdicts: list[Verdict], classes: CorpusDispositions,
+                    loaded: dict[str, Registry] | None) -> list[str]:
+    """What ``--check`` refuses about the corpus dispositions."""
+    problems: list[str] = []
+    checked: set[str] = set()
+
+    def check(name: str, resolution: Resolution, kind: str) -> None:
+        if name in checked:
+            return
+        checked.add(name)
+        if resolution.via == UNVERIFIED:
+            return
+        if kind == "delta":
+            if resolution.disposition is None:
+                problems.append(f"corpus {name}: no disposition")
+            elif resolution.disposition not in ("wontfix", "out-of-scope"):
+                problems.append(f"corpus {name}: a recorded delta is wontfix or out-of-scope, "
+                                f"not `{resolution.disposition}`")
+            return
+        if kind == "gap" and not resolution.tier and resolution.disposition is not None:
+            problems.append(f"corpus {name}: no tier")
+        problems.extend(capability_delta.resolution_problems(f"corpus {name}", resolution))
+
+    for index, (call, verdict) in enumerate(zip(calls, verdicts)):
+        if verdict.rule in RULES_BY_ID and verdict.rule != "F3b":
+            rule = RULES_BY_ID[verdict.rule]
+            name = f"G1|{call.verb}" if rule.id == "G1" else rule.id
+            check(name, classes.rule(rule, call), rule.kind)
+        elif verdict.kind == "gap" and "|" in verdict.rule:
+            check(verdict.rule, classes.group(verdict.rule), "gap")
+        if call.detail == "translated:D4":
+            check("D4", classes.rule(RULES_BY_ID["D4"]), "delta")
+        for _, skipped in call_skipped(call, loaded):
+            if skipped.kind == "gap":
+                check(skipped.rule, classes.group(skipped.rule), "gap")
+    dispositions = classes.dispositions
+    for script in sorted({call.script for call in calls}):
+        if dispositions.script_tier(script) is None:
+            problems.append(f"corpus script {script}: no tier")
+    problems += [f"stale disposition key `{key}`: it classifies no corpus class"
+                 for key in dispositions.entries.unused(prefix="corpus:")]
+    problems += [f"stale tier key `{key}`: it classifies no corpus class"
+                 for key in dispositions.tiers.unused(prefix="corpus:")]
+    problems += [f"stale corpus script key `{key}`: it matches no script"
+                 for key in dispositions.scripts.unused()]
+    return problems
+
+
+def cell(resolution: Resolution | None) -> str:
+    if resolution is None:
+        return ""
+    text = resolution.cell()
+    if resolution.via == UNVERIFIED:
+        return "unverified (detail bound)"
+    if resolution.via:
+        text += f" via {resolution.via}"
+    return text
+
+
+def render_subset(subset: Subset, calls: list[Call], dispositions) -> list[str]:
+    """The v1-scope subset: its definition, its status and its open lines."""
+    out = ["", "## v1-scope subset (design §14)", ""]
+    open_lines = [line for line in subset.lines if line[1] == "open"]
+    status = "green" if subset.green else "red"
+    out += [
+        "Design §14 requires the v1-scope subset of the corpus green, with every remaining "
+        "delta recorded. The subset is every counted line of the scripts whose tier "
+        f"(`corpusScripts` in `{capability_delta.DISPOSITIONS.as_posix()}`) is P0 or v1 "
+        "(design §13). A line is **accounted** when every gap class it carries (its delta, "
+        "named gap or element/property group; each property a warned call skipped; for a "
+        "cascade, the refused call it follows) is `wontfix`, `deferred-P1`, `deferred-P2` "
+        "or `out-of-scope`, and **open** otherwise (a `planned` class, a bug, a class without "
+        "a disposition, or skipped properties the outcome's detail bound left out). The "
+        "subset is green when no line is open.",
+        "",
+        f"**Status: {status}.** {len(subset.lines)} v1 lines: "
+        f"{sum(1 for line in subset.lines if line[1] == 'passed')} passed, "
+        f"{sum(1 for line in subset.lines if line[1] == 'accounted')} accounted, "
+        f"{len(open_lines)} open.",
+        "",
+        "Script tiers:",
+        "",
+        "| Scripts | Tier | Basis | Scripts matched |",
+        "|---|---|---|---:|",
+    ]
+    for entry in dispositions.data.get("corpusScripts", []):
+        keys = ", ".join(f"`{key}`" for key in entry["keys"])
+        matched = sum(1 for script in subset.scripts
+                      if dispositions.scripts.best(script, mark=False)
+                      and dispositions.scripts.best(script, mark=False)[1] is entry)
+        out.append(f"| {keys} | {entry['tier']} | {entry['basis']} | {matched} |")
+    columns = ("passed", "wontfix", "deferred-P1", "deferred-P2", "out-of-scope", "open")
+    by_family: dict[str, dict[str, int]] = {}
+    for index, state, found in subset.lines:
+        counts = by_family.setdefault(family(calls[index].script), dict.fromkeys(columns, 0))
+        column = state if state in ("passed", "open") else account(found)
+        counts[column] += 1
+    out += ["", "| Family | v1 lines | " + " | ".join(columns) + " |",
+            "|---|---:|" + "---:|" * len(columns)]
+    totals = dict.fromkeys(columns, 0)
+    for name in sorted(by_family):
+        counts = by_family[name]
+        out.append(f"| {name} | {sum(counts.values())} | "
+                   + " | ".join(str(counts[c]) for c in columns) + " |")
+        for column in columns:
+            totals[column] += counts[column]
+    out.append(f"| **total** | **{sum(totals.values())}** | "
+               + " | ".join(f"**{totals[c]}**" for c in columns) + " |")
+    blockers: dict[str, list[Call]] = defaultdict(list)
+    for index, _, found in open_lines:
+        blockers[blocker(found)].append(calls[index])
+    out += ["", "Open v1 lines by what blocks them (the first class that does not account "
+            "for the line):", ""]
+    if not blockers:
+        out.append("None.")
+    else:
+        out += ["| Blocked by | Lines | Examples |", "|---|---:|---|"]
+        for name in sorted(blockers, key=lambda key: (-len(blockers[key]), key)):
+            out.append(f"| {name} | {len(blockers[name])} | {cites(blockers[name])} |")
+    return out
 
 
 def render(calls: list[Call], verdicts: list[Verdict], commit: str,
            under: list[tuple[Call, str]] | None = None,
-           registries_for_render: dict[str, Registry] | None = None) -> str:
+           registries_for_render: dict[str, Registry] | None = None,
+           classes: CorpusDispositions | None = None,
+           subset: Subset | None = None) -> str:
     pairs = list(zip(calls, verdicts))
     out = [
         "# OfficeCLI example-corpus deltas",
@@ -748,6 +1089,14 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         "- **read-back**: after each script the harness runs `view <file> text` and "
         "`get <file> / --depth 2` on every file the script created.",
         "",
+        "Every delta, named gap and element/property group carries a disposition "
+        f"(`{capability_delta.DISPOSITIONS.as_posix()}`, record 0332): `planned` with a work "
+        "package or record id, `deferred-P1`/`deferred-P2` by design §13 tier, `wontfix` or "
+        "`out-of-scope` with a reason. A group OfficeCLI's schema names inherits the "
+        "capability delta's disposition for that row (`via delta`). `--check` fails on a "
+        "class without a disposition, on a P0 or v1 class that is deferred or wontfix, and "
+        "on a disposition key that matches nothing.",
+        "",
     ]
     by_family: dict[str, list] = defaultdict(list)
     by_format: dict[str, list] = defaultdict(list)
@@ -762,9 +1111,28 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
             "The format is the extension of the document each call names.", "",
             HEADER_ROW.format("Format"), RULE_ROW]
     out += table_rows(dict(sorted(by_format.items())))
+    if subset is not None and classes is not None:
+        out += render_subset(subset, calls, classes.dispositions)
 
-    out += ["", "## Deltas", "", "| Id | Delta | OfficeCLI | Litchi | Lines | Examples |",
-            "|---|---|---|---|---:|---|"]
+    def rule_cell(rule: Rule, hits: list[Call]) -> str:
+        if classes is None or not hits:
+            return ""
+        if rule.id == "G1":
+            verbs = sorted({call.verb for call in hits})
+            return "; ".join(
+                f"`{verb}` ({sum(1 for call in hits if call.verb == verb)}): "
+                f"{cell(classes.rule(rule, next(c for c in hits if c.verb == verb)))}"
+                for verb in verbs)
+        return cell(classes.rule(rule))
+
+    def rule_reason(rule: Rule, hits: list[Call]) -> str:
+        if classes is None or not hits or rule.id == "G1":
+            return ""
+        return classes.rule(rule).reason
+
+    out += ["", "## Deltas", "",
+            "| Id | Delta | OfficeCLI | Litchi | Lines | Examples | Disposition | Reason |",
+            "|---|---|---|---|---:|---|---|---|"]
     for rule in RULES:
         if rule.kind != "delta":
             continue
@@ -772,16 +1140,19 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         if rule.id == "D4":
             hits = [call for call, verdict in pairs if call.detail == "translated:D4"]
         out.append(f"| {rule.id} | {rule.title} | {rule.officecli} | {rule.litchi} | "
-                   f"{len(hits)} | {cites(hits)} |")
+                   f"{len(hits)} | {cites(hits)} | {rule_cell(rule, hits)} | "
+                   f"{rule_reason(rule, hits)} |")
 
-    out += ["", "## Named gaps", "", "| Id | Gap | OfficeCLI | Litchi | Lines | Examples |",
-            "|---|---|---|---|---:|---|"]
+    out += ["", "## Named gaps", "",
+            "| Id | Gap | OfficeCLI | Litchi | Lines | Examples | Disposition | Reason |",
+            "|---|---|---|---|---:|---|---|---|"]
     for rule in RULES:
         if rule.kind not in ("gap", "cascade"):
             continue
         hits = [call for call, verdict in pairs if verdict.rule == rule.id]
         out.append(f"| {rule.id} | {rule.title} | {rule.officecli} | {rule.litchi} | "
-                   f"{len(hits)} | {cites(hits)} |")
+                   f"{len(hits)} | {cites(hits)} | {rule_cell(rule, hits)} | "
+                   f"{rule_reason(rule, hits)} |")
 
     groups: dict[str, list] = defaultdict(list)
     notes: dict[str, str] = {}
@@ -795,17 +1166,20 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
             notes[skipped.rule] = skipped.note
     for fmt in sorted({key.split("|")[0] for key in groups}):
         out += ["", f"## Element and property gaps: {fmt}", "",
-                "| Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples |",
-                "|---|---|---|---|---:|---|---|"]
+                "| Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples "
+                "| Tier | Disposition |",
+                "|---|---|---|---|---:|---|---|---|---|"]
         keys = sorted(
             (key for key in groups if key.split("|")[0] == fmt),
             key=lambda key: (-len(groups[key]), key),
         )
         for key in keys:
             _, verb, element, result, prop = key.split("|", 4)
+            resolution = classes.group(key) if classes is not None else None
             out.append(
                 f"| {verb} | {element or '-'} | `{result}` | {f'`{prop}`' if prop else '-'} | "
-                f"{len(groups[key])} | {notes[key]} | {cites(groups[key], 2)} |"
+                f"{len(groups[key])} | {notes[key]} | {cites(groups[key], 2)} | "
+                f"{resolution.tier if resolution else ''} | {cell(resolution)} |"
             )
 
     out += ["", "## Bugs", ""]
@@ -851,12 +1225,23 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
     return "\n".join(out)
 
 
-def generate(repo: Path, outcomes: Path) -> tuple[str, list[Call], list[Verdict]]:
+def generate(repo: Path, outcomes: Path, dispositions_path: Path | None = None,
+             problems: list[str] | None = None) -> tuple[str, list[Call], list[Verdict]]:
+    """The table; ``problems`` (when given) collects what ``--check`` refuses
+    about the dispositions."""
     calls = parse(outcomes.read_text(encoding="utf-8"))
     loaded = registries(repo)
     verdicts = classify(calls, loaded)
     commit = (repo / UPSTREAM_COMMIT).read_text(encoding="utf-8").strip()[:10]
-    text = render(calls, verdicts, commit, unclaimed(calls, loaded), loaded)
+    dispositions = capability_delta.Dispositions.load(
+        dispositions_path or repo / capability_delta.DISPOSITIONS)
+    deltas, _, _ = capability_delta.classified(repo / VENDORED, repo, dispositions)
+    classes = CorpusDispositions(dispositions, deltas, loaded)
+    found = corpus_problems(calls, verdicts, classes, loaded)
+    subset = v1_subset(calls, verdicts, classes, loaded)
+    if problems is not None:
+        problems.extend(found)
+    text = render(calls, verdicts, commit, unclaimed(calls, loaded), loaded, classes, subset)
     return text, calls, verdicts
 
 
@@ -864,24 +1249,31 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--outcomes", type=Path, default=REPO / OUTCOMES)
     parser.add_argument("--output", type=Path, default=REPO / OUTPUT)
+    parser.add_argument("--dispositions", type=Path,
+                        default=REPO / capability_delta.DISPOSITIONS)
     parser.add_argument("--check", action="store_true",
-                        help="fail if the committed table differs from a fresh one")
+                        help="fail if the committed table differs from a fresh one, or a gap "
+                        "class lacks a valid disposition")
     arguments = parser.parse_args(argv)
-    text, calls, verdicts = generate(REPO, arguments.outcomes)
+    problems: list[str] = []
+    text, calls, verdicts = generate(REPO, arguments.outcomes, arguments.dispositions, problems)
     fatal = [call.cite for call, verdict in zip(calls, verdicts) if verdict.rule == "fatal"]
     if fatal:
         print("panics or internal errors recorded: " + ", ".join(fatal), file=sys.stderr)
         return 1
-    if len(text.encode()) >= 1 << 20:
+    if len(text.encode()) >= capability_delta.SIZE_LIMIT:
         raise SystemExit("the corpus table would reach 1 MiB; split it before committing")
+    for problem in problems:
+        print(f"disposition: {problem}", file=sys.stderr)
+    status = 1 if problems else 0
     if arguments.check:
         current = arguments.output.read_text(encoding="utf-8") if arguments.output.exists() else ""
         if current != text:
             print(f"{arguments.output} is stale; rerun {Path(__file__).name}", file=sys.stderr)
             return 1
-        return 0
+        return status
     arguments.output.write_text(text, encoding="utf-8")
-    return 0
+    return status
 
 
 if __name__ == "__main__":

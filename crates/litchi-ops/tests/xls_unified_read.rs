@@ -246,14 +246,15 @@ fn sheet_names_are_unicode_normalized_and_cell_coordinates_are_bounded() {
 #[test]
 fn unsupported_legacy_axes_return_typed_capability_gaps() {
     let file = eager(&workbook_bytes());
-    for path in [
-        "/sheet[1]/table[1]",
-        "/sheet[1]/chart[1]",
-        "/sheet[1]/comment[1]",
-    ] {
+    for path in ["/sheet[1]/table[1]", "/sheet[1]/chart[1]"] {
         let error = file.get(path).expect_err(path);
         assert_code(&error, Code::UnsupportedCapability);
     }
+    // Notes are readable (record 0327); this fixture has none.
+    assert_code(
+        &file.get("/sheet[1]/comment[1]").expect_err("no note"),
+        Code::PathNotFound,
+    );
     // Defined names are readable (record 0259); this fixture has none.
     assert_code(
         &file.get("/namedrange[1]").expect_err("no defined name"),

@@ -160,7 +160,20 @@ fn scope_range(scene: &Scene, item: &Item) -> Result<Option<Range<usize>>> {
             .and_then(|row| row.cells().get(*cell))
             .ok_or_else(missing)?
             .range(),
-        Item::Comment(_) | Item::Master(_) | Item::Layout(_) => {
+        Item::RunLink(at, paragraph, run) => story(at)?
+            .paragraphs()
+            .get(*paragraph)
+            .and_then(|paragraph| paragraph.runs().get(*run))
+            .ok_or_else(missing)?
+            .range(),
+        Item::ShapeLink(object) => scene.object(object).ok_or_else(missing)?.range(),
+        Item::Comment(_)
+        | Item::Master(_)
+        | Item::Layout(_)
+        | Item::LineBreak(..)
+        | Item::Column(..)
+        | Item::Series(..)
+        | Item::Axis(..) => {
             return Err(Error::new(
                 Code::UnsupportedType,
                 "an ODP find searches slides, their objects and notes",

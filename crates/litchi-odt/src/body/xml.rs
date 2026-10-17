@@ -201,6 +201,14 @@ pub(crate) fn tag_name(tag: &str) -> &str {
     &body[..end]
 }
 
+/// The local part of a qualified element name (`math` of `math:math`).
+pub(crate) fn tag_name_local(name: &[u8]) -> &[u8] {
+    match memchr::memchr(b':', name) {
+        Some(colon) => &name[colon + 1..],
+        None => name,
+    }
+}
+
 /// The raw (still escaped) attributes of one start tag, in source order.
 pub(crate) fn attributes(tag: &str) -> Attributes<'_> {
     let name = tag_name(tag);
@@ -220,8 +228,11 @@ impl<'a> Iterator for Attributes<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let rest = self.rest.trim_start();
-        let name_end =
-            rest.find(|c: char| c == '=' || c.is_ascii_whitespace() || c == '>' || c == '/')?;
+        // A byte scan: every delimiter is ASCII, so the position is a char
+        // boundary (and the scan stays inlined into each caller).
+        let name_end = rest.bytes().position(|byte| {
+            byte == b'=' || byte.is_ascii_whitespace() || byte == b'>' || byte == b'/'
+        })?;
         let name = &rest[..name_end];
         if name.is_empty() {
             self.rest = "";
@@ -235,7 +246,8 @@ impl<'a> Iterator for Attributes<'a> {
             return None;
         }
         let value_rest = &after[1..];
-        let close = value_rest.find(quote)?;
+        let quote = if quote == '"' { b'"' } else { b'\'' };
+        let close = value_rest.bytes().position(|byte| byte == quote)?;
         let value = &value_rest[..close];
         self.rest = &value_rest[close + 1..];
         Some((name, value))

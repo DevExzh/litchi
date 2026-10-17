@@ -68,6 +68,11 @@ pub enum Error {
 /// Result type for canonical XLS package operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Admit edited bytes under `source`'s retained read policy.
+pub(crate) fn republish(source: &Package, bytes: Vec<u8>) -> Result<Package> {
+    source.republish_bytes(bytes)
+}
+
 impl From<ReaderError> for Error {
     fn from(error: ReaderError) -> Self {
         Self::Reader(error)
@@ -217,6 +222,8 @@ struct PackageInner {
     policy: RetainedPolicy,
     metadata: OnceLock<Metadata>,
     edit_snapshot: Option<crate::cell_values::Snapshot>,
+    /// The Workbook stream, read once for worksheet-feature reads.
+    workbook_stream: OnceLock<Arc<[u8]>>,
 }
 
 impl fmt::Debug for PackageInner {
@@ -366,6 +373,7 @@ impl Package {
                 },
                 metadata: OnceLock::new(),
                 edit_snapshot: None,
+                workbook_stream: OnceLock::new(),
             }),
         })
     }
@@ -401,6 +409,7 @@ impl Package {
                 },
                 metadata: metadata_cache,
                 edit_snapshot: None,
+                workbook_stream: OnceLock::new(),
             }),
         })
     }
@@ -542,6 +551,85 @@ impl Package {
     /// only on this explicit compatibility escape.
     pub fn reader_ref(&self) -> Result<&crate::raw::Reader<Cursor<Vec<u8>>>> {
         reader_ref(&self.inner)
+    }
+
+    /// Admit edited bytes under this package's retained read policy.
+    pub(crate) fn republish_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
+        match self.inner.policy {
+            RetainedPolicy::Eager {
+                source_limits,
+                leniency,
+                compatibility_profile,
+            } => Self::from_owned_bytes(
+                bytes,
+                OpenOptions::default()
+                    .source_limits(source_limits)
+                    .leniency(leniency)
+                    .compatibility_profile(compatibility_profile),
+            ),
+            RetainedPolicy::Source { limits, leniency } => {
+                let cfb_limits = self
+                    .source()
+                    .map(SharedOleFile::limits)
+                    .ok_or(Error::InvalidData("source-backed XLS package lost its CFB"))?;
+                let cfb = Arc::new(SharedOleFile::open_with_limits(
+                    Arc::new(litchi_core::OwnedSource::new(bytes)),
+                    cfb_limits,
+                )?);
+                let workbook = SourceBackedWorkbook::from_shared_ole_file_with_options(
+                    cfb,
+                    crate::SourceBackedOptions::default()
+                        .with_limits(limits)
+                        .with_leniency(leniency),
+                )?;
+                Self::from_source(workbook)
+            },
+        }
+    }
+
+    /// The Workbook stream (`Workbook`, or `Book` from older producers), read
+    /// once per package and shared.
+    pub(crate) fn workbook_stream(&self) -> Result<Arc<[u8]>> {
+        if let Some(stream) = self.inner.workbook_stream.get() {
+            return Ok(Arc::clone(stream));
+        }
+        let bytes = match &self.inner.state {
+            PackageState::Eager { reader, .. } => {
+                let data = reader.get_ref().get_ref();
+                let mut ole = OleFile::open(Cursor::new(data.as_slice()))?;
+                let name = if ole.exists(&["Workbook"]) {
+                    "Workbook"
+                } else {
+                    "Book"
+                };
+                ole.open_stream(&[name])?
+            },
+            PackageState::Source { cfb, .. } => {
+                let expected = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                let name = if cfb.exists(&["Workbook"]) {
+                    "Workbook"
+                } else {
+                    "Book"
+                };
+                let bytes = cfb.open_stream(&[name])?;
+                let observed = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                if observed != expected {
+                    return Err(Error::Source(SourceBackedError::SourceChanged {
+                        expected,
+                        observed,
+                    }));
+                }
+                bytes
+            },
+        };
+        let stream: Arc<[u8]> = Arc::from(bytes);
+        Ok(Arc::clone(
+            self.inner.workbook_stream.get_or_init(|| stream),
+        ))
     }
 
     /// Return the exact source bytes, including password-to-open encryption.

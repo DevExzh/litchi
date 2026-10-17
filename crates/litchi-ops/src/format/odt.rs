@@ -11,6 +11,7 @@
 pub(crate) mod children;
 mod nav;
 mod node;
+mod parts;
 mod props;
 mod spec;
 pub(crate) mod views;
@@ -53,6 +54,10 @@ struct OdtState {
     /// Child identities by parent and unified kind, built on the first
     /// ordinal lookup past [`DIRECT_SCAN`] children.
     kinds: OnceLock<KindIndex>,
+    /// The part index of record 0328 (list styles, master-page regions,
+    /// tables of contents, shapes, objects and columns), its body fields and
+    /// its equations, built on the first read of a part.
+    parts: OnceLock<parts::Index>,
     origin: Option<Arc<Path>>,
     /// The flat single-XML document (`.fodt`) this handle reads, whose
     /// bytes it publishes; the package is its read projection (record
@@ -148,6 +153,7 @@ impl Odt {
             package: OnceLock::from(package),
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
+            parts: OnceLock::new(),
             origin,
             flat: None,
         })))
@@ -195,6 +201,7 @@ impl Odt {
             package: OnceLock::from(package),
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
+            parts: OnceLock::new(),
             origin,
             flat: Some(flat),
         })))
@@ -216,6 +223,7 @@ impl Odt {
                     package: OnceLock::from(package),
                     tree: OnceLock::new(),
                     kinds: OnceLock::new(),
+                    parts: OnceLock::new(),
                     origin: self.origin().cloned(),
                     flat: Some(republished),
                 })))
@@ -258,6 +266,7 @@ impl Odt {
             package: OnceLock::new(),
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
+            parts: OnceLock::new(),
             origin: None,
             flat: None,
         }))
@@ -384,6 +393,25 @@ impl Odt {
                 };
                 Ok(tree.view(content, styles))
             },
+        }
+    }
+
+    /// The part index of record 0328, built on the first part read.
+    pub(crate) fn parts(&self) -> Result<&parts::Index> {
+        if let Some(index) = self.0.parts.get() {
+            return Ok(index);
+        }
+        let index = parts::Index::build(self)?;
+        Ok(self.0.parts.get_or_init(|| index))
+    }
+
+    /// The bytes of one package member (an embedded object's part), or
+    /// `None` when the package has no such member.
+    pub(crate) fn member(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        match &self.0.owner {
+            OdtOwner::Eager(document) => document.member_data(path).map_err(core_error),
+            #[cfg(any(unix, windows))]
+            OdtOwner::Source(document) => self.0.owner.finish(document.member_data(path)),
         }
     }
 

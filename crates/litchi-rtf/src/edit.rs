@@ -28,6 +28,7 @@ use std::ops::Range;
 
 mod composition;
 mod destination_splice;
+mod marks;
 mod picture_payload;
 mod producer_paragraphs;
 mod transfer;
@@ -117,6 +118,7 @@ impl History {
 
 mod limits;
 pub use limits::{EditOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder};
+pub use marks::SectionValue;
 
 /// Exact bytes inserted for a raw ordinary-paragraph split.
 const PARAGRAPH_SPLIT_BYTES: &[u8] = br"\par ";
@@ -1609,6 +1611,9 @@ pub struct Edit {
     /// Effect keys of the staged destination operations, so a large
     /// destination batch checks uniqueness in constant time per operation.
     destination_effects: std::collections::HashSet<String>,
+    /// Field instructions, bookmarks, tab stops and section page setup,
+    /// committed by source splicing (record 0328).
+    marks: Vec<marks::Mark>,
 }
 
 #[derive(Debug, Clone)]
@@ -2106,6 +2111,7 @@ impl Edit {
             replacement_bytes: 0,
             paragraph_batch_len: None,
             destination_effects: std::collections::HashSet::new(),
+            marks: Vec::new(),
         }
     }
 
@@ -2149,7 +2155,7 @@ impl Edit {
     /// Number of staged operations.
     #[must_use]
     pub fn operation_count(&self) -> usize {
-        self.operations.len()
+        self.operations.len().saturating_add(self.marks.len())
     }
 
     /// Stages replacement of the complete ordinary body story.
@@ -5039,6 +5045,9 @@ impl Edit {
     /// Returns an error when the changed source is outside the supported
     /// closure or candidate validation/readback fails.
     pub fn commit(self) -> Result<Commit, Error> {
+        if !self.marks.is_empty() {
+            return self.commit_marks();
+        }
         // The plain-body paths keep their behaviour and cost; a paragraph
         // insertion, removal, move or swap they refuse falls back to exact
         // source splicing of producer paragraphs (records 0293, 0308), whose
@@ -16127,6 +16136,7 @@ fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {
     matches!(
         vocabulary,
         "field.transfer"
+            | "mark.transfer"
             | "nested-table.transfer"
             | "list.transfer"
             | "style.transfer"
@@ -16138,6 +16148,7 @@ fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {
 fn root_transfer_vocabulary(vocabulary: &str) -> Result<&'static str, Error> {
     match vocabulary {
         "field.transfer" => Ok("field.transfer"),
+        "mark.transfer" => Ok("mark.transfer"),
         "nested-table.transfer" => Ok("nested-table.transfer"),
         "list.transfer" => Ok("list.transfer"),
         "style.transfer" => Ok("style.transfer"),

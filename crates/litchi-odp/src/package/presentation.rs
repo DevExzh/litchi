@@ -485,6 +485,19 @@ impl Presentation {
         package.get_file(path).map(Some)
     }
 
+    /// Read one package member (an embedded object's part), or `None` when
+    /// the package has no member at `path` (record 0328).
+    ///
+    /// # Errors
+    /// Returns an error when the package or the member cannot be read.
+    pub fn member_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        let package = self.inner.package.package().package()?;
+        if !package.has_file(path) {
+            return Ok(None);
+        }
+        package.get_file(path).map(Some)
+    }
+
     /// Discover inert embedded objects in content and styles document order.
     ///
     /// This includes regular objects, OLE payloads, applets, plugins, and

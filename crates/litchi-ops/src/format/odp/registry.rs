@@ -229,10 +229,11 @@ pub(crate) const SETTABLE: &[&str] = &[
     "run",
     "tc",
     "notes",
+    "hyperlink",
 ];
 
 /// The canonical names of elements `add` creates.
-pub(crate) const ADDABLE: &[&str] = &["slide", "shape", "paragraph"];
+pub(crate) const ADDABLE: &[&str] = &["slide", "shape", "paragraph", "hyperlink", "linebreak"];
 
 /// The canonical names of elements `remove` deletes.
 pub(crate) const REMOVABLE: &[&str] = &[
@@ -248,6 +249,11 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "connector",
     "paragraph",
     "run",
+    "hyperlink",
+    "linebreak",
+    "video",
+    "audio",
+    "equation",
 ];
 
 const fn operation_gap(

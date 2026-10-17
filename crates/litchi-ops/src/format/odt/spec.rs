@@ -58,6 +58,30 @@ pub enum Kind {
     Style,
     /// The document properties (`/metadata`).
     Metadata,
+    /// A master-page header region (`/header[N]`, record 0328).
+    Header,
+    /// A master-page footer region (`/footer[N]`).
+    Footer,
+    /// The list styles (`/numbering`).
+    Numbering,
+    /// A list style as a list definition (`/numbering/abstractNum[N]`).
+    AbstractNum,
+    /// A list style as a list instance (`/numbering/num[N]`).
+    Num,
+    /// A list level (`/numbering/abstractNum[N]/level[L]`).
+    Level,
+    /// A body text field (`/field[N]`).
+    Field,
+    /// A table of contents (`/toc[N]`, `text:table-of-content`).
+    Toc,
+    /// A tab stop of a paragraph's automatic style (`p[N]/tab[M]`).
+    Tab,
+    /// A drawing shape (`/body/shape[N]`).
+    Shape,
+    /// A formula object (`/body/equation[N]`).
+    Equation,
+    /// A declared table column (`tbl[N]/col[C]`).
+    Column,
 }
 
 impl Kind {
@@ -87,7 +111,28 @@ impl Kind {
             Self::Styles => "styles",
             Self::Style => "style",
             Self::Metadata => "metadata",
+            Self::Header => "header",
+            Self::Footer => "footer",
+            Self::Numbering => "numbering",
+            Self::AbstractNum => "abstractNum",
+            Self::Num => "num",
+            Self::Level => "level",
+            Self::Field => "field",
+            Self::Toc => "toc",
+            Self::Tab => "tab",
+            Self::Shape => "shape",
+            Self::Equation => "equation",
+            Self::Column => "column",
         }
+    }
+
+    /// Whether the kind is a part of record 0328 (headers and footers,
+    /// numbering, fields, tables of contents, tab stops, shapes, equations
+    /// and columns). Parts are reached by path and by queries that name
+    /// them; the generic views of the root, the body, paragraphs and tables
+    /// list the structural kinds only, as before.
+    pub(crate) const fn is_part(self) -> bool {
+        (self as u8) > (Self::Metadata as u8)
     }
 
     /// The adapter kind of a leaf body kind.
@@ -117,7 +162,10 @@ impl Kind {
     }
 
     /// The number of kinds, for per-kind counters.
-    pub(crate) const COUNT: usize = 22;
+    pub(crate) const COUNT: usize = 34;
+    /// The structural kinds, `Document` through `Metadata`; the parts
+    /// follow them.
+    pub(crate) const STRUCTURAL: usize = Self::Metadata as usize + 1;
 }
 
 impl ElementKind for Kind {
@@ -148,6 +196,18 @@ impl ElementKind for Kind {
             "styles" => Self::Styles,
             "style" => Self::Style,
             "metadata" => Self::Metadata,
+            "header" => Self::Header,
+            "footer" => Self::Footer,
+            "numbering" => Self::Numbering,
+            "abstractNum" => Self::AbstractNum,
+            "num" => Self::Num,
+            "level" => Self::Level,
+            "field" => Self::Field,
+            "toc" => Self::Toc,
+            "tab" => Self::Tab,
+            "shape" => Self::Shape,
+            "equation" => Self::Equation,
+            "col" => Self::Column,
             _ => return None,
         })
     }
@@ -176,6 +236,18 @@ impl ElementKind for Kind {
             Self::Styles => "styles",
             Self::Style => "style",
             Self::Metadata => "metadata",
+            Self::Header => "header",
+            Self::Footer => "footer",
+            Self::Numbering => "numbering",
+            Self::AbstractNum => "abstractNum",
+            Self::Num => "num",
+            Self::Level => "level",
+            Self::Field => "field",
+            Self::Toc => "toc",
+            Self::Tab => "tab",
+            Self::Shape => "shape",
+            Self::Equation => "equation",
+            Self::Column => "col",
         }
     }
 
@@ -409,6 +481,164 @@ pub(crate) const METADATA_PROPS: &[PropSpec] = &[
     read("revisionNumber", ValueType::Text),
 ];
 
+/// Header and footer page kinds, as DOCX names them.
+pub(crate) static STORY_TYPE: Tokens = Tokens::new("type", &["default", "even", "first"], &[]);
+
+/// A list definition's kind, as DOCX names it.
+pub(crate) static MULTI_LEVEL_TYPE: Tokens = Tokens::new(
+    "multi-level type",
+    &["hybridMultilevel", "multilevel", "singleLevel"],
+    &[("hybrid", 0), ("multi", 1), ("single", 2)],
+);
+
+/// A level's label alignment (`fo:text-align` of the level properties).
+pub(crate) static LEVEL_JUSTIFICATION: Tokens =
+    Tokens::new("level justification", &["left", "center", "right"], &[]);
+
+/// What follows a level's label (`text:label-followed-by`).
+pub(crate) static LEVEL_SUFFIX: Tokens =
+    Tokens::new("level suffix", &["tab", "space", "nothing"], &[("none", 2)]);
+
+/// A tab stop's alignment (`style:type`), under the `ST_TabJc` spelling.
+pub(crate) static TAB_VAL: Tokens = Tokens::new(
+    "tab alignment",
+    &["left", "center", "right", "decimal"],
+    &[("char", 3)],
+);
+
+/// A tab stop's leader, under the `ST_TabTlc` spelling.
+pub(crate) static TAB_LEADER: Tokens = Tokens::new(
+    "tab leader",
+    &["none", "dot", "hyphen", "underscore", "middleDot"],
+    &[],
+);
+
+/// Text wrapping around a shape (`style:wrap`), under the DOCX spelling.
+pub(crate) static SHAPE_WRAP: Tokens =
+    Tokens::new("shape wrap", &["topAndBottom", "square", "through"], &[]);
+
+/// How an equation sits in its paragraph.
+pub(crate) static EQUATION_MODE: Tokens = Tokens::new("equation mode", &["display", "inline"], &[]);
+
+const fn raw(name: &'static str, ty: ValueType) -> PropSpec {
+    PropSpec {
+        name,
+        ty,
+        access: Access {
+            get: true,
+            set: false,
+            add: false,
+        },
+        raw: true,
+        admission: crate::registry::Admission::NONE,
+    }
+}
+
+/// A header or footer region: its text, the pages it shows on and its
+/// master page.
+pub(crate) const STORY_PROPS: &[PropSpec] = &[
+    write("text", ValueType::Text),
+    read("type", ValueType::Token(&STORY_TYPE)),
+    read("masterPage", ValueType::Text),
+];
+
+/// `/numbering`: the numbers of list definitions and instances.
+pub(crate) const NUMBERING_PROPS: &[PropSpec] = &[
+    read("abstractNumCount", ValueType::Int),
+    read("numCount", ValueType::Int),
+];
+
+/// A list style as a list definition. Its `id` is its index, a raw
+/// identity (record 0319 §3).
+pub(crate) const ABSTRACT_NUM_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    read("type", ValueType::Token(&MULTI_LEVEL_TYPE)),
+    read("name", ValueType::Text),
+    read("styleName", ValueType::Text),
+];
+
+/// A list style as a list instance: ODF lists name their style directly,
+/// so every style is one instance of itself.
+pub(crate) const NUM_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    read("abstractNumId", ValueType::Int),
+];
+
+/// A list level, in the DOCX level order; `indent` and `hanging` are
+/// integer twips.
+pub(crate) const LEVEL_PROPS: &[PropSpec] = &[
+    raw("ilvl", ValueType::Int),
+    read("start", ValueType::Int),
+    read("format", ValueType::Text),
+    read("lvlText", ValueType::Text),
+    read("justification", ValueType::Token(&LEVEL_JUSTIFICATION)),
+    read("suff", ValueType::Token(&LEVEL_SUFFIX)),
+    read("indent", ValueType::Int),
+    read("hanging", ValueType::Int),
+    read("font", ValueType::Text),
+    read("size", SIZE),
+    read("color", COLOR),
+    read("bold", ValueType::Bool),
+    read("italic", ValueType::Bool),
+];
+
+/// A text field: its Word field type (the ODF element name when Word has
+/// none), name, format, lock and whether it shows a result.
+pub(crate) const FIELD_PROPS: &[PropSpec] = &[
+    read("fieldType", ValueType::Text),
+    read("name", ValueType::Text),
+    read("format", ValueType::Text),
+    read("fldLock", ValueType::Bool),
+    read("evaluated", ValueType::Bool),
+    read("element", ValueType::Text),
+];
+
+/// A table of contents, from its source and entry templates.
+pub(crate) const TOC_PROPS: &[PropSpec] = &[
+    read("levels", ValueType::Text),
+    read("title", ValueType::Text),
+    read("hyperlinks", ValueType::Bool),
+    read("pageNumbers", ValueType::Bool),
+    read("name", ValueType::Text),
+];
+
+/// A tab stop: position in twips, alignment and leader.
+pub(crate) const TAB_PROPS: &[PropSpec] = &[
+    create("pos", ValueType::Int),
+    create("val", ValueType::Token(&TAB_VAL)),
+    create("leader", ValueType::Token(&TAB_LEADER)),
+];
+
+/// A drawing shape: geometry, name, extent, position, anchoring, wrapping,
+/// fill and outline.
+pub(crate) const SHAPE_PROPS: &[PropSpec] = &[
+    read("geometry", ValueType::Text),
+    read("name", ValueType::Text),
+    read("width", ValueType::Length(LengthSpec::EXTENT)),
+    read("height", ValueType::Length(LengthSpec::EXTENT)),
+    read("anchor.x", ValueType::Length(LengthSpec::POSITION)),
+    read("anchor.y", ValueType::Length(LengthSpec::POSITION)),
+    read("anchor", ValueType::Token(&ANCHOR)),
+    read("wrap", ValueType::Token(&SHAPE_WRAP)),
+    read("fill", COLOR),
+    read("line.color", COLOR),
+    read("line.width", ValueType::Length(LengthSpec::EXTENT)),
+];
+
+/// A formula object: its StarMath (or MathML token) text, how it sits in
+/// its paragraph, and its frame.
+pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
+    read("formula", ValueType::Text),
+    read("mode", ValueType::Token(&EQUATION_MODE)),
+    read("name", ValueType::Text),
+    read("width", ValueType::Length(LengthSpec::EXTENT)),
+    read("height", ValueType::Length(LengthSpec::EXTENT)),
+];
+
+/// A declared table column: its width.
+pub(crate) const COLUMN_PROPS: &[PropSpec] =
+    &[read("width", ValueType::Length(LengthSpec::EXTENT))];
+
 use Kind as K;
 
 /// Kinds that hold block content.
@@ -445,7 +675,19 @@ const BLOCKS: &[Kind] = &[
     K::Section,
     K::Frame,
 ];
-const INLINES: &[Kind] = &[
+/// The body's blocks and the parts listed under it (record 0328).
+const BODY_CHILDREN: &[Kind] = &[
+    K::Paragraph,
+    K::Heading,
+    K::List,
+    K::Table,
+    K::Section,
+    K::Frame,
+    K::Shape,
+    K::Equation,
+];
+/// A paragraph's inline content and its tab stops.
+const PARAGRAPH_CHILDREN: &[Kind] = &[
     K::Run,
     K::Hyperlink,
     K::Bookmark,
@@ -453,6 +695,7 @@ const INLINES: &[Kind] = &[
     K::Endnote,
     K::Comment,
     K::Frame,
+    K::Tab,
 ];
 
 const fn element(
@@ -487,7 +730,16 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "document",
             &["document"],
             &[],
-            &[K::Body, K::Styles, K::Metadata],
+            &[
+                K::Body,
+                K::Styles,
+                K::Metadata,
+                K::Header,
+                K::Footer,
+                K::Numbering,
+                K::Field,
+                K::Toc,
+            ],
             &["/"],
             &[],
         ),
@@ -496,7 +748,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "body",
             &["body"],
             &[K::Document],
-            BLOCKS,
+            BODY_CHILDREN,
             &["/body"],
             &[],
         ),
@@ -505,7 +757,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "paragraph",
             &["p", "paragraph"],
             BLOCK_PARENTS,
-            INLINES,
+            PARAGRAPH_CHILDREN,
             &["/body/p[N]"],
             PARAGRAPH_PROPS,
         ),
@@ -514,7 +766,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "heading",
             &["h", "heading"],
             BLOCK_PARENTS,
-            INLINES,
+            PARAGRAPH_CHILDREN,
             &["/body/h[N]"],
             HEADING_PROPS,
         ),
@@ -585,7 +837,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
                 K::Comment,
                 K::ListItem,
             ],
-            &[K::Row],
+            &[K::Row, K::Column],
             &["/body/tbl[N]"],
             TABLE_PROPS,
         ),
@@ -721,24 +973,160 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/metadata"],
             METADATA_PROPS,
         ),
+        ElementSpec {
+            identities: &["type"],
+            ..element(
+                K::Header,
+                "header",
+                &["header"],
+                &[K::Document],
+                &[],
+                &["/header[N]"],
+                STORY_PROPS,
+            )
+        },
+        ElementSpec {
+            identities: &["type"],
+            ..element(
+                K::Footer,
+                "footer",
+                &["footer"],
+                &[K::Document],
+                &[],
+                &["/footer[N]"],
+                STORY_PROPS,
+            )
+        },
+        element(
+            K::Numbering,
+            "numbering",
+            &["numbering"],
+            &[K::Document],
+            &[K::AbstractNum, K::Num],
+            &["/numbering"],
+            NUMBERING_PROPS,
+        ),
+        ElementSpec {
+            identities: &["id"],
+            ..element(
+                K::AbstractNum,
+                "abstractNum",
+                &["abstractnum"],
+                &[K::Numbering],
+                &[K::Level],
+                &["/numbering/abstractNum[N]"],
+                ABSTRACT_NUM_PROPS,
+            )
+        },
+        ElementSpec {
+            identities: &["id"],
+            ..element(
+                K::Num,
+                "num",
+                &["num"],
+                &[K::Numbering],
+                &[],
+                &["/numbering/num[N]"],
+                NUM_PROPS,
+            )
+        },
+        ElementSpec {
+            identities: &["ilvl"],
+            ..element(
+                K::Level,
+                "level",
+                &["level", "lvl"],
+                &[K::AbstractNum],
+                &[],
+                &["/numbering/abstractNum[N]/level[L]"],
+                LEVEL_PROPS,
+            )
+        },
+        element(
+            K::Field,
+            "field",
+            &["field"],
+            &[K::Document],
+            &[],
+            &["/field[N]"],
+            FIELD_PROPS,
+        ),
+        element(
+            K::Toc,
+            "toc",
+            &["tableofcontents", "toc"],
+            &[K::Document],
+            &[],
+            &["/toc[N]"],
+            TOC_PROPS,
+        ),
+        element(
+            K::Tab,
+            "tab",
+            &["tab"],
+            &[K::Paragraph, K::Heading],
+            &[],
+            &["/body/p[N]/tab[M]"],
+            TAB_PROPS,
+        ),
+        element(
+            K::Shape,
+            "shape",
+            &["shape"],
+            &[K::Body],
+            &[],
+            &["/body/shape[N]"],
+            SHAPE_PROPS,
+        ),
+        element(
+            K::Equation,
+            "equation",
+            &["equation", "formula", "math"],
+            &[K::Body],
+            &[],
+            &["/body/equation[N]"],
+            EQUATION_PROPS,
+        ),
+        element(
+            K::Column,
+            "column",
+            &["col", "column"],
+            &[K::Table],
+            &[],
+            &["/body/tbl[N]/col[C]"],
+            COLUMN_PROPS,
+        ),
     ],
     gaps: &[
-        read_gap("header"),
-        read_gap("footer"),
-        read_gap("numbering"),
-        read_gap("field"),
-        read_gap("shape"),
         read_gap("chart"),
         read_gap("ole"),
-        read_gap("toc"),
-        read_gap("revision"),
-        read_gap("col"),
-        read_gap("equation"),
+        GapSpec {
+            subject: Subject::Element("revision"),
+            code: crate::Code::UnsupportedCapability,
+            follow_up: "record 0328 follow-up: ODT tracked changes as revision nodes (P2)",
+            reason: "the ODT body index skips text:tracked-changes",
+        },
         read_gap("break"),
-        read_gap("tab"),
         read_gap("group"),
-        read_gap("formfield"),
+        GapSpec {
+            subject: Subject::Element("formfield"),
+            code: crate::Code::UnsupportedCapability,
+            follow_up: "record 0328 follow-up: ODT form controls as formfield nodes and their writes",
+            reason: "the ODT body index skips office:forms and its controls",
+        },
         read_gap("settings"),
+        GapSpec {
+            subject: Subject::Element("sdt"),
+            code: crate::Code::UnsupportedPath,
+            follow_up: "none: content controls are DOCX-only",
+            reason: "OpenDocument text has no structured document tags",
+        },
+        GapSpec {
+            subject: Subject::Element("watermark"),
+            code: crate::Code::UnsupportedCapability,
+            follow_up: "record 0328 follow-up: the ODT header text-art watermark",
+            reason: "a watermark is a header drawing shape the region reads do not project",
+        },
     ],
 };
 
@@ -763,7 +1151,6 @@ const fn read_gap(element: &'static str) -> GapSpec {
 
 /// Canonical names of the Word family that ODT has no concept of.
 pub(crate) const ABSENT: &[&str] = &[
-    "abstractNum",
     "axis",
     "bookmarkEnd",
     "comments",
@@ -772,14 +1159,11 @@ pub(crate) const ABSENT: &[&str] = &[
     "fieldChar",
     "footnotes",
     "instrText",
-    "level",
-    "num",
     "permStart",
     "ptab",
     "sdt",
     "series",
     "theme",
-    "watermark",
 ];
 
 /// Canonical element names whose properties `set` writes.
@@ -787,15 +1171,18 @@ pub(crate) const SETTABLE: &[&str] = &[
     "bookmark",
     "comment",
     "endnote",
+    "footer",
     "footnote",
     "frame",
     "h",
+    "header",
     "hyperlink",
     "listItem",
     "metadata",
     "p",
     "r",
     "section",
+    "tab",
     "tbl",
     "tc",
     "textbox",
@@ -814,6 +1201,7 @@ pub(crate) const ADDABLE: &[&str] = &[
     "p",
     "r",
     "section",
+    "tab",
     "tbl",
     "tr",
 ];
@@ -833,6 +1221,7 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "picture",
     "r",
     "section",
+    "tab",
     "tbl",
     "textbox",
     "tr",

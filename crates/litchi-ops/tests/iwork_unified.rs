@@ -160,7 +160,16 @@ mod pages {
             .add("/", litchi_ops::NewNode::new("section"))
             .expect("add a section");
         assert_eq!(added.path.to_string(), "/section[2]");
-        let error = file.add("/", litchi_ops::NewNode::new("tbl")).unwrap_err();
+        // Record 0329: a body table copies the document's first one; this
+        // document has none.
+        let error = file
+            .add(
+                "/body",
+                litchi_ops::NewNode::new("tbl")
+                    .prop("rows", 2)
+                    .prop("cols", 2),
+            )
+            .unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);
         let capabilities = Capabilities::of(FileFormat::Pages);
         assert!(capabilities.verb(Verb::Get).is_supported());

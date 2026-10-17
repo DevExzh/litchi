@@ -2479,6 +2479,21 @@ Both profiles now register 30 families.
 | --- | --- | --- |
 | `litchi_pages::section::lifecycle::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | Registered family in `pages` (request 11); `Package::{edit_section_lifecycle, apply_section_lifecycle}`; `Edit::{add(after, Option<&str>), remove(section)}`, one operation per edit; `Error::{InitialSection, EmptySection, UnsupportedContent, UnsupportedDependency}` | ✅ 0312 |
 
+## iWork table creation, `#REF!` and notes runs (record 0329)
+
+Table creation is one verb on the owner (as `insert` is elsewhere), not a
+staged family: `litchi_pages::table::creation` carries `{Commit, Patch,
+Diagnostics, Error, LimitKind, NewTable}` without an `Edit`, so it is not
+registered in the `pages` profile.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_numbers_wire::table_create::{Shape, Role, TableUuid, Frame, OwnerGeometry, admits_size, model_payload, info_payload, empty_storage, owner_payload, engine_payload, …}` | The payload half of Numbers table creation (0301), shared by the Keynote and Pages owners | ✅ 0329 |
+| `litchi_keynote::slide::drawable::{NewTable, Edit::add_table, Unsupported::TableTemplate, Error::InvalidTableSize}` | A slide table cloned from the deck's first slide table, in the slide-drawable commit | ✅ 0329 |
+| `litchi_pages::Package::{insert_body_table, apply_body_table_creation}`, `litchi_pages::table::creation::{NewTable, Commit, Patch, Diagnostics, Error, LimitKind}` | A body table cloned from the document's first body table, anchored at a UTF-16 body `Position`; `Error::NoTemplate` without one | ✅ 0329 |
+| `litchi_numbers_wire::BncCell::{set_formula_cached_error, set_formula_identifier}` | `#REF!` result caches and shared-formula splits of the topology shift | ✅ 0329 |
+| `litchi_keynote::slide::drawable::Edit::set_notes_text_style`, `litchi_keynote::Package::slide_notes_text_runs` | Speaker-notes character styles (request 10) | ✅ 0329 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |
@@ -2663,3 +2678,63 @@ ElementNotFound, InvalidElementValue}` name the element refusals.
 | `text_edit::{TextRuns, CharacterRun, TextLink, RunFormat}`; `Slide::shape_text_runs`; `Presentation::resolve_click` | a body's character runs (`TextCFException` over UTF-16 units, covering the final paragraph mark) and text hyperlinks; outline-backed placeholders read their slide-list body | ✅ 0323 |
 | `Edit::{set_run_format, set_text_hyperlink}` (and on `slide_order::Transaction`) | split the body's `StyleTextPropAtom` character runs (a body without one gains it) / write an `InteractiveInfo` + `TextInteractiveInfoAtom` pair; outline bodies are edited in the live document | ✅ 0323 |
 | `litchi_ppt::theme::{Theme, Fonts, COLOR_SLOTS, parse, from_package}`; `Presentation::theme` | the `RoundTripThemeAtom` theme part's color and font schemes, read only | ✅ 0323 |
+
+## XLS worksheet feature family (record 0327)
+
+One scoped family edits the worksheet features of an opened BIFF8
+workbook at the record level (`litchi_xls::sheet_features`): legacy notes,
+hyperlinks, drawing pictures and shapes, conditional formats, data
+validations, the auto-filter and manual page breaks. Every record a change
+does not touch keeps its bytes; the `BoundSheet8`, `Index` and `ExtSST`
+offsets that move with a splice are repaired, and the drawing group's
+cluster table and blip store follow the shapes. `commit()` returns the
+triad `package()`, `patch()`, `diagnostics()` with `into_package()`/
+`into_parts()`; an unchanged edit returns the source package. Positions
+are complete-catalog sheet positions.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_xls::sheet_features::{Features, FeatureSet, Area, PageBreak, Note, Drawing, DrawingKind, Fill, Line, ConditionalFormat, Rule, RuleType, Style, Threshold, ColorScale, DataBar, IconSet, Validation, AutoFilter}`, `Package::sheet_features` | reads one worksheet without decoding its cells; `FeatureSet` selects the kinds (only formats and validations render formulas) | ✅ 0327 |
+| `sheet_features::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_sheet_features, apply_sheet_features}` | `Edit::{features, set_row_breaks, set_column_breaks, add_hyperlink, set_hyperlink, remove_hyperlink, add_validation, set_validation, remove_validation, add_format, set_format, set_format_ranges, remove_format, set_auto_filter, add_note, set_note, remove_note, add_picture, add_shape, set_drawing, remove_drawing, commit}` | ✅ 0327; family registered in the gate |
+| `sheet_features::edit::{Hyperlink, Validation, Style, Format, FormatRule, Threshold, Picture, Shape, ShapeGeometry, Anchor, DrawingChange}` | the authored values; formulas are BIFF8 token streams, colors palette indexes (styles) or RGB (drawings, CF12 visuals) | ✅ 0327 |
+| `sheet_features::edit::compile_formula`, `Package::palette` | formula text to BIFF8 tokens with every built-in worksheet function (not `CALL`, `REGISTER.ID`, `EXEC`); the workbook palette a style's indexes name | ✅ 0327 |
+
+## ODS worksheet feature family (record 0327)
+
+The worksheet features of an ODS sheet (`litchi_ods::advanced::sheet_features`)
+are read from `content.xml` without decoding cells and edited through the
+existing `document::Edit` transaction as provenance splices of `content.xml`
+(and `styles.xml` for a conditional format's named cell style): every
+element an edit does not touch keeps its bytes. No new transaction family:
+the verbs extend `Edit`, and `commit()` keeps its triad.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `sheet_features::{read, Features, Drawing, DrawingKind, Validation, AutoFilter, Rect, format_styles, FormatStyle}` | `calcext:conditional-format`, `table:content-validation` bound by `table:content-validation-name`, `table:database-range` with filter buttons, `fo:break-before` row/column styles, `draw:frame`/`draw:custom-shape` | ✅ 0327 |
+| `sheet_features::{ValidationSpec, DrawingSpec, DrawingChange, parse_address, address, column_letters, to_odff, from_odff}` | authored values and ODF address / OpenFormula reference conversion | ✅ 0327 |
+| `Edit::{add_sheet_format, set_sheet_format, remove_sheet_format, add_sheet_validation, set_sheet_validation, remove_sheet_validation, set_sheet_auto_filter, set_sheet_breaks, add_sheet_drawing, set_sheet_drawing, remove_sheet_drawing}` | sheet-scoped verbs of the document transaction; drawings by kind and position | ✅ 0327 |
+
+## ODT, ODP and RTF element parts (record 0328)
+
+`litchi-odt` gains an on-demand part index beside the body index; it keeps
+offsets only and never changes the body index, so every body read and edit
+is unaffected. The primary `Edit` gains the header and footer text set; tab
+stops ride on the existing paragraph-property edit.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_odt::body::{Parts, PartsView}` (`Parts::{build, view}`; `PartsView::{list_styles, list_style, regions, tables_of_contents, shapes, objects, columns}`) | one pass over each of `content.xml` and `styles.xml` | ✅ 0328 |
+| `litchi_odt::body::parts::{ListStyle, ListLevel, ListLevelKind, Region, RegionKind, TableOfContents, Shape, EmbeddedObject, Column, TabStop, tab_stops, formula_text}` | borrowed views; attributes and text read from the source bytes | ✅ 0328 |
+| `litchi_odt::body::fields`, `TextField::at` | every body text field (the `text_fields` set and the variable, reference, sequence, chapter, sender, template, database and conditional fields); `text_fields` keeps its set for field refresh | ✅ 0328 |
+| `litchi_odt::body::TabStopEdit`, `ParagraphPropertyEdit::tab_stops` | replaces an automatic paragraph style's `style:tab-stops` | ✅ 0328 |
+| `litchi_odt::transaction::Edit::set_region_text` | a master-page header or footer region's text as one paragraph; content a text set cannot keep is refused (`Unsupported`) | ✅ 0328 |
+| `litchi_odt::Document::member_data` | the eager counterpart of `SourceBackedDocument::member_data` | ✅ 0328 |
+| `litchi_ops` ODT kinds `Header`, `Footer`, `Numbering`, `AbstractNum`, `Num`, `Level`, `Field`, `Toc`, `Tab`, `Shape`, `Equation`, `Column` | the DOCX element names and paths (`/header[N]`, `/footer[N]`, `/numbering/abstractNum[N]/level[L]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/shape[N]`, `/body/equation[N]`, `/body/tbl[N]/col[C]`), shared by OTH and ODM | ✅ 0328 |
+| `litchi_odp::scene::parts::{TableColumn, table_columns, line_breaks, Plugin, MediaKind, plugin, Click, shape_click, link_title, inline_math, formula_text}` | read the bytes of one indexed scene node on demand; the scene index is unchanged | ✅ 0328 |
+| `litchi_odp::scene::{Change::{SetRunLink, LinkRun, SetShapeClick, InsertLineBreak, RemoveLineBreak}, ShapeAction}` | a link run's target and title (or its removal, keeping the text), a plain run made a link, a shape's click listener or `draw:a` link, and line breaks, as checked scene splices | ✅ 0328 |
+| `litchi_odp::{Presentation, SourceBackedPresentation}::member_data` | one package member (an embedded object's part), `None` when absent | ✅ 0328 |
+| `litchi_ops` ODP kinds `Hyperlink`, `LineBreak`, `Col`, `Video`, `Audio`, `Equation`, `Series`, `Axis` | the PPTX paths of record 0321 (`/slide[N]/shape[M]/hyperlink`, `…/run[L]/hyperlink`, `…/paragraph[K]/linebreak[B]`, `/slide[N]/table[M]/col[C]`, `/slide[N]/video[M]`, `/slide[N]/audio[M]`, `/slide[N]/equation[K]`, `/slide[N]/chart[M]/series[K]`, `/slide[N]/chart[M]/axis[@role=ROLE]`); video, audio and equations are addressed among the media and embedded objects they are, and views list the structural kinds only | ✅ 0328 |
+| `litchi_rtf::edit::Edit::{set_field_instruction, rename_bookmark, remove_bookmark, insert_bookmark, set_paragraph_tab_stops, set_section_values}` | mark edits: each splices only the `\fldinst` text, the `\bkmkstart`/`\bkmkend` groups, the paragraph's tab-stop controls or the section's page-setup controls, then reparses the candidate and refuses any other change; they publish as one `mark.transfer` root transfer, which replays durably; mixing them with body work is `BodyDestinationConflict` | ✅ 0328 |
+| `litchi_rtf::edit::SectionValue` | one section page-setup value (break type, page size, orientation, margins, header and footer distance, columns, column spacing, title page, vertical alignment) | ✅ 0328 |
+| `litchi_rtf::ParagraphFormat::tab_stops` | a paragraph's custom tab stops in declaration order | ✅ 0328 |
+| `litchi_ops` RTF kinds `Section`, `Bookmark`, `Field`, `Toc`, `Tab`, `TextBox`, `Shape` | the DOCX paths (`/section[N]`, `/bookmark[N]`, `/bookmark[@name=X]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/textbox[N]`, `/body/shape[N]`) over the native collections; sections, bookmark names, field instructions, TOC switches and tab stops are writable, tab stops are added and removed, bookmarks removed | ✅ 0328 |

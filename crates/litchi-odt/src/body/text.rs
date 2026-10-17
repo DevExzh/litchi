@@ -6,7 +6,7 @@ use litchi_core::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use super::xml::{Ns, unescape};
+use super::xml::{Ns, Prefixes, unescape};
 use super::{Kind, Node};
 
 /// The largest text one node read returns.
@@ -22,8 +22,20 @@ pub(super) fn text<'a>(node: Node<'a>) -> Result<Cow<'a, str>> {
         return Ok(Cow::Borrowed(content));
     }
     let mut out = String::new();
-    walk(node, kind, content, &mut out)?;
+    walk(node.body.prefixes(), kind, content, &mut out)?;
     Ok(Cow::Owned(out))
+}
+
+/// The visible text of `content`, markup of a part bound by `prefixes`, read
+/// as the content of a `root` node (record 0328: header and footer regions,
+/// shapes and tables of contents).
+pub(super) fn text_of(prefixes: &Prefixes, root: Kind, content: &str) -> Result<String> {
+    if is_plain(content) {
+        return Ok(content.to_owned());
+    }
+    let mut out = String::new();
+    walk(prefixes, root, content, &mut out)?;
+    Ok(out)
 }
 
 fn is_plain(content: &str) -> bool {
@@ -52,8 +64,7 @@ pub(super) fn skipped(root: Kind, ns: Ns, local: &[u8]) -> bool {
     }
 }
 
-fn walk(node: Node<'_>, root: Kind, content: &str, out: &mut String) -> Result<()> {
-    let prefixes = node.body.prefixes();
+fn walk(prefixes: &Prefixes, root: Kind, content: &str, out: &mut String) -> Result<()> {
     let mut reader = Reader::from_str(content);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = false;

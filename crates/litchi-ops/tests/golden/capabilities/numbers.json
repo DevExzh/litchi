@@ -504,8 +504,8 @@
       "element": "row",
       "context": "formulas the coordinate shift refuses, merges",
       "code": "unsupported_capability",
-      "followUp": "record 0318 follow-ups (IWORK_API_REQUESTS.md request 6)",
-      "reason": "rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); refused: removing a row or column a surviving formula reads (native Numbers writes #REF!), a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a shared formula whose cells would diverge, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden, bordered or commented row or column"
+      "followUp": "record 0329 follow-ups (IWORK_API_REQUESTS.md request 6)",
+      "reason": "rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split (record 0329); refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column"
     },
     {
       "subject": "operation",

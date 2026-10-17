@@ -36,6 +36,7 @@ mod edit;
 mod fields;
 mod index;
 mod kept;
+pub mod parts;
 mod properties;
 mod text;
 pub(crate) mod xml;
@@ -47,9 +48,11 @@ use litchi_core::Result;
 
 pub(crate) use edit::{BodyEdits, apply as apply_body_edits};
 pub use edit::{Location, NewNode, Placement, admits};
-pub use fields::{TextField, text_fields};
+pub use fields::{TextField, fields, text_fields};
+pub use parts::{Parts, PartsView};
 pub use properties::{
-    CellProperties, ParagraphProperties, ParagraphPropertyEdit, TextProperties, TextPropertyEdit,
+    CellProperties, ParagraphProperties, ParagraphPropertyEdit, TabStopEdit, TextProperties,
+    TextPropertyEdit,
 };
 use xml::{Ns, Prefixes};
 

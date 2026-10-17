@@ -2131,10 +2131,10 @@ xls	table	edit	gap	M1-extended (R6b)	-
 xls	table	batch	gap	M1-extended (R6b)	-
 xls	table	create	gap	M1-extended (R6b)	ok format
 xls	table	save	gap	M1-extended (R6b)	ok format
-xls	namedrange	get	supported		ok 1 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
-xls	namedrange	find	supported		ok 1 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
+xls	namedrange	get	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
+xls	namedrange	find	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
 xls	namedrange	query	supported		ok matches in ole/xls/SimpleWithAutofilter.xls
-xls	namedrange	view	supported		ok 1 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
+xls	namedrange	view	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
 xls	namedrange	set	n/a	set not offered for this element	-
 xls	namedrange	add	n/a	add not offered for this element	-
 xls	namedrange	remove	n/a	remove not offered for this element	-
@@ -2144,19 +2144,19 @@ xls	namedrange	edit	n/a	edit not offered for this element	-
 xls	namedrange	batch	n/a	batch not offered for this element	-
 xls	namedrange	create	supported		ok format
 xls	namedrange	save	supported		ok format
-xls	comment	get	gap	M1-extended (R6b)	unreached
-xls	comment	find	gap	M1-extended (R6b)	unreached
-xls	comment	query	gap	M1-extended (R6b)	unreached
-xls	comment	view	gap	M1-extended (R6b)	unreached
-xls	comment	set	gap	M1-extended (R6b)	unreached
-xls	comment	add	gap	M1-extended (R6b)	-
-xls	comment	remove	gap	M1-extended (R6b)	unreached
-xls	comment	move	gap	M1-extended (R6b)	unreached
-xls	comment	swap	gap	M1-extended (R6b)	unreached
-xls	comment	edit	gap	M1-extended (R6b)	-
-xls	comment	batch	gap	M1-extended (R6b)	-
-xls	comment	create	gap	M1-extended (R6b)	ok format
-xls	comment	save	gap	M1-extended (R6b)	ok format
+xls	comment	get	supported		ok 4 instances, first `ole/xls/SimpleWithComments.xls` /sheet[1]/comment[1]
+xls	comment	find	supported		ok 4 instances, first `ole/xls/SimpleWithComments.xls` /sheet[1]/comment[1]
+xls	comment	query	supported		ok matches in ole/xls/SimpleWithComments.xls
+xls	comment	view	supported		ok 4 instances, first `ole/xls/SimpleWithComments.xls` /sheet[1]/comment[1]
+xls	comment	set	supported		ok `create() + add comment` /sheet[1]/comment[1] {"author":"Litchi"}
+xls	comment	add	supported		ok /sheet[1]/comment[1] on `create()` under /Sheet1 {"ref":"B2","text":"note","author":"Ann"}
+xls	comment	remove	supported		ok `create() + add comment` /sheet[1]/comment[1]
+xls	comment	move	format-verb		refused unsupported_type
+xls	comment	swap	format-verb		refused unsupported_type
+xls	comment	edit	supported		ok tx.set
+xls	comment	batch	supported		ok set item
+xls	comment	create	supported		ok format
+xls	comment	save	supported		ok format
 xls	chart	get	gap	M1-extended (R6b)	unreached
 xls	chart	find	gap	M1-extended (R6b)	unreached
 xls	chart	query	gap	M1-extended (R6b)	unreached
@@ -2235,58 +2235,58 @@ xls	sparkline	edit	gap	M1-extended (R6b)	-
 xls	sparkline	batch	gap	M1-extended (R6b)	-
 xls	sparkline	create	gap	M1-extended (R6b)	ok format
 xls	sparkline	save	gap	M1-extended (R6b)	ok format
-xls	dataValidation	get	gap	M1-extended (R6b)	unreached
-xls	dataValidation	find	gap	M1-extended (R6b)	unreached
-xls	dataValidation	query	gap	M1-extended (R6b)	unreached
-xls	dataValidation	view	gap	M1-extended (R6b)	unreached
-xls	dataValidation	set	gap	M1-extended (R6b)	unreached
-xls	dataValidation	add	gap	M1-extended (R6b)	-
-xls	dataValidation	remove	gap	M1-extended (R6b)	unreached
-xls	dataValidation	move	gap	M1-extended (R6b)	unreached
-xls	dataValidation	swap	gap	M1-extended (R6b)	unreached
-xls	dataValidation	edit	gap	M1-extended (R6b)	-
-xls	dataValidation	batch	gap	M1-extended (R6b)	-
-xls	dataValidation	create	gap	M1-extended (R6b)	ok format
-xls	dataValidation	save	gap	M1-extended (R6b)	ok format
-xls	conditionalFormatting	get	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	find	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	query	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	view	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	set	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	add	gap	M1-extended (R6b)	-
-xls	conditionalFormatting	remove	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	move	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	swap	gap	M1-extended (R6b)	unreached
-xls	conditionalFormatting	edit	gap	M1-extended (R6b)	-
-xls	conditionalFormatting	batch	gap	M1-extended (R6b)	-
-xls	conditionalFormatting	create	gap	M1-extended (R6b)	ok format
-xls	conditionalFormatting	save	gap	M1-extended (R6b)	ok format
-xls	autofilter	get	gap	M1-extended (R6b)	unreached
-xls	autofilter	find	gap	M1-extended (R6b)	unreached
-xls	autofilter	query	gap	M1-extended (R6b)	unreached
-xls	autofilter	view	gap	M1-extended (R6b)	unreached
-xls	autofilter	set	gap	M1-extended (R6b)	unreached
-xls	autofilter	add	gap	M1-extended (R6b)	-
-xls	autofilter	remove	gap	M1-extended (R6b)	unreached
-xls	autofilter	move	gap	M1-extended (R6b)	unreached
-xls	autofilter	swap	gap	M1-extended (R6b)	unreached
-xls	autofilter	edit	gap	M1-extended (R6b)	-
-xls	autofilter	batch	gap	M1-extended (R6b)	-
-xls	autofilter	create	gap	M1-extended (R6b)	ok format
-xls	autofilter	save	gap	M1-extended (R6b)	ok format
-xls	hyperlink	get	gap	M1-extended (R6b)	unreached
-xls	hyperlink	find	gap	M1-extended (R6b)	unreached
-xls	hyperlink	query	gap	M1-extended (R6b)	unreached
-xls	hyperlink	view	gap	M1-extended (R6b)	unreached
-xls	hyperlink	set	gap	M1-extended (R6b)	unreached
-xls	hyperlink	add	gap	M1-extended (R6b)	-
-xls	hyperlink	remove	gap	M1-extended (R6b)	unreached
-xls	hyperlink	move	gap	M1-extended (R6b)	unreached
-xls	hyperlink	swap	gap	M1-extended (R6b)	unreached
-xls	hyperlink	edit	gap	M1-extended (R6b)	-
-xls	hyperlink	batch	gap	M1-extended (R6b)	-
-xls	hyperlink	create	gap	M1-extended (R6b)	ok format
-xls	hyperlink	save	gap	M1-extended (R6b)	ok format
+xls	dataValidation	get	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xls	dataValidation	find	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xls	dataValidation	query	supported		ok matches in create() + add dataValidation
+xls	dataValidation	view	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xls	dataValidation	set	supported		ok `create() + add dataValidation` /sheet[1]/dataValidation[1] {"formula1":"Litchi"}
+xls	dataValidation	add	supported		ok /sheet[1]/dataValidation[1] on `create()` under /Sheet1 {"type":"list","ref":"A1:A9","formula1":"a,b"}
+xls	dataValidation	remove	supported		ok `create() + add dataValidation` /sheet[1]/dataValidation[1]
+xls	dataValidation	move	format-verb		unreached
+xls	dataValidation	swap	format-verb		unreached
+xls	dataValidation	edit	supported		ok tx.set
+xls	dataValidation	batch	supported		ok set item
+xls	dataValidation	create	supported		ok format
+xls	dataValidation	save	supported		ok format
+xls	conditionalFormatting	get	supported		ok 5 instances, first `ole/xls/WithConditionalFormatting.xls` /sheet[1]/cf[1]
+xls	conditionalFormatting	find	supported		ok 5 instances, first `ole/xls/WithConditionalFormatting.xls` /sheet[1]/cf[1]
+xls	conditionalFormatting	query	supported		ok matches in ole/xls/WithConditionalFormatting.xls
+xls	conditionalFormatting	view	supported		ok 5 instances, first `ole/xls/WithConditionalFormatting.xls` /sheet[1]/cf[1]
+xls	conditionalFormatting	set	supported		ok `create() + add conditionalFormatting` /sheet[1]/cf[1] {"stopIfTrue":"true"}
+xls	conditionalFormatting	add	supported		ok /sheet[1]/cf[1] on `create()` under /Sheet1 {"type":"cellIs","ref":"A1:A9","value":"5","fill":"FF0000"}
+xls	conditionalFormatting	remove	supported		ok `create() + add conditionalFormatting` /sheet[1]/cf[1]
+xls	conditionalFormatting	move	format-verb		refused unsupported_type
+xls	conditionalFormatting	swap	format-verb		refused unsupported_type
+xls	conditionalFormatting	edit	supported		ok tx.set
+xls	conditionalFormatting	batch	supported		ok set item
+xls	conditionalFormatting	create	supported		ok format
+xls	conditionalFormatting	save	supported		ok format
+xls	autofilter	get	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /sheet[1]/autofilter
+xls	autofilter	find	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /sheet[1]/autofilter
+xls	autofilter	query	supported		ok matches in ole/xls/SimpleWithAutofilter.xls
+xls	autofilter	view	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /sheet[1]/autofilter
+xls	autofilter	set	supported		ok `create() + add autofilter` /sheet[1]/autofilter {"range":"A1:C9"} (value unchanged: no-op only)
+xls	autofilter	add	supported		ok /sheet[1]/autofilter on `create()` under /Sheet1 {"range":"A1:C9"}
+xls	autofilter	remove	supported		ok `create() + add autofilter` /sheet[1]/autofilter
+xls	autofilter	move	format-verb		unreached
+xls	autofilter	swap	format-verb		unreached
+xls	autofilter	edit	supported		ok tx.set
+xls	autofilter	batch	supported		ok set item
+xls	autofilter	create	supported		ok format
+xls	autofilter	save	supported		ok format
+xls	hyperlink	get	supported		ok 2 instances, first `ole/xls/WithHyperlink.xls` /sheet[1]/hyperlink[1]
+xls	hyperlink	find	supported		ok 2 instances, first `ole/xls/WithHyperlink.xls` /sheet[1]/hyperlink[1]
+xls	hyperlink	query	supported		ok matches in ole/xls/WithHyperlink.xls
+xls	hyperlink	view	supported		ok 2 instances, first `ole/xls/WithHyperlink.xls` /sheet[1]/hyperlink[1]
+xls	hyperlink	set	supported		ok `create() + add hyperlink` /sheet[1]/hyperlink[1] {"url":"Litchi"}
+xls	hyperlink	add	supported		ok /sheet[1]/hyperlink[1] on `create()` under /Sheet1 {"ref":"A1","url":"https://example.test/"}
+xls	hyperlink	remove	supported		ok `create() + add hyperlink` /sheet[1]/hyperlink[1]
+xls	hyperlink	move	format-verb		unreached
+xls	hyperlink	swap	format-verb		unreached
+xls	hyperlink	edit	supported		ok tx.set
+xls	hyperlink	batch	supported		ok set item
+xls	hyperlink	create	supported		ok format
+xls	hyperlink	save	supported		ok format
 xls	mergeCell	get	gap	M1-extended (R6b)	unreached
 xls	mergeCell	find	gap	M1-extended (R6b)	unreached
 xls	mergeCell	query	gap	M1-extended (R6b)	unreached
@@ -2300,32 +2300,32 @@ xls	mergeCell	edit	gap	M1-extended (R6b)	-
 xls	mergeCell	batch	gap	M1-extended (R6b)	-
 xls	mergeCell	create	gap	M1-extended (R6b)	ok format
 xls	mergeCell	save	gap	M1-extended (R6b)	ok format
-xls	picture	get	gap	M1-extended (R6b)	unreached
-xls	picture	find	gap	M1-extended (R6b)	unreached
-xls	picture	query	gap	M1-extended (R6b)	unreached
-xls	picture	view	gap	M1-extended (R6b)	unreached
-xls	picture	set	gap	M1-extended (R6b)	unreached
-xls	picture	add	gap	M1-extended (R6b)	-
-xls	picture	remove	gap	M1-extended (R6b)	unreached
-xls	picture	move	gap	M1-extended (R6b)	unreached
-xls	picture	swap	gap	M1-extended (R6b)	unreached
-xls	picture	edit	gap	M1-extended (R6b)	-
-xls	picture	batch	gap	M1-extended (R6b)	-
-xls	picture	create	gap	M1-extended (R6b)	ok format
-xls	picture	save	gap	M1-extended (R6b)	ok format
-xls	shape	get	gap	M1-extended (R6b)	unreached
-xls	shape	find	gap	M1-extended (R6b)	unreached
-xls	shape	query	gap	M1-extended (R6b)	unreached
-xls	shape	view	gap	M1-extended (R6b)	unreached
-xls	shape	set	gap	M1-extended (R6b)	unreached
-xls	shape	add	gap	M1-extended (R6b)	-
-xls	shape	remove	gap	M1-extended (R6b)	unreached
-xls	shape	move	gap	M1-extended (R6b)	unreached
-xls	shape	swap	gap	M1-extended (R6b)	unreached
-xls	shape	edit	gap	M1-extended (R6b)	-
-xls	shape	batch	gap	M1-extended (R6b)	-
-xls	shape	create	gap	M1-extended (R6b)	ok format
-xls	shape	save	gap	M1-extended (R6b)	ok format
+xls	picture	get	supported		ok 6 instances, first `ole/xls/SimpleWithImages.xls` /sheet[1]/picture[1]
+xls	picture	find	supported		ok 6 instances, first `ole/xls/SimpleWithImages.xls` /sheet[1]/picture[1]
+xls	picture	query	supported		ok matches in ole/xls/SimpleWithImages.xls
+xls	picture	view	supported		ok 6 instances, first `ole/xls/SimpleWithImages.xls` /sheet[1]/picture[1]
+xls	picture	set	supported		ok `create() + add picture` /sheet[1]/picture[1] {"name":"Litchi"}
+xls	picture	add	supported		ok /sheet[1]/picture[1] on `create()` under /Sheet1 {"src":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="}
+xls	picture	remove	supported		ok `create() + add picture` /sheet[1]/picture[1]
+xls	picture	move	format-verb		refused unsupported_type
+xls	picture	swap	format-verb		refused unsupported_type
+xls	picture	edit	supported		ok tx.set
+xls	picture	batch	supported		ok set item
+xls	picture	create	supported		ok format
+xls	picture	save	supported		ok format
+xls	shape	get	supported		ok 2 instances, first `create() + add shape` /sheet[1]/shape[1]
+xls	shape	find	supported		ok 2 instances, first `create() + add shape` /sheet[1]/shape[1]
+xls	shape	query	supported		ok matches in create() + add shape
+xls	shape	view	supported		ok 2 instances, first `create() + add shape` /sheet[1]/shape[1]
+xls	shape	set	supported		ok `create() + add shape` /sheet[1]/shape[1] {"name":"Litchi"}
+xls	shape	add	supported		ok /sheet[1]/shape[1] on `create()` under /Sheet1 {"geometry":"rect","text":"box"}
+xls	shape	remove	supported		ok `create() + add shape` /sheet[1]/shape[1]
+xls	shape	move	format-verb		refused unsupported_type
+xls	shape	swap	format-verb		refused unsupported_type
+xls	shape	edit	supported		ok tx.set
+xls	shape	batch	supported		ok set item
+xls	shape	create	supported		ok format
+xls	shape	save	supported		ok format
 xls	ole	get	gap	M1-extended (R6b)	unreached
 xls	ole	find	gap	M1-extended (R6b)	unreached
 xls	ole	query	gap	M1-extended (R6b)	unreached
@@ -2339,32 +2339,32 @@ xls	ole	edit	gap	M1-extended (R6b)	-
 xls	ole	batch	gap	M1-extended (R6b)	-
 xls	ole	create	gap	M1-extended (R6b)	ok format
 xls	ole	save	gap	M1-extended (R6b)	ok format
-xls	rowbreak	get	gap	M1-extended (R6b)	unreached
-xls	rowbreak	find	gap	M1-extended (R6b)	unreached
-xls	rowbreak	query	gap	M1-extended (R6b)	unreached
-xls	rowbreak	view	gap	M1-extended (R6b)	unreached
-xls	rowbreak	set	gap	M1-extended (R6b)	unreached
-xls	rowbreak	add	gap	M1-extended (R6b)	-
-xls	rowbreak	remove	gap	M1-extended (R6b)	unreached
-xls	rowbreak	move	gap	M1-extended (R6b)	unreached
-xls	rowbreak	swap	gap	M1-extended (R6b)	unreached
-xls	rowbreak	edit	gap	M1-extended (R6b)	-
-xls	rowbreak	batch	gap	M1-extended (R6b)	-
-xls	rowbreak	create	gap	M1-extended (R6b)	ok format
-xls	rowbreak	save	gap	M1-extended (R6b)	ok format
-xls	colbreak	get	gap	M1-extended (R6b)	unreached
-xls	colbreak	find	gap	M1-extended (R6b)	unreached
-xls	colbreak	query	gap	M1-extended (R6b)	unreached
-xls	colbreak	view	gap	M1-extended (R6b)	unreached
-xls	colbreak	set	gap	M1-extended (R6b)	unreached
-xls	colbreak	add	gap	M1-extended (R6b)	-
-xls	colbreak	remove	gap	M1-extended (R6b)	unreached
-xls	colbreak	move	gap	M1-extended (R6b)	unreached
-xls	colbreak	swap	gap	M1-extended (R6b)	unreached
-xls	colbreak	edit	gap	M1-extended (R6b)	-
-xls	colbreak	batch	gap	M1-extended (R6b)	-
-xls	colbreak	create	gap	M1-extended (R6b)	ok format
-xls	colbreak	save	gap	M1-extended (R6b)	ok format
+xls	rowbreak	get	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/rowbreak[1]
+xls	rowbreak	find	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/rowbreak[1]
+xls	rowbreak	query	supported		ok matches in ole/xls/SimpleWithPageBreaks.xls
+xls	rowbreak	view	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/rowbreak[1]
+xls	rowbreak	set	supported		ok `create() + add rowbreak` /sheet[1]/rowbreak[1] {"row":"2"}
+xls	rowbreak	add	supported		ok /sheet[1]/rowbreak[1] on `create()` under /Sheet1 {"row":"10"}
+xls	rowbreak	remove	supported		ok `create() + add rowbreak` /sheet[1]/rowbreak[1]
+xls	rowbreak	move	format-verb		unreached
+xls	rowbreak	swap	format-verb		unreached
+xls	rowbreak	edit	supported		ok tx.set
+xls	rowbreak	batch	supported		ok set item
+xls	rowbreak	create	supported		ok format
+xls	rowbreak	save	supported		ok format
+xls	colbreak	get	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/colbreak[1]
+xls	colbreak	find	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/colbreak[1]
+xls	colbreak	query	supported		ok matches in ole/xls/SimpleWithPageBreaks.xls
+xls	colbreak	view	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/colbreak[1]
+xls	colbreak	set	supported		ok `create() + add colbreak` /sheet[1]/colbreak[1] {"col":"7"}
+xls	colbreak	add	supported		ok /sheet[1]/colbreak[1] on `create()` under /Sheet1 {"col":"4"}
+xls	colbreak	remove	supported		ok `create() + add colbreak` /sheet[1]/colbreak[1]
+xls	colbreak	move	format-verb		unreached
+xls	colbreak	swap	format-verb		unreached
+xls	colbreak	edit	supported		ok tx.set
+xls	colbreak	batch	supported		ok set item
+xls	colbreak	create	supported		ok format
+xls	colbreak	save	supported		ok format
 xls	run	get	gap	M1-extended (R6b)	unreached
 xls	run	find	gap	M1-extended (R6b)	unreached
 xls	run	query	gap	M1-extended (R6b)	unreached
@@ -3119,6 +3119,97 @@ rtf	level	edit	n/a	edit not offered for this element	-
 rtf	level	batch	n/a	batch not offered for this element	-
 rtf	level	create	supported		ok format
 rtf	level	save	supported		ok format
+rtf	section	get	supported		ok 7 instances, first `rtf/column-break.rtf` /section[1]
+rtf	section	find	supported		ok 7 instances, first `rtf/column-break.rtf` /section[1]
+rtf	section	query	supported		ok matches in rtf/column-break.rtf
+rtf	section	view	supported		ok 7 instances, first `rtf/column-break.rtf` /section[1]
+rtf	section	set	supported		ok `rtf/test437Encoding.rtf` /section[1] {"type":"nextColumn"}
+rtf	section	add	n/a	add not offered for this element	-
+rtf	section	remove	n/a	remove not offered for this element	-
+rtf	section	move	format-verb		refused unsupported_type
+rtf	section	swap	format-verb		refused unsupported_type
+rtf	section	edit	supported		ok tx.set
+rtf	section	batch	supported		ok set item
+rtf	section	create	supported		ok format
+rtf	section	save	supported		ok format
+rtf	bookmark	get	supported		ok 2 instances, first `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	find	supported		ok 2 instances, first `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	bookmark	view	supported		ok 2 instances, first `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	set	supported		ok `unified-ops/0294/parts.rtf` /bookmark[1] {"name":"Litchi"}
+rtf	bookmark	add	n/a	add not offered for this element	-
+rtf	bookmark	remove	supported		ok `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	move	format-verb		refused unsupported_type
+rtf	bookmark	swap	format-verb		refused unsupported_type
+rtf	bookmark	edit	supported		ok tx.set
+rtf	bookmark	batch	supported		ok set item
+rtf	bookmark	create	supported		ok format
+rtf	bookmark	save	supported		ok format
+rtf	field	get	supported		ok 4 instances, first `rtf/hyperlink.rtf` /field[1]
+rtf	field	find	supported		ok 4 instances, first `rtf/hyperlink.rtf` /field[1]
+rtf	field	query	supported		ok matches in rtf/hyperlink.rtf
+rtf	field	view	supported		ok 4 instances, first `rtf/hyperlink.rtf` /field[1]
+rtf	field	set	supported		ok `rtf/hyperlink.rtf` /field[1] {"instruction":"Litchi"}
+rtf	field	add	n/a	add not offered for this element	-
+rtf	field	remove	n/a	remove not offered for this element	-
+rtf	field	move	format-verb		refused unsupported_type
+rtf	field	swap	format-verb		refused unsupported_type
+rtf	field	edit	supported		ok tx.set
+rtf	field	batch	supported		ok set item
+rtf	field	create	supported		ok format
+rtf	field	save	supported		ok format
+rtf	toc	get	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /toc[1]
+rtf	toc	find	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /toc[1]
+rtf	toc	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	toc	view	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /toc[1]
+rtf	toc	set	supported		ok `unified-ops/0294/parts.rtf` /toc[1] {"hyperlinks":"false"}
+rtf	toc	add	n/a	add not offered for this element	-
+rtf	toc	remove	n/a	remove not offered for this element	-
+rtf	toc	move	format-verb		unreached
+rtf	toc	swap	format-verb		unreached
+rtf	toc	edit	supported		ok tx.set
+rtf	toc	batch	supported		ok set item
+rtf	toc	create	supported		ok format
+rtf	toc	save	supported		ok format
+rtf	tab	get	supported		ok 3 instances, first `unified-ops/0294/parts.rtf` /body/p[1]/tab[1]
+rtf	tab	find	supported		ok 3 instances, first `unified-ops/0294/parts.rtf` /body/p[1]/tab[1]
+rtf	tab	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	tab	view	supported		ok 3 instances, first `unified-ops/0294/parts.rtf` /body/p[1]/tab[1]
+rtf	tab	set	supported		ok `unified-ops/0294/parts.rtf` /body/p[1]/tab[1] {"pos":"2"}
+rtf	tab	add	supported		ok /body/p[1]/tab[1] on `rtf/testDefaultEncodingParse.rtf` under /body/p[1] {"pos":"2","val":"left","leader":"none"}
+rtf	tab	remove	supported		ok `rtf/testDefaultEncodingParse.rtf + add tab` /body/p[1]/tab[1]
+rtf	tab	move	format-verb		refused unsupported_type
+rtf	tab	swap	format-verb		refused unsupported_type
+rtf	tab	edit	supported		ok tx.set
+rtf	tab	batch	supported		ok set item
+rtf	tab	create	supported		ok format
+rtf	tab	save	supported		ok format
+rtf	textbox	get	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/textbox[1]
+rtf	textbox	find	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/textbox[1]
+rtf	textbox	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	textbox	view	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/textbox[1]
+rtf	textbox	set	n/a	set not offered for this element	-
+rtf	textbox	add	n/a	add not offered for this element	-
+rtf	textbox	remove	n/a	remove not offered for this element	-
+rtf	textbox	move	format-verb		unreached
+rtf	textbox	swap	format-verb		unreached
+rtf	textbox	edit	n/a	edit not offered for this element	-
+rtf	textbox	batch	n/a	batch not offered for this element	-
+rtf	textbox	create	supported		ok format
+rtf	textbox	save	supported		ok format
+rtf	shape	get	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/shape[1]
+rtf	shape	find	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/shape[1]
+rtf	shape	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	shape	view	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/shape[1]
+rtf	shape	set	n/a	set not offered for this element	-
+rtf	shape	add	n/a	add not offered for this element	-
+rtf	shape	remove	n/a	remove not offered for this element	-
+rtf	shape	move	format-verb		unreached
+rtf	shape	swap	format-verb		unreached
+rtf	shape	edit	n/a	edit not offered for this element	-
+rtf	shape	batch	n/a	batch not offered for this element	-
+rtf	shape	create	supported		ok format
+rtf	shape	save	supported		ok format
 odt	document	get	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /
 odt	document	find	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /
 odt	document	query	n/a	query not offered for this element	-
@@ -3158,10 +3249,10 @@ odt	paragraph	edit	supported		ok tx.set
 odt	paragraph	batch	supported		ok set item
 odt	paragraph	create	supported		ok format
 odt	paragraph	save	supported		ok format
-odt	heading	get	supported		ok 7 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
-odt	heading	find	supported		ok 7 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
+odt	heading	get	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
+odt	heading	find	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
 odt	heading	query	supported		ok matches in odf/corpus/writer-header-footer.odt
-odt	heading	view	supported		ok 7 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
+odt	heading	view	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /body/h[1]
 odt	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] {"text":"Litchi"}
 odt	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body {}
 odt	heading	remove	supported		ok `create() + add paragraph + add heading` /body/h[1]
@@ -3197,10 +3288,10 @@ odt	hyperlink	edit	supported		ok tx.set
 odt	hyperlink	batch	supported		ok set item
 odt	hyperlink	create	supported		ok format
 odt	hyperlink	save	supported		ok format
-odt	list	get	supported		ok 6 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]
-odt	list	find	supported		ok 6 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]
+odt	list	get	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]
+odt	list	find	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]
 odt	list	query	supported		ok matches in odf/corpus/writer-definition-lists.odt
-odt	list	view	supported		ok 6 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]
+odt	list	view	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /body/list[1]
 odt	list	set	n/a	set not offered for this element	-
 odt	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body {}
 odt	list	remove	supported		ok `create() + add paragraph + add list` /body/list[1]
@@ -3223,10 +3314,10 @@ odt	listItem	edit	supported		ok tx.set
 odt	listItem	batch	supported		ok set item
 odt	listItem	create	supported		ok format
 odt	listItem	save	supported		ok format
-odt	table	get	supported		ok 5 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
-odt	table	find	supported		ok 5 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
+odt	table	get	supported		ok 6 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
+odt	table	find	supported		ok 6 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
 odt	table	query	supported		ok matches in odf/corpus/writer-table.odt
-odt	table	view	supported		ok 5 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
+odt	table	view	supported		ok 6 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]
 odt	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] {"name":"Litchi"}
 odt	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body {}
 odt	table	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]
@@ -3275,10 +3366,10 @@ odt	section	edit	supported		ok tx.set
 odt	section	batch	supported		ok set item
 odt	section	create	supported		ok format
 odt	section	save	supported		ok format
-odt	frame	get	supported		ok 7 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
-odt	frame	find	supported		ok 7 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
+odt	frame	get	supported		ok 8 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
+odt	frame	find	supported		ok 8 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
 odt	frame	query	supported		ok matches in odf/corpus/writer-images-frames.odt
-odt	frame	view	supported		ok 7 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
+odt	frame	view	supported		ok 8 instances, first `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
 odt	frame	set	supported		ok `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1] {"name":"Litchi"}
 odt	frame	add	n/a	add not offered for this element	-
 odt	frame	remove	supported		ok `odf/corpus/writer-images-frames.odt` /body/p[2]/frame[1]
@@ -3405,6 +3496,162 @@ odt	metadata	edit	supported		ok tx.set
 odt	metadata	batch	supported		ok set item
 odt	metadata	create	supported		ok format
 odt	metadata	save	supported		ok format
+odt	header	get	supported		ok 4 instances, first `odf/corpus/writer-header-footer.odt` /header[1]
+odt	header	find	supported		ok 4 instances, first `odf/corpus/writer-header-footer.odt` /header[1]
+odt	header	query	supported		ok matches in odf/corpus/writer-header-footer.odt
+odt	header	view	supported		ok 4 instances, first `odf/corpus/writer-header-footer.odt` /header[1]
+odt	header	set	supported		ok `unified-ops/0294/parts.odt` /header[2] {"text":"Litchi"}
+odt	header	add	n/a	add not offered for this element	-
+odt	header	remove	n/a	remove not offered for this element	-
+odt	header	move	format-verb		refused unsupported_type
+odt	header	swap	format-verb		refused unsupported_type
+odt	header	edit	supported		ok tx.set
+odt	header	batch	supported		ok set item
+odt	header	create	supported		ok format
+odt	header	save	supported		ok format
+odt	footer	get	supported		ok 3 instances, first `odf/corpus/writer-header-footer.odt` /footer[1]
+odt	footer	find	supported		ok 3 instances, first `odf/corpus/writer-header-footer.odt` /footer[1]
+odt	footer	query	supported		ok matches in odf/corpus/writer-header-footer.odt
+odt	footer	view	supported		ok 3 instances, first `odf/corpus/writer-header-footer.odt` /footer[1]
+odt	footer	set	supported		ok `unified-ops/0294/parts.odt` /footer[1] {"text":"Litchi"}
+odt	footer	add	n/a	add not offered for this element	-
+odt	footer	remove	n/a	remove not offered for this element	-
+odt	footer	move	format-verb		refused unsupported_type
+odt	footer	swap	format-verb		refused unsupported_type
+odt	footer	edit	supported		ok tx.set
+odt	footer	batch	supported		ok set item
+odt	footer	create	supported		ok format
+odt	footer	save	supported		ok format
+odt	numbering	get	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering
+odt	numbering	find	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering
+odt	numbering	query	supported		ok matches in create()
+odt	numbering	view	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering
+odt	numbering	set	n/a	set not offered for this element	-
+odt	numbering	add	n/a	add not offered for this element	-
+odt	numbering	remove	n/a	remove not offered for this element	-
+odt	numbering	move	format-verb		unreached
+odt	numbering	swap	format-verb		unreached
+odt	numbering	edit	n/a	edit not offered for this element	-
+odt	numbering	batch	n/a	batch not offered for this element	-
+odt	numbering	create	supported		ok format
+odt	numbering	save	supported		ok format
+odt	abstractNum	get	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/abstractNum[1]
+odt	abstractNum	find	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/abstractNum[1]
+odt	abstractNum	query	supported		ok matches in create()
+odt	abstractNum	view	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/abstractNum[1]
+odt	abstractNum	set	n/a	set not offered for this element	-
+odt	abstractNum	add	n/a	add not offered for this element	-
+odt	abstractNum	remove	n/a	remove not offered for this element	-
+odt	abstractNum	move	format-verb		refused unsupported_type
+odt	abstractNum	swap	format-verb		refused unsupported_type
+odt	abstractNum	edit	n/a	edit not offered for this element	-
+odt	abstractNum	batch	n/a	batch not offered for this element	-
+odt	abstractNum	create	supported		ok format
+odt	abstractNum	save	supported		ok format
+odt	num	get	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/num[1]
+odt	num	find	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/num[1]
+odt	num	query	supported		ok matches in create()
+odt	num	view	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/num[1]
+odt	num	set	n/a	set not offered for this element	-
+odt	num	add	n/a	add not offered for this element	-
+odt	num	remove	n/a	remove not offered for this element	-
+odt	num	move	format-verb		refused unsupported_type
+odt	num	swap	format-verb		refused unsupported_type
+odt	num	edit	n/a	edit not offered for this element	-
+odt	num	batch	n/a	batch not offered for this element	-
+odt	num	create	supported		ok format
+odt	num	save	supported		ok format
+odt	level	get	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/abstractNum[1]/level[1]
+odt	level	find	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/abstractNum[1]/level[1]
+odt	level	query	supported		ok matches in create()
+odt	level	view	supported		ok 8 instances, first `odf/corpus/writer-definition-lists.odt` /numbering/abstractNum[1]/level[1]
+odt	level	set	n/a	set not offered for this element	-
+odt	level	add	n/a	add not offered for this element	-
+odt	level	remove	n/a	remove not offered for this element	-
+odt	level	move	format-verb		refused unsupported_type
+odt	level	swap	format-verb		refused unsupported_type
+odt	level	edit	n/a	edit not offered for this element	-
+odt	level	batch	n/a	batch not offered for this element	-
+odt	level	create	supported		ok format
+odt	level	save	supported		ok format
+odt	field	get	supported		ok 5 instances, first `unified-ops/0294/parts.odt` /field[1]
+odt	field	find	supported		ok 5 instances, first `unified-ops/0294/parts.odt` /field[1]
+odt	field	query	supported		ok matches in unified-ops/0294/parts.odt
+odt	field	view	supported		ok 5 instances, first `unified-ops/0294/parts.odt` /field[1]
+odt	field	set	n/a	set not offered for this element	-
+odt	field	add	n/a	add not offered for this element	-
+odt	field	remove	n/a	remove not offered for this element	-
+odt	field	move	format-verb		refused unsupported_type
+odt	field	swap	format-verb		refused unsupported_type
+odt	field	edit	n/a	edit not offered for this element	-
+odt	field	batch	n/a	batch not offered for this element	-
+odt	field	create	supported		ok format
+odt	field	save	supported		ok format
+odt	toc	get	supported		ok 2 instances, first `odf/corpus/writer-table-of-contents.odt` /toc[1]
+odt	toc	find	supported		ok 2 instances, first `odf/corpus/writer-table-of-contents.odt` /toc[1]
+odt	toc	query	supported		ok matches in odf/corpus/writer-table-of-contents.odt
+odt	toc	view	supported		ok 2 instances, first `odf/corpus/writer-table-of-contents.odt` /toc[1]
+odt	toc	set	n/a	set not offered for this element	-
+odt	toc	add	n/a	add not offered for this element	-
+odt	toc	remove	n/a	remove not offered for this element	-
+odt	toc	move	format-verb		unreached
+odt	toc	swap	format-verb		unreached
+odt	toc	edit	n/a	edit not offered for this element	-
+odt	toc	batch	n/a	batch not offered for this element	-
+odt	toc	create	supported		ok format
+odt	toc	save	supported		ok format
+odt	tab	get	supported		ok 7 instances, first `odf/corpus/writer-table-of-contents.odt` /body/p[2]/tab[1]
+odt	tab	find	supported		ok 7 instances, first `odf/corpus/writer-table-of-contents.odt` /body/p[2]/tab[1]
+odt	tab	query	supported		ok matches in odf/corpus/writer-table-of-contents.odt
+odt	tab	view	supported		ok 7 instances, first `odf/corpus/writer-table-of-contents.odt` /body/p[2]/tab[1]
+odt	tab	set	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1] {"pos":"1"}
+odt	tab	add	supported		ok /body/p[1]/tab[1] on `create() + add paragraph` under /body/p[1] {"pos":"2","val":"left","leader":"none"}
+odt	tab	remove	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1]
+odt	tab	move	format-verb		refused unsupported_type
+odt	tab	swap	format-verb		refused unsupported_type
+odt	tab	edit	supported		ok tx.set
+odt	tab	batch	supported		ok set item
+odt	tab	create	supported		ok format
+odt	tab	save	supported		ok format
+odt	shape	get	supported		ok 2 instances, first `unified-ops/0294/parts.odt` /body/shape[1]
+odt	shape	find	supported		ok 2 instances, first `unified-ops/0294/parts.odt` /body/shape[1]
+odt	shape	query	supported		ok matches in unified-ops/0294/parts.odt
+odt	shape	view	supported		ok 2 instances, first `unified-ops/0294/parts.odt` /body/shape[1]
+odt	shape	set	n/a	set not offered for this element	-
+odt	shape	add	n/a	add not offered for this element	-
+odt	shape	remove	n/a	remove not offered for this element	-
+odt	shape	move	format-verb		refused unsupported_type
+odt	shape	swap	format-verb		refused unsupported_type
+odt	shape	edit	n/a	edit not offered for this element	-
+odt	shape	batch	n/a	batch not offered for this element	-
+odt	shape	create	supported		ok format
+odt	shape	save	supported		ok format
+odt	equation	get	supported		ok 2 instances, first `unified-ops/0294/parts.odt` /body/equation[1]
+odt	equation	find	supported		ok 2 instances, first `unified-ops/0294/parts.odt` /body/equation[1]
+odt	equation	query	supported		ok matches in unified-ops/0294/parts.odt
+odt	equation	view	supported		ok 2 instances, first `unified-ops/0294/parts.odt` /body/equation[1]
+odt	equation	set	n/a	set not offered for this element	-
+odt	equation	add	n/a	add not offered for this element	-
+odt	equation	remove	n/a	remove not offered for this element	-
+odt	equation	move	format-verb		refused unsupported_type
+odt	equation	swap	format-verb		refused unsupported_type
+odt	equation	edit	n/a	edit not offered for this element	-
+odt	equation	batch	n/a	batch not offered for this element	-
+odt	equation	create	supported		ok format
+odt	equation	save	supported		ok format
+odt	column	get	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]/col[1]
+odt	column	find	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]/col[1]
+odt	column	query	supported		ok matches in odf/corpus/writer-table.odt
+odt	column	view	supported		ok 8 instances, first `odf/corpus/writer-table.odt` /body/tbl[1]/col[1]
+odt	column	set	n/a	set not offered for this element	-
+odt	column	add	n/a	add not offered for this element	-
+odt	column	remove	n/a	remove not offered for this element	-
+odt	column	move	format-verb		refused unsupported_type
+odt	column	swap	format-verb		refused unsupported_type
+odt	column	edit	n/a	edit not offered for this element	-
+odt	column	batch	n/a	batch not offered for this element	-
+odt	column	create	supported		ok format
+odt	column	save	supported		ok format
 ods	workbook	get	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /
 ods	workbook	find	supported		ok 8 instances, first `odf/corpus/calc-formulas.ods` /
 ods	workbook	query	n/a	query not offered for this element	-
@@ -3600,58 +3847,58 @@ ods	sparkline	edit	gap	ODS adapter follow-up (record 0277)	-
 ods	sparkline	batch	gap	ODS adapter follow-up (record 0277)	-
 ods	sparkline	create	gap	ODS adapter follow-up (record 0277)	ok format
 ods	sparkline	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	dataValidation	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	add	gap	ODS adapter follow-up (record 0277)	-
-ods	dataValidation	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	dataValidation	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	dataValidation	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	dataValidation	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	dataValidation	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	conditionalFormatting	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	add	gap	ODS adapter follow-up (record 0277)	-
-ods	conditionalFormatting	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	conditionalFormatting	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	conditionalFormatting	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	conditionalFormatting	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	conditionalFormatting	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	autofilter	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	add	gap	ODS adapter follow-up (record 0277)	-
-ods	autofilter	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	autofilter	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	autofilter	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	autofilter	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	autofilter	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	hyperlink	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	add	gap	ODS adapter follow-up (record 0277)	-
-ods	hyperlink	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	hyperlink	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	hyperlink	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	hyperlink	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	hyperlink	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	dataValidation	get	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
+ods	dataValidation	find	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
+ods	dataValidation	query	supported		ok matches in odf/ods/grid-padding-package.ods
+ods	dataValidation	view	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
+ods	dataValidation	set	supported		ok `odf/corpus/calc-two-sheets.ods + add dataValidation` /sheet[1]/dataValidation[1] {"formula1":"Litchi"}
+ods	dataValidation	add	supported		ok /sheet[1]/dataValidation[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"type":"list","ref":"A1:A2","formula1":"a,b"}
+ods	dataValidation	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add dataValidation` /sheet[1]/dataValidation[1]
+ods	dataValidation	move	format-verb		unreached
+ods	dataValidation	swap	format-verb		unreached
+ods	dataValidation	edit	supported		ok tx.set
+ods	dataValidation	batch	supported		ok set item
+ods	dataValidation	create	supported		ok format
+ods	dataValidation	save	supported		ok format
+ods	conditionalFormatting	get	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	find	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add conditionalFormatting
+ods	conditionalFormatting	view	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	set	supported		ok `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1] {"value":"Litchi"}
+ods	conditionalFormatting	add	supported		ok /sheet[1]/cf[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"type":"cellIs","ref":"A1:A9","value":"5","fill":"FF0000"}
+ods	conditionalFormatting	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` /sheet[1]/cf[1]
+ods	conditionalFormatting	move	format-verb		refused unsupported_element
+ods	conditionalFormatting	swap	format-verb		refused unsupported_element
+ods	conditionalFormatting	edit	supported		ok tx.set
+ods	conditionalFormatting	batch	supported		ok set item
+ods	conditionalFormatting	create	supported		ok format
+ods	conditionalFormatting	save	supported		ok format
+ods	autofilter	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add autofilter
+ods	autofilter	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	set	supported		ok `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter {"range":"A1:C3"} (value unchanged: no-op only)
+ods	autofilter	add	supported		ok /sheet[1]/autofilter on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"range":"A1:C3"}
+ods	autofilter	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add autofilter` /sheet[1]/autofilter
+ods	autofilter	move	format-verb		unreached
+ods	autofilter	swap	format-verb		unreached
+ods	autofilter	edit	supported		ok tx.set
+ods	autofilter	batch	supported		ok set item
+ods	autofilter	create	supported		ok format
+ods	autofilter	save	supported		ok format
+ods	hyperlink	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add hyperlink
+ods	hyperlink	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	set	supported		ok `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1] {"url":"Litchi"}
+ods	hyperlink	add	supported		ok /sheet[1]/hyperlink[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"ref":"A1","url":"https://example.test/"}
+ods	hyperlink	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add hyperlink` /sheet[1]/hyperlink[1]
+ods	hyperlink	move	format-verb		unreached
+ods	hyperlink	swap	format-verb		unreached
+ods	hyperlink	edit	supported		ok tx.set
+ods	hyperlink	batch	supported		ok set item
+ods	hyperlink	create	supported		ok format
+ods	hyperlink	save	supported		ok format
 ods	mergeCell	get	supported		ok 3 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/mergeCell[1]
 ods	mergeCell	find	supported		ok 3 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/mergeCell[1]
 ods	mergeCell	query	supported		ok matches in seed
@@ -3665,32 +3912,32 @@ ods	mergeCell	edit	n/a	edit not offered for this element	-
 ods	mergeCell	batch	n/a	batch not offered for this element	-
 ods	mergeCell	create	supported		ok format
 ods	mergeCell	save	supported		ok format
-ods	picture	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	add	gap	ODS adapter follow-up (record 0277)	-
-ods	picture	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	picture	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	picture	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	picture	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	picture	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	shape	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	add	gap	ODS adapter follow-up (record 0277)	-
-ods	shape	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	shape	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	shape	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	shape	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	shape	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	picture	get	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	find	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add picture
+ods	picture	view	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	set	supported		ok `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1] {"name":"Litchi"}
+ods	picture	add	supported		ok /sheet[1]/picture[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"src":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="}
+ods	picture	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add picture` /sheet[1]/picture[1]
+ods	picture	move	format-verb		refused unsupported_element
+ods	picture	swap	format-verb		refused unsupported_element
+ods	picture	edit	supported		ok tx.set
+ods	picture	batch	supported		ok set item
+ods	picture	create	supported		ok format
+ods	picture	save	supported		ok format
+ods	shape	get	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	find	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add shape
+ods	shape	view	supported		ok 2 instances, first `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	set	supported		ok `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1] {"name":"Litchi"}
+ods	shape	add	supported		ok /sheet[1]/shape[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"geometry":"rect","text":"box"}
+ods	shape	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add shape` /sheet[1]/shape[1]
+ods	shape	move	format-verb		refused unsupported_element
+ods	shape	swap	format-verb		refused unsupported_element
+ods	shape	edit	supported		ok tx.set
+ods	shape	batch	supported		ok set item
+ods	shape	create	supported		ok format
+ods	shape	save	supported		ok format
 ods	ole	get	gap	ODS adapter follow-up (record 0277)	unreached
 ods	ole	find	gap	ODS adapter follow-up (record 0277)	unreached
 ods	ole	query	gap	ODS adapter follow-up (record 0277)	unreached
@@ -3704,32 +3951,32 @@ ods	ole	edit	gap	ODS adapter follow-up (record 0277)	-
 ods	ole	batch	gap	ODS adapter follow-up (record 0277)	-
 ods	ole	create	gap	ODS adapter follow-up (record 0277)	ok format
 ods	ole	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	rowbreak	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	add	gap	ODS adapter follow-up (record 0277)	-
-ods	rowbreak	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	rowbreak	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	rowbreak	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	rowbreak	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	rowbreak	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	colbreak	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	add	gap	ODS adapter follow-up (record 0277)	-
-ods	colbreak	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	colbreak	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	colbreak	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	colbreak	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	colbreak	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	rowbreak	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add rowbreak
+ods	rowbreak	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	set	supported		ok `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1] {"row":"1"}
+ods	rowbreak	add	supported		ok /sheet[1]/rowbreak[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"row":"2"}
+ods	rowbreak	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
+ods	rowbreak	move	format-verb		unreached
+ods	rowbreak	swap	format-verb		unreached
+ods	rowbreak	edit	supported		ok tx.set
+ods	rowbreak	batch	supported		ok set item
+ods	rowbreak	create	supported		ok format
+ods	rowbreak	save	supported		ok format
+ods	colbreak	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add colbreak
+ods	colbreak	view	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	set	supported		ok `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1] {"col":"7"}
+ods	colbreak	add	supported		ok /sheet[1]/colbreak[1] on `odf/corpus/calc-two-sheets.ods` under /sheet1 {"col":"2"}
+ods	colbreak	remove	supported		ok `odf/corpus/calc-two-sheets.ods + add colbreak` /sheet[1]/colbreak[1]
+ods	colbreak	move	format-verb		unreached
+ods	colbreak	swap	format-verb		unreached
+ods	colbreak	edit	supported		ok tx.set
+ods	colbreak	batch	supported		ok set item
+ods	colbreak	create	supported		ok format
+ods	colbreak	save	supported		ok format
 ods	run	get	gap	ODS adapter follow-up (record 0277)	unreached
 ods	run	find	gap	ODS adapter follow-up (record 0277)	unreached
 ods	run	query	gap	ODS adapter follow-up (record 0277)	unreached
@@ -3808,10 +4055,10 @@ odp	picture	edit	supported		ok tx.set
 odp	picture	batch	supported		ok set item
 odp	picture	create	supported		ok format
 odp	picture	save	supported		ok format
-odp	table	get	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
-odp	table	find	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
+odp	table	get	supported		ok 3 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
+odp	table	find	supported		ok 3 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
 odp	table	query	supported		ok matches in odf/odp/tdf105502.odp
-odp	table	view	supported		ok 2 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
+odp	table	view	supported		ok 3 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]
 odp	table	set	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1] {"name":"Litchi"}
 odp	table	add	n/a	add not offered for this element	-
 odp	table	remove	supported		ok `odf/odp/tdf105502.odp` /slide[1]/table[1]
@@ -3821,10 +4068,10 @@ odp	table	edit	supported		ok tx.set
 odp	table	batch	supported		ok set item
 odp	table	create	supported		ok format
 odp	table	save	supported		ok format
-odp	tr	get	supported		ok 5 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
-odp	tr	find	supported		ok 5 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
+odp	tr	get	supported		ok 6 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
+odp	tr	find	supported		ok 6 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
 odp	tr	query	supported		ok matches in odf/odp/tdf105502.odp
-odp	tr	view	supported		ok 5 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
+odp	tr	view	supported		ok 6 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]
 odp	tr	set	n/a	set not offered for this element	-
 odp	tr	add	n/a	add not offered for this element	-
 odp	tr	remove	n/a	remove not offered for this element	-
@@ -3847,10 +4094,10 @@ odp	tc	edit	supported		ok tx.set
 odp	tc	batch	supported		ok set item
 odp	tc	create	supported		ok format
 odp	tc	save	supported		ok format
-odp	chart	get	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
-odp	chart	find	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
+odp	chart	get	supported		ok 2 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
+odp	chart	find	supported		ok 2 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
 odp	chart	query	supported		ok matches in libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp
-odp	chart	view	supported		ok 1 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
+odp	chart	view	supported		ok 2 instances, first `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
 odp	chart	set	supported		ok `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1] {"name":"Litchi"}
 odp	chart	add	n/a	add not offered for this element	-
 odp	chart	remove	supported		ok `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp` /slide[1]/chart[1]
@@ -3886,58 +4133,58 @@ odp	connector	edit	supported		ok tx.set
 odp	connector	batch	supported		ok set item
 odp	connector	create	supported		ok format
 odp	connector	save	supported		ok format
-odp	ole	get	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
-odp	ole	find	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
+odp	ole	get	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
+odp	ole	find	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
 odp	ole	query	supported		ok matches in odf/odp/tdf169979.odp
-odp	ole	view	supported		ok 3 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
+odp	ole	view	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/ole[1]
 odp	ole	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/ole[1] {"name":"Litchi"}
 odp	ole	add	n/a	add not offered for this element	-
 odp	ole	remove	supported		ok `odf/odp/tdf169979.odp` /slide[1]/ole[1]
-odp	ole	move	format-verb		unreached
-odp	ole	swap	format-verb		unreached
+odp	ole	move	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/ole[1] /slide[1]/ole[2]
+odp	ole	swap	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/ole[1] /slide[1]/ole[2]
 odp	ole	edit	supported		ok tx.set
 odp	ole	batch	supported		ok set item
 odp	ole	create	supported		ok format
 odp	ole	save	supported		ok format
-odp	media	get	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
-odp	media	find	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
+odp	media	get	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
+odp	media	find	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
 odp	media	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp
-odp	media	view	supported		ok 1 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
+odp	media	view	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
 odp	media	set	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1] {"name":"Litchi"}
 odp	media	add	n/a	add not offered for this element	-
 odp	media	remove	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/media[1]
-odp	media	move	format-verb		unreached
-odp	media	swap	format-verb		unreached
+odp	media	move	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/media[1] /slide[1]/media[2]
+odp	media	swap	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/media[1] /slide[1]/media[2]
 odp	media	edit	supported		ok tx.set
 odp	media	batch	supported		ok set item
 odp	media	create	supported		ok format
 odp	media	save	supported		ok format
-odp	video	get	gap	M6 ODP media typing	unreached
-odp	video	find	gap	M6 ODP media typing	unreached
-odp	video	query	gap	M6 ODP media typing	unreached
-odp	video	view	gap	M6 ODP media typing	unreached
-odp	video	set	gap	M6 ODP media typing	unreached
-odp	video	add	gap	M6 ODP media typing	-
-odp	video	remove	gap	M6 ODP media typing	unreached
-odp	video	move	gap	M6 ODP media typing	unreached
-odp	video	swap	gap	M6 ODP media typing	unreached
-odp	video	edit	gap	M6 ODP media typing	-
-odp	video	batch	gap	M6 ODP media typing	-
-odp	video	create	gap	M6 ODP media typing	ok format
-odp	video	save	gap	M6 ODP media typing	ok format
-odp	audio	get	gap	M6 ODP media typing	unreached
-odp	audio	find	gap	M6 ODP media typing	unreached
-odp	audio	query	gap	M6 ODP media typing	unreached
-odp	audio	view	gap	M6 ODP media typing	unreached
-odp	audio	set	gap	M6 ODP media typing	unreached
-odp	audio	add	gap	M6 ODP media typing	-
-odp	audio	remove	gap	M6 ODP media typing	unreached
-odp	audio	move	gap	M6 ODP media typing	unreached
-odp	audio	swap	gap	M6 ODP media typing	unreached
-odp	audio	edit	gap	M6 ODP media typing	-
-odp	audio	batch	gap	M6 ODP media typing	-
-odp	audio	create	gap	M6 ODP media typing	ok format
-odp	audio	save	gap	M6 ODP media typing	ok format
+odp	video	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp
+odp	video	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	set	n/a	set not offered for this element	-
+odp	video	add	n/a	add not offered for this element	-
+odp	video	remove	supported		ok `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp` /slide[1]/video[1]
+odp	video	move	format-verb		unreached
+odp	video	swap	format-verb		unreached
+odp	video	edit	n/a	edit not offered for this element	-
+odp	video	batch	n/a	batch not offered for this element	-
+odp	video	create	supported		ok format
+odp	video	save	supported		ok format
+odp	audio	get	supported		ok 1 instances, first `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	find	supported		ok 1 instances, first `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	audio	view	supported		ok 1 instances, first `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	set	n/a	set not offered for this element	-
+odp	audio	add	n/a	add not offered for this element	-
+odp	audio	remove	supported		ok `unified-ops/0294/parts.odp` /slide[1]/audio[1]
+odp	audio	move	format-verb		unreached
+odp	audio	swap	format-verb		unreached
+odp	audio	edit	n/a	edit not offered for this element	-
+odp	audio	batch	n/a	batch not offered for this element	-
+odp	audio	create	supported		ok format
+odp	audio	save	supported		ok format
 odp	paragraph	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
 odp	paragraph	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
 odp	paragraph	query	supported		ok matches in odf/odp/tdf105502.odp
@@ -3958,38 +4205,38 @@ odp	run	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/
 odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
 odp	run	add	n/a	add not offered for this element	-
 odp	run	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1]
-odp	run	move	format-verb		unreached
-odp	run	swap	format-verb		unreached
+odp	run	move	format-verb		refused unsupported_capability
+odp	run	swap	format-verb		refused unsupported_capability
 odp	run	edit	supported		ok tx.set
 odp	run	batch	supported		ok set item
 odp	run	create	supported		ok format
 odp	run	save	supported		ok format
-odp	linebreak	get	gap	M6 ODP inline controls	unreached
-odp	linebreak	find	gap	M6 ODP inline controls	unreached
-odp	linebreak	query	gap	M6 ODP inline controls	unreached
-odp	linebreak	view	gap	M6 ODP inline controls	unreached
-odp	linebreak	set	gap	M6 ODP inline controls	unreached
-odp	linebreak	add	gap	M6 ODP inline controls	-
-odp	linebreak	remove	gap	M6 ODP inline controls	unreached
-odp	linebreak	move	gap	M6 ODP inline controls	unreached
-odp	linebreak	swap	gap	M6 ODP inline controls	unreached
-odp	linebreak	edit	gap	M6 ODP inline controls	-
-odp	linebreak	batch	gap	M6 ODP inline controls	-
-odp	linebreak	create	gap	M6 ODP inline controls	ok format
-odp	linebreak	save	gap	M6 ODP inline controls	ok format
-odp	hyperlink	get	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	find	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	query	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	view	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	set	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	add	gap	M6 ODP hyperlink nodes	-
-odp	hyperlink	remove	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	move	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	swap	gap	M6 ODP hyperlink nodes	unreached
-odp	hyperlink	edit	gap	M6 ODP hyperlink nodes	-
-odp	hyperlink	batch	gap	M6 ODP hyperlink nodes	-
-odp	hyperlink	create	gap	M6 ODP hyperlink nodes	ok format
-odp	hyperlink	save	gap	M6 ODP hyperlink nodes	ok format
+odp	linebreak	get	supported		ok 4 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[2]/linebreak[1]
+odp	linebreak	find	supported		ok 4 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[2]/linebreak[1]
+odp	linebreak	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	linebreak	view	supported		ok 4 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[2]/linebreak[1]
+odp	linebreak	set	n/a	set not offered for this element	-
+odp	linebreak	add	supported		ok /slide[1]/shape[1]/paragraph[1]/linebreak[1] on `create() + add slide + add shape` under /slide[1]/shape[1]/paragraph[1] {}
+odp	linebreak	remove	supported		ok `create() + add slide + add shape + add linebreak` /slide[1]/shape[1]/paragraph[1]/linebreak[1]
+odp	linebreak	move	format-verb		refused unsupported_capability
+odp	linebreak	swap	format-verb		refused unsupported_capability
+odp	linebreak	edit	n/a	edit not offered for this element	-
+odp	linebreak	batch	n/a	batch not offered for this element	-
+odp	linebreak	create	supported		ok format
+odp	linebreak	save	supported		ok format
+odp	hyperlink	get	supported		ok 7 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[1]/run[2]/hyperlink
+odp	hyperlink	find	supported		ok 7 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[1]/run[2]/hyperlink
+odp	hyperlink	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	hyperlink	view	supported		ok 7 instances, first `unified-ops/0294/parts.odp` /slide[1]/shape[1]/paragraph[1]/run[2]/hyperlink
+odp	hyperlink	set	supported		ok `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink {"link":"7"}
+odp	hyperlink	add	supported		ok /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink on `create() + add slide + add shape` under /slide[1]/shape[1]/paragraph[1]/run[1] {"link":"Litchi","tooltip":"Litchi"}
+odp	hyperlink	remove	supported		ok `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink
+odp	hyperlink	move	format-verb		unreached
+odp	hyperlink	swap	format-verb		unreached
+odp	hyperlink	edit	supported		ok tx.set
+odp	hyperlink	batch	supported		ok set item
+odp	hyperlink	create	supported		ok format
+odp	hyperlink	save	supported		ok format
 odp	notes	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/notes
 odp	notes	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/notes
 odp	notes	query	supported		ok matches in odf/odp/tdf105502.odp
@@ -4016,19 +4263,19 @@ odp	comment	edit	n/a	edit not offered for this element	-
 odp	comment	batch	n/a	batch not offered for this element	-
 odp	comment	create	supported		ok format
 odp	comment	save	supported		ok format
-odp	equation	get	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	find	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	query	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	view	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	set	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	add	gap	M6 ODP formula objects (litchi-odf-formula)	-
-odp	equation	remove	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	move	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	swap	gap	M6 ODP formula objects (litchi-odf-formula)	unreached
-odp	equation	edit	gap	M6 ODP formula objects (litchi-odf-formula)	-
-odp	equation	batch	gap	M6 ODP formula objects (litchi-odf-formula)	-
-odp	equation	create	gap	M6 ODP formula objects (litchi-odf-formula)	ok format
-odp	equation	save	gap	M6 ODP formula objects (litchi-odf-formula)	ok format
+odp	equation	get	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	find	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	equation	view	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	set	n/a	set not offered for this element	-
+odp	equation	add	n/a	add not offered for this element	-
+odp	equation	remove	supported		ok `unified-ops/0294/parts.odp` /slide[1]/equation[1]
+odp	equation	move	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/equation[1] /slide[1]/equation[2]
+odp	equation	swap	format-verb		ok `unified-ops/0294/parts.odp` /slide[1]/equation[1] /slide[1]/equation[2]
+odp	equation	edit	n/a	edit not offered for this element	-
+odp	equation	batch	n/a	batch not offered for this element	-
+odp	equation	create	supported		ok format
+odp	equation	save	supported		ok format
 odp	slideMaster	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slideMaster[1]
 odp	slideMaster	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slideMaster[1]
 odp	slideMaster	query	supported		ok matches in odf/odp/tdf105502.odp
@@ -4094,45 +4341,45 @@ odp	animation	edit	gap	M6 ODP animation nodes	-
 odp	animation	batch	gap	M6 ODP animation nodes	-
 odp	animation	create	gap	M6 ODP animation nodes	ok format
 odp	animation	save	gap	M6 ODP animation nodes	ok format
-odp	series	get	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	find	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	query	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	view	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	set	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	add	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	series	remove	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	move	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	swap	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	series	edit	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	series	batch	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	series	create	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	series	save	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	axis	get	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	find	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	query	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	view	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	set	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	add	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	axis	remove	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	move	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	swap	gap	M6 ODP chart CRUD (litchi_odp::charts)	unreached
-odp	axis	edit	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	axis	batch	gap	M6 ODP chart CRUD (litchi_odp::charts)	-
-odp	axis	create	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	axis	save	gap	M6 ODP chart CRUD (litchi_odp::charts)	ok format
-odp	col	get	gap	M6 ODP table columns	unreached
-odp	col	find	gap	M6 ODP table columns	unreached
-odp	col	query	gap	M6 ODP table columns	unreached
-odp	col	view	gap	M6 ODP table columns	unreached
-odp	col	set	gap	M6 ODP table columns	unreached
-odp	col	add	gap	M6 ODP table columns	-
-odp	col	remove	gap	M6 ODP table columns	unreached
-odp	col	move	gap	M6 ODP table columns	unreached
-odp	col	swap	gap	M6 ODP table columns	unreached
-odp	col	edit	gap	M6 ODP table columns	-
-odp	col	batch	gap	M6 ODP table columns	-
-odp	col	create	gap	M6 ODP table columns	ok format
-odp	col	save	gap	M6 ODP table columns	ok format
+odp	series	get	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
+odp	series	find	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
+odp	series	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	series	view	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
+odp	series	set	n/a	set not offered for this element	-
+odp	series	add	n/a	add not offered for this element	-
+odp	series	remove	n/a	remove not offered for this element	-
+odp	series	move	format-verb		refused unsupported_capability
+odp	series	swap	format-verb		refused unsupported_capability
+odp	series	edit	n/a	edit not offered for this element	-
+odp	series	batch	n/a	batch not offered for this element	-
+odp	series	create	supported		ok format
+odp	series	save	supported		ok format
+odp	axis	get	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/axis[1]
+odp	axis	find	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/axis[1]
+odp	axis	query	supported		ok matches in unified-ops/0294/parts.odp
+odp	axis	view	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/axis[1]
+odp	axis	set	n/a	set not offered for this element	-
+odp	axis	add	n/a	add not offered for this element	-
+odp	axis	remove	n/a	remove not offered for this element	-
+odp	axis	move	format-verb		refused unsupported_capability
+odp	axis	swap	format-verb		refused unsupported_capability
+odp	axis	edit	n/a	edit not offered for this element	-
+odp	axis	batch	n/a	batch not offered for this element	-
+odp	axis	create	supported		ok format
+odp	axis	save	supported		ok format
+odp	col	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/col[1]
+odp	col	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/col[1]
+odp	col	query	supported		ok matches in odf/odp/tdf105502.odp
+odp	col	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/col[1]
+odp	col	set	n/a	set not offered for this element	-
+odp	col	add	n/a	add not offered for this element	-
+odp	col	remove	n/a	remove not offered for this element	-
+odp	col	move	format-verb		refused unsupported_capability
+odp	col	swap	format-verb		refused unsupported_capability
+odp	col	edit	n/a	edit not offered for this element	-
+odp	col	batch	n/a	batch not offered for this element	-
+odp	col	create	supported		ok format
+odp	col	save	supported		ok format
 odg	drawing	get	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	find	supported		ok 7 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /
 odg	drawing	query	n/a	query not offered for this element	-
@@ -4367,10 +4614,10 @@ oth	paragraph	edit	supported		ok tx.set
 oth	paragraph	batch	supported		ok set item
 oth	paragraph	create	supported		ok format
 oth	paragraph	save	supported		ok format
-oth	heading	get	supported		ok 2 instances, first `create() + add paragraph + add heading` /body/h[1]
-oth	heading	find	supported		ok 2 instances, first `create() + add paragraph + add heading` /body/h[1]
-oth	heading	query	supported		ok matches in create() + add paragraph + add heading
-oth	heading	view	supported		ok 2 instances, first `create() + add paragraph + add heading` /body/h[1]
+oth	heading	get	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /body/h[1]
+oth	heading	find	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /body/h[1]
+oth	heading	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	heading	view	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /body/h[1]
 oth	heading	set	supported		ok `create() + add paragraph + add heading` /body/h[1] {"text":"Litchi"}
 oth	heading	add	supported		ok /body/h[1] on `create() + add paragraph` under /body {}
 oth	heading	remove	supported		ok `create() + add paragraph + add heading` /body/h[1]
@@ -4380,10 +4627,10 @@ oth	heading	edit	supported		ok tx.set
 oth	heading	batch	supported		ok set item
 oth	heading	create	supported		ok format
 oth	heading	save	supported		ok format
-oth	run	get	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
-oth	run	find	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	get	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	find	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
 oth	run	query	supported		ok matches in unified-ops/0294/frames.oth
-oth	run	view	supported		ok 7 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
+oth	run	view	supported		ok 8 instances, first `unified-ops/0294/frames.oth` /body/p[1]/r[1]
 oth	run	set	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1] {"text":"Litchi"}
 oth	run	add	supported		ok /body/p[1]/r[1] on `create() + add paragraph` under /body/p[1] {}
 oth	run	remove	supported		ok `create() + add paragraph + add run` /body/p[1]/r[1]
@@ -4406,10 +4653,10 @@ oth	hyperlink	edit	supported		ok tx.set
 oth	hyperlink	batch	supported		ok set item
 oth	hyperlink	create	supported		ok format
 oth	hyperlink	save	supported		ok format
-oth	list	get	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
-oth	list	find	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
-oth	list	query	supported		ok matches in create() + add paragraph + add list
-oth	list	view	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
+oth	list	get	supported		ok 6 instances, first `unified-ops/0294/parts.oth` /body/list[1]
+oth	list	find	supported		ok 6 instances, first `unified-ops/0294/parts.oth` /body/list[1]
+oth	list	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	list	view	supported		ok 6 instances, first `unified-ops/0294/parts.oth` /body/list[1]
 oth	list	set	n/a	set not offered for this element	-
 oth	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body {}
 oth	list	remove	supported		ok `create() + add paragraph + add list` /body/list[1]
@@ -4419,10 +4666,10 @@ oth	list	edit	n/a	edit not offered for this element	-
 oth	list	batch	n/a	batch not offered for this element	-
 oth	list	create	supported		ok format
 oth	list	save	supported		ok format
-oth	listItem	get	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
-oth	listItem	find	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
-oth	listItem	query	supported		ok matches in create() + add paragraph + add list
-oth	listItem	view	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
+oth	listItem	get	supported		ok 8 instances, first `unified-ops/0294/parts.oth` /body/list[1]/listItem[1]
+oth	listItem	find	supported		ok 8 instances, first `unified-ops/0294/parts.oth` /body/list[1]/listItem[1]
+oth	listItem	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	listItem	view	supported		ok 8 instances, first `unified-ops/0294/parts.oth` /body/list[1]/listItem[1]
 oth	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] {"text":"Litchi"}
 oth	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] {}
 oth	listItem	remove	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1]
@@ -4432,10 +4679,10 @@ oth	listItem	edit	supported		ok tx.set
 oth	listItem	batch	supported		ok set item
 oth	listItem	create	supported		ok format
 oth	listItem	save	supported		ok format
-oth	table	get	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
-oth	table	find	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
-oth	table	query	supported		ok matches in create() + add paragraph + add table
-oth	table	view	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
+oth	table	get	supported		ok 5 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]
+oth	table	find	supported		ok 5 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]
+oth	table	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	table	view	supported		ok 5 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]
 oth	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] {"name":"Litchi"}
 oth	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body {}
 oth	table	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]
@@ -4445,10 +4692,10 @@ oth	table	edit	supported		ok tx.set
 oth	table	batch	supported		ok set item
 oth	table	create	supported		ok format
 oth	table	save	supported		ok format
-oth	row	get	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
-oth	row	find	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
-oth	row	query	supported		ok matches in create() + add paragraph + add table
-oth	row	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
+oth	row	get	supported		ok 7 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/tr[1]
+oth	row	find	supported		ok 7 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/tr[1]
+oth	row	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	row	view	supported		ok 7 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/tr[1]
 oth	row	set	n/a	set not offered for this element	-
 oth	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] {}
 oth	row	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]
@@ -4458,15 +4705,15 @@ oth	row	edit	n/a	edit not offered for this element	-
 oth	row	batch	n/a	batch not offered for this element	-
 oth	row	create	supported		ok format
 oth	row	save	supported		ok format
-oth	cell	get	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
-oth	cell	find	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
-oth	cell	query	supported		ok matches in create() + add paragraph + add table
-oth	cell	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
+oth	cell	get	supported		ok 8 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/tr[1]/tc[1]
+oth	cell	find	supported		ok 8 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/tr[1]/tc[1]
+oth	cell	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	cell	view	supported		ok 8 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/tr[1]/tc[1]
 oth	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 oth	cell	add	n/a	add not offered for this element	-
 oth	cell	remove	n/a	remove not offered for this element	-
-oth	cell	move	format-verb		unreached
-oth	cell	swap	format-verb		unreached
+oth	cell	move	format-verb		refused invalid_value
+oth	cell	swap	format-verb		refused invalid_value
 oth	cell	edit	supported		ok tx.set
 oth	cell	batch	supported		ok set item
 oth	cell	create	supported		ok format
@@ -4484,10 +4731,10 @@ oth	section	edit	supported		ok tx.set
 oth	section	batch	supported		ok set item
 oth	section	create	supported		ok format
 oth	section	save	supported		ok format
-oth	frame	get	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
-oth	frame	find	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	get	supported		ok 5 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	find	supported		ok 5 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
 oth	frame	query	supported		ok matches in unified-ops/0294/frames.oth
-oth	frame	view	supported		ok 3 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
+oth	frame	view	supported		ok 5 instances, first `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
 oth	frame	set	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1] {"name":"Litchi"}
 oth	frame	add	n/a	add not offered for this element	-
 oth	frame	remove	supported		ok `unified-ops/0294/frames.oth` /body/p[1]/frame[1]
@@ -4588,10 +4835,10 @@ oth	styles	edit	n/a	edit not offered for this element	-
 oth	styles	batch	n/a	batch not offered for this element	-
 oth	styles	create	supported		ok format
 oth	styles	save	supported		ok format
-oth	style	get	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
-oth	style	find	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	get	supported		ok 4 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	find	supported		ok 4 instances, first `unified-ops/0294/frames.oth` /styles/Standard
 oth	style	query	supported		ok matches in unified-ops/0294/frames.oth
-oth	style	view	supported		ok 2 instances, first `unified-ops/0294/frames.oth` /styles/Standard
+oth	style	view	supported		ok 4 instances, first `unified-ops/0294/frames.oth` /styles/Standard
 oth	style	set	n/a	set not offered for this element	-
 oth	style	add	n/a	add not offered for this element	-
 oth	style	remove	n/a	remove not offered for this element	-
@@ -4614,6 +4861,162 @@ oth	metadata	edit	supported		ok tx.set
 oth	metadata	batch	supported		ok set item
 oth	metadata	create	supported		ok format
 oth	metadata	save	supported		ok format
+oth	header	get	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /header[1]
+oth	header	find	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /header[1]
+oth	header	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	header	view	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /header[1]
+oth	header	set	supported		ok `unified-ops/0294/parts.oth` /header[2] {"text":"Litchi"}
+oth	header	add	n/a	add not offered for this element	-
+oth	header	remove	n/a	remove not offered for this element	-
+oth	header	move	format-verb		refused unsupported_type
+oth	header	swap	format-verb		refused unsupported_type
+oth	header	edit	supported		ok tx.set
+oth	header	batch	supported		ok set item
+oth	header	create	supported		ok format
+oth	header	save	supported		ok format
+oth	footer	get	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /footer[1]
+oth	footer	find	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /footer[1]
+oth	footer	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	footer	view	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /footer[1]
+oth	footer	set	supported		ok `unified-ops/0294/parts.oth` /footer[1] {"text":"Litchi"}
+oth	footer	add	n/a	add not offered for this element	-
+oth	footer	remove	n/a	remove not offered for this element	-
+oth	footer	move	format-verb		refused unsupported_type
+oth	footer	swap	format-verb		refused unsupported_type
+oth	footer	edit	supported		ok tx.set
+oth	footer	batch	supported		ok set item
+oth	footer	create	supported		ok format
+oth	footer	save	supported		ok format
+oth	numbering	get	supported		ok 1 instances, first `unified-ops/0294/parts.oth` /numbering
+oth	numbering	find	supported		ok 1 instances, first `unified-ops/0294/parts.oth` /numbering
+oth	numbering	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	numbering	view	supported		ok 1 instances, first `unified-ops/0294/parts.oth` /numbering
+oth	numbering	set	n/a	set not offered for this element	-
+oth	numbering	add	n/a	add not offered for this element	-
+oth	numbering	remove	n/a	remove not offered for this element	-
+oth	numbering	move	format-verb		unreached
+oth	numbering	swap	format-verb		unreached
+oth	numbering	edit	n/a	edit not offered for this element	-
+oth	numbering	batch	n/a	batch not offered for this element	-
+oth	numbering	create	supported		ok format
+oth	numbering	save	supported		ok format
+oth	abstractNum	get	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /numbering/abstractNum[1]
+oth	abstractNum	find	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /numbering/abstractNum[1]
+oth	abstractNum	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	abstractNum	view	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /numbering/abstractNum[1]
+oth	abstractNum	set	n/a	set not offered for this element	-
+oth	abstractNum	add	n/a	add not offered for this element	-
+oth	abstractNum	remove	n/a	remove not offered for this element	-
+oth	abstractNum	move	format-verb		refused unsupported_type
+oth	abstractNum	swap	format-verb		refused unsupported_type
+oth	abstractNum	edit	n/a	edit not offered for this element	-
+oth	abstractNum	batch	n/a	batch not offered for this element	-
+oth	abstractNum	create	supported		ok format
+oth	abstractNum	save	supported		ok format
+oth	num	get	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /numbering/num[1]
+oth	num	find	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /numbering/num[1]
+oth	num	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	num	view	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /numbering/num[1]
+oth	num	set	n/a	set not offered for this element	-
+oth	num	add	n/a	add not offered for this element	-
+oth	num	remove	n/a	remove not offered for this element	-
+oth	num	move	format-verb		refused unsupported_type
+oth	num	swap	format-verb		refused unsupported_type
+oth	num	edit	n/a	edit not offered for this element	-
+oth	num	batch	n/a	batch not offered for this element	-
+oth	num	create	supported		ok format
+oth	num	save	supported		ok format
+oth	level	get	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /numbering/abstractNum[1]/level[1]
+oth	level	find	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /numbering/abstractNum[1]/level[1]
+oth	level	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	level	view	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /numbering/abstractNum[1]/level[1]
+oth	level	set	n/a	set not offered for this element	-
+oth	level	add	n/a	add not offered for this element	-
+oth	level	remove	n/a	remove not offered for this element	-
+oth	level	move	format-verb		refused unsupported_type
+oth	level	swap	format-verb		refused unsupported_type
+oth	level	edit	n/a	edit not offered for this element	-
+oth	level	batch	n/a	batch not offered for this element	-
+oth	level	create	supported		ok format
+oth	level	save	supported		ok format
+oth	field	get	supported		ok 5 instances, first `unified-ops/0294/parts.oth` /field[1]
+oth	field	find	supported		ok 5 instances, first `unified-ops/0294/parts.oth` /field[1]
+oth	field	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	field	view	supported		ok 5 instances, first `unified-ops/0294/parts.oth` /field[1]
+oth	field	set	n/a	set not offered for this element	-
+oth	field	add	n/a	add not offered for this element	-
+oth	field	remove	n/a	remove not offered for this element	-
+oth	field	move	format-verb		refused unsupported_type
+oth	field	swap	format-verb		refused unsupported_type
+oth	field	edit	n/a	edit not offered for this element	-
+oth	field	batch	n/a	batch not offered for this element	-
+oth	field	create	supported		ok format
+oth	field	save	supported		ok format
+oth	toc	get	supported		ok 1 instances, first `unified-ops/0294/parts.oth` /toc[1]
+oth	toc	find	supported		ok 1 instances, first `unified-ops/0294/parts.oth` /toc[1]
+oth	toc	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	toc	view	supported		ok 1 instances, first `unified-ops/0294/parts.oth` /toc[1]
+oth	toc	set	n/a	set not offered for this element	-
+oth	toc	add	n/a	add not offered for this element	-
+oth	toc	remove	n/a	remove not offered for this element	-
+oth	toc	move	format-verb		unreached
+oth	toc	swap	format-verb		unreached
+oth	toc	edit	n/a	edit not offered for this element	-
+oth	toc	batch	n/a	batch not offered for this element	-
+oth	toc	create	supported		ok format
+oth	toc	save	supported		ok format
+oth	tab	get	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /body/p[2]/tab[1]
+oth	tab	find	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /body/p[2]/tab[1]
+oth	tab	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	tab	view	supported		ok 3 instances, first `unified-ops/0294/parts.oth` /body/p[2]/tab[1]
+oth	tab	set	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1] {"pos":"1"}
+oth	tab	add	supported		ok /body/p[1]/tab[1] on `create() + add paragraph` under /body/p[1] {"pos":"2","val":"left","leader":"none"}
+oth	tab	remove	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1]
+oth	tab	move	format-verb		refused unsupported_type
+oth	tab	swap	format-verb		refused unsupported_type
+oth	tab	edit	supported		ok tx.set
+oth	tab	batch	supported		ok set item
+oth	tab	create	supported		ok format
+oth	tab	save	supported		ok format
+oth	shape	get	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /body/shape[1]
+oth	shape	find	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /body/shape[1]
+oth	shape	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	shape	view	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /body/shape[1]
+oth	shape	set	n/a	set not offered for this element	-
+oth	shape	add	n/a	add not offered for this element	-
+oth	shape	remove	n/a	remove not offered for this element	-
+oth	shape	move	format-verb		refused unsupported_type
+oth	shape	swap	format-verb		refused unsupported_type
+oth	shape	edit	n/a	edit not offered for this element	-
+oth	shape	batch	n/a	batch not offered for this element	-
+oth	shape	create	supported		ok format
+oth	shape	save	supported		ok format
+oth	equation	get	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /body/equation[1]
+oth	equation	find	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /body/equation[1]
+oth	equation	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	equation	view	supported		ok 2 instances, first `unified-ops/0294/parts.oth` /body/equation[1]
+oth	equation	set	n/a	set not offered for this element	-
+oth	equation	add	n/a	add not offered for this element	-
+oth	equation	remove	n/a	remove not offered for this element	-
+oth	equation	move	format-verb		refused unsupported_type
+oth	equation	swap	format-verb		refused unsupported_type
+oth	equation	edit	n/a	edit not offered for this element	-
+oth	equation	batch	n/a	batch not offered for this element	-
+oth	equation	create	supported		ok format
+oth	equation	save	supported		ok format
+oth	column	get	supported		ok 7 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/col[1]
+oth	column	find	supported		ok 7 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/col[1]
+oth	column	query	supported		ok matches in unified-ops/0294/parts.oth
+oth	column	view	supported		ok 7 instances, first `unified-ops/0294/parts.oth` /body/tbl[1]/col[1]
+oth	column	set	n/a	set not offered for this element	-
+oth	column	add	n/a	add not offered for this element	-
+oth	column	remove	n/a	remove not offered for this element	-
+oth	column	move	format-verb		refused unsupported_type
+oth	column	swap	format-verb		refused unsupported_type
+oth	column	edit	n/a	edit not offered for this element	-
+oth	column	batch	n/a	batch not offered for this element	-
+oth	column	create	supported		ok format
+oth	column	save	supported		ok format
 odm	document	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /
 odm	document	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /
 odm	document	query	n/a	query not offered for this element	-
@@ -4692,10 +5095,10 @@ odm	hyperlink	edit	supported		ok tx.set
 odm	hyperlink	batch	supported		ok set item
 odm	hyperlink	create	supported		ok format
 odm	hyperlink	save	supported		ok format
-odm	list	get	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
-odm	list	find	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
-odm	list	query	supported		ok matches in create() + add paragraph + add list
-odm	list	view	supported		ok 4 instances, first `create() + add paragraph + add list` /body/list[1]
+odm	list	get	supported		ok 6 instances, first `unified-ops/0294/parts.odm` /body/list[1]
+odm	list	find	supported		ok 6 instances, first `unified-ops/0294/parts.odm` /body/list[1]
+odm	list	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	list	view	supported		ok 6 instances, first `unified-ops/0294/parts.odm` /body/list[1]
 odm	list	set	n/a	set not offered for this element	-
 odm	list	add	supported		ok /body/list[1] on `create() + add paragraph` under /body {}
 odm	list	remove	supported		ok `create() + add paragraph + add list` /body/list[1]
@@ -4705,10 +5108,10 @@ odm	list	edit	n/a	edit not offered for this element	-
 odm	list	batch	n/a	batch not offered for this element	-
 odm	list	create	supported		ok format
 odm	list	save	supported		ok format
-odm	listItem	get	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
-odm	listItem	find	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
-odm	listItem	query	supported		ok matches in create() + add paragraph + add list
-odm	listItem	view	supported		ok 6 instances, first `create() + add paragraph + add list` /body/list[1]/listItem[1]
+odm	listItem	get	supported		ok 8 instances, first `unified-ops/0294/parts.odm` /body/list[1]/listItem[1]
+odm	listItem	find	supported		ok 8 instances, first `unified-ops/0294/parts.odm` /body/list[1]/listItem[1]
+odm	listItem	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	listItem	view	supported		ok 8 instances, first `unified-ops/0294/parts.odm` /body/list[1]/listItem[1]
 odm	listItem	set	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1] {"text":"Litchi"}
 odm	listItem	add	supported		ok /body/list[1]/listItem[2] on `create() + add paragraph + add list` under /body/list[1] {}
 odm	listItem	remove	supported		ok `create() + add paragraph + add list` /body/list[1]/listItem[1]
@@ -4718,10 +5121,10 @@ odm	listItem	edit	supported		ok tx.set
 odm	listItem	batch	supported		ok set item
 odm	listItem	create	supported		ok format
 odm	listItem	save	supported		ok format
-odm	table	get	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
-odm	table	find	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
-odm	table	query	supported		ok matches in create() + add paragraph + add table
-odm	table	view	supported		ok 4 instances, first `create() + add paragraph + add table` /body/tbl[1]
+odm	table	get	supported		ok 5 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]
+odm	table	find	supported		ok 5 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]
+odm	table	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	table	view	supported		ok 5 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]
 odm	table	set	supported		ok `create() + add paragraph + add table` /body/tbl[1] {"name":"Litchi"}
 odm	table	add	supported		ok /body/tbl[1] on `create() + add paragraph` under /body {}
 odm	table	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]
@@ -4731,10 +5134,10 @@ odm	table	edit	supported		ok tx.set
 odm	table	batch	supported		ok set item
 odm	table	create	supported		ok format
 odm	table	save	supported		ok format
-odm	row	get	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
-odm	row	find	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
-odm	row	query	supported		ok matches in create() + add paragraph + add table
-odm	row	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]
+odm	row	get	supported		ok 7 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/tr[1]
+odm	row	find	supported		ok 7 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/tr[1]
+odm	row	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	row	view	supported		ok 7 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/tr[1]
 odm	row	set	n/a	set not offered for this element	-
 odm	row	add	supported		ok /body/tbl[1]/tr[2] on `create() + add paragraph + add table` under /body/tbl[1] {}
 odm	row	remove	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]
@@ -4744,15 +5147,15 @@ odm	row	edit	n/a	edit not offered for this element	-
 odm	row	batch	n/a	batch not offered for this element	-
 odm	row	create	supported		ok format
 odm	row	save	supported		ok format
-odm	cell	get	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
-odm	cell	find	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
-odm	cell	query	supported		ok matches in create() + add paragraph + add table
-odm	cell	view	supported		ok 6 instances, first `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1]
+odm	cell	get	supported		ok 8 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/tr[1]/tc[1]
+odm	cell	find	supported		ok 8 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/tr[1]/tc[1]
+odm	cell	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	cell	view	supported		ok 8 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/tr[1]/tc[1]
 odm	cell	set	supported		ok `create() + add paragraph + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 odm	cell	add	n/a	add not offered for this element	-
 odm	cell	remove	n/a	remove not offered for this element	-
-odm	cell	move	format-verb		unreached
-odm	cell	swap	format-verb		unreached
+odm	cell	move	format-verb		refused invalid_value
+odm	cell	swap	format-verb		refused invalid_value
 odm	cell	edit	supported		ok tx.set
 odm	cell	batch	supported		ok set item
 odm	cell	create	supported		ok format
@@ -4770,10 +5173,10 @@ odm	section	edit	supported		ok tx.set
 odm	section	batch	supported		ok set item
 odm	section	create	supported		ok format
 odm	section	save	supported		ok format
-odm	frame	get	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
-odm	frame	find	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	get	supported		ok 5 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	find	supported		ok 5 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
 odm	frame	query	supported		ok matches in unified-ops/0294/frames.odm
-odm	frame	view	supported		ok 3 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
+odm	frame	view	supported		ok 5 instances, first `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
 odm	frame	set	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1] {"name":"Litchi"}
 odm	frame	add	n/a	add not offered for this element	-
 odm	frame	remove	supported		ok `unified-ops/0294/frames.odm` /body/p[1]/frame[1]
@@ -4900,6 +5303,162 @@ odm	metadata	edit	supported		ok tx.set
 odm	metadata	batch	supported		ok set item
 odm	metadata	create	supported		ok format
 odm	metadata	save	supported		ok format
+odm	header	get	supported		ok 3 instances, first `unified-ops/0294/parts.odm` /header[1]
+odm	header	find	supported		ok 3 instances, first `unified-ops/0294/parts.odm` /header[1]
+odm	header	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	header	view	supported		ok 3 instances, first `unified-ops/0294/parts.odm` /header[1]
+odm	header	set	supported		ok `unified-ops/0294/parts.odm` /header[2] {"text":"Litchi"}
+odm	header	add	n/a	add not offered for this element	-
+odm	header	remove	n/a	remove not offered for this element	-
+odm	header	move	format-verb		refused unsupported_type
+odm	header	swap	format-verb		refused unsupported_type
+odm	header	edit	supported		ok tx.set
+odm	header	batch	supported		ok set item
+odm	header	create	supported		ok format
+odm	header	save	supported		ok format
+odm	footer	get	supported		ok 7 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /footer[1]
+odm	footer	find	supported		ok 7 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /footer[1]
+odm	footer	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	footer	view	supported		ok 7 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /footer[1]
+odm	footer	set	supported		ok `unified-ops/0294/parts.odm` /footer[1] {"text":"Litchi"}
+odm	footer	add	n/a	add not offered for this element	-
+odm	footer	remove	n/a	remove not offered for this element	-
+odm	footer	move	format-verb		refused unsupported_type
+odm	footer	swap	format-verb		refused unsupported_type
+odm	footer	edit	supported		ok tx.set
+odm	footer	batch	supported		ok set item
+odm	footer	create	supported		ok format
+odm	footer	save	supported		ok format
+odm	numbering	get	supported		ok 2 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering
+odm	numbering	find	supported		ok 2 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering
+odm	numbering	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	numbering	view	supported		ok 2 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering
+odm	numbering	set	n/a	set not offered for this element	-
+odm	numbering	add	n/a	add not offered for this element	-
+odm	numbering	remove	n/a	remove not offered for this element	-
+odm	numbering	move	format-verb		unreached
+odm	numbering	swap	format-verb		unreached
+odm	numbering	edit	n/a	edit not offered for this element	-
+odm	numbering	batch	n/a	batch not offered for this element	-
+odm	numbering	create	supported		ok format
+odm	numbering	save	supported		ok format
+odm	abstractNum	get	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/abstractNum[1]
+odm	abstractNum	find	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/abstractNum[1]
+odm	abstractNum	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	abstractNum	view	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/abstractNum[1]
+odm	abstractNum	set	n/a	set not offered for this element	-
+odm	abstractNum	add	n/a	add not offered for this element	-
+odm	abstractNum	remove	n/a	remove not offered for this element	-
+odm	abstractNum	move	format-verb		refused unsupported_type
+odm	abstractNum	swap	format-verb		refused unsupported_type
+odm	abstractNum	edit	n/a	edit not offered for this element	-
+odm	abstractNum	batch	n/a	batch not offered for this element	-
+odm	abstractNum	create	supported		ok format
+odm	abstractNum	save	supported		ok format
+odm	num	get	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/num[1]
+odm	num	find	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/num[1]
+odm	num	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	num	view	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/num[1]
+odm	num	set	n/a	set not offered for this element	-
+odm	num	add	n/a	add not offered for this element	-
+odm	num	remove	n/a	remove not offered for this element	-
+odm	num	move	format-verb		refused unsupported_type
+odm	num	swap	format-verb		refused unsupported_type
+odm	num	edit	n/a	edit not offered for this element	-
+odm	num	batch	n/a	batch not offered for this element	-
+odm	num	create	supported		ok format
+odm	num	save	supported		ok format
+odm	level	get	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/abstractNum[1]/level[1]
+odm	level	find	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/abstractNum[1]/level[1]
+odm	level	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	level	view	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /numbering/abstractNum[1]/level[1]
+odm	level	set	n/a	set not offered for this element	-
+odm	level	add	n/a	add not offered for this element	-
+odm	level	remove	n/a	remove not offered for this element	-
+odm	level	move	format-verb		refused unsupported_type
+odm	level	swap	format-verb		refused unsupported_type
+odm	level	edit	n/a	edit not offered for this element	-
+odm	level	batch	n/a	batch not offered for this element	-
+odm	level	create	supported		ok format
+odm	level	save	supported		ok format
+odm	field	get	supported		ok 6 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /field[1]
+odm	field	find	supported		ok 6 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /field[1]
+odm	field	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	field	view	supported		ok 6 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /field[1]
+odm	field	set	n/a	set not offered for this element	-
+odm	field	add	n/a	add not offered for this element	-
+odm	field	remove	n/a	remove not offered for this element	-
+odm	field	move	format-verb		refused unsupported_type
+odm	field	swap	format-verb		refused unsupported_type
+odm	field	edit	n/a	edit not offered for this element	-
+odm	field	batch	n/a	batch not offered for this element	-
+odm	field	create	supported		ok format
+odm	field	save	supported		ok format
+odm	toc	get	supported		ok 2 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /toc[1]
+odm	toc	find	supported		ok 2 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /toc[1]
+odm	toc	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	toc	view	supported		ok 2 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /toc[1]
+odm	toc	set	n/a	set not offered for this element	-
+odm	toc	add	n/a	add not offered for this element	-
+odm	toc	remove	n/a	remove not offered for this element	-
+odm	toc	move	format-verb		unreached
+odm	toc	swap	format-verb		unreached
+odm	toc	edit	n/a	edit not offered for this element	-
+odm	toc	batch	n/a	batch not offered for this element	-
+odm	toc	create	supported		ok format
+odm	toc	save	supported		ok format
+odm	tab	get	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /body/p[10]/tab[1]
+odm	tab	find	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /body/p[10]/tab[1]
+odm	tab	query	supported		ok matches in libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm
+odm	tab	view	supported		ok 8 instances, first `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm` /body/p[10]/tab[1]
+odm	tab	set	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1] {"pos":"1"}
+odm	tab	add	supported		ok /body/p[1]/tab[1] on `create() + add paragraph` under /body/p[1] {"pos":"2","val":"left","leader":"none"}
+odm	tab	remove	supported		ok `create() + add paragraph + add tab` /body/p[1]/tab[1]
+odm	tab	move	format-verb		refused unsupported_type
+odm	tab	swap	format-verb		refused unsupported_type
+odm	tab	edit	supported		ok tx.set
+odm	tab	batch	supported		ok set item
+odm	tab	create	supported		ok format
+odm	tab	save	supported		ok format
+odm	shape	get	supported		ok 2 instances, first `unified-ops/0294/parts.odm` /body/shape[1]
+odm	shape	find	supported		ok 2 instances, first `unified-ops/0294/parts.odm` /body/shape[1]
+odm	shape	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	shape	view	supported		ok 2 instances, first `unified-ops/0294/parts.odm` /body/shape[1]
+odm	shape	set	n/a	set not offered for this element	-
+odm	shape	add	n/a	add not offered for this element	-
+odm	shape	remove	n/a	remove not offered for this element	-
+odm	shape	move	format-verb		refused unsupported_type
+odm	shape	swap	format-verb		refused unsupported_type
+odm	shape	edit	n/a	edit not offered for this element	-
+odm	shape	batch	n/a	batch not offered for this element	-
+odm	shape	create	supported		ok format
+odm	shape	save	supported		ok format
+odm	equation	get	supported		ok 2 instances, first `unified-ops/0294/parts.odm` /body/equation[1]
+odm	equation	find	supported		ok 2 instances, first `unified-ops/0294/parts.odm` /body/equation[1]
+odm	equation	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	equation	view	supported		ok 2 instances, first `unified-ops/0294/parts.odm` /body/equation[1]
+odm	equation	set	n/a	set not offered for this element	-
+odm	equation	add	n/a	add not offered for this element	-
+odm	equation	remove	n/a	remove not offered for this element	-
+odm	equation	move	format-verb		refused unsupported_type
+odm	equation	swap	format-verb		refused unsupported_type
+odm	equation	edit	n/a	edit not offered for this element	-
+odm	equation	batch	n/a	batch not offered for this element	-
+odm	equation	create	supported		ok format
+odm	equation	save	supported		ok format
+odm	column	get	supported		ok 7 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/col[1]
+odm	column	find	supported		ok 7 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/col[1]
+odm	column	query	supported		ok matches in unified-ops/0294/parts.odm
+odm	column	view	supported		ok 7 instances, first `unified-ops/0294/parts.odm` /body/tbl[1]/col[1]
+odm	column	set	n/a	set not offered for this element	-
+odm	column	add	n/a	add not offered for this element	-
+odm	column	remove	n/a	remove not offered for this element	-
+odm	column	move	format-verb		refused unsupported_type
+odm	column	swap	format-verb		refused unsupported_type
+odm	column	edit	n/a	edit not offered for this element	-
+odm	column	batch	n/a	batch not offered for this element	-
+odm	column	create	supported		ok format
+odm	column	save	supported		ok format
 odf	math	get	supported		ok 4 instances, first `odf/native-resave/source/font-styles.odf` /
 odf	math	find	supported		ok 4 instances, first `odf/native-resave/source/font-styles.odf` /
 odf	math	query	n/a	query not offered for this element	-
@@ -4978,13 +5537,13 @@ pages	section	edit	supported		ok tx.set
 pages	section	batch	supported		ok set item
 pages	section	create	supported		ok format
 pages	section	save	supported		ok format
-pages	table	get	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
-pages	table	find	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	get	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	find	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	query	supported		ok matches in iwork/pages/body-table-read-native.pages
-pages	table	view	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	view	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	set	n/a	set not offered for this element	-
-pages	table	add	n/a	add not offered for this element	-
-pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	add	supported		ok /body/tbl[3] on `iwork/pages/body-table-read-native.pages` under /body {"name":"Litchi","rows":"2","columns":"2","data":"Litchi"}
+pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages + add table` /body/tbl[1]
 pages	table	move	format-verb		refused invalid_argument
 pages	table	swap	format-verb		refused invalid_argument
 pages	table	edit	n/a	edit not offered for this element	-
@@ -5138,7 +5697,7 @@ keynote	run	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key`
 keynote	run	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
 keynote	run	query	supported		ok matches in create()
 keynote	run	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
-keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
+keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes/paragraph[1]/run[1] {"bold":"true"}
 keynote	run	add	n/a	add not offered for this element	-
 keynote	run	remove	n/a	remove not offered for this element	-
 keynote	run	move	format-verb		unreached
@@ -5212,23 +5771,23 @@ keynote	audio	edit	n/a	edit not offered for this element	-
 keynote	audio	batch	n/a	batch not offered for this element	-
 keynote	audio	create	supported		ok format
 keynote	audio	save	supported		ok format
-keynote	table	get	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
-keynote	table	find	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	get	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	find	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
 keynote	table	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	table	view	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	view	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
 keynote	table	set	n/a	set not offered for this element	-
-keynote	table	add	n/a	add not offered for this element	-
+keynote	table	add	supported		ok /slide[1]/table[2] on `iwork/keynote/slide-table-read-native.key` under /slide[1] {"rows":"2","cols":"2","data":"a,b;c,d"}
 keynote	table	remove	n/a	remove not offered for this element	-
-keynote	table	move	format-verb		unreached
-keynote	table	swap	format-verb		unreached
+keynote	table	move	format-verb		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1] /slide[1]/table[2]
+keynote	table	swap	format-verb		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1] /slide[1]/table[2]
 keynote	table	edit	n/a	edit not offered for this element	-
 keynote	table	batch	n/a	batch not offered for this element	-
 keynote	table	create	supported		ok format
 keynote	table	save	supported		ok format
-keynote	tr	get	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
-keynote	tr	find	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	get	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	find	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
 keynote	tr	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	tr	view	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	view	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
 keynote	tr	set	n/a	set not offered for this element	-
 keynote	tr	add	n/a	add not offered for this element	-
 keynote	tr	remove	n/a	remove not offered for this element	-
@@ -5238,11 +5797,11 @@ keynote	tr	edit	n/a	edit not offered for this element	-
 keynote	tr	batch	n/a	batch not offered for this element	-
 keynote	tr	create	supported		ok format
 keynote	tr	save	supported		ok format
-keynote	tc	get	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
-keynote	tc	find	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	get	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	find	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
 keynote	tc	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	tc	view	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
-keynote	tc	set	supported		ok `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
+keynote	tc	view	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	set	supported		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
 keynote	tc	add	n/a	add not offered for this element	-
 keynote	tc	remove	n/a	remove not offered for this element	-
 keynote	tc	move	format-verb		refused unsupported_capability
