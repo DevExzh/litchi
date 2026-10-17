@@ -951,6 +951,14 @@ impl Package {
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
     ) -> Result<Vec<(CellPosition, Comment)>, Error> {
+        let (sheet, table) = (sheet.into(), table.into());
+        // A positional selection reads the table's comment list through
+        // its model alone: most tables' lists are empty.
+        if let (SheetSelector::Position(sheet), TableSelector::Position(table)) = (sheet, table)
+            && !comment_list_populated(self, sheet.get(), table.get())?
+        {
+            return Ok(Vec::new());
+        }
         let origin = resolve_comment(self, sheet, table, CellPosition::new(0, 0))?;
         let target = origin.target.clone();
         let path = target.path;
@@ -1466,6 +1474,55 @@ fn validate_comment_authors(
         }
     }
     Ok(())
+}
+
+/// Whether the table's comment list holds an entry or a segment: the table
+/// model's data store, its comment-list reference and the list's fields,
+/// read without decoding the table.
+fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Result<bool, Error> {
+    let path = Path::Package;
+    let target = super::table_headers::resolve::resolve_target(source, sheet, table)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let model = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .and_then(|component| component.archive().objects.get(target.object_index))
+        .and_then(|object| object.messages.get(target.message_index))
+        .ok_or(Error::InvalidSource { path })?;
+    let field = |data: &[u8], number: u32| -> Result<Option<Vec<u8>>, Error> {
+        let view = WireView::parse(data).map_err(|_| Error::InvalidSource { path })?;
+        Ok(view
+            .fields()
+            .find(|field| field.number() == number && field.wire_type() == 2)
+            .map(|field| field.payload().to_vec()))
+    };
+    let Some(store) = field(model.data.as_slice(), 4)? else {
+        return Err(Error::InvalidSource { path });
+    };
+    let Some(reference) = field(&store, 19)? else {
+        return Ok(false);
+    };
+    let view = WireView::parse(&reference).map_err(|_| Error::InvalidSource { path })?;
+    let identifier = view
+        .fields()
+        .find(|field| field.number() == 1 && field.wire_type() == 0)
+        .and_then(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok())
+        .map(|(value, _)| value)
+        .ok_or(Error::InvalidSource { path })?;
+    let resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(resolved.messages.iter().any(|message| {
+        WireView::parse(message.data.as_slice()).is_ok_and(|view| {
+            view.fields()
+                .any(|field| field.number() == 3 || field.number() == 4)
+        })
+    }))
 }
 
 fn resolve_comment<'sheet, 'table>(
