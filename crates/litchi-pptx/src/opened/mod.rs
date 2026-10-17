@@ -60,7 +60,7 @@ pub use text_format::{
     MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill, TextEdit, TextProperties,
     TextTarget,
 };
-pub use transaction::{Commit, Diagnostics, Edit, SmartArtParts};
+pub use transaction::{Commit, Diagnostics, Edit, MediaFile, SmartArtParts};
 
 pub(crate) use chunks::{
     ChunkAdmission, admit_shape_property_chunks, admit_shape_text_chunks,
@@ -87,7 +87,8 @@ pub(crate) use remove_plan::{
 };
 pub(crate) use sections::SECTION_EXTENSION_URI;
 pub(crate) use slide_properties::{
-    normalize_slide_properties, slide_properties_skeleton, stage_slide_properties,
+    normalize_slide_properties, slide_properties_skeleton, stage_common_slide_name,
+    stage_slide_properties,
 };
 pub(crate) use transaction::{
     next_shape_id, stage_text_box, text_box_fragment, text_box_output_bound,

@@ -28,17 +28,17 @@ Kinds:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | excel | 1633 | 1484 | 0 | 21 | 124 | 4 | 0 | 0 | 20 | 20/20 |
 | excel/charts | 743 | 451 | 0 | 255 | 22 | 15 | 0 | 0 | 32 | 32/32 |
-| ppt | 310 | 129 | 32 | 37 | 143 | 0 | 1 | 0 | 10 | 12/12 |
+| ppt | 310 | 129 | 32 | 37 | 141 | 2 | 1 | 0 | 10 | 12/12 |
 | ppt/charts | 735 | 318 | 113 | 402 | 14 | 1 | 0 | 0 | 28 | 28/28 |
 | ppt/ole | 26 | 19 | 2 | 0 | 5 | 0 | 2 | 0 | 6 | 6/6 |
 | ppt/pictures | 68 | 36 | 5 | 0 | 2 | 24 | 6 | 0 | 2 | 2/2 |
 | ppt/shapes | 220 | 102 | 19 | 92 | 26 | 0 | 0 | 0 | 8 | 8/8 |
-| ppt/tables | 457 | 95 | 33 | 7 | 69 | 0 | 286 | 0 | 14 | 14/14 |
+| ppt/tables | 457 | 95 | 33 | 7 | 65 | 0 | 290 | 0 | 14 | 14/14 |
 | ppt/templates | 452 | 27 | 0 | 152 | 52 | 119 | 102 | 0 | 11 | 24/24 |
 | ppt/textboxes | 132 | 50 | 10 | 17 | 65 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
 | word | 1133 | 629 | 3 | 183 | 248 | 6 | 67 | 0 | 24 | 32/32 |
-| **total** | **6431** | **3847** | **344** | **1172** | **779** | **169** | **464** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3847** | **344** | **1172** | **773** | **171** | **468** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -47,9 +47,9 @@ The format is the extension of the document each call names.
 | Format | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | docx | 949 | 479 | 0 | 180 | 217 | 6 | 67 | 0 | 22 | 30/30 |
-| pptx | 2959 | 1286 | 344 | 716 | 416 | 144 | 397 | 0 | 99 | 114/114 |
+| pptx | 2959 | 1286 | 344 | 716 | 410 | 146 | 401 | 0 | 99 | 114/114 |
 | xlsx | 2523 | 2082 | 0 | 276 | 146 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **3847** | **344** | **1172** | **779** | **169** | **464** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3847** | **344** | **1172** | **773** | **171** | **468** | **0** | **177** | **200/200** |
 
 ## Deltas
 
@@ -62,7 +62,7 @@ The format is the extension of the document each call names.
 | D7 | Stray words on the command line | System.CommandLine leaves unmatched words unparsed and OfficeCLI ignores them; the examples pass unquoted values (`--prop categories=Product A,Product B`) that the shell splits | the argument parser refuses the command line (usage, exit 2): Litchi is strict by default (record 0015 D4) | 5 | `excel/charts/charts-bar.sh:203`, `excel/charts/charts-bar.sh:289`, `excel/charts/charts-bar.sh:303` |
 | U1 | Upstream script error: `--name=` | `--name=VALUE` is not an OfficeCLI option either: `RejectUnknownOptionTokens` refuses it (invalid_argument) | refused as an unknown option (usage, exit 2) | 111 | `ppt/templates/styles/product--geminicli-timetravel/build.sh:23`, `ppt/templates/styles/product--geminicli-timetravel/build.sh:27`, `ppt/templates/styles/product--geminicli-timetravel/build.sh:31` |
 | U2 | Upstream script error: batch input not shipped | the script pipes `slideN.json` files that the upstream example directory does not contain, so OfficeCLI reads an empty batch too | an empty batch payload is `corrupt_batch` | 6 | `ppt/templates/styles/tech--wildlife-company/build.sh:256`, `ppt/templates/styles/tech--wildlife-company/build.sh:261`, `ppt/templates/styles/tech--wildlife-company/build.sh:266` |
-| H1 | Harness: generated inputs need Pillow | the script draws its input pictures with Pillow before adding them | the harness runs `python3 -I -S` (standard library only) so every machine replays the same lines; the pictures are missing (`file_not_found`) | 24 | `ppt/pictures/pictures-basic.sh:87`, `ppt/pictures/pictures-basic.sh:107`, `ppt/pictures/pictures-basic.sh:128` |
+| H1 | Harness: generated inputs need Pillow | the script draws its input pictures with Pillow before adding them | the harness runs `python3 -I -S` (standard library only) so every machine replays the same lines; the pictures are missing (`file_not_found`) | 26 | `ppt/pictures/pictures-basic.sh:87`, `ppt/pictures/pictures-basic.sh:107`, `ppt/pictures/pictures-basic.sh:128` |
 | D8 | Formula with a leading `=` | the help schema documents `formula` "without leading =" (cell.json), but the cell handler also strips a leading `=` | the documented contract: a leading `=` is `invalid_value` | 4 | `excel/workbook-settings.sh:29`, `excel/workbook-settings.sh:32` |
 | D9 | Chart formatting the chart type cannot carry | a chart-level key the chart group's schema omits (`labelPos` on an area, doughnut, radar or stock chart) is reported as unsupported and the chart is still added (exit 2) | the key is `invalid_value` and the whole `add` is refused, so no chart carries a dropped setting (record 0270) | 10 | `excel/charts/charts-area.sh:275`, `excel/charts/charts-combo.sh:119`, `excel/charts/charts-pie.sh:49` |
 | D10 | A property given twice in one chart `add` | the later value wins (a shared option array like `DASH` sets `dataLabels=false` and the line sets `dataLabels=true` again) | `invalid_argument`: one command assigns each property once, so no value is silently dropped (records 0270, 0283) | 1 | `excel/charts/charts-histogram.sh:460` |
@@ -320,7 +320,6 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `shownegbubbles` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-bubble.sh:55`, `ppt/charts/charts-bubble.sh:56` |
 | add | chart | `warned` | `sizerepresents` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-bubble.sh:47`, `ppt/charts/charts-bubble.sh:48` |
 | add | chart | `warned` | `tickLabelPos` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:58`, `ppt/charts/charts-bar.sh:68` |
-| add | col | `unsupported_element` | - | 4 | registry gap L-PPTX-R8 | `ppt/tables/tables-rows-cols.sh:43`, `ppt/tables/tables-rows-cols.sh:48` |
 | add | ole | `unsupported_element` | - | 4 | registry: no add on ole | `ppt/ole/ole-embed.sh:102`, `ppt/ole/ole-embed.sh:115` |
 | add | shape | `warned` | `depth` | 4 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:165`, `ppt/shapes/shapes-effects.sh:172` |
 | add | shape | `warned` | `font.cs` | 4 | registry: `font.cs` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:126`, `ppt/shapes/shapes-typography.sh:138` |
@@ -348,7 +347,7 @@ The format is the extension of the document each call names.
 | add | shape | `warned` | `material` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:172`, `ppt/shapes/shapes-effects.sh:178` |
 | add | shape | `warned` | `softEdge` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:199`, `ppt/shapes/shapes-effects.sh:204` |
 | add | shape | `warned` | `spacing` | 3 | registry: `spacing` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:78`, `ppt/shapes/shapes-typography.sh:83` |
-| batch | - | `warned` | `name` | 3 | refused on a batch item; the registry lists it on series, slide | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
+| batch | - | `warned` | `name` | 3 | refused on a batch item; the registry lists it on series, slide, slideLayout, slideMaster, theme | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
 | batch | - | `warned` | `opacity` | 3 | refused on a batch item; not in the registry | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
 | batch | - | `warned` | `rotation` | 3 | refused on a batch item; not in the registry | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
 | set | axis | `warned` | `visible` | 3 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236`, `ppt/charts/charts-advanced.sh:251` |
@@ -373,7 +372,8 @@ The format is the extension of the document each call names.
 | add | shape | `warned` | `lineAlign` | 2 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:245` |
 | add | shape | `warned` | `marginLeft` | 2 | registry: `marginLeft` is not add-able; not in OfficeCLI's help schema | `ppt/textboxes/textboxes-advanced.sh:68`, `ppt/textboxes/textboxes-advanced.sh:82` |
 | add | shape | `warned` | `tailEnd` | 2 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:142`, `ppt/shapes/shapes-basic.sh:147` |
-| add | video | `unsupported_element` | - | 2 | registry gap L-PPTX-R11 | `ppt/video.sh:74`, `ppt/video.sh:103` |
+| add | video | `skipped` | `autoplay` | 2 | not in the registry; OfficeCLI documents it | `ppt/video.sh:74`, `ppt/video.sh:103` |
+| add | video | `skipped` | `volume` | 2 | not in the registry; OfficeCLI documents it | `ppt/video.sh:74`, `ppt/video.sh:103` |
 | set | axis | `warned` | `labelRotation` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236`, `ppt/charts/charts-advanced.sh:257` |
 | set | axis | `warned` | `majorUnit` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:297`, `ppt/charts/charts-column.sh:68` |
 | set | presentation | `warned` | `slideSize` | 2 | registry: `slideSize` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:34`, `ppt/templates/styles/lifestyle--feline-report/build_ppt.sh:11` |
@@ -431,6 +431,9 @@ The format is the extension of the document each call names.
 | add | shape | `warned` | `strike` | 1 | registry: `strike` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:225` |
 | add | shape | `warned` | `tooltip` | 1 | registry gap M1-extended; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:215` |
 | add | shape | `warned` | `underline` | 1 | registry: `underline` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:231` |
+| add | video | `skipped` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `ppt/video.sh:103` |
+| add | video | `skipped` | `loop` | 1 | not in the registry; OfficeCLI documents it | `ppt/video.sh:103` |
+| add | video | `skipped` | `trimStart` | 1 | registry: `trimStart` is not add-able; OfficeCLI documents it | `ppt/video.sh:103` |
 | batch | - | `skipped` | `transition` | 1 | refused on a batch item; the registry lists it on slide | `ppt/templates/styles/brand--aura-coffee-dark/build.sh:157` |
 | batch | - | `unsupported_capability` | - | 1 | element not in the registry | `ppt/templates/styles/brand--aura-coffee/build.sh:55` |
 | batch | - | `warned` | `(more)` | 1 | refused on a batch item; not in the registry | `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
@@ -658,7 +661,7 @@ None.
 |---|---|---:|
 | F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1172 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
-| F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 132 |
+| F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 134 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
 | F6 | `add --from`, find/replace on `set`, `remove --shift`, `get --save` | 40 |
 | D6 | missing verbs (`validate`, `raw-set`, `add-part`, `dump`) | 138 |
@@ -723,7 +726,7 @@ None.
 | `ppt/tables/tables-financial.sh` | 75 | 10 | 4 | 0 | 4 | 0 | 61 | 0 | 2 | 2/2 |
 | `ppt/tables/tables-merged.sh` | 63 | 5 | 2 | 0 | 3 | 0 | 55 | 0 | 2 | 2/2 |
 | `ppt/tables/tables-nested.sh` | 63 | 5 | 4 | 6 | 5 | 0 | 47 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-rows-cols.sh` | 84 | 13 | 4 | 0 | 16 | 0 | 55 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-rows-cols.sh` | 84 | 13 | 4 | 0 | 12 | 0 | 59 | 0 | 2 | 2/2 |
 | `ppt/tables/tables-styled.sh` | 44 | 28 | 11 | 0 | 15 | 0 | 1 | 0 | 2 | 2/2 |
 | `ppt/templates/styles/brand--aura-coffee-dark/build.sh` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2/2 |
 | `ppt/templates/styles/brand--aura-coffee/build.sh` | 13 | 2 | 0 | 1 | 6 | 0 | 4 | 0 | 1 | 2/2 |
@@ -748,7 +751,7 @@ None.
 | `ppt/transitions/transitions-random.sh` | 17 | 16 | 4 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/transitions/transitions-shapes.sh` | 57 | 56 | 14 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/transitions/transitions-timing.sh` | 37 | 34 | 9 | 2 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/video.sh` | 20 | 9 | 1 | 8 | 3 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/video.sh` | 20 | 9 | 1 | 8 | 1 | 2 | 0 | 0 | 2 | 2/2 |
 | `word/charts.sh` | 46 | 37 | 0 | 8 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/content-controls.sh` | 21 | 11 | 0 | 0 | 9 | 0 | 1 | 0 | 2 | 2/2 |
 | `word/diagram.sh` | 50 | 26 | 0 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
@@ -763,4 +766,4 @@ None.
 | `word/sections.sh` | 33 | 24 | 0 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 210 | 3 | 108 | 39 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **3847** | **344** | **1172** | **779** | **169** | **464** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3847** | **344** | **1172** | **773** | **171** | **468** | **0** | **177** | **200/200** |

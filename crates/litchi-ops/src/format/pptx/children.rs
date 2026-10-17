@@ -52,6 +52,10 @@ pub(crate) struct Children<'f> {
     file: &'f Pptx,
     kinds: KindSet<Kind>,
     state: State,
+    /// Children a query walk lists after the main axis (record 0321): the
+    /// theme, table columns, hyperlinks, media and equations. The node view
+    /// never lists them, so existing views keep their shape.
+    extra: std::vec::IntoIter<Item>,
 }
 
 enum State {
@@ -151,16 +155,31 @@ impl<'f> Children<'f> {
     /// The children of `parent` whose kinds are in `kinds`.
     pub(crate) fn of(parent: &Node<'f>, kinds: KindSet<Kind>, listing: Listing) -> Self {
         let file = parent.file();
-        let state = match State::of(file, parent, kinds, listing) {
-            Ok(state) => state,
-            Err(error) => State::Failed(Some(error)),
+        let (state, extra) = match State::of(file, parent, kinds, listing) {
+            Ok(state) if listing == Listing::Walk => {
+                match super::elements::walk_children(file, parent.item(), kinds) {
+                    Ok(extra) => (state, extra),
+                    Err(error) => (State::Failed(Some(error)), Vec::new()),
+                }
+            },
+            Ok(state) => (state, Vec::new()),
+            Err(error) => (State::Failed(Some(error)), Vec::new()),
         };
-        Self { file, kinds, state }
+        Self {
+            file,
+            kinds,
+            state,
+            extra: extra.into_iter(),
+        }
     }
 
     fn step(&mut self) -> Result<Option<Node<'f>>> {
         self.file.check_owner()?;
         let result = self.step_unfenced();
+        let result = match result {
+            Ok(None) => Ok(self.extra.next().map(|item| Node::new(self.file, item))),
+            other => other,
+        };
         self.file.check_owner().and(result)
     }
 
@@ -673,7 +692,7 @@ impl<'f> Iterator for Children<'f> {
     type Item = Result<Node<'f>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if matches!(self.state, State::Done) {
+        if matches!(self.state, State::Done) && self.extra.len() == 0 {
             return None;
         }
         match self.step() {
@@ -684,6 +703,7 @@ impl<'f> Iterator for Children<'f> {
             },
             Err(error) => {
                 self.state = State::Done;
+                self.extra = Vec::new().into_iter();
                 Some(Err(error))
             },
         }

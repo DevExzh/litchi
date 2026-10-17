@@ -216,6 +216,18 @@ impl Pptx {
             };
             return self.set_comment(comment.slide, comment.index, &props, limits);
         }
+        if let Some(commit) = self.try_set_theme(&target, &props, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_set_master(&target, &props, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_set_column(&target, &props, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_set_hyperlink(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_chart(&target, &props, limits)? {
             return Ok(commit);
         }

@@ -2526,3 +2526,24 @@ through common styles, a run over its paragraph.
 | Canonical name | Notes | Status |
 | --- | --- | --- |
 | `litchi_xls::WorksheetDefect::{ZoomLevel, SharedFormulaFlag}`, `Defect::Worksheet` | Excel-compatible repairs under every `Leniency`: a WINDOW2 zoom outside `10..=400` reads as the default; a stale `fShrFmla` on a formula with its own tokens is ignored | ✅ 0316 |
+
+## PPTX theme, columns, hyperlinks, media, equations, masters and layouts (record 0321)
+
+New verbs live on the primary `opened::Edit` (no new transaction family);
+reads live on the owners and slide views that already answer charts and
+SmartArt. Slide hyperlink targets are semantic (`Target::{Url, Slide,
+Action}`); the authored relationship ID of a `Click` stays crate-private.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::Package::theme`, `SourceBackedPresentation::theme`, `shape::theme::presentation_theme` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{theme, set_theme_colors, set_theme_fonts}` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_master_name, set_layout_name, set_master_shape_text, set_layout_shape_text}` | adopted (0321) |
+| `litchi_pptx::table::Table::grid_columns`; `opened::Edit::{set_table_column_width, insert_table_column, remove_table_column}` | adopted (0321) |
+| `litchi_pptx::hyperlinks::{Click, Link, Target}`; `Click::{of_shape, from_text, action, tooltip}` | adopted (0321) |
+| `litchi_pptx::slide::Slide::hyperlink`, `SourceSlide::hyperlink`, `source::Slide::hyperlink` | adopted (0321) |
+| `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted (0321) |
+| `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted (0321) |
+| `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
+
+See [0321](unified-ops/0321-pptx-element-gaps.md).

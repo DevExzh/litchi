@@ -4346,11 +4346,11 @@
 33	add	pptx	table	unsupported_element	-	-
 41	add	pptx	row	unsupported_element	-	-
 42	add	pptx	row	unsupported_element	-	-
-43	add	pptx	column	unsupported_element	-	-
+43	add	pptx	column	path_not_found	-	-
 45	set	pptx	-	path_not_found	-	tc
 46	set	pptx	-	path_not_found	-	tc
 47	set	pptx	-	path_not_found	-	tc
-48	add	pptx	column	unsupported_element	-	-
+48	add	pptx	column	path_not_found	-	-
 50	set	pptx	-	path_not_found	-	tc
 51	set	pptx	-	path_not_found	-	tc
 52	set	pptx	-	path_not_found	-	tc
@@ -4358,11 +4358,11 @@
 59	add	pptx	table	unsupported_element	-	-
 63	add	pptx	row	unsupported_element	-	-
 64	add	pptx	row	unsupported_element	-	-
-65	add	pptx	column	unsupported_element	-	-
+65	add	pptx	column	path_not_found	-	-
 67	set	pptx	-	path_not_found	-	tc
 68	set	pptx	-	path_not_found	-	tc
 69	set	pptx	-	path_not_found	-	tc
-70	add	pptx	column	unsupported_element	-	-
+70	add	pptx	column	path_not_found	-	-
 72	set	pptx	-	path_not_found	-	tc
 73	set	pptx	-	path_not_found	-	tc
 74	set	pptx	-	path_not_found	-	tc
@@ -5693,7 +5693,7 @@
 71	add	pptx	slide	warned	title	-
 72	set	pptx	-	warned	background	slide
 73	set	pptx	-	ok	-	shape
-74	add	pptx	video	unsupported_element	-	-
+74	add	pptx	video	file_not_found	src;skipped:volume,autoplay	-
 81	add	pptx	slide	warned	title	-
 82	set	pptx	-	warned	background	slide
 83	set	pptx	-	ok	-	shape
@@ -5702,7 +5702,7 @@
 98	add	pptx	slide	warned	title	-
 99	set	pptx	-	warned	background	slide
 100	set	pptx	-	ok	-	shape
-103	add	pptx	video	unsupported_element	-	-
+103	add	pptx	video	file_not_found	src;skipped:volume,autoplay,loop,trimStart,+1	-
 109	add	pptx	shape	ok	-	-
 114	close	pptx	-	skip	-	-
 117	validate	pptx	-	usage	validate	-

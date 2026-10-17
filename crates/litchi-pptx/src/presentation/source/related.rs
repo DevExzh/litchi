@@ -851,6 +851,69 @@ impl SourceSlide {
         })
     }
 
+    /// The Office Math equations of this slide's text (record 0321); see
+    /// [`crate::slide::Slide::equations`].
+    ///
+    /// # Errors
+    /// Returns typed source, execution, limit or XML errors.
+    pub fn equations(&self) -> Result<Vec<crate::shape::math::Equation>> {
+        with_fences(&self.owner, || {
+            // The slide's own bytes: the equations sit in a
+            // markup-compatibility choice the processed part drops.
+            let view = self.owner.package.part(&self.data.part_uri)?;
+            let declared = view.declared_uncompressed_size()?;
+            let maximum = crate::shape::Limits::DEFAULT.input_bytes();
+            if declared > maximum as u64 {
+                return Err(Error::Limit {
+                    resource: "source slide bytes",
+                    limit: maximum,
+                });
+            }
+            let data = view.data()?;
+            crate::source_limits::validate_xml_limits(data.as_bytes(), self.owner.limits)?;
+            crate::shape::math::equations(data.as_bytes())
+        })
+    }
+
+    /// Resolve a click action of this slide's shapes or text through the
+    /// slide's relationships (record 0321); see
+    /// [`crate::slide::Slide::hyperlink`].
+    ///
+    /// # Errors
+    /// Returns typed source, execution or relationship errors.
+    pub fn hyperlink(
+        &self,
+        click: &crate::hyperlinks::Click,
+    ) -> Result<Option<crate::hyperlinks::Link>> {
+        with_fences(&self.owner, || {
+            let slide_part = self.owner.package.part(&self.data.part_uri)?;
+            let rels = slide_part.rels();
+            crate::hyperlinks::Link::resolve(
+                click,
+                |id| {
+                    let Some(relationship) = rels.get(id) else {
+                        return Ok(None);
+                    };
+                    Ok(Some(
+                        if relationship.target_mode() == TargetMode::External {
+                            (true, relationship.target_ref().to_owned())
+                        } else {
+                            (false, relationship.target_partname()?.to_string())
+                        },
+                    ))
+                },
+                |part| {
+                    Ok(self
+                        .owner
+                        .slides
+                        .iter()
+                        .position(|slide| slide.part_uri.as_str() == part)
+                        .map(Position::new))
+                },
+            )
+        })
+    }
+
     /// The data-model XML of the SmartArt this slide relates through
     /// `relationship_id` (a SmartArt frame's `dgm:relIds/@r:dm`), or `None`
     /// when the slide has no such diagram-data relationship (record 0284).

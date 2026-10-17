@@ -393,6 +393,30 @@ class PptxVerbTests(WriteAssertions):
         file = file.remove("/slide[1]/smartart[1]/node[2]")
         self.assertEqual(self.assertReopens(file).get(art, 0)["text"], "Plan\n\tSize\nLearn")
 
+    def test_record_0321_elements(self):
+        # Record 0321: theme, master and layout names, hyperlinks and media.
+        theme = self.file.set("/theme", {"accent1": "FF0000", "majorFont": "Georgia"})
+        view = self.assertReopens(theme).get("/theme", 0)["format"]
+        self.assertEqual((view["accent1"], view["headingFont"]), ("#FF0000", "Georgia"))
+        renamed = self.file.set("/slidemaster[1]", {"name": "Brand"})
+        self.assertEqual(renamed.get("/slidemaster[1]", 0)["format"]["name"], "Brand")
+        file, _ = self.file.add(self.first, "shape", {"text": "Docs", "width": "2in", "height": "1in"})
+        file, link = file.add("/slide[1]/shape[1]", "hyperlink", {"link": "slide[2]", "tooltip": "Next"})
+        self.assertEqual(link, "/slide[1]/shape[1]/hyperlink")
+        self.assertEqual(self.assertReopens(file).get(link, 0)["format"]["link"], "slide[2]")
+        file = file.remove(link)
+        self.assertEqual(len(list(file.query("hyperlink"))), 0)
+        png = (
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4"
+            "nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC"
+        )
+        mp4 = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t"
+        file, video = self.file.add(self.first, "video", {"src": mp4, "poster": png})
+        self.assertEqual(video, "/slide[1]/video[1]")
+        self.assertEqual(self.assertReopens(file).get(video, 0)["type"], "video")
+        error = raised(lambda: self.file.add(self.first, "video", {"src": mp4}))
+        self.assertError(error, L.PropertyError, "missing_property")
+
 
 class XlsbVerbTests(WriteAssertions):
     def test_cells_and_sheets(self):

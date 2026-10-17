@@ -122,6 +122,11 @@ const SPECS: &[Spec] = &[
             "ooxml/pptx/sample.pptx",
             // Record 0294: a generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/modern-comments.pptx",
+            // Record 0321: Office Math in a markup-compatibility choice, and
+            // embedded audio and video (Apache POI, Apache-2.0).
+            "libreoffice-core/oox/qa/unit/data/import-mce.pptx",
+            "poi/test-data/slideshow/EmbeddedAudio.pptx",
+            "poi/test-data/slideshow/EmbeddedVideo.pptx",
         ],
     },
     Spec {
@@ -373,6 +378,10 @@ struct Recipe {
 
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC";
 
+/// Inert media payloads (record 0321): the leaf stores them undecoded.
+const MP4: &str = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t";
+const MP3: &str = "data:audio/mpeg;base64,SUQzAwAAAAAAAA==";
+
 const RECIPES: &[Recipe] = &[
     // Record 0297: a Numbers merged range needs an A1 `ref` of two cells or
     // more inside the table's grid.
@@ -515,6 +524,31 @@ const RECIPES: &[Recipe] = &[
         fixture: "create() + add slide + add smartart",
         parent: "/slide[1]/smartart[1]",
         props: &[("text", "Learn")],
+        start: false,
+    },
+    // Record 0321: media is embedded with a poster image.
+    Recipe {
+        format: "pptx",
+        element: "video",
+        fixture: "create() + add slide",
+        parent: "/slide[1]",
+        props: &[("src", MP4), ("poster", PNG)],
+        start: false,
+    },
+    Recipe {
+        format: "pptx",
+        element: "audio",
+        fixture: "create() + add slide",
+        parent: "/slide[1]",
+        props: &[("src", MP3), ("poster", PNG)],
+        start: false,
+    },
+    Recipe {
+        format: "pptx",
+        element: "media",
+        fixture: "create() + add slide",
+        parent: "/slide[1]",
+        props: &[("src", MP4), ("poster", PNG)],
         start: false,
     },
     Recipe {

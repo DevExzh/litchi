@@ -218,6 +218,27 @@ impl<'a> Table<'a> {
         Ok(row.cells()?.get(column).copied())
     }
 
+    /// The widths of the table's grid columns (`a:tblGrid/a:gridCol/@w`),
+    /// in EMU, in grid order (record 0321).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a malformed grid or a column without a
+    /// non-negative integer width.
+    pub fn grid_columns(self) -> Result<Vec<i64>> {
+        let table = self.xml()?;
+        match self.context {
+            Some(context) => {
+                let end = context
+                    .offset
+                    .checked_add(table.len())
+                    .ok_or_else(|| invalid("table XML span overflows usize"))?;
+                super::columns::widths(context.owner, context.offset..end)
+            },
+            None => super::columns::widths(table, 0..table.len()),
+        }
+    }
+
     /// Read the optional `a:tblPr` values.
     ///
     /// # Errors
