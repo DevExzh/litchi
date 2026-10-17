@@ -243,7 +243,25 @@ cargo through the memory-capped shim, `CARGO_BUILD_JOBS=6`,
 `RUST_TEST_THREADS=8`; every exit status checked
 (`.coord/pptx-p0/gate-logs/summary.txt`).
 
-GATES
+| gate | exit |
+|---|---:|
+| `cargo fmt --all --check` | 0 (after a rustfmt of `pptx_table_rows.rs`) |
+| `cargo clippy -p litchi-pptx -p litchi-ops -p litchi -p litchi-py -p litchi-cli --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --features <all but encryption> --all-targets -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features pptx] --all-targets -- -D warnings` | 0, 0 |
+| `cargo test -p litchi-pptx --all-features` | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib` (929), `--doc`, 8 `--test` chunks of 20 (executables deleted per chunk) | 0 (the first run failed `spec_tables_agree_with_their_vocabularies`: a `para` paragraph alias the shared path vocabulary does not know; the alias was dropped, the goldens re-blessed and the lib and the affected chunk rerun) |
+| `cargo test -p litchi --all-features`; `cargo test -p litchi-cli --all-features` | 0; 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --test capabilities --test registry` (all features; all but `encryption`) | 0, 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test crud_matrix --test corpus_fidelity` | 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pptx -p litchi-ops` | 0 |
+| `tools/check_crate_boundaries.py`; `tools/non_iwork_gate.py verify` | 0; 0 |
+| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` (40 profiles, 2,313 bans, 253 families) | 0 |
+| `tools/officecli_capability_delta.py --officecli …/3rdparty/OfficeCLI` and `--check` | 0, 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test officecli_corpus`; `tools/officecli_corpus.py`; `--check` | 0, 0, 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta`; `tools/test_no_3rdparty_references.py`; `tools/unified_bench_matrix.py --check` | 0, 0, 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` (286 tests, new `test_record_0333_p0_residue`) | 0 |
 
 ## 8. Follow-ups
 

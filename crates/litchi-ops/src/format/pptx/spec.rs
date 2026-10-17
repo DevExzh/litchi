@@ -1275,7 +1275,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         element(
             Paragraph,
             "paragraph",
-            &["p", "para", "paragraph"],
+            &["p", "paragraph"],
             &[Shape, Placeholder, Cell, Notes],
             &[Run, LineBreak],
             &[],

@@ -2988,8 +2988,7 @@
         "notes"
       ],
       "elementAliases": [
-        "p",
-        "para"
+        "p"
       ],
       "operations": {
         "add": true,
