@@ -337,12 +337,7 @@ pub(super) fn list(file: &Xlsx, sheet: &Sheet, kind: Kind) -> Result<Vec<Feature
                 .map(|comments| {
                     comments
                         .iter()
-                        .map(|(reference, comment)| Note {
-                            reference: reference.to_owned(),
-                            author: comment.author.clone(),
-                            text: comment.text.clone(),
-                            runs: comment.runs.clone(),
-                        })
+                        .map(|(reference, comment)| note(reference, comment))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -501,13 +496,19 @@ fn comment<'f>(
         Feature {
             kind: Kind::Comment,
             index: u32::try_from(index).unwrap_or(u32::MAX),
-            data: Data::Comment(Note {
-                reference: reference.to_owned(),
-                author: comment.author.clone(),
-                text: comment.text.clone(),
-            }),
+            data: Data::Comment(note(reference, comment)),
         },
     )))
+}
+
+/// A note's copy of a comment of the part.
+fn note(reference: &str, comment: &xlsx::workbook::comments::Comment) -> Note {
+    Note {
+        reference: reference.to_owned(),
+        author: comment.author.clone(),
+        text: comment.text.clone(),
+        runs: comment.runs.clone(),
+    }
 }
 
 impl<'f> Node<'f> {
