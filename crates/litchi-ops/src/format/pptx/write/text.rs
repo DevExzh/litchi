@@ -13,8 +13,10 @@ use crate::value::{Base, Scalar};
 use crate::{Code, Props, Result};
 use litchi_core::Position;
 use litchi_drawingml::geom::Preset;
-use litchi_drawingml::text::Alignment;
-use litchi_pptx::opened::{Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
+use litchi_drawingml::text::{Alignment, Anchor, Strike, Underline};
+use litchi_pptx::opened::{
+    CellFill, CellMargin, Rgb, ShapeFill, TextEdit, TextProperties, TextTarget,
+};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -75,7 +77,11 @@ pub(in crate::format::pptx) struct TextValues {
     font: Option<Option<String>>,
     latin: Option<Option<String>>,
     align: Option<Option<Alignment>>,
-    fill: Option<Option<Rgb>>,
+    underline: Option<Option<Underline>>,
+    strike: Option<Option<Strike>>,
+    fill: Option<Option<CellFill>>,
+    valign: Option<Option<Anchor>>,
+    margins: [Option<Option<i64>>; 4],
     shape_fill: Option<Option<ShapeFill>>,
     geometry: Option<Preset>,
 }
@@ -90,7 +96,11 @@ impl TextValues {
             && self.font.is_none()
             && self.latin.is_none()
             && self.align.is_none()
+            && self.underline.is_none()
+            && self.strike.is_none()
             && self.fill.is_none()
+            && self.valign.is_none()
+            && self.margins.iter().all(Option::is_none)
             && self.shape_fill.is_none()
             && self.geometry.is_none()
     }
@@ -141,8 +151,22 @@ impl TextValues {
         if let Some(value) = self.align {
             properties = properties.with_align(value);
         }
+        if let Some(value) = self.underline {
+            properties = properties.with_underline(value);
+        }
+        if let Some(value) = self.strike {
+            properties = properties.with_strike(value);
+        }
         if let Some(value) = self.fill {
             properties = properties.with_fill(value);
+        }
+        if let Some(value) = self.valign {
+            properties = properties.with_cell_anchor(value);
+        }
+        for (margin, value) in CellMargin::ALL.into_iter().zip(self.margins) {
+            if let Some(value) = value {
+                properties = properties.with_cell_margin(margin, value);
+            }
         }
         if let Some(value) = self.shape_fill {
             properties = properties.with_shape_fill(value);
@@ -165,6 +189,16 @@ impl TextValues {
             TextSetter::FontLatin => self.latin.is_some(),
             TextSetter::Align => self.align.is_some(),
             TextSetter::Fill => self.fill.is_some(),
+            TextSetter::Underline => self.underline.is_some(),
+            TextSetter::Strike => self.strike.is_some(),
+            TextSetter::Valign => self.valign.is_some(),
+            TextSetter::Margin(margin) => self.margins[margin as usize].is_some(),
+            TextSetter::Padding => {
+                self.margins[0].is_some()
+                    || self.margins[1].is_some()
+                    || self.margins[2].is_some()
+                    || self.margins[3].is_some()
+            },
             TextSetter::ShapeFill => self.shape_fill.is_some(),
             TextSetter::Geometry => self.geometry.is_some(),
             TextSetter::Click(_) => false,
@@ -226,16 +260,85 @@ impl TextValues {
                     _ => unreachable!("font size coercion"),
                 });
             },
-            TextSetter::Color | TextSetter::Fill => {
-                let color = match value {
+            TextSetter::Color => {
+                self.color = Some(match value {
                     Some(Scalar::Color(color)) => Some(rgb(&color)?),
                     None => None,
                     _ => unreachable!("colour coercion"),
+                });
+            },
+            TextSetter::Fill => {
+                self.fill = Some(match value {
+                    Some(Scalar::Color(color)) => Some(cell_fill(&color)?),
+                    None => None,
+                    _ => unreachable!("colour coercion"),
+                });
+            },
+            TextSetter::Underline => {
+                self.underline = Some(match value {
+                    Some(Scalar::Token(token)) => Some(underline(token)?),
+                    None => None,
+                    _ => unreachable!("underline coercion"),
+                });
+            },
+            TextSetter::Strike => {
+                self.strike = Some(match value {
+                    Some(Scalar::Token(token)) => Some(match token {
+                        "single" => Strike::Single,
+                        "double" => Strike::Double,
+                        "none" => Strike::None,
+                        _ => {
+                            return Err(
+                                error(Code::InvalidValue, "unknown strike").with_property("strike")
+                            );
+                        },
+                    }),
+                    None => None,
+                    _ => unreachable!("strike coercion"),
+                });
+            },
+            TextSetter::Valign => {
+                self.valign = Some(match value {
+                    Some(Scalar::Token(token)) => Some(match token {
+                        "top" => Anchor::Top,
+                        "center" => Anchor::Center,
+                        "bottom" => Anchor::Bottom,
+                        _ => {
+                            return Err(error(Code::InvalidValue, "unknown vertical alignment")
+                                .with_property("valign"));
+                        },
+                    }),
+                    None => None,
+                    _ => unreachable!("anchor coercion"),
+                });
+            },
+            TextSetter::Margin(_) | TextSetter::Padding => {
+                let inset = match value {
+                    Some(Scalar::Length(length)) => {
+                        let emu = length.emu();
+                        if emu < 0 {
+                            return Err(error(
+                                Code::InvalidValue,
+                                "a cell inset cannot be negative",
+                            )
+                            .with_property("padding"));
+                        }
+                        Some(emu)
+                    },
+                    None => None,
+                    _ => unreachable!("inset coercion"),
                 };
-                if setter == TextSetter::Color {
-                    self.color = Some(color);
-                } else {
-                    self.fill = Some(color);
+                // `padding` and one side's key name the same inset.
+                if self.has(setter) {
+                    return Err(error(
+                        Code::InvalidArgument,
+                        "a cell inset was assigned more than once",
+                    )
+                    .with_property("padding"));
+                }
+                match setter {
+                    TextSetter::Margin(margin) => self.margins[margin as usize] = Some(inset),
+                    _ => self.margins = [Some(inset); 4],
                 }
             },
             TextSetter::Font | TextSetter::FontLatin => {
@@ -352,6 +455,71 @@ fn rgb(color: &crate::value::Color) -> Result<Rgb> {
     }
 }
 
+/// A table cell fill colour: opaque RGB, or a theme colour without
+/// transforms (record 0333).
+fn cell_fill(color: &crate::value::Color) -> Result<CellFill> {
+    if let Base::Scheme(scheme) = color.base()
+        && color.transforms().is_empty()
+    {
+        return Ok(CellFill::Scheme(drawing_scheme(scheme)));
+    }
+    rgb(color).map(CellFill::Rgb).map_err(|error| {
+        error.with_property("fill").with_suggestion(
+            "use a hex colour such as 1F4E79, a theme colour such as accent1, or none",
+        )
+    })
+}
+
+/// The `DrawingML` token of a theme colour.
+fn drawing_scheme(scheme: crate::value::Scheme) -> litchi_drawingml::color::Scheme {
+    use crate::value::Scheme;
+    use litchi_drawingml::color::Scheme as Drawing;
+    match scheme {
+        Scheme::Background1 => Drawing::Background,
+        Scheme::Text1 => Drawing::Text,
+        Scheme::Background2 => Drawing::Background2,
+        Scheme::Text2 => Drawing::Text2,
+        Scheme::Accent1 => Drawing::Accent1,
+        Scheme::Accent2 => Drawing::Accent2,
+        Scheme::Accent3 => Drawing::Accent3,
+        Scheme::Accent4 => Drawing::Accent4,
+        Scheme::Accent5 => Drawing::Accent5,
+        Scheme::Accent6 => Drawing::Accent6,
+        Scheme::Hyperlink => Drawing::Hyperlink,
+        Scheme::FollowedHyperlink => Drawing::FollowedHyperlink,
+        Scheme::Placeholder => Drawing::Placeholder,
+        Scheme::Dark1 => Drawing::Dark1,
+        Scheme::Light1 => Drawing::Light1,
+        Scheme::Dark2 => Drawing::Dark2,
+        Scheme::Light2 => Drawing::Light2,
+    }
+}
+
+/// An underline token, as OfficeCLI names it.
+fn underline(token: &str) -> Result<Underline> {
+    Ok(match token {
+        "none" => Underline::None,
+        "single" => Underline::Single,
+        "double" => Underline::Double,
+        "words" => Underline::Words,
+        "heavy" => Underline::Heavy,
+        "dotted" => Underline::Dotted,
+        "dottedHeavy" => Underline::DottedHeavy,
+        "dash" => Underline::Dash,
+        "dashHeavy" => Underline::DashHeavy,
+        "dashLong" => Underline::DashLong,
+        "dashLongHeavy" => Underline::DashLongHeavy,
+        "dotDash" => Underline::DotDash,
+        "dotDashHeavy" => Underline::DotDashHeavy,
+        "dotDotDash" => Underline::DotDotDash,
+        "dotDotDashHeavy" => Underline::DotDotDashHeavy,
+        "wavy" => Underline::Wavy,
+        "wavyHeavy" => Underline::WavyHeavy,
+        "wavyDbl" => Underline::WavyDouble,
+        _ => return Err(error(Code::InvalidValue, "unknown underline").with_property("underline")),
+    })
+}
+
 fn alignment(token: &str) -> Result<Alignment> {
     Ok(match token {
         "left" => Alignment::Left,
@@ -405,6 +573,13 @@ pub(in crate::format::pptx) fn admit_for<const N: usize, const A: usize>(
             .with_property(entry.spec.name));
         }
         seen |= bit;
+        // OfficeCLI's `fill=none` is an explicit no-fill, not a colour.
+        if matches!(entry.access, crate::registry::Access::Set(TextSetter::Fill))
+            && matches!(value, crate::PropValue::Text(text) if text.trim().eq_ignore_ascii_case("none"))
+        {
+            values.fill = Some(Some(CellFill::None));
+            continue;
+        }
         entry.prepare(operation, value, |setter, value| {
             values.stage(setter, value, limits)
         })?;

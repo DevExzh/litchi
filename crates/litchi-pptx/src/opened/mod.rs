@@ -58,8 +58,8 @@ pub use model::{
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
 pub use text_format::{
-    MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill, TextBody, TextEdit,
-    TextProperties, TextTarget,
+    CellFill, CellMargin, MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill,
+    TextBody, TextEdit, TextProperties, TextTarget,
 };
 pub(crate) use text_format::{TextChange, stage_text_properties, stage_text_structure};
 pub use transaction::{Commit, Diagnostics, Edit, MediaFile, SmartArtParts};

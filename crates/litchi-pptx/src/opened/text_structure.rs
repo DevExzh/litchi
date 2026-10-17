@@ -94,7 +94,7 @@ fn validate(change: &Change<'_>, max_text_bytes: usize) -> Result<()> {
         Change::InsertRun { properties, .. } => (properties, true),
         Change::RemoveParagraph { .. } | Change::RemoveRun { .. } => return Ok(()),
     };
-    if properties.fill.is_some()
+    if properties.has_cell_properties()
         || properties.shape_fill.is_some()
         || properties.geometry.is_some()
         || (run && properties.align.is_some())

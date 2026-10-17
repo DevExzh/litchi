@@ -1338,7 +1338,7 @@ impl<'f> Node<'f> {
                 ),
                 None => (RUN_PROPS, PropKind::Empty),
             },
-            Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_fill(cell)?)),
+            Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_properties(cell)?)),
             Item::Row(row) => (ROW_PROPS, PropKind::Row(text::row_height(row)?)),
             Item::LineBreak(_) => (&[][..], PropKind::Empty),
             Item::Series(item) => (SERIES_PROPS, PropKind::Series(item)),
@@ -1535,7 +1535,7 @@ enum PropKind<'a> {
         Option<Arc<litchi_pptx::hyperlinks::Link>>,
     ),
     Notes(&'a str),
-    Cell(Option<[u8; 3]>),
+    Cell(litchi_pptx::table::CellProperties),
     /// A table row's height (record 0333).
     Row(Option<i64>),
     Comment(&'a Comment),
@@ -2035,11 +2035,7 @@ impl<'a> Props<'a> {
                 RunKey::Tooltip => super::links::click_value(link.as_deref(), true),
                 key => text::run_value(properties, key),
             },
-            PropKind::Cell(fill) => match CellKey::at(index)? {
-                CellKey::Fill => fill.map(|[red, green, blue]| {
-                    Value::Color(crate::value::Color::rgb(red, green, blue))
-                }),
-            },
+            PropKind::Cell(properties) => text::cell_value(properties, CellKey::at(index)?),
             PropKind::Row(height) => match RowKey::at(index)? {
                 RowKey::Height => height.map(length),
             },

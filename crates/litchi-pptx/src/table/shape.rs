@@ -452,6 +452,94 @@ impl<'a> Cell<'a> {
         Ok(Some(body))
     }
 
+    /// The cell's local properties (`a:tcPr`, record 0333): its fill (a
+    /// solid RGB or theme colour, or no fill; other fills read as `None`),
+    /// vertical anchor and insets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cell XML is malformed, an inset is not an
+    /// integer, or an RGB value is not six hexadecimal digits.
+    pub fn properties(self) -> Result<CellProperties> {
+        let xml = self.xml()?;
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        reader.config_mut().check_end_names = true;
+        let mut properties = CellProperties::default();
+        // Local names below the cell root.
+        let mut path: Vec<Vec<u8>> = Vec::new();
+        loop {
+            let event = reader
+                .read_event()
+                .map_err(|_| invalid("malformed table cell XML"))?;
+            let (start, empty) = match &event {
+                Event::Start(start) => (start, false),
+                Event::Empty(start) => (start, true),
+                Event::End(_) => {
+                    path.pop();
+                    continue;
+                },
+                Event::Eof => return Ok(properties),
+                _ => continue,
+            };
+            let local = start.local_name().as_ref().to_vec();
+            let value = |name: &[u8]| -> Result<Option<Vec<u8>>> {
+                for attribute in start.checked_attributes() {
+                    let attribute = attribute.map_err(|_| invalid("malformed table cell XML"))?;
+                    if attribute.key.as_ref() == name {
+                        return Ok(Some(attribute.value.into_owned()));
+                    }
+                }
+                Ok(None)
+            };
+            match (path.len(), path.get(1).map(Vec::as_slice), local.as_slice()) {
+                (1, _, b"tcPr") => {
+                    if let Some(anchor) = value(b"anchor")? {
+                        properties.anchor = std::str::from_utf8(&anchor)
+                            .ok()
+                            .and_then(|token| token.parse().ok());
+                    }
+                    for (index, name) in
+                        [&b"marL"[..], b"marR", b"marT", b"marB"].iter().enumerate()
+                    {
+                        if let Some(margin) = value(name)? {
+                            properties.margins[index] = Some(
+                                std::str::from_utf8(&margin)
+                                    .ok()
+                                    .and_then(|value| value.trim().parse::<i64>().ok())
+                                    .ok_or_else(|| {
+                                        invalid("a table cell inset is not an integer")
+                                    })?,
+                            );
+                        }
+                    }
+                },
+                (2, Some(b"tcPr"), b"noFill") => {
+                    properties.fill = Some(crate::opened::CellFill::None);
+                },
+                (3, Some(b"tcPr"), b"srgbClr") if path[2].as_slice() == b"solidFill" => {
+                    let rgb =
+                        value(b"val")?.ok_or_else(|| invalid("table cell colour has no value"))?;
+                    properties.fill = Some(crate::opened::CellFill::Rgb(crate::opened::Rgb(
+                        parse_rgb(&rgb)?,
+                    )));
+                },
+                (3, Some(b"tcPr"), b"schemeClr") if path[2].as_slice() == b"solidFill" => {
+                    properties.fill = value(b"val")?
+                        .and_then(|token| {
+                            litchi_drawingml::color::Scheme::from_token(
+                                std::str::from_utf8(&token).ok()?,
+                            )
+                        })
+                        .map(crate::opened::CellFill::Scheme);
+                },
+                _ => {},
+            }
+            if !empty {
+                path.push(local);
+            }
+        }
+    }
+
     /// The cell's local solid RGB fill (`a:tcPr/a:solidFill/a:srgbClr`).
     ///
     /// Scheme, preset and system colours, gradient, picture and pattern
@@ -500,6 +588,18 @@ impl<'a> Cell<'a> {
             }
         }
     }
+}
+
+/// A table cell's local properties (`a:tcPr`, record 0333).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct CellProperties {
+    /// The local fill: solid RGB or theme colour, or no fill.
+    pub fill: Option<crate::opened::CellFill>,
+    /// The vertical text anchor (`anchor`).
+    pub anchor: Option<litchi_drawingml::text::Anchor>,
+    /// The insets in EMU, in `marL`, `marR`, `marT`, `marB` order.
+    pub margins: [Option<i64>; 4],
 }
 
 fn parse_rgb(value: &[u8]) -> Result<[u8; 3]> {

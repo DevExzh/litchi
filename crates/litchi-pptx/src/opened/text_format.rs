@@ -19,7 +19,7 @@ use std::ops::Range;
 
 use litchi_core::Position;
 use litchi_drawingml::geom::Preset;
-use litchi_drawingml::text::Alignment;
+use litchi_drawingml::text::{Alignment, Anchor, Strike, Underline};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -134,6 +134,46 @@ pub enum TextTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rgb(pub [u8; 3]);
 
+/// A table cell's local fill, the fill choice of its `a:tcPr` (record
+/// 0333).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CellFill {
+    /// A solid RGB colour (`a:solidFill/a:srgbClr`).
+    Rgb(Rgb),
+    /// A solid theme colour (`a:solidFill/a:schemeClr`).
+    Scheme(litchi_drawingml::color::Scheme),
+    /// No fill (`a:noFill`).
+    None,
+}
+
+/// One cell inset of `a:tcPr` (record 0333).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CellMargin {
+    /// `marL`.
+    Left,
+    /// `marR`.
+    Right,
+    /// `marT`.
+    Top,
+    /// `marB`.
+    Bottom,
+}
+
+impl CellMargin {
+    /// Every inset, in `marL`, `marR`, `marT`, `marB` order.
+    pub const ALL: [Self; 4] = [Self::Left, Self::Right, Self::Top, Self::Bottom];
+
+    const fn attribute(self) -> &'static [u8] {
+        match self {
+            Self::Left => b"marL",
+            Self::Right => b"marR",
+            Self::Top => b"marT",
+            Self::Bottom => b"marB",
+        }
+    }
+}
+
 /// A shape's own fill, the fill choice of its `p:spPr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -162,7 +202,11 @@ pub struct TextProperties<'a> {
     font: Option<Option<&'a str>>,
     latin: Option<Option<&'a str>>,
     align: Option<Option<Alignment>>,
-    fill: Option<Option<Rgb>>,
+    underline: Option<Option<Underline>>,
+    strike: Option<Option<Strike>>,
+    fill: Option<Option<CellFill>>,
+    anchor: Option<Option<Anchor>>,
+    margins: [Option<Option<i64>>; 4],
     shape_fill: Option<Option<ShapeFill>>,
     geometry: Option<Preset>,
 }
@@ -225,10 +269,37 @@ impl<'a> TextProperties<'a> {
         self.align = Some(value);
         self
     }
-    /// Set or remove a table cell's solid fill (`a:tcPr`); cells only.
+    /// Set or remove `a:rPr@u` on every addressed run (record 0333).
     #[must_use]
-    pub const fn with_fill(mut self, value: Option<Rgb>) -> Self {
+    pub const fn with_underline(mut self, value: Option<Underline>) -> Self {
+        self.underline = Some(value);
+        self
+    }
+    /// Set or remove `a:rPr@strike` on every addressed run (record 0333).
+    #[must_use]
+    pub const fn with_strike(mut self, value: Option<Strike>) -> Self {
+        self.strike = Some(value);
+        self
+    }
+    /// Set or remove a table cell's local fill (`a:tcPr`): a solid RGB or
+    /// theme colour, or no fill; cells only.
+    #[must_use]
+    pub const fn with_fill(mut self, value: Option<CellFill>) -> Self {
         self.fill = Some(value);
+        self
+    }
+    /// Set or remove a table cell's vertical anchor (`a:tcPr@anchor`);
+    /// cells only (record 0333).
+    #[must_use]
+    pub const fn with_cell_anchor(mut self, value: Option<Anchor>) -> Self {
+        self.anchor = Some(value);
+        self
+    }
+    /// Set or remove one table cell inset (`a:tcPr@marL`, …), in EMU; cells
+    /// only (record 0333).
+    #[must_use]
+    pub const fn with_cell_margin(mut self, margin: CellMargin, value: Option<i64>) -> Self {
+        self.margins[margin as usize] = Some(value);
         self
     }
     /// Set or remove a shape's own fill (`p:spPr`); shape targets only.
@@ -259,6 +330,8 @@ impl<'a> TextProperties<'a> {
             || self.color.is_some()
             || self.font.is_some()
             || self.latin.is_some()
+            || self.underline.is_some()
+            || self.strike.is_some()
     }
     fn has_shape_properties(&self) -> bool {
         self.shape_fill.is_some() || self.geometry.is_some()
@@ -266,8 +339,12 @@ impl<'a> TextProperties<'a> {
     fn has_body_properties(&self) -> bool {
         self.text.is_some() || self.has_run_properties() || self.align.is_some()
     }
+    /// Whether a cell-only property (fill, anchor, insets) is assigned.
+    fn has_cell_properties(&self) -> bool {
+        self.fill.is_some() || self.anchor.is_some() || self.margins.iter().any(Option::is_some)
+    }
     fn is_empty(&self) -> bool {
-        !self.has_body_properties() && self.fill.is_none() && !self.has_shape_properties()
+        !self.has_body_properties() && !self.has_cell_properties() && !self.has_shape_properties()
     }
 }
 
@@ -387,7 +464,7 @@ pub(crate) fn stage_text_properties(
                     })?
                 },
                 None => {
-                    if is_table || edit.properties.fill.is_some() {
+                    if is_table || edit.properties.has_cell_properties() {
                         return Err(Error::UnsafeEdit {
                             operation: "set_text_properties",
                             reason: "text formatting requires a shape text body; fill applies to table cells",
@@ -503,8 +580,13 @@ fn validate(edit: &TextEdit<'_>) -> Result<()> {
     {
         return Err(Error::Invalid("a run span is empty".into()));
     }
-    if properties.fill.is_some() && !matches!(edit.target, TextTarget::Cell { .. }) {
+    if properties.has_cell_properties() && !matches!(edit.target, TextTarget::Cell { .. }) {
         return Err(Error::Invalid("fill applies to table cells only".into()));
+    }
+    for margin in properties.margins.into_iter().flatten().flatten() {
+        if !(0..=crate::table::columns::MAX_COLUMN_WIDTH).contains(&margin) {
+            return Err(Error::Invalid("a cell inset is out of range".into()));
+        }
     }
     if properties.has_shape_properties() && !matches!(edit.target, TextTarget::Shape { .. }) {
         return Err(Error::Invalid(
@@ -821,6 +903,32 @@ fn srgb_fill(prefix: &[u8], color: Rgb) -> Vec<u8> {
     output
 }
 
+/// The fill markup of a table cell.
+fn cell_fill(prefix: &[u8], fill: CellFill) -> Vec<u8> {
+    match fill {
+        CellFill::Rgb(color) => srgb_fill(prefix, color),
+        CellFill::Scheme(scheme) => {
+            let fill = qualified(prefix, "solidFill");
+            let mut output = b"<".to_vec();
+            output.extend_from_slice(&fill);
+            output.extend_from_slice(b"><");
+            output.extend_from_slice(&qualified(prefix, "schemeClr"));
+            output.extend_from_slice(b" val=\"");
+            output.extend_from_slice(scheme.token().as_bytes());
+            output.extend_from_slice(b"\"/></");
+            output.extend_from_slice(&fill);
+            output.push(b'>');
+            output
+        },
+        CellFill::None => {
+            let mut output = b"<".to_vec();
+            output.extend_from_slice(&qualified(prefix, "noFill"));
+            output.extend_from_slice(b"/>");
+            output
+        },
+    }
+}
+
 fn typeface(prefix: &[u8], local: &str, face: &str) -> Vec<u8> {
     let mut output = Vec::with_capacity(32 + face.len());
     output.push(b'<');
@@ -966,6 +1074,12 @@ fn rewrite_rpr(element: &[u8], prefix: &[u8], properties: &TextProperties<'_>) -
     if let Some(value) = properties.size {
         size = value.map(|value| value.to_string());
         attributes.push((b"sz", size.as_deref().map(str::as_bytes)));
+    }
+    if let Some(value) = properties.underline {
+        attributes.push((b"u", value.map(|value| value.dml().as_bytes())));
+    }
+    if let Some(value) = properties.strike {
+        attributes.push((b"strike", value.map(|value| value.token().as_bytes())));
     }
     let mut changes = Vec::new();
     if let Some(color) = properties.color {
@@ -1679,22 +1793,44 @@ fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>>
         };
         splices.replace(body.span.clone(), rewritten);
     }
-    if let Some(fill) = properties.fill {
-        let changes = [ChildChange {
-            rank: 7,
-            bytes: fill.map(|color| srgb_fill(&prefix, color)),
-        }];
+    if properties.has_cell_properties() {
+        let mut changes = Vec::new();
+        if let Some(fill) = properties.fill {
+            changes.push(ChildChange {
+                rank: 7,
+                bytes: fill.map(|fill| cell_fill(&prefix, fill)),
+            });
+        }
+        let margins: Vec<Option<String>> = properties
+            .margins
+            .iter()
+            .map(|margin| margin.flatten().map(|value| value.to_string()))
+            .collect();
+        let mut attributes: Vec<(&[u8], Option<&[u8]>)> = Vec::new();
+        for (index, margin) in CellMargin::ALL.into_iter().enumerate() {
+            if properties.margins[index].is_some() {
+                attributes.push((
+                    margin.attribute(),
+                    margins[index].as_deref().map(str::as_bytes),
+                ));
+            }
+        }
+        if let Some(anchor) = properties.anchor {
+            attributes.push((b"anchor", anchor.map(|anchor| anchor.token().as_bytes())));
+        }
+        let creates = changes.iter().any(|change| change.bytes.is_some())
+            || attributes.iter().any(|(_, value)| value.is_some());
         match child(cell, &kids, b"tcPr") {
             Some(tcpr) => {
                 let rewritten =
-                    rewrite_properties(&cell[tcpr.span.clone()], &[], &changes, tcpr_rank)?;
+                    rewrite_properties(&cell[tcpr.span.clone()], &attributes, &changes, tcpr_rank)?;
                 splices.replace(tcpr.span.clone(), rewritten);
             },
-            None if fill.is_some() => {
+            None if creates => {
                 let mut empty = b"<".to_vec();
                 empty.extend_from_slice(&qualified(&prefix, "tcPr"));
                 empty.extend_from_slice(b"/>");
-                let created = rewrite_properties(&empty, &[], &changes, tcpr_rank)?;
+                let created = rewrite_properties(&empty, &attributes, &changes, tcpr_rank)?;
                 // tcPr follows txBody and precedes extLst.
                 let at =
                     child(cell, &kids, b"extLst").map_or(node.close_start, |ext| ext.span.start);
@@ -1766,6 +1902,8 @@ fn rewrite_body_text(
             let formatting = TextProperties {
                 text: None,
                 fill: None,
+                anchor: None,
+                margins: [None; 4],
                 ..*properties
             };
             rewrite_paragraph(&paragraph, None, None, &formatting)?

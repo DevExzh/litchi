@@ -103,12 +103,44 @@ pub(crate) fn cell_body(item: &TableItem) -> Result<Option<Body>> {
     }
 }
 
-/// A table cell's local solid RGB fill.
-pub(crate) fn cell_fill(item: &TableItem) -> Result<Option<[u8; 3]>> {
+/// A table cell's local properties: fill, vertical anchor and insets
+/// (record 0333).
+pub(crate) fn cell_properties(item: &TableItem) -> Result<litchi_pptx::table::CellProperties> {
     let table = table(&item.table.handle)?;
     match table.cell(item.row as usize, item.column as usize)? {
-        Some(cell) => Ok(cell.fill()?),
-        None => Ok(None),
+        Some(cell) => Ok(cell.properties()?),
+        None => Ok(litchi_pptx::table::CellProperties::default()),
+    }
+}
+
+/// The value of a table cell property.
+pub(crate) fn cell_value(
+    properties: &litchi_pptx::table::CellProperties,
+    key: super::spec::CellKey,
+) -> Option<Value<'static>> {
+    use super::spec::CellKey;
+    use litchi_drawingml::text::Anchor;
+    use litchi_pptx::opened::CellFill;
+    let inset = |index: usize| {
+        properties.margins[index].map(|emu| Value::Length(crate::value::Length::from_emu(emu)))
+    };
+    match key {
+        CellKey::Fill => match properties.fill? {
+            CellFill::Rgb(rgb) => Some(Value::Color(Color::rgb(rgb.0[0], rgb.0[1], rgb.0[2]))),
+            CellFill::Scheme(scheme) => Some(Value::Color(Color::scheme(scheme_of(scheme)))),
+            // An explicit no-fill has no colour to report.
+            _ => None,
+        },
+        CellKey::Valign => match properties.anchor? {
+            Anchor::Top => Some(Value::Token("top")),
+            Anchor::Center => Some(Value::Token("center")),
+            Anchor::Bottom => Some(Value::Token("bottom")),
+            Anchor::Justified | Anchor::Distributed => None,
+        },
+        CellKey::PaddingLeft => inset(0),
+        CellKey::PaddingRight => inset(1),
+        CellKey::PaddingTop => inset(2),
+        CellKey::PaddingBottom => inset(3),
     }
 }
 

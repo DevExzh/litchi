@@ -328,7 +328,16 @@ pub(crate) static UNDERLINE: Tokens = Tokens::new(
         "wavyDbl",
         "none",
     ],
-    &[("dbl", 1), ("sng", 0)],
+    // OfficeCLI also takes `true` for single and `false` for none.
+    &[("dbl", 1), ("false", 17), ("sng", 0), ("true", 0)],
+);
+
+/// A table cell's vertical anchor, as OfficeCLI prints it (`top`, `center`,
+/// `bottom` for `t`, `ctr`, `b`; record 0333).
+pub(crate) static VALIGN: Tokens = Tokens::new(
+    "vertical alignment",
+    &["top", "center", "bottom"],
+    &[("b", 2), ("ctr", 1), ("middle", 1), ("t", 0)],
 );
 
 /// Strikethrough (`ST_TextStrikeType`), as OfficeCLI prints it.
@@ -783,9 +792,15 @@ props! {
 }
 
 props! {
-    /// A table cell (`TableCellToNode`): its local solid fill.
+    /// A table cell (`TableCellToNode`): its local solid fill, vertical
+    /// anchor and insets (record 0333).
     CELL_PROPS, CellKey {
         Fill = "fill": DRAWING_COLOR,
+        Valign = "valign": ValueType::Token(&VALIGN),
+        PaddingLeft = "padding.left": EXTENT,
+        PaddingRight = "padding.right": EXTENT,
+        PaddingTop = "padding.top": EXTENT,
+        PaddingBottom = "padding.bottom": EXTENT,
     }
 }
 
@@ -1633,6 +1648,16 @@ pub(super) enum TextSetter {
     /// A run's click action (record 0325), written through the hyperlink
     /// verbs rather than the text edit.
     Click(ClickKey),
+    /// `a:rPr@u` (record 0333).
+    Underline,
+    /// `a:rPr@strike` (record 0333).
+    Strike,
+    /// A table cell's vertical anchor (record 0333).
+    Valign,
+    /// One table cell inset (record 0333).
+    Margin(litchi_pptx::opened::CellMargin),
+    /// Every table cell inset at once (`padding`, record 0333).
+    Padding,
 }
 
 /// A text write entry that a new paragraph or run also takes (record 0333).
@@ -1704,6 +1729,10 @@ const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_C
             text_add_entry(spec, TextSetter::Italic)
         } else if index == RunKey::Color as usize {
             text_add_entry(spec, TextSetter::Color)
+        } else if index == RunKey::Underline as usize {
+            text_add_entry(spec, TextSetter::Underline)
+        } else if index == RunKey::Strike as usize {
+            text_add_entry(spec, TextSetter::Strike)
         } else if index == RunKey::Link as usize {
             run_click_entry(spec, TextSetter::Click(ClickKey::Link))
         } else if index == RunKey::Tooltip as usize {
@@ -1742,7 +1771,7 @@ pub(super) const RUN_WRITE_TABLE: crate::registry::Table<TextSetter, RUN_WRITE_C
     crate::registry::Table::new(run_write_entries(), RUN_WRITE_ALIASES);
 pub(crate) const RUN_CAPABILITY_PROPS: &[PropSpec] = &RUN_WRITE_TABLE.readable();
 
-const PARAGRAPH_WRITE_COUNT: usize = PARAGRAPH_PROPS.len() + 5;
+const PARAGRAPH_WRITE_COUNT: usize = PARAGRAPH_PROPS.len() + 7;
 const fn paragraph_write_entries() -> [crate::registry::Entry<TextSetter>; PARAGRAPH_WRITE_COUNT] {
     use crate::registry::Entry;
     let mut entries = [Entry::read(PARAGRAPH_PROPS[0]); PARAGRAPH_WRITE_COUNT];
@@ -1764,6 +1793,14 @@ const fn paragraph_write_entries() -> [crate::registry::Entry<TextSetter>; PARAG
     entries[base + 2] = text_add_entry(write_only("italic", ValueType::Bool), TextSetter::Italic);
     entries[base + 3] = text_add_entry(write_only("color", DRAWING_COLOR), TextSetter::Color);
     entries[base + 4] = text_add_entry(write_only("font", ValueType::Text), TextSetter::Font);
+    entries[base + 5] = text_add_entry(
+        write_only("underline", ValueType::Token(&UNDERLINE)),
+        TextSetter::Underline,
+    );
+    entries[base + 6] = text_add_entry(
+        write_only("strike", ValueType::Token(&STRIKE)),
+        TextSetter::Strike,
+    );
     entries
 }
 /// OfficeCLI's paragraph aliases of writable properties (`paragraph.json`).
@@ -1784,9 +1821,28 @@ pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<
 > = crate::registry::Table::new(paragraph_write_entries(), PARAGRAPH_WRITE_ALIASES);
 pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
 
-const CELL_WRITE_COUNT: usize = CELL_PROPS.len() + 7;
+const CELL_WRITE_COUNT: usize = CELL_PROPS.len() + 10;
 const fn cell_write_entries() -> [crate::registry::Entry<TextSetter>; CELL_WRITE_COUNT] {
+    use litchi_pptx::opened::CellMargin;
     let mut entries = [text_entry(CELL_PROPS[0], TextSetter::Fill); CELL_WRITE_COUNT];
+    entries[CellKey::Valign as usize] =
+        text_entry(CELL_PROPS[CellKey::Valign as usize], TextSetter::Valign);
+    entries[CellKey::PaddingLeft as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingLeft as usize],
+        TextSetter::Margin(CellMargin::Left),
+    );
+    entries[CellKey::PaddingRight as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingRight as usize],
+        TextSetter::Margin(CellMargin::Right),
+    );
+    entries[CellKey::PaddingTop as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingTop as usize],
+        TextSetter::Margin(CellMargin::Top),
+    );
+    entries[CellKey::PaddingBottom as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingBottom as usize],
+        TextSetter::Margin(CellMargin::Bottom),
+    );
     let base = CELL_PROPS.len();
     entries[base] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
     entries[base + 1] = text_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
@@ -1798,10 +1854,47 @@ const fn cell_write_entries() -> [crate::registry::Entry<TextSetter>; CELL_WRITE
         write_only("align", ValueType::Token(&ALIGN)),
         TextSetter::Align,
     );
+    entries[base + 7] = text_entry(
+        write_only("underline", ValueType::Token(&UNDERLINE)),
+        TextSetter::Underline,
+    );
+    entries[base + 8] = text_entry(
+        write_only("strike", ValueType::Token(&STRIKE)),
+        TextSetter::Strike,
+    );
+    entries[base + 9] = text_entry(write_only("padding", EXTENT), TextSetter::Padding);
     entries
 }
-pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, CELL_WRITE_COUNT, 0> =
-    crate::registry::Table::new(cell_write_entries(), []);
+/// OfficeCLI's table-cell aliases of writable properties
+/// (`table-cell.json`, record 0333).
+const CELL_WRITE_ALIASES: [crate::registry::Alias; 17] = {
+    use crate::registry::Alias;
+    const BASE: usize = CELL_PROPS.len();
+    const fn alias(name: &'static str, entry: usize) -> Alias {
+        Alias { name, entry }
+    }
+    [
+        alias("background", CellKey::Fill as usize),
+        alias("shd", CellKey::Fill as usize),
+        alias("shading", CellKey::Fill as usize),
+        alias("margin.bottom", CellKey::PaddingBottom as usize),
+        alias("font.bold", BASE + 1),
+        alias("font.italic", BASE + 2),
+        alias("font.size", BASE + 3),
+        alias("fontsize", BASE + 3),
+        alias("font.color", BASE + 4),
+        alias("font.name", BASE + 5),
+        alias("font.latin", BASE + 5),
+        alias("alignment", BASE + 6),
+        alias("halign", BASE + 6),
+        alias("font.underline", BASE + 7),
+        alias("strikethrough", BASE + 8),
+        alias("font.strike", BASE + 8),
+        alias("margin", BASE + 9),
+    ]
+};
+pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, CELL_WRITE_COUNT, 17> =
+    crate::registry::Table::new(cell_write_entries(), CELL_WRITE_ALIASES);
 pub(crate) const CELL_CAPABILITY_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
 const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 3;
 const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WRITE_COUNT] {
@@ -1854,6 +1947,10 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
             Some(ShapeSetter::Format(TextSetter::Color))
         } else if index == ShapeKey::Align as usize {
             Some(ShapeSetter::Format(TextSetter::Align))
+        } else if index == ShapeKey::Underline as usize {
+            Some(ShapeSetter::Format(TextSetter::Underline))
+        } else if index == ShapeKey::Strike as usize {
+            Some(ShapeSetter::Format(TextSetter::Strike))
         } else if index == ShapeKey::Link as usize {
             Some(ShapeSetter::Click(ClickKey::Link))
         } else if index == ShapeKey::Tooltip as usize {

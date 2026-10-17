@@ -597,10 +597,13 @@
           ],
           "valueAliases": {
             "dbl": "double",
-            "sng": "single"
+            "false": "none",
+            "sng": "single",
+            "true": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -615,8 +618,9 @@
             "nostrike": "none",
             "sngstrike": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -1083,10 +1087,13 @@
           ],
           "valueAliases": {
             "dbl": "double",
-            "sng": "single"
+            "false": "none",
+            "sng": "single",
+            "true": "single"
           },
+          "clearable": true,
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -1101,8 +1108,9 @@
             "nostrike": "none",
             "sngstrike": "single"
           },
+          "clearable": true,
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -1761,6 +1769,56 @@
           "set": true,
           "get": true
         },
+        "valign": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom"
+          ],
+          "valueAliases": {
+            "b": "bottom",
+            "ctr": "center",
+            "middle": "center",
+            "t": "top"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.left": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.right": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.top": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "add": false,
@@ -1825,6 +1883,64 @@
             "l": "left",
             "r": "right"
           },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "valueAliases": {
+            "dbl": "double",
+            "false": "none",
+            "sng": "single",
+            "true": "single"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "valueAliases": {
+            "dblstrike": "double",
+            "nostrike": "none",
+            "sngstrike": "single"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "padding": {
+          "type": "length",
+          "unit": "emu",
           "clearable": true,
           "add": false,
           "set": true,
@@ -3585,6 +3701,56 @@
           "add": true,
           "set": true,
           "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "valueAliases": {
+            "dbl": "double",
+            "false": "none",
+            "sng": "single",
+            "true": "single"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "valueAliases": {
+            "dblstrike": "double",
+            "nostrike": "none",
+            "sngstrike": "single"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
         }
       },
       "propertyGaps": {
@@ -3692,10 +3858,13 @@
           ],
           "valueAliases": {
             "dbl": "double",
-            "sng": "single"
+            "false": "none",
+            "sng": "single",
+            "true": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -3710,8 +3879,9 @@
             "nostrike": "none",
             "sngstrike": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "spacing": {

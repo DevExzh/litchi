@@ -682,10 +682,20 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "geometry"
                 | "link"
                 | "tooltip"
+                | "underline"
+                | "strike"
         ),
         "paragraph" => matches!(
             property,
-            "align" | "size" | "text" | "bold" | "italic" | "color" | "font"
+            "align"
+                | "size"
+                | "text"
+                | "bold"
+                | "italic"
+                | "color"
+                | "font"
+                | "underline"
+                | "strike"
         ),
         "run" => matches!(
             property,
@@ -698,12 +708,29 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "font"
                 | "link"
                 | "tooltip"
+                | "underline"
+                | "strike"
         ),
         // The click action (record 0325).
         "picture" | "group" => matches!(property, "link" | "tooltip"),
         "tc" => matches!(
             property,
-            "fill" | "text" | "bold" | "italic" | "size" | "color" | "font" | "align"
+            "fill"
+                | "text"
+                | "bold"
+                | "italic"
+                | "size"
+                | "color"
+                | "font"
+                | "align"
+                | "valign"
+                | "padding"
+                | "padding.left"
+                | "padding.right"
+                | "padding.top"
+                | "padding.bottom"
+                | "underline"
+                | "strike"
         ),
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
@@ -746,9 +773,15 @@ fn pptx_shape_add(property: &str) -> bool {
 /// Write-only rich text entries (no ordinary read of the same key).
 fn pptx_write_only(element: &str, property: &str) -> bool {
     match element {
-        "paragraph" => matches!(property, "text" | "bold" | "italic" | "color" | "font"),
+        "paragraph" => matches!(
+            property,
+            "text" | "bold" | "italic" | "color" | "font" | "underline" | "strike"
+        ),
         "run" => matches!(property, "text" | "font"),
-        "tc" => property != "fill",
+        "tc" => !matches!(
+            property,
+            "fill" | "valign" | "padding.left" | "padding.right" | "padding.top" | "padding.bottom"
+        ),
         "slide" => matches!(property, "notes" | "transition"),
         "shape" | "placeholder" => matches!(property, "fill" | "geometry"),
         "picture" => property == "src",

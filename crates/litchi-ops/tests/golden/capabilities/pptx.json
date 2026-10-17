@@ -617,8 +617,8 @@
             "wavyDbl",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -628,8 +628,8 @@
             "double",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -951,7 +951,7 @@
             "none"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -962,7 +962,7 @@
             "none"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -1551,6 +1551,41 @@
           "set": true,
           "get": true
         },
+        "valign": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.left": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.right": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.top": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "text": {
           "type": "string",
           "add": false,
@@ -1598,6 +1633,49 @@
             "dist",
             "thaiDist"
           ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "padding": {
+          "type": "length",
           "add": false,
           "set": true,
           "get": false
@@ -3031,6 +3109,43 @@
           "add": true,
           "set": true,
           "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "add": true,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -3121,8 +3236,8 @@
             "wavyDbl",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -3132,8 +3247,8 @@
             "double",
             "none"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "spacing": {
