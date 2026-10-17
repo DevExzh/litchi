@@ -126,6 +126,14 @@ impl Tree {
 
 /// Scan `xml`, recording every element whose depth is at most `depth`.
 pub(crate) fn scan(xml: &[u8], depth: usize) -> Result<Tree> {
+    scan_kept(xml, depth, |_| true)
+}
+
+/// [`scan`], recording a direct child of the root only when `keep` accepts
+/// its local name; the subtree of a skipped child is checked and not
+/// recorded (the styles catalog skips `w:latentStyles` and
+/// `w:docDefaults`).
+pub(crate) fn scan_kept(xml: &[u8], depth: usize, keep: impl Fn(&[u8]) -> bool) -> Result<Tree> {
     let mut reader = Reader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut elements: Vec<Element> = Vec::new();
@@ -166,8 +174,13 @@ pub(crate) fn scan(xml: &[u8], depth: usize) -> Result<Tree> {
                 if level >= MAX_DEPTH {
                     return Err(Error::InvalidFormat("the part nests too deeply".into()));
                 }
-                let recorded = if level <= depth {
-                    let parent = open.last().copied().flatten();
+                let parent = open.last().copied().flatten();
+                let kept = match level {
+                    0 => true,
+                    1 => keep(element.local_name().as_ref()),
+                    _ => parent.is_some(),
+                };
+                let recorded = if level <= depth && kept {
                     elements.push(record(&reader, &element, start, end, empty, level, parent)?);
                     Some(elements.len() - 1)
                 } else {

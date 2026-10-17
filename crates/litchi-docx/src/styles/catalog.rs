@@ -215,7 +215,9 @@ impl Catalog {
     /// Returns an error for XML that is not well-formed, a root that is not
     /// `w:styles`, or a style without a `w:styleId`.
     pub fn from_xml(xml: Arc<Vec<u8>>) -> Result<Self> {
-        let tree = part_scan::scan(&xml, 2)?;
+        // Only the styles are located; latent styles and document defaults
+        // are checked and skipped.
+        let tree = part_scan::scan_kept(&xml, 2, |local| local == b"style")?;
         if !tree.root()?.is(b"styles") {
             return Err(Error::InvalidFormat(
                 "the styles part root is not w:styles".into(),

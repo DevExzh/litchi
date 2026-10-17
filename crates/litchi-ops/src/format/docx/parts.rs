@@ -1418,43 +1418,161 @@ fn int_text(text: Option<&str>) -> Option<NodeValue<'static>> {
         .map(NodeValue::Int)
 }
 
-/// The run value of a part table entry, through the run table's index.
-fn run_value<'a>(table: &[PropSpec], index: usize, run: &direct::Run) -> Option<NodeValue<'a>> {
-    let name = table.get(index)?.name;
-    let from = match name {
-        "font" => "font.latin",
-        "smallCaps" => "smallcaps",
-        other => other,
-    };
-    let at = RUN_PROPS.iter().position(|spec| spec.name == from)?;
-    let value = super::props::run(run, at);
-    // `font` reads the ASCII slot when the ASCII and high-ANSI slots differ.
-    if name == "font" && value.is_none() {
-        let fonts = run.fonts.as_ref()?;
-        return fonts
-            .ascii
-            .as_deref()
-            .or(fonts.h_ansi.as_deref())
-            .filter(|font| !font.is_empty())
-            .map(text_value);
-    }
-    value
+/// Where a part table entry's value comes from: the part's own data, or
+/// the run or paragraph table's entry at an index, computed at compile
+/// time so a `format` read does no name lookup.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum From {
+    Own,
+    /// A run key; `font` falls back to the ASCII slot.
+    Run(usize),
+    Font,
+    Paragraph(usize),
 }
 
-/// The paragraph value of a part table entry, through the paragraph
-/// table's index.
-fn paragraph_value<'a>(
-    table: &[PropSpec],
-    index: usize,
-    paragraph: &direct::Paragraph,
+const fn same(left: &str, right: &str) -> bool {
+    let (left, right) = (left.as_bytes(), right.as_bytes());
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < left.len() {
+        if left[index] != right[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+const fn find(props: &[PropSpec], name: &str) -> Option<usize> {
+    let mut index = 0;
+    while index < props.len() {
+        if same(props[index].name, name) {
+            return Some(index);
+        }
+        index += 1;
+    }
+    None
+}
+
+const fn listed(names: &[&str], name: &str) -> bool {
+    let mut index = 0;
+    while index < names.len() {
+        if same(names[index], name) {
+            return true;
+        }
+        index += 1;
+    }
+    false
+}
+
+/// The source of every entry of `table`: `own` keys first, then the run
+/// table (`font` is `font.latin`, `smallCaps` is `smallcaps`), then the
+/// paragraph table (`leftIndent` is `indent`; `direction` and `align` are
+/// paragraph keys).
+const fn sources<const N: usize>(table: &[PropSpec], own: &[&str]) -> [From; N] {
+    let mut sources = [From::Own; N];
+    let mut index = 0;
+    while index < N {
+        let name = table[index].name;
+        sources[index] = if listed(own, name) {
+            From::Own
+        } else if same(name, "font") {
+            From::Font
+        } else if same(name, "direction") || same(name, "align") {
+            match find(PARAGRAPH_PROPS, name) {
+                Some(at) => From::Paragraph(at),
+                None => From::Own,
+            }
+        } else if same(name, "leftIndent") {
+            match find(PARAGRAPH_PROPS, "indent") {
+                Some(at) => From::Paragraph(at),
+                None => From::Own,
+            }
+        } else {
+            let run_name = if same(name, "smallCaps") {
+                "smallcaps"
+            } else {
+                name
+            };
+            match find(RUN_PROPS, run_name) {
+                Some(at) => From::Run(at),
+                None => match find(PARAGRAPH_PROPS, name) {
+                    Some(at) => From::Paragraph(at),
+                    None => From::Own,
+                },
+            }
+        };
+        index += 1;
+    }
+    sources
+}
+
+const STYLE_SOURCES: [From; STYLE_PROPS.len()] = sources(
+    STYLE_PROPS,
+    &[
+        "id",
+        "name",
+        "type",
+        "default",
+        "basedOn",
+        "basedOn.path",
+        "next",
+        "linked",
+        "autoRedefine",
+        "hidden",
+        "qFormat",
+        "uiPriority",
+        "semiHidden",
+        "unhideWhenUsed",
+        "locked",
+        "customStyle",
+    ],
+);
+const LEVEL_SOURCES: [From; LEVEL_PROPS.len()] = sources(
+    LEVEL_PROPS,
+    &[
+        "ilvl",
+        "start",
+        "format",
+        "lvlText",
+        "justification",
+        "suff",
+        "lvlRestart",
+        "isLgl",
+        "indent",
+        "hanging",
+    ],
+);
+const STORY_SOURCES: [From; STORY_PROPS.len()] = sources(STORY_PROPS, &["type", "text", "field"]);
+const NOTE_SOURCES: [From; NOTE_PROPS.len()] = sources(NOTE_PROPS, &["id", "text"]);
+
+/// The value of a run or paragraph sourced entry.
+fn sourced<'a>(
+    from: From,
+    paragraph: Option<&direct::Paragraph>,
+    run: Option<&direct::Run>,
 ) -> Option<NodeValue<'a>> {
-    let name = table.get(index)?.name;
-    let from = match name {
-        "leftIndent" => "indent",
-        other => other,
-    };
-    let at = PARAGRAPH_PROPS.iter().position(|spec| spec.name == from)?;
-    super::props::paragraph_value(paragraph, None, at)
+    match from {
+        From::Own => None,
+        From::Run(at) => super::props::run(run?, at),
+        From::Paragraph(at) => super::props::paragraph_value(paragraph?, None, at),
+        From::Font => {
+            let run = run?;
+            let latin = find(RUN_PROPS, "font.latin")?;
+            super::props::run(run, latin).or_else(|| {
+                // The ASCII slot when the ASCII and high-ANSI slots differ.
+                let fonts = run.fonts.as_ref()?;
+                fonts
+                    .ascii
+                    .as_deref()
+                    .or(fonts.h_ansi.as_deref())
+                    .filter(|font| !font.is_empty())
+                    .map(text_value)
+            })
+        },
+    }
 }
 
 impl<'a> PartProps<'a> {
@@ -1488,10 +1606,13 @@ impl<'a> PartProps<'a> {
                 paragraph,
                 run,
             } => story_value(*kind, text, paragraph.as_deref(), run.as_deref(), index),
-            Self::Note { id, text, run } => match NOTE_PROPS.get(index)?.name {
-                "id" => Some(NodeValue::Int(i64::from(*id))),
-                "text" => Some(text_value(text)),
-                _ => run_value(NOTE_PROPS, index, run.as_deref()?),
+            Self::Note { id, text, run } => match NOTE_SOURCES.get(index)? {
+                From::Own => match NOTE_PROPS.get(index)?.name {
+                    "id" => Some(NodeValue::Int(i64::from(*id))),
+                    "text" => Some(text_value(text)),
+                    _ => None,
+                },
+                from => sourced(*from, None, run.as_deref()),
             },
         }
     }
@@ -1504,6 +1625,10 @@ fn style_value<'a>(
     run: &direct::Run,
     index: usize,
 ) -> Option<NodeValue<'a>> {
+    let from = *STYLE_SOURCES.get(index)?;
+    if from != From::Own {
+        return sourced(from, Some(paragraph), Some(run));
+    }
     let catalog = docx.parts().styles.get()?.as_ref()?;
     let entry = catalog.entries().get(style)?;
     let spec = STYLE_PROPS.get(index)?;
@@ -1528,13 +1653,7 @@ fn style_value<'a>(
         "locked" => flag(Flag::Locked),
         // OfficeCLI always emits `customStyle`.
         "customStyle" => Some(NodeValue::Bool(entry.custom().unwrap_or(false))),
-        _ => match STYLE_REGISTRY.lookup(spec.name)?.1.access {
-            Access::SetAndAdd(PartSetter::Run(_)) => run_value(STYLE_PROPS, index, run),
-            Access::SetAndAdd(PartSetter::Paragraph(_)) => {
-                paragraph_value(STYLE_PROPS, index, paragraph)
-            },
-            _ => None,
-        },
+        _ => None,
     }
 }
 
@@ -1601,7 +1720,7 @@ fn level_value<'a>(
         "isLgl" => level.legal().filter(|legal| *legal).map(NodeValue::Bool),
         "indent" => indentation?.leading().map(|value| NodeValue::Int(value.0)),
         "hanging" => indentation?.hanging.map(|value| NodeValue::Int(value.0)),
-        _ => run_value(LEVEL_PROPS, index, run),
+        _ => sourced(*LEVEL_SOURCES.get(index)?, None, Some(run)),
     }
 }
 
@@ -1615,9 +1734,8 @@ fn story_value<'a>(
     match STORY_PROPS.get(index)?.name {
         "type" => kind.map(|kind| NodeValue::Token(kind.to_xml())),
         "text" => Some(text_value(text)),
-        "align" => paragraph_value(STORY_PROPS, index, paragraph?),
         "direction" | "field" => None,
-        _ => run_value(STORY_PROPS, index, run?),
+        _ => sourced(*STORY_SOURCES.get(index)?, paragraph, run),
     }
 }
 
