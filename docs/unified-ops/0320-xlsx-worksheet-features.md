@@ -194,3 +194,23 @@ the command in the example's header.
 7. A worksheet whose root is prefixed (`x:worksheet`): the validation
    writer emits an unprefixed owner the hyperlink writer then refuses.
 8. Pivot tables, slicers and OLE stay recorded deferrals (P2).
+
+## 8. Gates (exit 0, after merging trunk `3fa22ff1a4`)
+
+| command | exit |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-xlsx -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings` (no features; `--features xlsx`) | 0, 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-xlsx -p litchi-ops` | 0 |
+| `cargo test -p litchi-xlsx --all-features` | 0 |
+| `cargo test -p litchi --all-features` | 0 |
+| `cargo test -p litchi-ops --all-features` (`--lib`, `--doc`, then all 141 `--test` targets in chunks of 20) | 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test capabilities --test registry`, and with every feature except `encryption` | 0, 0 (XLSX goldens only) |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test crud_matrix --test corpus_fidelity` | 0 (fidelity unchanged) |
+| `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test officecli_corpus`; `python3 tools/officecli_corpus.py`; `--check` | 0, 0, 0 |
+| `python3 tools/officecli_capability_delta.py --officecli /home/zhuhe/code/litchi/3rdparty/OfficeCLI` | 0 |
+| `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0, 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (40 profiles, 238 families) | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` (280 tests) | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
