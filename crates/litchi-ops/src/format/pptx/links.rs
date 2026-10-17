@@ -180,7 +180,10 @@ pub(super) fn children(file: &Pptx, parent: &Item) -> Result<Vec<Item>> {
         Item::Run(text) => of_run(file, text)?,
         _ => None,
     };
-    Ok(found.map(Item::Hyperlink).into_iter().collect())
+    Ok(found
+        .map(|item| Item::Hyperlink(Box::new(item)))
+        .into_iter()
+        .collect())
 }
 
 /// Parse OfficeCLI's `link` input; `None` removes.
@@ -424,7 +427,7 @@ impl Pptx {
         }
         let node = crate::path::resolve::get(&Nav::new(self), path)?;
         Ok(match node.item() {
-            Item::Hyperlink(item) => Some(item.clone()),
+            Item::Hyperlink(item) => Some(LinkItem::clone(item)),
             _ => None,
         })
     }
