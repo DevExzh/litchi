@@ -2106,7 +2106,10 @@ impl Xlsb {
         };
         let editor = self.editor()?;
         let mut edit = editor.edit_conditional_formats();
-        let worksheet_formats = editor.sheet_features(parent.sheet).map_err(native)?.formats;
+        let worksheet_formats = editor
+            .sheet_features(parent.sheet, xlsb::sheet::FeatureSet::FORMATS)
+            .map_err(native)?
+            .formats;
         let priority = worksheet_formats
             .iter()
             .flat_map(|format| format.rules.iter().map(|rule| rule.priority))

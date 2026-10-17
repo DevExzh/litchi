@@ -82,7 +82,8 @@ pub(crate) enum Data {
 pub(crate) struct Note {
     pub(super) row: u32,
     pub(super) col: u32,
-    pub(super) reference: String,
+    /// The note's A1 cell, inline.
+    pub(super) reference: crate::format::workbook::Label,
     pub(super) author: String,
     pub(super) text: String,
 }
@@ -155,7 +156,9 @@ impl Feature {
     /// The node view's one-line preview.
     pub(super) fn preview(&self) -> Option<Preview<'_>> {
         Some(Preview::Text(match &self.data {
-            Data::Comment(note) => Cow::Owned(format!("{}: {}", note.reference, note.text)),
+            Data::Comment(note) => {
+                Cow::Owned(format!("{}: {}", note.reference.as_str(), note.text))
+            },
             Data::Hyperlink(link) => Cow::Owned(link_reference(link)),
             Data::Drawing(element) => Cow::Borrowed(element.name.as_deref()?),
             Data::Cf(cf) => Cow::Owned(format!(
@@ -179,7 +182,9 @@ impl Feature {
     pub(super) fn value(&self, index: usize, sheet: &str) -> Option<Value<'_>> {
         match &self.data {
             Data::Comment(note) => match *COMMENT_KEYS.get(index)? {
-                CommentKey::AnchoredTo => Some(owned(format!("/{sheet}/{}", note.reference))),
+                CommentKey::AnchoredTo => {
+                    Some(owned(format!("/{sheet}/{}", note.reference.as_str())))
+                },
                 key => comment_value(note, key),
             },
             Data::Hyperlink(link) => hyperlink_value(link, *HYPERLINK_KEYS.get(index)?),
@@ -273,10 +278,15 @@ impl SheetHandle {
         }
     }
 
-    pub(super) fn features(&self) -> Result<xlsb::sheet::Features> {
+    pub(super) fn features(
+        &self,
+        select: xlsb::sheet::FeatureSet,
+    ) -> Result<xlsb::sheet::Features> {
         Ok(match self {
-            Self::Eager { .. } => self.eager()?.sheet_features(self.position().get())?,
-            Self::Source { sheet, .. } => sheet.features()?,
+            Self::Eager { .. } => self
+                .eager()?
+                .sheet_features(self.position().get(), select)?,
+            Self::Source { sheet, .. } => sheet.features(select)?,
         })
     }
 
@@ -319,7 +329,7 @@ pub(super) fn notes(records: Vec<xlsb::comments::Record>) -> Vec<Note> {
         .map(|record| Note {
             row: record.row,
             col: record.col,
-            reference: a1(record.row, record.col),
+            reference: crate::format::workbook::Label::cell(record.col, record.row),
             author: record.author,
             text: record.text,
         })
@@ -357,13 +367,13 @@ pub(super) fn list_handle(file: &Xlsb, handle: &SheetHandle, kind: Kind) -> Resu
                 .collect()
         },
         Kind::Hyperlink => handle
-            .features()?
+            .features(xlsb::sheet::FeatureSet::HYPERLINKS)?
             .hyperlinks
             .into_iter()
             .map(|link| Data::Hyperlink(Box::new(link)))
             .collect(),
         Kind::Cf => {
-            let formats = handle.features()?.formats;
+            let formats = handle.features(xlsb::sheet::FeatureSet::FORMATS)?.formats;
             let dxfs = if formats.is_empty() {
                 Vec::new()
             } else {
@@ -382,26 +392,26 @@ pub(super) fn list_handle(file: &Xlsb, handle: &SheetHandle, kind: Kind) -> Resu
                 .collect()
         },
         Kind::DataValidation => handle
-            .features()?
+            .features(xlsb::sheet::FeatureSet::VALIDATIONS)?
             .validations
             .into_iter()
             .map(|validation| Data::Validation(Box::new(validation)))
             .collect(),
         Kind::Autofilter => handle
-            .features()?
+            .features(xlsb::sheet::FeatureSet::AUTO_FILTER)?
             .auto_filter
             .map(Data::Autofilter)
             .into_iter()
             .collect(),
         Kind::RowBreak => handle
-            .features()?
+            .features(xlsb::sheet::FeatureSet::PAGE_BREAKS)?
             .page_breaks
             .rows
             .into_iter()
             .map(Data::Break)
             .collect(),
         Kind::ColBreak => handle
-            .features()?
+            .features(xlsb::sheet::FeatureSet::PAGE_BREAKS)?
             .page_breaks
             .columns
             .into_iter()
@@ -577,7 +587,7 @@ keyed!(CommentKey, CommentKey, COMMENT_TABLE, COMMENT_PROPS, COMMENT_KEYS, [
 
 fn comment_value(note: &Note, key: CommentKey) -> Option<Value<'_>> {
     match key {
-        CommentKey::Ref => Some(text(&note.reference)),
+        CommentKey::Ref => Some(text(note.reference.as_str())),
         CommentKey::Author => Some(text(&note.author)),
         CommentKey::Text => Some(text(&note.text)),
         // Read through `Feature::value`, which knows the sheet's name.

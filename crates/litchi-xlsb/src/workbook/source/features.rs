@@ -10,7 +10,7 @@ use crate::comments::Record;
 use crate::conditional_formatting::edit::DifferentialStyle;
 use crate::drawing::edit::Element;
 use crate::package::error::{Error, Result};
-use crate::sheet::{Features, Kind};
+use crate::sheet::{FeatureSet, Features, Kind};
 
 impl SourceBackedWorksheet {
     fn fenced<T>(&self, read: impl FnOnce() -> Result<T>) -> Result<T> {
@@ -25,15 +25,15 @@ impl SourceBackedWorksheet {
         result
     }
 
-    /// The hyperlinks, auto-filter, classic validations and conditional
-    /// formats, and page breaks of this worksheet, read without decoding its
-    /// cells.
+    /// The `select`ed hyperlinks, auto-filter, classic validations and
+    /// conditional formats, and page breaks of this worksheet, read without
+    /// decoding its cells.
     ///
     /// # Errors
     ///
     /// Returns an error for a non-worksheet tab, a changed source, or a
     /// malformed stream.
-    pub fn features(&self) -> Result<Features> {
+    pub fn features(&self, select: FeatureSet) -> Result<Features> {
         self.fenced(|| {
             let partname = self.physical_partname()?.clone();
             let mut formula_context = self.inner.formula_context.clone();
@@ -47,6 +47,7 @@ impl SourceBackedWorksheet {
                 &formula_context,
                 self.metadata().workbook_position,
                 self.inner.leniency,
+                select,
             )
         })
     }
@@ -116,6 +117,7 @@ mod tests {
     use crate::drawing::edit::{Marker, Placement, ShapeSpec};
     use crate::hyperlinks::Hyperlink;
     use crate::page_breaks::{Break, PageBreaks};
+    use crate::sheet::FeatureSet;
 
     fn featured() -> Package {
         let package = Package::new().unwrap();
@@ -177,8 +179,8 @@ mod tests {
         let workbook = package.workbook().unwrap();
         let source = SourceBackedWorkbook::from_reader(bytes.as_slice()).unwrap();
         let sheet = source.sheet_by_index(0).unwrap().unwrap();
-        let eager = workbook.sheet_features(0).unwrap();
-        let lazy = sheet.features().unwrap();
+        let eager = workbook.sheet_features(0, FeatureSet::all()).unwrap();
+        let lazy = sheet.features(FeatureSet::all()).unwrap();
         assert_eq!(lazy.hyperlinks, eager.hyperlinks);
         assert_eq!(
             lazy.hyperlinks[0].target.as_deref(),

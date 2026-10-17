@@ -27,7 +27,7 @@ pub(crate) mod features;
 pub mod read;
 mod weight;
 
-pub use features::Features;
+pub use features::{FeatureSet, Features};
 pub use read::Cells;
 
 // Sheet metadata is shared by eager and source-backed workbook views.  Keep

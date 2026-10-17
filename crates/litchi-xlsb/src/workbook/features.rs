@@ -7,18 +7,18 @@ use crate::comments::Record;
 use crate::conditional_formatting::edit::DifferentialStyle;
 use crate::drawing::edit::Element;
 use crate::package::error::Result;
-use crate::sheet::Features;
+use crate::sheet::{FeatureSet, Features};
 
 impl Workbook {
-    /// The hyperlinks, auto-filter, classic validations and conditional
-    /// formats, and page breaks of the worksheet at complete-catalog
-    /// position `sheet`.
+    /// The `select`ed hyperlinks, auto-filter, classic validations and
+    /// conditional formats, and page breaks of the worksheet at
+    /// complete-catalog position `sheet`.
     ///
     /// # Errors
     ///
     /// Returns an error for a missing or non-worksheet tab or a malformed
     /// stream.
-    pub fn sheet_features(&self, sheet: usize) -> Result<Features> {
+    pub fn sheet_features(&self, sheet: usize, select: FeatureSet) -> Result<Features> {
         let worksheet = crate::part_edit::worksheet_uri(self, sheet)?;
         let part = self.package.get_part(&worksheet)?;
         crate::sheet::features::read(
@@ -27,6 +27,7 @@ impl Workbook {
             &self.formula_context,
             sheet,
             self.leniency,
+            select,
         )
     }
 

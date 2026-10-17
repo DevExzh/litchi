@@ -232,3 +232,8 @@ required-features = ["odt", "doc", "ods"]
 [[example]]
 name              = "xlsx_features_bench"
 required-features = ["xlsx"]
+
+# Paired leaf-vs-unified XLSB worksheet feature measurements (record 0322).
+[[example]]
+name              = "xlsb_features_bench"
+required-features = ["xlsb"]

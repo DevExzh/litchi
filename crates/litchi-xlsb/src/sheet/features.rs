@@ -9,13 +9,32 @@ use crate::page_breaks::PageBreaks;
 use crate::part_edit::SheetLayout;
 use crate::sheet::AutoFilter;
 
+bitflags::bitflags! {
+    /// The worksheet features one read decodes. Hyperlinks, the auto-filter
+    /// and page breaks are read from the record layout alone; validations
+    /// and conditional formats also render their formulas.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct FeatureSet: u8 {
+        /// [`Features::hyperlinks`].
+        const HYPERLINKS = 1;
+        /// [`Features::auto_filter`].
+        const AUTO_FILTER = 1 << 1;
+        /// [`Features::validations`].
+        const VALIDATIONS = 1 << 2;
+        /// [`Features::formats`].
+        const FORMATS = 1 << 3;
+        /// [`Features::page_breaks`].
+        const PAGE_BREAKS = 1 << 4;
+    }
+}
+
 /// The features stored in one worksheet stream, in stream order: the same
 /// values the worksheet edit families list and edit.
 ///
 /// Conditional formats and validations are the classic (`BrtBegin…`)
 /// records; Office 2013 formats and `BrtDVal14` validations are not listed.
 /// A hyperlink's external target is resolved through the worksheet's
-/// relationships.
+/// relationships. A feature its read did not select is empty.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Features {
@@ -31,22 +50,52 @@ pub struct Features {
     pub page_breaks: PageBreaks,
 }
 
-/// Read the features of a worksheet stream at complete-catalog position
-/// `sheet`.
+/// Read the `select`ed features of a worksheet stream at complete-catalog
+/// position `sheet`.
 pub(crate) fn read(
     bytes: &[u8],
     relationships: &litchi_opc::Relationships,
     context: &crate::package::formula::Context,
     sheet: usize,
     leniency: crate::leniency::Leniency,
+    select: FeatureSet,
 ) -> Result<Features> {
     let layout = SheetLayout::scan(bytes)?;
-    let pass = crate::part_edit::feature_pass(bytes, context, sheet, leniency)?;
+    let (validations, formats) = if select.intersects(FeatureSet::VALIDATIONS | FeatureSet::FORMATS)
+    {
+        let pass = crate::part_edit::feature_pass(bytes, context, sheet, leniency)?;
+        (
+            if select.contains(FeatureSet::VALIDATIONS) {
+                crate::data_validation::edit::classic(pass.validations)
+            } else {
+                Vec::new()
+            },
+            if select.contains(FeatureSet::FORMATS) {
+                crate::conditional_formatting::edit::classic(pass.formats)
+            } else {
+                Vec::new()
+            },
+        )
+    } else {
+        (Vec::new(), Vec::new())
+    };
     Ok(Features {
-        hyperlinks: crate::hyperlinks::edit::read_layout(bytes, &layout, relationships)?,
-        auto_filter: crate::auto_filter::read_layout(bytes, &layout)?,
-        validations: crate::data_validation::edit::classic(pass.validations),
-        formats: crate::conditional_formatting::edit::classic(pass.formats),
-        page_breaks: crate::page_breaks::read_layout(bytes, &layout)?,
+        hyperlinks: if select.contains(FeatureSet::HYPERLINKS) {
+            crate::hyperlinks::edit::read_layout(bytes, &layout, relationships)?
+        } else {
+            Vec::new()
+        },
+        auto_filter: if select.contains(FeatureSet::AUTO_FILTER) {
+            crate::auto_filter::read_layout(bytes, &layout)?
+        } else {
+            None
+        },
+        validations,
+        formats,
+        page_breaks: if select.contains(FeatureSet::PAGE_BREAKS) {
+            crate::page_breaks::read_layout(bytes, &layout)?
+        } else {
+            PageBreaks::default()
+        },
     })
 }

@@ -729,9 +729,16 @@ impl<'f> Node<'f> {
             },
             Item::Table(table) => (TABLE_PROPS, Props::Table(&table.part)),
             Item::Feature(feature) => {
-                let sheet = SheetHandle::at(self.file, self.sheet_position())?
-                    .map(|handle| handle.name().to_owned())
-                    .unwrap_or_default();
+                // Only a note reads its worksheet's name (`anchoredTo`).
+                let sheet = if feature.kind == Kind::Comment {
+                    self.file
+                        .catalog()?
+                        .get(self.sheet_position())
+                        .map(|tab| tab.name().to_owned())
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
                 (feature.table(), Props::Feature(feature, sheet))
             },
             Item::NamedRange(index) => {
