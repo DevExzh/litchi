@@ -19,7 +19,9 @@
 //! a Keynote slide duplicated and a slide added and both removed, a Numbers
 //! table added and removed, or an XLSB note added and removed, must read
 //! back with the same node texts. DOC (record 0324) adds a bookmark and a
-//! hyperlink to its first body paragraph and removes both; ODT, OTH and ODM
+//! hyperlink to its first body paragraph and removes both; DOCX (record
+//! 0335) adds a picture and a comment to its first body paragraph, sets
+//! each once, and removes both; ODT, OTH and ODM
 //! (record 0328) add a tab stop to the first body paragraph and remove it,
 //! and ODP (record 0328) a line break to its first shape's first paragraph.
 //!
@@ -414,6 +416,9 @@ fn revert(file: &File, input: &[u8]) -> (&'static str, String) {
     ("refused", refusals.first().cloned().unwrap_or_default())
 }
 
+/// A 1x1 PNG, the DOCX structural probe's image (record 0335).
+const PROBE_PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 /// Texts of the nodes at `paths`, for the value check of a structural round
 /// trip.
 fn texts(file: &File, paths: &[&str]) -> Vec<Option<String>> {
@@ -510,6 +515,42 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 Box::new(|file: &File| {
                     file.remove("/body/p[1]/hyperlink[last()]")?
                         .remove("/bookmark[@name=LitchiProbe]")
+                }),
+            )
+        },
+        // Record 0335: a picture and a comment added to the first body
+        // paragraph, each set once, and both removed again, through the
+        // leaf picture and comment edits.
+        Some(FileFormat::Docx) => {
+            if count("/body", "paragraph") == 0 {
+                return ("none", String::new());
+            }
+            (
+                "picture+comment add+set+remove",
+                &["/body/p[1]"],
+                Box::new(|file: &File| {
+                    let pictured =
+                        file.add("/body/p[1]", NewNode::new("picture").prop("src", PROBE_PNG))?;
+                    let sized = pictured.file.set(
+                        pictured.path.to_string().as_str(),
+                        Props::new().with("width", "1in"),
+                    )?;
+                    let commented = sized.add(
+                        "/body/p[1]",
+                        NewNode::new("comment")
+                            .prop("author", "Litchi")
+                            .prop("text", "Structural probe"),
+                    )?;
+                    commented.file.set(
+                        commented.path.to_string().as_str(),
+                        Props::new().with("text", "Structural probe, set"),
+                    )
+                }),
+                Box::new(|file: &File| {
+                    let comments = file.query("/comments/comment")?.count();
+                    let pictures = file.query("/body/p[1]/picture")?.count();
+                    file.remove(format!("/comments/comment[{comments}]").as_str())?
+                        .remove(format!("/body/p[1]/picture[{pictures}]").as_str())
                 }),
             )
         },

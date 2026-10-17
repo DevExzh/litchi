@@ -111,7 +111,7 @@ impl Pptx {
                         shape,
                         text,
                     },
-                    TreeContainer::Slide(_) => return Ok(None),
+                    TreeContainer::Slide(_) | TreeContainer::Notes(_) => return Ok(None),
                 }
             },
             Item::Tree(_) => {

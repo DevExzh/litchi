@@ -137,21 +137,19 @@ fn refusals_leave_the_document_unchanged() {
         .add("/body/p[1]", NewNode::new("smartart").prop("text", "A"))
         .unwrap()
         .file;
+    // `set` writes the outline (record 0335); an unknown key is refused.
     let error = added
-        .set("/smartart[1]", props! { "text" => "B" })
+        .set("/smartart[1]", props! { "color" => "red" })
         .unwrap_err();
-    assert!(
-        matches!(
-            error.code(),
-            Code::UnsupportedCapability | Code::UnsupportedElement | Code::UnsupportedType
-        ),
-        "{error}"
-    );
+    assert_eq!(error.code(), Code::UnsupportedProperty, "{error}");
+    let set = added.set("/smartart[1]", props! { "text" => "B" }).unwrap();
+    assert_eq!(prop(&set, "/smartart[1]", "text").as_deref(), Some("B"));
     let capabilities = Capabilities::of(FileFormat::Docx);
     let element = capabilities
         .elements()
         .find(|element| element.name() == "smartart")
         .unwrap();
     assert!(element.operations().add);
+    assert!(element.operations().set && element.operations().remove);
     assert!(capabilities.verb(Verb::Add).is_supported());
 }

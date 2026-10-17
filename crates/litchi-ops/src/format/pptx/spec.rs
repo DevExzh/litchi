@@ -328,7 +328,16 @@ pub(crate) static UNDERLINE: Tokens = Tokens::new(
         "wavyDbl",
         "none",
     ],
-    &[("dbl", 1), ("sng", 0)],
+    // OfficeCLI also takes `true` for single and `false` for none.
+    &[("dbl", 1), ("false", 17), ("sng", 0), ("true", 0)],
+);
+
+/// A table cell's vertical anchor, as OfficeCLI prints it (`top`, `center`,
+/// `bottom` for `t`, `ctr`, `b`; record 0333).
+pub(crate) static VALIGN: Tokens = Tokens::new(
+    "vertical alignment",
+    &["top", "center", "bottom"],
+    &[("b", 2), ("ctr", 1), ("middle", 1), ("t", 0)],
 );
 
 /// Strikethrough (`ST_TextStrikeType`), as OfficeCLI prints it.
@@ -776,9 +785,22 @@ props! {
 }
 
 props! {
-    /// A table cell (`TableCellToNode`): its local solid fill.
+    /// A table row (`table-row.json`, record 0333): its height.
+    ROW_PROPS, RowKey {
+        Height = "height": EXTENT,
+    }
+}
+
+props! {
+    /// A table cell (`TableCellToNode`): its local solid fill, vertical
+    /// anchor and insets (record 0333).
     CELL_PROPS, CellKey {
         Fill = "fill": DRAWING_COLOR,
+        Valign = "valign": ValueType::Token(&VALIGN),
+        PaddingLeft = "padding.left": EXTENT,
+        PaddingRight = "padding.right": EXTENT,
+        PaddingTop = "padding.top": EXTENT,
+        PaddingBottom = "padding.bottom": EXTENT,
     }
 }
 
@@ -949,22 +971,6 @@ static ANIMATION_GAP: GapSpec = element_gap(
 static NOTE_SLIDE_GAP: GapSpec = element_gap("noteSlide", "M1-extended", NOTES_PARTS);
 static NOTES_MASTER_GAP: GapSpec = element_gap("notesMaster", "M1-extended", NOTES_PARTS);
 
-/// Paragraphs inside a table cell.
-pub(crate) static CELL_TEXT_GAP: GapSpec = GapSpec {
-    subject: Subject::Axis("/slide[N]/table[N]/tr[N]/tc[N]/paragraph"),
-    code: Code::UnsupportedCapability,
-    follow_up: "L-PPTX-R8",
-    reason: "the table reader gives a cell's text, not its text body",
-};
-
-/// Paragraphs of the speaker notes.
-pub(crate) static NOTES_TEXT_GAP: GapSpec = GapSpec {
-    subject: Subject::Axis("/slide[N]/notes/paragraph"),
-    code: Code::UnsupportedCapability,
-    follow_up: "M1-extended",
-    reason: "the notes node reads the notes text, not the notes body's paragraphs",
-};
-
 const fn property_gap(
     element: &'static str,
     key: &'static str,
@@ -979,6 +985,7 @@ const fn property_gap(
     }
 }
 
+const CROP: &str = "the picture reader does not model the blip fill's a:srcRect yet";
 const SHAPE_FILL: &str = "the shape record keeps no spPr fill, line or geometry span";
 const BODY_PROPS: &str =
     "the text-body reader applies body-property defaults, so local values are unknown";
@@ -1203,14 +1210,14 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[Cell],
             &[],
             &["/slide[N]/table[N]/tr[N]"],
-            &[],
+            ROW_PROPS,
         ),
         element(
             Cell,
             "tc",
             &["cell", "tc"],
             &[Row],
-            &[],
+            &[Paragraph],
             &[],
             &["/slide[N]/table[N]/tr[N]/tc[N]"],
             CELL_PROPS,
@@ -1269,10 +1276,14 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Paragraph,
             "paragraph",
             &["p", "paragraph"],
-            &[Shape, Placeholder],
+            &[Shape, Placeholder, Cell, Notes],
             &[Run, LineBreak],
             &[],
-            &["/slide[N]/shape[@id=ID]/paragraph[N]"],
+            &[
+                "/slide[N]/shape[@id=ID]/paragraph[N]",
+                "/slide[N]/table[N]/tr[N]/tc[N]/paragraph[N]",
+                "/slide[N]/notes/paragraph[N]",
+            ],
             PARAGRAPH_PROPS,
         ),
         element(
@@ -1303,7 +1314,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "notes",
             &["notes"],
             &[Slide],
-            &[],
+            &[Paragraph],
             &[],
             &["/slide[N]/notes"],
             NOTES_PROPS,
@@ -1575,12 +1586,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "the table node does not list its grid widths; read /slide[N]/table[N]/col[N]",
         ),
         property_gap(
-            "tr",
-            "height",
-            "L-PPTX-R8",
-            "the table reader does not read row properties yet",
-        ),
-        property_gap(
             "tc",
             "colspan",
             "L-PPTX-R8",
@@ -1592,6 +1597,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "L-PPTX-R8",
             "the table reader does not read cell properties yet",
         ),
+        property_gap("picture", "crop", "0333-F4", CROP),
+        property_gap("picture", "cropLeft", "0333-F4", CROP),
+        property_gap("picture", "cropTop", "0333-F4", CROP),
+        property_gap("picture", "cropRight", "0333-F4", CROP),
+        property_gap("picture", "cropBottom", "0333-F4", CROP),
         property_gap(
             "picture",
             "mediaType",
@@ -1644,6 +1654,23 @@ pub(super) enum TextSetter {
     /// A run's click action (record 0325), written through the hyperlink
     /// verbs rather than the text edit.
     Click(ClickKey),
+    /// `a:rPr@u` (record 0333).
+    Underline,
+    /// `a:rPr@strike` (record 0333).
+    Strike,
+    /// A table cell's vertical anchor (record 0333).
+    Valign,
+    /// One table cell inset (record 0333).
+    Margin(litchi_pptx::opened::CellMargin),
+    /// Every table cell inset at once (`padding`, record 0333).
+    Padding,
+}
+
+/// A text write entry that a new paragraph or run also takes (record 0333).
+const fn text_add_entry(spec: PropSpec, setter: TextSetter) -> crate::registry::Entry<TextSetter> {
+    let mut entry = text_entry(spec, setter);
+    entry.access = crate::registry::Access::SetAndAdd(setter);
+    entry
 }
 
 /// A write entry for `spec` with a text setter; `get` keeps the spec's
@@ -1699,15 +1726,19 @@ const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_C
     while index < RUN_PROPS.len() {
         let spec = RUN_PROPS[index];
         entries[index] = if index == RunKey::FontLatin as usize {
-            text_entry(spec, TextSetter::FontLatin)
+            text_add_entry(spec, TextSetter::FontLatin)
         } else if index == RunKey::Size as usize {
-            text_entry(spec, TextSetter::Size)
+            text_add_entry(spec, TextSetter::Size)
         } else if index == RunKey::Bold as usize {
-            text_entry(spec, TextSetter::Bold)
+            text_add_entry(spec, TextSetter::Bold)
         } else if index == RunKey::Italic as usize {
-            text_entry(spec, TextSetter::Italic)
+            text_add_entry(spec, TextSetter::Italic)
         } else if index == RunKey::Color as usize {
-            text_entry(spec, TextSetter::Color)
+            text_add_entry(spec, TextSetter::Color)
+        } else if index == RunKey::Underline as usize {
+            text_add_entry(spec, TextSetter::Underline)
+        } else if index == RunKey::Strike as usize {
+            text_add_entry(spec, TextSetter::Strike)
         } else if index == RunKey::Link as usize {
             run_click_entry(spec, TextSetter::Click(ClickKey::Link))
         } else if index == RunKey::Tooltip as usize {
@@ -1717,9 +1748,10 @@ const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_C
         };
         index += 1;
     }
-    entries[RUN_PROPS.len()] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
+    entries[RUN_PROPS.len()] =
+        text_add_entry(write_only("text", ValueType::Text), TextSetter::Text);
     entries[RUN_PROPS.len() + 1] =
-        text_entry(write_only("font", ValueType::Text), TextSetter::Font);
+        text_add_entry(write_only("font", ValueType::Text), TextSetter::Font);
     entries
 }
 /// OfficeCLI's run aliases of writable properties (`run.json`).
@@ -1745,7 +1777,7 @@ pub(super) const RUN_WRITE_TABLE: crate::registry::Table<TextSetter, RUN_WRITE_C
     crate::registry::Table::new(run_write_entries(), RUN_WRITE_ALIASES);
 pub(crate) const RUN_CAPABILITY_PROPS: &[PropSpec] = &RUN_WRITE_TABLE.readable();
 
-const PARAGRAPH_WRITE_COUNT: usize = PARAGRAPH_PROPS.len() + 5;
+const PARAGRAPH_WRITE_COUNT: usize = PARAGRAPH_PROPS.len() + 7;
 const fn paragraph_write_entries() -> [crate::registry::Entry<TextSetter>; PARAGRAPH_WRITE_COUNT] {
     use crate::registry::Entry;
     let mut entries = [Entry::read(PARAGRAPH_PROPS[0]); PARAGRAPH_WRITE_COUNT];
@@ -1753,20 +1785,28 @@ const fn paragraph_write_entries() -> [crate::registry::Entry<TextSetter>; PARAG
     while index < PARAGRAPH_PROPS.len() {
         let spec = PARAGRAPH_PROPS[index];
         entries[index] = if index == ParagraphKey::Align as usize {
-            text_entry(spec, TextSetter::Align)
+            text_add_entry(spec, TextSetter::Align)
         } else if index == ParagraphKey::Size as usize {
-            text_entry(spec, TextSetter::Size)
+            text_add_entry(spec, TextSetter::Size)
         } else {
             Entry::read(spec)
         };
         index += 1;
     }
     let base = PARAGRAPH_PROPS.len();
-    entries[base] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
-    entries[base + 1] = text_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
-    entries[base + 2] = text_entry(write_only("italic", ValueType::Bool), TextSetter::Italic);
-    entries[base + 3] = text_entry(write_only("color", DRAWING_COLOR), TextSetter::Color);
-    entries[base + 4] = text_entry(write_only("font", ValueType::Text), TextSetter::Font);
+    entries[base] = text_add_entry(write_only("text", ValueType::Text), TextSetter::Text);
+    entries[base + 1] = text_add_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
+    entries[base + 2] = text_add_entry(write_only("italic", ValueType::Bool), TextSetter::Italic);
+    entries[base + 3] = text_add_entry(write_only("color", DRAWING_COLOR), TextSetter::Color);
+    entries[base + 4] = text_add_entry(write_only("font", ValueType::Text), TextSetter::Font);
+    entries[base + 5] = text_add_entry(
+        write_only("underline", ValueType::Token(&UNDERLINE)),
+        TextSetter::Underline,
+    );
+    entries[base + 6] = text_add_entry(
+        write_only("strike", ValueType::Token(&STRIKE)),
+        TextSetter::Strike,
+    );
     entries
 }
 /// OfficeCLI's paragraph aliases of writable properties (`paragraph.json`).
@@ -1787,9 +1827,28 @@ pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<
 > = crate::registry::Table::new(paragraph_write_entries(), PARAGRAPH_WRITE_ALIASES);
 pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
 
-const CELL_WRITE_COUNT: usize = CELL_PROPS.len() + 7;
+const CELL_WRITE_COUNT: usize = CELL_PROPS.len() + 10;
 const fn cell_write_entries() -> [crate::registry::Entry<TextSetter>; CELL_WRITE_COUNT] {
+    use litchi_pptx::opened::CellMargin;
     let mut entries = [text_entry(CELL_PROPS[0], TextSetter::Fill); CELL_WRITE_COUNT];
+    entries[CellKey::Valign as usize] =
+        text_entry(CELL_PROPS[CellKey::Valign as usize], TextSetter::Valign);
+    entries[CellKey::PaddingLeft as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingLeft as usize],
+        TextSetter::Margin(CellMargin::Left),
+    );
+    entries[CellKey::PaddingRight as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingRight as usize],
+        TextSetter::Margin(CellMargin::Right),
+    );
+    entries[CellKey::PaddingTop as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingTop as usize],
+        TextSetter::Margin(CellMargin::Top),
+    );
+    entries[CellKey::PaddingBottom as usize] = text_entry(
+        CELL_PROPS[CellKey::PaddingBottom as usize],
+        TextSetter::Margin(CellMargin::Bottom),
+    );
     let base = CELL_PROPS.len();
     entries[base] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
     entries[base + 1] = text_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
@@ -1801,10 +1860,47 @@ const fn cell_write_entries() -> [crate::registry::Entry<TextSetter>; CELL_WRITE
         write_only("align", ValueType::Token(&ALIGN)),
         TextSetter::Align,
     );
+    entries[base + 7] = text_entry(
+        write_only("underline", ValueType::Token(&UNDERLINE)),
+        TextSetter::Underline,
+    );
+    entries[base + 8] = text_entry(
+        write_only("strike", ValueType::Token(&STRIKE)),
+        TextSetter::Strike,
+    );
+    entries[base + 9] = text_entry(write_only("padding", EXTENT), TextSetter::Padding);
     entries
 }
-pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, CELL_WRITE_COUNT, 0> =
-    crate::registry::Table::new(cell_write_entries(), []);
+/// OfficeCLI's table-cell aliases of writable properties
+/// (`table-cell.json`, record 0333).
+const CELL_WRITE_ALIASES: [crate::registry::Alias; 17] = {
+    use crate::registry::Alias;
+    const BASE: usize = CELL_PROPS.len();
+    const fn alias(name: &'static str, entry: usize) -> Alias {
+        Alias { name, entry }
+    }
+    [
+        alias("background", CellKey::Fill as usize),
+        alias("shd", CellKey::Fill as usize),
+        alias("shading", CellKey::Fill as usize),
+        alias("margin.bottom", CellKey::PaddingBottom as usize),
+        alias("font.bold", BASE + 1),
+        alias("font.italic", BASE + 2),
+        alias("font.size", BASE + 3),
+        alias("fontsize", BASE + 3),
+        alias("font.color", BASE + 4),
+        alias("font.name", BASE + 5),
+        alias("font.latin", BASE + 5),
+        alias("alignment", BASE + 6),
+        alias("halign", BASE + 6),
+        alias("font.underline", BASE + 7),
+        alias("strikethrough", BASE + 8),
+        alias("font.strike", BASE + 8),
+        alias("margin", BASE + 9),
+    ]
+};
+pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, CELL_WRITE_COUNT, 17> =
+    crate::registry::Table::new(cell_write_entries(), CELL_WRITE_ALIASES);
 pub(crate) const CELL_CAPABILITY_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
 const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 3;
 const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WRITE_COUNT] {
@@ -1857,6 +1953,10 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
             Some(ShapeSetter::Format(TextSetter::Color))
         } else if index == ShapeKey::Align as usize {
             Some(ShapeSetter::Format(TextSetter::Align))
+        } else if index == ShapeKey::Underline as usize {
+            Some(ShapeSetter::Format(TextSetter::Underline))
+        } else if index == ShapeKey::Strike as usize {
+            Some(ShapeSetter::Format(TextSetter::Strike))
         } else if index == ShapeKey::Link as usize {
             Some(ShapeSetter::Click(ClickKey::Link))
         } else if index == ShapeKey::Tooltip as usize {
@@ -2082,6 +2182,8 @@ pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.re
 pub(super) enum PictureSetter {
     Src,
     Name,
+    /// The alternative text (`cNvPr@descr`, record 0333).
+    Alt,
     X,
     Y,
     Width,
@@ -2098,6 +2200,8 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
         let spec = LINKED_FRAME_PROPS[index];
         let setter = if index == LinkedFrameKey::Name as usize {
             Some(PictureSetter::Name)
+        } else if index == LinkedFrameKey::Alt as usize {
+            Some(PictureSetter::Alt)
         } else if index == LinkedFrameKey::X as usize {
             Some(PictureSetter::X)
         } else if index == LinkedFrameKey::Y as usize {
@@ -2117,7 +2221,14 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
             match setter {
                 Some(setter) => Entry {
                     spec,
-                    access: Access::Add(setter),
+                    // Pictures are named at creation only, as in OfficeCLI;
+                    // their frame, alternative text and image are also set
+                    // (record 0333).
+                    access: if matches!(setter, PictureSetter::Name) {
+                        Access::Add(setter)
+                    } else {
+                        Access::SetAndAdd(setter)
+                    },
                     constraint: if matches!(setter, PictureSetter::Width | PictureSetter::Height) {
                         Constraint::Length {
                             min: crate::value::Length::from_emu(1),
@@ -2126,7 +2237,7 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
                     } else {
                         Constraint::None
                     },
-                    clear: false,
+                    clear: matches!(setter, PictureSetter::Alt),
                 },
                 None => Entry::read(spec),
             }
@@ -2135,7 +2246,7 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
     }
     entries[LINKED_FRAME_PROPS.len()] = Entry {
         spec: write_only("src", ValueType::Text),
-        access: Access::Add(PictureSetter::Src),
+        access: Access::SetAndAdd(PictureSetter::Src),
         constraint: Constraint::NotEmpty,
         clear: false,
     };
@@ -2144,13 +2255,23 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
 pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
     PictureSetter,
     PICTURE_WRITE_COUNT,
-    1,
+    3,
 > = crate::registry::Table::new(
     picture_write_entries(),
-    [crate::registry::Alias {
-        name: "path",
-        entry: LINKED_FRAME_PROPS.len(),
-    }],
+    [
+        crate::registry::Alias {
+            name: "path",
+            entry: LINKED_FRAME_PROPS.len(),
+        },
+        crate::registry::Alias {
+            name: "altText",
+            entry: LinkedFrameKey::Alt as usize,
+        },
+        crate::registry::Alias {
+            name: "description",
+            entry: LinkedFrameKey::Alt as usize,
+        },
+    ],
 );
 pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
 
@@ -2588,6 +2709,135 @@ pub(crate) const MASTER_CAPABILITY_PROPS: &[PropSpec] = &MASTER_WRITE_TABLE.read
 pub(super) const LAYOUT_WRITE_TABLE: crate::registry::Table<(), { LAYOUT_PROPS.len() }, 0> =
     crate::registry::Table::new(named_write_entries(LAYOUT_PROPS), []);
 pub(crate) const LAYOUT_CAPABILITY_PROPS: &[PropSpec] = &LAYOUT_WRITE_TABLE.readable();
+
+/// Table insertion assignments (record 0333): OfficeCLI's `add --type
+/// table` keys Litchi authors: `rows`, `cols`, `data`, `name` and the frame.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum TableSetter {
+    Name,
+    Rows,
+    Cols,
+    X,
+    Y,
+    Width,
+    Height,
+    Data,
+}
+const TABLE_WRITE_COUNT: usize = TABLE_PROPS.len() + 1;
+const fn table_write_entries() -> [crate::registry::Entry<TableSetter>; TABLE_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(TABLE_PROPS[0]); TABLE_WRITE_COUNT];
+    let mut index = 0;
+    while index < TABLE_PROPS.len() {
+        let spec = TABLE_PROPS[index];
+        let setter = if index == TableKey::Name as usize {
+            Some(TableSetter::Name)
+        } else if index == TableKey::Rows as usize {
+            Some(TableSetter::Rows)
+        } else if index == TableKey::Cols as usize {
+            Some(TableSetter::Cols)
+        } else if index == TableKey::X as usize {
+            Some(TableSetter::X)
+        } else if index == TableKey::Y as usize {
+            Some(TableSetter::Y)
+        } else if index == TableKey::Width as usize {
+            Some(TableSetter::Width)
+        } else if index == TableKey::Height as usize {
+            Some(TableSetter::Height)
+        } else {
+            None
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: Access::Add(setter),
+                constraint: match setter {
+                    TableSetter::Rows | TableSetter::Cols => Constraint::Int { min: 1, max: 5_000 },
+                    TableSetter::Width | TableSetter::Height => Constraint::Length {
+                        min: crate::value::Length::from_emu(1),
+                        max: crate::value::Length::from_emu(i64::MAX),
+                    },
+                    TableSetter::Name => Constraint::NotEmpty,
+                    _ => Constraint::None,
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries[TABLE_PROPS.len()] = Entry {
+        spec: write_only("data", ValueType::Text),
+        access: Access::Add(TableSetter::Data),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries
+}
+pub(super) const TABLE_WRITE_TABLE: crate::registry::Table<TableSetter, TABLE_WRITE_COUNT, 2> =
+    crate::registry::Table::new(
+        table_write_entries(),
+        [
+            crate::registry::Alias {
+                name: "w",
+                entry: TableKey::Width as usize,
+            },
+            crate::registry::Alias {
+                name: "h",
+                entry: TableKey::Height as usize,
+            },
+        ],
+    );
+pub(crate) const TABLE_CAPABILITY_PROPS: &[PropSpec] = &TABLE_WRITE_TABLE.readable();
+
+/// Table row assignments (record 0333): `height` on `add` and `set`; on
+/// `add`, OfficeCLI's `cols` check and `c1`…`c20` seed texts.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum RowSetter {
+    Height,
+    Cols,
+    /// `c{N}`, by its zero-based column.
+    Cell(u8),
+}
+/// The seed-text keys of a new row.
+const ROW_CELL_KEYS: [&str; 20] = [
+    "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "c13", "c14", "c15",
+    "c16", "c17", "c18", "c19", "c20",
+];
+const ROW_WRITE_COUNT: usize = ROW_PROPS.len() + 1 + ROW_CELL_KEYS.len();
+const fn row_write_entries() -> [crate::registry::Entry<RowSetter>; ROW_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(ROW_PROPS[0]); ROW_WRITE_COUNT];
+    entries[RowKey::Height as usize] = Entry {
+        spec: ROW_PROPS[RowKey::Height as usize],
+        access: Access::SetAndAdd(RowSetter::Height),
+        constraint: Constraint::Length {
+            min: crate::value::Length::from_emu(0),
+            max: crate::value::Length::from_emu(27_273_042_316_900),
+        },
+        clear: false,
+    };
+    entries[ROW_PROPS.len()] = Entry {
+        spec: write_only("cols", ValueType::Int),
+        access: Access::Add(RowSetter::Cols),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    let mut index = 0;
+    while index < ROW_CELL_KEYS.len() {
+        entries[ROW_PROPS.len() + 1 + index] = Entry {
+            spec: write_only(ROW_CELL_KEYS[index], ValueType::Text),
+            access: Access::Add(RowSetter::Cell(index as u8)),
+            constraint: Constraint::None,
+            clear: false,
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const ROW_WRITE_TABLE: crate::registry::Table<RowSetter, ROW_WRITE_COUNT, 0> =
+    crate::registry::Table::new(row_write_entries(), []);
+pub(crate) const ROW_CAPABILITY_PROPS: &[PropSpec] = &ROW_WRITE_TABLE.readable();
 
 /// Table column assignments (record 0321): `width` on `add` and `set`, seed
 /// `text` on `add` (OfficeCLI's `table-column.json`).

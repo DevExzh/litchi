@@ -2613,6 +2613,28 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 
 See [0321](unified-ops/0321-pptx-element-gaps.md).
 
+## PPTX P0 residue: text structure, rows, cell properties, comments, pictures (record 0333)
+
+New verbs live on the primary `opened::Edit`, and the slide-local ones also
+on the source primary `source::Edit` (no new transaction family). The verb
+names follow the glossary's `insert_*`/`remove_*`/`set_*` spellings of the
+other text and table owners; positions are `litchi_core::Position`s, and
+native comment identities stay behind the positional verbs.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::opened::TextBody::{Shape, Cell, Notes}`; `opened::Edit::{insert_paragraph, remove_paragraph, insert_run, remove_run}`; `source::Edit::{insert_paragraph, remove_paragraph, insert_run, remove_run}` (slide bodies) | adopted (0333) |
+| `litchi_pptx::opened::TextTarget::CellParagraph` | adopted (0333) |
+| `litchi_pptx::opened::{CellFill, CellMargin}`; `TextProperties::{with_fill(CellFill), with_cell_anchor, with_cell_margin, with_underline, with_strike}` | adopted (0333); `with_fill` takes a `CellFill` (was an `Rgb`) |
+| `litchi_pptx::table::{CellProperties, Cell::properties, Row::height, Table::row_cell_counts}` | adopted (0333) |
+| `litchi_pptx::opened::Edit::{insert_table_row, remove_table_row, set_table_row_height}` | adopted (0333); column insertion and removal keep merged cells consistent where safe |
+| `litchi_pptx::opened::Edit::set_text_property_chunks`; `source::Edit::set_text_property_chunks`; `SourceBackedSlideEdit::set_text_property_chunks` | adopted (0333), the text-formatting sibling of `set_shape_text_chunks` |
+| `litchi_pptx::opened::Edit::{remove_comment_at, remove_modern_comment_at, remove_modern_comment_reply_at}` | adopted (0333), positional siblings of `set_comment_at` |
+| `litchi_pptx::opened::Edit::{set_picture_image, set_shape_description, set_shape_name}` | adopted (0333) |
+| `litchi_ops` PPTX kinds: `paragraph` and `run` under `tc` and `notes` (by path), `tr` (`height`, `cols`, `c1`…`c20`), `table` add (`rows`, `cols`, `data`), `tc` `valign`/`padding.*`, `picture` `alt`/`src`/frame set | adopted (0333) |
+
+See [0333](unified-ops/0333-pptx-p0-residue.md).
+
 ## XLSB worksheet feature families (record 0322)
 
 Seven scoped families publish XLSB worksheet features through immutable
@@ -2738,6 +2760,27 @@ stops ride on the existing paragraph-property edit.
 | `litchi_rtf::edit::SectionValue` | one section page-setup value (break type, page size, orientation, margins, header and footer distance, columns, column spacing, title page, vertical alignment) | ✅ 0328 |
 | `litchi_rtf::ParagraphFormat::tab_stops` | a paragraph's custom tab stops in declaration order | ✅ 0328 |
 | `litchi_ops` RTF kinds `Section`, `Bookmark`, `Field`, `Toc`, `Tab`, `TextBox`, `Shape` | the DOCX paths (`/section[N]`, `/bookmark[N]`, `/bookmark[@name=X]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/textbox[N]`, `/body/shape[N]`) over the native collections; sections, bookmark names, field instructions, TOC switches and tab stops are writable, tab stops are added and removed, bookmarks removed | ✅ 0328 |
+
+## DOCX picture, comment and SmartArt edits; DOCX chart series and axes (record 0335)
+
+The eager package-bound `document::Edit` gains the set and remove halves of
+the DOCX picture, comment and SmartArt families whose add halves landed in
+records 0251c, 0251d and 0295. Changes are `with_*` builders, as
+`styles::catalog::StyleChange` is; each part left unset keeps the current
+value. Every verb travels in the main-document `Patch` (graph changes and
+element replacements), so replay and the exact inverse apply; no second
+transaction family is introduced.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_docx::document::PictureChange` (`new`, `with_size`, `with_name`, `with_description`, `with_image`, `is_empty`), `Edit::{set_picture_at, remove_picture_at}` | addressed as `insert_picture_at` returns them: a paragraph and the picture's position among `Paragraph::images`; a new image is a new media part, the previous one stays unreferenced (the removed-chart policy) | ✅ 0335 |
+| `litchi_docx::document::CommentChange` (`new`, `with_author`, `with_initials`, `with_date`, `with_text`, `is_empty`), `Edit::set_comment` | by native comment identifier, as `remove_comment`; text replaced as `set_note_text` replaces a note's | ✅ 0335 |
+| `litchi_docx::document::SmartArtParts` (`data`, `layout`, `quick_style`, `colors`, `drawing`), `Edit::{smartart_parts, set_smartart, remove_smartart}` | by the data-model relationship `insert_smartart_at` returns; the PPTX `opened::SmartArtParts` shape | ✅ 0335 |
+| `litchi_docx::smartart::Diagram::extent` | the drawing's `wp:extent`, which a regenerated cached drawing takes | ✅ 0335 |
+| DOCX `picture` set (`width`, `height`, `alt`, `name`, `src`; aliases `w`, `h`, `altText`, `description`, `path`), remove, query | OfficeCLI's picture keys; pictures are paragraph children for the query walker | ✅ 0335 |
+| DOCX `comment` set (`author`, `initials`, `date`, `text`); `parentId` and `done` property gaps (follow-up 0335-F2) | a reply or resolution key is refused (`unsupported_capability`) on add and set | ✅ 0335 |
+| DOCX `smartart` set (`layout`, `text`) and remove; `node` element (`/smartart[N]/node[K]`, nested; `level`, write-only `text`) | the PPTX `node` vocabulary of record 0284 | ✅ 0335 |
+| DOCX `series` (`/body/p[N]/chart[M]/series[K]`, `/chart[N]/series[K]`; `name`, `values`, `categories`, `color`) and `axis` (`.../axis[@role=ROLE]`, `.../axis[N]`; `role`, `title`, `min`, `max`) | the PPTX and XLSX `chart-series` and `chart-axis` vocabulary | ✅ 0335 |
 
 ## XLSX P0 residue, root metadata and two correctness fixes (record 0338)
 

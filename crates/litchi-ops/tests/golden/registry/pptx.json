@@ -378,7 +378,8 @@
       },
       "children": [
         {
-          "element": "paragraph"
+          "element": "paragraph",
+          "pathSegment": "paragraph"
         },
         {
           "element": "equation",
@@ -596,10 +597,13 @@
           ],
           "valueAliases": {
             "dbl": "double",
-            "sng": "single"
+            "false": "none",
+            "sng": "single",
+            "true": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -614,8 +618,9 @@
             "nostrike": "none",
             "sngstrike": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -875,7 +880,8 @@
       },
       "children": [
         {
-          "element": "paragraph"
+          "element": "paragraph",
+          "pathSegment": "paragraph"
         }
       ],
       "properties": {
@@ -1081,10 +1087,13 @@
           ],
           "valueAliases": {
             "dbl": "double",
-            "sng": "single"
+            "false": "none",
+            "sng": "single",
+            "true": "single"
           },
+          "clearable": true,
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -1099,8 +1108,9 @@
             "nostrike": "none",
             "sngstrike": "single"
           },
+          "clearable": true,
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -1308,22 +1318,23 @@
         },
         "alt": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "x": {
           "type": "length",
           "unit": "emu",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
           "unit": "emu",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "width": {
@@ -1334,7 +1345,7 @@
             "maxEmu": 9223372036854775807
           },
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
@@ -1345,7 +1356,7 @@
             "maxEmu": 9223372036854775807
           },
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rotation": {
@@ -1392,11 +1403,36 @@
             "notEmpty": true
           },
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         }
       },
       "propertyGaps": {
+        "crop": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropLeft": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropTop": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropRight": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
+        "cropBottom": {
+          "code": "unsupported_capability",
+          "followUp": "0333-F4",
+          "reason": "the picture reader does not model the blip fill's a:srcRect yet"
+        },
         "mediaType": {
           "code": "unsupported_capability",
           "followUp": "L-PPTX-R11",
@@ -1421,7 +1457,7 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
@@ -1445,19 +1481,30 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
           "set": false,
           "get": true
         },
         "rows": {
           "type": "int",
-          "add": false,
+          "constraint": {
+            "min": 1,
+            "max": 5000
+          },
+          "add": true,
           "set": false,
           "get": true
         },
         "cols": {
           "type": "int",
-          "add": false,
+          "constraint": {
+            "min": 1,
+            "max": 5000
+          },
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1506,28 +1553,36 @@
         "x": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "y": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "width": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "constraint": {
+            "minEmu": 1,
+            "maxEmu": 9223372036854775807
+          },
+          "add": true,
           "set": false,
           "get": true
         },
         "height": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "constraint": {
+            "minEmu": 1,
+            "maxEmu": 9223372036854775807
+          },
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1536,6 +1591,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "propertyGaps": {
@@ -1561,11 +1622,11 @@
         "row"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1578,12 +1639,143 @@
           "pathSegment": "tc"
         }
       ],
-      "properties": {},
-      "propertyGaps": {
+      "properties": {
         "height": {
-          "code": "unsupported_capability",
-          "followUp": "L-PPTX-R8",
-          "reason": "the table reader does not read row properties yet"
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 27273042316900
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c1": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c2": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c3": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c4": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c5": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c6": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c7": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c8": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c9": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c10": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c11": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c12": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c13": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c14": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c15": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c16": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c17": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c18": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c19": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "c20": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -1613,10 +1805,66 @@
           "/slide[N]/table[N]/tr[N]/tc[N]"
         ]
       },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
       "properties": {
         "fill": {
           "type": "color",
           "colorContext": "drawing",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "valign": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom"
+          ],
+          "valueAliases": {
+            "b": "bottom",
+            "ctr": "center",
+            "middle": "center",
+            "t": "top"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.left": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.right": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.top": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "length",
+          "unit": "emu",
           "clearable": true,
           "add": false,
           "set": true,
@@ -1686,6 +1934,64 @@
             "l": "left",
             "r": "right"
           },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "valueAliases": {
+            "dbl": "double",
+            "false": "none",
+            "sng": "single",
+            "true": "single"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "valueAliases": {
+            "dblstrike": "double",
+            "nostrike": "none",
+            "sngstrike": "single"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "padding": {
+          "type": "length",
+          "unit": "emu",
           "clearable": true,
           "add": false,
           "set": true,
@@ -3287,19 +3593,26 @@
       "element": "paragraph",
       "parent": [
         "shape",
-        "placeholder"
+        "placeholder",
+        "tc",
+        "notes"
       ],
       "elementAliases": [
         "p"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
-      "paths": {},
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]/tc[N]/paragraph[N]",
+          "/slide[N]/notes/paragraph[N]"
+        ]
+      },
       "children": [
         {
           "element": "run"
@@ -3332,7 +3645,7 @@
             "r": "right"
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3397,27 +3710,27 @@
           "type": "font-size",
           "unit": "pt",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "bold": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "italic": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -3425,7 +3738,7 @@
           "type": "color",
           "colorContext": "drawing",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -3435,7 +3748,57 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "words",
+            "heavy",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dotDashHeavy",
+            "dotDotDash",
+            "dotDotDashHeavy",
+            "wavy",
+            "wavyHeavy",
+            "wavyDbl",
+            "none"
+          ],
+          "valueAliases": {
+            "dbl": "double",
+            "false": "none",
+            "sng": "single",
+            "true": "single"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "none"
+          ],
+          "valueAliases": {
+            "dblstrike": "double",
+            "nostrike": "none",
+            "sngstrike": "single"
+          },
+          "clearable": true,
+          "add": true,
           "set": true,
           "get": false
         }
@@ -3463,11 +3826,11 @@
         "r"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {},
       "children": [
@@ -3483,7 +3846,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3503,21 +3866,21 @@
           "type": "font-size",
           "unit": "pt",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3545,10 +3908,13 @@
           ],
           "valueAliases": {
             "dbl": "double",
-            "sng": "single"
+            "false": "none",
+            "sng": "single",
+            "true": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "strike": {
@@ -3563,8 +3929,9 @@
             "nostrike": "none",
             "sngstrike": "single"
           },
-          "add": false,
-          "set": false,
+          "clearable": true,
+          "add": true,
+          "set": true,
           "get": true
         },
         "spacing": {
@@ -3583,7 +3950,7 @@
           "type": "color",
           "colorContext": "drawing",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3633,7 +4000,7 @@
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -3648,7 +4015,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         }
@@ -3673,7 +4040,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {},
       "properties": {},
@@ -3701,6 +4068,12 @@
           "/slide[N]/notes"
         ]
       },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
       "properties": {
         "text": {
           "type": "string",
@@ -3727,7 +4100,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -4679,7 +5052,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -4778,7 +5151,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [

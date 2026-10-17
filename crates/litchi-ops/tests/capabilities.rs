@@ -155,10 +155,14 @@ fn ordinary_reports_hide_native_selection_fields() {
         let (set, add, remove) = match element.name() {
             "paragraph" | "run" | "hyperlink" => (true, true, true),
             "cell" => (true, false, true),
-            // Record 0251c: comments are added and removed.
-            "table" | "row" | "comment" => (false, true, true),
-            // Record 0251d: pictures are added; record 0295: SmartArt too.
-            "picture" | "smartart" => (false, true, false),
+            // Record 0251c: comments are added and removed; record 0335:
+            // set too.
+            "table" | "row" => (false, true, true),
+            // Record 0251d: pictures are added; record 0295: SmartArt too;
+            // record 0335: both are set and removed, as are SmartArt nodes.
+            "comment" | "picture" | "smartart" | "node" => (true, true, true),
+            // Record 0335: chart series and axes are set.
+            "series" | "axis" => (true, false, false),
             // Record 0283: charts are added, set and removed.
             "chart" => (true, true, true),
             "sdt" => (false, false, true),
@@ -271,26 +275,33 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert_eq!(property.set(), property.name() == "url");
             } else if element.name() == "picture" && property.name() != "relId" {
                 // Record 0251d: the extent, name and alternative text seed a
-                // new picture; `src` is add-only.
+                // new picture; `src` is write-only. Record 0335: each is
+                // also set.
                 assert_eq!(
                     property.get(),
                     property.name() != "src",
                     "picture {}",
                     property.name()
                 );
-                assert!(!property.set(), "picture {}", property.name());
+                assert!(property.set(), "picture {}", property.name());
                 assert!(property.add(), "picture {}", property.name());
             } else if element.name() == "comment" && property.name() != "id" {
                 // Record 0251c: author, initials, date and text seed a new
-                // comment.
+                // comment; record 0335 sets them.
                 assert!(property.get(), "comment {}", property.name());
-                assert!(!property.set(), "comment {}", property.name());
+                assert!(property.set(), "comment {}", property.name());
                 assert!(property.add(), "comment {}", property.name());
             } else if element.name() == "smartart" {
                 // Record 0295: layout, text, name, alternative text and
                 // extent seed a new graphic; the projection reads layout,
-                // its identifier, the node count and the outline.
-                assert!(!property.set(), "smartart {}", property.name());
+                // its identifier, the node count and the outline. Record
+                // 0335 sets the layout and the outline.
+                assert_eq!(
+                    property.set(),
+                    matches!(property.name(), "layout" | "text"),
+                    "smartart {}",
+                    property.name()
+                );
                 assert_eq!(
                     property.add(),
                     !matches!(property.name(), "layoutId" | "nodeCount"),
@@ -338,6 +349,16 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert!(property.get(), "document {}", property.name());
                 assert!(property.set(), "document {}", property.name());
                 assert!(!property.add(), "document {}", property.name());
+            } else if matches!(element.name(), "series" | "axis" | "node") {
+                // Record 0335: chart series and axes read and set the PPTX
+                // keys; a SmartArt node reads its level, and its text is
+                // write-only.
+                assert!(
+                    property.set() || property.get(),
+                    "{} {}",
+                    element.name(),
+                    property.name()
+                );
             } else if element.name() == "chart" {
                 // Record 0283: chart keys seed a new chart and most are
                 // also settable; the registry declares each.
@@ -710,10 +731,20 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "geometry"
                 | "link"
                 | "tooltip"
+                | "underline"
+                | "strike"
         ),
         "paragraph" => matches!(
             property,
-            "align" | "size" | "text" | "bold" | "italic" | "color" | "font"
+            "align"
+                | "size"
+                | "text"
+                | "bold"
+                | "italic"
+                | "color"
+                | "font"
+                | "underline"
+                | "strike"
         ),
         "run" => matches!(
             property,
@@ -726,18 +757,68 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "font"
                 | "link"
                 | "tooltip"
+                | "underline"
+                | "strike"
         ),
-        // The click action (record 0325).
-        "picture" | "group" => matches!(property, "link" | "tooltip"),
+        // The click action (record 0325); a picture's frame, alternative
+        // text and image (record 0333).
+        "picture" => matches!(
+            property,
+            "link" | "tooltip" | "x" | "y" | "width" | "height" | "alt" | "src"
+        ),
+        "group" => matches!(property, "link" | "tooltip"),
         "tc" => matches!(
             property,
-            "fill" | "text" | "bold" | "italic" | "size" | "color" | "font" | "align"
+            "fill"
+                | "text"
+                | "bold"
+                | "italic"
+                | "size"
+                | "color"
+                | "font"
+                | "align"
+                | "valign"
+                | "padding"
+                | "padding.left"
+                | "padding.right"
+                | "padding.top"
+                | "padding.bottom"
+                | "underline"
+                | "strike"
         ),
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
         "comment" => matches!(property, "text" | "x" | "y"),
+        // Table rows (record 0333).
+        "tr" => property == "height",
         _ => false,
     }
+}
+
+#[cfg(feature = "pptx")]
+/// What a new paragraph or run takes on `add` (record 0333): its text and
+/// formatting, but not a run's click action.
+fn pptx_text_add(element: &str, property: &str) -> bool {
+    (matches!(element, "paragraph" | "run")
+        && pptx_text_format_set(element, property)
+        && !matches!(property, "link" | "tooltip"))
+        || (element == "tr" && pptx_row_add(property))
+        || (element == "table"
+            && matches!(
+                property,
+                "name" | "rows" | "cols" | "x" | "y" | "width" | "height" | "data"
+            ))
+}
+
+#[cfg(feature = "pptx")]
+/// A new row's keys (record 0333): its height, OfficeCLI's `cols` check and
+/// the `c1`…`c20` seed texts.
+fn pptx_row_add(property: &str) -> bool {
+    matches!(property, "height" | "cols")
+        || property
+            .strip_prefix('c')
+            .and_then(|number| number.parse::<u8>().ok())
+            .is_some_and(|number| (1..=20).contains(&number))
 }
 
 #[cfg(feature = "pptx")]
@@ -751,12 +832,20 @@ fn pptx_shape_add(property: &str) -> bool {
 /// Write-only rich text entries (no ordinary read of the same key).
 fn pptx_write_only(element: &str, property: &str) -> bool {
     match element {
-        "paragraph" => matches!(property, "text" | "bold" | "italic" | "color" | "font"),
+        "paragraph" => matches!(
+            property,
+            "text" | "bold" | "italic" | "color" | "font" | "underline" | "strike"
+        ),
         "run" => matches!(property, "text" | "font"),
-        "tc" => property != "fill",
+        "tc" => !matches!(
+            property,
+            "fill" | "valign" | "padding.left" | "padding.right" | "padding.top" | "padding.bottom"
+        ),
         "slide" => matches!(property, "notes" | "transition"),
         "shape" | "placeholder" => matches!(property, "fill" | "geometry"),
         "picture" => property == "src",
+        "tr" => property != "height" && pptx_row_add(property),
+        "table" => property == "data",
         _ => false,
     }
 }
@@ -826,7 +915,7 @@ fn pptx_reports_selection_and_structural_writes() {
             let picture_add = element.name() == "picture"
                 && matches!(
                     property.name(),
-                    "src" | "name" | "x" | "y" | "width" | "height" | "link" | "tooltip"
+                    "src" | "name" | "alt" | "x" | "y" | "width" | "height" | "link" | "tooltip"
                 );
             let comment_add = element.name() == "comment"
                 && matches!(
@@ -835,7 +924,11 @@ fn pptx_reports_selection_and_structural_writes() {
                 );
             assert_eq!(
                 property.add(),
-                slide_add || shape_add || picture_add || comment_add,
+                slide_add
+                    || shape_add
+                    || picture_add
+                    || comment_add
+                    || pptx_text_add(element.name(), property.name()),
                 "{} / {}",
                 element.name(),
                 property.name()
@@ -1238,6 +1331,13 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "video"
                     | "audio"
                     | "media"
+                    | "paragraph"
+                    | "run"
+                    | "linebreak"
+                    | "tr"
+                    | "comment"
+                    | "modernComment"
+                    | "reply"
             ),
             "{}",
             element.name()
@@ -1277,6 +1377,13 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "video"
                     | "audio"
                     | "media"
+                    | "paragraph"
+                    | "run"
+                    | "linebreak"
+                    | "tr"
+                    | "comment"
+                    | "modernComment"
+                    | "reply"
             ),
             "{}",
             element.name()

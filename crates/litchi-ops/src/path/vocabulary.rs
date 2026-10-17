@@ -574,6 +574,7 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
         ("level", "level"),
         ("lvl", "level"),
         ("math", "equation"),
+        ("node", "node"),
         ("num", "num"),
         ("numbering", "numbering"),
         ("object", "ole"),
@@ -646,6 +647,7 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
         ElementRule::new("level")
             .ids(&[Identity::new("ilvl", Exact)])
             .index(IndexRule::Number),
+        ElementRule::new("node"),
         ElementRule::new("num").ids(&[Identity::new("id", Exact)]),
         ElementRule::new("numbering"),
         ElementRule::new("ole"),

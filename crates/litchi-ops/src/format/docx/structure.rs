@@ -150,7 +150,8 @@ impl Docx {
                 | NewKind::Comment
                 | NewKind::Picture
                 | NewKind::Chart
-                | NewKind::SmartArt,
+                | NewKind::SmartArt
+                | NewKind::Node,
                 _,
             ) => {
                 return self.add_nested(editor, &parent, kind, &node);
@@ -352,6 +353,8 @@ pub(super) enum NewKind {
     Picture,
     Chart,
     SmartArt,
+    /// A SmartArt content node (record 0335).
+    Node,
     Part(super::parts::write::NewPart),
     Mark(super::marks::write::NewMark),
 }
@@ -399,6 +402,8 @@ fn new_kind(name: &str) -> Result<NewKind> {
         Ok(NewKind::Chart)
     } else if name.eq_ignore_ascii_case("smartart") {
         Ok(NewKind::SmartArt)
+    } else if name.eq_ignore_ascii_case("node") {
+        Ok(NewKind::Node)
     } else if let Some(part) = super::parts::write::NewPart::of(name) {
         Ok(NewKind::Part(part))
     } else if let Some(mark) = super::marks::write::NewMark::of(name) {

@@ -148,10 +148,12 @@ pub(super) fn rewrite_shape_bounds_many(
         let shape = scene.at(index)?;
         if !matches!(
             shape,
-            crate::shape::Shape::Auto(_) | crate::shape::Shape::Chart(_)
+            crate::shape::Shape::Auto(_)
+                | crate::shape::Shape::Chart(_)
+                | crate::shape::Shape::Picture(_)
         ) {
             return Err(Error::Invalid(
-                "opened-presentation geometry authoring supports ordinary p:sp shapes and chart frames only".into(),
+                "opened-presentation geometry authoring supports ordinary p:sp shapes, pictures and chart frames only".into(),
             ));
         }
         let span = shape.common().span()?.range(xml.len())?;
@@ -846,7 +848,7 @@ fn classify_element(
     stack: &[ElementFrame],
 ) -> ElementKind {
     let local = element.local_name();
-    if is_pml(namespace) && matches!(local.as_ref(), b"sp" | b"graphicFrame") {
+    if is_pml(namespace) && matches!(local.as_ref(), b"sp" | b"graphicFrame" | b"pic") {
         ElementKind::Shape
     } else if is_pml(namespace)
         && local.as_ref() == b"xfrm"

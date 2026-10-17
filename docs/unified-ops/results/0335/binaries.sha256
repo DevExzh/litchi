@@ -1,0 +1,3 @@
+docx_p0_residue_bench 52fc105157d4c61bed9d87ed9d6b4114f92d7e16f975bb81e1da9a9ad477b865 built from c8e434dd56: cargo build --release -p litchi-ops --features docx --example docx_p0_residue_bench
+docx_view_regression before d68a65a07362d2d6d255628eed63938b84b482b4108b0faa4fce1b168447ccbf built from 3bec513e6a (git archive)
+docx_view_regression after 53270cf70b8024e3d09b60d3d180dacb4d9f99376a8bde0c4d43ab372c12d4be built from ede8cd85af

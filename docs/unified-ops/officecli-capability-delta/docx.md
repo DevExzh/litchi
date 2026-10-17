@@ -32,43 +32,44 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | bookmark | `id` | string | --g | --g | supported | — |  |  |  |
 | bookmarkEnd | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| chart-axis | `axisFont` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `axisMax` | number | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `axisMin` | number | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `axisNumFmt` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `axisOrientation` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `axisTitle` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `format` | string | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `labelOffset` | number | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `labelRotation` | number | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `logBase` | number | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `majorGridlines` | bool | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `max` | number | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `min` | number | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `minorGridlines` | bool | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `tickLabelSkip` | number | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `title` | string | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-axis | `visible` | bool | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `categories` | string | asg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `categoriesRef` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `color` | color | asg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `dataLabels.numFmt` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `dataLabels.separator` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `errBars` | string | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `invertIfNeg` | string | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `lineDash` | enum | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `lineWidth` | number | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `marker` | string | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `markerSize` | number | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `markerColor` | string | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `name` | string | asg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `nameRef` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `scatterStyle` | string | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `secondaryAxis` | bool | --g |  | unlisted | — | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `smooth` | string | -sg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `values` | string | asg |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `bubbleSize` | string | a-g |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series | `bubbleSizeRef` | string | a-g |  | unlisted | gap | v1 | planned WP4 (docx-p0-residue) |  |
+| chart-axis | `axisFont` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisMax` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisMin` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisNumFmt` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisOrientation` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisTitle` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `format` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `labelOffset` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `labelRotation` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `logBase` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `majorGridlines` | bool | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `max` | number | -sg | -sg | supported | supported |  |  |  |
+| chart-axis | `min` | number | -sg | -sg | supported | supported |  |  |  |
+| chart-axis | `minorGridlines` | bool | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `tickLabelSkip` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `title` | string | -sg | -sg | supported | supported |  |  |  |
+| chart-axis | `visible` | bool | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `role` | string |  | --g | litchi-only | — |  |  |  |
+| chart-series | `categories` | string | asg | --g | supported | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `categoriesRef` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `color` | color | asg | -sg | supported | partial | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `dataLabels.numFmt` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `dataLabels.separator` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `errBars` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `invertIfNeg` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `lineDash` | enum | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `lineWidth` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `marker` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `markerSize` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `markerColor` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `name` | string | asg | -sg | supported | partial | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `nameRef` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `scatterStyle` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `secondaryAxis` | bool | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `smooth` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `values` | string | asg | -sg | supported | partial | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `bubbleSize` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `bubbleSizeRef` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
 | chart | `dispUnits` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | chart | `seriesCount` | number | --g | --g | supported | — |  |  |  |
 | chart | `radarstyle` | string | as- | asg | supported | supported |  |  |  |
@@ -268,15 +269,15 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |  |  |
 | chart | `series20.color` | string |  | as- | litchi-only | litchi-only |  |  |  |
 | comment | `id` | number | --g | --g | supported | — |  |  |  |
-| comment | `anchoredTo` | string | --g |  | unlisted | — | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `runStart` | int | a-- |  | write-only | gap | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `range` | bool | a-- |  | write-only | gap | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `parentId` | number | a-g |  | unlisted | gap | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `done` | bool | asg |  | unlisted | gap | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `date` | string | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `initials` | string | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `author` | string | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| comment | `text` | string | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
+| comment | `anchoredTo` | string | --g |  | unlisted | — | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| comment | `runStart` | int | a-- |  | write-only | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| comment | `range` | bool | a-- |  | write-only | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| comment | `parentId` | number | a-g |  | gap | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) | 0335-F2 |
+| comment | `done` | bool | asg |  | gap | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) | 0335-F2 |
+| comment | `date` | string | asg | asg | supported | supported |  |  |  |
+| comment | `initials` | string | asg | asg | supported | supported |  |  |  |
+| comment | `author` | string | asg | asg | supported | supported |  |  |  |
+| comment | `text` | string | asg | asg | supported | supported |  |  |  |
 | diagram | `mermaid` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `src` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `width` | length | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
@@ -787,34 +788,34 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | permStart | `ed` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | permStart | `colFirst` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | permStart | `colLast` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| picture | `decorative` | bool | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `crop` | string | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `cropLeft` | string | as- |  | write-only | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `cropTop` | string | as- |  | write-only | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `cropRight` | string | as- |  | write-only | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `cropBottom` | string | as- |  | write-only | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `anchor` | bool | a-g |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `wrap` | string | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `behindText` | bool | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `relativeHeight` | integer | a-g |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `effectExtent` | string | a-- |  | write-only | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `hPosition` | length | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `vPosition` | length | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `hRelative` | string | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `vRelative` | string | asg |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `hAlign` | string | a-g |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `vAlign` | string | a-g |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `link` | string | a-g |  | unlisted | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `width` | length | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| picture | `height` | length | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| picture | `fallback` | string | a-- |  | write-only | gap | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `id` | number | --g |  | unlisted | — | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `alt` | string | asg | a-g | supported | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| picture | `contentType` | string | --g |  | unlisted | — | P1 | planned WP4 (docx-p0-residue) |  |
-| picture | `fileSize` | number | --g |  | unlisted | — | P1 | planned WP4 (docx-p0-residue) |  |
+| picture | `decorative` | bool | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `crop` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `cropTop` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `cropRight` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `anchor` | bool | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `wrap` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `behindText` | bool | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `relativeHeight` | integer | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `effectExtent` | string | a-- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `hPosition` | length | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `vPosition` | length | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `hRelative` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `vRelative` | string | asg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `hAlign` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `vAlign` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `link` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `width` | length | asg | asg | supported | supported |  |  |  |
+| picture | `height` | length | asg | asg | supported | supported |  |  |  |
+| picture | `fallback` | string | a-- |  | write-only | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `id` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `alt` | string | asg | asg | supported | supported |  |  |  |
+| picture | `contentType` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| picture | `fileSize` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
 | picture | `relId` | string | --g | --g | supported | — |  |  |  |
-| picture | `src` | string | as- | a-- | write-only | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| picture | `name` | string |  | a-g | litchi-only | litchi-only |  |  |  |
+| picture | `src` | string | as- | as- | write-only | supported |  |  |  |
+| picture | `name` | string |  | asg | litchi-only | litchi-only |  |  |  |
 | ptab | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | ptab | `relativeTo` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | ptab | `leader` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |

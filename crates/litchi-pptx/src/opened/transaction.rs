@@ -5,8 +5,10 @@ mod links;
 mod masters;
 mod media;
 mod notes;
+mod picture;
 mod smartart;
 mod table;
+mod text;
 mod theme;
 
 pub use media::MediaFile;
@@ -678,6 +680,39 @@ impl Edit {
         let (xml, changed) = super::stage_text_properties(
             owner.blob(),
             edits,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+            self.note_scene_read(&selected_slide.part_name);
+        }
+        Ok(changed)
+    }
+
+    /// Apply several already bounded batches of rich text edits to one
+    /// slide, in order, in one scene read, rewrite and read-back (record
+    /// 0333). Each chunk keeps the limits of [`Self::set_text_properties`]
+    /// (256 edits and its text bytes); the total is bounded by 100,000
+    /// edits. The return value is the number of edits that changed bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_text_properties`], and a limit error for too many
+    /// chunks or edits. A failed batch leaves the transaction unchanged.
+    pub fn set_text_property_chunks<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        chunks: &[&[super::TextEdit<'_>]],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let (xml, changed) = super::stage_text_property_chunks(
+            owner.blob(),
+            chunks,
             self.source.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
         )?;

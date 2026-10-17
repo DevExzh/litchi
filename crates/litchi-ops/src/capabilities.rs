@@ -2794,7 +2794,17 @@ impl Element {
                     && self.retains_source != Some(false)
                     && matches!(
                         self.data().canonical,
-                        "p" | "r" | "hyperlink" | "tc" | "chart" | "document"
+                        "p" | "r"
+                            | "hyperlink"
+                            | "tc"
+                            | "chart"
+                            | "series"
+                            | "axis"
+                            | "picture"
+                            | "comment"
+                            | "smartart"
+                            | "node"
+                            | "document"
                     )
                     && readable)
                     || (self.adapter == Adapter::Docx
@@ -2937,8 +2947,9 @@ impl Element {
                 && self.retains_source != Some(false)
                 && self.data().canonical == "cell"
                 && readable);
-        // DOCX pictures are addable but not yet removable (record 0251d);
-        // charts are both (record 0283).
+        // DOCX pictures (records 0251d, 0335), charts (record 0283) and
+        // SmartArt graphics and nodes (records 0295, 0335) are addable and
+        // removable.
         #[cfg(feature = "docx")]
         let add = add
             || (self.adapter == Adapter::Docx
@@ -2948,6 +2959,7 @@ impl Element {
                     "picture"
                         | "chart"
                         | "smartart"
+                        | "node"
                         | "tab"
                         | "break"
                         | "bookmark"
@@ -3029,7 +3041,15 @@ impl Element {
                 && self.retains_source != Some(false)
                 && (matches!(
                     self.data().canonical,
-                    "tc" | "sdt" | "chart" | "tab" | "break" | "bookmark" | "toc"
+                    "tc" | "sdt"
+                        | "chart"
+                        | "picture"
+                        | "smartart"
+                        | "node"
+                        | "tab"
+                        | "break"
+                        | "bookmark"
+                        | "toc"
                 ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]

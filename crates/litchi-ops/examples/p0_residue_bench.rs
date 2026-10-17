@@ -29,7 +29,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     type Leg<'a> = Box<dyn Fn() -> Result<(), Box<dyn std::error::Error>> + 'a>;
 
-    fn pair(name: &str, native: Leg<'_>, unified: Leg<'_>) -> Result<(), Box<dyn std::error::Error>> {
+    fn pair(
+        name: &str,
+        native: Leg<'_>,
+        unified: Leg<'_>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut native_ns = Vec::new();
         let mut unified_ns = Vec::new();
         for round in 0..ROUNDS + WARMUP {
@@ -89,7 +93,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let file = open_bytes_with(bytes.as_slice(), &eager)?;
         let package = litchi_docx::Package::from_bytes(&bytes)?;
         let unified = file.set("/", Props::new().with("title", title))?;
-        assert_eq!(unified.metadata()?.unwrap_or_default().title.as_deref(), Some(title));
+        assert_eq!(
+            unified.metadata()?.unwrap_or_default().title.as_deref(),
+            Some(title)
+        );
         pair(
             "docx set / title",
             Box::new(|| {
@@ -155,10 +162,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // XLSX cells, runs and pictures on one workbook.
     let runs = r#"[{"text":"Bold ","bold":true},{"text":"plain"}]"#;
     let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";
-    let jpeg_bytes = [0xFF_u8, 0xD8, 0xFF, 0xE0, 0, 0x10, 0x4A, 0x46, 0x49, 0x46, 0];
+    let jpeg_bytes = [
+        0xFF_u8, 0xD8, 0xFF, 0xE0, 0, 0x10, 0x4A, 0x46, 0x49, 0x46, 0,
+    ];
     let jpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRgA=";
     let seeded = create(FileFormat::Xlsx)?
-        .set("/Sheet1/A1", Props::new().with("type", "richtext").with("runs", runs))?
+        .set(
+            "/Sheet1/A1",
+            Props::new().with("type", "richtext").with("runs", runs),
+        )?
         .add("/Sheet1", NewNode::new("picture").prop("src", png))?
         .file;
     let bytes = seeded.to_bytes()?;
@@ -207,10 +219,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         }),
         Box::new(|| {
-            black_box(file.add(
-                "/Sheet1",
-                NewNode::new("cell").prop("ref", "C3").prop("value", "added"),
-            )?);
+            black_box(
+                file.add(
+                    "/Sheet1",
+                    NewNode::new("cell")
+                        .prop("ref", "C3")
+                        .prop("value", "added"),
+                )?,
+            );
             Ok(())
         }),
     )?;

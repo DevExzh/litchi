@@ -48,10 +48,20 @@ impl Docx {
             let nodes = self.resolve_targets(target)?;
             // Charts have their own setter outside the formatting surface
             // (record 0283): the ordinary set path writes them (0289).
-            // So do the part elements (record 0319).
+            // So do the part elements (record 0319), and pictures,
+            // comments, SmartArt and chart series and axes (record 0335).
             if nodes.iter().any(|node| {
-                node.element_kind() == crate::format::docx::Kind::Chart
-                    || super::super::parts::is_part_kind(node.element_kind())
+                use crate::format::docx::Kind;
+                matches!(
+                    node.element_kind(),
+                    Kind::Chart
+                        | Kind::Series
+                        | Kind::Axis
+                        | Kind::Picture
+                        | Kind::Comment
+                        | Kind::SmartArt
+                        | Kind::Node
+                ) || super::super::parts::is_part_kind(node.element_kind())
                     || super::super::marks::is_mark_kind(node.element_kind())
             }) {
                 return Ok(None);

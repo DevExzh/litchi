@@ -206,6 +206,72 @@ impl<'a> Table<'a> {
             .collect()
     }
 
+    /// The number of cells of every row, in one pass over the table
+    /// (record 0333): the counts [`Row::cell_count`] gives, without
+    /// resolving each row's namespace scope again.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed table XML or more rows than the
+    /// reader admits.
+    pub fn row_cell_counts(self) -> Result<Vec<usize>> {
+        let Some(context) = self.context else {
+            return Ok(self.rows()?.into_iter().map(Row::cell_count).collect());
+        };
+        let table = self.xml()?;
+        if table.len() > MAX_XML_BYTES {
+            return Err(limit("table XML bytes", MAX_XML_BYTES));
+        }
+        let mut reader = NsReader::from_reader(table);
+        *reader.resolver_mut() = context.resolver()?;
+        // DrawingML local names of the open elements.
+        let mut stack: Vec<Option<Vec<u8>>> = Vec::new();
+        let mut counts = Vec::new();
+        let drawing = |namespace: &ResolveResult<'_>| {
+            matches!(namespace, ResolveResult::Bound(Namespace(value))
+                if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE)
+        };
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let empty = matches!(event, Event::Empty(_));
+            match event {
+                Event::Start(element) | Event::Empty(element) => {
+                    let local = drawing(&namespace).then(|| element.local_name().as_ref().to_vec());
+                    let parent = stack.last().and_then(Option::as_deref);
+                    let grandparent = stack
+                        .len()
+                        .checked_sub(2)
+                        .and_then(|index| stack[index].as_deref());
+                    match (local.as_deref(), parent, grandparent) {
+                        (Some(b"tr"), Some(b"tbl"), _) => {
+                            if counts.len() >= MAX_ROWS {
+                                return Err(limit("table row count", MAX_ROWS));
+                            }
+                            counts.push(0);
+                        },
+                        (Some(b"tc"), Some(b"tr"), Some(b"tbl")) => {
+                            if let Some(count) = counts.last_mut() {
+                                *count += 1;
+                            }
+                        },
+                        _ => {},
+                    }
+                    if !empty {
+                        stack.push(local);
+                    }
+                },
+                Event::End(_) => {
+                    stack.pop();
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        Ok(counts)
+    }
+
     /// Get one cell by zero-based row and column position.
     ///
     /// # Errors
@@ -270,6 +336,44 @@ impl<'a> Row<'a> {
     pub fn cell_count(self) -> usize {
         scan_with_context(self.xml().unwrap_or_default(), b"tc", self.context)
             .map_or(0, |spans| spans.len())
+    }
+
+    /// The row's height (`a:tr@h`) in EMU; `None` when the attribute is
+    /// absent (record 0333).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed row XML or a height that is not a
+    /// non-negative integer.
+    pub fn height(self) -> Result<Option<i64>> {
+        let xml = self.xml()?;
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        loop {
+            match reader
+                .read_event()
+                .map_err(|_| invalid("malformed table row XML"))?
+            {
+                Event::Start(start) | Event::Empty(start) => {
+                    for attribute in start.checked_attributes() {
+                        let attribute =
+                            attribute.map_err(|_| invalid("malformed table row XML"))?;
+                        if attribute.key.as_ref() == b"h" {
+                            return std::str::from_utf8(&attribute.value)
+                                .ok()
+                                .and_then(|value| value.trim().parse::<i64>().ok())
+                                .filter(|value| *value >= 0)
+                                .map(Some)
+                                .ok_or_else(|| {
+                                    invalid("a table row height is not a non-negative integer")
+                                });
+                        }
+                    }
+                    return Ok(None);
+                },
+                Event::Eof => return Ok(None),
+                _ => {},
+            }
+        }
     }
 
     /// # Errors
@@ -414,6 +518,94 @@ impl<'a> Cell<'a> {
         Ok(Some(body))
     }
 
+    /// The cell's local properties (`a:tcPr`, record 0333): its fill (a
+    /// solid RGB or theme colour, or no fill; other fills read as `None`),
+    /// vertical anchor and insets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cell XML is malformed, an inset is not an
+    /// integer, or an RGB value is not six hexadecimal digits.
+    pub fn properties(self) -> Result<CellProperties> {
+        let xml = self.xml()?;
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        reader.config_mut().check_end_names = true;
+        let mut properties = CellProperties::default();
+        // Local names below the cell root.
+        let mut path: Vec<Vec<u8>> = Vec::new();
+        loop {
+            let event = reader
+                .read_event()
+                .map_err(|_| invalid("malformed table cell XML"))?;
+            let (start, empty) = match &event {
+                Event::Start(start) => (start, false),
+                Event::Empty(start) => (start, true),
+                Event::End(_) => {
+                    path.pop();
+                    continue;
+                },
+                Event::Eof => return Ok(properties),
+                _ => continue,
+            };
+            let local = start.local_name().as_ref().to_vec();
+            let value = |name: &[u8]| -> Result<Option<Vec<u8>>> {
+                for attribute in start.checked_attributes() {
+                    let attribute = attribute.map_err(|_| invalid("malformed table cell XML"))?;
+                    if attribute.key.as_ref() == name {
+                        return Ok(Some(attribute.value.into_owned()));
+                    }
+                }
+                Ok(None)
+            };
+            match (path.len(), path.get(1).map(Vec::as_slice), local.as_slice()) {
+                (1, _, b"tcPr") => {
+                    if let Some(anchor) = value(b"anchor")? {
+                        properties.anchor = std::str::from_utf8(&anchor)
+                            .ok()
+                            .and_then(|token| token.parse().ok());
+                    }
+                    for (index, name) in
+                        [&b"marL"[..], b"marR", b"marT", b"marB"].iter().enumerate()
+                    {
+                        if let Some(margin) = value(name)? {
+                            properties.margins[index] = Some(
+                                std::str::from_utf8(&margin)
+                                    .ok()
+                                    .and_then(|value| value.trim().parse::<i64>().ok())
+                                    .ok_or_else(|| {
+                                        invalid("a table cell inset is not an integer")
+                                    })?,
+                            );
+                        }
+                    }
+                },
+                (2, Some(b"tcPr"), b"noFill") => {
+                    properties.fill = Some(crate::opened::CellFill::None);
+                },
+                (3, Some(b"tcPr"), b"srgbClr") if path[2].as_slice() == b"solidFill" => {
+                    let rgb =
+                        value(b"val")?.ok_or_else(|| invalid("table cell colour has no value"))?;
+                    properties.fill = Some(crate::opened::CellFill::Rgb(crate::opened::Rgb(
+                        parse_rgb(&rgb)?,
+                    )));
+                },
+                (3, Some(b"tcPr"), b"schemeClr") if path[2].as_slice() == b"solidFill" => {
+                    properties.fill = value(b"val")?
+                        .and_then(|token| {
+                            litchi_drawingml::color::Scheme::from_token(
+                                std::str::from_utf8(&token).ok()?,
+                            )
+                        })
+                        .map(crate::opened::CellFill::Scheme);
+                },
+                _ => {},
+            }
+            if !empty {
+                path.push(local);
+            }
+        }
+    }
+
     /// The cell's local solid RGB fill (`a:tcPr/a:solidFill/a:srgbClr`).
     ///
     /// Scheme, preset and system colours, gradient, picture and pattern
@@ -462,6 +654,18 @@ impl<'a> Cell<'a> {
             }
         }
     }
+}
+
+/// A table cell's local properties (`a:tcPr`, record 0333).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct CellProperties {
+    /// The local fill: solid RGB or theme colour, or no fill.
+    pub fill: Option<crate::opened::CellFill>,
+    /// The vertical text anchor (`anchor`).
+    pub anchor: Option<litchi_drawingml::text::Anchor>,
+    /// The insets in EMU, in `marL`, `marR`, `marT`, `marB` order.
+    pub margins: [Option<i64>; 4],
 }
 
 fn parse_rgb(value: &[u8]) -> Result<[u8; 3]> {

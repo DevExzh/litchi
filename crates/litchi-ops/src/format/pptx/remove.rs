@@ -58,7 +58,16 @@ impl Pptx {
         if let Some(commit) = self.try_remove_column(&target, limits)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_remove_row(&target, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_remove_hyperlink(&target, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_remove_text(&target, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_remove_comment(&target, limits)? {
             return Ok(commit);
         }
         let mut positions = resolve_targets(self, &target, limits)?;

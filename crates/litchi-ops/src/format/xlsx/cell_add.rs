@@ -192,9 +192,7 @@ fn first_empty(parent: &Node<'_>, row: u32) -> Result<Address> {
 /// Whether the cell at `at` holds a value or formula.
 fn occupied(parent: &Node<'_>, at: Address) -> Result<bool> {
     let grid = parent_grid(parent)?;
-    Ok(grid
-        .record(at)?
-        .is_some_and(super::node::has_content))
+    Ok(grid.record(at)?.is_some_and(super::node::has_content))
 }
 
 /// The grid of the parent's worksheet.
