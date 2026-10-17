@@ -526,6 +526,13 @@ enum Operation {
         name: Box<str>,
         table: NewTable,
     },
+    NotesStyle {
+        slide: u64,
+        note: u64,
+        storage: u64,
+        span: TextSpan,
+        style: Style,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -908,6 +915,7 @@ impl<'a> Edit<'a> {
             Operation::Geometry { .. }
             | Operation::Text { .. }
             | Operation::TextStyle { .. }
+            | Operation::NotesStyle { .. }
             | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
@@ -1437,6 +1445,70 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
+    /// Stage character styling of one span (characters) of a slide's
+    /// speaker notes (record 0329), as [`Self::set_text_style`] styles a
+    /// text box: each character-style run inside the span gets a new
+    /// variation of its style carrying the set properties, registered in
+    /// the notes storage's stylesheet. Notes text is written by
+    /// [`Package::edit_slide_notes`], never by this edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors, [`Error::InvalidSpan`],
+    /// [`Error::Unsupported`] with [`Unsupported::Kind`] for a slide
+    /// without notes and [`Unsupported::TextStyling`] for a style that sets
+    /// nothing; notes stored outside their slide's component, or a storage
+    /// other objects reference, are refused by [`Self::commit`].
+    ///
+    /// ```no_run
+    /// use litchi_keynote::slide::drawable::{Style, TextSpan};
+    /// use litchi_keynote::{Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// let mut edit = package.edit_slide_drawables();
+    /// edit.set_notes_text_style(
+    ///     SlideSelector::index(0),
+    ///     TextSpan::new(0, 4),
+    ///     Style::new().with_italic(true),
+    /// )?;
+    /// let commit = edit.commit()?;
+    /// let runs = commit.package().slide_notes_text_runs(SlideSelector::index(0))?;
+    /// assert_eq!(runs[0].style().italic, Some(true));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_notes_text_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        span: TextSpan,
+        style: Style,
+    ) -> Result<&mut Self, Error> {
+        let selected = self.slide(slide.into())?;
+        let (note, storage, text) =
+            super::slide_notes::notes_identity(self.source, selected.position)
+                .map_err(|_error| Error::InvalidSource)?
+                .ok_or(Error::Unsupported {
+                    reason: Unsupported::Kind { kind: Kind::Other },
+                })?;
+        if span.start() >= span.end() || span.end() > text.chars().count() {
+            return Err(Error::InvalidSpan);
+        }
+        if style == Style::new() {
+            return Err(Error::Unsupported {
+                reason: Unsupported::TextStyling,
+            });
+        }
+        self.operations.push(Operation::NotesStyle {
+            slide: selected.identifier,
+            note,
+            storage,
+            span,
+            style,
+        });
+        Ok(self)
+    }
+
     /// Stage a value in one cell (zero-based `row`, `column`) of a slide
     /// table.
     ///
@@ -1782,6 +1854,41 @@ impl Package {
         text::runs(self, storage, text_value, wire).map_err(lift)
     }
 
+    /// Read the character-style runs of one slide's speaker notes (record
+    /// 0329), as [`Self::slide_drawable_text_runs`] reads a text box's.
+    ///
+    /// ```no_run
+    /// use litchi_keynote::{Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// for run in package.slide_notes_text_runs(SlideSelector::index(0))?.iter() {
+    ///     println!("{:?} italic={:?}", run.span(), run.style().italic);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Error::Unsupported`] for a slide
+    /// without notes.
+    pub fn slide_notes_text_runs<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+    ) -> Result<Box<[TextRun]>, Error> {
+        let selected = select_slide(self, slide.into())?;
+        let (_, storage, text_value) = super::slide_notes::notes_identity(self, selected.position)
+            .map_err(|_error| Error::InvalidSource)?
+            .ok_or(Error::Unsupported {
+                reason: Unsupported::Kind { kind: Kind::Other },
+            })?;
+        let wire = self
+            .semantic_wire_limits()
+            .map_err(|_error| Error::InvalidSource)?;
+        text::runs(self, storage, &text_value, wire).map_err(lift)
+    }
+
     /// Start one slide-drawable edit.
     ///
     /// ```no_run
@@ -1929,6 +2036,7 @@ fn commit_operations(
     let mut context = None;
     let mut created = Vec::new();
     let mut tables = Vec::new();
+    let mut notes: Vec<(u64, String)> = Vec::new();
     let mut touched: HashMap<u64, HashSet<u64>> = HashMap::new();
     let mut diagnostics = Diagnostics {
         operations: operations.len(),
@@ -2053,6 +2161,23 @@ fn commit_operations(
                 stage::set_table_cell(&mut workspace, *drawable, *row, *column, value)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
+            Operation::NotesStyle {
+                slide,
+                note,
+                storage,
+                span,
+                style,
+            } => {
+                let wire = workspace.wire;
+                let before = inventory::storage_text(&workspace, *storage, wire).map_err(lift)?;
+                stage::set_text_style(&mut workspace, *slide, *note, *storage, *span, style)?;
+                let after = inventory::storage_text(&workspace, *storage, wire).map_err(lift)?;
+                if before != after {
+                    return Err(Error::Verification);
+                }
+                notes.push((*slide, before));
+                touched.entry(*slide).or_default();
+            },
             Operation::AddTable {
                 slide,
                 slide_position,
@@ -2164,6 +2289,27 @@ fn commit_operations(
             name,
             table,
         )?;
+    }
+    // Styled notes keep their text.
+    for (slide, text) in &notes {
+        let mut position = None;
+        for index in 0.. {
+            match candidate.slide_record_at(index).map_err(map_read_error)? {
+                Some(record) if record.slide_identifier == *slide => {
+                    position = Some(Position::new(index));
+                    break;
+                },
+                Some(_) => {},
+                None => break,
+            }
+        }
+        let position = position.ok_or(Error::Verification)?;
+        let read = super::slide_notes::notes_identity(&candidate, position)
+            .map_err(|_error| Error::Verification)?
+            .ok_or(Error::Verification)?;
+        if read.2 != *text {
+            return Err(Error::Verification);
+        }
     }
     let mut public_created = Vec::with_capacity(created.len());
     for (slide_position, slide, drawable) in created {
