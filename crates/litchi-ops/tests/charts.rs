@@ -665,8 +665,12 @@ fn dotted_series_refusals_leave_the_input_unchanged() {
                 Code::InvalidValue,
                 "series1.color",
             ),
+            // A range is refused on a slide, and on a worksheet for a
+            // scatter chart (record 0338 binds category charts to ranges).
             (
-                NewNode::new("chart").prop("series1.values", "Sheet1!B2:B3"),
+                NewNode::new("chart")
+                    .prop("chartType", "scatter")
+                    .prop("series1.values", "Sheet1!B2:B3"),
                 Code::UnsupportedCapability,
                 "series1.values",
             ),

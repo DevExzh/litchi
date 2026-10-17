@@ -59,6 +59,15 @@ impl Xlsx {
             drop(source);
             return self.add_feature(&parent, kind, implied, node);
         }
+        // A worksheet cell and a rich-text run (record 0338).
+        if matches!(kind, NewKind::Cell) {
+            drop(source);
+            return self.add_cell(&parent, &node, &SemanticLimits::default());
+        }
+        if matches!(kind, NewKind::Run) {
+            drop(source);
+            return self.add_run_node(&parent, &node);
+        }
         if parent.element() != Kind::Workbook {
             return Err(Error::new(
                 Code::UnsupportedType,
@@ -117,6 +126,9 @@ impl Xlsx {
     }
 
     fn remove_inner<'p>(&self, target: TargetArg<'p>, limits: &SemanticLimits) -> Result<Commit> {
+        if let Some(commit) = self.try_remove_run(&target)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_remove_chart(&target)? {
             return Ok(commit);
         }
@@ -218,6 +230,10 @@ enum NewKind {
     /// A worksheet feature (record 0320), with the rule type a CF element
     /// word implies.
     Feature(Kind, Option<&'static str>),
+    /// A worksheet cell (record 0338), under a sheet, row or cell.
+    Cell,
+    /// A rich-text run (record 0338), under a cell.
+    Run,
 }
 
 fn new_kind(name: &str, props: &crate::props::Props<'_>) -> Result<NewKind> {
@@ -225,6 +241,10 @@ fn new_kind(name: &str, props: &crate::props::Props<'_>) -> Result<NewKind> {
         Ok(NewKind::Sheet)
     } else if name.eq_ignore_ascii_case("chart") {
         Ok(NewKind::Chart)
+    } else if name.eq_ignore_ascii_case("cell") {
+        Ok(NewKind::Cell)
+    } else if name.eq_ignore_ascii_case("run") || name.eq_ignore_ascii_case("r") {
+        Ok(NewKind::Run)
     } else if let Some(implied) = super::feature_write::cf_element(name) {
         Ok(NewKind::Feature(Kind::Cf, Some(implied)))
     } else if name.eq_ignore_ascii_case("pagebreak") {

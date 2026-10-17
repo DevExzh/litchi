@@ -65,6 +65,43 @@ fn property_inputs_keep_types_order_and_first_equals_split() {
     assert_eq!(props.get("f"), Some(&PropValue::from("2")));
 }
 
+/// JSON numbers decode correctly rounded and the canonical wire form is a
+/// fixed point (record 0338 F1: the workspace's `serde_json` has
+/// `float_roundtrip`).
+#[test]
+fn numbers_decode_correctly_rounded_and_round_trip_exactly() {
+    // Correctly rounded values, checked against Python's `float()`.
+    let cases = [
+        ("98446744073709551615", 9.844_674_407_370_955e19),
+        ("0.1", 0.1),
+        ("2.2250738585072011e-308", 2.225_073_858_507_201e-308),
+        ("9007199254740993.0", 9_007_199_254_740_992.0),
+        ("1.7976931348623157e308", f64::MAX),
+        ("3.0000000000000004", 3.000_000_000_000_000_4),
+    ];
+    for (text, expected) in cases {
+        let json = format!(r#"[{{"command":"set","props":{{"n":{text}}}}}]"#);
+        let items = from_bytes(json.as_bytes()).unwrap();
+        let Some(PropValue::Number(number)) = items[0].props.as_ref().unwrap().get("n") else {
+            panic!("{text}: not a number");
+        };
+        assert_eq!(number.to_bits(), expected.to_bits(), "{text}");
+        // Serializing and decoding again gives the same double, twice.
+        let wire = serde_json::to_vec(&items).unwrap();
+        let again = from_bytes(&wire).unwrap();
+        assert!(again == items, "{text}: round trip moved the number");
+        let rewire = serde_json::to_vec(&again).unwrap();
+        assert_eq!(rewire, wire, "{text}: the wire form is not a fixed point");
+    }
+    // The 121-digit literal of record 0334 (finding F1): stable from the
+    // first round trip.
+    let long = format!("9{}", "7".repeat(120));
+    let json = format!(r#"[{{"command":"set","props":{{"n":{long}}}}}]"#);
+    let items = from_bytes(json.as_bytes()).unwrap();
+    let wire = serde_json::to_vec(&items).unwrap();
+    assert!(from_bytes(&wire).unwrap() == items);
+}
+
 #[test]
 fn keys_are_ascii_caseless_and_serialization_is_canonical() {
     let item: BatchItem<'_> =

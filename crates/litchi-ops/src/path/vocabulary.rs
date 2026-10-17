@@ -1197,6 +1197,8 @@ pub(crate) static WORKBOOK: Vocabulary = Vocabulary {
         ("picture", "picture"),
         ("pivot", "pivottable"),
         ("pivottable", "pivottable"),
+        // OfficeCLI's run path step, `/Sheet1/A1/r[N]` (record 0338).
+        ("r", "run"),
         ("range", "range"),
         ("row", "row"),
         ("rowbreak", "rowbreak"),

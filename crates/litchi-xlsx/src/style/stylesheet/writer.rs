@@ -449,7 +449,7 @@ fn write_string_color(xml: &mut String, element: &str, value: &str) -> Result<()
     Ok(())
 }
 
-fn write_font_color(xml: &mut String, element: &str, color: &FontColor) -> Result<()> {
+pub(crate) fn write_font_color(xml: &mut String, element: &str, color: &FontColor) -> Result<()> {
     let mut output = format!("<{element}");
     match color.kind() {
         FontColorKind::Default => {},

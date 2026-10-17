@@ -3,13 +3,13 @@ docx	document	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/write
 docx	document	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx` /
 docx	document	query	n/a	query not offered for this element	-
 docx	document	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx` /
-docx	document	set	n/a	set not offered for this element	-
+docx	document	set	supported		ok `seed + add paragraph` / {"title":"Litchi"}
 docx	document	add	n/a	add not offered for this element	-
 docx	document	remove	n/a	remove not offered for this element	-
 docx	document	move	format-verb		unreached
 docx	document	swap	format-verb		unreached
-docx	document	edit	n/a	edit not offered for this element	-
-docx	document	batch	n/a	batch not offered for this element	-
+docx	document	edit	supported		ok tx.set
+docx	document	batch	supported		ok set item
 docx	document	create	supported		ok format
 docx	document	save	supported		ok format
 docx	body	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx` /body
@@ -575,13 +575,13 @@ xlsx	workbook	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationLis
 xlsx	workbook	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
 xlsx	workbook	query	n/a	query not offered for this element	-
 xlsx	workbook	view	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
-xlsx	workbook	set	n/a	set not offered for this element	-
+xlsx	workbook	set	supported		ok `create() + add sheet` / {"title":"Litchi"}
 xlsx	workbook	add	n/a	add not offered for this element	-
 xlsx	workbook	remove	n/a	remove not offered for this element	-
 xlsx	workbook	move	format-verb		unreached
 xlsx	workbook	swap	format-verb		unreached
-xlsx	workbook	edit	n/a	edit not offered for this element	-
-xlsx	workbook	batch	n/a	batch not offered for this element	-
+xlsx	workbook	edit	supported		ok tx.set
+xlsx	workbook	batch	supported		ok set item
 xlsx	workbook	create	supported		ok format
 xlsx	workbook	save	supported		ok format
 xlsx	sheet	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]
@@ -601,8 +601,8 @@ xlsx	cell	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListToo
 xlsx	cell	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/A1
 xlsx	cell	query	supported		ok matches in ooxml/xlsx/DataValidationListTooLong.xlsx
 xlsx	cell	view	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/A1
-xlsx	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 {"formula":"Litchi"}
-xlsx	cell	add	n/a	add not offered for this element	-
+xlsx	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 {"type":"Number"}
+xlsx	cell	add	supported		ok /sheet[1]/H8 on `create()` under /sheet[1] {"ref":"H8","value":"added"}
 xlsx	cell	remove	n/a	remove not offered for this element	-
 xlsx	cell	move	format-verb		refused unsupported_type
 xlsx	cell	swap	format-verb		refused unsupported_type
@@ -896,30 +896,30 @@ xlsx	colbreak	edit	supported		ok tx.set
 xlsx	colbreak	batch	supported		ok set item
 xlsx	colbreak	create	supported		ok format
 xlsx	colbreak	save	supported		ok format
-xlsx	run	get	gap	M1-extended (R4x)	unreached
-xlsx	run	find	gap	M1-extended (R4x)	unreached
-xlsx	run	query	gap	M1-extended (R4x)	unreached
-xlsx	run	view	gap	M1-extended (R4x)	unreached
-xlsx	run	set	gap	M1-extended (R4x)	unreached
-xlsx	run	add	gap	M1-extended (R4x)	-
-xlsx	run	remove	gap	M1-extended (R4x)	unreached
-xlsx	run	move	gap	M1-extended (R4x)	unreached
-xlsx	run	swap	gap	M1-extended (R4x)	unreached
-xlsx	run	edit	gap	M1-extended (R4x)	-
-xlsx	run	batch	gap	M1-extended (R4x)	-
-xlsx	run	create	gap	M1-extended (R4x)	ok format
-xlsx	run	save	gap	M1-extended (R4x)	ok format
+xlsx	run	get	supported		ok 1 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
+xlsx	run	find	supported		ok 1 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
+xlsx	run	query	supported		ok matches in create() + add sheet + add run
+xlsx	run	view	supported		ok 1 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
+xlsx	run	set	supported		ok `create() + add sheet + add run` /sheet[1]/A1/run[1] {"text":"Litchi"}
+xlsx	run	add	supported		ok /sheet[1]/A1/run[1] on `create() + add sheet` under /sheet[1]/A1 {}
+xlsx	run	remove	supported		ok `create() + add sheet + add run` /sheet[1]/A1/run[1]
+xlsx	run	move	format-verb		unreached
+xlsx	run	swap	format-verb		unreached
+xlsx	run	edit	supported		ok tx.set
+xlsx	run	batch	supported		ok set item
+xlsx	run	create	supported		ok format
+xlsx	run	save	supported		ok format
 pptx	presentation	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /
 pptx	presentation	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /
 pptx	presentation	query	n/a	query not offered for this element	-
 pptx	presentation	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /
-pptx	presentation	set	n/a	set not offered for this element	-
+pptx	presentation	set	supported		ok `create() + add slide` / {"title":"Litchi"}
 pptx	presentation	add	n/a	add not offered for this element	-
 pptx	presentation	remove	n/a	remove not offered for this element	-
 pptx	presentation	move	format-verb		unreached
 pptx	presentation	swap	format-verb		unreached
-pptx	presentation	edit	n/a	edit not offered for this element	-
-pptx	presentation	batch	n/a	batch not offered for this element	-
+pptx	presentation	edit	supported		ok tx.set
+pptx	presentation	batch	supported		ok set item
 pptx	presentation	create	supported		ok format
 pptx	presentation	save	supported		ok format
 pptx	slide	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slide[1]

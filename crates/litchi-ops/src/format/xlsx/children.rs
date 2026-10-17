@@ -78,6 +78,13 @@ enum State {
         sheet: usize,
         items: std::vec::IntoIter<(Kind, ChartItem)>,
     },
+    /// A cell's rich-text runs, for a walk that wants runs (record 0338).
+    Runs {
+        sheet: usize,
+        at: Address,
+        rich: std::sync::Arc<xlsx::RichText>,
+        next: usize,
+    },
 }
 
 /// What a worksheet lists.
@@ -278,7 +285,8 @@ impl<'f> Children<'f> {
             | Item::NamedRange(_)
             | Item::Series(_)
             | Item::Axis(_)
-            | Item::Feature(_) => State::Done,
+            | Item::Feature(_)
+            | Item::Run(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
@@ -382,6 +390,16 @@ impl<'f> Children<'f> {
                 grid: range.grid.clone(),
                 cursor: Box::new(Cursor::new(range.rect, false)),
             },
+            // A cell's runs, only for a walk that wants them (record 0338).
+            Item::Cell(_) if kinds.contains(Kind::Run) => match super::runs::cell_runs(node)? {
+                Some((sheet, at, rich)) => State::Runs {
+                    sheet,
+                    at,
+                    rich,
+                    next: 0,
+                },
+                None => State::Done,
+            },
             _ => State::Done,
         };
         Ok(Self::new(file, state))
@@ -410,6 +428,24 @@ impl<'f> Children<'f> {
                     return Ok(items
                         .next()
                         .map(|feature| Node::new_feature(file, *sheet, feature)));
+                },
+                State::Runs {
+                    sheet,
+                    at,
+                    rich,
+                    next,
+                } => {
+                    if *next >= rich.runs().len() {
+                        return Ok(None);
+                    }
+                    *next += 1;
+                    return Ok(Some(Node::new_run(
+                        file,
+                        *sheet,
+                        *at,
+                        *next - 1,
+                        std::sync::Arc::clone(rich),
+                    )));
                 },
                 State::Charts { sheet, items } => {
                     return Ok(items.next().map(|(kind, item)| match kind {

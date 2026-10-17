@@ -113,7 +113,7 @@
       "element": "workbook",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": false,
         "remove": false
@@ -137,61 +137,61 @@
         "title": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "author": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "subject": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "keywords": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "description": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "category": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "lastModifiedBy": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "revisionNumber": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "created": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "modified": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "workbook.date1904": {
@@ -209,19 +209,19 @@
         "extended.template": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "extended.manager": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "extended.company": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "extended.application": {
@@ -407,7 +407,7 @@
         "range"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -437,13 +437,13 @@
             "Date",
             "Unknown"
           ],
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "formula": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -479,19 +479,19 @@
         },
         "font.bold": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.italic": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "strike": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -503,43 +503,43 @@
             "singleAccounting",
             "doubleAccounting"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "superscript": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "subscript": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.size": {
           "type": "font-size",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "fill": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -566,13 +566,13 @@
             "gray125",
             "gray0625"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "fillBg": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -593,13 +593,13 @@
             "mediumDashDotDot",
             "slantDashDot"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.left.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -620,13 +620,13 @@
             "mediumDashDotDot",
             "slantDashDot"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.right.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -647,13 +647,13 @@
             "mediumDashDotDot",
             "slantDashDot"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.top.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -674,13 +674,13 @@
             "mediumDashDotDot",
             "slantDashDot"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.bottom.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -701,31 +701,31 @@
             "mediumDashDotDot",
             "slantDashDot"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.diagonal.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.diagonalUp": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "border.diagonalDown": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.wrapText": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -741,7 +741,7 @@
             "centerContinuous",
             "distributed"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -754,25 +754,25 @@
             "justify",
             "distributed"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.textRotation": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.indent": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.shrinkToFit": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -783,31 +783,31 @@
             "ltr",
             "rtl"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "protection.locked": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "protection.hidden": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "quotePrefix": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "numberformat": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -825,37 +825,37 @@
         },
         "font.outline": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.shadow": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.condense": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.extend": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.charset": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.family": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -866,25 +866,25 @@
             "major",
             "minor"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.relativeIndent": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "alignment.justifyLastLine": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "value": {
           "type": "scalar",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -912,7 +912,7 @@
             "slantDashDot",
             "none"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -934,20 +934,32 @@
             "slantDashDot",
             "none"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "border.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "border.all.color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
+          "get": false
+        },
+        "runs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": false,
           "get": false
         },
         "link": {
@@ -1485,6 +1497,32 @@
           "type": "bool",
           "add": false,
           "set": true,
+          "get": false
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "string",
+            "number",
+            "boolean",
+            "date",
+            "error",
+            "richtext"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "runs": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
           "get": false
         }
       }
@@ -3490,7 +3528,7 @@
         "src": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "anchor": {
@@ -3907,22 +3945,92 @@
       "element": "run",
       "parent": "cell",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/<sheet>/<A1>/run[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
-        "reason": "the XLSX cell model flattens rich-text runs into plain text"
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting",
+            "none"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     }
   ],
@@ -3961,13 +4069,6 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4x)",
       "reason": "OLE objects are not projected into nodes yet"
-    },
-    {
-      "subject": "element",
-      "element": "run",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
-      "reason": "the XLSX cell model flattens rich-text runs into plain text"
     },
     {
       "subject": "property",

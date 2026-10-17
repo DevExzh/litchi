@@ -84,6 +84,7 @@ mod few;
 mod lists;
 mod marks;
 pub(crate) mod merge;
+mod metadata;
 mod nav;
 mod nested;
 mod node;
@@ -667,17 +668,7 @@ impl Docx {
     /// lose its encryption profile in the unsigned copy; [`Code::IoError`]
     /// when the source changed; and the leaf's typed failures otherwise.
     pub(crate) fn edit(&self) -> Result<DocxEditor> {
-        if self.0.signature() == Signature::Signed {
-            return Err(signature::refusal(FileFormat::Docx));
-        }
-        if !self.0.retain_source {
-            return Err(Error::new(
-                Code::UnsupportedCapability,
-                "the DOCX document was opened without retaining its source for editing",
-            )
-            .with_format(FileFormat::Docx)
-            .with_suggestion("reopen the document without `OpenOptions::retain_source(false)`"));
-        }
+        self.edit_policy()?;
         if self.0.signature() == Signature::RemovalAuthorized {
             return self
                 .unsigned_package()
@@ -693,6 +684,23 @@ impl Docx {
                     .map(|edit| DocxEditor::Source(Box::new(edit)))
             },
         }
+    }
+
+    /// The refusals of [`Self::edit`] that come before any editor is built:
+    /// a signed document, and a document opened without its source.
+    pub(crate) fn edit_policy(&self) -> Result<()> {
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Docx));
+        }
+        if !self.0.retain_source {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "the DOCX document was opened without retaining its source for editing",
+            )
+            .with_format(FileFormat::Docx)
+            .with_suggestion("reopen the document without `OpenOptions::retain_source(false)`"));
+        }
+        Ok(())
     }
 
     /// An owning copy of the document whose signature the leaf removed

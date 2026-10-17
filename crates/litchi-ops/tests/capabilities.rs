@@ -166,6 +166,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             // Record 0283: charts are added, set and removed.
             "chart" => (true, true, true),
             "sdt" => (false, false, true),
+            // Record 0338: the root sets the core document properties.
+            "document" => (true, false, false),
             // Record 0319: styles, numbering, headers, footers and notes.
             "style" | "abstractNum" | "num" | "level" | "header" | "footer" | "footnote"
             | "endnote" => (true, true, true),
@@ -341,6 +343,12 @@ fn ordinary_reports_hide_native_selection_fields() {
                     element.name(),
                     property.name()
                 );
+            } else if element.name() == "document" {
+                // Record 0338: every root key is a core document property,
+                // set through the metadata writer.
+                assert!(property.get(), "document {}", property.name());
+                assert!(property.set(), "document {}", property.name());
+                assert!(!property.add(), "document {}", property.name());
             } else if matches!(element.name(), "series" | "axis" | "node") {
                 // Record 0335: chart series and axes read and set the PPTX
                 // keys; a SmartArt node reads its level, and its text is
@@ -567,11 +575,15 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
-        // Chart writes have their own report test (`tests/charts.rs`), and
-        // worksheet features theirs (`tests/xlsx_features.rs`, record 0320).
+        // Chart writes have their own report test (`tests/charts.rs`),
+        // worksheet features theirs (`tests/xlsx_features.rs`, record 0320),
+        // the root's metadata keys theirs (`tests/root_metadata.rs`, record
+        // 0338), and rich-text runs theirs (`tests/xlsx_cells_runs.rs`).
         if matches!(
             element.name(),
-            "chart"
+            "workbook"
+                | "run"
+                | "chart"
                 | "series"
                 | "axis"
                 | "comment"
@@ -647,6 +659,11 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                         | "superscript"
                         | "subscript"
                         | "merge"
+                        // Record 0338: the cell type, rich-text runs and
+                        // the address of an added cell.
+                        | "type"
+                        | "runs"
+                        | "ref"
                 );
             let write_only = (cell_write
                 && ((element.name() == "range" && property.name() != "merge")
@@ -658,6 +675,8 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                             | "border.all"
                             | "border.color"
                             | "border.all.color"
+                            | "runs"
+                            | "ref"
                     )))
                 || (matches!(element.name(), "row" | "column") && property.name() == "outline")
                 || (element.name() == "sheet" && property.name() == "merge")
@@ -672,7 +691,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                 );
             assert_eq!(
                 property.set(),
-                cell_write
+                (cell_write && property.name() != "ref")
                     || sheet_write
                     || dimension_write
                     || link_write
@@ -680,7 +699,16 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                 "{}",
                 property.name()
             );
-            assert_eq!(property.add(), sheet_write, "{}", property.name());
+            // Record 0338: an added cell takes the cell setters.
+            let cell_add = element.name() == "cell"
+                && cell_write
+                && !matches!(property.name(), "clear" | "merge");
+            assert_eq!(
+                property.add(),
+                sheet_write || cell_add,
+                "{}",
+                property.name()
+            );
         }
     }
 }
@@ -840,10 +868,12 @@ fn pptx_reports_selection_and_structural_writes() {
         }));
         // Chart (record 0270), SmartArt (record 0284) and the record 0321
         // elements' writes have their own report tests (`tests/charts.rs`,
-        // `tests/smartart.rs`, `tests/pptx_elements.rs`).
+        // `tests/smartart.rs`, `tests/pptx_elements.rs`), and so do the
+        // root's metadata keys (`tests/root_metadata.rs`, record 0338).
         if matches!(
             element.name(),
-            "chart"
+            "presentation"
+                | "chart"
                 | "series"
                 | "axis"
                 | "smartart"
