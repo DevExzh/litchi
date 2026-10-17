@@ -641,6 +641,70 @@ fn a_batch_of_sets_publishes_one_commit_per_family() {
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 }
 
+/// A long run of paragraph sets on one text (record 0340: staged paragraph
+/// by paragraph, joined once) publishes one commit and what its items
+/// publish one at a time, including sets that bring a paragraph back to its
+/// base text, empty paragraphs, repeated targets and the parent's other
+/// spellings.
+#[test]
+fn long_paragraph_runs_equal_their_items_one_at_a_time() {
+    let lines = (0..120).map(|i| format!("line {i}")).collect::<Vec<_>>();
+    let file = reopen(
+        &read("multi-slide.key")
+            .set(BODY, props! { "text" => lines.join("\n") })
+            .expect("body"),
+    );
+    let mut sets = Vec::new();
+    for i in 0..120_usize {
+        let value = match i % 7 {
+            0 => String::new(),
+            1 => format!("line {i}"),
+            _ => format!("edited \u{e9} {i}"),
+        };
+        sets.push((format!("{BODY}/p[{}]", i + 1), value));
+        if i % 11 == 0 {
+            // Back to the base text, then again.
+            sets.push((format!("{BODY}/p[{}]", i + 1), format!("line {i}")));
+        }
+        if i % 13 == 0 {
+            sets.push((
+                format!("{BODY}/paragraph[{}]", i / 2 + 1),
+                format!("other {i}"),
+            ));
+        }
+    }
+    let mut one_by_one = file.clone();
+    for (path, value) in &sets {
+        one_by_one = one_by_one
+            .set(path.as_str(), props! { "text" => value.clone() })
+            .expect("set");
+    }
+    let items = sets.iter().map(|(path, value)| {
+        let mut item = BatchItem::new("set");
+        item.path = Some(path.clone().into());
+        item.props = Some(litchi_ops::Props::new().with("text", value.clone()));
+        item
+    });
+    let batch = file.batch(items, BatchMode::Atomic).expect("batch");
+    assert_eq!(
+        batch.file.to_bytes().expect("publish"),
+        one_by_one.to_bytes().expect("publish")
+    );
+    // A run without cancelling sets is one leaf commit.
+    let items = (0..120).map(|i| {
+        let mut item = BatchItem::new("set");
+        item.path = Some(format!("{BODY}/p[{}]", i + 1).into());
+        item.props = Some(litchi_ops::Props::new().with("text", format!("batch {i}")));
+        item
+    });
+    let batch = file.batch(items, BatchMode::Atomic).expect("batch");
+    assert_eq!(batch.diagnostics.commits(), 1);
+    assert_eq!(
+        texts(&reopen(&batch.file), &format!("{BODY}/paragraph")),
+        (0..120).map(|i| format!("batch {i}")).collect::<Vec<_>>()
+    );
+}
+
 #[test]
 fn consecutive_new_slides_and_drawables_coalesce() {
     let file = read("multi-slide.key");
