@@ -53,6 +53,48 @@ was refused (typed), `none` nothing to move.
 | rtf | corrupt_file ×14, unsupported_format ×1 |
 | xls | corrupt_file ×2, unsupported_format ×2 |
 
+### Each file, classified (record 0341)
+
+| file | code | class | why |
+|---|---|---|---|
+| `libreoffice-core/chart2/qa/extras/data/fods/stacked-column-chart.fods` | `corrupt_file` | reader gap | a chart object inlined as a nested office:document in draw:object (valid flat ODF); the flat ODS validator takes its office:body for a second body |
+| `libreoffice-core/sc/qa/unit/data/functions/mathematical/fods/aggregate.fods` | `corrupt_file` | invalid input | Sheet2 declares 1,048,578 logical rows, two past the 1,048,576-row grid |
+| `libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf` | `corrupt_file` | fuzzed input | LibreOffice's must-fail fuzz case: a bitmap header without a DIB or bitmap picture |
+| `libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf` | `corrupt_file` | fuzzed input | LibreOffice's must-fail fuzz case: a control parameter below i32 |
+| `libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-1.rtf` | `corrupt_file` | fuzzed input | a fuzz case LibreOffice must survive: a control parameter past i32 |
+| `libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-3.rtf` | `corrupt_file` | fuzzed input | a fuzz case LibreOffice must survive: a control parameter below i32 |
+| `libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc` | `unsupported_format` | fuzzed input | LibreOffice's must-fail case: a compound file with a corrupt DIFAT (first index out of range) |
+| `libreoffice-core/sw/qa/extras/rtfexport/data/all_gaps_word.rtf` | `corrupt_file` | invalid input | a \brdrw border width past the RTF 1.9.1 maximum of 75 |
+| `libreoffice-core/sw/qa/extras/rtfexport/data/fdo77996.rtf` | `corrupt_file` | invalid input | a bare \rtf root without the required version parameter |
+| `libreoffice-core/sw/qa/extras/rtfexport/data/tdf108505_fieldCharFormat2.rtf` | `corrupt_file` | invalid input | a \datafield with an odd number of hexadecimal digits |
+| `libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf` | `corrupt_file` | invalid input | a revision root outside the revision-save table |
+| `libreoffice-core/sw/qa/extras/rtfimport/data/fdo53556.rtf` | `corrupt_file` | invalid input | shape properties after \shptxt instead of as direct \shpinst children |
+| `libreoffice-core/sw/qa/extras/rtfimport/data/tdf117403.rtf` | `corrupt_file` | invalid input | a bare \rtf root without the required version parameter |
+| `libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf` | `corrupt_file` | invalid input | an unstarred \shprslt destination in a shape group |
+| `libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf` | `corrupt_file` | invalid input | a negative page-border width (RTF admits 0..=75 twips) |
+| `odf/corpus/writer-minimal-nasty.odt` | `corrupt_file` | invalid input | content.xml references the undeclared entity &nasty; |
+| `odf/drawing/dashed-line.fodg` | `corrupt_file` | invalid input | a style fixture with an empty office:body (ODF requires office:drawing) |
+| `odf/drawing/hatch-angles.fodg` | `corrupt_file` | invalid input | a style fixture with an empty office:body (ODF requires office:drawing) |
+| `odf/drawing/multicolor-gradient.fodp` | `corrupt_file` | invalid input | a style fixture with an empty office:body (ODF requires office:presentation) |
+| `ole/doc/cfb-v3-uninitialized-size-high-word.doc` | `unsupported_format` | legacy version | a Word 95 document (nFib 0x0068) |
+| `ole/doc/duplicate-style-names.doc` | `corrupt_file` | invalid; opens leniently | duplicate style names ([MS-DOC] 2.9 requires unique names); opens with Leniency::TolerateStylesheetDefects |
+| `ole/doc/footnote.doc` | `corrupt_file` | invalid; opens leniently | duplicate style names; opens with Leniency::TolerateStylesheetDefects |
+| `ole/doc/lists-margins.doc` | `corrupt_file` | invalid; opens leniently | duplicate style names; opens with Leniency::TolerateStylesheetDefects |
+| `ole/doc/picture.doc` | `corrupt_file` | invalid; opens leniently | duplicate style names; opens with Leniency::TolerateStylesheetDefects |
+| `ole/doc/pictures_escher.doc` | `corrupt_file` | invalid; opens leniently | duplicate style names; opens with Leniency::TolerateStylesheetDefects |
+| `ole/doc/word6-no-table-stream.doc` | `unsupported_format` | legacy version | a Word 6.0 document (nFib 0x0065) |
+| `poi/test-data/hpsf/TestBug52117.doc` | `unsupported_format` | legacy version | a Word 6.0 document (nFib 0x0065) |
+| `poi/test-data/hpsf/TestMickey.doc` | `unsupported_format` | legacy version | a Word 95 document (nFib 0x0068) |
+| `poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx` | `corrupt_file` | invalid input | Apache POI's OPC-conformance negative case: two core-properties relationships |
+| `poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx` | `corrupt_file` | invalid input | Apache POI's OPC-conformance negative case: a part name derived from another part's name |
+| `poi/test-data/spreadsheet/1900DateWindowing.xls` | `unsupported_format` | invalid input | a compound file whose FAT sectors are not marked FATSECT ([MS-CFB] requires it) |
+| `poi/test-data/spreadsheet/1904DateWindowing.xls` | `unsupported_format` | invalid input | a compound file whose FAT sectors are not marked FATSECT ([MS-CFB] requires it) |
+| `poi/test-data/spreadsheet/57456.xls` | `corrupt_file` | invalid input | an SST declaring 1,761 unique strings and 0 total |
+| `poi/test-data/spreadsheet/SharedFormulaTest.xls` | `corrupt_file` | invalid input | an XFCRC record declaring 72 XF records where 62 are present |
+| `rtf/binary-garbage-nested-groups.rtf` | `unsupported_format` | fuzzed input | binary garbage after an opening brace |
+| `rtf/test10001Encoding.rtf` | `corrupt_file` | reader gap | \ansicpg10001 (Mac Japanese) is not a supported code page; the refusal should be typed unsupported, not corrupt |
+| `rtf/test10007Encoding.rtf` | `corrupt_file` | reader gap | \ansicpg10007 (Mac Cyrillic) is not a supported code page; the refusal should be typed unsupported, not corrupt |
+
 ## Every no-op that is not exact, and every revert that is not exact
 
 - `iwork/numbers/formula-envelope-native.numbers` (numbers): exact ; structure one-way: table add+remove, row add+remove: the inverse is refused: unsupported_capability: source representation does not support table lifecycle ...
