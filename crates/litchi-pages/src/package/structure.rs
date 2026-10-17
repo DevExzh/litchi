@@ -30,11 +30,12 @@ use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTr
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::DataReferenceOwnerDescriptor;
 use litchi_iwa_protos::package_metadata_codec::{
-    Batch, ComponentDescriptor, ComponentSelector, ExternalReferenceDescriptor,
-    ExternalReferenceRemoval, ObjectUuidAddition, ObjectUuidDescriptor, ObjectUuidRemoval,
-    PackageMetadataVisitor, RemovalBatch, RemovalSaveTokenBatch, RewriteError, RewriteLimit,
-    RewriteOptions, SaveTokenBatch, UuidBits, inspect_package_metadata_with_visitor,
-    rewrite_package_metadata, rewrite_package_metadata_removals_and_save_tokens,
+    Batch, ComponentDescriptor, ComponentSelector, ExternalReferenceAddition,
+    ExternalReferenceDescriptor, ExternalReferenceRemoval, ObjectUuidAddition,
+    ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor, RemovalBatch,
+    RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions, SaveTokenBatch, UuidBits,
+    inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    rewrite_package_metadata_removals_and_save_tokens,
 };
 
 use super::Package;
@@ -495,6 +496,9 @@ pub(super) struct Registry {
     pub(super) externals: Vec<External>,
     /// Objects that own a data (media) reference.
     pub(super) data_owners: Vec<u64>,
+    /// Component-level external references (no object named): source and
+    /// target components.
+    pub(super) component_externals: Vec<(u64, u64)>,
     pub(super) last_object_identifier: u64,
     unknown: bool,
 }
@@ -505,6 +509,28 @@ impl Registry {
             .iter()
             .find(|component| component.identifier == identifier)
             .ok_or(Fault::Invalid)
+    }
+
+    /// The component stored at package member `member`.
+    pub(super) fn component_for_member(&self, member: &str) -> FaultResult<&Component> {
+        self.components
+            .iter()
+            .find(|component| {
+                member
+                    .strip_prefix("Index/")
+                    .and_then(|rest| rest.strip_suffix(".iwa"))
+                    == Some(component.locator.as_str())
+            })
+            .ok_or(Fault::Unsupported)
+    }
+
+    /// Whether component `source` already records a reference to `object`
+    /// of component `target` (by object, or at component level when the
+    /// object is the target component's own).
+    pub(super) fn covers(&self, source: u64, target: u64, object: u64) -> bool {
+        self.externals.iter().any(|external| {
+            external.source == source && external.target == target && external.object == object
+        }) || (target == object && self.component_externals.contains(&(source, target)))
     }
 }
 
@@ -565,6 +591,14 @@ impl PackageMetadataVisitor for Visitor {
                     weak: reference.is_weak(),
                 },
             )?;
+        } else {
+            remember(
+                &mut self.registry.component_externals,
+                (
+                    reference.source().identifier(),
+                    reference.target_component_identifier(),
+                ),
+            )?;
         }
         Ok(())
     }
@@ -610,6 +644,8 @@ pub(super) struct Transition {
     pub(super) uuid_additions: Vec<Uuid>,
     pub(super) uuid_removals: Vec<Uuid>,
     pub(super) external_removals: Vec<External>,
+    /// Cross-component object references the transaction introduces.
+    pub(super) external_additions: Vec<External>,
 }
 
 impl Transition {
@@ -617,6 +653,7 @@ impl Transition {
         self.uuid_additions.is_empty()
             && self.uuid_removals.is_empty()
             && self.external_removals.is_empty()
+            && self.external_additions.is_empty()
     }
 
     /// Record the registry consequences of removing `objects`: their UUID
@@ -989,7 +1026,8 @@ impl<'p> Working<'p> {
             .uuid_removals
             .len()
             .saturating_add(transition.uuid_additions.len())
-            .saturating_add(transition.external_removals.len());
+            .saturating_add(transition.external_removals.len())
+            .saturating_add(transition.external_additions.len());
         let options = self.options(source.len(), additions);
         let selector = |identifier: u64| -> FaultResult<ComponentSelector<'_>> {
             let component = registry.component(identifier)?;
@@ -1001,7 +1039,10 @@ impl<'p> Working<'p> {
         let removes =
             !transition.uuid_removals.is_empty() || !transition.external_removals.is_empty();
         let output = if removes {
-            if !transition.uuid_additions.is_empty() || last != current {
+            if !transition.uuid_additions.is_empty()
+                || !transition.external_additions.is_empty()
+                || last != current
+            {
                 // No transaction both adds and removes objects.
                 return Err(Fault::Unsupported);
             }
@@ -1062,9 +1103,19 @@ impl<'p> Working<'p> {
                     binding.uuid,
                 ));
             }
+            let mut external_additions = Vec::new();
+            reserve(&mut external_additions, transition.external_additions.len())?;
+            for external in &transition.external_additions {
+                external_additions.push(ExternalReferenceAddition::new(
+                    selector(external.source)?,
+                    selector(external.target)?,
+                    external.object,
+                    external.weak,
+                ));
+            }
             rewrite_package_metadata(
                 source,
-                Batch::new(current, last, &uuid_additions, &[]),
+                Batch::new(current, last, &uuid_additions, &external_additions),
                 options,
             )
         }

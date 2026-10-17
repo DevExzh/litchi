@@ -10,6 +10,7 @@ pub(crate) mod body_chart_metadata;
 pub(crate) mod body_footnote;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
+pub(crate) mod body_table_creation;
 pub(crate) mod body_table_deletion;
 pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;

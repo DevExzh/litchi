@@ -5537,13 +5537,13 @@ pages	section	edit	supported		ok tx.set
 pages	section	batch	supported		ok set item
 pages	section	create	supported		ok format
 pages	section	save	supported		ok format
-pages	table	get	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
-pages	table	find	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	get	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	find	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	query	supported		ok matches in iwork/pages/body-table-read-native.pages
-pages	table	view	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	view	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	set	n/a	set not offered for this element	-
-pages	table	add	n/a	add not offered for this element	-
-pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	add	supported		ok /body/tbl[3] on `iwork/pages/body-table-read-native.pages` under /body {"name":"Litchi","rows":"2","columns":"2","data":"Litchi"}
+pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages + add table` /body/tbl[1]
 pages	table	move	format-verb		refused invalid_argument
 pages	table	swap	format-verb		refused invalid_argument
 pages	table	edit	n/a	edit not offered for this element	-
@@ -5697,7 +5697,7 @@ keynote	run	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key`
 keynote	run	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
 keynote	run	query	supported		ok matches in create()
 keynote	run	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
-keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
+keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes/paragraph[1]/run[1] {"bold":"true"}
 keynote	run	add	n/a	add not offered for this element	-
 keynote	run	remove	n/a	remove not offered for this element	-
 keynote	run	move	format-verb		unreached
@@ -5771,23 +5771,23 @@ keynote	audio	edit	n/a	edit not offered for this element	-
 keynote	audio	batch	n/a	batch not offered for this element	-
 keynote	audio	create	supported		ok format
 keynote	audio	save	supported		ok format
-keynote	table	get	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
-keynote	table	find	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	get	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	find	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
 keynote	table	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	table	view	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	view	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
 keynote	table	set	n/a	set not offered for this element	-
-keynote	table	add	n/a	add not offered for this element	-
+keynote	table	add	supported		ok /slide[1]/table[2] on `iwork/keynote/slide-table-read-native.key` under /slide[1] {"rows":"2","cols":"2","data":"a,b;c,d"}
 keynote	table	remove	n/a	remove not offered for this element	-
-keynote	table	move	format-verb		unreached
-keynote	table	swap	format-verb		unreached
+keynote	table	move	format-verb		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1] /slide[1]/table[2]
+keynote	table	swap	format-verb		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1] /slide[1]/table[2]
 keynote	table	edit	n/a	edit not offered for this element	-
 keynote	table	batch	n/a	batch not offered for this element	-
 keynote	table	create	supported		ok format
 keynote	table	save	supported		ok format
-keynote	tr	get	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
-keynote	tr	find	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	get	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	find	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
 keynote	tr	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	tr	view	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	view	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
 keynote	tr	set	n/a	set not offered for this element	-
 keynote	tr	add	n/a	add not offered for this element	-
 keynote	tr	remove	n/a	remove not offered for this element	-
@@ -5797,11 +5797,11 @@ keynote	tr	edit	n/a	edit not offered for this element	-
 keynote	tr	batch	n/a	batch not offered for this element	-
 keynote	tr	create	supported		ok format
 keynote	tr	save	supported		ok format
-keynote	tc	get	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
-keynote	tc	find	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	get	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	find	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
 keynote	tc	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	tc	view	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
-keynote	tc	set	supported		ok `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
+keynote	tc	view	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	set	supported		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
 keynote	tc	add	n/a	add not offered for this element	-
 keynote	tc	remove	n/a	remove not offered for this element	-
 keynote	tc	move	format-verb		refused unsupported_capability

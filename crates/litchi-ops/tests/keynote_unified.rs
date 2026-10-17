@@ -506,8 +506,104 @@ fn unsupported_writes_are_typed_refusals() {
         .set("/slide[1]/table[1]/tr[2]/tc[4]", props! { "text" => "x" })
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
-    let error = file.add("/slide[1]", NewNode::new("table")).unwrap_err();
+    // A deck without a slide table has no table structure to copy.
+    let error = file
+        .add(
+            "/slide[1]",
+            NewNode::new("table").prop("rows", 2).prop("cols", 2),
+        )
+        .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
+    let error = tables.add("/slide[1]", NewNode::new("tbl")).unwrap_err();
+    assert_eq!(error.code(), Code::MissingProperty);
+    let error = tables
+        .add(
+            "/slide[1]",
+            NewNode::new("tbl").prop("rows", 0).prop("cols", 2),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), Code::OutOfRange);
+    let error = tables
+        .add(
+            "/slide[1]",
+            NewNode::new("tbl")
+                .prop("rows", 1)
+                .prop("cols", 1)
+                .prop("data", "a,b"),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), Code::OutOfRange);
+}
+
+#[test]
+fn slide_tables_are_added_with_seeded_text() {
+    let file = read("slide-table-read-native.key");
+    let before = count(&file, "/slide[1]/table");
+    let added = file
+        .add(
+            "/slide[1]",
+            NewNode::new("tbl")
+                .prop("name", "Forecast")
+                .prop("data", "Region,Q1;North,12")
+                .prop("x", "1in")
+                .prop("width", "6in"),
+        )
+        .expect("table");
+    assert_eq!(
+        added.path.to_string(),
+        format!("/slide[1]/table[{}]", before + 1)
+    );
+    let reopened = reopen(&added.file);
+    let path = added.path.to_string();
+    assert_eq!(prop(&reopened, &path, "name").as_deref(), Some("Forecast"));
+    assert_eq!(prop(&reopened, &path, "rows").as_deref(), Some("2"));
+    assert_eq!(prop(&reopened, &path, "cols").as_deref(), Some("2"));
+    assert_eq!(prop(&reopened, &path, "width"), Some(pt(432)));
+    assert_eq!(
+        text(&reopened, &format!("{path}/tr[2]/tc[1]")).as_deref(),
+        Some("North")
+    );
+    // The new table's cells take values like any other.
+    let written = reopened
+        .set(&format!("{path}/tr[1]/tc[2]"), props! { "value" => 7 })
+        .expect("a cell");
+    assert_eq!(
+        prop(&reopen(&written), &format!("{path}/tr[1]/tc[2]"), "type").as_deref(),
+        Some("number")
+    );
+    let edited = file
+        .edit(|tx| {
+            tx.add(
+                "/slide[1]",
+                NewNode::new("tbl").prop("rows", 2).prop("cols", 2),
+            )?;
+            Ok(())
+        })
+        .expect("edit");
+    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    // In a batch, a table add takes its own commit beside other items.
+    let batch = file
+        .edit(|tx| {
+            tx.add(
+                "/slide[1]",
+                NewNode::new("table").prop("rows", 2).prop("cols", 3),
+            )?;
+            tx.add("/slide[1]", NewNode::new("textbox").prop("text", "Note"))?;
+            Ok(())
+        })
+        .expect("batch");
+    let reopened = reopen(&batch.file);
+    assert_eq!(count(&reopened, "/slide[1]/table"), before + 1);
+    assert_eq!(
+        prop(
+            &reopened,
+            &format!("/slide[1]/table[{}]", before + 1),
+            "cols"
+        )
+        .as_deref(),
+        Some("3")
+    );
 }
 
 #[test]
@@ -838,5 +934,52 @@ fn placeholder_runs_take_character_properties() {
         .expect("batch");
     let reopened = reopen(&commit.file);
     assert_eq!(text(&reopened, run).as_deref(), Some("Changed"));
+    assert_eq!(prop(&reopened, run, "italic").as_deref(), Some("true"));
+}
+
+#[test]
+fn notes_runs_take_character_properties() {
+    // Record 0329: speaker notes list their runs, which take character
+    // properties as placeholder runs do.
+    let file = read("multi-slide.key")
+        .set(
+            "/slide[2]/notes",
+            props! { "text" => "Remember\nthe second point" },
+        )
+        .expect("notes");
+    let file = reopen(&file);
+    let run = "/slide[2]/notes/p[2]/run[1]";
+    assert_eq!(text(&file, run).as_deref(), Some("the second point"));
+    let styled = file
+        .set(run, props! { "bold" => true, "color" => "C01020" })
+        .expect("style a notes run");
+    let reopened = reopen(&styled);
+    assert_eq!(prop(&reopened, run, "bold").as_deref(), Some("true"));
+    assert_eq!(
+        text(&reopened, "/slide[2]/notes"),
+        text(&file, "/slide[2]/notes")
+    );
+    let restored = file
+        .edit(|tx| tx.set(run, props! { "italic" => true }))
+        .expect("edit");
+    let undone = restored
+        .patch
+        .inverse()
+        .apply(&restored.file)
+        .expect("inverse");
+    assert_eq!(undone.to_bytes().unwrap(), file.to_bytes().unwrap());
+    // In a batch, the run addresses the notes text the earlier item wrote.
+    let commit = file
+        .edit(|tx| {
+            tx.set(
+                "/slide[2]/notes",
+                props! { "text" => "Recall\nthe other point" },
+            )?;
+            tx.set(run, props! { "italic" => true })?;
+            Ok(())
+        })
+        .expect("batch");
+    let reopened = reopen(&commit.file);
+    assert_eq!(text(&reopened, run).as_deref(), Some("the other point"));
     assert_eq!(prop(&reopened, run, "italic").as_deref(), Some("true"));
 }

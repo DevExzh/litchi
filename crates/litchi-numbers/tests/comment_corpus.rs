@@ -3,7 +3,8 @@
 //! of their own, so a comment edit rewrites several members. Every corpus
 //! table takes a new comment on a stored cell, gives it back through the
 //! inverse byte for byte, and takes a further edit and a clear; every
-//! natively commented cell is rewritten and cleared the same way.
+//! natively commented cell is rewritten and cleared the same way; an empty
+//! cell in a row its tile does not store takes one too (record 0329).
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -142,6 +143,32 @@ fn every_corpus_table_takes_and_gives_back_a_cell_comment() -> TestResult {
                     round_trip(&package, sheet, table, position, &label)?;
                     *summary.entry("created").or_default() += 1;
                 }
+                // Record 0329: an empty cell, in a row the tile does not
+                // store (the table's last cell), takes a comment too.
+                let stored: Vec<CellPosition> =
+                    semantic.iter_cells().map(|cell| cell.position()).collect();
+                let last = CellPosition::new(
+                    semantic.row_count().saturating_sub(1),
+                    semantic.column_count().saturating_sub(1),
+                );
+                if !stored.contains(&last) {
+                    round_trip(&package, sheet, table, last, &format!("{label} empty"))?;
+                    *summary.entry("created on an empty cell").or_default() += 1;
+                    // The other cells keep their values.
+                    let after = package
+                        .set_table_cell_comment(sheet, table, last, "x")?
+                        .into_package();
+                    let values = |package: &Package| {
+                        package.sheets()[sheet].tables().nth(table).map(|table| {
+                            table
+                                .iter_cells()
+                                .filter(|cell| cell.position() != last)
+                                .map(|cell| (cell.position(), cell.value().clone()))
+                                .collect::<Vec<_>>()
+                        })
+                    };
+                    assert_eq!(values(&after), values(&package), "{label}: values");
+                }
                 for position in commented {
                     round_trip(&package, sheet, table, position, &label)?;
                     *summary.entry("native comment rewritten").or_default() += 1;
@@ -160,6 +187,14 @@ fn every_corpus_table_takes_and_gives_back_a_cell_comment() -> TestResult {
             .copied()
             .unwrap_or(0)
             >= 6,
+        "{summary:?}"
+    );
+    assert!(
+        summary
+            .get("created on an empty cell")
+            .copied()
+            .unwrap_or(0)
+            >= 25,
         "{summary:?}"
     );
     Ok(())
