@@ -4488,7 +4488,7 @@ fn visit_shape_container(
     Ok(())
 }
 
-fn shape_id_of(record: &[u8]) -> PackageResult<Option<u32>> {
+pub(crate) fn shape_id_of(record: &[u8]) -> PackageResult<Option<u32>> {
     for child_result in children(record)? {
         let child = child_result?;
         if record_type(child)? == OFFICEART_SP {
@@ -4727,7 +4727,7 @@ fn text_units(kind: TextKind, byte_length: usize) -> Result<usize> {
     }
 }
 
-fn decode_utf16(bytes: &[u8]) -> Result<String> {
+pub(crate) fn decode_utf16(bytes: &[u8]) -> Result<String> {
     if !bytes.len().is_multiple_of(2) {
         return Err(Error::Refused(Refusal::IncompatibleEncoding));
     }
@@ -4740,7 +4740,7 @@ fn decode_utf16(bytes: &[u8]) -> Result<String> {
     String::from_utf16(&units).map_err(|_err| Error::Refused(Refusal::IncompatibleEncoding))
 }
 
-fn record_type(record: &[u8]) -> PackageResult<u16> {
+pub(crate) fn record_type(record: &[u8]) -> PackageResult<u16> {
     let bytes: &[u8; 2] = record
         .get(2..4)
         .and_then(|value| value.try_into().ok())
@@ -4748,7 +4748,7 @@ fn record_type(record: &[u8]) -> PackageResult<u16> {
     Ok(u16::from_le_bytes(*bytes))
 }
 
-fn record_version(record: &[u8]) -> PackageResult<u16> {
+pub(crate) fn record_version(record: &[u8]) -> PackageResult<u16> {
     let bytes: &[u8; 2] = record
         .get(..2)
         .and_then(|value| value.try_into().ok())
@@ -4756,7 +4756,7 @@ fn record_version(record: &[u8]) -> PackageResult<u16> {
     Ok(u16::from_le_bytes(*bytes) & 0x000F)
 }
 
-fn record_instance(record: &[u8]) -> PackageResult<u16> {
+pub(crate) fn record_instance(record: &[u8]) -> PackageResult<u16> {
     let bytes: &[u8; 2] = record
         .get(..2)
         .and_then(|value| value.try_into().ok())
@@ -4764,7 +4764,7 @@ fn record_instance(record: &[u8]) -> PackageResult<u16> {
     Ok(u16::from_le_bytes(*bytes) >> 4)
 }
 
-fn drawing_payload(record: &[u8]) -> PackageResult<&[u8]> {
+pub(crate) fn drawing_payload(record: &[u8]) -> PackageResult<&[u8]> {
     let bytes: &[u8; 4] = record
         .get(4..8)
         .and_then(|value| value.try_into().ok())
@@ -4780,7 +4780,7 @@ fn drawing_payload(record: &[u8]) -> PackageResult<&[u8]> {
         .ok_or_else(|| PackageError::Corrupted("truncated text-edit record payload".into()))
 }
 
-fn children(record: &[u8]) -> PackageResult<impl Iterator<Item = PackageResult<&[u8]>>> {
+pub(crate) fn children(record: &[u8]) -> PackageResult<impl Iterator<Item = PackageResult<&[u8]>>> {
     let payload = drawing_payload(record)?;
     Ok(ChildRecords { payload, offset: 0 })
 }
@@ -4817,7 +4817,7 @@ impl<'a> Iterator for ChildRecords<'a> {
     }
 }
 
-fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
+pub(crate) fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
     let _ = drawing_payload(record)?;
     let data_length = u32::try_from(data.len())
         .map_err(|_err| PackageError::ResourceLimit("PPT text-edit record exceeds u32".into()))?;

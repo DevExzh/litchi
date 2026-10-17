@@ -23,9 +23,12 @@ use litchi_ppt::{Package, SourceBackedPackage, SourceLimits};
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
+use crate::Code;
+use crate::node::spec::{GapSpec, PropSpec, Subject};
 use crate::{OpenOptions, Result};
 
 mod children;
+mod elements;
 mod metadata;
 mod nav;
 mod node;
@@ -37,10 +40,96 @@ pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::{
-    NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
-    SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
+pub(crate) use spec::SPEC;
+use spec::{
+    COMMENT_CAPABILITY_PROPS, NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS,
+    PLACEHOLDER_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS,
 };
+
+/// PPT elements the unified `set` verb writes.
+pub(crate) const SETTABLE: &[&str] = &[
+    "slide",
+    "shape",
+    "placeholder",
+    "notes",
+    "paragraph",
+    "comment",
+];
+
+/// PPT elements the unified `add` verb creates.
+pub(crate) const ADDABLE: &[&str] = &["slide", "comment"];
+
+/// PPT elements the unified `remove` verb deletes.
+pub(crate) const REMOVABLE: &[&str] = &["slide", "comment"];
+
+/// The capability property table of one PPT element, where its write
+/// registry differs from its read table.
+pub(crate) fn capability_props(name: &str) -> Option<&'static [PropSpec]> {
+    Some(match name {
+        "shape" => SHAPE_CAPABILITY_PROPS,
+        "placeholder" => PLACEHOLDER_CAPABILITY_PROPS,
+        "slide" => SLIDE_CAPABILITY_PROPS,
+        "notes" => NOTES_CAPABILITY_PROPS,
+        "paragraph" => PARAGRAPH_CAPABILITY_PROPS,
+        "comment" => COMMENT_CAPABILITY_PROPS,
+        _ => return None,
+    })
+}
+
+/// Operation gaps of the PPT write surface, listed in `capabilities()`.
+pub(crate) const WRITE_GAPS: &[GapSpec] = &[
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "slide",
+            context: "native-slide-dependencies",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT dependency-preserving slide removal",
+        reason: "slide removal requires native closure admission; unsupported dependent records refuse atomically",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "slide",
+            context: "native-visibility-record",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT visibility atom insertion",
+        reason: "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "shape",
+            context: "native-shape-preservation",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT nested-shape and rich-text edits",
+        reason: "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "batch",
+            element: "presentation",
+            context: "native-write-coalescing",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT broader native edit runs and performance qualification",
+        reason: "distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open",
+    },
+];
+
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 pub(crate) use write::WriteCommit;
 
@@ -179,7 +268,7 @@ impl Ppt {
         }
         if !self.retains_source() {
             return Err(crate::Error::new(
-                crate::Code::UnsupportedCapability,
+                Code::UnsupportedCapability,
                 "the PPT source was released before editing",
             )
             .with_format(FileFormat::Ppt)
@@ -496,7 +585,7 @@ impl Ppt {
             PptOwner::Source(package) | PptOwner::Eager(package) => package,
             PptOwner::Released => {
                 return Err(crate::Error::new(
-                    crate::Code::UnsupportedCapability,
+                    Code::UnsupportedCapability,
                     "the PPT source was released before publication",
                 )
                 .with_format(FileFormat::Ppt)
@@ -795,7 +884,7 @@ mod tests {
             Ok(_) => panic!("a PPT larger than the package limit opened"),
             Err(error) => error,
         };
-        assert_eq!(error.code(), crate::Code::LimitExceeded);
+        assert_eq!(error.code(), Code::LimitExceeded);
 
         #[cfg(any(unix, windows))]
         {
@@ -803,7 +892,7 @@ mod tests {
                 Ok(_) => panic!("a PPT larger than the stream limit opened"),
                 Err(error) => error,
             };
-            assert_eq!(error.code(), crate::Code::LimitExceeded);
+            assert_eq!(error.code(), Code::LimitExceeded);
         }
     }
 
@@ -953,10 +1042,7 @@ mod tests {
         source.revision.store(1, Ordering::Relaxed);
         for handle in [&retained, &released] {
             source.probes.store(0, Ordering::Relaxed);
-            assert_eq!(
-                handle.check_source().unwrap_err().code(),
-                crate::Code::IoError
-            );
+            assert_eq!(handle.check_source().unwrap_err().code(), Code::IoError);
             assert_eq!(source.probes.load(Ordering::Relaxed), 1);
         }
     }

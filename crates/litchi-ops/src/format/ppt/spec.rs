@@ -292,6 +292,18 @@ const SHAPE_IDS: &[&str] = &["id", "name"];
 /// Speaker notes: the text of the notes page's body placeholder.
 const NOTES_PROPS: &[PropSpec] = &[PropSpec::new("text", ValueType::Text)];
 
+/// A slide comment (`Comment10Container`, record 0323), in the PPTX comment
+/// vocabulary: the anchor is in master units, read as a length.
+pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
+    PropSpec::new("text", ValueType::Text),
+    PropSpec::new("author", ValueType::Text),
+    PropSpec::new("initials", ValueType::Text),
+    PropSpec::new("index", ValueType::Int),
+    PropSpec::new("date", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+];
+
 /// A paragraph of a shape's text body: the text between paragraph marks. Its
 /// text is the node's text member, as for PPTX paragraphs; `text` is a
 /// write-only registry key.
@@ -403,11 +415,6 @@ static LINEBREAK_GAP: GapSpec = element_gap(
     "linebreak",
     "M1-extended",
     "legacy PPT exposes normalized shape text, not line-break nodes",
-);
-static COMMENT_GAP: GapSpec = element_gap(
-    "comment",
-    "M1-extended",
-    "legacy PPT comments are parsed by the presentation leaf but not navigable nodes",
 );
 static VIDEO_GAP: GapSpec = element_gap(
     "video",
@@ -723,14 +730,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/notes"],
             NOTES_PROPS,
         ),
-        gap(
+        element(
             Kind::Comment,
             "comment",
             &["comment"],
             &[Kind::Slide],
             &[],
+            &[],
             &["/slide[N]/comment[N]"],
-            &COMMENT_GAP,
+            COMMENT_PROPS,
         ),
         gap(
             Kind::Video,
@@ -1054,3 +1062,63 @@ pub(crate) const NOTES_CAPABILITY_PROPS: &[PropSpec] = &NOTES_WRITE_TABLE.readab
 pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
     crate::registry::Table::new(text_write_entries(false), []);
 pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
+
+/// Comment assignments (record 0323), as the PPTX comment registry: `text`,
+/// `x` and `y` are settable; `author` (required), `initials` and `date` are
+/// given when the comment is added; `index` is assigned.
+#[derive(Clone, Copy)]
+pub(super) enum CommentSetter {
+    Text,
+    Author,
+    Initials,
+    Date,
+    X,
+    Y,
+}
+
+const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMMENT_PROPS.len()] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+
+    let mut entries = [Entry::read(COMMENT_PROPS[0]); COMMENT_PROPS.len()];
+    let mut index = 0;
+    while index < COMMENT_PROPS.len() {
+        let spec = COMMENT_PROPS[index];
+        let access = if same_name(spec.name, "text") {
+            Some(WriteAccess::SetAndAdd(CommentSetter::Text))
+        } else if same_name(spec.name, "author") {
+            Some(WriteAccess::Add(CommentSetter::Author))
+        } else if same_name(spec.name, "initials") {
+            Some(WriteAccess::Add(CommentSetter::Initials))
+        } else if same_name(spec.name, "date") {
+            Some(WriteAccess::Add(CommentSetter::Date))
+        } else if same_name(spec.name, "x") {
+            Some(WriteAccess::SetAndAdd(CommentSetter::X))
+        } else if same_name(spec.name, "y") {
+            Some(WriteAccess::SetAndAdd(CommentSetter::Y))
+        } else {
+            None
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if same_name(spec.name, "author") {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries
+}
+
+pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
+    CommentSetter,
+    { COMMENT_PROPS.len() },
+    0,
+> = crate::registry::Table::new(comment_write_entries(), []);
+pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();

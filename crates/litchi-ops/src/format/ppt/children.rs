@@ -23,6 +23,9 @@ pub(crate) struct Children<'f> {
     /// A query walk also visits a slide's notes after its shape tree; a view
     /// listing does not, as in the PPTX adapter.
     notes: Option<usize>,
+    /// A query walk then visits the slide's comments (record 0323), as the
+    /// PPTX walk does: the slide, its steps and the next comment position.
+    comments: Option<Box<(usize, Arc<[crate::node::PathStep<'static>]>, usize)>>,
 }
 
 // Only physical kinds through Connector are emitted by this iterator.
@@ -122,10 +125,17 @@ impl<'f> Children<'f> {
     /// children, then a slide's notes.
     pub(crate) fn walk(parent: &Node<'f>, kinds: KindSet<Kind>) -> Self {
         let mut children = Self::of(parent, kinds);
-        if let Item::Slide(slide) = parent.item()
-            && kinds.contains(Kind::Notes)
-        {
-            children.notes = Some(slide.position);
+        if let Item::Slide(slide) = parent.item() {
+            if kinds.contains(Kind::Notes) {
+                children.notes = Some(slide.position);
+            }
+            if kinds.contains(Kind::Comment) {
+                children.comments = Some(Box::new((
+                    slide.position,
+                    Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                    0,
+                )));
+            }
         }
         children
     }
@@ -154,6 +164,7 @@ impl<'f> Children<'f> {
                         kinds,
                         state: State::Done,
                         notes: None,
+                        comments: None,
                     };
                 }
                 let source = ShapeSource::tree(Arc::clone(&shape.source), Arc::clone(&shape.path));
@@ -180,13 +191,14 @@ impl<'f> Children<'f> {
                     _ => State::Done,
                 }
             },
-            Item::Shape(_) | Item::Notes(_) | Item::Paragraph(_) => State::Done,
+            Item::Shape(_) | Item::Notes(_) | Item::Paragraph(_) | Item::Element(_) => State::Done,
         };
         Self {
             file,
             kinds,
             state,
             notes: None,
+            comments: None,
         }
     }
 
@@ -195,7 +207,7 @@ impl<'f> Children<'f> {
         // In particular, do not perform another source check on a later pull:
         // a source that changes after EOF/error must not make this iterator
         // yield a second result.
-        if matches!(self.state, State::Done) && self.notes.is_none() {
+        if matches!(self.state, State::Done) && self.notes.is_none() && self.comments.is_none() {
             return Ok(None);
         }
         self.file.check_source()?;
@@ -210,11 +222,23 @@ impl<'f> Children<'f> {
             return Ok(next);
         }
         // The shape tree is done: a query walk then visits the slide's notes.
-        let Some(slide) = self.notes.take() else {
+        if let Some(slide) = self.notes.take()
+            && let Some(text) = super::nav::slide_notes(self.file, slide)?
+        {
+            return Ok(Some(Node::notes_node(self.file, slide, text)));
+        }
+        // Then its comments, one per pull.
+        let Some(cursor) = self.comments.take() else {
             return Ok(None);
         };
-        Ok(super::nav::slide_notes(self.file, slide)?
-            .map(|text| Node::notes_node(self.file, slide, text)))
+        let (slide, steps, next) = *cursor;
+        let comments = super::elements::slide_comments(self.file, slide)?;
+        let Some(comment) = comments.into_iter().nth(next) else {
+            return Ok(None);
+        };
+        let node = super::nav::comment_node(self.file, &steps, slide, next, comment);
+        self.comments = Some(Box::new((slide, steps, next + 1)));
+        Ok(Some(node))
     }
 
     fn step_state(&mut self, state: State) -> Result<Option<Node<'f>>> {
@@ -340,6 +364,7 @@ impl<'f> Iterator for Children<'f> {
             Err(error) => {
                 self.state = State::Done;
                 self.notes = None;
+                self.comments = None;
                 Some(Err(error))
             },
         }

@@ -2594,3 +2594,17 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 | `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
 
 See [0321](unified-ops/0321-pptx-element-gaps.md).
+
+## PPT element surface (record 0323)
+
+Element verbs live on the primary `package::edit::Edit` and the root
+`slide_order::Transaction` (no new transaction family). Each publishes
+complete replacements of the persisted records it changes and keeps every
+other record byte for byte; `slide_order::Refusal::{UnsupportedElement,
+ElementNotFound, InvalidElementValue}` name the element refusals.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_ppt::comments::{NewComment, CommentChange, DateTime}` | `DateTime::{parse, day_of_week}`; no ambient clock: an absent date is an all-zero `SYSTEMTIME` | ✅ 0323 |
+| `Edit::{add_comment, set_comment, remove_comment}` (and on `slide_order::Transaction`) | `add_comment` returns the comment's `Position`; the author's next index raises a document-level author seed | ✅ 0323 |
+| `slide_order::Refusal::{UnsupportedElement, ElementNotFound, InvalidElementValue}` | | ✅ 0323 |

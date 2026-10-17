@@ -53,6 +53,9 @@ impl<'f> Nav<'f> {
         match (parent.item(), kind) {
             (Item::Presentation, Kind::Slide) => self.slide(step.select),
             (Item::Slide(slide), Kind::Notes) => self.notes(slide.position, step.select),
+            (Item::Slide(slide), Kind::Comment) => {
+                self.comment(parent, slide.position, step.select)
+            },
             (Item::Shape(shape), Kind::Paragraph) => self.paragraph(parent, shape, step.select),
             (Item::Slide(_) | Item::Shape(_), Kind::Shape | Kind::Placeholder)
             | (
@@ -86,6 +89,35 @@ impl<'f> Nav<'f> {
         }
         Ok(match slide_notes(self.file, slide)? {
             Some(text) => Lookup::Found(Node::notes_node(self.file, slide, text)),
+            None => Lookup::Missing,
+        })
+    }
+
+    fn comment(
+        &self,
+        parent: &Node<'f>,
+        slide: usize,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let comments = super::elements::slide_comments(self.file, slide)?;
+        let count = comments.len();
+        let index = match select {
+            Select::None => (count > 0).then_some(0),
+            Select::Ordinal(position) => (position.get() < count).then_some(position.get()),
+            Select::Last => count.checked_sub(1),
+            _ => return Ok(Lookup::NotApplicable),
+        };
+        Ok(match index {
+            Some(index) => Lookup::Found(comment_node(
+                self.file,
+                parent.steps(),
+                slide,
+                index,
+                comments
+                    .into_iter()
+                    .nth(index)
+                    .ok_or_else(|| missing_slide(slide))?,
+            )),
             None => Lookup::Missing,
         })
     }
@@ -203,7 +235,7 @@ impl<'f> Nav<'f> {
             Item::Presentation => {
                 out.kind(Kind::Slide.name(), self.file.reader().slide_count());
             },
-            Item::Notes(_) | Item::Paragraph(_) => {},
+            Item::Notes(_) | Item::Paragraph(_) | Item::Element(_) => {},
             Item::Shape(_) if parent.shape().is_some_and(has_text_body) => {
                 let count = parent.shape().map_or(Ok(0), paragraph_count)?;
                 out.kind(Kind::Paragraph.name(), count);
@@ -212,6 +244,9 @@ impl<'f> Nav<'f> {
                 if let Item::Slide(slide) = parent.item() {
                     let notes = usize::from(slide_notes(self.file, slide.position)?.is_some());
                     out.kind(Kind::Notes.name(), notes);
+                    let comments =
+                        super::elements::slide_comments(self.file, slide.position)?.len();
+                    out.kind(Kind::Comment.name(), comments);
                 }
                 if let Some(source) = source_for(parent)? {
                     let Some(direct) = source.direct() else {
@@ -377,6 +412,26 @@ pub(crate) fn slide_notes(file: &Ppt, slide: usize) -> Result<Option<std::sync::
         .speaker_notes()?
         .map(|notes| notes.text().map(std::sync::Arc::from))
         .transpose()?)
+}
+
+/// The node of the comment at `index` on `slide`.
+pub(crate) fn comment_node<'f>(
+    file: &'f Ppt,
+    slide_steps: &[PathStep<'static>],
+    slide: usize,
+    index: usize,
+    comment: litchi_ppt::ParsedComment,
+) -> Node<'f> {
+    Node::element_node(
+        file,
+        slide_steps,
+        PathStep::at(Kind::Comment.name(), Position::new(index)),
+        super::elements::Element::Comment {
+            slide,
+            index,
+            comment: std::sync::Arc::new(comment),
+        },
+    )
 }
 
 fn id_is(id: u32, wanted: &str) -> bool {

@@ -93,6 +93,13 @@ pub(crate) fn find_replace(
                     paragraph.index,
                 ),
                 Item::Notes(notes) => Scope::Notes(notes.slide),
+                Item::Element(_) => {
+                    return Err(Error::new(
+                        Code::UnsupportedCapability,
+                        "PPT find and replace scopes are slides, shapes, paragraphs and notes",
+                    )
+                    .with_format(FileFormat::Ppt));
+                },
             });
             Ok(())
         })?;

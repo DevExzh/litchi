@@ -62,6 +62,7 @@
 
 mod consts;
 mod officeart_wire;
+mod record_wire;
 
 pub use consts::RecordType;
 // Core modules
