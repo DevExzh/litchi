@@ -13,34 +13,51 @@ refusal for that element kind (not a failure), `no pair` no two siblings.
 Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 `add`/`remove`/`edit`/`batch` claims plus `create`/`save` per row.
 
-| format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused |
-|---|---|---|---|---|---|---|---|---|---|
-| docx | 44 | 343 | 343 | 0 | 0 | 78 | 75 | 8 | 44 |
-| xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 |
-| pptx | 37 | 293 | 293 | 0 | 0 | 65 | 59 | 2 | 42 |
-| xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 |
-| doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
-| xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 |
-| ppt | 36 | 170 | 170 | 0 | 0 | 169 | 83 | 2 | 22 |
-| rtf | 28 | 214 | 214 | 0 | 0 | 0 | 94 | 2 | 14 |
-| odt | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 29 | 25 |
-| ods | 26 | 166 | 166 | 0 | 0 | 117 | 21 | 2 | 14 |
-| odp | 30 | 228 | 228 | 0 | 0 | 39 | 69 | 12 | 22 |
-| odg | 4 | 33 | 33 | 0 | 0 | 0 | 11 | 4 | 2 |
-| odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 |
-| odi | 3 | 24 | 24 | 0 | 0 | 2 | 7 | 0 | 0 |
-| odb | 4 | 36 | 36 | 0 | 0 | 2 | 6 | 4 | 0 |
-| oth | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
-| odm | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
-| odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
-| pages | 11 | 91 | 91 | 0 | 0 | 0 | 30 | 2 | 14 |
-| keynote | 16 | 132 | 132 | 0 | 0 | 0 | 44 | 16 | 4 |
-| numbers | 7 | 61 | 61 | 0 | 0 | 7 | 16 | 2 | 3 |
+ADR 0008 rows (record 0341), one per format: `atomic failure` a
+batch whose item 1 names nothing, after a valid set, is refused naming
+item 1 and leaves the snapshot, its file on disk and two refused save
+destinations byte-identical; `patch inverse` an edit's patch replays
+onto its source, its inverse restores the exact source bytes and the
+patch on its own result is refused (typed), and whether a
+byte-identical reopened copy takes it is reported; `composition` two
+sets made on two threads from one snapshot compose in either order
+(each repeatable) to the same bytes, or to the same document where a
+format writes new strings, links or records in edit order, holding
+both values, and each edit's patch on the other's result is refused
+(typed). `n/a` a typed reason the format cannot support the row.
+Evidence: `crud-adr0008.tsv`.
+
+| format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused | atomic failure | patch inverse | composition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| docx | 44 | 343 | 343 | 0 | 0 | 78 | 75 | 8 | 44 | ok | ok | ok |
+| xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 | ok | ok | ok |
+| pptx | 37 | 293 | 293 | 0 | 0 | 65 | 59 | 2 | 42 | ok | ok | ok |
+| xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 | ok | ok | ok |
+| doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 | ok | ok | ok |
+| xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 | ok | ok | ok |
+| ppt | 36 | 170 | 170 | 0 | 0 | 169 | 83 | 2 | 22 | ok | ok | ok |
+| rtf | 28 | 214 | 214 | 0 | 0 | 0 | 94 | 2 | 14 | ok | ok | ok |
+| odt | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 29 | 25 | ok | ok | ok |
+| ods | 26 | 166 | 166 | 0 | 0 | 117 | 21 | 2 | 14 | ok | ok | ok |
+| odp | 30 | 228 | 228 | 0 | 0 | 39 | 69 | 12 | 22 | ok | ok | ok |
+| odg | 4 | 33 | 33 | 0 | 0 | 0 | 11 | 4 | 2 | ok | ok | ok |
+| odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 | ok | ok | ok |
+| odi | 3 | 24 | 24 | 0 | 0 | 2 | 7 | 0 | 0 | ok | ok | ok |
+| odb | 4 | 36 | 36 | 0 | 0 | 2 | 6 | 4 | 0 | ok | ok | ok |
+| oth | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 | ok | ok | ok |
+| odm | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 | ok | ok | ok |
+| odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 | ok | ok | ok |
+| pages | 11 | 91 | 91 | 0 | 0 | 0 | 30 | 2 | 14 | ok | ok | ok |
+| keynote | 16 | 132 | 132 | 0 | 0 | 0 | 44 | 16 | 4 | ok | ok | ok |
+| numbers | 7 | 61 | 61 | 0 | 0 | 7 | 16 | 2 | 3 | ok | ok | ok |
 
 ## docx
 
 - fixtures: `create()`, `seed`, `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`, `ooxml/docx/Hyperlink.docx`, `officecli/examples/word/revisions.docx`, `ooxml/docx/table-indent.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`, `ooxml/docx/comment.docx`, `libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`, `ooxml/docx/footnotes.docx`, `ooxml/docx/endnotes.docx`, `ooxml/docx/headerFooter.docx`, `ooxml/docx/ComplexNumberedLists.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx`, `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx`, `seed + add paragraph`, `seed + add paragraph + add run`, `seed + add hyperlink`, `seed + add table`, `seed + add table + add row`, `seed + add paragraph + add header`, `seed + add paragraph + add footer`, `seed + add footnote`, `seed + add endnote`, `seed + add comment`, `seed + add paragraph + add style`, `seed + add paragraph + add abstractNum`, `seed + add paragraph + add num`, `ooxml/docx/ComplexNumberedLists.docx + add level`, `seed + add bookmark`, `seed + add field`, `seed + add picture`, `seed + add chart`, `seed + add toc`, `seed + add paragraph + add break`, `seed + add paragraph + add tab`, `seed + add smartart`, `seed + add smartart + add node`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `seed + add paragraph` batch [set /body/p[1] {"style":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `seed + add paragraph` set /body/p[1] {"style":"Litchi"}: the patch replays onto its source, the inverse restores the exact 8623 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `seed + add hyperlink` set /body/p[1]/hyperlink[1] {"url":"Litchi"} and set /body/p[1]/hyperlink[2] {"url":"Lychee"} on two threads: both orders hold both values and give the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written); each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -93,6 +110,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `ooxml/xlsx/DataValidationListTooLong.xlsx`, `poi/test-data/spreadsheet/47889.xlsx`, `ooxml/xlsx/column_style.xlsx`, `ooxml/xlsx/ExcelTables.xlsx`, `ooxml/xlsx/named-ranges-global.xlsx`, `ooxml/xlsx/SimpleScatterChart.xlsx`, `libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx`, `create() + add sheet`, `create() + add comment`, `create() + add chart`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
 - document views on `ooxml/xlsx/DataValidationListTooLong.xlsx`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add sheet` batch [set /sheet[1] {"name":"Litchi"}, set /sheet[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add sheet` set /sheet[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 2700 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `create() + add chart` set /sheet[1]/chart[1] {"title":"Litchi"} and set /sheet[1]/chart[2] {"title":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -127,6 +147,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `libreoffice-core/oox/qa/unit/data/import-mce.pptx`, `poi/test-data/slideshow/EmbeddedAudio.pptx`, `poi/test-data/slideshow/EmbeddedVideo.pptx`, `create() + add slide`, `create() + add slide + add shape`, `ooxml/pptx/shapes.pptx + add picture`, `create() + add slide + add table`, `ooxml/pptx/shapes.pptx + add picture + add tr`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `create() + add slide + add shape + add paragraph`, `create() + add slide + add shape + add run`, `ooxml/pptx/shapes.pptx + add comment`, `create() + add slide + add video`, `create() + add slide + add audio`, `create() + add slide + add media`, `create() + add slide + add shape + add hyperlink`, `ooxml/pptx/shapes.pptx + add picture + add col`, `create() + add slide + add smartart + add node`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add slide` batch [set /slide[1] {"name":"Litchi"}, set /slide[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add slide` set /slide[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 30414 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `ooxml/pptx/shapes.pptx + add picture` set /slide[1]/table[1]/tr[1] {"height":"12pt"} and set /slide[1]/table[1]/tr[2] {"height":"12pt"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -172,6 +195,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `ooxml/xlsb/date.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb`, `poi/test-data/spreadsheet/testVarious.xlsb`, `unified-ops/0294/table.xlsb`, `create() + add sheet`, `create() + add namedrange`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
 - document views on `ooxml/xlsb/date.xlsb`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add sheet` batch [set /sheet[1] {"name":"Litchi"}, set /sheet[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add sheet` set /sheet[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 6714 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `create() + add conditionalFormatting` set /sheet[1]/cf[1] {"stopIfTrue":"true"} and set /sheet[1]/cf[2] {"stopIfTrue":"true"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -206,6 +232,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `ole/doc/documentProperties.doc`, `ole/doc/hyperlink.doc`, `ole/doc/table-merged-cells.doc`, `poi/test-data/hpsf/TestNon4ByteBoundary.doc`, `libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc`, `ole/doc/endingnote.doc`, `ole/doc/commented-table.doc`, `ole/doc/image-comment-at-char.doc`, `ole/doc/Lists.doc`, `ole/doc/watermark.doc`, `poi/test-data/document/Bug53453Section.doc`, `ole/doc/FloatingPictures.doc`, `unified-ops/0294/marks.doc`, `create() + add paragraph`, `ole/doc/Lists.doc + add hyperlink`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `ole/doc/documentProperties.doc`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 18944 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `ole/doc/Lists.doc + add hyperlink` set /body/p[2]/hyperlink[1] {"url":"Litchi"} and set /body/p[2]/hyperlink[2] {"url":"Lychee"} on two threads: both orders hold both values and give the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written); each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -241,6 +270,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`, `ole/xls/SimpleWithColours.xls`, `ole/xls/WithExtendedStyles.xls`, `libreoffice-core/sc/qa/unit/data/xls/formats.xls`, `ole/xls/SimpleWithAutofilter.xls`, `ole/xls/SimpleWithComments.xls`, `ole/xls/SimpleWithImages.xls`, `ole/xls/WithConditionalFormatting.xls`, `ole/xls/WithHyperlink.xls`, `ole/xls/SimpleWithPageBreaks.xls`, `create() + add sheet`, `create() + add row`, `create() + add column`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
 - document views on `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add sheet` batch [set /sheet[1] {"name":"Litchi"}, set /sheet[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add sheet` set /sheet[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 4096 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `create() + add conditionalFormatting` set /sheet[1]/cf[1] {"stopIfTrue":"true"} and set /sheet[1]/cf[2] {"stopIfTrue":"true"} on two threads: both orders hold both values and give the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written); each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -275,6 +307,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `poi/test-data/slideshow/incorrect_slide_order.ppt`, `poi/test-data/slideshow/WithComments.ppt`, `ole/ppt/text_shapes.ppt`, `ole/ppt/ppt_with_png.ppt`, `poi/test-data/slideshow/headers_footers.ppt`, `poi/test-data/slideshow/basic_test_ppt_file.ppt`, `poi/test-data/slideshow/42485.ppt`, `poi/test-data/slideshow/bug61881.ppt`, `unified-ops/0294/connectors.ppt`, `unified-ops/0294/elements.ppt`, `poi/test-data/slideshow/headers_footers_2007.ppt`, `poi/test-data/slideshow/testPPT_oleWorkbook.ppt`, `poi/test-data/slideshow/sound.ppt`, `unified-ops/0294/video.ppt`, `create() + add slide`, `unified-ops/0294/elements.ppt + add comment`, `unified-ops/0294/elements.ppt + add hyperlink`
 - document views on `poi/test-data/slideshow/incorrect_slide_order.ppt`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add slide` batch [set /slide[1] {"hidden":"true"}, set /slide[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add slide` set /slide[1] {"hidden":"true"}: the patch replays onto its source, the inverse restores the exact 12288 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `poi/test-data/slideshow/incorrect_slide_order.ppt` set /slide[2]/shape[2] {"x":"12pt"} and set /slide[3]/shape[2] {"x":"12pt"} on two threads: both orders hold both values and give the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written); each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -319,6 +354,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `seed`, `rtf/testDefaultEncodingParse.rtf`, `rtf/column-break.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf`, `rtf/test437Encoding.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf87034.rtf`, `libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf94377.rtf`, `rtf/hyperlink.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf`, `libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf`, `unified-ops/0294/parts.rtf`, `seed + add paragraph`, `seed + add paragraph + add run`, `rtf/testDefaultEncodingParse.rtf + add tab`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `seed + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `seed + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 56 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `libreoffice-core/sw/qa/extras/rtfexport/data/table-rtl.rtf` set /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"} and set /body/tbl[1]/tr[1]/tc[2] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -355,6 +393,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `odf/corpus/writer-header-footer.odt`, `odf/corpus/writer-table.odt`, `odf/corpus/writer-definition-lists.odt`, `odf/corpus/writer-images-frames.odt`, `odf/corpus/writer-table-of-contents.odt`, `libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt`, `unified-ops/0294/parts.odt`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `odf/corpus/writer-header-footer.odt`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 1945 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `create() + add paragraph + add heading` set /body/h[1] {"text":"Litchi"} and set /body/h[2] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -397,6 +438,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `seed`, `odf/corpus/calc-formulas.ods`, `odf/corpus/calc-two-sheets.ods`, `odfdo/tests/samples/simple_table_named_range.ods`, `odf/ods/grid-padding-package.ods`, `seed + add sheet`, `create() + add row`, `odf/corpus/calc-two-sheets.ods + add namedrange`, `odf/corpus/calc-two-sheets.ods + add comment`, `odf/corpus/calc-two-sheets.ods + add dataValidation`, `odf/corpus/calc-two-sheets.ods + add conditionalFormatting`, `odf/corpus/calc-two-sheets.ods + add autofilter`, `odf/corpus/calc-two-sheets.ods + add hyperlink`, `odf/corpus/calc-two-sheets.ods + add picture`, `odf/corpus/calc-two-sheets.ods + add shape`, `odf/corpus/calc-two-sheets.ods + add rowbreak`, `odf/corpus/calc-two-sheets.ods + add colbreak`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `seed + add sheet` batch [set /sheet[1] {"name":"Litchi"}, set /sheet[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `seed + add sheet` set /sheet[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 853 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `odf/corpus/calc-two-sheets.ods + add conditionalFormatting` set /sheet[1]/cf[1] {"value":"Litchi"} and set /sheet[1]/cf[2] {"value":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -431,6 +475,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `odf/odp/tdf105502.odp`, `odf/odp/tdf169979.odp`, `odf/corpus/impress-basic.odp`, `odf/odp/text-in-image.odp`, `odf/odp/cellspan.odp`, `libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp`, `libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp`, `libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp`, `libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp`, `unified-ops/0294/comments.odp`, `unified-ops/0294/parts.odp`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add shape + add paragraph`, `create() + add slide + add shape + add linebreak`, `create() + add slide + add shape + add hyperlink`
 - document views on `odf/odp/tdf105502.odp`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add slide` batch [set /slide[1] {"name":"Litchi"}, set /slide[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add slide` set /slide[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 2003 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `odf/odp/tdf169979.odp` set /slide[1]/shape[1] {"name":"Litchi"} and set /slide[2]/shape[1] {"name":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -469,6 +516,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg`, `libreoffice-core/svx/qa/unit/data/FontWork.odg`, `libreoffice-core/desktop/qa/data/3page.odg`, `unified-ops/0294/layers.odg`, `create() + add page`, `create() + add page + add shape`
 - document views on `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add page` batch [set /page[1] {"name":"Litchi"}, set /page[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add page` set /page[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 726 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `create() + add page` set /page[1] {"name":"Litchi"} and set /page[2] {"name":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -481,6 +531,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `odf/odc-producer-evidence/odfdom-created.odc`, `odf/odc-producer-evidence/odfdom-resaved.odc`, `create() + add axis`, `create() + add series`, `create() + add legend`
 - document views on `odf/odc-producer-evidence/odfdom-created.odc`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add axis` batch [set / {"title":"Litchi"}, set /missing[9999]] refused `invalid_path` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add axis` set / {"title":"Litchi"}: the patch replays onto its source, the inverse restores the exact 812 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `create() + add axis` set /axis[1] {"name":"Litchi"} and set /axis[2] {"name":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -493,6 +546,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`
 - document views on `create()`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create()` batch [set /frame[1] {"name":"Litchi"}, set /frame[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create()` set /frame[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 1075 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `create()` set /frame[1] {"name":"Litchi"} and set /metadata {"title":"Lychee"} on two threads: both orders hold both values and give the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written); each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -504,6 +560,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `libreoffice-core/extras/source/database/biblio.odb`, `libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb`, `create() + add query`
 - document views on `libreoffice-core/extras/source/database/biblio.odb`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `libreoffice-core/extras/source/database/biblio.odb` batch [set /table[1] {"name":"Litchi"}, set /table[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `libreoffice-core/extras/source/database/biblio.odb` set /table[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 2892 source bytes (the input file's bytes), the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `libreoffice-core/extras/source/database/biblio.odb` set /table[1] {"name":"Litchi"} and set /table[2] {"name":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -516,6 +575,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `unified-ops/0294/frames.oth`, `unified-ops/0294/parts.oth`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `create() + add paragraph + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `unified-ops/0294/frames.oth`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 740 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `create() + add paragraph + add heading` set /body/h[1] {"text":"Litchi"} and set /body/h[2] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -558,6 +620,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`, `libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm`, `unified-ops/0294/frames.odm`, `unified-ops/0294/parts.odm`, `create() + add paragraph`, `create() + add paragraph + add heading`, `create() + add paragraph + add run`, `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink`, `create() + add paragraph + add list`, `create() + add paragraph + add list + add listItem`, `create() + add paragraph + add table`, `create() + add paragraph + add table + add row`, `create() + add paragraph + add section`, `create() + add paragraph + add footnote`, `create() + add paragraph + add endnote`, `create() + add paragraph + add comment`, `create() + add paragraph + add bookmark`, `create() + add paragraph + add tab`
 - document views on `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 698 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `create() + add paragraph + add heading` set /body/h[1] {"text":"Litchi"} and set /body/h[2] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -600,6 +665,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `odf/native-resave/source/font-styles.odf`, `libreoffice-core/starmath/qa/extras/data/tdf151842.odf`, `create() + add element`
 - document views on `odf/native-resave/source/font-styles.odf`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `odf/native-resave/source/font-styles.odf` batch [set / {"starmath":"Litchi"}, set /missing[9999]] refused `invalid_path` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `odf/native-resave/source/font-styles.odf` set / {"starmath":"Litchi"}: the patch replays onto its source, the inverse restores the exact 6311 source bytes (the input file's bytes), the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `create() + add element` set /element[2] {"text":"Litchi"} and set /element[3] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -610,6 +678,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-name-focused.pages`, `create() + add paragraph`, `create() + add paragraph + add section`, `iwork/pages/body-table-read-native.pages + add table`, `create() + add paragraph + add footnote`
 - document views on `iwork/pages/body-sections-unicode.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 5386 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"} and set /body/p[2] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -629,6 +700,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `seed`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `unified-ops/0294/shapes.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`, `iwork/keynote/slide-table-read-native.key + add table`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `iwork/keynote/multi-slide.key + add slide` batch [set /slide[1] {"hidden":"true"}, set /slide[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `iwork/keynote/multi-slide.key + add slide` set /slide[1] {"hidden":"true"}: the patch replays onto its source, the inverse restores the exact 466799 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `iwork/keynote/multi-slide.key + add slide` set /slide[1]/notes {"text":"Litchi"} and set /slide[2]/notes {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -653,6 +727,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 - fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `create() + add sheet`, `create() + add sheet + add table`, `create() + add mergeCell`, `create() + add sheet + add row`, `create() + add sheet + add col`
 - document views on `iwork/numbers/basic.numbers`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `create() + add sheet` batch [set /sheet[1] {"name":"Litchi"}, set /sheet[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `create() + add sheet` set /sheet[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 6299 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
+- ADR 0008 composition: ok, `iwork/numbers/basic.numbers` set /sheet[1]/table[1]/B2 {"value":"Litchi"} and set /sheet[1]/table[1]/B3 {"value":"Lychee"} on two threads: both orders hold both values and give the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written); each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
