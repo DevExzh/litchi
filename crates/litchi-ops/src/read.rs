@@ -111,8 +111,8 @@ impl File {
             #[cfg(feature = "xls")]
             Self::Xls(handle) => {
                 let path = path.into_path()?;
-                crate::path::resolve::get(&crate::format::xls::Nav::new(handle), &path)
-                    .map(Node::Xls)
+                // Record 0315: through the handle's sheet-step cache.
+                crate::format::xls::get(handle, &path).map(Node::Xls)
             },
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => {

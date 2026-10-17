@@ -32,7 +32,7 @@ pub(crate) mod views;
 pub(crate) mod write;
 
 pub(crate) use children::Children;
-pub(crate) use nav::Nav;
+pub(crate) use nav::{Nav, get};
 pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
@@ -43,7 +43,28 @@ pub(crate) use write::WriteCommit;
 
 /// An immutable legacy Excel workbook. Cloning shares its native package.
 #[derive(Clone)]
-pub struct Xls(Arc<Opened<Package>>);
+pub struct Xls(Arc<Opened<XlsState>>);
+
+/// The state a handle shares with its clones: the native package and the
+/// read caches of exactly that package (record 0315).
+///
+/// Every write publishes a new package into a new state
+/// ([`Xls::with_package`]), so the caches never outlive the snapshot they
+/// were filled from: a write invalidates them by construction.
+pub(crate) struct XlsState {
+    package: Package,
+    /// The sheet step of the last cell `get` ([`nav::SheetStep`]).
+    sheet_step: nav::SheetStep,
+}
+
+impl XlsState {
+    fn new(package: Package) -> Self {
+        Self {
+            package,
+            sheet_step: nav::SheetStep::default(),
+        }
+    }
+}
 
 type EagerWorkbook = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
@@ -99,7 +120,7 @@ impl Xls {
             signature => signature,
         };
         Ok(Self(
-            Opened::new(package)
+            Opened::new(XlsState::new(package))
                 .with_origin(self.origin())
                 .with_signature(signature),
         ))
@@ -171,8 +192,10 @@ impl Xls {
                 .with_suggestion(suggestion));
         }
         match options.metadata_value() {
-            Some(metadata) => Ok(Self(Opened::new(metadata::create(metadata)?))),
-            None => Ok(Self(Opened::new(Package::new()?))),
+            Some(metadata) => Ok(Self(Opened::new(XlsState::new(metadata::create(
+                metadata,
+            )?)))),
+            None => Ok(Self(Opened::new(XlsState::new(Package::new()?)))),
         }
     }
 
@@ -231,7 +254,9 @@ impl Xls {
     }
 
     pub(crate) fn from_source(workbook: SourceBackedWorkbook) -> Result<Self> {
-        Ok(Self(Opened::new(Package::from_source(workbook)?)))
+        Ok(Self(Opened::new(XlsState::new(Package::from_source(
+            workbook,
+        )?))))
     }
 
     pub(crate) fn from_ole_file(
@@ -249,7 +274,9 @@ impl Xls {
             leaf_options = leaf_options.source_limits(limits);
         }
         match Package::from_ole_file_or_password_required(ole, leaf_options)? {
-            Ok(package) => Ok(LegacyOpen::Opened(Self(Opened::new(package)))),
+            Ok(package) => Ok(LegacyOpen::Opened(Self(Opened::new(XlsState::new(
+                package,
+            ))))),
             Err(ole) => Ok(LegacyOpen::PasswordRequired(Box::new(ole))),
         }
     }
@@ -263,7 +290,12 @@ impl Xls {
     }
 
     pub(super) fn owner(&self) -> &Package {
-        &self.0
+        &self.0.package
+    }
+
+    /// The handle's sheet-step cache (record 0315).
+    pub(super) fn sheet_step(&self) -> &nav::SheetStep {
+        &self.0.sheet_step
     }
 
     /// Run one read against the retained native owner, fencing both the
@@ -781,6 +813,180 @@ mod tests {
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             self.inner.version()
         }
+    }
+
+    /// A source that counts its version observations and can be changed
+    /// (record 0315).
+    struct Changing {
+        inner: litchi_core::OwnedSource,
+        revision: std::sync::atomic::AtomicU64,
+        versions: std::sync::atomic::AtomicUsize,
+    }
+
+    impl litchi_core::ReadAt for Changing {
+        fn len(&self) -> std::io::Result<u64> {
+            self.inner.len()
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            self.inner.read_at(offset, output)
+        }
+
+        fn version(&self) -> std::io::Result<litchi_core::SourceVersion> {
+            use std::sync::atomic::Ordering;
+            self.versions.fetch_add(1, Ordering::SeqCst);
+            Ok(litchi_core::SourceVersion::new(
+                0x584c_5331_3533_3135,
+                self.revision.load(Ordering::SeqCst),
+            ))
+        }
+    }
+
+    /// What a `get` of `path` gives: the node's path, kind and text, or
+    /// the error's code and message.
+    fn outcome(result: Result<crate::node::Node<'_>>) -> String {
+        match result {
+            Ok(node) => format!(
+                "ok {} {} {:?}",
+                node.path(),
+                node.kind(),
+                node.view()
+                    .text()
+                    .map(|text| text.map(|text| text.into_owned()))
+            ),
+            Err(error) => format!("err {:?} {error}", error.code()),
+        }
+    }
+
+    /// The cell paths the sheet-step cache tests resolve on `xls`: every
+    /// sheet step form for each worksheet, a few cells each, and misses.
+    fn cached_get_paths(xls: &Xls) -> Vec<String> {
+        let names = xls.worksheet_names().unwrap();
+        let mut steps = vec!["sheet".to_owned(), "sheet[last()]".to_owned()];
+        for (index, name) in names.iter().enumerate() {
+            steps.push(format!("sheet[{}]", index + 1));
+            steps.push(format!("\"{name}\""));
+            steps.push(format!("\"{}\"", name.to_ascii_uppercase()));
+        }
+        steps.push(format!("sheet[{}]", names.len() + 1));
+        steps.push("NoSuchSheet".to_owned());
+        let mut paths = Vec::new();
+        for step in &steps {
+            for cell in ["A1", "B2", "a1", "C3", "IV65536", "IW1", "A65537"] {
+                paths.push(format!("/{step}/{cell}"));
+            }
+        }
+        paths
+    }
+
+    /// Record 0315 (record 0310 G8): a cell `get` whose sheet step the
+    /// handle cached gives exactly what the general resolver gives on a
+    /// handle that never cached a step: the same node, text and error, on
+    /// both owners, whatever step the cache holds.
+    #[test]
+    fn cached_sheet_steps_resolve_as_the_resolver_does() {
+        for name in ["Simple.xls", "HyperlinksOnManySheets.xls"] {
+            let bytes = fixture(name);
+            let eager = crate::File::Xls(open_bytes(bytes.clone()).unwrap());
+            let source = Arc::new(litchi_core::OwnedSource::new(bytes.clone()));
+            let positional = crate::File::Xls(
+                Xls::from_source(SourceBackedWorkbook::from_read_at(source).unwrap()).unwrap(),
+            );
+            for file in [&eager, &positional] {
+                let crate::File::Xls(xls) = file else {
+                    unreachable!("an XLS handle")
+                };
+                let paths = cached_get_paths(xls);
+                for path in &paths {
+                    let arg = crate::path::IntoPath::into_path(path.as_str()).unwrap();
+                    let general = outcome(
+                        crate::path::resolve::get(&Nav::new(xls), &arg).map(crate::node::Node::Xls),
+                    );
+                    // Uncached, then cached on the same step, then after the
+                    // cache moved to another step.
+                    assert_eq!(outcome(file.get(path.as_str())), general, "{name} {path}");
+                    assert_eq!(outcome(file.get(path.as_str())), general, "{name} {path}");
+                }
+                for path in paths.iter().rev() {
+                    let arg = crate::path::IntoPath::into_path(path.as_str()).unwrap();
+                    let general = outcome(
+                        crate::path::resolve::get(&Nav::new(xls), &arg).map(crate::node::Node::Xls),
+                    );
+                    assert_eq!(outcome(file.get(path.as_str())), general, "{name} {path}");
+                }
+            }
+        }
+    }
+
+    /// Record 0315: the cached route reads the source exactly as the
+    /// resolver does (the same observations per `get`), a source changed
+    /// between two cached `get`s fails the second, and a write publishes a
+    /// handle whose cache starts empty, so a renamed worksheet is no longer
+    /// found under its old name.
+    #[test]
+    fn cached_sheet_steps_keep_the_resolver_checks() {
+        use std::sync::atomic::Ordering;
+        let changing = Arc::new(Changing {
+            inner: litchi_core::OwnedSource::new(fixture("Simple.xls")),
+            revision: std::sync::atomic::AtomicU64::new(0),
+            versions: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let workbook = SourceBackedWorkbook::from_read_at(changing.clone()).unwrap();
+        let file = crate::File::Xls(Xls::from_source(workbook).unwrap());
+        let crate::File::Xls(xls) = &file else {
+            unreachable!("an XLS handle")
+        };
+        let observe = |read: &dyn Fn()| {
+            let before = changing.versions.load(Ordering::SeqCst);
+            read();
+            changing.versions.load(Ordering::SeqCst) - before
+        };
+        let resolver = || {
+            let arg = crate::path::IntoPath::into_path("/sheet[1]/A1").unwrap();
+            drop(crate::path::resolve::get(&Nav::new(xls), &arg).unwrap());
+        };
+        // The first reads warm the leaf's own caches (its cell index).
+        for _ in 0..3 {
+            resolver();
+        }
+        let general = observe(&resolver);
+        assert_eq!(
+            observe(&resolver),
+            general,
+            "a warm resolver read is stable"
+        );
+        // The first `get` fills the cache; the next ones read through it.
+        let first = observe(&|| drop(file.get("/sheet[1]/A1").unwrap()));
+        let cached = observe(&|| drop(file.get("/sheet[1]/A1").unwrap()));
+        assert_eq!(first, general);
+        assert_eq!(
+            cached, general,
+            "a cached get observes what the resolver does"
+        );
+        changing.revision.store(1, Ordering::SeqCst);
+        let error = file.get("/sheet[1]/A1").unwrap_err();
+        assert_eq!(error.code(), Code::IoError);
+        assert!(matches!(
+            error.leaf(),
+            crate::error::Source::XlsSource(SourceBackedError::SourceChanged { .. })
+        ));
+
+        let eager = crate::File::Xls(open_bytes(fixture("Simple.xls")).unwrap());
+        let name = match &eager {
+            crate::File::Xls(xls) => xls.worksheet_names().unwrap()[0].clone(),
+            _ => unreachable!("an XLS handle"),
+        };
+        let by_name = format!("/\"{name}\"/A1");
+        let before = outcome(eager.get(by_name.as_str()));
+        assert!(before.starts_with("ok "), "{before}");
+        let renamed = eager
+            .set("/sheet[1]", crate::props! { "name" => "Renamed" })
+            .unwrap();
+        let after = outcome(renamed.get(by_name.as_str()));
+        assert!(after.starts_with("err "), "{after}");
+        assert!(outcome(renamed.get("/Renamed/A1")).starts_with("ok "));
+        // The old handle keeps its snapshot and its cache.
+        assert_eq!(outcome(eager.get(by_name.as_str())), before);
     }
 
     /// Record 0291: a read nested in another fenced read of the same handle
