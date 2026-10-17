@@ -471,11 +471,6 @@ static TABLE_GAP: GapSpec = gap(
     "M1-extended (R6b)",
     "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet",
 );
-static COMMENT_GAP: GapSpec = gap(
-    "comment",
-    "M1-extended (R6b)",
-    "legacy XLS comments are retained by the leaf but are not projected into unified nodes yet",
-);
 static CHART_GAP: GapSpec = gap(
     "chart",
     "M1-extended (R6b)",
@@ -506,55 +501,15 @@ static SPARKLINE_GAP: GapSpec = gap(
     "M1-extended (R6b)",
     "legacy XLS sparkline groups are not projected into unified nodes yet",
 );
-static VALIDATION_GAP: GapSpec = gap(
-    "dataValidation",
-    "M1-extended (R6b)",
-    "legacy XLS data validations are not projected into unified nodes yet",
-);
-static CF_GAP: GapSpec = gap(
-    "conditionalFormatting",
-    "M1-extended (R6b)",
-    "legacy XLS conditional formats are not projected into unified nodes yet",
-);
-static AUTOFILTER_GAP: GapSpec = gap(
-    "autofilter",
-    "M1-extended (R6b)",
-    "legacy XLS auto-filters are not projected into unified nodes yet",
-);
-static HYPERLINK_GAP: GapSpec = gap(
-    "hyperlink",
-    "M1-extended (R6b)",
-    "legacy XLS hyperlinks are not projected into unified nodes yet",
-);
 static MERGE_GAP: GapSpec = gap(
     "mergeCell",
     "M1-extended (R6b)",
     "legacy XLS merged ranges are not projected into unified nodes yet",
 );
-static PICTURE_GAP: GapSpec = gap(
-    "picture",
-    "M1-extended (R6b)",
-    "legacy XLS drawings are not projected into unified nodes yet",
-);
-static SHAPE_GAP: GapSpec = gap(
-    "shape",
-    "M1-extended (R6b)",
-    "legacy XLS drawing shapes are not projected into unified nodes yet",
-);
 static OLE_GAP: GapSpec = gap(
     "ole",
     "M1-extended (R6b)",
     "legacy XLS OLE objects are not projected into unified nodes yet",
-);
-static ROW_BREAK_GAP: GapSpec = gap(
-    "rowbreak",
-    "M1-extended (R6b)",
-    "legacy XLS row page breaks are not projected into unified nodes yet",
-);
-static COL_BREAK_GAP: GapSpec = gap(
-    "colbreak",
-    "M1-extended (R6b)",
-    "legacy XLS column page breaks are not projected into unified nodes yet",
 );
 static RUN_GAP: GapSpec = gap(
     "run",
@@ -602,23 +557,38 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_props(&workbook::SPEC.elements[5], COLUMN_PROPS),
     with_gap(&workbook::SPEC.elements[6], &TABLE_GAP),
     with_props(&workbook::SPEC.elements[7], NAMED_RANGE_PROPS),
-    with_gap(&workbook::SPEC.elements[8], &COMMENT_GAP),
+    with_props(&workbook::SPEC.elements[8], super::features::COMMENT_PROPS),
     with_gap(&workbook::SPEC.elements[9], &CHART_GAP),
     with_gap(&workbook::SPEC.elements[10], &SERIES_GAP),
     with_gap(&workbook::SPEC.elements[11], &AXIS_GAP),
     with_gap(&workbook::SPEC.elements[12], &PIVOT_GAP),
     with_gap(&workbook::SPEC.elements[13], &SLICER_GAP),
     with_gap(&workbook::SPEC.elements[14], &SPARKLINE_GAP),
-    with_gap(&workbook::SPEC.elements[15], &VALIDATION_GAP),
-    with_gap(&workbook::SPEC.elements[16], &CF_GAP),
-    with_gap(&workbook::SPEC.elements[17], &AUTOFILTER_GAP),
-    with_gap(&workbook::SPEC.elements[18], &HYPERLINK_GAP),
+    with_props(
+        &workbook::SPEC.elements[15],
+        super::features::VALIDATION_PROPS,
+    ),
+    with_props(&workbook::SPEC.elements[16], super::features::CF_PROPS),
+    with_props(
+        &workbook::SPEC.elements[17],
+        super::features::AUTOFILTER_PROPS,
+    ),
+    with_props(
+        &workbook::SPEC.elements[18],
+        super::features::HYPERLINK_PROPS,
+    ),
     with_gap(&workbook::SPEC.elements[19], &MERGE_GAP),
-    with_gap(&workbook::SPEC.elements[20], &PICTURE_GAP),
-    with_gap(&workbook::SPEC.elements[21], &SHAPE_GAP),
+    with_props(&workbook::SPEC.elements[20], super::features::PICTURE_PROPS),
+    with_props(&workbook::SPEC.elements[21], super::features::SHAPE_PROPS),
     with_gap(&workbook::SPEC.elements[22], &OLE_GAP),
-    with_gap(&workbook::SPEC.elements[23], &ROW_BREAK_GAP),
-    with_gap(&workbook::SPEC.elements[24], &COL_BREAK_GAP),
+    with_props(
+        &workbook::SPEC.elements[23],
+        super::features::ROW_BREAK_PROPS,
+    ),
+    with_props(
+        &workbook::SPEC.elements[24],
+        super::features::COL_BREAK_PROPS,
+    ),
     with_gap(&workbook::SPEC.elements[25], &RUN_GAP),
 ];
 
@@ -665,13 +635,55 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
 
 check_format_spec!(SPEC);
 
-/// Elements whose properties the unified XLS writer sets.
-pub(crate) const SETTABLE: &[&str] = &["cell", "sheet", "row", "col"];
+/// Elements whose properties the unified XLS writer sets (the worksheet
+/// features of record 0327 included).
+pub(crate) const SETTABLE: &[&str] = &[
+    "cell",
+    "sheet",
+    "row",
+    "col",
+    "comment",
+    "hyperlink",
+    "picture",
+    "shape",
+    "cf",
+    "dataValidation",
+    "autofilter",
+    "rowbreak",
+    "colbreak",
+];
 /// Elements the unified XLS writer adds: worksheet tabs, and empty rows and
 /// columns inserted under a sheet.
-pub(crate) const ADDABLE: &[&str] = &["sheet", "row", "col"];
+pub(crate) const ADDABLE: &[&str] = &[
+    "sheet",
+    "row",
+    "col",
+    "comment",
+    "hyperlink",
+    "picture",
+    "shape",
+    "cf",
+    "dataValidation",
+    "autofilter",
+    "rowbreak",
+    "colbreak",
+];
 /// Elements the unified XLS writer removes.
-pub(crate) const REMOVABLE: &[&str] = &["cell", "sheet", "row", "col"];
+pub(crate) const REMOVABLE: &[&str] = &[
+    "cell",
+    "sheet",
+    "row",
+    "col",
+    "comment",
+    "hyperlink",
+    "picture",
+    "shape",
+    "cf",
+    "dataValidation",
+    "autofilter",
+    "rowbreak",
+    "colbreak",
+];
 
 const fn operation_gap(
     verb: &'static str,

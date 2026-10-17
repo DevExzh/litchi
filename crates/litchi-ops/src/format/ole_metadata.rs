@@ -254,7 +254,9 @@ pub(crate) fn metadata_error(error: &MetadataError, format: FileFormat) -> Error
 
 /// The patch a legacy write step retains: the format's primary patch, or a
 /// metadata transaction's exact-source patch. Both expose the endpoint bytes
-/// the generic history compares.
+/// the generic history compares. (XLS keeps its own, with worksheet-feature
+/// patches; record 0327.)
+#[cfg(any(feature = "doc", feature = "ppt"))]
 pub(crate) enum StepPatch<P, M> {
     /// A primary content edit.
     Primary(P),
@@ -263,11 +265,13 @@ pub(crate) enum StepPatch<P, M> {
 }
 
 /// Exact package endpoints of a retained leaf patch.
+#[cfg(any(feature = "doc", feature = "ppt"))]
 pub(crate) trait Endpoints {
     fn before_image(&self) -> &[u8];
     fn after_image(&self) -> &[u8];
 }
 
+#[cfg(any(feature = "doc", feature = "ppt"))]
 impl<P: Endpoints, M: Endpoints> StepPatch<P, M> {
     pub(crate) fn before(&self) -> &[u8] {
         match self {
@@ -284,6 +288,7 @@ impl<P: Endpoints, M: Endpoints> StepPatch<P, M> {
     }
 }
 
+#[cfg(any(feature = "doc", feature = "ppt"))]
 macro_rules! endpoints {
     ($type:ty, $before:ident, $after:ident) => {
         impl Endpoints for $type {
@@ -303,14 +308,6 @@ endpoints!(litchi_doc::Patch, before_bytes, after_bytes);
 #[cfg(feature = "doc")]
 endpoints!(
     litchi_doc::package::metadata::Patch,
-    before_bytes,
-    after_bytes
-);
-#[cfg(feature = "xls")]
-endpoints!(litchi_xls::Patch, before, after);
-#[cfg(feature = "xls")]
-endpoints!(
-    litchi_xls::package::metadata::Patch,
     before_bytes,
     after_bytes
 );

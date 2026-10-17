@@ -1066,6 +1066,7 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
             policy: source.inner.policy,
             metadata: std::sync::OnceLock::from(metadata),
             edit_snapshot: Some(snapshot),
+            workbook_stream: std::sync::OnceLock::new(),
         }),
     })
 }

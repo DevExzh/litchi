@@ -45,6 +45,7 @@ use self::worksheet::{
     WritableWorksheet,
 };
 
+pub(crate) use self::comment::deterministic_comment_guid;
 pub use self::comment::{CommentTextRunWrite, CommentWriteOptions};
 pub use self::conditional_format::{
     ConditionalFormat, ConditionalFormat12Group, ConditionalFormat12Rule, ConditionalFormat12Type,

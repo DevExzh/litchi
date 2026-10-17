@@ -64,7 +64,7 @@ pub(crate) fn find_replace(
                     Item::Merge(merge) => merge.rect,
                     Item::Row(row) => (row.index, 0, row.index, LAST_COLUMN),
                     Item::Column(column) => (0, column.index, LAST_ROW, column.index),
-                    Item::NamedRange(_) | Item::Comment(_) => {
+                    Item::NamedRange(_) | Item::Comment(_) | Item::Feature(_) => {
                         return Err(Error::new(
                             Code::UnsupportedCapability,
                             "find searches the workbook, sheets, cells, ranges, rows and columns",

@@ -366,6 +366,18 @@ impl Xls {
         limits: &SemanticLimits,
     ) -> Result<(WriteCommit, Path<'static>)> {
         self.finish(|| {
+            if let Some((kind, implied)) =
+                super::feature_write::feature_kind(node.kind(), node.props())
+            {
+                self.admit_edit()?;
+                let parent_node = crate::path::resolve::get(&Nav::new(self), &parent)?;
+                if matches!(
+                    parent_node.element(),
+                    Kind::Sheet | Kind::Cell | Kind::Range
+                ) {
+                    return self.add_feature(&parent_node, kind, implied, &node, limits);
+                }
+            }
             if !node.kind().eq_ignore_ascii_case("sheet") {
                 return super::layout::add_axis(self, &parent, &node, limits);
             }

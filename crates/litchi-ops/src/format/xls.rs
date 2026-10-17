@@ -20,6 +20,8 @@ use crate::{OpenOptions, Result};
 #[cfg(feature = "eval")]
 pub(crate) mod calc;
 mod children;
+mod feature_write;
+mod features;
 mod layout;
 mod metadata;
 mod nav;
