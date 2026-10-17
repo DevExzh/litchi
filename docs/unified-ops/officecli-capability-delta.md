@@ -24,7 +24,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `137339ca055080024cbcc80287ca72cd2eaf31d4c0d1a533c75b59784aabf8cb` |
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6036228da65ef4bd4889a861832909bfaf95d6fa316df17f2fd703ad232846e1` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
-| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
+| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `c5dce2f2b310342025a6297ff3e415e7df028f30672ef737694dd85446a5f266` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `319c2f64b082acd6ad4fd954c975e824a682e5c568335d00f08ff5ac0ef7d2ef` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `2e0f0a530e324122151d0c4966192b0045a219e9083fa40150cf7e8542bc0877` |
@@ -83,7 +83,7 @@ Elements:
 |---|---|---|---|---|---|---|---|
 | docx | 31 | 4 | 0 | 0 | 9 | 2 | 6 |
 | doc | 29 | 5 | 0 | 0 | 10 | 2 | 1 |
-| rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
+| rtf | 29 | 5 | 0 | 0 | 10 | 2 | 1 |
 | xlsx | 33 | 5 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 33 | 5 | 0 | 0 | 1 | 2 | 1 |
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
@@ -109,7 +109,7 @@ Property reads:
 |---|---|---|---|---|---|---|---|---|
 | docx | 291 | 2 | 58 | 0 | 232 | 2 | 376 | 165 |
 | doc | 156 | 0 | 59 | 0 | 238 | 1 | 507 | 68 |
-| rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
+| rtf | 109 | 0 | 59 | 0 | 241 | 1 | 551 | 36 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 552 |
 | xlsb | 295 | 29 | 87 | 0 | 120 | 1 | 159 | 430 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
@@ -135,7 +135,7 @@ Property writes:
 |---|---|---|---|---|---|---|
 | docx | 227 | 30 | 539 | 0 | 138 | 192 |
 | doc | 10 | 29 | 757 | 0 | 27 | 206 |
-| rtf | 12 | 15 | 769 | 0 | 22 | 177 |
+| rtf | 15 | 35 | 746 | 0 | 23 | 178 |
 | xlsx | 212 | 60 | 272 | 0 | 515 | 184 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
@@ -2499,7 +2499,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|
 | abstractNum | abstractNum | supported |  |
 | body | body | supported |  |
-| bookmark |  | gap | unified RTF retained-node projection |
+| bookmark | bookmark | supported |  |
 | bookmarkEnd |  | missing |  |
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
@@ -2508,12 +2508,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | diagram |  | missing |  |
 | document | document | supported |  |
 | endnote | endnote | supported |  |
-| equation |  | gap | unified RTF retained-node projection |
-| field |  | gap | unified RTF retained-node projection |
+| equation |  | gap | record 0328 follow-up: RTF EQ fields and math zones as equation nodes |
+| field | field | supported |  |
 | fieldChar |  | missing |  |
 | footer | footer | supported |  |
 | footnote | footnote | supported |  |
-| formfield |  | gap | unified RTF retained-node projection |
+| formfield |  | gap | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
 | header | header | supported |  |
 | hyperlink | hyperlink | supported |  |
 | instrText |  | missing |  |
@@ -2528,21 +2528,21 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | picture | supported |  |
 | ptab |  | missing |  |
 | raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
-| revision |  | gap | unified RTF retained-node projection |
+| revision |  | gap | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
 | run | run | supported |  |
-| sdt |  | missing |  |
-| section |  | gap | unified RTF retained-node projection |
-| shape |  | gap | unified RTF retained-node projection |
+| sdt |  | gap | none: content controls are DOCX-only |
+| section | section | supported |  |
+| shape | shape | supported |  |
 | style | style | supported |  |
 | styles | styles | supported |  |
-| tab |  | missing |  |
+| tab | tab | supported |  |
 | cell | cell | supported |  |
 | column |  | missing |  |
 | row | row | supported |  |
 | table | table | supported |  |
-| textbox |  | gap | unified RTF retained-node projection |
-| toc |  | missing |  |
-| watermark |  | missing |  |
+| textbox | textbox | supported |  |
+| toc | toc | supported |  |
+| watermark |  | gap | record 0328 follow-up: the RTF header WordArt watermark |
 |  | comments | litchi-only |  |
 
 ### Properties
@@ -2572,9 +2572,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
 | abstractNum | `levels` | int |  | --g | litchi-only | — |  |
-| bookmark | `name` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| bookmark | `text` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| bookmark | `id` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| bookmark | `name` | string | asg | -sg | supported | partial |  |
+| bookmark | `text` | string | a-- |  | supported | gap | the node's text |
+| bookmark | `id` | string | --g |  | missing | — |  |
 | bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
 | chart-axis | `axisFont` | string | --g |  | missing | — |  |
@@ -2851,20 +2851,20 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | endnote | `size.cs` | font-size | as- |  | write-only | gap |  |
 | endnote | `id` | number | --g |  | missing | — |  |
 | endnote | `number` | int |  | --g | litchi-only | — |  |
-| equation | `mode` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| equation | `formula` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| field | `evaluated` | bool | --g |  | element gap | — | unified RTF retained-node projection |
-| field | `fieldType` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| field | `name` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| field | `id` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| field | `expression` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| field | `trueText` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| field | `falseText` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| field | `hyperlink` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| field | `format` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| field | `instruction` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| field | `vertAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| field | `fldLock` | bool | a-g |  | element gap | gap | unified RTF retained-node projection |
+| equation | `mode` | enum | asg |  | element gap | gap | record 0328 follow-up: RTF EQ fields and math zones as equation nodes |
+| equation | `formula` | string | as- |  | element gap | gap | record 0328 follow-up: RTF EQ fields and math zones as equation nodes |
+| field | `evaluated` | bool | --g | --g | supported | — |  |
+| field | `fieldType` | enum | asg | --g | supported | gap |  |
+| field | `name` | string | asg |  | missing | gap |  |
+| field | `id` | string | asg |  | missing | gap |  |
+| field | `expression` | string | as- |  | write-only | gap |  |
+| field | `trueText` | string | as- |  | write-only | gap |  |
+| field | `falseText` | string | as- |  | write-only | gap |  |
+| field | `hyperlink` | bool | as- |  | write-only | gap |  |
+| field | `format` | string | asg |  | missing | gap |  |
+| field | `instruction` | string | asg | -sg | supported | partial |  |
+| field | `vertAlign` | enum | a-- |  | write-only | gap |  |
+| field | `fldLock` | bool | a-g | --g | supported | gap |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
 | footer | `type` | enum | asg | --g | supported | gap |  |
 | footer | `text` | string | asg | -sg | supported | partial |  |
@@ -2887,13 +2887,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | footnote | `size.cs` | font-size | as- |  | write-only | gap |  |
 | footnote | `id` | number | --g |  | missing | — |  |
 | footnote | `number` | int |  | --g | litchi-only | — |  |
-| formfield | `type` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| formfield | `name` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| formfield | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| formfield | `checked` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| formfield | `default` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| formfield | `enabled` | bool | --g |  | element gap | — | unified RTF retained-node projection |
-| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| formfield | `type` | enum | asg |  | element gap | gap | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
+| formfield | `name` | string | asg |  | element gap | gap | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
+| formfield | `text` | string | asg |  | element gap | gap | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
+| formfield | `checked` | bool | asg |  | element gap | gap | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
+| formfield | `default` | string | --g |  | element gap | — | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
+| formfield | `enabled` | bool | --g |  | element gap | — | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
+| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes |
 | header | `type` | enum | asg | --g | supported | gap |  |
 | header | `text` | string | asg | -sg | supported | partial |  |
 | header | `align` | enum | asg |  | missing | gap |  |
@@ -3164,29 +3164,29 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ptab | `align` | enum | asg |  | missing | gap |  |
 | ptab | `relativeTo` | enum | asg |  | missing | gap |  |
 | ptab | `leader` | enum | asg |  | missing | gap |  |
-| revision | `type` | enum | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `text` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `author` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `date` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `id` | integer | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `nativePath` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `action` | enum | -s- |  | element gap | gap | unified RTF retained-node projection |
-| revision | `paraMarkIns.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `paraMarkIns.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `paraMarkIns.id` | int | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `paraMarkDel.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `paraMarkDel.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `paraMarkDel.id` | int | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `revision.beforeLost` | bool | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `sectPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `sectPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `sectPrChange.id` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `tblPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `tblPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `trPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `trPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `tcPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| revision | `tcPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `type` | enum | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `text` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `author` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `date` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `id` | integer | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `nativePath` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `action` | enum | -s- |  | element gap | gap | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `paraMarkIns.author` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `paraMarkIns.date` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `paraMarkIns.id` | int | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `paraMarkDel.author` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `paraMarkDel.date` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `paraMarkDel.id` | int | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `revision.beforeLost` | bool | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `sectPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `sectPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `sectPrChange.id` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `tblPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `tblPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `trPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `trPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `tcPrChange.author` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
+| revision | `tcPrChange.date` | string | --g |  | element gap | — | record 0328 follow-up: RTF revision nodes and accept/reject (P2) |
 | run | `highlight` | color | asg |  | missing | gap |  |
 | run | `strike` | bool | asg | asg | supported | supported |  |
 | run | `dstrike` | bool | asg | asg | supported | supported |  |
@@ -3266,93 +3266,94 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `size` | font-size | asg | asg | supported | supported |  |
 | run | `text` | string | asg | asg | supported | supported |  |
 | run | `rStyle` | string |  | --g | litchi-only | — |  |
-| sdt | `type` | enum | a-g |  | missing | gap |  |
-| sdt | `tag` | string | asg |  | missing | gap |  |
-| sdt | `alias` | string | asg |  | missing | gap |  |
-| sdt | `text` | string | asg |  | missing | gap |  |
-| sdt | `checked` | bool | asg |  | missing | gap |  |
-| sdt | `format` | string | asg |  | missing | gap |  |
-| sdt | `items` | string | asg |  | missing | gap |  |
-| sdt | `lock` | enum | asg |  | missing | gap |  |
-| sdt | `placeholder` | bool | asg |  | missing | gap |  |
-| sdt | `placeholderText` | string | asg |  | missing | gap |  |
-| sdt | `date.fullDate` | string | asg |  | missing | gap |  |
-| sdt | `date.calendar` | string | asg |  | missing | gap |  |
-| sdt | `date.lid` | string | asg |  | missing | gap |  |
-| sdt | `date.storeMappedDataAs` | string | asg |  | missing | gap |  |
-| sdt | `comboBox.lastValue` | string | asg |  | missing | gap |  |
-| sdt | `dropDown.lastValue` | string | asg |  | missing | gap |  |
-| sdt | `id` | number | --g |  | missing | — |  |
-| sdt | `editable` | bool | --g |  | missing | — |  |
-| section | `type` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pageWidth` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pageHeight` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `orientation` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `marginTop` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `marginBottom` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `marginLeft` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `marginRight` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `marginHeader` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `marginFooter` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `marginGutter` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `columns` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `columnSpace` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `titlePage` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pageNumFmt` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `direction` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `rtlGutter` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pageStart` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `lineNumbers` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `lineNumberCountBy` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `lineNumberDistance` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `headerRef` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `headerRef.default` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `headerRef.first` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `headerRef.even` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `footerRef` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `footerRef.default` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `footerRef.first` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `footerRef.even` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `colSpaces` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `columns.equalWidth` | bool | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `columns.separator` | bool | --g |  | element gap | — | unified RTF retained-node projection |
-| section | `pgBorders` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
-| section | `pgBorders.top` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pgBorders.left` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pgBorders.bottom` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pgBorders.right` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pgBorders.offsetFrom` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pgBorders.zOrder` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `pgBorders.display` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `paperSrc.first` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `paperSrc.other` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `formProt` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `vAlign` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `textDirection` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `footnotePr.numFmt` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `footnotePr.numRestart` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `footnotePr.numStart` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `footnotePr.pos` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `endnotePr.numFmt` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `endnotePr.numRestart` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `endnotePr.numStart` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| section | `endnotePr.pos` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| shape | `geometry` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `height` | length | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `wrap` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `hAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `vAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `hRelative` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `vRelative` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `anchor.x` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `anchor.y` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `fill` | color | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `line` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `line.color` | color | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `line.width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `line.style` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| shape | `alt` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| sdt | `type` | enum | a-g |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `tag` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `alias` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `text` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `checked` | bool | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `format` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `items` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `lock` | enum | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `placeholder` | bool | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `placeholderText` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.fullDate` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.calendar` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.lid` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.storeMappedDataAs` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `comboBox.lastValue` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `dropDown.lastValue` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `id` | number | --g |  | element gap | — | none: content controls are DOCX-only |
+| sdt | `editable` | bool | --g |  | element gap | — | none: content controls are DOCX-only |
+| section | `type` | enum | asg | -sg | supported | partial |  |
+| section | `pageWidth` | length | asg | -sg | supported | partial |  |
+| section | `pageHeight` | length | asg | -sg | supported | partial |  |
+| section | `orientation` | enum | asg | -sg | supported | partial |  |
+| section | `marginTop` | length | asg | -sg | supported | partial |  |
+| section | `marginBottom` | length | asg | -sg | supported | partial |  |
+| section | `marginLeft` | length | asg | -sg | supported | partial |  |
+| section | `marginRight` | length | asg | -sg | supported | partial |  |
+| section | `marginHeader` | length | asg | -sg | supported | partial |  |
+| section | `marginFooter` | length | asg | -sg | supported | partial |  |
+| section | `marginGutter` | length | asg | -sg | supported | partial |  |
+| section | `columns` | int | asg | -sg | supported | partial |  |
+| section | `columnSpace` | length | asg | -sg | supported | partial |  |
+| section | `titlePage` | bool | asg | -sg | supported | partial |  |
+| section | `pageNumFmt` | enum | asg | --g | supported | gap |  |
+| section | `direction` | enum | asg | --g | supported | gap |  |
+| section | `rtlGutter` | bool | asg |  | missing | gap |  |
+| section | `pageStart` | int | asg | --g | supported | gap |  |
+| section | `lineNumbers` | enum | asg |  | missing | gap |  |
+| section | `lineNumberCountBy` | int | asg |  | missing | gap |  |
+| section | `lineNumberDistance` | int | asg |  | missing | gap |  |
+| section | `headerRef` | string | --g |  | missing | — |  |
+| section | `headerRef.default` | string | --g |  | missing | — |  |
+| section | `headerRef.first` | string | --g |  | missing | — |  |
+| section | `headerRef.even` | string | --g |  | missing | — |  |
+| section | `footerRef` | string | --g |  | missing | — |  |
+| section | `footerRef.default` | string | --g |  | missing | — |  |
+| section | `footerRef.first` | string | --g |  | missing | — |  |
+| section | `footerRef.even` | string | --g |  | missing | — |  |
+| section | `colSpaces` | string | --g |  | missing | — |  |
+| section | `columns.equalWidth` | bool | --g |  | missing | — |  |
+| section | `columns.separator` | bool | --g | --g | supported | — |  |
+| section | `pgBorders` | enum | as- |  | write-only | gap |  |
+| section | `pgBorders.top` | string | asg |  | missing | gap |  |
+| section | `pgBorders.left` | string | asg |  | missing | gap |  |
+| section | `pgBorders.bottom` | string | asg |  | missing | gap |  |
+| section | `pgBorders.right` | string | asg |  | missing | gap |  |
+| section | `pgBorders.offsetFrom` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.zOrder` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.display` | enum | asg |  | missing | gap |  |
+| section | `paperSrc.first` | int | asg |  | missing | gap |  |
+| section | `paperSrc.other` | int | asg |  | missing | gap |  |
+| section | `formProt` | bool | asg |  | missing | gap |  |
+| section | `vAlign` | enum | asg | -sg | supported | partial |  |
+| section | `textDirection` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `footnotePr.pos` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `endnotePr.pos` | enum | asg |  | missing | gap |  |
+| shape | `geometry` | string | as- | --g | supported | gap |  |
+| shape | `width` | length | as- | --g | supported | gap |  |
+| shape | `height` | length | as- | --g | supported | gap |  |
+| shape | `wrap` | enum | a-- | --g | supported | gap |  |
+| shape | `hAlign` | enum | a-- |  | write-only | gap |  |
+| shape | `vAlign` | enum | a-- |  | write-only | gap |  |
+| shape | `hRelative` | enum | a-- |  | write-only | gap |  |
+| shape | `vRelative` | enum | a-- |  | write-only | gap |  |
+| shape | `anchor.x` | length | a-- | --g | supported | gap |  |
+| shape | `anchor.y` | length | a-- | --g | supported | gap |  |
+| shape | `fill` | color | as- |  | write-only | gap |  |
+| shape | `line` | string | as- |  | write-only | gap |  |
+| shape | `line.color` | color | as- |  | write-only | gap |  |
+| shape | `line.width` | length | as- |  | write-only | gap |  |
+| shape | `line.style` | string | as- |  | write-only | gap |  |
+| shape | `alt` | string | a-- | --g | supported | gap |  |
+| shape | `behindDoc` | bool |  | --g | litchi-only | — |  |
 | style | `id` | string | a-g | --g | supported | gap |  |
 | style | `name` | string | asg | --g | supported | gap |  |
 | style | `type` | enum | a-g | --g | supported | gap |  |
@@ -3428,9 +3429,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | style | `effective.spaceAfter.src` | string | --g |  | missing | — |  |
 | style | `effective.strike` | bool | --g |  | missing | — |  |
 | styles | `count` | number | --g |  | missing | — |  |
-| tab | `pos` | length | asg |  | missing | gap |  |
-| tab | `val` | enum | asg |  | missing | gap |  |
-| tab | `leader` | enum | asg |  | missing | gap |  |
+| tab | `pos` | length | asg | asg | supported | supported |  |
+| tab | `val` | enum | asg | asg | supported | supported |  |
+| tab | `leader` | enum | asg | asg | supported | supported |  |
 | cell | `width` | string | asg | --g | supported | gap |  |
 | cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
 | cell | `font` | string | -sg |  | missing | gap |  |
@@ -3504,46 +3505,47 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | table | `rows` | int | a-g | --g | supported | gap |  |
 | table | `width` | string | asg |  | missing | gap |  |
 | table | `style` | string | asg |  | supported | gap | the node's text |
-| textbox | `text` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `height` | length | as- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `geometry` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `wrap` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `hAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `vAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `hRelative` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `vRelative` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `anchor.x` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `anchor.y` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `fill` | color | as- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `fill.gradient` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `fill.opacity` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `line.color` | color | as- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `line.width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `line.style` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `inset.left` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `inset.top` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `inset.right` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `inset.bottom` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `textDirection` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `textAnchor` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `autoFit` | bool | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `rotation` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `shadow` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `alt` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| toc | `levels` | string | asg |  | missing | gap |  |
+| textbox | `text` | string | a-- |  | supported | gap | the node's text |
+| textbox | `width` | length | as- | --g | supported | gap |  |
+| textbox | `height` | length | as- | --g | supported | gap |  |
+| textbox | `geometry` | string | as- |  | write-only | gap |  |
+| textbox | `wrap` | enum | a-- |  | write-only | gap |  |
+| textbox | `hAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `vAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `hRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `vRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `anchor.x` | length | a-- |  | write-only | gap |  |
+| textbox | `anchor.y` | length | a-- |  | write-only | gap |  |
+| textbox | `fill` | color | as- |  | write-only | gap |  |
+| textbox | `fill.gradient` | string | a-- |  | write-only | gap |  |
+| textbox | `fill.opacity` | string | a-- |  | write-only | gap |  |
+| textbox | `line.color` | color | as- |  | write-only | gap |  |
+| textbox | `line.width` | length | as- |  | write-only | gap |  |
+| textbox | `line.style` | string | as- |  | write-only | gap |  |
+| textbox | `inset.left` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.top` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.right` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.bottom` | length | a-- |  | write-only | gap |  |
+| textbox | `textDirection` | string | a-- |  | write-only | gap |  |
+| textbox | `textAnchor` | string | a-- |  | write-only | gap |  |
+| textbox | `autoFit` | bool | a-- |  | write-only | gap |  |
+| textbox | `rotation` | string | a-- |  | write-only | gap |  |
+| textbox | `shadow` | string | a-- |  | write-only | gap |  |
+| textbox | `alt` | string | a-- |  | write-only | gap |  |
+| toc | `levels` | string | asg | -sg | supported | partial |  |
 | toc | `title` | string | asg |  | missing | gap |  |
-| toc | `hyperlinks` | bool | asg |  | missing | gap |  |
-| toc | `pageNumbers` | bool | asg |  | missing | gap |  |
-| watermark | `text` | string | asg |  | missing | gap |  |
-| watermark | `image` | string | as- |  | write-only | gap |  |
-| watermark | `color` | color | asg |  | missing | gap |  |
-| watermark | `font` | string | asg |  | missing | gap |  |
-| watermark | `rotation` | int | asg |  | missing | gap |  |
-| watermark | `opacity` | string | asg |  | missing | gap |  |
-| watermark | `size` | string | asg |  | missing | gap |  |
-| watermark | `width` | string | asg |  | missing | gap |  |
-| watermark | `height` | string | asg |  | missing | gap |  |
+| toc | `hyperlinks` | bool | asg | -sg | supported | partial |  |
+| toc | `pageNumbers` | bool | asg | -sg | supported | partial |  |
+| toc | `instruction` | string |  | -sg | litchi-only | litchi-only |  |
+| watermark | `text` | string | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `image` | string | as- |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `color` | color | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `font` | string | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `rotation` | int | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `opacity` | string | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `size` | string | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `width` | string | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
+| watermark | `height` | string | asg |  | element gap | gap | record 0328 follow-up: the RTF header WordArt watermark |
 
 ### Contextual operation gaps
 

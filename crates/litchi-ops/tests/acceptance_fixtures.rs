@@ -19,6 +19,7 @@
     feature = "doc",
     feature = "pptx",
     feature = "ppt",
+    feature = "rtf",
     feature = "xlsb",
     feature = "odt",
     feature = "odp",
@@ -457,6 +458,38 @@ fn odp_elements() -> Vec<u8> {
     writer.finish_to_bytes().unwrap()
 }
 
+/// A two-section RTF document with every part record 0328 reads: document
+/// and section page setup, two bookmarks, `PAGE`, `NUMPAGES` and `TOC`
+/// fields, a paragraph with two tab stops, a rectangle shape and a text-box
+/// shape. The bytes are written here; the open test proves they parse.
+fn rtf_parts() -> Vec<u8> {
+    concat!(
+        r"{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\froman Times New Roman;}}",
+        r"\paperw12240\paperh15840\margl1440\margr1440\margt1440\margb1440",
+        "\n",
+        r"\sectd\pgwsxn12240\pghsxn15840\marglsxn1440\margrsxn1440\margtsxn1440\margbsxn1440\headery720\footery720\cols1",
+        "\n",
+        r"\pard\plain\tx1440\tqr\tldot\tx5760 {\*\bkmkstart Intro}Intro{\*\bkmkend Intro}\tab Value\par",
+        "\n",
+        r"\pard\plain Page {\field{\*\fldinst{ PAGE }}{\fldrslt{1}}} of {\field{\*\fldinst{ NUMPAGES }}{\fldrslt{2}}}\par",
+        "\n",
+        r#"\pard\plain {\field{\*\fldinst{ TOC \\o "1-3" \\h \\z }}{\fldrslt{Intro\tab 1}}}\par"#,
+        "\n",
+        r"\pard\plain {\*\bkmkstart Second}Second{\*\bkmkend Second} paragraph\par",
+        "\n",
+        r"\pard\plain Shape {\shp{\*\shpinst\shpleft100\shptop200\shpright2100\shpbottom1200\shpwr3\shpz0{\sp{\sn shapeType}{\sv 1}}{\sp{\sn wzName}{\sv Box1}}}} here\par",
+        "\n",
+        r"\pard\plain Box {\shp{\*\shpinst\shpleft100\shptop200\shpright3100\shpbottom1200\shpz1{\sp{\sn shapeType}{\sv 202}}{\shptxt Boxed text}}} here\par",
+        "\n",
+        r"\sect\sectd\sbknone\lndscpsxn\pgwsxn15840\pghsxn12240\cols2\colsx720\linebetcol",
+        "\n",
+        r"\pard\plain Second section\par",
+        "\n}"
+    )
+    .as_bytes()
+    .to_vec()
+}
+
 /// Every generated fixture: file name and bytes.
 fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
     vec![
@@ -468,6 +501,7 @@ fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
         ("comments.odp", odp_comments()),
         ("layers.odg", odg_layers()),
         ("parts.odp", odp_elements()),
+        ("parts.rtf", rtf_parts()),
         (
             "parts.odt",
             odt_parts("application/vnd.oasis.opendocument.text"),

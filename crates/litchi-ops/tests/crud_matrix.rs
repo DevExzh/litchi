@@ -227,6 +227,9 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf",
             "libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf",
             "libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf",
+            // Record 0328: sections, bookmarks, fields, a table of contents,
+            // tab stops, a shape and a text box (hand-written).
+            "unified-ops/0294/parts.rtf",
         ],
     },
     Spec {

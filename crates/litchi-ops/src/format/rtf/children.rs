@@ -109,6 +109,19 @@ impl<'f> Children<'f> {
             // Views list a story's paragraphs; the query walker does not
             // descend into header/footer stories.
             Kind::Header | Kind::Footer if self.view => &[Kind::Paragraph],
+            // Views list the structural kinds only (record 0328).
+            Kind::Document if self.view => &[
+                Kind::Body,
+                Kind::Header,
+                Kind::Footer,
+                Kind::Footnote,
+                Kind::Endnote,
+                Kind::Comments,
+                Kind::Styles,
+                Kind::Numbering,
+            ],
+            Kind::Body if self.view => &[Kind::Paragraph, Kind::Table],
+            Kind::Paragraph if self.view => &[Kind::Run, Kind::Hyperlink, Kind::Picture],
             kind => SPEC.elements[kind as usize].children,
         }
     }
@@ -180,6 +193,40 @@ impl<'f> Children<'f> {
                     }
                 };
                 return Some(Node::paragraph_child(doc, paragraph, kind, item, position));
+            },
+            (
+                State::Paragraph {
+                    doc,
+                    position: paragraph,
+                    ..
+                },
+                Kind::Tab,
+            ) => {
+                let (doc, paragraph) = (*doc, *paragraph);
+                let native = doc.0.package.body().paragraphs().nth(paragraph.get())?;
+                let stop = *native.format().tab_stops().get(self.ordinal)?;
+                return Some(Node::paragraph_child(
+                    doc,
+                    paragraph,
+                    Kind::Tab,
+                    Item::Tab {
+                        index: self.ordinal,
+                        value: stop,
+                    },
+                    position,
+                ));
+            },
+            (State::Body { doc, .. }, Kind::TextBox) => {
+                let doc = *doc;
+                let reference = *super::parts::text_boxes(doc).get(self.ordinal)?;
+                return super::nav::text_box_node(doc, &Node::body(doc), reference, self.ordinal);
+            },
+            (State::Body { doc, .. }, Kind::Shape) => {
+                let doc = *doc;
+                let index = super::parts::shapes(doc).nth(self.ordinal)?;
+                return doc.0.package.shapes().get(index).map(|value| {
+                    Node::body(doc).child(Kind::Shape, Item::Shape { value }, position)
+                });
             },
             (State::Body { .. } | State::Paragraph { .. }, _) => return None,
             (State::Other(_), _) => {},
@@ -321,6 +368,40 @@ impl<'f> Children<'f> {
                 list.levels
                     .get(self.ordinal)
                     .map(|level| parent.child(Kind::Level, Item::Level(level), position))
+            },
+            (Kind::Document, Kind::Section) => package.sections().get(self.ordinal).map(|value| {
+                Node::top(
+                    doc,
+                    Kind::Section,
+                    Item::Section {
+                        index: self.ordinal,
+                        value,
+                    },
+                    position,
+                )
+            }),
+            (Kind::Document, Kind::Bookmark) => package
+                .raw()
+                .bookmarks()
+                .bookmarks()
+                .get(self.ordinal)
+                .map(|value| {
+                    Node::top(
+                        doc,
+                        Kind::Bookmark,
+                        Item::Bookmark {
+                            index: self.ordinal,
+                            value,
+                        },
+                        position,
+                    )
+                }),
+            (Kind::Document, kind @ (Kind::Field | Kind::Toc)) => {
+                let index = super::parts::fields(doc, kind == Kind::Toc).nth(self.ordinal)?;
+                package
+                    .fields()
+                    .get(index)
+                    .map(|value| Node::top(doc, kind, Item::Field { index, value }, position))
             },
             _ => None,
         }

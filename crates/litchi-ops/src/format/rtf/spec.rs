@@ -57,6 +57,20 @@ pub enum Kind {
     Num,
     /// A list level (`/numbering/abstractNum[N]/level[L]`).
     Level,
+    /// A section (`/section[N]`, record 0328).
+    Section,
+    /// A main-story bookmark (`/bookmark[N]`, `/bookmark[@name=X]`).
+    Bookmark,
+    /// A main-story field (`/field[N]`).
+    Field,
+    /// A main-story `TOC` field (`/toc[N]`).
+    Toc,
+    /// A main-story paragraph's tab stop (`/body/p[N]/tab[M]`).
+    Tab,
+    /// A main-story text box (`/body/textbox[N]`).
+    TextBox,
+    /// A main-story drawing shape (`/body/shape[N]`).
+    Shape,
 }
 
 impl Kind {
@@ -85,6 +99,13 @@ impl Kind {
             Self::AbstractNum => "abstractNum",
             Self::Num => "num",
             Self::Level => "level",
+            Self::Section => "section",
+            Self::Bookmark => "bookmark",
+            Self::Field => "field",
+            Self::Toc => "toc",
+            Self::Tab => "tab",
+            Self::TextBox => "textbox",
+            Self::Shape => "shape",
         }
     }
 }
@@ -116,6 +137,13 @@ impl ElementKind for Kind {
             "abstractNum" => Some(Self::AbstractNum),
             "num" => Some(Self::Num),
             "level" => Some(Self::Level),
+            "section" => Some(Self::Section),
+            "bookmark" => Some(Self::Bookmark),
+            "field" => Some(Self::Field),
+            "toc" => Some(Self::Toc),
+            "tab" => Some(Self::Tab),
+            "textbox" => Some(Self::TextBox),
+            "shape" => Some(Self::Shape),
             _ => None,
         }
     }
@@ -143,6 +171,13 @@ impl ElementKind for Kind {
             Self::AbstractNum => "abstractNum",
             Self::Num => "num",
             Self::Level => "level",
+            Self::Section => "section",
+            Self::Bookmark => "bookmark",
+            Self::Field => "field",
+            Self::Toc => "toc",
+            Self::Tab => "tab",
+            Self::TextBox => "textbox",
+            Self::Shape => "shape",
         }
     }
 
@@ -165,6 +200,10 @@ const DOCUMENT: ElementSpec<Kind> = ElementSpec {
         Kind::Comments,
         Kind::Styles,
         Kind::Numbering,
+        Kind::Section,
+        Kind::Bookmark,
+        Kind::Field,
+        Kind::Toc,
     ],
     identities: &[],
     paths: &["/"],
@@ -177,7 +216,7 @@ const BODY: ElementSpec<Kind> = ElementSpec {
     name: "body",
     aliases: &["body"],
     parents: &[Kind::Document],
-    children: &[Kind::Paragraph, Kind::Table],
+    children: &[Kind::Paragraph, Kind::Table, Kind::TextBox, Kind::Shape],
     identities: &[],
     paths: &["/body"],
     props: &[],
@@ -672,12 +711,154 @@ pub(crate) const LEVEL_PROPS: &[PropSpec] = &[
     prop("start", ValueType::Int, Access::READ),
 ];
 
+const READ_SET_ADD: Access = Access {
+    get: true,
+    set: true,
+    add: true,
+};
+
+/// A section's break kind (`\sbkN`), under the `ST_SectionMark` spelling.
+pub(crate) static SECTION_TYPE: Tokens = Tokens::new(
+    "section type",
+    &[
+        "continuous",
+        "nextColumn",
+        "nextPage",
+        "evenPage",
+        "oddPage",
+    ],
+    &[],
+);
+
+/// Page orientation (`\lndscpsxn`).
+pub(crate) static ORIENTATION: Tokens = Tokens::new("orientation", &["portrait", "landscape"], &[]);
+
+/// A section's vertical alignment (`\vertal*`).
+pub(crate) static SECTION_VALIGN: Tokens = Tokens::new(
+    "vertical alignment",
+    &["top", "center", "both", "bottom"],
+    &[],
+);
+
+/// Section direction.
+pub(crate) static DIRECTION: Tokens = Tokens::new("direction", &["ltr", "rtl"], &[]);
+
+/// Page extents and margins, printed as OfficeCLI prints extents.
+pub(crate) const EXTENT: LengthSpec = LengthSpec::EXTENT;
+
+/// A section's page setup (record 0328), under the DOCX section keys DOC
+/// uses (record 0324).
+pub(crate) const SECTION_PROPS: &[PropSpec] = &[
+    prop("type", ValueType::Token(&SECTION_TYPE), READ_SET),
+    prop("pageWidth", ValueType::Length(EXTENT), READ_SET),
+    prop("pageHeight", ValueType::Length(EXTENT), READ_SET),
+    prop("orientation", ValueType::Token(&ORIENTATION), READ_SET),
+    prop("marginTop", ValueType::Length(SIGNED_POINTS), READ_SET),
+    prop("marginBottom", ValueType::Length(SIGNED_POINTS), READ_SET),
+    prop("marginLeft", ValueType::Length(EXTENT), READ_SET),
+    prop("marginRight", ValueType::Length(EXTENT), READ_SET),
+    prop("marginHeader", ValueType::Length(EXTENT), READ_SET),
+    prop("marginFooter", ValueType::Length(EXTENT), READ_SET),
+    prop("marginGutter", ValueType::Length(EXTENT), READ_SET),
+    prop("columns", ValueType::Int, READ_SET),
+    prop("columnSpace", ValueType::Length(EXTENT), READ_SET),
+    prop("columns.separator", ValueType::Bool, Access::READ),
+    prop("titlePage", ValueType::Bool, READ_SET),
+    prop("pageNumFmt", ValueType::Text, Access::READ),
+    prop("pageStart", ValueType::Int, Access::READ),
+    prop("direction", ValueType::Token(&DIRECTION), Access::READ),
+    prop("vAlign", ValueType::Token(&SECTION_VALIGN), READ_SET),
+];
+
+/// A bookmark: its name.
+pub(crate) const BOOKMARK_PROPS: &[PropSpec] = &[prop("name", ValueType::Text, READ_SET)];
+
+/// A field: its type, instruction, lock and whether it has a result.
+pub(crate) const FIELD_PROPS: &[PropSpec] = &[
+    prop("fieldType", ValueType::Text, Access::READ),
+    prop("instruction", ValueType::Text, READ_SET),
+    prop("fldLock", ValueType::Bool, Access::READ),
+    prop("evaluated", ValueType::Bool, Access::READ),
+];
+
+/// A table of contents, from its `TOC` field's switches; each is written
+/// back as the field's instruction.
+pub(crate) const TOC_PROPS: &[PropSpec] = &[
+    prop("levels", ValueType::Text, READ_SET),
+    prop("hyperlinks", ValueType::Bool, READ_SET),
+    prop("pageNumbers", ValueType::Bool, READ_SET),
+    prop("instruction", ValueType::Text, READ_SET),
+];
+
+/// A tab stop's alignment, under the `ST_TabJc` spelling.
+pub(crate) static TAB_VAL: Tokens = Tokens::new(
+    "tab alignment",
+    &["left", "center", "right", "decimal", "bar"],
+    &[],
+);
+
+/// A tab stop's leader, under the `ST_TabTlc` spelling (`\tleq` reads as
+/// `equal`).
+pub(crate) static TAB_LEADER: Tokens = Tokens::new(
+    "tab leader",
+    &[
+        "none",
+        "dot",
+        "hyphen",
+        "underscore",
+        "heavy",
+        "middleDot",
+        "equal",
+    ],
+    &[],
+);
+
+/// A paragraph tab stop: position in twips, alignment and leader.
+pub(crate) const TAB_PROPS: &[PropSpec] = &[
+    prop("pos", ValueType::Int, READ_SET_ADD),
+    prop("val", ValueType::Token(&TAB_VAL), READ_SET_ADD),
+    prop("leader", ValueType::Token(&TAB_LEADER), READ_SET_ADD),
+];
+
+/// A text box: its extent; its story text is the text.
+pub(crate) const TEXT_BOX_PROPS: &[PropSpec] = &[
+    prop("width", ValueType::Length(EXTENT), Access::READ),
+    prop("height", ValueType::Length(EXTENT), Access::READ),
+];
+
+/// Text wrapping around a shape, under the OfficeCLI shape `wrap` spelling.
+pub(crate) static SHAPE_WRAP: Tokens = Tokens::new(
+    "shape wrap",
+    &[
+        "none",
+        "square",
+        "tight",
+        "through",
+        "topAndBottom",
+        "behind",
+        "front",
+    ],
+    &[],
+);
+
+/// A drawing shape: extent, position, wrapping and identity.
+pub(crate) const SHAPE_PROPS: &[PropSpec] = &[
+    prop("width", ValueType::Length(EXTENT), Access::READ),
+    prop("height", ValueType::Length(EXTENT), Access::READ),
+    prop("anchor.x", ValueType::Length(SIGNED_POINTS), Access::READ),
+    prop("anchor.y", ValueType::Length(SIGNED_POINTS), Access::READ),
+    prop("wrap", ValueType::Token(&SHAPE_WRAP), Access::READ),
+    prop("behindDoc", ValueType::Bool, Access::READ),
+    prop("geometry", ValueType::Text, Access::READ),
+    prop("name", ValueType::Text, Access::READ),
+];
+
 const PARAGRAPH: ElementSpec<Kind> = ElementSpec {
     kind: Kind::Paragraph,
     name: "paragraph",
     aliases: &["p", "paragraph"],
     parents: &[Kind::Body, Kind::Header, Kind::Footer],
-    children: &[Kind::Run, Kind::Hyperlink, Kind::Picture],
+    children: &[Kind::Run, Kind::Hyperlink, Kind::Picture, Kind::Tab],
     identities: &[],
     paths: &["/body/p[N]", "/header[N]/p[M]", "/footer[N]/p[M]"],
     props: PARAGRAPH_PROPS,
@@ -918,17 +1099,105 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 ),
                 &["ilvl"],
             ),
+            element(
+                K::Section,
+                "section",
+                &["section"],
+                &[K::Document],
+                &[],
+                &["/section[N]"],
+                SECTION_PROPS,
+            ),
+            identities(
+                element(
+                    K::Bookmark,
+                    "bookmark",
+                    &["bookmark"],
+                    &[K::Document],
+                    &[],
+                    &["/bookmark[N]", "/bookmark[@name=X]"],
+                    BOOKMARK_PROPS,
+                ),
+                &["name"],
+            ),
+            element(
+                K::Field,
+                "field",
+                &["field"],
+                &[K::Document],
+                &[],
+                &["/field[N]"],
+                FIELD_PROPS,
+            ),
+            element(
+                K::Toc,
+                "toc",
+                &["tableofcontents", "toc"],
+                &[K::Document],
+                &[],
+                &["/toc[N]"],
+                TOC_PROPS,
+            ),
+            element(
+                K::Tab,
+                "tab",
+                &["tab"],
+                &[K::Paragraph],
+                &[],
+                &["/body/p[N]/tab[M]"],
+                TAB_PROPS,
+            ),
+            element(
+                K::TextBox,
+                "textbox",
+                &["textbox"],
+                &[K::Body],
+                &[],
+                &["/body/textbox[N]"],
+                TEXT_BOX_PROPS,
+            ),
+            element(
+                K::Shape,
+                "shape",
+                &["shape"],
+                &[K::Body],
+                &[],
+                &["/body/shape[N]"],
+                SHAPE_PROPS,
+            ),
         ],
         gaps: &[
-            read_gap("shape"),
-            read_gap("textbox"),
-            read_gap("field"),
-            read_gap("formfield"),
-            read_gap("bookmark"),
+            GapSpec {
+                subject: Subject::Element("formfield"),
+                code: crate::Code::UnsupportedCapability,
+                follow_up: "record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes",
+                reason: "RTF form fields are read by the native model but not yet projected into generic paths and queries",
+            },
             read_gap("ole"),
-            read_gap("equation"),
-            read_gap("revision"),
-            read_gap("section"),
+            GapSpec {
+                subject: Subject::Element("equation"),
+                code: crate::Code::UnsupportedCapability,
+                follow_up: "record 0328 follow-up: RTF EQ fields and math zones as equation nodes",
+                reason: "RTF equation fields and math zones are read by the native model but not yet projected",
+            },
+            GapSpec {
+                subject: Subject::Element("revision"),
+                code: crate::Code::UnsupportedCapability,
+                follow_up: "record 0328 follow-up: RTF revision nodes and accept/reject (P2)",
+                reason: "RTF revision marks are read by the native model but not yet projected",
+            },
+            GapSpec {
+                subject: Subject::Element("sdt"),
+                code: crate::Code::UnsupportedPath,
+                follow_up: "none: content controls are DOCX-only",
+                reason: "Rich Text Format has no structured document tags",
+            },
+            GapSpec {
+                subject: Subject::Element("watermark"),
+                code: crate::Code::UnsupportedCapability,
+                follow_up: "record 0328 follow-up: the RTF header WordArt watermark",
+                reason: "a watermark is a header shape the story reads do not project",
+            },
         ],
     }
 };
@@ -952,13 +1221,14 @@ const fn read_gap(element: &'static str) -> GapSpec {
 /// Elements the unified RTF writer sets: main-story paragraphs and runs, and
 /// the text of retained destination stories.
 pub(crate) const SETTABLE: &[&str] = &[
-    "p", "r", "tc", "header", "footer", "footnote", "endnote", "comment",
+    "p", "r", "tc", "header", "footer", "footnote", "endnote", "comment", "section", "bookmark",
+    "field", "toc", "tab",
 ];
 /// Elements the unified RTF writer creates: paragraphs (under the body)
 /// and runs. The body itself is a parent, never added (record 0289).
-pub(crate) const ADDABLE: &[&str] = &["p", "r"];
+pub(crate) const ADDABLE: &[&str] = &["p", "r", "tab"];
 /// Elements the unified RTF writer removes.
-pub(crate) const REMOVABLE: &[&str] = &["p", "r", "picture"];
+pub(crate) const REMOVABLE: &[&str] = &["p", "r", "picture", "bookmark", "tab"];
 
 const fn operation_gap(
     verb: &'static str,

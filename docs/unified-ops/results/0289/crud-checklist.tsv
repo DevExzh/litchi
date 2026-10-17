@@ -3119,6 +3119,97 @@ rtf	level	edit	n/a	edit not offered for this element	-
 rtf	level	batch	n/a	batch not offered for this element	-
 rtf	level	create	supported		ok format
 rtf	level	save	supported		ok format
+rtf	section	get	supported		ok 7 instances, first `rtf/column-break.rtf` /section[1]
+rtf	section	find	supported		ok 7 instances, first `rtf/column-break.rtf` /section[1]
+rtf	section	query	supported		ok matches in rtf/column-break.rtf
+rtf	section	view	supported		ok 7 instances, first `rtf/column-break.rtf` /section[1]
+rtf	section	set	supported		ok `rtf/test437Encoding.rtf` /section[1] {"type":"nextColumn"}
+rtf	section	add	n/a	add not offered for this element	-
+rtf	section	remove	n/a	remove not offered for this element	-
+rtf	section	move	format-verb		refused unsupported_type
+rtf	section	swap	format-verb		refused unsupported_type
+rtf	section	edit	supported		ok tx.set
+rtf	section	batch	supported		ok set item
+rtf	section	create	supported		ok format
+rtf	section	save	supported		ok format
+rtf	bookmark	get	supported		ok 2 instances, first `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	find	supported		ok 2 instances, first `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	bookmark	view	supported		ok 2 instances, first `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	set	supported		ok `unified-ops/0294/parts.rtf` /bookmark[1] {"name":"Litchi"}
+rtf	bookmark	add	n/a	add not offered for this element	-
+rtf	bookmark	remove	supported		ok `unified-ops/0294/parts.rtf` /bookmark[1]
+rtf	bookmark	move	format-verb		refused unsupported_type
+rtf	bookmark	swap	format-verb		refused unsupported_type
+rtf	bookmark	edit	supported		ok tx.set
+rtf	bookmark	batch	supported		ok set item
+rtf	bookmark	create	supported		ok format
+rtf	bookmark	save	supported		ok format
+rtf	field	get	supported		ok 4 instances, first `rtf/hyperlink.rtf` /field[1]
+rtf	field	find	supported		ok 4 instances, first `rtf/hyperlink.rtf` /field[1]
+rtf	field	query	supported		ok matches in rtf/hyperlink.rtf
+rtf	field	view	supported		ok 4 instances, first `rtf/hyperlink.rtf` /field[1]
+rtf	field	set	supported		ok `rtf/hyperlink.rtf` /field[1] {"instruction":"Litchi"}
+rtf	field	add	n/a	add not offered for this element	-
+rtf	field	remove	n/a	remove not offered for this element	-
+rtf	field	move	format-verb		refused unsupported_type
+rtf	field	swap	format-verb		refused unsupported_type
+rtf	field	edit	supported		ok tx.set
+rtf	field	batch	supported		ok set item
+rtf	field	create	supported		ok format
+rtf	field	save	supported		ok format
+rtf	toc	get	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /toc[1]
+rtf	toc	find	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /toc[1]
+rtf	toc	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	toc	view	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /toc[1]
+rtf	toc	set	supported		ok `unified-ops/0294/parts.rtf` /toc[1] {"hyperlinks":"false"}
+rtf	toc	add	n/a	add not offered for this element	-
+rtf	toc	remove	n/a	remove not offered for this element	-
+rtf	toc	move	format-verb		unreached
+rtf	toc	swap	format-verb		unreached
+rtf	toc	edit	supported		ok tx.set
+rtf	toc	batch	supported		ok set item
+rtf	toc	create	supported		ok format
+rtf	toc	save	supported		ok format
+rtf	tab	get	supported		ok 3 instances, first `unified-ops/0294/parts.rtf` /body/p[1]/tab[1]
+rtf	tab	find	supported		ok 3 instances, first `unified-ops/0294/parts.rtf` /body/p[1]/tab[1]
+rtf	tab	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	tab	view	supported		ok 3 instances, first `unified-ops/0294/parts.rtf` /body/p[1]/tab[1]
+rtf	tab	set	supported		ok `unified-ops/0294/parts.rtf` /body/p[1]/tab[1] {"pos":"2"}
+rtf	tab	add	supported		ok /body/p[1]/tab[1] on `rtf/testDefaultEncodingParse.rtf` under /body/p[1] {"pos":"2","val":"left","leader":"none"}
+rtf	tab	remove	supported		ok `rtf/testDefaultEncodingParse.rtf + add tab` /body/p[1]/tab[1]
+rtf	tab	move	format-verb		refused unsupported_type
+rtf	tab	swap	format-verb		refused unsupported_type
+rtf	tab	edit	supported		ok tx.set
+rtf	tab	batch	supported		ok set item
+rtf	tab	create	supported		ok format
+rtf	tab	save	supported		ok format
+rtf	textbox	get	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/textbox[1]
+rtf	textbox	find	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/textbox[1]
+rtf	textbox	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	textbox	view	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/textbox[1]
+rtf	textbox	set	n/a	set not offered for this element	-
+rtf	textbox	add	n/a	add not offered for this element	-
+rtf	textbox	remove	n/a	remove not offered for this element	-
+rtf	textbox	move	format-verb		unreached
+rtf	textbox	swap	format-verb		unreached
+rtf	textbox	edit	n/a	edit not offered for this element	-
+rtf	textbox	batch	n/a	batch not offered for this element	-
+rtf	textbox	create	supported		ok format
+rtf	textbox	save	supported		ok format
+rtf	shape	get	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/shape[1]
+rtf	shape	find	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/shape[1]
+rtf	shape	query	supported		ok matches in unified-ops/0294/parts.rtf
+rtf	shape	view	supported		ok 1 instances, first `unified-ops/0294/parts.rtf` /body/shape[1]
+rtf	shape	set	n/a	set not offered for this element	-
+rtf	shape	add	n/a	add not offered for this element	-
+rtf	shape	remove	n/a	remove not offered for this element	-
+rtf	shape	move	format-verb		unreached
+rtf	shape	swap	format-verb		unreached
+rtf	shape	edit	n/a	edit not offered for this element	-
+rtf	shape	batch	n/a	batch not offered for this element	-
+rtf	shape	create	supported		ok format
+rtf	shape	save	supported		ok format
 odt	document	get	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /
 odt	document	find	supported		ok 8 instances, first `odf/corpus/writer-header-footer.odt` /
 odt	document	query	n/a	query not offered for this element	-

@@ -198,6 +198,7 @@ impl Composition {
             limits,
             operations,
             replacement_bytes,
+            marks: Vec::new(),
         }
     }
 

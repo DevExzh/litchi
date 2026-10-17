@@ -67,6 +67,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
     type Children = Children<'f>;
 
     const FORMAT: FileFormat = FileFormat::Rtf;
+    const ABSENT: &'static [&'static str] = &["sdt"];
 
     fn check_source(&self) -> Result<()> {
         Ok(())
@@ -442,6 +443,105 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     })
                 })))
             },
+            (Kind::Document, Kind::Section) => {
+                let Some(index) = pick(select, package.sections().len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    package.sections().get(index).map(|value| {
+                        Node::top(
+                            doc,
+                            Kind::Section,
+                            Item::Section { index, value },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Document, Kind::Bookmark) => {
+                let bookmarks = package.raw().bookmarks().bookmarks();
+                let index = match identity(select, "name") {
+                    Some(Some(wanted)) => bookmarks
+                        .iter()
+                        .position(|bookmark| bookmark.name.as_ref() == wanted),
+                    Some(None) => return Ok(Lookup::NotApplicable),
+                    None => {
+                        let Some(index) = pick(select, bookmarks.len()) else {
+                            return Ok(Lookup::NotApplicable);
+                        };
+                        index
+                    },
+                };
+                Ok(found(index.and_then(|index| {
+                    bookmarks.get(index).map(|value| {
+                        Node::top(
+                            doc,
+                            Kind::Bookmark,
+                            Item::Bookmark { index, value },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Document, kind @ (Kind::Field | Kind::Toc)) => {
+                let indexes: Vec<usize> = super::parts::fields(doc, kind == Kind::Toc).collect();
+                let Some(ordinal) = pick(select, indexes.len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(ordinal.and_then(|ordinal| {
+                    let index = *indexes.get(ordinal)?;
+                    package.fields().get(index).map(|value| {
+                        Node::top(
+                            doc,
+                            kind,
+                            Item::Field { index, value },
+                            Position::new(ordinal),
+                        )
+                    })
+                })))
+            },
+            (Kind::Paragraph, Kind::Tab) => {
+                let Some(paragraph) = parent.body_paragraph() else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let stops = paragraph.format().tab_stops();
+                let Some(index) = pick(select, stops.len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    stops.get(index).map(|value| {
+                        parent.child(
+                            Kind::Tab,
+                            Item::Tab {
+                                index,
+                                value: *value,
+                            },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Body, Kind::TextBox) => {
+                let boxes = super::parts::text_boxes(doc);
+                let Some(index) = pick(select, boxes.len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|ordinal| {
+                    text_box_node(doc, parent, *boxes.get(ordinal)?, ordinal)
+                })))
+            },
+            (Kind::Body, Kind::Shape) => {
+                let indexes: Vec<usize> = super::parts::shapes(doc).collect();
+                let Some(ordinal) = pick(select, indexes.len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(ordinal.and_then(|ordinal| {
+                    let index = *indexes.get(ordinal)?;
+                    package.shapes().get(index).map(|value| {
+                        parent.child(Kind::Shape, Item::Shape { value }, Position::new(ordinal))
+                    })
+                })))
+            },
             _ => Ok(Lookup::NotApplicable),
         }
     }
@@ -504,6 +604,25 @@ impl<'f> Navigate<'f> for Nav<'f> {
         }
         Ok(())
     }
+}
+
+/// The text-box node at `ordinal` among the body's text boxes.
+pub(super) fn text_box_node<'f>(
+    doc: &'f Rtf,
+    parent: &Node<'f>,
+    reference: super::parts::TextBoxRef,
+    ordinal: usize,
+) -> Option<Node<'f>> {
+    let package = &doc.0.package;
+    let item = match reference {
+        super::parts::TextBoxRef::Shape(index) => Item::ShapeTextBox {
+            value: package.shapes().get(index)?,
+        },
+        super::parts::TextBoxRef::Legacy(index) => Item::LegacyTextBox {
+            value: package.raw().legacy_text_boxes().get(index)?,
+        },
+    };
+    Some(parent.child(Kind::TextBox, item, Position::new(ordinal)))
 }
 
 impl<'f> Inspect<'f> for Nav<'f> {

@@ -1011,4 +1011,5 @@ unified-ops/0294/parts.odm	odm	exact		value-exact	/body/h[1] text: 3223 -> 3222 
 unified-ops/0294/parts.odp	odp	exact		value-exact	/slide[1] name: 3196 -> 3218 bytes, first difference at 91	value-exact	linebreak add+remove: 3196 -> 3218 bytes, first difference at 91
 unified-ops/0294/parts.odt	odt	exact		value-exact	/body/h[1] text: 3212 -> 3211 bytes, first difference at 2640	value-exact	tab add+remove: 3212 -> 3254 bytes, first difference at 91
 unified-ops/0294/parts.oth	oth	exact		value-exact	/body/h[1] text: 3219 -> 3218 bytes, first difference at 2644	value-exact	tab add+remove: 3219 -> 3261 bytes, first difference at 95
+unified-ops/0294/parts.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
 unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	byte-exact	note add+remove
