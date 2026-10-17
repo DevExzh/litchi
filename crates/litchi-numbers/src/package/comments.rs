@@ -1265,7 +1265,7 @@ impl Package {
                 return Err(Error::UnsupportedDependency { path: patch.path });
             }
             if patch.after.is_none() {
-                prove_root_clear_ownership(self, &located)?;
+                let _ = prove_root_clear_ownership(self, &located)?;
             }
         }
         let source_previews = root_preview_deletions(source_catalog)?;
@@ -2557,8 +2557,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 path: edit.target.path,
             });
         }
-        prove_root_clear_ownership(edit.source, &located)?;
-        let mut prepared = prepare_root_clear(edit.source, &located)?;
+        let remove_uuid = prove_root_clear_ownership(edit.source, &located)?;
+        let mut prepared = prepare_root_clear(edit.source, &located, remove_uuid)?;
         if prepared.cell.is_empty()
             || prepared.mutations.len() != 3
             || prepared.metadata_entry.0 != super::metadata::ENTRY_NAME
@@ -2773,7 +2773,11 @@ fn rewrite_existing(
     Ok((package, Arc::clone(cell), touched, deleted.len()))
 }
 
-fn prepare_root_clear(source: &Package, located: &Located) -> Result<PreparedRootClear, Error> {
+fn prepare_root_clear(
+    source: &Package,
+    located: &Located,
+    remove_uuid: bool,
+) -> Result<PreparedRootClear, Error> {
     let path = located.target.path;
     let entry = located
         .entry
@@ -2867,12 +2871,72 @@ fn prepare_root_clear(source: &Package, located: &Located) -> Result<PreparedRoo
         component_index: storage.component_index,
         object_identifier: entry.entry.storage_id,
     });
-    let metadata_entry = prepare_metadata_token_entry(source, &mutations, path)?;
+    let metadata_entry = if remove_uuid {
+        prepare_metadata_uuid_removal_entry(
+            source,
+            &mutations,
+            storage,
+            entry.entry.storage_id,
+            path,
+        )?
+    } else {
+        prepare_metadata_token_entry(source, &mutations, path)?
+    };
     Ok(PreparedRootClear {
         cell,
         mutations,
         metadata_entry,
     })
+}
+
+/// The metadata of a clear that deletes a UUID-registered storage: its
+/// registration is removed and the touched components' save tokens move.
+fn prepare_metadata_uuid_removal_entry(
+    source: &Package,
+    mutations: &[ArchiveMutation],
+    storage: MessageRoute,
+    storage_id: u64,
+    path: Path,
+) -> Result<(String, Vec<u8>), Error> {
+    let options = metadata_inspection_options(source);
+    let registry = super::comments_metadata::inspect(source, options)
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let removal = registry
+        .uuid_removal(storage.component_index, storage_id)
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let mut components = Vec::new();
+    for mutation in mutations {
+        let index = mutation.component_index();
+        if !components.contains(&index) {
+            components
+                .try_reserve(1)
+                .map_err(|_| Error::Allocation { amount: 1, path })?;
+            components.push(index);
+        }
+    }
+    components.sort_unstable();
+    let selectors = registry
+        .touched_selectors(&components)
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let removals = [removal];
+    let batch = litchi_iwa_protos::package_metadata_codec::RemovalSaveTokenBatch::new(
+        litchi_iwa_protos::package_metadata_codec::RemovalBatch::new(
+            registry.last_object_identifier(),
+            &removals,
+            &[],
+            &[],
+        ),
+        SaveTokenBatch::new(&selectors),
+    );
+    let prepared = super::comments_metadata::prepare_removals(&registry, batch, options)
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let requirements = prepared.execution_requirements();
+    let payload = prepared
+        .execute(requirements.exact_limits())
+        .map_err(|_| Error::Verification)?
+        .into_bytes();
+    let compressed = comments_create::pack_metadata(source, payload, path)?;
+    Ok((super::metadata::ENTRY_NAME.to_owned(), compressed))
 }
 
 fn prepare_metadata_token_entry(
@@ -4012,14 +4076,45 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
     Ok(())
 }
 
-fn prove_root_clear_ownership(source: &Package, selected: &Located) -> Result<(), Error> {
+/// Prove a root clear's ownership; `true` when the deleted storage's own
+/// object-UUID registration goes with it (a storage this crate created,
+/// record 0318), `false` when metadata does not name it (native storages).
+fn prove_root_clear_ownership(source: &Package, selected: &Located) -> Result<bool, Error> {
     prove_global_comment_ownership(source, selected)?;
     let entry = selected.entry.as_ref().ok_or(Error::InvalidSource {
         path: selected.target.path,
     })?;
     let deleted_object = entry.entry.storage_id;
     prove_archive_reference_ownership(source, deleted_object, entry.route, selected.target.path)?;
-    prove_metadata_ownership(source, deleted_object, selected.target.path)
+    if prove_metadata_ownership(source, deleted_object, selected.target.path).is_ok() {
+        return Ok(false);
+    }
+    let path = selected.target.path;
+    let storage = selected.storage.ok_or(Error::InvalidSource { path })?;
+    let registry = super::comments_metadata::inspect(source, metadata_inspection_options(source))
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    match registry.current_uuid_if_registered(storage.component_index, deleted_object) {
+        Ok(Some(_)) => Ok(true),
+        _ => Err(Error::UnsupportedDependency { path }),
+    }
+}
+
+/// Metadata inspection options sized to the source's metadata payload, for
+/// a batch of one registry change.
+fn metadata_inspection_options(source: &Package) -> MetadataRewriteOptions {
+    let length = super::metadata::unique_message_route(source)
+        .and_then(|route| {
+            source
+                .state
+                .components
+                .catalog()
+                .get_index(route.component_index)
+                .and_then(|component| component.archive().objects.get(route.object_index))
+                .and_then(|object| object.messages.get(route.message_index))
+                .map(|message| message.data.len())
+        })
+        .unwrap_or(0);
+    comments_create::metadata_options(length, 1)
 }
 
 fn prove_metadata_ownership(
@@ -4906,9 +5001,6 @@ fn validate_comment_message_metadata(
     if !expected.is_empty() && info.object_references != expected {
         return Err(Error::InvalidSource { path });
     }
-    if !expected.is_empty() && require_field_infos && info.field_infos.is_empty() {
-        return Err(Error::InvalidSource { path });
-    }
     let mut field_reference_index = 0usize;
     for (field_index, field) in info.field_infos.iter().enumerate() {
         if !expected.is_empty()
@@ -4941,12 +5033,15 @@ fn validate_comment_message_metadata(
             }
         }
     }
-    // Native Numbers sometimes keeps the aggregate ArchiveInfo edge while
-    // omitting the corresponding FieldInfo mirror.  A read census may admit
-    // that representation, but a present FieldInfo sequence is still checked
-    // in full above and a mutation census still requires it.
+    // Native Numbers keeps the aggregate ArchiveInfo edge of a comment list
+    // and omits the FieldInfo mirror (every natively commented corpus
+    // workbook does, record 0318). The aggregate is checked against the
+    // payload's references above in both modes; a present FieldInfo
+    // sequence is still checked in full, and the writers keep whichever
+    // representation the message has.
+    let _ = require_field_infos;
     if !expected.is_empty()
-        && (require_field_infos || !info.field_infos.is_empty())
+        && !info.field_infos.is_empty()
         && field_reference_index != expected.len()
     {
         return Err(Error::InvalidSource { path });
