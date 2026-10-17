@@ -252,3 +252,8 @@ required-features = ["xlsb"]
 [[example]]
 name              = "dump_bench"
 required-features = ["docx", "xlsx", "pptx"]
+
+# `File::dump` round trips over corpus files and built documents (record 0336).
+[[test]]
+name              = "dump_round_trip"
+required-features = ["docx", "xlsx", "xlsb", "pptx", "ods", "odt", "rtf", "doc", "xls", "ppt", "odp", "odg"]

@@ -50,6 +50,14 @@
 //! # Ok::<(), litchi_ops::Error>(())
 //! ```
 
+#![cfg_attr(
+    not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb")),
+    allow(
+        dead_code,
+        reason = "the part payloads are read only by the OOXML writes"
+    )
+)]
+
 use std::fmt;
 use std::str::FromStr;
 

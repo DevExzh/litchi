@@ -2,8 +2,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "tests")]
 
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "odt"))]
+use super::Action;
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
-use super::{Action, NewPart};
+use super::NewPart;
 use crate::Code;
 use litchi_core::FileFormat;
 

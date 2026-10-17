@@ -1,6 +1,28 @@
 //! `File::validate`: the leaf owners' bounded validators over the published
 //! package, plus OPC part-graph checks for OOXML.
 
+#![cfg_attr(
+    not(any(
+        feature = "docx",
+        feature = "pptx",
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "xls",
+        feature = "ppt",
+        feature = "doc",
+        feature = "rtf",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "odf-objects"
+    )),
+    allow(
+        unreachable_code,
+        unused_variables,
+        reason = "without a validating format every arm refuses"
+    )
+)]
+
 use std::fmt;
 #[cfg(any(
     feature = "docx",
@@ -13,6 +35,10 @@ use std::fmt;
 ))]
 use std::sync::Arc;
 
+#[allow(
+    unused_imports,
+    reason = "each import serves some format features only"
+)]
 use litchi_core::{FileFormat, ValidateReport, ValidationLimits, ValidationReportError};
 
 use super::{Validation, with_format};
