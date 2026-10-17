@@ -543,8 +543,15 @@ fn styles(out: &mut Out, styles: &Node<'_>, defaults: &mut Vec<String>) -> Resul
         } else if !defaults.contains(&id) {
             let mut props = out.props(&style, "style", Command::Add, &[])?;
             if props.get("name").is_none() {
-                // `add` names an unnamed style after its id.
-                props.push("name", id.clone());
+                // `add` names an unnamed style after its id, right after it.
+                let mut named = Props::new();
+                for (key, value) in props.iter() {
+                    named.push(key.clone(), value.clone());
+                    if key.as_str() == "id" {
+                        named.push("name", id.clone());
+                    }
+                }
+                props = named;
             }
             out.add("/styles", "style", props);
             defaults.push(id);
@@ -574,9 +581,24 @@ fn paragraph_excluded(out: &Out) -> &'static [&'static str] {
     // List numbering refers to native numbering-instance ids the created
     // document does not share (ADR 0034); `numbering_warning` reports it.
     if has_id {
-        &["text", "style", "styleName", "numId", "numLevel"]
+        &[
+            "text",
+            "style",
+            "styleName",
+            "numId",
+            "numLevel",
+            "listStyle",
+            "start",
+        ]
     } else {
-        &["text", "styleName", "numId", "numLevel"]
+        &[
+            "text",
+            "styleName",
+            "numId",
+            "numLevel",
+            "listStyle",
+            "start",
+        ]
     }
 }
 
@@ -622,7 +644,11 @@ fn paragraph(
     doc: &Doc,
 ) -> Result<()> {
     let excluded = paragraph_excluded(out);
-    if node.view().format()?.any(|prop| prop.key() == "numId") {
+    if node
+        .view()
+        .format()?
+        .any(|prop| matches!(prop.key(), "numId" | "listStyle" | "start"))
+    {
         out.warnings.push(Error::new(
             Code::UnsupportedProperty,
             format!(
