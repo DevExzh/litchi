@@ -696,6 +696,13 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - OfficeCLI excel corpus: passed 1484 → 1552, gap 124 → 51, bug 0. Delta: XLSX elements supported 11 → 33 (gap 27 → 5: ole, pivottable, run, slicer, sparkline). CRUD checklist XLSX 92 → 191 cells, all ok.
   - Performance: every write within 1.011× the leaf; `comment_get` 1.10 (+4 µs, sort and clone of the sheet's notes).
   - Open (part to 0322): x14 CF styling, drawing effects, threaded comments, note runs, filter criteria, the prefixed-root validation/hyperlink writer conflict.
+- Merged `docx-p0p1` (0319) — **DOCX P0 surface closed**:
+  - Styles and numbering (`abstractNum`/`num`/`level`): read, set, add, remove; paragraph and run `style` set by id or display name (Δ4).
+  - Headers and footers by type, footnotes and endnotes (anchored add, set, remove), tabs, breaks: editable. Bookmarks, fields, TOC, watermark and text boxes: read.
+  - litchi-docx: style, numbering, header/footer and note catalogs with edit verbs; source-backed `bookmarks`/`text_boxes`. New fixture `textWatermark.docx` (18 KB, LibreOffice, provenance recorded).
+  - Word corpus gap 248 → 221; DOCX delta elements supported 14 → 31, gap 21 → 4 (formfield, ole, revision, shape). New corpus deltas D1b (positional `num` path) and D11.
+  - Writes within budget (max `footnote_add` 1.09). Reads `style_get_format` 1.22 (+1.1 µs) and `paragraph_list_format` 1.13 (+0.25 µs) miss.
+  - Open: bookmark/field/TOC writes, paragraphs inside headers/footers/notes, `levelN.*` shortcut keys, the two read misses.
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
@@ -940,6 +947,10 @@ Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-ppt
 ## Awaiting owner decision
 
 - ~~ADR 0033 acceptance~~ — accepted 2026-10-04 (record 0006).
+- **Adopted defaults, awaiting owner confirmation (2026-10-17):**
+  - Record 0319: removing a DOCX `num` keeps the paragraphs' `numPr` references that point at it. OfficeCLI clears them, which edits paragraphs the caller did not name.
+  - Record 0319, corpus delta D11: re-adding a built-in DOCX style id is refused (typed) instead of upserted as OfficeCLI does.
+  - Record 0316: the XLS CONDFMT rule count > 3 and the out-of-place ShrFmla refusals stay spec-strict.
 
 ## 0016 — restart and glossary adoption (2026-10-08)
 
