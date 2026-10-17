@@ -37,6 +37,8 @@ mod text_format_tests;
 #[cfg(test)]
 mod text_run_tests;
 #[cfg(test)]
+mod text_structure_tests;
+#[cfg(test)]
 mod transition_edit_tests;
 
 /// The failure type of this transaction family.
@@ -55,11 +57,11 @@ pub use model::{
 };
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
-pub(crate) use text_format::stage_text_properties;
 pub use text_format::{
-    MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill, TextEdit, TextProperties,
-    TextTarget,
+    MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill, TextBody, TextEdit,
+    TextProperties, TextTarget,
 };
+pub(crate) use text_format::{TextChange, stage_text_properties, stage_text_structure};
 pub use transaction::{Commit, Diagnostics, Edit, MediaFile, SmartArtParts};
 
 pub(crate) use chunks::{

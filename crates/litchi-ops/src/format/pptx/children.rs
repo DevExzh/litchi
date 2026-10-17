@@ -28,8 +28,8 @@ use litchi_pptx::shape::owned::Handles;
 
 use super::Pptx;
 use super::node::{
-    CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node, NotesItem, ReplyItem,
-    SlideItem, TableItem, TextItem, TreeContainer, TreeItem,
+    CellRef, CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node, NotesItem,
+    ReplyItem, SlideItem, TableItem, TextItem, TreeContainer, TreeItem,
 };
 use super::spec::Kind;
 use super::steps;
@@ -398,6 +398,7 @@ impl<'f> Children<'f> {
                             paragraph,
                             run: 0,
                             ordinal: paragraph,
+                            cell: CellRef::NONE,
                         }),
                     )));
                 },
@@ -500,6 +501,9 @@ fn next_tree<'f>(
                     },
                     TreeContainer::Layout { master, position } => {
                         TreeItem::new_layout(master, position, kind, handle, ordinal)
+                    },
+                    container @ TreeContainer::Notes(_) => {
+                        TreeItem::in_container(container, kind, handle, ordinal)
                     },
                 }),
             ));

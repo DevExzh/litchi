@@ -949,22 +949,6 @@ static ANIMATION_GAP: GapSpec = element_gap(
 static NOTE_SLIDE_GAP: GapSpec = element_gap("noteSlide", "M1-extended", NOTES_PARTS);
 static NOTES_MASTER_GAP: GapSpec = element_gap("notesMaster", "M1-extended", NOTES_PARTS);
 
-/// Paragraphs inside a table cell.
-pub(crate) static CELL_TEXT_GAP: GapSpec = GapSpec {
-    subject: Subject::Axis("/slide[N]/table[N]/tr[N]/tc[N]/paragraph"),
-    code: Code::UnsupportedCapability,
-    follow_up: "L-PPTX-R8",
-    reason: "the table reader gives a cell's text, not its text body",
-};
-
-/// Paragraphs of the speaker notes.
-pub(crate) static NOTES_TEXT_GAP: GapSpec = GapSpec {
-    subject: Subject::Axis("/slide[N]/notes/paragraph"),
-    code: Code::UnsupportedCapability,
-    follow_up: "M1-extended",
-    reason: "the notes node reads the notes text, not the notes body's paragraphs",
-};
-
 const fn property_gap(
     element: &'static str,
     key: &'static str,
@@ -1210,7 +1194,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "tc",
             &["cell", "tc"],
             &[Row],
-            &[],
+            &[Paragraph],
             &[],
             &["/slide[N]/table[N]/tr[N]/tc[N]"],
             CELL_PROPS,
@@ -1268,11 +1252,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         element(
             Paragraph,
             "paragraph",
-            &["p", "paragraph"],
-            &[Shape, Placeholder],
+            &["p", "para", "paragraph"],
+            &[Shape, Placeholder, Cell, Notes],
             &[Run, LineBreak],
             &[],
-            &["/slide[N]/shape[@id=ID]/paragraph[N]"],
+            &[
+                "/slide[N]/shape[@id=ID]/paragraph[N]",
+                "/slide[N]/table[N]/tr[N]/tc[N]/paragraph[N]",
+                "/slide[N]/notes/paragraph[N]",
+            ],
             PARAGRAPH_PROPS,
         ),
         element(
@@ -1303,7 +1291,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "notes",
             &["notes"],
             &[Slide],
-            &[],
+            &[Paragraph],
             &[],
             &["/slide[N]/notes"],
             NOTES_PROPS,
@@ -1646,6 +1634,13 @@ pub(super) enum TextSetter {
     Click(ClickKey),
 }
 
+/// A text write entry that a new paragraph or run also takes (record 0333).
+const fn text_add_entry(spec: PropSpec, setter: TextSetter) -> crate::registry::Entry<TextSetter> {
+    let mut entry = text_entry(spec, setter);
+    entry.access = crate::registry::Access::SetAndAdd(setter);
+    entry
+}
+
 /// A write entry for `spec` with a text setter; `get` keeps the spec's
 /// read flag (write-only entries have none).
 const fn text_entry(spec: PropSpec, setter: TextSetter) -> crate::registry::Entry<TextSetter> {
@@ -1699,15 +1694,15 @@ const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_C
     while index < RUN_PROPS.len() {
         let spec = RUN_PROPS[index];
         entries[index] = if index == RunKey::FontLatin as usize {
-            text_entry(spec, TextSetter::FontLatin)
+            text_add_entry(spec, TextSetter::FontLatin)
         } else if index == RunKey::Size as usize {
-            text_entry(spec, TextSetter::Size)
+            text_add_entry(spec, TextSetter::Size)
         } else if index == RunKey::Bold as usize {
-            text_entry(spec, TextSetter::Bold)
+            text_add_entry(spec, TextSetter::Bold)
         } else if index == RunKey::Italic as usize {
-            text_entry(spec, TextSetter::Italic)
+            text_add_entry(spec, TextSetter::Italic)
         } else if index == RunKey::Color as usize {
-            text_entry(spec, TextSetter::Color)
+            text_add_entry(spec, TextSetter::Color)
         } else if index == RunKey::Link as usize {
             run_click_entry(spec, TextSetter::Click(ClickKey::Link))
         } else if index == RunKey::Tooltip as usize {
@@ -1717,9 +1712,10 @@ const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_C
         };
         index += 1;
     }
-    entries[RUN_PROPS.len()] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
+    entries[RUN_PROPS.len()] =
+        text_add_entry(write_only("text", ValueType::Text), TextSetter::Text);
     entries[RUN_PROPS.len() + 1] =
-        text_entry(write_only("font", ValueType::Text), TextSetter::Font);
+        text_add_entry(write_only("font", ValueType::Text), TextSetter::Font);
     entries
 }
 /// OfficeCLI's run aliases of writable properties (`run.json`).
@@ -1753,20 +1749,20 @@ const fn paragraph_write_entries() -> [crate::registry::Entry<TextSetter>; PARAG
     while index < PARAGRAPH_PROPS.len() {
         let spec = PARAGRAPH_PROPS[index];
         entries[index] = if index == ParagraphKey::Align as usize {
-            text_entry(spec, TextSetter::Align)
+            text_add_entry(spec, TextSetter::Align)
         } else if index == ParagraphKey::Size as usize {
-            text_entry(spec, TextSetter::Size)
+            text_add_entry(spec, TextSetter::Size)
         } else {
             Entry::read(spec)
         };
         index += 1;
     }
     let base = PARAGRAPH_PROPS.len();
-    entries[base] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
-    entries[base + 1] = text_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
-    entries[base + 2] = text_entry(write_only("italic", ValueType::Bool), TextSetter::Italic);
-    entries[base + 3] = text_entry(write_only("color", DRAWING_COLOR), TextSetter::Color);
-    entries[base + 4] = text_entry(write_only("font", ValueType::Text), TextSetter::Font);
+    entries[base] = text_add_entry(write_only("text", ValueType::Text), TextSetter::Text);
+    entries[base + 1] = text_add_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
+    entries[base + 2] = text_add_entry(write_only("italic", ValueType::Bool), TextSetter::Italic);
+    entries[base + 3] = text_add_entry(write_only("color", DRAWING_COLOR), TextSetter::Color);
+    entries[base + 4] = text_add_entry(write_only("font", ValueType::Text), TextSetter::Font);
     entries
 }
 /// OfficeCLI's paragraph aliases of writable properties (`paragraph.json`).

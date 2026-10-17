@@ -306,14 +306,30 @@ fn missing_layout(master: u32, position: u32) -> Error {
 pub(super) enum TreeContainer {
     Slide(u32),
     Master(u32),
-    Layout { master: u32, position: u32 },
+    Layout {
+        master: u32,
+        position: u32,
+    },
+    /// The notes page of a slide: the container of the notes body shape a
+    /// notes paragraph or run belongs to (record 0333).
+    Notes(u32),
 }
 
 impl TreeContainer {
+    /// The slide whose shape tree holds the element; `None` for masters,
+    /// layouts and notes pages, so slide-shape writes refuse them.
     pub(super) const fn slide(self) -> Option<u32> {
         match self {
             Self::Slide(position) => Some(position),
-            Self::Master(_) | Self::Layout { .. } => None,
+            Self::Master(_) | Self::Layout { .. } | Self::Notes(_) => None,
+        }
+    }
+
+    /// The slide of a notes page.
+    pub(super) const fn notes(self) -> Option<u32> {
+        match self {
+            Self::Notes(slide) => Some(slide),
+            Self::Slide(_) | Self::Master(_) | Self::Layout { .. } => None,
         }
     }
 }
@@ -400,7 +416,10 @@ impl TreeItem {
     }
 
     pub(super) const fn slide_position(&self) -> Option<u32> {
-        self.container.slide()
+        match self.container {
+            TreeContainer::Notes(slide) => Some(slide),
+            container => container.slide(),
+        }
     }
 
     /// The shape's text body with local properties, parsed and pinned on
@@ -487,6 +506,12 @@ impl TreeItem {
                 ));
                 push_tree_tail(&mut out, &self.handle, self.kind, self.ordinal, canonical);
             },
+            // A notes body is addressed through the notes node: its text
+            // nodes are `/slide[N]/notes/paragraph[K]` (record 0333).
+            TreeContainer::Notes(slide) => {
+                out.push(steps::slide(slide));
+                out.push(PathStep::new("notes"));
+            },
         }
         out
     }
@@ -533,6 +558,9 @@ pub(super) fn is_title(handle: &Handle) -> bool {
 /// where it sits in it.
 #[derive(Clone)]
 pub(super) struct TextItem {
+    /// The shape whose body holds the text: a slide shape, the table frame
+    /// of a cell's text ([`Self::cell`]), or a notes page's body shape (a
+    /// [`TreeContainer::Notes`] container).
     pub(super) shape: TreeItem,
     pub(super) body: Arc<Body>,
     pub(super) paragraph: u32,
@@ -540,9 +568,52 @@ pub(super) struct TextItem {
     pub(super) run: u32,
     /// The position among the paragraph's runs, or among its line breaks.
     pub(super) ordinal: u32,
+    /// The table cell whose body holds the text; [`CellRef::NONE`] for a
+    /// shape's or notes page's text (record 0333). It fills the padding
+    /// after the three positions, so the item keeps its size.
+    pub(super) cell: CellRef,
+}
+
+/// A table cell's row and column, packed into one word: rows and columns
+/// up to 65,534 are addressable (`PowerPoint` tables hold 75 of each).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) struct CellRef(u32);
+
+impl CellRef {
+    /// No cell: the text of a shape or notes page.
+    pub(super) const NONE: Self = Self(u32::MAX);
+
+    /// The cell at `row` and `column`; `None` past the packed range.
+    pub(super) const fn new(row: u32, column: u32) -> Option<Self> {
+        if row < 0xFFFF && column < 0xFFFF {
+            Some(Self((row << 16) | column))
+        } else {
+            None
+        }
+    }
+
+    /// The cell's row and column.
+    pub(super) const fn get(self) -> Option<(u32, u32)> {
+        if self.0 == u32::MAX {
+            None
+        } else {
+            Some((self.0 >> 16, self.0 & 0xFFFF))
+        }
+    }
 }
 
 impl TextItem {
+    /// The steps of the node whose body holds the text: the shape, the
+    /// table cell, or the notes node.
+    pub(super) fn owner_steps(&self, canonical: bool) -> Builder {
+        let mut out = self.shape.steps(canonical);
+        if let Some((row, column)) = self.cell.get() {
+            out.push(PathStep::at("tr", Position::new(row as usize)));
+            out.push(PathStep::at("tc", Position::new(column as usize)));
+        }
+        out
+    }
+
     pub(super) fn paragraph(&self) -> Option<&Paragraph> {
         self.body.paragraphs.get(self.paragraph as usize)
     }
@@ -858,18 +929,18 @@ impl<'f> Node<'f> {
             },
             Item::Tree(tree) => tree.steps(canonical),
             Item::Paragraph(text) => {
-                let mut out = text.shape.steps(canonical);
+                let mut out = text.owner_steps(canonical);
                 out.push(at("paragraph", text.paragraph));
                 out
             },
             Item::Run(text) => {
-                let mut out = text.shape.steps(canonical);
+                let mut out = text.owner_steps(canonical);
                 out.push(at("paragraph", text.paragraph));
                 out.push(at("run", text.ordinal));
                 out
             },
             Item::LineBreak(text) => {
-                let mut out = text.shape.steps(canonical);
+                let mut out = text.owner_steps(canonical);
                 out.push(at("paragraph", text.paragraph));
                 out.push(at("linebreak", text.ordinal));
                 out
@@ -941,7 +1012,7 @@ impl<'f> Node<'f> {
                 let mut out = match &item.owner {
                     super::links::Owner::Shape(tree) => tree.steps(canonical),
                     super::links::Owner::Run(text) => {
-                        let mut out = text.shape.steps(canonical);
+                        let mut out = text.owner_steps(canonical);
                         out.push(at("paragraph", text.paragraph));
                         out.push(at("run", text.ordinal));
                         out

@@ -713,6 +713,15 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
 }
 
 #[cfg(feature = "pptx")]
+/// What a new paragraph or run takes on `add` (record 0333): its text and
+/// formatting, but not a run's click action.
+fn pptx_text_add(element: &str, property: &str) -> bool {
+    matches!(element, "paragraph" | "run")
+        && pptx_text_format_set(element, property)
+        && !matches!(property, "link" | "tooltip")
+}
+
+#[cfg(feature = "pptx")]
 /// Text-box formatting a shape takes on `add` (record 0269).
 fn pptx_shape_add(property: &str) -> bool {
     matches!(property, "text" | "x" | "y" | "width" | "height")
@@ -805,7 +814,11 @@ fn pptx_reports_selection_and_structural_writes() {
                 );
             assert_eq!(
                 property.add(),
-                slide_add || shape_add || picture_add || comment_add,
+                slide_add
+                    || shape_add
+                    || picture_add
+                    || comment_add
+                    || pptx_text_add(element.name(), property.name()),
                 "{} / {}",
                 element.name(),
                 property.name()
@@ -1208,6 +1221,9 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "video"
                     | "audio"
                     | "media"
+                    | "paragraph"
+                    | "run"
+                    | "linebreak"
             ),
             "{}",
             element.name()
@@ -1247,6 +1263,9 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "video"
                     | "audio"
                     | "media"
+                    | "paragraph"
+                    | "run"
+                    | "linebreak"
             ),
             "{}",
             element.name()

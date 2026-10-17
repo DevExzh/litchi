@@ -378,7 +378,8 @@
       },
       "children": [
         {
-          "element": "paragraph"
+          "element": "paragraph",
+          "pathSegment": "paragraph"
         },
         {
           "element": "equation",
@@ -875,7 +876,8 @@
       },
       "children": [
         {
-          "element": "paragraph"
+          "element": "paragraph",
+          "pathSegment": "paragraph"
         }
       ],
       "properties": {
@@ -1613,6 +1615,12 @@
           "/slide[N]/table[N]/tr[N]/tc[N]"
         ]
       },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
       "properties": {
         "fill": {
           "type": "color",
@@ -3287,19 +3295,27 @@
       "element": "paragraph",
       "parent": [
         "shape",
-        "placeholder"
+        "placeholder",
+        "tc",
+        "notes"
       ],
       "elementAliases": [
-        "p"
+        "p",
+        "para"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
-      "paths": {},
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]/tc[N]/paragraph[N]",
+          "/slide[N]/notes/paragraph[N]"
+        ]
+      },
       "children": [
         {
           "element": "run"
@@ -3332,7 +3348,7 @@
             "r": "right"
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3397,27 +3413,27 @@
           "type": "font-size",
           "unit": "pt",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "bold": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
         "italic": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -3425,7 +3441,7 @@
           "type": "color",
           "colorContext": "drawing",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -3435,7 +3451,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         }
@@ -3463,11 +3479,11 @@
         "r"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {},
       "children": [
@@ -3483,7 +3499,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3503,21 +3519,21 @@
           "type": "font-size",
           "unit": "pt",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3583,7 +3599,7 @@
           "type": "color",
           "colorContext": "drawing",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -3633,7 +3649,7 @@
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -3648,7 +3664,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         }
@@ -3673,7 +3689,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {},
       "properties": {},
@@ -3701,6 +3717,12 @@
           "/slide[N]/notes"
         ]
       },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
       "properties": {
         "text": {
           "type": "string",

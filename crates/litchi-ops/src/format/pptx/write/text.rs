@@ -95,6 +95,11 @@ impl TextValues {
             && self.geometry.is_none()
     }
 
+    /// The assigned text, if any.
+    pub(in crate::format::pptx) fn text(&self) -> Option<&str> {
+        self.text.as_deref()
+    }
+
     pub(super) fn charge(&self) -> usize {
         let text = |value: &Option<Option<String>>| {
             value
@@ -365,6 +370,24 @@ pub(super) fn admit<const N: usize, const A: usize>(
     props: &Props<'_>,
     limits: &SemanticLimits,
 ) -> Result<TextValues> {
+    let values = admit_for(table, props, Operation::Set, limits)?;
+    if values.is_empty() {
+        return Err(error(
+            Code::InvalidArgument,
+            "no text property was assigned",
+        ));
+    }
+    Ok(values)
+}
+
+/// Admit `props` for `operation` through `table`: `set` or, for a new
+/// paragraph or run, `add` (record 0333). An empty payload is admitted.
+pub(in crate::format::pptx) fn admit_for<const N: usize, const A: usize>(
+    table: &Table<TextSetter, N, A>,
+    props: &Props<'_>,
+    operation: Operation,
+    limits: &SemanticLimits,
+) -> Result<TextValues> {
     let mut values = TextValues::default();
     let mut seen = 0_u64;
     for (key, value) in props.iter() {
@@ -382,15 +405,9 @@ pub(super) fn admit<const N: usize, const A: usize>(
             .with_property(entry.spec.name));
         }
         seen |= bit;
-        entry.prepare(Operation::Set, value, |setter, value| {
+        entry.prepare(operation, value, |setter, value| {
             values.stage(setter, value, limits)
         })?;
-    }
-    if values.is_empty() {
-        return Err(error(
-            Code::InvalidArgument,
-            "no text property was assigned",
-        ));
     }
     Ok(values)
 }
@@ -421,27 +438,46 @@ impl Pptx {
             );
         }
         let per_target = values.charge();
-        let mut targets: Vec<(usize, TextTarget)> = Vec::new();
+        // `(notes page, slide, target)`: a notes body's text is edited in
+        // its notes part (record 0333).
+        let mut targets: Vec<(bool, usize, TextTarget)> = Vec::new();
         let mut seen = HashSet::new();
         let mut append = |node: crate::format::pptx::Node<'_>| -> Result<()> {
-            let (slide, target) = match (kind, node.item()) {
+            let (container, target) = match (kind, node.item()) {
                 (TextKind::Paragraph, Item::Paragraph(text)) => (
-                    text.shape.container.slide(),
-                    TextTarget::Paragraph {
-                        shape: text.shape.handle.position(),
-                        paragraph: Position::new(text.paragraph as usize),
+                    text.shape.container,
+                    match text.cell.get() {
+                        Some((row, column)) => TextTarget::CellParagraph {
+                            shape: text.shape.handle.position(),
+                            row: Position::new(row as usize),
+                            column: Position::new(column as usize),
+                            paragraph: Position::new(text.paragraph as usize),
+                        },
+                        None => TextTarget::Paragraph {
+                            shape: text.shape.handle.position(),
+                            paragraph: Position::new(text.paragraph as usize),
+                        },
                     },
                 ),
                 (TextKind::Run, Item::Run(text) | Item::LineBreak(text)) => (
-                    text.shape.container.slide(),
-                    TextTarget::Run {
-                        shape: text.shape.handle.position(),
-                        paragraph: Position::new(text.paragraph as usize),
-                        run: Position::new(text.run as usize),
+                    text.shape.container,
+                    match text.cell.get() {
+                        Some((row, column)) => TextTarget::CellRun {
+                            shape: text.shape.handle.position(),
+                            row: Position::new(row as usize),
+                            column: Position::new(column as usize),
+                            paragraph: Position::new(text.paragraph as usize),
+                            run: Position::new(text.run as usize),
+                        },
+                        None => TextTarget::Run {
+                            shape: text.shape.handle.position(),
+                            paragraph: Position::new(text.paragraph as usize),
+                            run: Position::new(text.run as usize),
+                        },
                     },
                 ),
                 (TextKind::Cell, Item::Cell(cell)) => (
-                    cell.table.container.slide(),
+                    cell.table.container,
                     TextTarget::Cell {
                         shape: cell.table.handle.position(),
                         row: Position::new(cell.row as usize),
@@ -455,13 +491,17 @@ impl Pptx {
                     ));
                 },
             };
-            let Some(slide) = slide else {
-                return Err(error(
-                    Code::UnsupportedCapability,
-                    "master and layout text writes are not integrated",
-                ));
+            let (notes, slide) = match (container.slide(), container.notes()) {
+                (Some(slide), _) => (false, slide),
+                (None, Some(slide)) => (true, slide),
+                (None, None) => {
+                    return Err(error(
+                        Code::UnsupportedCapability,
+                        "master and layout text writes are not integrated",
+                    ));
+                },
             };
-            let key = (slide, target);
+            let key = (notes, slide, target);
             if seen.contains(&key) {
                 return Ok(());
             }
@@ -479,7 +519,7 @@ impl Pptx {
             targets.try_reserve(1).map_err(allocation)?;
             seen.try_reserve(1).map_err(allocation)?;
             seen.insert(key);
-            targets.push((slide as usize, target));
+            targets.push((notes, slide as usize, target));
             Ok(())
         };
         let nav = Nav::new(self);
@@ -505,10 +545,16 @@ impl Pptx {
                 "mutation selector matched no element",
             ));
         }
-        targets.sort_by_key(|(slide, _)| *slide);
+        targets.sort_by_key(|(notes, slide, _)| (*notes, *slide));
         let properties = values.properties();
         let mut groups: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
-        for (slide, target) in &targets {
+        let mut notes_groups: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
+        for (notes, slide, target) in &targets {
+            let groups = if *notes {
+                &mut notes_groups
+            } else {
+                &mut groups
+            };
             if groups.last().is_none_or(|(current, _)| current != slide) {
                 groups.try_reserve(1).map_err(allocation)?;
                 groups.push((*slide, Vec::new()));
@@ -519,7 +565,7 @@ impl Pptx {
             edits.try_reserve(1).map_err(allocation)?;
             edits.push(TextEdit::new(*target, properties));
         }
-        self.commit_text_edits(&groups)
+        self.commit_story_text_edits(&groups, &notes_groups)
     }
 
     /// Publish slide-grouped text edits through one native edit.

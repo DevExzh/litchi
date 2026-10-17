@@ -84,6 +84,18 @@ pub enum TextTarget {
         /// Position among the row's `a:tc` cells.
         column: Position,
     },
+    /// One paragraph of a table cell's text body, as [`Self::Paragraph`]
+    /// is one of a shape's (record 0333).
+    CellParagraph {
+        /// Positional scene index of the table frame.
+        shape: Position,
+        /// Position among the table's `a:tr` rows.
+        row: Position,
+        /// Position among the row's `a:tc` cells.
+        column: Position,
+        /// Position among the cell body's `a:p` children.
+        paragraph: Position,
+    },
     /// One run (`a:r`, `a:br` or `a:fld`) of a paragraph of a table cell's
     /// text body, as [`Self::Run`] is one of a shape's (record 0285).
     CellRun {
@@ -334,6 +346,7 @@ pub(crate) fn stage_text_properties(
             let element = &current[span.clone()];
             let cell = match edit.target {
                 TextTarget::Cell { row, column, .. }
+                | TextTarget::CellParagraph { row, column, .. }
                 | TextTarget::CellRun { row, column, .. }
                 | TextTarget::CellRunSpan { row, column, .. } => Some((row.get(), column.get())),
                 _ => None,
@@ -347,6 +360,9 @@ pub(crate) fn stage_text_properties(
                         });
                     }
                     rewrite_cell_frame(element, row, column, |cell| match edit.target {
+                        TextTarget::CellParagraph { paragraph, .. } => {
+                            rewrite_cell_paragraph(cell, paragraph.get(), &edit.properties)
+                        },
                         TextTarget::CellRun { paragraph, run, .. } => rewrite_cell_run(
                             cell,
                             paragraph.get(),
@@ -434,6 +450,7 @@ const fn shape_position(target: TextTarget) -> Position {
         | TextTarget::Run { shape, .. }
         | TextTarget::RunSpan { shape, .. }
         | TextTarget::Cell { shape, .. }
+        | TextTarget::CellParagraph { shape, .. }
         | TextTarget::CellRun { shape, .. }
         | TextTarget::CellRunSpan { shape, .. } => shape,
     }
@@ -1515,7 +1532,10 @@ fn rewrite_shape(
             end,
             ..
         } => (Some(paragraph.get()), Some(run.get()), Some(start..end)),
-        TextTarget::Cell { .. } | TextTarget::CellRun { .. } | TextTarget::CellRunSpan { .. } => {
+        TextTarget::Cell { .. }
+        | TextTarget::CellParagraph { .. }
+        | TextTarget::CellRun { .. }
+        | TextTarget::CellRunSpan { .. } => {
             unreachable!("cells are rewritten through their frame")
         },
     };
@@ -1602,6 +1622,34 @@ fn rewrite_cell_run(
         Some(paragraph),
         Some(run),
         span,
+        properties,
+    )?;
+    let mut splices = Splices::new();
+    splices.replace(body.span.clone(), rewritten);
+    splices.apply(cell)
+}
+
+/// Rewrite one paragraph of a cell's text body, as a shape's paragraph is
+/// rewritten (record 0333).
+fn rewrite_cell_paragraph(
+    cell: &[u8],
+    paragraph: usize,
+    properties: &TextProperties<'_>,
+) -> Result<Vec<u8>> {
+    let node = root(cell)?;
+    if node.empty {
+        return Err(invalid("an empty a:tc has no paragraphs"));
+    }
+    let kids = children(cell, &node)?;
+    let body = child(cell, &kids, b"txBody").ok_or(Error::UnsafeEdit {
+        operation: "set_text_properties",
+        reason: "the table cell has no text body",
+    })?;
+    let rewritten = rewrite_body(
+        &cell[body.span.clone()],
+        Some(paragraph),
+        None,
+        None,
         properties,
     )?;
     let mut splices = Splices::new();
@@ -1738,3 +1786,8 @@ fn rewrite_body_text(
     }
     splices.apply(body)
 }
+
+#[path = "text_structure.rs"]
+mod structure;
+pub use structure::TextBody;
+pub(crate) use structure::{Change as TextChange, stage_text_structure};

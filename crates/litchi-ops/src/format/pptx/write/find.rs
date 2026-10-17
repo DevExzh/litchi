@@ -391,13 +391,10 @@ impl Pptx {
                 Some(*column as usize),
                 scopes,
             ),
-            Item::Paragraph(text) => push(&text.shape, Some(text.paragraph as usize), None, scopes),
-            Item::Run(text) | Item::LineBreak(text) => push(
-                &text.shape,
-                Some(text.paragraph as usize),
-                Some(text.run as usize),
-                scopes,
-            ),
+            Item::Paragraph(text) => text_scope(text, None, scopes),
+            Item::Run(text) | Item::LineBreak(text) => {
+                text_scope(text, Some(text.run as usize), scopes)
+            },
             _ => Err(error(
                 Code::UnsupportedCapability,
                 "find searches the presentation, slides, notes, shapes, groups, tables, rows, cells, paragraphs and runs",
@@ -440,6 +437,35 @@ impl Pptx {
         }
         Ok(())
     }
+}
+
+/// The body of a paragraph, run or line break, narrowed to it: a slide
+/// shape's, a table cell's or the notes page's (record 0333).
+fn text_scope(
+    text: &crate::format::pptx::node::TextItem,
+    run: Option<usize>,
+    scopes: &mut Vec<Scope>,
+) -> Result<()> {
+    let (place, slide) = match text.shape.container.notes() {
+        Some(slide) => (Place::Notes, slide as usize),
+        None => (Place::Slide, slide_of(&text.shape)?),
+    };
+    scopes.try_reserve(1).map_err(allocation)?;
+    scopes.push(Scope {
+        locus: Locus {
+            place,
+            slide,
+            shape: text.shape.handle.position().get(),
+            cell: text
+                .cell
+                .get()
+                .map(|(row, column)| (row as usize, column as usize)),
+        },
+        body: Arc::clone(&text.body),
+        paragraph: Some(text.paragraph as usize),
+        run,
+    });
+    Ok(())
 }
 
 /// The slide of a shape; masters and layouts are not searched.

@@ -72,7 +72,7 @@ impl Pptx {
                 "this element kind cannot be added to a PPTX presentation yet",
             )
             .with_suggestion(
-                "addable: slide, shape (textbox), picture, chart, smartart (and its nodes), table column, hyperlink, media and comment; capabilities() lists the gaps",
+                "addable: slide, shape (textbox), picture, chart, smartart (and its nodes), table column, hyperlink, media, comment, paragraph and run; capabilities() lists the gaps",
             ));
         }
         if ["picture", "image", "img"]
@@ -106,6 +106,15 @@ impl Pptx {
         }
         if node.kind().eq_ignore_ascii_case("comment") {
             return self.add_comment(parent, node, limits);
+        }
+        if ["paragraph", "p", "para"]
+            .iter()
+            .any(|kind| node.kind().eq_ignore_ascii_case(kind))
+        {
+            return self.add_paragraph(parent, node, limits);
+        }
+        if node.kind().eq_ignore_ascii_case("run") || node.kind().eq_ignore_ascii_case("r") {
+            return self.add_run(parent, node, limits);
         }
         if node.kind().eq_ignore_ascii_case("shape") || node.kind().eq_ignore_ascii_case("textbox")
         {
@@ -287,6 +296,11 @@ const ADDABLE: &[&str] = &[
     "video",
     "audio",
     "media",
+    "paragraph",
+    "p",
+    "para",
+    "run",
+    "r",
 ];
 
 pub(super) fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {

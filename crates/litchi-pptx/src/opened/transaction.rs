@@ -7,6 +7,7 @@ mod media;
 mod notes;
 mod smartart;
 mod table;
+mod text;
 mod theme;
 
 pub use media::MediaFile;

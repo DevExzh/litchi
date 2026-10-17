@@ -73,6 +73,7 @@ mod spec;
 mod steps;
 mod structure;
 mod text;
+mod text_structure;
 mod theme;
 mod views;
 pub(crate) mod write;
@@ -136,6 +137,9 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     // Pictures (`src`) and legacy comments (record 0252).
     "picture",
     "comment",
+    // Paragraphs and runs of shape, cell and notes bodies (record 0333).
+    "paragraph",
+    "run",
 ];
 
 /// The non-slide elements `remove` deletes when the owner admits shape
@@ -156,6 +160,10 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "video",
     "audio",
     "media",
+    // Paragraphs, runs and line breaks of text bodies (record 0333).
+    "paragraph",
+    "run",
+    "linebreak",
 ];
 
 /// The capability property table of an element whose writable keys extend

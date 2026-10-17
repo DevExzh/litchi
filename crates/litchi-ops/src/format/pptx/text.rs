@@ -84,6 +84,16 @@ pub(crate) fn cell_text(item: &TableItem) -> Result<String> {
     }
 }
 
+/// A table cell's text body with its local properties (record 0333);
+/// `None` for a missing cell or a cell without a body.
+pub(crate) fn cell_body(item: &TableItem) -> Result<Option<Body>> {
+    let table = table(&item.table.handle)?;
+    match table.cell(item.row as usize, item.column as usize)? {
+        Some(cell) => Ok(cell.text_body()?),
+        None => Ok(None),
+    }
+}
+
 /// A table cell's local solid RGB fill.
 pub(crate) fn cell_fill(item: &TableItem) -> Result<Option<[u8; 3]>> {
     let table = table(&item.table.handle)?;

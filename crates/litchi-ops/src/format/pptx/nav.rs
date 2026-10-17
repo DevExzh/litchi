@@ -31,10 +31,11 @@ use litchi_pptx::shape::owned::{Handle as ShapeHandle, Handles};
 use super::Pptx;
 use super::children::{Children, Listing};
 use super::node::{
-    ChartItem, CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node, NotesItem,
-    ReplyItem, SlideItem, TableItem, TextItem, TreeContainer, TreeItem, placeholder_type,
+    CellRef, ChartItem, CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node,
+    NotesItem, ReplyItem, SlideItem, TableItem, TextItem, TreeContainer, TreeItem,
+    placeholder_type,
 };
-use super::spec::{CELL_TEXT_GAP, Kind, NOTES_TEXT_GAP, PLACEHOLDER_TYPE, SPEC};
+use super::spec::{Kind, PLACEHOLDER_TYPE, SPEC};
 use super::{steps, text};
 use crate::Result;
 use crate::node::spec::{FormatSpec, GapSpec};
@@ -363,6 +364,65 @@ impl<'f> Nav<'f> {
                 paragraph: index,
                 run: 0,
                 ordinal: index,
+                cell: CellRef::NONE,
+            }),
+        )))
+    }
+
+    /// A paragraph of a table cell's text body, by path only: cell text
+    /// is not listed in views or unscoped queries (record 0333).
+    fn cell_paragraph(
+        self,
+        cell: &TableItem,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let Some(body) = text::cell_body(cell)? else {
+            return Ok(Lookup::Missing);
+        };
+        let Some(packed) = CellRef::new(cell.row, cell.column) else {
+            return Ok(Lookup::NotApplicable);
+        };
+        let index = match pick_index(body.paragraphs.len(), select) {
+            Pick::Index(index) => index,
+            Pick::Missing => return Ok(Lookup::Missing),
+            Pick::NotApplicable => return Ok(Lookup::NotApplicable),
+        };
+        Ok(Lookup::Found(Node::new(
+            self.file,
+            Item::Paragraph(TextItem {
+                shape: cell.table.clone(),
+                body: Arc::new(body),
+                paragraph: index,
+                run: 0,
+                ordinal: index,
+                cell: packed,
+            }),
+        )))
+    }
+
+    /// A paragraph of a slide's speaker notes (the notes page's body
+    /// placeholder), by path only (record 0333).
+    fn notes_paragraph(self, slide: u32, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let Some(shape) = super::text_structure::notes_body(self.file, slide)? else {
+            return Ok(Lookup::Missing);
+        };
+        let Some(body) = shape.body()?.cloned() else {
+            return Ok(Lookup::Missing);
+        };
+        let index = match pick_index(body.paragraphs.len(), select) {
+            Pick::Index(index) => index,
+            Pick::Missing => return Ok(Lookup::Missing),
+            Pick::NotApplicable => return Ok(Lookup::NotApplicable),
+        };
+        Ok(Lookup::Found(Node::new(
+            self.file,
+            Item::Paragraph(TextItem {
+                shape,
+                body,
+                paragraph: index,
+                run: 0,
+                ordinal: index,
+                cell: CellRef::NONE,
             }),
         )))
     }
@@ -411,6 +471,7 @@ impl<'f> Nav<'f> {
                     paragraph: to_u32(paragraph),
                     run: to_u32(run),
                     ordinal: to_u32(ordinal),
+                    cell: CellRef::NONE,
                 }),
             )),
             None => Lookup::Missing,
@@ -724,8 +785,8 @@ impl<'f> Nav<'f> {
             (Item::DiagramNode(_), Kind::SmartArtNode) => nav.diagram_node(parent.item(), select),
             (Item::Row(row), Kind::Cell) => nav.cell(row, select),
             (Item::Paragraph(text), Kind::Run | Kind::LineBreak) => Ok(nav.run(text, kind, select)),
-            (Item::Cell(_), Kind::Paragraph) => Ok(Lookup::Gap(&CELL_TEXT_GAP)),
-            (Item::Notes(_), Kind::Paragraph) => Ok(Lookup::Gap(&NOTES_TEXT_GAP)),
+            (Item::Cell(cell), Kind::Paragraph) => nav.cell_paragraph(cell, select),
+            (Item::Notes(notes), Kind::Paragraph) => nav.notes_paragraph(notes.slide, select),
             _ => Ok(Lookup::NotApplicable),
         }
     }
@@ -850,6 +911,9 @@ fn tree_item(container: TreeContainer, kind: Kind, handle: ShapeHandle, ordinal:
         TreeContainer::Master(master) => TreeItem::new_master(master, kind, handle, ordinal),
         TreeContainer::Layout { master, position } => {
             TreeItem::new_layout(master, position, kind, handle, ordinal)
+        },
+        container @ TreeContainer::Notes(_) => {
+            TreeItem::in_container(container, kind, handle, ordinal)
         },
     }
 }
