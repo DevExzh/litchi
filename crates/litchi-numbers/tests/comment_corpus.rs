@@ -66,6 +66,13 @@ fn round_trip(
         Some("record 0318"),
         "{label}"
     );
+    assert!(
+        reopened
+            .table_cell_comments(sheet, table)?
+            .iter()
+            .any(|(at, comment)| *at == position && comment.text() == "record 0318"),
+        "{label}"
+    );
     let restored = set
         .package()
         .apply_table_cell_comment(&set.patch().inverse())?;
@@ -124,6 +131,13 @@ fn every_corpus_table_takes_and_gives_back_a_cell_comment() -> TestResult {
                         Err(error) => panic!("{label}: read {error:?}"),
                     }
                 }
+                // The table read lists exactly the cells that read a comment.
+                let listed: Vec<CellPosition> = package
+                    .table_cell_comments(sheet, table)?
+                    .into_iter()
+                    .map(|(position, _)| position)
+                    .collect();
+                assert_eq!(listed, commented, "{label}");
                 if let Some(position) = plain {
                     round_trip(&package, sheet, table, position, &label)?;
                     *summary.entry("created").or_default() += 1;

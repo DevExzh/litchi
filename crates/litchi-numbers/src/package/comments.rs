@@ -937,6 +937,83 @@ impl Package {
         Ok(located.comment)
     }
 
+    /// Read every comment of one table, in row-major cell order.
+    ///
+    /// A table whose comment list holds no entry costs one table-model and
+    /// list decode; otherwise each stored cell is resolved as
+    /// [`Self::table_cell_comment`] resolves it.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::table_cell_comment`].
+    pub fn table_cell_comments<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+    ) -> Result<Vec<(CellPosition, Comment)>, Error> {
+        let origin = resolve_comment(self, sheet, table, CellPosition::new(0, 0))?;
+        let target = origin.target.clone();
+        let path = target.path;
+        let decoded = decode_table_storage(self, &target)?;
+        let Some(list) = decoded.data_store.comment_storage_table() else {
+            return Ok(Vec::new());
+        };
+        let resolved = self
+            .state
+            .index
+            .resolve_ref_id(&self.state.components, list.identifier())
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        let populated = resolved.messages.iter().any(|message| {
+            WireView::parse(message.data.as_slice()).is_ok_and(|view| {
+                view.fields()
+                    .any(|field| field.number() == 3 || field.number() == 4)
+            })
+        });
+        if !populated {
+            return Ok(Vec::new());
+        }
+        let Path::Cell { sheet, table, .. } = path else {
+            return Err(Error::InvalidSource { path });
+        };
+        let semantic = self
+            .state
+            .document
+            .sheets()
+            .get(sheet)
+            .and_then(|candidate| candidate.tables().nth(table))
+            .ok_or(Error::TableNotFound)?;
+        let mut output = Vec::new();
+        for cell in semantic.iter_cells() {
+            let position = cell.position();
+            let row = usize::try_from(position.row()).map_err(|_| Error::InvalidSource { path })?;
+            let column =
+                usize::try_from(position.column()).map_err(|_| Error::InvalidSource { path })?;
+            let located = resolve_comment_native(
+                self,
+                Target {
+                    path: Path::Cell {
+                        sheet,
+                        table,
+                        row,
+                        column,
+                    },
+                    native: target.native.clone(),
+                    row,
+                    column,
+                    tile_size: DEFAULT_TILE_SIZE,
+                },
+            )?;
+            if let Some(comment) = located.comment {
+                output
+                    .try_reserve(1)
+                    .map_err(|_| Error::Allocation { amount: 1, path })?;
+                output.push((position, comment));
+            }
+        }
+        Ok(output)
+    }
+
     /// Read the source-ordered semantic replies for one table-cell comment.
     ///
     /// The recognized native comment graph is validated package-wide before
