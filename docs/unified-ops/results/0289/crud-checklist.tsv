@@ -237,13 +237,13 @@ docx	comment	get	supported		ok 3 instances, first `ooxml/docx/comment.docx` /com
 docx	comment	find	supported		ok 3 instances, first `ooxml/docx/comment.docx` /comments/comment[1]
 docx	comment	query	supported		ok matches in ooxml/docx/comment.docx
 docx	comment	view	supported		ok 3 instances, first `ooxml/docx/comment.docx` /comments/comment[1]
-docx	comment	set	n/a	set not offered for this element	-
+docx	comment	set	supported		ok `seed + add comment` /comments/comment[1] {"author":"Litchi"}
 docx	comment	add	supported		ok /comments/comment[1] on `seed` under /body/p[1] {"author":"Ada","text":"Check"}
 docx	comment	remove	supported		ok `seed + add comment` /comments/comment[1]
 docx	comment	move	format-verb		refused unsupported_capability
 docx	comment	swap	format-verb		refused unsupported_capability
-docx	comment	edit	n/a	edit not offered for this element	-
-docx	comment	batch	n/a	batch not offered for this element	-
+docx	comment	edit	supported		ok tx.set
+docx	comment	batch	supported		ok set item
 docx	comment	create	supported		ok format
 docx	comment	save	supported		ok format
 docx	styles	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /styles
@@ -389,17 +389,17 @@ docx	formfield	edit	gap	R4x	-
 docx	formfield	batch	gap	R4x	-
 docx	formfield	create	gap	R4x	ok format
 docx	formfield	save	gap	R4x	ok format
-docx	picture	get	supported		ok 2 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
-docx	picture	find	supported		ok 2 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
-docx	picture	query	n/a	query not offered for this element	-
-docx	picture	view	supported		ok 2 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
-docx	picture	set	n/a	set not offered for this element	-
+docx	picture	get	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
+docx	picture	find	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
+docx	picture	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
+docx	picture	view	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
+docx	picture	set	supported		ok `seed + add picture` /body/p[1]/picture[1] {"width":"12pt"}
 docx	picture	add	supported		ok /body/p[1]/picture[1] on `seed` under /body/p[1] {"src":"<PNG>","alt":"Logo"}
-docx	picture	remove	n/a	remove not offered for this element	-
-docx	picture	move	format-verb		unreached
-docx	picture	swap	format-verb		unreached
-docx	picture	edit	n/a	edit not offered for this element	-
-docx	picture	batch	n/a	batch not offered for this element	-
+docx	picture	remove	supported		ok `seed + add picture` /body/p[1]/picture[1]
+docx	picture	move	format-verb		refused unsupported_capability
+docx	picture	swap	format-verb		refused unsupported_capability
+docx	picture	edit	supported		ok tx.set
+docx	picture	batch	supported		ok set item
 docx	picture	create	supported		ok format
 docx	picture	save	supported		ok format
 docx	chart	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]
@@ -519,19 +519,58 @@ docx	tab	edit	supported		ok tx.set
 docx	tab	batch	supported		ok set item
 docx	tab	create	supported		ok format
 docx	tab	save	supported		ok format
-docx	smartart	get	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
-docx	smartart	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
+docx	smartart	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
+docx	smartart	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
 docx	smartart	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
-docx	smartart	view	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
-docx	smartart	set	n/a	set not offered for this element	-
+docx	smartart	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
+docx	smartart	set	supported		ok `seed + add smartart` /smartart[1] {"text":"Litchi"}
 docx	smartart	add	supported		ok /smartart[1] on `seed` under /body/p[1] {"layout":"process","text":"Plan\nBuild"}
-docx	smartart	remove	n/a	remove not offered for this element	-
+docx	smartart	remove	supported		ok `seed + add smartart` /smartart[1]
 docx	smartart	move	format-verb		refused unsupported_capability
 docx	smartart	swap	format-verb		refused unsupported_capability
-docx	smartart	edit	n/a	edit not offered for this element	-
-docx	smartart	batch	n/a	batch not offered for this element	-
+docx	smartart	edit	supported		ok tx.set
+docx	smartart	batch	supported		ok set item
 docx	smartart	create	supported		ok format
 docx	smartart	save	supported		ok format
+docx	series	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]/series[1]
+docx	series	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]/series[1]
+docx	series	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
+docx	series	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]/series[1]
+docx	series	set	supported		ok `seed + add chart` /body/p[1]/chart[1]/series[1] {"name":"Litchi"}
+docx	series	add	n/a	add not offered for this element	-
+docx	series	remove	n/a	remove not offered for this element	-
+docx	series	move	format-verb		refused unsupported_capability
+docx	series	swap	format-verb		refused unsupported_capability
+docx	series	edit	supported		ok tx.set
+docx	series	batch	supported		ok set item
+docx	series	create	supported		ok format
+docx	series	save	supported		ok format
+docx	axis	get	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]/axis[1]
+docx	axis	find	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]/axis[1]
+docx	axis	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
+docx	axis	view	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[2]/chart[1]/axis[1]
+docx	axis	set	supported		ok `seed + add chart` /body/p[1]/chart[1]/axis[1] {"title":"Litchi"}
+docx	axis	add	n/a	add not offered for this element	-
+docx	axis	remove	n/a	remove not offered for this element	-
+docx	axis	move	format-verb		refused unsupported_capability
+docx	axis	swap	format-verb		refused unsupported_capability
+docx	axis	edit	supported		ok tx.set
+docx	axis	batch	supported		ok set item
+docx	axis	create	supported		ok format
+docx	axis	save	supported		ok format
+docx	node	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]/node[1]
+docx	node	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]/node[1]
+docx	node	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
+docx	node	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]/node[1]
+docx	node	set	supported		ok `seed + add smartart` /smartart[1]/node[1] {"text":"Litchi"}
+docx	node	add	supported		ok /smartart[1]/node[3] on `seed + add smartart` under /smartart[1] {"text":"Ship"}
+docx	node	remove	supported		ok `seed + add smartart` /smartart[1]/node[1]
+docx	node	move	format-verb		refused unsupported_capability
+docx	node	swap	format-verb		refused unsupported_capability
+docx	node	edit	supported		ok tx.set
+docx	node	batch	supported		ok set item
+docx	node	create	supported		ok format
+docx	node	save	supported		ok format
 xlsx	workbook	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
 xlsx	workbook	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
 xlsx	workbook	query	n/a	query not offered for this element	-
@@ -5537,13 +5576,13 @@ pages	section	edit	supported		ok tx.set
 pages	section	batch	supported		ok set item
 pages	section	create	supported		ok format
 pages	section	save	supported		ok format
-pages	table	get	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
-pages	table	find	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	get	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	find	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	query	supported		ok matches in iwork/pages/body-table-read-native.pages
-pages	table	view	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	view	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	set	n/a	set not offered for this element	-
-pages	table	add	n/a	add not offered for this element	-
-pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	add	supported		ok /body/tbl[3] on `iwork/pages/body-table-read-native.pages` under /body {"name":"Litchi","rows":"2","columns":"2","data":"Litchi"}
+pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages + add table` /body/tbl[1]
 pages	table	move	format-verb		refused invalid_argument
 pages	table	swap	format-verb		refused invalid_argument
 pages	table	edit	n/a	edit not offered for this element	-
@@ -5697,7 +5736,7 @@ keynote	run	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key`
 keynote	run	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
 keynote	run	query	supported		ok matches in create()
 keynote	run	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
-keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
+keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes/paragraph[1]/run[1] {"bold":"true"}
 keynote	run	add	n/a	add not offered for this element	-
 keynote	run	remove	n/a	remove not offered for this element	-
 keynote	run	move	format-verb		unreached
@@ -5771,23 +5810,23 @@ keynote	audio	edit	n/a	edit not offered for this element	-
 keynote	audio	batch	n/a	batch not offered for this element	-
 keynote	audio	create	supported		ok format
 keynote	audio	save	supported		ok format
-keynote	table	get	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
-keynote	table	find	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	get	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	find	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
 keynote	table	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	table	view	supported		ok 1 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
+keynote	table	view	supported		ok 4 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]
 keynote	table	set	n/a	set not offered for this element	-
-keynote	table	add	n/a	add not offered for this element	-
+keynote	table	add	supported		ok /slide[1]/table[2] on `iwork/keynote/slide-table-read-native.key` under /slide[1] {"rows":"2","cols":"2","data":"a,b;c,d"}
 keynote	table	remove	n/a	remove not offered for this element	-
-keynote	table	move	format-verb		unreached
-keynote	table	swap	format-verb		unreached
+keynote	table	move	format-verb		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1] /slide[1]/table[2]
+keynote	table	swap	format-verb		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1] /slide[1]/table[2]
 keynote	table	edit	n/a	edit not offered for this element	-
 keynote	table	batch	n/a	batch not offered for this element	-
 keynote	table	create	supported		ok format
 keynote	table	save	supported		ok format
-keynote	tr	get	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
-keynote	tr	find	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	get	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	find	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
 keynote	tr	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	tr	view	supported		ok 5 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
+keynote	tr	view	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]
 keynote	tr	set	n/a	set not offered for this element	-
 keynote	tr	add	n/a	add not offered for this element	-
 keynote	tr	remove	n/a	remove not offered for this element	-
@@ -5797,11 +5836,11 @@ keynote	tr	edit	n/a	edit not offered for this element	-
 keynote	tr	batch	n/a	batch not offered for this element	-
 keynote	tr	create	supported		ok format
 keynote	tr	save	supported		ok format
-keynote	tc	get	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
-keynote	tc	find	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	get	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	find	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
 keynote	tc	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
-keynote	tc	view	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
-keynote	tc	set	supported		ok `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
+keynote	tc	view	supported		ok 8 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
+keynote	tc	set	supported		ok `iwork/keynote/slide-table-read-native.key + add table` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
 keynote	tc	add	n/a	add not offered for this element	-
 keynote	tc	remove	n/a	remove not offered for this element	-
 keynote	tc	move	format-verb		refused unsupported_capability

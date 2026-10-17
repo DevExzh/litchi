@@ -15,6 +15,7 @@ fn fixture(relative: &str) -> std::path::PathBuf {
 }
 
 /// Archive constructions recorded while running `body`.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx"))]
 fn archive_constructions(body: impl FnOnce()) -> usize {
     crate::detection_smart::reset_opc_probe_count();
     body();
@@ -120,6 +121,7 @@ fn xlsx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
 /// A non-OOXML input keeps its classification and receives no handle.
 #[test]
 fn non_ooxml_inputs_are_still_classified_without_a_prepared_handle() {
+    #[allow(unused_mut, reason = "a build with no non-OOXML format pushes no case")]
     let mut cases: Vec<(std::path::PathBuf, FileFormat)> = Vec::new();
     #[cfg(feature = "doc")]
     cases.push((fixture("ole/doc/NoHeadFoot.doc"), FileFormat::Doc));

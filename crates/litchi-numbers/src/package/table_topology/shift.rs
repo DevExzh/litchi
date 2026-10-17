@@ -27,10 +27,16 @@
 //!
 //! Refused, typed, before anything is published:
 //!
-//! - [`Unsupported::DeletedReference`]: a surviving formula reads a cell of
-//!   the removed row or column, or a range starts or ends there. Native
-//!   Numbers turns such a reference into `#REF!`; like the host editor, this
-//!   transaction does not write reference-error nodes.
+//! Removed rows and columns (record 0329): a reference to a removed cell,
+//! and a range wholly on the removed axis, become `REFERENCE_ERROR_NODE`s
+//! (`#REF!`, as native Numbers writes them) and the formula caches an error
+//! result; a range that loses a row or column shrinks; precedent edges and
+//! range dependencies into the removed axis go with it. Where the cell
+//! writer could not clear the removed cells, their hosts' dependency
+//! records go here, and an emptied dependency tile with them.
+//!
+//! - [`Unsupported::DeletedReference`]: the removed axis is one of several
+//!   ranges of one colon tract, or an endpoint of a merge range.
 //! - [`Unsupported::ReferencedByOtherOwners`]: a formula in another table, or
 //!   a chart, reads the table (its dependency edges, legacy UUID ranges or
 //!   UUID references name the table).
@@ -39,8 +45,8 @@
 //!   moves, a packed coordinate, a dependency record that would cross its
 //!   tile.
 //! - [`Unsupported::SharedFormulas`]: one formula-list entry shared by cells
-//!   whose rewritten formulas would differ (the host editor splits the entry;
-//!   not ported).
+//!   whose rewritten formulas would differ, in a segmented formula list (an
+//!   unsegmented list is split: record 0329).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -50,8 +56,8 @@ use super::super::Package;
 use super::super::structure::{Fault, map_wire, references, reserve};
 use super::storage::bnc_cells;
 use super::wire::{
-    bytes_field, fields, push_varint, rebuild, repeated_bytes, repeated_varints, single_bytes,
-    single_reference, single_varint,
+    bytes_field, fields, push_varint, push_varint_field, rebuild, repeated_bytes, repeated_varints,
+    single_bytes, single_reference, single_varint,
 };
 use super::{LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, Unsupported};
 
@@ -114,6 +120,12 @@ pub(super) struct Shift {
     /// A check before the removed axis is cleared: formula hosts on it are
     /// left as they are (the clear removes them).
     pub(super) pending_clear: bool,
+    /// The removed axis was not cleared through the cell writer (record
+    /// 0329): the formula hosts on it are dropped here, with their
+    /// dependency records and formula-list references, and no dependent
+    /// cache is recomputed, so a surviving range over the removed axis is
+    /// refused.
+    pub(super) drop_hosts: bool,
 }
 
 impl Shift {
@@ -129,6 +141,7 @@ impl Shift {
         if value > self.position {
             return Ok(value - 1);
         }
+        eprintln!("DEBUGREF {}", std::backtrace::Backtrace::force_capture());
         refuse(Unsupported::DeletedReference)
     }
 
@@ -139,7 +152,33 @@ impl Shift {
     /// Whether a formula host at `(row, column)` sits on the removed axis
     /// that a pending clear empties.
     const fn cleared(self, row: u32, column: u32) -> bool {
-        self.pending_clear && !self.insert && self.axis(row, column) == self.position
+        (self.pending_clear || self.drop_hosts)
+            && !self.insert
+            && self.axis(row, column) == self.position
+    }
+
+    /// Whether `value` is the removed coordinate.
+    const fn removed(self, value: u32) -> bool {
+        !self.insert && value == self.position
+    }
+
+    /// The interval `[low, high]` after the edit: a removed endpoint moves
+    /// inward, as native Numbers shrinks a range that loses a row or
+    /// column (record 0329); `None` when the whole interval is removed.
+    fn interval(self, low: u32, high: u32) -> Out<Option<(u32, u32)>> {
+        if self.insert || !(low..=high).contains(&self.position) {
+            return Ok(Some((self.coordinate(low)?, self.coordinate(high)?)));
+        }
+        if low == high {
+            return Ok(None);
+        }
+        if self.drop_hosts {
+            // The removed cells were not cleared through the cell writer, so
+            // the range's cached result would go stale.
+            return refuse(Unsupported::Formulas);
+        }
+        let low = if low > self.position { low - 1 } else { low };
+        Ok(Some((low, high - 1)))
     }
 }
 
@@ -194,6 +233,9 @@ pub(super) struct Table<'a> {
     pub(super) rows: u32,
     /// Footer rows before the edit.
     pub(super) footer_rows: u32,
+    /// The references removed cells hold per formula-list key, when the
+    /// cell writer could not clear them (record 0329).
+    pub(super) dropped_formulas: &'a BTreeMap<u64, u64>,
 }
 
 fn u32_of(value: u64) -> Out<u32> {
@@ -470,8 +512,14 @@ fn patch_range_coordinate(data: &[u8], values: [u32; 4]) -> Out<Vec<u8>> {
     Ok(output)
 }
 
-/// `mutate_range_coordinate`, with the footer override.
-fn mutate_range(range: [u32; 4], shift: Shift, adjustment: Option<&Adjustment>) -> Out<[u32; 4]> {
+/// `mutate_range_coordinate`, with the footer override; a range that loses
+/// a row or column shrinks, and `None` is a range wholly removed (record
+/// 0329).
+fn mutate_range(
+    range: [u32; 4],
+    shift: Shift,
+    adjustment: Option<&Adjustment>,
+) -> Out<Option<[u32; 4]>> {
     let [left, top, right, bottom] = range;
     let footer = adjustment.and_then(|adjustment| {
         if !shift.row_axis {
@@ -491,24 +539,18 @@ fn mutate_range(range: [u32; 4], shift: Shift, adjustment: Option<&Adjustment>) 
             .flatten()
         }
     });
-    Ok(if shift.row_axis {
-        [
-            left,
-            shift.coordinate(top)?,
-            right,
-            match footer {
-                Some(value) => value,
-                None => shift.coordinate(bottom)?,
-            },
-        ]
+    if shift.row_axis {
+        if let Some(value) = footer {
+            return Ok(Some([left, shift.coordinate(top)?, right, value]));
+        }
+        Ok(shift
+            .interval(top.min(bottom), top.max(bottom))?
+            .map(|(top, bottom)| [left, top, right, bottom]))
     } else {
-        [
-            shift.coordinate(left)?,
-            top,
-            shift.coordinate(right)?,
-            bottom,
-        ]
-    })
+        Ok(shift
+            .interval(left.min(right), left.max(right))?
+            .map(|(left, right)| [left, top, right, bottom]))
+    }
 }
 
 /// An explicit `TSCE.CellCoordinateArchive`: `(row, column)`.
@@ -532,8 +574,13 @@ fn patch_coordinate(data: &[u8], row: u32, column: u32) -> Out<Vec<u8>> {
     )?)
 }
 
-/// `mutate_cell_rect` and its wire rewrite.
-fn rewrite_rect(rect: &[u8], shift: Shift, adjustment: Option<&Adjustment>) -> Out<Vec<u8>> {
+/// `mutate_cell_rect` and its wire rewrite; `None` for a rect wholly
+/// removed.
+fn rewrite_rect(
+    rect: &[u8],
+    shift: Shift,
+    adjustment: Option<&Adjustment>,
+) -> Out<Option<Vec<u8>>> {
     let origin = single_bytes(rect, 1)?.ok_or(Fault::Invalid)?;
     let size = single_bytes(rect, 2)?.ok_or(Fault::Invalid)?;
     let (row, column) = explicit_coordinate(origin)?;
@@ -550,7 +597,9 @@ fn rewrite_rect(rect: &[u8], shift: Shift, adjustment: Option<&Adjustment>) -> O
         row.checked_add(rows.saturating_sub(1))
             .ok_or(Fault::Invalid)?,
     ];
-    let [left, top, right, bottom] = mutate_range(range, shift, adjustment)?;
+    let Some([left, top, right, bottom]) = mutate_range(range, shift, adjustment)? else {
+        return Ok(None);
+    };
     let columns = right
         .checked_sub(left)
         .and_then(|size| size.checked_add(1))
@@ -561,20 +610,24 @@ fn rewrite_rect(rect: &[u8], shift: Shift, adjustment: Option<&Adjustment>) -> O
         .ok_or(Fault::Invalid)?;
     let output =
         w::transform_length_delimited_field(rect, 1, |origin| patch_coordinate(origin, top, left))?;
-    w::transform_length_delimited_field(&output, 2, |size| -> Out<Vec<u8>> {
-        let size = w::patch_varint_field(
-            size,
-            1,
-            previous_columns.is_some(),
-            (columns != 1).then_some(u64::from(columns)),
-        )?;
-        Ok(w::patch_varint_field(
-            &size,
-            2,
-            previous_rows.is_some(),
-            (rows != 1).then_some(u64::from(rows)),
-        )?)
-    })
+    Ok(Some(w::transform_length_delimited_field(
+        &output,
+        2,
+        |size| -> Out<Vec<u8>> {
+            let size = w::patch_varint_field(
+                size,
+                1,
+                previous_columns.is_some(),
+                (columns != 1).then_some(u64::from(columns)),
+            )?;
+            Ok(w::patch_varint_field(
+                &size,
+                2,
+                previous_rows.is_some(),
+                (rows != 1).then_some(u64::from(rows)),
+            )?)
+        },
+    )?))
 }
 
 // ---------------------------------------------------------------------------
@@ -656,7 +709,8 @@ fn whole_axis(tract: &[u8], row_axis: bool) -> Out<bool> {
     )
 }
 
-/// `mutate_tract_interval`.
+/// `mutate_tract_interval`; `None` for an interval wholly removed (record
+/// 0329).
 #[allow(
     clippy::too_many_arguments,
     reason = "the host editor's interval rule takes the whole edit context"
@@ -669,9 +723,9 @@ fn mutate_interval(
     footer: Option<Footer>,
     columns: &[(u32, u32)],
     adjustment: &mut Adjustment,
-) -> Out<(u32, u32)> {
+) -> Out<Option<(u32, u32)>> {
     if cross_table {
-        return Ok((begin, end));
+        return Ok(Some((begin, end)));
     }
     let low = begin.min(end);
     let high = begin.max(end);
@@ -687,16 +741,21 @@ fn mutate_interval(
                     && low < shift.position
             }
         });
-    let shifted_high = if footer_change {
-        if shift.insert {
-            shift.position
-        } else {
-            shift.position.checked_sub(1).ok_or(Fault::Invalid)?
-        }
+    let (shifted_low, shifted_high) = if footer_change {
+        (
+            shift.coordinate(low)?,
+            if shift.insert {
+                shift.position
+            } else {
+                shift.position.checked_sub(1).ok_or(Fault::Invalid)?
+            },
+        )
     } else {
-        shift.coordinate(high)?
+        match shift.interval(low, high)? {
+            Some(interval) => interval,
+            None => return Ok(None),
+        }
     };
-    let shifted_low = shift.coordinate(low)?;
     if footer_change {
         if columns.is_empty() {
             return refuse(Unsupported::Formulas);
@@ -713,11 +772,11 @@ fn mutate_interval(
             }
         }
     }
-    Ok(if begin <= end {
+    Ok(Some(if begin <= end {
         (shifted_low, shifted_high)
     } else {
         (shifted_high, shifted_low)
-    })
+    }))
 }
 
 /// The edit context of one formula host.
@@ -787,13 +846,22 @@ fn cfuuid_key(uuid: &[u8]) -> Out<Option<(u64, u64)>> {
     Ok(Some((value as u64, (value >> 64) as u64)))
 }
 
+/// What a colon tract becomes.
+enum Tract {
+    Unchanged,
+    Rewritten(Vec<u8>),
+    /// Its only range on the edited axis was removed: the node reads
+    /// `#REF!` (record 0329).
+    Removed,
+}
+
 /// `rewrite_colon_tract` and its wire rewrite (`rewrite_colon_tract_wire`).
 fn rewrite_tract(
     tract: &[u8],
     host: Host,
     cross_table: bool,
     adjustment: &mut Adjustment,
-) -> Out<Option<Vec<u8>>> {
+) -> Out<Tract> {
     let shift = host.shift;
     let columns = tract_intervals(tract, false, host.column)?;
     let (relative_field, absolute_field) = if shift.row_axis { (2, 4) } else { (1, 3) };
@@ -806,14 +874,64 @@ fn rewrite_tract(
     }
     let previous = current.clone();
     let keep_sentinel = whole_axis(tract, shift.row_axis)?;
-    if let Some(ranges) = current.get_mut(&relative_field) {
+    let axis_ranges = current[&relative_field].len() + current[&absolute_field].len();
+    let mut removed = false;
+    // A range whose endpoints mix absolute and relative rows (or columns),
+    // `C$2:$C6`, holds one single-point range of each kind: its endpoints
+    // move as one interval's (record 0329).
+    let mixed = match (
+        current[&relative_field].as_slice(),
+        current[&absolute_field].as_slice(),
+    ) {
+        ([relative], [absolute])
+            if !cross_table
+                && !shift.insert
+                && !keep_sentinel
+                && host.footer.is_none()
+                && relative.end.is_none()
+                && absolute.end.is_none() =>
+        {
+            let first = resolve_relative(anchor, relative.begin)?;
+            let second = u32_of(u64::try_from(absolute.begin).map_err(|_error| Fault::Invalid)?)?;
+            let (low, high) = (first.min(second), first.max(second));
+            if (low..=high).contains(&shift.position) {
+                if shift.interval(low, high)?.is_none() {
+                    return Ok(Tract::Removed);
+                }
+                let moved = |value: u32| -> Out<u32> {
+                    if value != shift.position {
+                        return shift.coordinate(value);
+                    }
+                    Ok(if value == high {
+                        shift.position - 1
+                    } else {
+                        shift.position
+                    })
+                };
+                Some((moved(first)?, moved(second)?))
+            } else {
+                None
+            }
+        },
+        _ => None,
+    };
+    if let Some((first, second)) = mixed {
+        if let Some([range]) = current.get_mut(&relative_field).map(Vec::as_mut_slice) {
+            range.begin = i64::from(first) - i64::from(shifted_host);
+            check_i32(range.begin)?;
+        }
+        if let Some([range]) = current.get_mut(&absolute_field).map(Vec::as_mut_slice) {
+            range.begin = i64::from(second);
+        }
+    }
+    if let Some(ranges) = current.get_mut(&relative_field).filter(|_| mixed.is_none()) {
         for range in ranges.iter_mut() {
             let begin = resolve_relative(anchor, range.begin)?;
             let end = match range.end {
                 Some(end) => resolve_relative(anchor, end)?,
                 None => begin,
             };
-            let (shifted_begin, shifted_end) = mutate_interval(
+            let Some((shifted_begin, shifted_end)) = mutate_interval(
                 begin,
                 end,
                 cross_table,
@@ -821,7 +939,11 @@ fn rewrite_tract(
                 host.footer,
                 &columns,
                 adjustment,
-            )?;
+            )?
+            else {
+                removed = true;
+                continue;
+            };
             if cross_table {
                 range.begin = shift_relative(range.begin, offset)?;
                 range.end = range
@@ -837,14 +959,17 @@ fn rewrite_tract(
             }
         }
     }
-    if !keep_sentinel && let Some(ranges) = current.get_mut(&absolute_field) {
+    if !keep_sentinel
+        && mixed.is_none()
+        && let Some(ranges) = current.get_mut(&absolute_field)
+    {
         for range in ranges.iter_mut() {
             let begin = u32_of(u64::try_from(range.begin).map_err(|_error| Fault::Invalid)?)?;
             let end = match range.end {
                 Some(end) => u32_of(u64::try_from(end).map_err(|_error| Fault::Invalid)?)?,
                 None => begin,
             };
-            let (shifted_begin, shifted_end) = mutate_interval(
+            let Some((shifted_begin, shifted_end)) = mutate_interval(
                 begin,
                 end,
                 cross_table,
@@ -852,13 +977,24 @@ fn rewrite_tract(
                 host.footer,
                 &columns,
                 adjustment,
-            )?;
+            )?
+            else {
+                removed = true;
+                continue;
+            };
             range.begin = i64::from(shifted_begin);
             range.end = (shifted_begin != shifted_end).then_some(i64::from(shifted_end));
         }
     }
+    if removed {
+        if axis_ranges == 1 {
+            return Ok(Tract::Removed);
+        }
+        // A tract of several ranges, one of them removed.
+        return refuse(Unsupported::DeletedReference);
+    }
     if current == previous {
-        return Ok(None);
+        return Ok(Tract::Unchanged);
     }
     let mut output = tract.to_vec();
     for number in 1..=4 {
@@ -890,7 +1026,7 @@ fn rewrite_tract(
         }
         output = w::rewrite_repeated_length_delimited_fields(&output, number, &replacements)?;
     }
-    Ok(Some(output))
+    Ok(Tract::Rewritten(output))
 }
 
 fn check_i32(value: i64) -> Out<i32> {
@@ -991,9 +1127,108 @@ fn footer_overrides(
     Ok(overrides)
 }
 
+/// `TSCE.ASTNodeArrayArchive.ASTNodeType.REFERENCE_ERROR_NODE`.
+const REFERENCE_ERROR_NODE: u64 = 30;
+
+/// The node that replaces a reference to a removed row or column (or a
+/// range wholly removed): `#REF!`, as native Numbers writes it (record
+/// 0329). The replaced node's leading whitespace stays.
+fn reference_error_node(node: &[u8]) -> Out<Vec<u8>> {
+    let mut output = Vec::new();
+    push_varint_field(&mut output, 1, REFERENCE_ERROR_NODE)?;
+    if let Some(whitespace) = single_bytes(node, 25)? {
+        output.extend(bytes_field(25, whitespace)?);
+    }
+    Ok(output)
+}
+
+/// The target, on the edited axis, of a node whose coordinate moves with
+/// the edit (a same-table reference of an own formula, or a reference into
+/// the edited table of another table's formula).
+fn moving_target(node: &[u8], host: Host, coordinate_field: u32) -> Out<Option<u32>> {
+    if host.other_table(node)? {
+        return Ok(None);
+    }
+    let Some((encoded, absolute)) = node_coordinate(node, coordinate_field)? else {
+        return Ok(None);
+    };
+    let target = if absolute {
+        encoded
+    } else {
+        i64::from(host.axis()) + encoded
+    };
+    u32::try_from(target)
+        .map(Some)
+        .map_err(|_error| Failure::Refused(Unsupported::Formulas))
+}
+
+/// The ranges (`reference, reference, COLON_NODE`) a removal reaches: the
+/// first-node indices of the ranges wholly removed, and the endpoints that
+/// move inward (record 0329). Footer overrides keep their endpoints.
+fn range_removals(
+    nodes: &[&[u8]],
+    host: Host,
+    coordinate_field: u32,
+    overrides: &HashMap<usize, u32>,
+) -> Out<(HashSet<usize>, HashMap<usize, u32>)> {
+    let shift = host.shift;
+    let mut removed = HashSet::new();
+    let mut shrunk = HashMap::new();
+    if shift.insert {
+        return Ok((removed, shrunk));
+    }
+    let mut index = 0;
+    while index + 2 < nodes.len() {
+        if optional_varint(nodes[index + 2], 1)? != Some(COLON_NODE) {
+            index += 1;
+            continue;
+        }
+        let (Some(first), Some(second)) = (
+            moving_target(nodes[index], host, coordinate_field)?,
+            moving_target(nodes[index + 1], host, coordinate_field)?,
+        ) else {
+            index += 1;
+            continue;
+        };
+        let (low, high) = (first.min(second), first.max(second));
+        if (low..=high).contains(&shift.position) {
+            if overrides.contains_key(&index) || overrides.contains_key(&(index + 1)) {
+                index += 3;
+                continue;
+            }
+            match shift.interval(low, high)? {
+                None => {
+                    removed.insert(index);
+                },
+                Some(_) => {
+                    for (endpoint, target) in [(index, first), (index + 1, second)] {
+                        if target == shift.position {
+                            let moved = if target == high {
+                                shift.position - 1
+                            } else {
+                                shift.position
+                            };
+                            shrunk.insert(endpoint, moved);
+                        }
+                    }
+                },
+            }
+        }
+        index += 3;
+    }
+    Ok((removed, shrunk))
+}
+
 /// `rewrite_formula_nodes` and its wire rewrite (`rewrite_ast_array_wire`):
-/// the rewritten `ASTNodeArrayArchive`, or `None` when nothing moves.
-fn rewrite_array(array: &[u8], host: Host, adjustment: &mut Adjustment) -> Out<Option<Vec<u8>>> {
+/// the rewritten `ASTNodeArrayArchive`, or `None` when nothing moves. A
+/// reference to a removed row or column becomes `#REF!` and sets
+/// `references_removed`; a range that loses a row or column shrinks.
+fn rewrite_array(
+    array: &[u8],
+    host: Host,
+    adjustment: &mut Adjustment,
+    references_removed: &mut bool,
+) -> Out<Option<Vec<u8>>> {
     let shift = host.shift;
     let nodes = w::repeated_length_delimited_payloads(array, 1)?;
     let anchor = host.axis();
@@ -1001,11 +1236,21 @@ fn rewrite_array(array: &[u8], host: Host, adjustment: &mut Adjustment) -> Out<O
     let offset = host.cross_table_offset()?;
     let overrides = footer_overrides(&nodes, host, adjustment)?;
     let coordinate_field = if shift.row_axis { 27 } else { 26 };
+    let (removed_ranges, shrunk) = range_removals(&nodes, host, coordinate_field, &overrides)?;
     let mut changed = false;
     let mut replacements = Vec::new();
     reserve(&mut replacements, nodes.len())?;
-    for (index, node) in nodes.iter().enumerate() {
-        let node: &[u8] = node;
+    let mut index = 0;
+    while index < nodes.len() {
+        let node: &[u8] = nodes[index];
+        if removed_ranges.contains(&index) {
+            replacements.push(reference_error_node(node)?);
+            *references_removed = true;
+            changed = true;
+            index += 3;
+            continue;
+        }
+        index += 1;
         if single_bytes(node, 39)?.is_some() && shifted_host != anchor {
             return refuse(Unsupported::Formulas);
         }
@@ -1028,8 +1273,17 @@ fn rewrite_array(array: &[u8], host: Host, adjustment: &mut Adjustment) -> Out<O
                 };
                 let target = u32::try_from(target)
                     .map_err(|_error| Failure::Refused(Unsupported::Formulas))?;
-                let shifted_target = match overrides.get(&index) {
+                let shifted_target = match overrides
+                    .get(&(index - 1))
+                    .or_else(|| shrunk.get(&(index - 1)))
+                {
                     Some(value) => *value,
+                    None if shift.removed(target) => {
+                        replacements.push(reference_error_node(node)?);
+                        *references_removed = true;
+                        changed = true;
+                        continue;
+                    },
                     None => shift.coordinate(target)?,
                 };
                 if absolute {
@@ -1049,18 +1303,28 @@ fn rewrite_array(array: &[u8], host: Host, adjustment: &mut Adjustment) -> Out<O
             }
         }
         if let Some(thunk) = single_bytes(node, 14)?
-            && let Some(rewritten) = rewrite_array(thunk, host, adjustment)?
+            && let Some(rewritten) = rewrite_array(thunk, host, adjustment, references_removed)?
         {
             output = w::transform_length_delimited_field(&output, 14, |_| -> Out<Vec<u8>> {
                 Ok(rewritten)
             })?;
         }
-        if let Some(tract) = single_bytes(node, 40)?
-            && let Some(rewritten) = rewrite_tract(tract, host, cross_table, adjustment)?
-        {
-            output = w::transform_length_delimited_field(&output, 40, |_| -> Out<Vec<u8>> {
-                Ok(rewritten)
-            })?;
+        if let Some(tract) = single_bytes(node, 40)? {
+            match rewrite_tract(tract, host, cross_table, adjustment)? {
+                Tract::Unchanged => {},
+                Tract::Rewritten(rewritten) => {
+                    output =
+                        w::transform_length_delimited_field(&output, 40, |_| -> Out<Vec<u8>> {
+                            Ok(rewritten)
+                        })?;
+                },
+                Tract::Removed => {
+                    replacements.push(reference_error_node(node)?);
+                    *references_removed = true;
+                    changed = true;
+                    continue;
+                },
+            }
         }
         changed |= output.as_slice() != node;
         replacements.push(output);
@@ -1080,9 +1344,10 @@ fn rewrite_formula(
     formula: &[u8],
     host: Host,
     adjustment: &mut Adjustment,
+    references_removed: &mut bool,
 ) -> Out<Option<Vec<u8>>> {
     let array = single_bytes(formula, 1)?.ok_or(Fault::Invalid)?;
-    let Some(rewritten) = rewrite_array(array, host, adjustment)? else {
+    let Some(rewritten) = rewrite_array(array, host, adjustment, references_removed)? else {
         return Ok(None);
     };
     Ok(Some(w::transform_length_delimited_field(
@@ -1203,7 +1468,9 @@ fn formula_key(package: &Package, store: &[u8], row: u32, column: u32) -> Out<u6
 // ---------------------------------------------------------------------------
 
 /// `mutate_dependency_record` and its wire rewrite
-/// (`rewrite_shifted_dependency_records`, one record).
+/// (`rewrite_shifted_dependency_records`, one record). `None` drops the
+/// record of a dropped host; precedent edges into a removed row or column
+/// go (record 0329: the formula reads `#REF!` there).
 fn rewrite_record(
     record: &[u8],
     shift: Shift,
@@ -1211,11 +1478,11 @@ fn rewrite_record(
     adjustments: &BTreeMap<(u32, u32), Adjustment>,
     range_hosts: &HashSet<(u32, u32)>,
     host_moves: bool,
-) -> Out<Vec<u8>> {
+) -> Out<Option<Vec<u8>>> {
     let column = required_u32(record, 1)?;
     let row = required_u32(record, 2)?;
     if host_moves && shift.cleared(row, column) {
-        return Ok(record.to_vec());
+        return Ok((!shift.drop_hosts).then(|| record.to_vec()));
     }
     let (axis_field, axis_value) = if shift.row_axis {
         (2, row)
@@ -1229,13 +1496,13 @@ fn rewrite_record(
         record.to_vec()
     };
     let Some(edges) = single_bytes(record, 6)? else {
-        return Ok(output);
+        return Ok(Some(output));
     };
     let mut local_rows = repeated_varints(edges, 1)?;
     let mut local_columns = repeated_varints(edges, 2)?;
     let mut owned_rows = repeated_varints(edges, 3)?;
     let mut owned_columns = repeated_varints(edges, 4)?;
-    let owners = repeated_varints(edges, 5)?;
+    let mut owners = repeated_varints(edges, 5)?;
     if local_rows.len() != local_columns.len()
         || owned_rows.len() != owned_columns.len()
         || owned_rows.len() != owners.len()
@@ -1268,6 +1535,9 @@ fn rewrite_record(
                 continue;
             }
             let (row, column) = coordinate;
+            if shift.removed(shift.axis(row, column)) {
+                continue;
+            }
             retained.push(if shift.row_axis {
                 (shift.coordinate(row)?, column)
             } else {
@@ -1283,38 +1553,69 @@ fn rewrite_record(
             .map(|(_, column)| u64::from(*column))
             .collect();
     } else {
-        let local = if shift.row_axis {
-            &mut local_rows
-        } else {
-            &mut local_columns
-        };
-        for coordinate in local.iter_mut() {
-            *coordinate = u64::from(shift.coordinate(u32_of(*coordinate)?)?);
+        let mut rows = Vec::new();
+        let mut columns = Vec::new();
+        reserve(&mut rows, local_rows.len())?;
+        reserve(&mut columns, local_columns.len())?;
+        for (row, column) in local_rows.iter().zip(&local_columns) {
+            let (row, column) = (u32_of(*row)?, u32_of(*column)?);
+            if shift.removed(shift.axis(row, column)) {
+                continue;
+            }
+            let (row, column) = if shift.row_axis {
+                (shift.coordinate(row)?, column)
+            } else {
+                (row, shift.coordinate(column)?)
+            };
+            rows.push(u64::from(row));
+            columns.push(u64::from(column));
         }
+        local_rows = rows;
+        local_columns = columns;
     }
-    let owned = if shift.row_axis {
-        &mut owned_rows
-    } else {
-        &mut owned_columns
-    };
-    for (coordinate, owner) in owned.iter_mut().zip(&owners) {
+    let mut kept_rows = Vec::new();
+    let mut kept_columns = Vec::new();
+    let mut kept_owners = Vec::new();
+    reserve(&mut kept_rows, owned_rows.len())?;
+    reserve(&mut kept_columns, owned_rows.len())?;
+    reserve(&mut kept_owners, owned_rows.len())?;
+    for ((row, column), owner) in owned_rows.iter().zip(&owned_columns).zip(&owners) {
+        let (mut row, mut column) = (u32_of(*row)?, u32_of(*column)?);
         if *owner == internal {
-            *coordinate = u64::from(shift.coordinate(u32_of(*coordinate)?)?);
+            if shift.removed(shift.axis(row, column)) {
+                continue;
+            }
+            if shift.row_axis {
+                row = shift.coordinate(row)?;
+            } else {
+                column = shift.coordinate(column)?;
+            }
         }
+        kept_rows.push(u64::from(row));
+        kept_columns.push(u64::from(column));
+        kept_owners.push(*owner);
     }
+    let owners_changed = kept_owners.len() != owners.len();
+    owned_rows = kept_rows;
+    owned_columns = kept_columns;
+    owners = kept_owners;
     output = w::transform_length_delimited_field(&output, 6, |edges| -> Out<Vec<u8>> {
         let mut data = edges.to_vec();
-        for (number, values) in [
+        let mut lists = vec![
             (1, &local_rows),
             (2, &local_columns),
             (3, &owned_rows),
             (4, &owned_columns),
-        ] {
+        ];
+        if owners_changed {
+            lists.push((5, &owners));
+        }
+        for (number, values) in lists {
             data = write_varints(&data, number, values)?;
         }
         Ok(data)
     })?;
-    Ok(output)
+    Ok(Some(output))
 }
 
 fn rewrite_records(
@@ -1322,30 +1623,62 @@ fn rewrite_records(
     field: u32,
     mut map: impl FnMut(&[u8]) -> Out<Vec<u8>>,
 ) -> Out<Vec<u8>> {
-    let raw = w::repeated_length_delimited_payloads(container, field)?;
-    let mut replacements = Vec::new();
-    reserve(&mut replacements, raw.len())?;
-    for record in raw {
-        replacements.push(map(record)?);
-    }
-    Ok(w::rewrite_repeated_length_delimited_fields(
-        container,
-        field,
-        &replacements,
-    )?)
+    filter_records(container, field, |record| map(record).map(Some))
 }
 
-/// `rewrite_range_back_dependency` for one own range dependency.
+/// Rewrite the records of `container` (`field` repeated records); `None`
+/// from `map` drops the record (record 0329: a dependency on removed cells
+/// only, or a removed host's).
+fn filter_records(
+    container: &[u8],
+    field: u32,
+    mut map: impl FnMut(&[u8]) -> Out<Option<Vec<u8>>>,
+) -> Out<Vec<u8>> {
+    let raw = w::repeated_length_delimited_payloads(container, field)?;
+    let mut mapped = Vec::new();
+    reserve(&mut mapped, raw.len())?;
+    for record in raw {
+        mapped.push(map(record)?);
+    }
+    if mapped.iter().all(Option::is_some) {
+        let replacements: Vec<Vec<u8>> = mapped.into_iter().flatten().collect();
+        return Ok(w::rewrite_repeated_length_delimited_fields(
+            container,
+            field,
+            &replacements,
+        )?);
+    }
+    let mut next = mapped.into_iter();
+    let mut output = Vec::new();
+    reserve(&mut output, container.len())?;
+    for candidate in fields(container)? {
+        if candidate.number != field {
+            output.extend_from_slice(candidate.raw);
+            continue;
+        }
+        match next.next().ok_or(Fault::Invalid)? {
+            Some(record) if record.as_slice() == candidate.payload => {
+                output.extend_from_slice(candidate.raw);
+            },
+            Some(record) => output.extend(bytes_field(field, &record)?),
+            None => {},
+        }
+    }
+    Ok(output)
+}
+
+/// `rewrite_range_back_dependency` for one own range dependency; `None`
+/// drops it (its host is dropped, or its range wholly removed).
 fn rewrite_back_dependency(
     dependency: &[u8],
     shift: Shift,
     internal: u64,
     adjustments: &BTreeMap<(u32, u32), Adjustment>,
-) -> Out<Vec<u8>> {
+) -> Out<Option<Vec<u8>>> {
     let row = required_u32(dependency, 1)?;
     let column = required_u32(dependency, 2)?;
     if shift.cleared(row, column) {
-        return Ok(dependency.to_vec());
+        return Ok((!shift.drop_hosts).then(|| dependency.to_vec()));
     }
     let (row_shifted, column_shifted) = if shift.row_axis {
         (shift.coordinate(row)?, column)
@@ -1363,31 +1696,34 @@ fn rewrite_back_dependency(
         && optional_varint(reference, 1)? == Some(internal)
     {
         let range = single_bytes(reference, 2)?.ok_or(Fault::Invalid)?;
-        let values = mutate_range(
+        let Some(values) = mutate_range(
             range_coordinate(range)?,
             shift,
             adjustments.get(&(row, column)),
-        )?;
+        )?
+        else {
+            return Ok(None);
+        };
         output = w::transform_length_delimited_field(&output, 4, |reference| -> Out<Vec<u8>> {
             w::transform_length_delimited_field(reference, 2, |range| {
                 patch_range_coordinate(range, values)
             })
         })?;
     }
-    Ok(output)
+    Ok(Some(output))
 }
 
-/// One range-precedent tile entry (`FromToRangeArchive`).
+/// One range-precedent tile entry (`FromToRangeArchive`); `None` drops it.
 fn rewrite_from_to(
     entry: &[u8],
     shift: Shift,
     to_own: bool,
     adjustments: &BTreeMap<(u32, u32), Adjustment>,
-) -> Out<Vec<u8>> {
+) -> Out<Option<Vec<u8>>> {
     let from = single_bytes(entry, 1)?.ok_or(Fault::Invalid)?;
     let (row, column) = explicit_coordinate(from)?;
     if shift.cleared(row, column) {
-        return Ok(entry.to_vec());
+        return Ok((!shift.drop_hosts).then(|| entry.to_vec()));
     }
     let (row_shifted, column_shifted) = if shift.row_axis {
         (shift.coordinate(row)?, column)
@@ -1399,51 +1735,78 @@ fn rewrite_from_to(
     })?;
     if to_own {
         let adjustment = adjustments.get(&(row, column));
-        output = w::transform_length_delimited_field(&output, 2, |rect| {
-            rewrite_rect(rect, shift, adjustment)
-        })?;
+        let rect = single_bytes(&output, 2)?.ok_or(Fault::Invalid)?;
+        let Some(rewritten) = rewrite_rect(rect, shift, adjustment)? else {
+            return Ok(None);
+        };
+        output =
+            w::transform_length_delimited_field(&output, 2, |_| -> Out<Vec<u8>> { Ok(rewritten) })?;
     }
-    Ok(output)
+    Ok(Some(output))
 }
 
-/// `mutate_cell_coord_set` and its wire rewrite.
+/// `mutate_cell_coord_set` and its wire rewrite. With dropped hosts
+/// (record 0329) the removed row or column leaves the set.
 fn rewrite_coord_set(set: &[u8], shift: Shift) -> Out<Vec<u8>> {
     if shift.pending_clear && !shift.insert {
         // The hosts on the removed axis are cleared first; the coordinates
         // are checked again after the clear.
         return Ok(set.to_vec());
     }
-    rewrite_records(set, 1, |entry| {
+    let dropping = shift.drop_hosts && !shift.insert;
+    filter_records(set, 1, |entry| {
         let column = required_u32(entry, 1)?;
+        if dropping && !shift.row_axis && column == shift.position {
+            return Ok(None);
+        }
         let column = if shift.row_axis {
             column
         } else {
             shift.coordinate(column)?
         };
         let output = w::patch_varint_field(entry, 1, true, Some(u64::from(column)))?;
-        w::transform_length_delimited_field(&output, 2, |rows| {
-            rewrite_records(rows, 1, |range| {
-                let begin = int32_of(optional_varint(range, 1)?.unwrap_or(0))?;
-                let end = optional_varint(range, 2)?.map(int32_of).transpose()?;
-                let (begin, new_end) = if shift.row_axis {
-                    let shift_row = |value: i32| -> Out<i32> {
-                        let value = u32::try_from(value).map_err(|_error| Fault::Invalid)?;
-                        i32::try_from(shift.coordinate(value)?)
-                            .map_err(|_error| Failure::Fault(Fault::Invalid))
+        Ok(Some(w::transform_length_delimited_field(
+            &output,
+            2,
+            |rows| {
+                filter_records(rows, 1, |range| {
+                    let begin = int32_of(optional_varint(range, 1)?.unwrap_or(0))?;
+                    let end = optional_varint(range, 2)?.map(int32_of).transpose()?;
+                    let (begin, new_end) = if shift.row_axis {
+                        let row = |value: i32| -> Out<u32> {
+                            u32::try_from(value).map_err(|_error| Failure::Fault(Fault::Invalid))
+                        };
+                        let low = row(begin)?;
+                        let high = end.map(row).transpose()?.unwrap_or(low);
+                        let shifted = if dropping
+                            && (low.min(high)..=low.max(high)).contains(&shift.position)
+                        {
+                            if low == high {
+                                return Ok(None);
+                            }
+                            let (low, high) = (low.min(high), low.max(high));
+                            let low = if low > shift.position { low - 1 } else { low };
+                            (low, high - 1)
+                        } else {
+                            (shift.coordinate(low)?, shift.coordinate(high)?)
+                        };
+                        let encode = |value: u32| -> Out<i32> {
+                            i32::try_from(value).map_err(|_error| Failure::Fault(Fault::Invalid))
+                        };
+                        (
+                            encode(shifted.0)?,
+                            end.map(|_| encode(shifted.1)).transpose()?,
+                        )
+                    } else {
+                        (begin, end)
                     };
-                    (shift_row(begin)?, end.map(shift_row).transpose()?)
-                } else {
-                    (begin, end)
-                };
-                let output = w::patch_varint_field(range, 1, true, Some(int32_wire(begin)))?;
-                Ok(w::patch_varint_field(
-                    &output,
-                    2,
-                    end.is_some(),
-                    new_end.map(int32_wire),
-                )?)
-            })
-        })
+                    let output = w::patch_varint_field(range, 1, true, Some(int32_wire(begin)))?;
+                    let output =
+                        w::patch_varint_field(&output, 2, end.is_some(), new_end.map(int32_wire))?;
+                    Ok(Some(output))
+                })
+            },
+        )?))
     })
 }
 
@@ -1505,79 +1868,225 @@ fn formula_hosts(package: &Package, owner: &[u8]) -> Out<Vec<(u32, u32)>> {
     Ok(hosts)
 }
 
-/// Rewrite the formulas of `hosts` (cells of the table whose data store is
-/// `store`) in its formula list.
+/// One cell rewrite the topology applies to a table's tiles (record 0329).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct CellPatch {
+    /// The drawable of the table holding the cell.
+    pub(super) info: u64,
+    /// The cell's row before the edit.
+    pub(super) row: u32,
+    /// The cell's column before the edit.
+    pub(super) column: u32,
+    /// The formula reads `#REF!`: its cached result becomes an error.
+    pub(super) error: bool,
+    /// The cell moves to this formula-list entry (a shared formula split).
+    pub(super) formula_key: Option<u32>,
+}
+
+/// One formula cell of a list entry and its rewritten formula.
+struct Moved {
+    row: u32,
+    column: u32,
+    formula: Option<Vec<u8>>,
+}
+
+/// Rewrite the formulas of `hosts` (cells of the table whose drawable is
+/// `info` and data store `store`) in its formula list. `dropped` counts the
+/// references of removed cells per formula-list key (record 0329: a
+/// removal whose cells the cell writer could not clear).
+///
+/// An entry whose surviving cells all take one formula is rewritten in
+/// place. When they diverge, the entry is split (record 0329): it keeps the
+/// formula of its unchanged cells (or the first new formula), and every
+/// other new formula takes a new entry its cells move to.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the formula list of one table, with the plan it feeds"
+)]
 fn rewrite_formulas(
     package: &Package,
     store: &[u8],
+    info: u64,
     hosts: &[Host],
+    dropped: &BTreeMap<u64, u64>,
     adjustments: &mut BTreeMap<(u32, u32), Adjustment>,
     output: &mut Plan,
 ) -> Out<()> {
-    if hosts.is_empty() {
+    if hosts.is_empty() && dropped.is_empty() {
         return Ok(());
     }
     let containers = formula_containers(package, store)?;
     let entries = formula_entries(&containers)?;
-    // key -> rewritten formulas, and the count of cells left as they are.
-    let mut jobs: BTreeMap<u64, Vec<Vec<u8>>> = BTreeMap::new();
-    let mut unchanged: BTreeMap<u64, usize> = BTreeMap::new();
+    let mut groups: BTreeMap<u64, Vec<Moved>> = BTreeMap::new();
     for host in hosts {
         let key = formula_key(package, store, host.row, host.column)?;
         let entry = entries.get(&key).ok_or(Fault::Invalid)?;
         let mut adjustment = Adjustment::default();
-        let rewritten = rewrite_formula(entry.formula, *host, &mut adjustment)?;
+        let mut removed = false;
+        let rewritten = rewrite_formula(entry.formula, *host, &mut adjustment, &mut removed)?;
         adjustment.normalize();
         if !adjustment.is_empty() {
             adjustments.insert((host.row, host.column), adjustment);
         }
-        match rewritten {
-            Some(current) => {
-                let list = jobs.entry(key).or_default();
-                reserve(list, 1)?;
-                list.push(current);
-            },
-            None => *unchanged.entry(key).or_default() += 1,
+        if removed {
+            output.cell(CellPatch {
+                info,
+                row: host.row,
+                column: host.column,
+                error: true,
+                formula_key: None,
+            })?;
         }
+        let list = groups.entry(key).or_default();
+        reserve(list, 1)?;
+        list.push(Moved {
+            row: host.row,
+            column: host.column,
+            formula: rewritten,
+        });
     }
-    let mut container_rewrites: BTreeMap<usize, BTreeMap<usize, Vec<u8>>> = BTreeMap::new();
-    for (key, changed) in &jobs {
-        let entry = &entries[key];
-        let kept = unchanged.get(key).copied().unwrap_or(0);
-        let all_rewritten =
-            u64::try_from(changed.len() + kept).ok() == Some(entry.refcount) && kept == 0;
-        let first = &changed[0];
-        let shared = changed.iter().all(|current| current == first);
-        // Every cell holding the entry moves to the same formula: the entry
-        // is rewritten in place. (The host editor moves a cell whose formula
-        // becomes another entry's onto that entry; with that entry also
-        // rewritten, its cells end up with each other's formulas. Rewriting
-        // in place keeps every cell's formula.)
-        if !(entry.refcount == 1 || (all_rewritten && shared)) {
-            return refuse(Unsupported::SharedFormulas);
+    for key in dropped.keys() {
+        groups.entry(*key).or_default();
+    }
+    let root = &containers[0];
+    let mut next_key = single_varint(root.data, 2)?.ok_or(Fault::Invalid)?;
+    if let Some(maximum) = entries.keys().next_back() {
+        next_key = next_key.max(maximum.checked_add(1).ok_or(Fault::Invalid)?);
+    }
+    let mut container_rewrites: BTreeMap<usize, BTreeMap<usize, Option<Vec<u8>>>> = BTreeMap::new();
+    let mut appended: Vec<Vec<u8>> = Vec::new();
+    for (key, cells) in &groups {
+        let entry = entries.get(key).ok_or(Fault::Invalid)?;
+        let dropped_count = dropped.get(key).copied().unwrap_or(0);
+        let surviving = entry
+            .refcount
+            .checked_sub(dropped_count)
+            .ok_or(Fault::Invalid)?;
+        let mut outcomes: Vec<(&[u8], Vec<(u32, u32)>)> = Vec::new();
+        for cell in cells {
+            let Some(formula) = cell.formula.as_deref() else {
+                continue;
+            };
+            match outcomes.iter_mut().find(|(known, _)| *known == formula) {
+                Some((_, members)) => {
+                    reserve(members, 1)?;
+                    members.push((cell.row, cell.column));
+                },
+                None => {
+                    reserve(&mut outcomes, 1)?;
+                    outcomes.push((formula, vec![(cell.row, cell.column)]));
+                },
+            }
         }
+        let changed: u64 = outcomes
+            .iter()
+            .map(|(_, members)| members.len() as u64)
+            .sum();
+        // Cells that keep the entry's formula: unchanged hosts and cells
+        // without a dependency record.
+        let others = surviving.checked_sub(changed).ok_or(Fault::Invalid)?;
         let raw = w::repeated_length_delimited_payloads(containers[entry.container].data, 3)?;
         let entry_raw = raw.get(entry.position).ok_or(Fault::Invalid)?;
-        let rewritten = w::transform_length_delimited_field(entry_raw, 5, |_| -> Out<Vec<u8>> {
-            Ok(first.clone())
-        })?;
+        let with = |formula: Option<&[u8]>, refcount: u64| -> Out<Vec<u8>> {
+            let mut data = entry_raw.to_vec();
+            if let Some(formula) = formula {
+                data = w::transform_length_delimited_field(&data, 5, |_| -> Out<Vec<u8>> {
+                    Ok(formula.to_vec())
+                })?;
+            }
+            if refcount != entry.refcount {
+                data = w::patch_varint_field(&data, 2, true, Some(refcount))?;
+            }
+            Ok(data)
+        };
+        let replacement = if outcomes.is_empty() {
+            if dropped_count == 0 {
+                continue;
+            }
+            (surviving > 0).then(|| with(None, surviving)).transpose()?
+        } else if others == 0 && outcomes.len() == 1 {
+            // Every surviving cell takes the same formula: the entry is
+            // rewritten in place. (The host editor moves a cell whose formula
+            // becomes another entry's onto that entry; with that entry also
+            // rewritten, its cells end up with each other's formulas.
+            // Rewriting in place keeps every cell's formula.)
+            Some(with(Some(outcomes[0].0), surviving)?)
+        } else {
+            // The cells diverge: split the entry (record 0329).
+            if containers.len() > 1 {
+                // A segmented list: new keys would fall in a segment's range.
+                return refuse(Unsupported::SharedFormulas);
+            }
+            let (kept, rest) = if others > 0 {
+                (with(None, others)?, &outcomes[..])
+            } else {
+                let (formula, members) = &outcomes[0];
+                (with(Some(formula), members.len() as u64)?, &outcomes[1..])
+            };
+            for (formula, members) in rest {
+                let new_key = next_key;
+                next_key = next_key.checked_add(1).ok_or(Fault::Invalid)?;
+                let mut data = w::patch_varint_field(entry_raw, 1, true, Some(new_key))?;
+                data = w::patch_varint_field(&data, 2, true, Some(members.len() as u64))?;
+                data = w::transform_length_delimited_field(&data, 5, |_| -> Out<Vec<u8>> {
+                    Ok(formula.to_vec())
+                })?;
+                reserve(&mut appended, 1)?;
+                appended.push(data);
+                for (row, column) in members {
+                    output.cell(CellPatch {
+                        info,
+                        row: *row,
+                        column: *column,
+                        error: false,
+                        formula_key: Some(u32_of(new_key)?),
+                    })?;
+                }
+            }
+            Some(kept)
+        };
         container_rewrites
             .entry(entry.container)
             .or_default()
-            .insert(entry.position, rewritten);
+            .insert(entry.position, replacement);
+    }
+    if !appended.is_empty() {
+        container_rewrites.entry(0).or_default();
     }
     for (index, rewrites) in container_rewrites {
         let container = &containers[index];
         let raw = w::repeated_length_delimited_payloads(container.data, 3)?;
         let mut replacements = Vec::new();
-        reserve(&mut replacements, raw.len())?;
-        for (position, entry) in raw.into_iter().enumerate() {
-            replacements.push(match rewrites.get(&position) {
-                Some(rewritten) => rewritten.clone(),
-                None => entry.to_vec(),
-            });
+        reserve(&mut replacements, raw.len() + appended.len())?;
+        for (position, entry) in raw.iter().enumerate() {
+            match rewrites.get(&position) {
+                Some(Some(rewritten)) => replacements.push(rewritten.clone()),
+                Some(None) => {},
+                None => replacements.push(entry.to_vec()),
+            }
         }
-        let data = w::rewrite_repeated_length_delimited_fields(container.data, 3, &replacements)?;
+        let mut data = container.data.to_vec();
+        if index == 0 && !appended.is_empty() {
+            replacements.extend(appended.iter().cloned());
+            data = w::patch_varint_field(&data, 2, true, Some(next_key))?;
+        } else if index == 0 {
+            // A dropped last key is handed back, as the cell writer does.
+            let mut next = single_varint(&data, 2)?.ok_or(Fault::Invalid)?;
+            for (position, rewritten) in &rewrites {
+                if rewritten.is_some() {
+                    continue;
+                }
+                let entry = raw.get(*position).ok_or(Fault::Invalid)?;
+                let key = single_varint(entry, 1)?.ok_or(Fault::Invalid)?;
+                if key.checked_add(1) == Some(next) {
+                    next = key;
+                }
+            }
+            if Some(next) != single_varint(&data, 2)? {
+                data = w::patch_varint_field(&data, 2, true, Some(next))?;
+            }
+        }
+        let data = w::rewrite_repeated_length_delimited_fields(&data, 3, &replacements)?;
         output.push(container.object, container.message, data)?;
     }
     Ok(())
@@ -1620,32 +2129,46 @@ fn rewrite_reader(
         });
     }
     let mut ignored = BTreeMap::new();
-    rewrite_formulas(package, store, &hosts, &mut ignored, output)?;
+    rewrite_formulas(
+        package,
+        store,
+        info,
+        &hosts,
+        &BTreeMap::new(),
+        &mut ignored,
+        output,
+    )?;
     let empty = HashSet::new();
     let mut data = owner.data.to_vec();
     if single_bytes(&data, 4)?.is_some() {
         data = w::transform_length_delimited_field(&data, 4, |dependencies| {
-            rewrite_records(dependencies, 1, |record| {
+            filter_records(dependencies, 1, |record| {
                 rewrite_record(record, shift, internal, &ignored, &empty, false)
             })
         })?;
     }
     if incoming.ranges {
         data = w::transform_length_delimited_field(&data, 5, |ranges| {
-            rewrite_records(ranges, 2, |dependency| {
+            filter_records(ranges, 2, |dependency| {
                 let Some(reference) = single_bytes(dependency, 4)? else {
-                    return Ok(dependency.to_vec());
+                    return Ok(Some(dependency.to_vec()));
                 };
                 if optional_varint(reference, 1)? != Some(internal) {
-                    return Ok(dependency.to_vec());
+                    return Ok(Some(dependency.to_vec()));
                 }
                 let range = single_bytes(reference, 2)?.ok_or(Fault::Invalid)?;
-                let values = mutate_range(range_coordinate(range)?, shift, None)?;
-                w::transform_length_delimited_field(dependency, 4, |reference| {
-                    w::transform_length_delimited_field(reference, 2, |range| {
-                        patch_range_coordinate(range, values)
-                    })
-                })
+                let Some(values) = mutate_range(range_coordinate(range)?, shift, None)? else {
+                    return Ok(None);
+                };
+                Ok(Some(w::transform_length_delimited_field(
+                    dependency,
+                    4,
+                    |reference| {
+                        w::transform_length_delimited_field(reference, 2, |range| {
+                            patch_range_coordinate(range, values)
+                        })
+                    },
+                )?))
             })
         })?;
     }
@@ -1654,7 +2177,7 @@ fn rewrite_reader(
     }
     for tile in tile_references(owner.data, 13)? {
         let (message, tile_data) = object_message(package, tile, CELL_TILE_TYPE)?;
-        let rewritten = rewrite_records(tile_data, 4, |record| {
+        let rewritten = filter_records(tile_data, 4, |record| {
             rewrite_record(record, shift, internal, &ignored, &empty, false)
         })?;
         if rewritten != tile_data {
@@ -1663,8 +2186,16 @@ fn rewrite_reader(
     }
     for tile in &incoming.tiles {
         let (message, tile_data) = object_message(package, *tile, RANGE_TILE_TYPE)?;
-        let rewritten = rewrite_records(tile_data, 2, |entry| {
-            w::transform_length_delimited_field(entry, 2, |rect| rewrite_rect(rect, shift, None))
+        let rewritten = filter_records(tile_data, 2, |entry| {
+            let rect = single_bytes(entry, 2)?.ok_or(Fault::Invalid)?;
+            let Some(rect) = rewrite_rect(rect, shift, None)? else {
+                return Ok(None);
+            };
+            Ok(Some(w::transform_length_delimited_field(
+                entry,
+                2,
+                |_| -> Out<Vec<u8>> { Ok(rect) },
+            )?))
         })?;
         if rewritten != tile_data {
             output.push(*tile, message, rewritten)?;
@@ -1747,21 +2278,29 @@ pub(super) fn plan(
             incoming: None,
         });
     }
-    rewrite_formulas(package, store, &own_hosts, &mut adjustments, &mut output)?;
+    rewrite_formulas(
+        package,
+        store,
+        table.info,
+        &own_hosts,
+        table.dropped_formulas,
+        &mut adjustments,
+        &mut output,
+    )?;
 
     // The own owner.
     let range_hosts = range_dependency_hosts(package, own.data)?;
     let mut owner = own.data.to_vec();
     if single_bytes(&owner, 4)?.is_some() {
         owner = w::transform_length_delimited_field(&owner, 4, |dependencies| {
-            rewrite_records(dependencies, 1, |record| {
+            filter_records(dependencies, 1, |record| {
                 rewrite_record(record, shift, internal, &adjustments, &range_hosts, true)
             })
         })?;
     }
     if single_bytes(&owner, 5)?.is_some() {
         owner = w::transform_length_delimited_field(&owner, 5, |ranges| {
-            rewrite_records(ranges, 2, |dependency| {
+            filter_records(ranges, 2, |dependency| {
                 rewrite_back_dependency(dependency, shift, internal, &adjustments)
             })
         })?;
@@ -1774,6 +2313,7 @@ pub(super) fn plan(
     output.own = Some((own.object, own.message, owner));
 
     // Dependency-record tiles.
+    let mut empty_tiles: Vec<(u32, u64)> = Vec::new();
     for tile in tile_references(own.data, 13)? {
         let (message, data) = object_message(package, tile, CELL_TILE_TYPE)?;
         if single_varint(data, 1)? != Some(internal) {
@@ -1785,16 +2325,23 @@ pub(super) fn plan(
             (2, DEPENDENCY_TILE_COLUMNS)
         };
         let begin = required_u32(data, begin_field)?;
-        let rewritten = rewrite_records(data, 4, |record| {
-            let rewritten =
-                rewrite_record(record, shift, internal, &adjustments, &range_hosts, true)?;
+        let rewritten = filter_records(data, 4, |record| {
+            let Some(rewritten) =
+                rewrite_record(record, shift, internal, &adjustments, &range_hosts, true)?
+            else {
+                return Ok(None);
+            };
             let coordinate = required_u32(&rewritten, if shift.row_axis { 2 } else { 1 })?;
             if coordinate / size * size != begin {
                 return refuse(Unsupported::Formulas);
             }
-            Ok(rewritten)
+            Ok(Some(rewritten))
         })?;
-        if rewritten != data {
+        if repeated_bytes(&rewritten, 4)?.is_empty() && !repeated_bytes(data, 4)?.is_empty() {
+            // Its last record went with a dropped host (record 0329): the
+            // tile goes too, as the cell writer drops it.
+            empty_tiles.push((13, tile));
+        } else if rewritten != data {
             output.push(tile, message, rewritten)?;
         }
     }
@@ -1803,12 +2350,28 @@ pub(super) fn plan(
     for tile in tile_references(own.data, 15)? {
         let (message, data) = object_message(package, tile, RANGE_TILE_TYPE)?;
         let to_own = single_varint(data, 1)? == Some(internal);
-        let rewritten = rewrite_records(data, 2, |entry| {
+        let rewritten = filter_records(data, 2, |entry| {
             rewrite_from_to(entry, shift, to_own, &adjustments)
         })?;
-        if rewritten != data {
+        if repeated_bytes(&rewritten, 2)?.is_empty() && !repeated_bytes(data, 2)?.is_empty() {
+            empty_tiles.push((15, tile));
+        } else if rewritten != data {
             output.push(tile, message, rewritten)?;
         }
+    }
+    if !empty_tiles.is_empty() {
+        let mut owner = output.own.take().ok_or(Fault::Invalid)?;
+        for (field, tile) in &empty_tiles {
+            owner.2 = w::transform_length_delimited_field(&owner.2, *field, |tiles| {
+                filter_records(tiles, 1, |reference| {
+                    Ok((references::reference_identifier(reference)? != *tile)
+                        .then(|| reference.to_vec()))
+                })
+            })?;
+            reserve(&mut output.removed, 1)?;
+            output.removed.push(*tile);
+        }
+        output.own = Some(owner);
     }
 
     // Other tables' formulas that read the table.
@@ -1943,9 +2506,21 @@ fn rewrite_incoming_rect(rect: &[u8], shift: Shift) -> Out<Vec<u8>> {
 pub(super) struct Plan {
     pub(super) own: Option<(u64, usize, Vec<u8>)>,
     pub(super) rewrites: Vec<Rewrite>,
+    /// Cells whose tiles change with the formulas (record 0329): error
+    /// caches of `#REF!` formulas, cells of split shared formulas.
+    pub(super) cells: Vec<CellPatch>,
+    /// Dependency tiles emptied by dropped hosts, which go with their
+    /// owner's references to them (record 0329).
+    pub(super) removed: Vec<u64>,
 }
 
 impl Plan {
+    fn cell(&mut self, patch: CellPatch) -> Out<()> {
+        reserve(&mut self.cells, 1)?;
+        self.cells.push(patch);
+        Ok(())
+    }
+
     fn push(&mut self, object: u64, message: usize, data: Vec<u8>) -> Out<()> {
         reserve(&mut self.rewrites, 1)?;
         self.rewrites.push(Rewrite {

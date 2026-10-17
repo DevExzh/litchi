@@ -22,16 +22,24 @@
 //!   table ([`shift`], record 0318): the table's own formulas and their
 //!   dependency records, and other tables' formulas that read it.
 //!
-//! A removed row or column first has its stored cells cleared through the
+//! A removed row or column first has its comments cleared through the
+//! comment transaction and its stored cells cleared through the
 //! [`crate::table::cells`] transaction (value, style and list references are
-//! released there), so the structural pass only drops empty storage.
+//! released there, and the caches of formulas that read them refreshed), so
+//! the structural pass only drops empty storage. Where the cell writer
+//! cannot clear them, the structural pass drops the cells itself, with
+//! their strings, formulas and dependency records (record 0329). A
+//! surviving formula that reads a removed cell reads `#REF!` there and
+//! caches an error result; a range that loses a row or column shrinks; a
+//! shared formula whose cells diverge is split into one entry per formula.
 //!
 //! Ported from the host editor's `row_insert`, `column_insert`,
 //! `table_delete` and `formula_dependency_shift` phases. Refused with a
-//! typed [`Unsupported`] reason so a failed edit never publishes: removing a
-//! row or column a surviving formula reads, a chart or other non-table
-//! owner reading the table, volatile, spanning, error or spill dependency
-//! state, shared formulas whose cells would diverge, merged cells, filters,
+//! typed [`Unsupported`] reason so a failed edit never publishes: a chart or
+//! other non-table owner reading the table, volatile, spanning, error or
+//! spill dependency state, a stale-cache range over cells the cell writer
+//! cannot clear, a removed range among several of one tract, shared
+//! formulas that diverge in a segmented list, merged cells, filters,
 //! categories, pivots, column edits under sort rules, removing a hidden row
 //! or column, and removing a row or column that carries a border layer.
 
@@ -99,8 +107,10 @@ const DEFAULT_TILE_SIZE: u64 = 256;
 pub enum Unsupported {
     /// Calculation-engine state the coordinate shift does not rewrite:
     /// volatile, spanning, whole-owner, error or spill dependencies, a
-    /// category reference whose host moves, a packed coordinate, or a
-    /// dependency record that would leave its tile.
+    /// category reference whose host moves, a packed coordinate, a
+    /// dependency record that would leave its tile, or (record 0329) a
+    /// range over a removed row or column whose cells the cell writer could
+    /// not clear, so its cached result would go stale.
     Formulas,
     /// A chart or another non-table owner reads the table, or a formula
     /// reads it through legacy UUID ranges or UUID references.
@@ -120,16 +130,21 @@ pub enum Unsupported {
     HiddenAxis,
     /// The removed row or column carries a border layer.
     Borders,
-    /// A cell on the removed row or column has a comment.
+    /// A comment on the removed row or column that the comment transaction
+    /// cannot clear.
     Comments,
     /// The table's storage layout is outside what this transaction rewrites
     /// (a missing UID map, a row that would cross a storage tile, a cell
     /// the clear left behind).
     StorageLayout,
-    /// A surviving formula reads a cell of the removed row or column, or a
-    /// range starts or ends on it (native Numbers would write `#REF!`).
+    /// The removed row or column is one of several ranges of one colon
+    /// tract a formula reads, or an endpoint of a merge range. (A single
+    /// reference to it, or a range wholly on it, reads `#REF!`, and a range
+    /// that loses it shrinks: record 0329.)
     DeletedReference,
-    /// One formula shared by several cells would become different formulas.
+    /// One formula shared by several cells would become different formulas
+    /// in a segmented formula list (an unsegmented one is split: record
+    /// 0329).
     SharedFormulas,
 }
 
@@ -762,6 +777,42 @@ fn cells_on_axis(
     Ok(output)
 }
 
+/// Clear the comments on a removed row or column through the comment
+/// transaction (record 0329); `None` when the axis holds none.
+fn clear_comments(
+    source: &Package,
+    sheet: usize,
+    table: usize,
+    row_axis: bool,
+    index: u32,
+) -> Result<Option<Package>, Error> {
+    let refused = |_error| refuse(Unsupported::Comments);
+    let comments = source
+        .table_cell_comments(SheetSelector::index(sheet), TableSelector::index(table))
+        .map_err(refused)?;
+    let mut current: Option<Package> = None;
+    for (position, _) in comments {
+        let on_axis = if row_axis {
+            position.row() == index
+        } else {
+            position.column() == index
+        };
+        if !on_axis {
+            continue;
+        }
+        let base = current.as_ref().unwrap_or(source);
+        let commit = base
+            .clear_table_cell_comment(
+                SheetSelector::index(sheet),
+                TableSelector::index(table),
+                position,
+            )
+            .map_err(refused)?;
+        current = Some(commit.into_package());
+    }
+    Ok(current)
+}
+
 /// Clear the stored cells of a removed row or column through the cell
 /// transaction, so value, style and list references are released.
 fn clear_axis(
@@ -780,6 +831,13 @@ fn clear_axis(
     Ok(edit.commit().map_err(cell_error)?.into_package())
 }
 
+/// The planned rewrites of one operation, and the objects it removes
+/// (record 0329: dependency tiles emptied by dropped formula hosts).
+struct Planned {
+    replacements: Vec<Replacement>,
+    removed: Vec<u64>,
+}
+
 /// One planned payload replacement.
 struct Replacement {
     object: u64,
@@ -790,13 +848,18 @@ struct Replacement {
 }
 
 /// The data-store list field a released cell key belongs to, or `None` for
-/// a key this transaction does not release (values, comments).
-const fn list_field(kind: ListKind) -> Option<u32> {
+/// a key this transaction does not release (values, comments). With
+/// `values` (record 0329: the removed cells were not cleared through the
+/// cell writer) strings and formula errors are released too; formula keys
+/// are counted for the coordinate shift, which owns the formula list.
+const fn list_field(kind: ListKind, values: bool) -> Option<u32> {
     match kind {
         ListKind::Style => Some(5),
         ListKind::ConditionalStyle => Some(18),
         ListKind::ControlCellSpec => Some(21),
         ListKind::Format => Some(22),
+        ListKind::String if values => Some(4),
+        ListKind::FormulaError if values => Some(12),
         ListKind::String
         | ListKind::RichText
         | ListKind::Formula
@@ -805,14 +868,20 @@ const fn list_field(kind: ListKind) -> Option<u32> {
     }
 }
 
+/// The data-store field of a table's string list.
+const STRING_LIST_FIELD: u32 = 4;
+
 /// The cells a removal drops after the value clear: their columns (a row
 /// removal) or rows (a column removal), and the list keys they hold, per
 /// data-store list field.
+#[derive(Default)]
 struct Released {
     /// Source index on the other axis -> dropped cells there.
     per_index: BTreeMap<u32, u64>,
     /// Data-store list field -> key -> references released.
     keys: BTreeMap<u32, BTreeMap<u32, u32>>,
+    /// Formula-list key -> references the dropped cells hold (record 0329).
+    formulas: BTreeMap<u64, u64>,
 }
 
 fn released_cells(
@@ -820,12 +889,10 @@ fn released_cells(
     store: &[u8],
     row_axis: bool,
     index: u32,
+    values: bool,
 ) -> Result<Released, Error> {
     let (tiles, size) = tiles(store)?;
-    let mut released = Released {
-        per_index: BTreeMap::new(),
-        keys: BTreeMap::new(),
-    };
+    let mut released = Released::default();
     for (key, tile) in tiles {
         let (_, data) = message(working, tile, &[TILE_MESSAGE_TYPE])?;
         for row in repeated_bytes(data, 5)? {
@@ -844,11 +911,16 @@ fn released_cells(
                 let cell = litchi_numbers_wire::BncCell::parse(bytes)
                     .map_err(|_error| Error::InvalidSource)?;
                 for (kind, list_key) in cell.list_keys() {
-                    let field = list_field(kind).ok_or(refuse(if kind == ListKind::Comment {
-                        Unsupported::Comments
-                    } else {
-                        Unsupported::StorageLayout
-                    }))?;
+                    if values && kind == ListKind::Formula {
+                        *released.formulas.entry(u64::from(list_key)).or_insert(0) += 1;
+                        continue;
+                    }
+                    let field =
+                        list_field(kind, values).ok_or(refuse(if kind == ListKind::Comment {
+                            Unsupported::Comments
+                        } else {
+                            Unsupported::StorageLayout
+                        }))?;
                     *released
                         .keys
                         .entry(field)
@@ -862,23 +934,85 @@ fn released_cells(
     Ok(released)
 }
 
+/// Apply one formula cell patch (record 0329) to the tile of `store` that
+/// holds the cell, keeping the rewritten tile in `patched`; returns the
+/// string-list key a replaced text cache held.
+fn patch_cell(
+    working: &Working<'_>,
+    store: &[u8],
+    columns: u32,
+    patch: shift::CellPatch,
+    patched: &mut BTreeMap<u64, Vec<u8>>,
+) -> Result<Option<u32>, Error> {
+    let (tiles, size) = tiles(store)?;
+    let key = u32::try_from(u64::from(patch.row) / size).map_err(|_error| Error::InvalidSource)?;
+    let local =
+        u32::try_from(u64::from(patch.row) % size).map_err(|_error| Error::InvalidSource)?;
+    let tile = tiles
+        .iter()
+        .find(|(candidate, _)| *candidate == key)
+        .map(|(_, tile)| *tile)
+        .ok_or(Error::InvalidSource)?;
+    let current = match patched.get(&tile) {
+        Some(data) => data.clone(),
+        None => message(working, tile, &[TILE_MESSAGE_TYPE])?.1.to_vec(),
+    };
+    let layout = |_error| refuse(Unsupported::StorageLayout);
+    let bytes = litchi_numbers_wire::table_write::tile_cell(&current, local, patch.column)
+        .map_err(layout)?
+        .ok_or(Error::InvalidSource)?;
+    let mut cell =
+        litchi_numbers_wire::BncCell::parse(&bytes).map_err(|_error| Error::InvalidSource)?;
+    let mut released = None;
+    if let Some(key) = patch.formula_key {
+        cell.set_formula_identifier(key)
+            .map_err(|_error| Error::InvalidSource)?;
+    }
+    if patch.error {
+        released = cell
+            .set_formula_cached_error()
+            .map_err(|_error| refuse(Unsupported::StorageLayout))?;
+    }
+    let written = litchi_numbers_wire::table_write::tile_set_cell(
+        &current,
+        local,
+        patch.column,
+        columns,
+        Some(&cell.encode()),
+    )
+    .map_err(layout)?;
+    patched.insert(tile, written.tile);
+    Ok(released)
+}
+
 /// Plan every payload rewrite of `step` over `working`'s source.
 ///
 /// With `cells_pending`, the removed row or column may still hold the cells
 /// the caller clears before the real plan, so the storage tiles are not
-/// planned.
+/// planned. With `drop_cells` (record 0329), the removed cells were not
+/// cleared through the cell writer: their values, strings and formulas are
+/// released here.
 fn plan(
     working: &Working<'_>,
     target: &Target,
     step: Step,
     before: Geometry,
     cells_pending: bool,
-) -> Result<Vec<Replacement>, Error> {
+    drop_cells: bool,
+) -> Result<Planned, Error> {
     let source = working.source();
     let (model_index, model) = message(working, target.model, &[6_001])?;
     let (info_index, info) = message(working, target.info, &[6_000, 6_003])?;
     check_features(working, target, model, info, step)?;
     let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
+
+    // The cells a removal drops with the axis, and their list references.
+    let mut released = match step.edit {
+        AxisEdit::Remove(index) if !cells_pending => {
+            released_cells(working, store, step.row_axis, index, drop_cells)?
+        },
+        _ => Released::default(),
+    };
 
     // The calculation graph: the formula-coordinate shift (record 0318).
     let (insert, position) = match step.edit {
@@ -892,6 +1026,7 @@ fn plan(
             model,
             rows: before.rows,
             footer_rows: before.footer_rows,
+            dropped_formulas: &released.formulas,
         },
         shift::Shift {
             row_axis: step.row_axis,
@@ -899,6 +1034,7 @@ fn plan(
             insert,
             expand_footer: step.expand_footer,
             pending_clear: cells_pending,
+            drop_hosts: drop_cells,
         },
         cells_pending,
     )
@@ -922,21 +1058,66 @@ fn plan(
             Ok(())
         };
 
-    // The cells a removal drops with the axis, and their list references.
-    let released = match step.edit {
-        AxisEdit::Remove(index) if !cells_pending => {
-            released_cells(working, store, step.row_axis, index)?
-        },
-        _ => Released {
-            per_index: BTreeMap::new(),
-            keys: BTreeMap::new(),
-        },
-    };
+    // Cells the formula rewrite changes (record 0329): error caches of
+    // `#REF!` formulas and cells of split shared formulas. The edited
+    // table's tiles are patched before they move; other tables' in place.
+    let mut patched: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
+    let mut readers: BTreeMap<u64, Vec<shift::CellPatch>> = BTreeMap::new();
+    for patch in &calculation.cells {
+        if patch.info == target.info {
+            let strings = patch_cell(working, store, before.columns, *patch, &mut patched)?;
+            if let Some(key) = strings {
+                *released
+                    .keys
+                    .entry(STRING_LIST_FIELD)
+                    .or_default()
+                    .entry(key)
+                    .or_insert(0) += 1;
+            }
+        } else {
+            readers.entry(patch.info).or_default().push(*patch);
+        }
+    }
+    for (reader, patches) in &readers {
+        let reader_info = message(working, *reader, &[6_000, 6_003])?.1;
+        let reader_model = single_reference(reader_info, 2)?.ok_or(Error::InvalidSource)?;
+        let (_, reader_model) = message(working, reader_model, &[6_001])?;
+        let columns = geometry(reader_model)?.columns;
+        let reader_store = single_bytes(reader_model, 4)?.ok_or(Error::InvalidSource)?;
+        let mut tiles_patched = BTreeMap::new();
+        let mut strings: BTreeMap<u32, u32> = BTreeMap::new();
+        for patch in patches {
+            if let Some(key) =
+                patch_cell(working, reader_store, columns, *patch, &mut tiles_patched)?
+            {
+                *strings.entry(key).or_insert(0) += 1;
+            }
+        }
+        for (tile, data) in tiles_patched {
+            let (index, _) = message(working, tile, &[TILE_MESSAGE_TYPE])?;
+            push(tile, index, data, Vec::new())?;
+        }
+        if !strings.is_empty() {
+            let list =
+                single_reference(reader_store, STRING_LIST_FIELD)?.ok_or(Error::InvalidSource)?;
+            let (index, data) = message(working, list, &[LIST_MESSAGE_TYPE])?;
+            let (payload, pruned) =
+                lists::release_with(data, &mut strings, true).map_err(storage_fault)?;
+            if !strings.is_empty() {
+                return Err(refuse(Unsupported::StorageLayout));
+            }
+            if let Some(payload) = payload {
+                push(list, index, payload, pruned)?;
+            }
+        }
+    }
     for (field, keys) in &released.keys {
         let list = single_reference(store, *field)?.ok_or(Error::InvalidSource)?;
         let (index, data) = message(working, list, &[LIST_MESSAGE_TYPE])?;
         let mut remaining = keys.clone();
-        let (payload, pruned) = lists::release(data, &mut remaining).map_err(storage_fault)?;
+        let reclaim = drop_cells && (*field == STRING_LIST_FIELD || *field == 12);
+        let (payload, pruned) =
+            lists::release_with(data, &mut remaining, reclaim).map_err(storage_fault)?;
         if let Some(payload) = payload {
             push(list, index, payload, pruned)?;
         }
@@ -957,6 +1138,7 @@ fn plan(
             return Err(refuse(Unsupported::StorageLayout));
         }
     }
+    let released = released;
     let released_at = |index: u32| released.per_index.get(&index).copied().unwrap_or(0);
     let none = |_index: u32| 0_u64;
 
@@ -979,7 +1161,8 @@ fn plan(
     // Storage tiles.
     let (tiles, size) = tiles(store)?;
     for (key, tile) in tiles.iter().filter(|_| !cells_pending) {
-        let (index, data) = message(working, *tile, &[TILE_MESSAGE_TYPE])?;
+        let (index, original) = message(working, *tile, &[TILE_MESSAGE_TYPE])?;
+        let data = patched.get(tile).map_or(original, Vec::as_slice);
         let rewritten = if step.row_axis {
             storage::tile_rows(
                 data,
@@ -991,8 +1174,10 @@ fn plan(
             storage::tile_columns(data, before.columns, step.edit)
         }
         .map_err(storage_fault)?;
-        if let Some(rewritten) = rewritten {
-            push(*tile, index, rewritten, Vec::new())?;
+        match rewritten {
+            Some(rewritten) => push(*tile, index, rewritten, Vec::new())?,
+            None if data != original => push(*tile, index, data.to_vec(), Vec::new())?,
+            None => {},
         }
     }
 
@@ -1100,13 +1285,16 @@ fn plan(
         .unwrap_or(payload);
         let (_, original) = message(working, object, &[4_008])?;
         if rewritten != original {
-            push(object, index, rewritten, Vec::new())?;
+            push(object, index, rewritten, calculation.removed.clone())?;
         }
     }
     for rewrite in calculation.rewrites {
         push(rewrite.object, rewrite.message, rewrite.data, Vec::new())?;
     }
-    Ok(replacements)
+    Ok(Planned {
+        replacements,
+        removed: calculation.removed,
+    })
 }
 
 fn replace(working: &mut Working<'_>, replacement: Replacement) -> FaultResult<()> {
@@ -1179,7 +1367,7 @@ fn run(
     let cells = {
         let working = Working::new(source)?;
         let target = locate(&working, sheet, table)?;
-        plan(&working, &target, step, before, true)?;
+        plan(&working, &target, step, before, true, false)?;
         match step.edit {
             AxisEdit::Remove(index) => {
                 let (_, model) = message(&working, target.model, &[6_001])?;
@@ -1189,19 +1377,49 @@ fn run(
             AxisEdit::Insert(_) => Vec::new(),
         }
     };
-    let cleared = if cells.is_empty() {
-        None
-    } else {
-        Some(clear_axis(source, sheet, table, &cells)?)
+    // Comments on the removed axis go through the comment transaction
+    // first, which removes their storage graphs (record 0329).
+    let uncommented = match step.edit {
+        AxisEdit::Remove(index) if !cells.is_empty() => {
+            clear_comments(source, sheet, table, step.row_axis, index)?
+        },
+        _ => None,
     };
-    let base = cleared.as_ref().unwrap_or(source);
+    let commented = uncommented.as_ref().unwrap_or(source);
+    // The cell writer clears the removed cells and refreshes the caches of
+    // the formulas that read them; where it cannot, the structural pass
+    // drops them itself (record 0329).
+    let (cleared, drop_cells) = if cells.is_empty() {
+        (None, false)
+    } else {
+        match clear_axis(commented, sheet, table, &cells) {
+            Ok(package) => (Some(package), false),
+            Err(
+                error @ Error::CellClear {
+                    error: crate::table::cells::Error::Allocation { .. },
+                },
+            ) => return Err(error),
+            Err(Error::CellClear { .. }) => (None, true),
+            Err(other) => return Err(other),
+        }
+    };
+    let base = cleared.as_ref().unwrap_or(commented);
     let mut working = Working::new(base)?;
     let target = locate(&working, sheet, table)?;
-    let replacements = plan(&working, &target, step, before, false)?;
-    for replacement in replacements {
+    let planned = plan(&working, &target, step, before, false, drop_cells)?;
+    for replacement in planned.replacements {
         replace(&mut working, replacement)?;
     }
-    let published = working.publish(&Transition::default())?;
+    let mut transition = Transition::default();
+    if !planned.removed.is_empty() {
+        if let Some(registry) = structure::metadata::registry(&working)? {
+            transition.remove_objects(&registry, &planned.removed)?;
+        }
+        for identifier in &planned.removed {
+            working.remove(*identifier)?;
+        }
+    }
+    let published = working.publish(&transition)?;
     verify(source, &published.package, sheet, table, step)?;
     Ok(published)
 }
@@ -1353,5 +1571,78 @@ impl Package {
     /// source.
     pub fn apply_table_topology(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use litchi_numbers_wire::{BncCell, CachedScalar};
+
+    use super::{TILE_MESSAGE_TYPE, locate, message, tiles};
+    use crate::formula::Expression;
+    use crate::package::structure::Working;
+    use crate::table::cells::Input;
+    use crate::table::topology::RowDeletion;
+    use crate::{CellPosition, Package};
+
+    /// The stored BNC cell at `position` of the first table.
+    fn stored(package: &Package, position: CellPosition) -> BncCell {
+        let working = Working::new(package).expect("working set");
+        let target = locate(&working, 0, 0).expect("table");
+        let (_, model) = message(&working, target.model, &[6_001]).expect("model");
+        let store = super::single_bytes(model, 4)
+            .expect("store")
+            .expect("store");
+        let (tiles, size) = tiles(store).expect("tiles");
+        let key = u32::try_from(u64::from(position.row()) / size).expect("key");
+        let local = u32::try_from(u64::from(position.row()) % size).expect("row");
+        let tile = tiles
+            .iter()
+            .find(|(candidate, _)| *candidate == key)
+            .expect("tile")
+            .1;
+        let (_, data) = message(&working, tile, &[TILE_MESSAGE_TYPE]).expect("tile payload");
+        let bytes = litchi_numbers_wire::table_write::tile_cell(data, local, position.column())
+            .expect("cell")
+            .expect("stored");
+        BncCell::parse(&bytes).expect("cell")
+    }
+
+    /// Record 0329: a formula whose reference is removed reads `#REF!` and
+    /// caches an error result.
+    #[test]
+    fn deleted_references_cache_an_error() {
+        let base = Package::new();
+        let mut edit = base.edit_table_cells(0, 0).expect("edit");
+        edit = edit
+            .set_a1("B2", Input::number(4.0).expect("number"))
+            .expect("value")
+            .set_a1("B3", Input::number(5.0).expect("number"))
+            .expect("value");
+        edit = edit
+            .set_formula_a1("E3", Expression::parse("B2+B3").expect("formula"))
+            .expect("formula");
+        let package = edit.commit().expect("cells").into_package();
+        let before = stored(&package, CellPosition::new(2, 4));
+        assert!(matches!(
+            before.cached_scalar(),
+            Ok(Some(CachedScalar::Number(_)))
+        ));
+        let removed = package
+            .edit_table_topology(0, 0)
+            .expect("topology")
+            .remove_row(RowDeletion::body(0))
+            .expect("row")
+            .commit()
+            .expect("commit");
+        let after = stored(removed.package(), CellPosition::new(1, 4));
+        assert!(matches!(
+            after.cached_scalar(),
+            Ok(Some(CachedScalar::Unsupported(8)))
+        ));
+        assert!(matches!(
+            after.stored_value(),
+            litchi_numbers_wire::StoredValue::Formula(_)
+        ));
     }
 }

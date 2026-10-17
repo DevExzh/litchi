@@ -25,8 +25,19 @@ pub(in crate::package) fn release(
     list: &[u8],
     remaining: &mut BTreeMap<u32, u32>,
 ) -> FaultResult<(Option<Vec<u8>>, Vec<u64>)> {
+    release_with(list, remaining, false)
+}
+
+/// [`release`], handing back the list's last key when its entry goes
+/// (`reclaim`; record 0329), as the cell writer does for a string list.
+pub(in crate::package) fn release_with(
+    list: &[u8],
+    remaining: &mut BTreeMap<u32, u32>,
+    reclaim: bool,
+) -> FaultResult<(Option<Vec<u8>>, Vec<u64>)> {
     let mut pruned = Vec::new();
     let mut changed = false;
+    let mut dropped = Vec::new();
     let output = rebuild(list, |field| {
         if field.number != 3 {
             return Ok(None);
@@ -59,8 +70,29 @@ pub(in crate::package) fn release(
                 pruned.push(references::reference_identifier(reference)?);
             }
         }
+        reserve(&mut dropped, 1)?;
+        dropped.push(u64::from(key));
         Ok(Some(Vec::new()))
     })?;
+    let mut output = output;
+    if reclaim && !dropped.is_empty() {
+        let current = single_varint(&output, 2)?.ok_or(Fault::Invalid)?;
+        let mut next = current;
+        dropped.sort_unstable();
+        for key in dropped {
+            if key.checked_add(1) == Some(next) {
+                next = key;
+            }
+        }
+        if next != current {
+            output = rebuild(&output, |field| {
+                if field.number == 2 {
+                    return varint_field(2, next).map(Some);
+                }
+                Ok(None)
+            })?;
+        }
+    }
     Ok((changed.then_some(output), pruned))
 }
 

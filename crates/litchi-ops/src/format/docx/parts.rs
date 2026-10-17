@@ -55,6 +55,13 @@ pub(crate) struct Cache {
     /// 0325; the marks of record 0319).
     pub(super) bookmarks: OnceLock<Vec<litchi_docx::bookmark::Bookmark>>,
     pub(super) fields: OnceLock<Vec<litchi_docx::Field>>,
+    /// The SmartArt inventory in document order, each graphic's outline
+    /// read on first use (record 0335).
+    pub(super) smartarts: OnceLock<Arc<[Arc<super::smartart::SmartArtValue>]>>,
+    /// The chart parts read so far, by main-document relationship (record
+    /// 0335): a chart's series and axes resolve against its projection.
+    pub(super) charts:
+        std::sync::Mutex<Vec<(Box<str>, Option<Arc<crate::format::chart::Summary>>)>>,
 }
 
 /// One header or footer part, with its payload read on first use.

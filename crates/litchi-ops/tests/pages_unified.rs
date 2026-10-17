@@ -564,3 +564,68 @@ fn sections_are_added_and_removed() {
         text(&file, "/section[1]").map(|text| format!("{text}Tail"))
     );
 }
+
+#[test]
+fn body_tables_are_added_with_seeded_text() {
+    let file = read("pages/body-table-visible.pages");
+    let tables: usize = prop(&file, "/", "tableCount")
+        .expect("tables")
+        .parse()
+        .expect("count");
+    let paragraphs_before = paragraphs(&file).len();
+    let added = file
+        .add(
+            "/body",
+            NewNode::new("tbl")
+                .prop("name", "Budget")
+                .prop("data", "Item,Cost;Paper,3")
+                .at(Placement::Position(litchi_core::Position::new(0))),
+        )
+        .expect("table");
+    let reopened = reopen(&added.file);
+    let path = added.path.to_string();
+    assert!(path.starts_with("/body/tbl["), "{path}");
+    assert_eq!(prop(&reopened, &path, "name").as_deref(), Some("Budget"));
+    assert_eq!(prop(&reopened, &path, "rows").as_deref(), Some("2"));
+    assert_eq!(prop(&reopened, &path, "columns").as_deref(), Some("2"));
+    assert_eq!(
+        text(&reopened, &format!("{path}/tr[2]/tc[1]")).as_deref(),
+        Some("Paper")
+    );
+    assert_eq!(
+        prop(&reopened, "/", "tableCount").as_deref(),
+        Some((tables + 1).to_string().as_str())
+    );
+    // The table anchors in a paragraph of its own, at the placement.
+    assert_eq!(paragraphs(&reopened).len(), paragraphs_before + 1);
+    assert_eq!(
+        prop(&reopened, "/body/p[1]", "objects").as_deref(),
+        Some("1")
+    );
+    let edited = file
+        .edit(|tx| {
+            tx.add("/body", NewNode::new("tbl").prop("rows", 2).prop("cols", 2))?;
+            Ok(())
+        })
+        .expect("edit");
+    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    // Removing the new table's paragraph removes the table with it.
+    let removed = reopened.remove("/body/p[1]").expect("remove");
+    assert_eq!(
+        prop(&reopen(&removed), "/", "tableCount").as_deref(),
+        Some(tables.to_string().as_str())
+    );
+    // A document without a body table has no structure to copy.
+    let error = read("pages/basic.pages")
+        .add("/body", NewNode::new("tbl").prop("rows", 2).prop("cols", 2))
+        .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    let error = file
+        .add(
+            "/body/p[1]",
+            NewNode::new("tbl").prop("rows", 2).prop("cols", 2),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), Code::InvalidArgument);
+}

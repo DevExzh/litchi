@@ -244,10 +244,7 @@ impl Run {
                 let staged = self
                     .pending
                     .adds_on(slide)
-                    .filter(|add| {
-                        let picture = matches!(add, super::write::Add::Image { .. });
-                        picture == (request.element == "picture")
-                    })
+                    .filter(|add| add.element() == request.element)
                     .count();
                 self.admit(index)?;
                 self.pending.stage_add(request.add, index);

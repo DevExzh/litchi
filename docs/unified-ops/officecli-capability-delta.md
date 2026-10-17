@@ -25,8 +25,8 @@ row has no disposition.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `9c9015925758c2332b68a118d51bfb7a9f153d475af94fb233b723f78ed821f7` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `1b5404fded785036e25222c15438482644b478e39f9e6ba653e2c67e0498c39e` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `dbae971f8735d0dead114eece2c3da25d7cefbc727eba52ec2292e6fcfae8190` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `ee70421edb33f37a4bde7e46ee5434d666cf6ff3419ac17b53ac559455e87d30` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
@@ -35,8 +35,8 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `6769b6e588c2abedd1e298586c7c90cd0741f3bf4147db3a12cf1ff7f2abe77c` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `5f7fd859d62b6f570a465c859cfc1b26d5218386a4eb6c251a63678a71e446fc` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `2fdded1c92e64c56696c48a388dd03c27c4f6297468640ffa1133bd113bc8529` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `bcfba00773c28a5c08f4a081185dd93e258334c1e625a6e812ac48cac651beac` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `104f4afa7068abc7bbe1d9e51861f007ee37cb23f5ff4fad6537de7fbcecff14` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `9c4afdf165334e207de69da99cdc335356d3ed7ec6ff012885c95f067bdf8398` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
@@ -47,7 +47,7 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `8101c13967ee6059e70011f78af45c0b7d64b0fdf8952178f901b2ceb7a57dec` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `d1c48fe2ba724c013f55f0997bb31713f35c6e178e3dfdda4f1f7d81a6490faf` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d84a027ace50689549f78d7d9d6662782f76ea58436a8dbac99da253ace7952f` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `51c51512e3c89b13c59f053cfb96cdd907747af2510db1945450c8e8fbb800dd` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `7a0bad7630d2adadfe7131a1f00c6ced4478d93c19903a276cda45704a308dfc` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -86,7 +86,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | unlisted | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 31 | 4 | 0 | 0 | 0 | 9 | 2 | 6 |
+| docx | 33 | 4 | 0 | 0 | 0 | 7 | 2 | 7 |
 | doc | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
 | rtf | 29 | 5 | 0 | 0 | 0 | 10 | 2 | 1 |
 | xlsx | 33 | 5 | 0 | 0 | 0 | 1 | 2 | 1 |
@@ -112,7 +112,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | unlisted | litchi-only |
 |---|---|---|---|---|---|---|---|---|---|
-| docx | 289 | 2 | 58 | 0 | 237 | 2 | 0 | 373 | 269 |
+| docx | 296 | 4 | 58 | 0 | 237 | 2 | 0 | 364 | 270 |
 | doc | 157 | 0 | 59 | 0 | 237 | 1 | 0 | 507 | 59 |
 | rtf | 109 | 0 | 59 | 0 | 241 | 1 | 0 | 551 | 36 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 0 | 145 | 559 |
@@ -138,7 +138,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 249 | 39 | 508 | 0 | 242 | 192 |
+| docx | 260 | 34 | 502 | 0 | 242 | 193 |
 | doc | 10 | 29 | 757 | 0 | 27 | 197 |
 | rtf | 15 | 35 | 746 | 0 | 23 | 178 |
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
@@ -179,7 +179,7 @@ Element gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 3 | 5 | 2 | 0 | 5 | 0 |
+| docx | 1 | 5 | 2 | 0 | 5 | 0 |
 | doc | 0 | 11 | 1 | 0 | 5 | 0 |
 | rtf | 0 | 11 | 1 | 0 | 5 | 0 |
 | xlsx | 1 | 2 | 4 | 0 | 1 | 0 |
@@ -205,7 +205,7 @@ Property gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 96 | 533 | 35 | 0 | 19 | 0 |
+| docx | 85 | 533 | 35 | 0 | 19 | 0 |
 | doc | 0 | 882 | 35 | 0 | 19 | 0 |
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
 | xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
@@ -231,9 +231,8 @@ All gap rows by tier:
 
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| P0 | 89 | 0 | 0 | 0 | 4 | 0 |
-| v1 | 39 | 0 | 0 | 0 | 0 | 0 |
-| P1 | 442 | 6044 | 0 | 0 | 55 | 0 |
+| P0 | 81 | 0 | 0 | 0 | 4 | 0 |
+| P1 | 476 | 6044 | 0 | 0 | 55 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -258,7 +257,8 @@ properties share its entry unless an entry names the property):
 | raw-layer | out-of-scope | 0336 | 11 | `delta:*:raw` | the raw XML layer is the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336: OOXML parts, packaged ODF reads), not an element of the node tree |
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
-| docx-p0-residue | planned | WP4 | 82 | `delta:docx:chart-axis`, `delta:docx:chart-series`, `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:comment.*`, `delta:docx:hyperlink.*`, `delta:docx:picture.*`, `delta:docx:table.style` | DOCX P0/v1 residue: chart series and axes, table columns, table and row writes, comment set, picture set/remove, style and list application |
+| docx-p0-residue | planned | WP4 | 8 | `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:paragraph.listStyle`, `delta:docx:paragraph.start`, `delta:docx:hyperlink.*`, `delta:docx:table.style` | DOCX P0/v1 residue: table columns, table and row writes, style and list application (chart series and axes, comment set and picture set/remove closed in record 0335) |
+| docx-picture-comment-follow-ups | planned | 0335 | 61 | `delta:docx:comment.*`, `delta:docx:picture.*`, `delta:docx:chart-series.*`, `delta:docx:chart-axis.*` | record 0335 follow-ups: floating pictures (anchor, wrap, positions), crop and effects, click links and part facts; comment replies and resolution (commentsExtended) and anchor controls; series formatting and axis formatting keys beyond name/values/color and title/min/max |
 | pptx-p0-residue | planned | WP3 | 44 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:paragraph.text`, `delta:pptx:run.text`, `delta:pptx:picture.*`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text`, `delta:pptx:table.style` | PPTX P0/v1 residue: paragraph/run add and remove, comment remove, picture set, slide text and layout writes |
 | xlsx-p0-residue | planned | WP16 | 13 | `delta:xlsx:run`, `delta:xlsx:cell.value`, `delta:xlsx:cell.formula`, `delta:xlsx:cell.type`, `delta:xlsx:picture.src` | XLSX P0/v1 residue (WP16, proposed in record 0332): rich-text runs, `add` of a cell, the cell type, picture source replacement |
 | mermaid-diagram | out-of-scope |  | 83 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
@@ -277,8 +277,8 @@ properties share its entry unless an entry names the property):
 | body | body | supported |  |  |  |
 | bookmark | bookmark | supported |  |  |  |
 | bookmarkEnd |  | unlisted | P1 | deferred-P1 0332 (docx-breadth) |  |
-| chart-axis |  | unlisted | v1 | planned WP4 (docx-p0-residue) |  |
-| chart-series |  | unlisted | v1 | planned WP4 (docx-p0-residue) |  |
+| chart-axis | axis | supported |  |  |  |
+| chart-series | series | supported |  |  |  |
 | chart | chart | supported |  |  |  |
 | comment | comment | supported |  |  |  |
 | diagram |  | unlisted | P2 | out-of-scope (mermaid-diagram) |  |
@@ -325,8 +325,9 @@ properties share its entry unless an entry names the property):
 |  | settings | litchi-only |  |  | L-DOCX-R6 (R4x) |
 |  | theme | litchi-only |  |  | L-DOCX-R6 (R4x) |
 |  | smartart | litchi-only |  |  |  |
+|  | node | litchi-only |  |  |  |
 
-Properties: 1230 rows, 683 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
+Properties: 1231 rows, 672 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
 
 ### Contextual operation gaps
 
@@ -969,10 +970,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `run` | `speaker-notes runs` | character properties are written on runs of text boxes, shapes and title and body placeholders (record 0312); speaker notes list no runs and keep their styles | record 0312 follow-ups |
 | `add` | `run` | `a new character run` | a run is a styled span of a paragraph; add a paragraph or set its text | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
 | `set` | `tc` | `cells in a formula graph` | slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale | record 0309 follow-ups |
-| `add` | `table` | `a new slide table` | the Keynote leaf has no slide-table creation transaction | record 0298 follow-up: Keynote slide-table creation |
+| `add` | `table` | `a deck without a slide table` | a new table copies the structure (styles, header counts, storage layout) of the deck's first slide table; a deck without one has none to copy | record 0329 follow-up: a built-in table template |
 | `remove` | `table` | `a slide table, chart or group` | the leaf's drawable removal refuses tables, charts and groups | record 0298 follow-up: structural removal of tables, charts and groups |
 | `add` | `video` | `a new movie or audio clip` | the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet | record 0309 follow-up: wire slide::movie and slide::audio creation |
 | `set` | `video` | `the frame of a movie, audio clip, line, table, chart or group` | the leaf's drawable geometry refuses tables, charts, groups, lines and movies | record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others |
@@ -1001,7 +1001,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `set` | `cell` | `cross-table formula references` | formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
 | `add` | `table` | `a workbook without a table` | a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet | record 0301 follow-ups (IWORK_API_REQUESTS.md request 5) |
-| `add` | `row` | `formulas the coordinate shift refuses, merges` | rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); refused: removing a row or column a surviving formula reads (native Numbers writes #REF!), a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a shared formula whose cells would diverge, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden, bordered or commented row or column | record 0318 follow-ups (IWORK_API_REQUESTS.md request 6) |
+| `add` | `row` | `formulas the coordinate shift refuses, merges` | rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split (record 0329); refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column | record 0329 follow-ups (IWORK_API_REQUESTS.md request 6) |
 | `set` | `row` | `height and visibility` | rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction | record 0309 follow-ups |
 
 ## odb
@@ -1477,6 +1477,6 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata() | record 0299 Pages metadata node |
 | `set` | `tc` | `cells in a formula graph` | body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale | record 0309 follow-ups |
-| `add` | `tbl` | `a new body table` | the Pages leaf deletes body tables but has no table-creation transaction | record 0299 follow-up: Pages body-table creation |
+| `add` | `tbl` | `a document without a body table` | a new body table copies the structure (styles, header counts, storage layout) of the document's first body table; a document without one has none to copy | record 0329 follow-up: a built-in table template |
 | `remove` | `p` | `a paragraph that anchors a chart, image or footnote` | a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here | record 0301 follow-up: delete those anchored objects with their paragraph |
 | `create` | `document` | `a document with a fresh identity` | `create` returns the deterministic minimal Pages document (`Package::new`); a fresh document identity is an explicit leaf builder input | litchi_pages::builder::Builder with Identity::generate |

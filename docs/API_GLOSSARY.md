@@ -2490,6 +2490,21 @@ Both profiles now register 30 families.
 | --- | --- | --- |
 | `litchi_pages::section::lifecycle::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | Registered family in `pages` (request 11); `Package::{edit_section_lifecycle, apply_section_lifecycle}`; `Edit::{add(after, Option<&str>), remove(section)}`, one operation per edit; `Error::{InitialSection, EmptySection, UnsupportedContent, UnsupportedDependency}` | ✅ 0312 |
 
+## iWork table creation, `#REF!` and notes runs (record 0329)
+
+Table creation is one verb on the owner (as `insert` is elsewhere), not a
+staged family: `litchi_pages::table::creation` carries `{Commit, Patch,
+Diagnostics, Error, LimitKind, NewTable}` without an `Edit`, so it is not
+registered in the `pages` profile.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_numbers_wire::table_create::{Shape, Role, TableUuid, Frame, OwnerGeometry, admits_size, model_payload, info_payload, empty_storage, owner_payload, engine_payload, …}` | The payload half of Numbers table creation (0301), shared by the Keynote and Pages owners | ✅ 0329 |
+| `litchi_keynote::slide::drawable::{NewTable, Edit::add_table, Unsupported::TableTemplate, Error::InvalidTableSize}` | A slide table cloned from the deck's first slide table, in the slide-drawable commit | ✅ 0329 |
+| `litchi_pages::Package::{insert_body_table, apply_body_table_creation}`, `litchi_pages::table::creation::{NewTable, Commit, Patch, Diagnostics, Error, LimitKind}` | A body table cloned from the document's first body table, anchored at a UTF-16 body `Position`; `Error::NoTemplate` without one | ✅ 0329 |
+| `litchi_numbers_wire::BncCell::{set_formula_cached_error, set_formula_identifier}` | `#REF!` result caches and shared-formula splits of the topology shift | ✅ 0329 |
+| `litchi_keynote::slide::drawable::Edit::set_notes_text_style`, `litchi_keynote::Package::slide_notes_text_runs` | Speaker-notes character styles (request 10) | ✅ 0329 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |
@@ -2734,3 +2749,24 @@ stops ride on the existing paragraph-property edit.
 | `litchi_rtf::edit::SectionValue` | one section page-setup value (break type, page size, orientation, margins, header and footer distance, columns, column spacing, title page, vertical alignment) | ✅ 0328 |
 | `litchi_rtf::ParagraphFormat::tab_stops` | a paragraph's custom tab stops in declaration order | ✅ 0328 |
 | `litchi_ops` RTF kinds `Section`, `Bookmark`, `Field`, `Toc`, `Tab`, `TextBox`, `Shape` | the DOCX paths (`/section[N]`, `/bookmark[N]`, `/bookmark[@name=X]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/textbox[N]`, `/body/shape[N]`) over the native collections; sections, bookmark names, field instructions, TOC switches and tab stops are writable, tab stops are added and removed, bookmarks removed | ✅ 0328 |
+
+## DOCX picture, comment and SmartArt edits; DOCX chart series and axes (record 0335)
+
+The eager package-bound `document::Edit` gains the set and remove halves of
+the DOCX picture, comment and SmartArt families whose add halves landed in
+records 0251c, 0251d and 0295. Changes are `with_*` builders, as
+`styles::catalog::StyleChange` is; each part left unset keeps the current
+value. Every verb travels in the main-document `Patch` (graph changes and
+element replacements), so replay and the exact inverse apply; no second
+transaction family is introduced.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_docx::document::PictureChange` (`new`, `with_size`, `with_name`, `with_description`, `with_image`, `is_empty`), `Edit::{set_picture_at, remove_picture_at}` | addressed as `insert_picture_at` returns them: a paragraph and the picture's position among `Paragraph::images`; a new image is a new media part, the previous one stays unreferenced (the removed-chart policy) | ✅ 0335 |
+| `litchi_docx::document::CommentChange` (`new`, `with_author`, `with_initials`, `with_date`, `with_text`, `is_empty`), `Edit::set_comment` | by native comment identifier, as `remove_comment`; text replaced as `set_note_text` replaces a note's | ✅ 0335 |
+| `litchi_docx::document::SmartArtParts` (`data`, `layout`, `quick_style`, `colors`, `drawing`), `Edit::{smartart_parts, set_smartart, remove_smartart}` | by the data-model relationship `insert_smartart_at` returns; the PPTX `opened::SmartArtParts` shape | ✅ 0335 |
+| `litchi_docx::smartart::Diagram::extent` | the drawing's `wp:extent`, which a regenerated cached drawing takes | ✅ 0335 |
+| DOCX `picture` set (`width`, `height`, `alt`, `name`, `src`; aliases `w`, `h`, `altText`, `description`, `path`), remove, query | OfficeCLI's picture keys; pictures are paragraph children for the query walker | ✅ 0335 |
+| DOCX `comment` set (`author`, `initials`, `date`, `text`); `parentId` and `done` property gaps (follow-up 0335-F2) | a reply or resolution key is refused (`unsupported_capability`) on add and set | ✅ 0335 |
+| DOCX `smartart` set (`layout`, `text`) and remove; `node` element (`/smartart[N]/node[K]`, nested; `level`, write-only `text`) | the PPTX `node` vocabulary of record 0284 | ✅ 0335 |
+| DOCX `series` (`/body/p[N]/chart[M]/series[K]`, `/chart[N]/series[K]`; `name`, `values`, `categories`, `color`) and `axis` (`.../axis[@role=ROLE]`, `.../axis[N]`; `role`, `title`, `min`, `max`) | the PPTX and XLSX `chart-series` and `chart-axis` vocabulary | ✅ 0335 |

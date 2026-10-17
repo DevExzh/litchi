@@ -14,6 +14,13 @@ pub mod values {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Value,
     };
 }
+/// Exact-source creation of a body table cloned from the document's first
+/// body table (record 0329).
+pub mod creation {
+    pub use crate::package::body_table_creation::{
+        Commit, Diagnostics, Error, LimitKind, NewTable, Patch,
+    };
+}
 /// Exact-source deletion of one rooted body table.
 pub mod deletion {
     pub use crate::package::body_table_deletion::{Commit, Diagnostics, Error, LimitKind, Patch};

@@ -349,6 +349,10 @@
           "pathSegment": "hyperlink"
         },
         {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
           "element": "chart",
           "pathSegment": "chart"
         },
@@ -2588,7 +2592,7 @@
       "parent": "comments",
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -2608,25 +2612,25 @@
         "author": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "initials": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "date": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "text": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         }
       },
@@ -5381,10 +5385,10 @@
       ],
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
-        "query": false,
-        "remove": false
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -5395,25 +5399,25 @@
         "width": {
           "type": "length",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "alt": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "name": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "relId": {
@@ -5425,9 +5429,16 @@
         "src": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -5451,6 +5462,16 @@
           "/body/chart[N]"
         ]
       },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
       "properties": {
         "chartType": {
           "type": "string",
@@ -6579,10 +6600,10 @@
       "parent": "document",
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -6590,11 +6611,17 @@
           "/body/smartart[N]"
         ]
       },
+      "children": [
+        {
+          "element": "node",
+          "pathSegment": "node"
+        }
+      ],
       "properties": {
         "layout": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "layoutId": {
@@ -6612,7 +6639,7 @@
         "text": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "name": {
@@ -6637,6 +6664,157 @@
           "type": "length",
           "add": true,
           "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/chart[M]/series[K]",
+          "/chart[N]/series[K]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "values": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/chart[M]/axis[@role=ROLE]",
+          "/body/p[N]/chart[M]/axis[N]",
+          "/chart[N]/axis[@role=ROLE]"
+        ]
+      },
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "node",
+      "parent": [
+        "smartart",
+        "node"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/smartart[N]/node[K]",
+          "/smartart[N]/node[K]/node[J]"
+        ]
+      },
+      "children": [
+        {
+          "element": "node",
+          "pathSegment": "node"
+        }
+      ],
+      "properties": {
+        "level": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
           "get": false
         }
       },
@@ -6691,6 +6869,22 @@
       "code": "unsupported_capability",
       "followUp": "R4x",
       "reason": "drawing shapes have no located reader yet"
+    },
+    {
+      "subject": "property",
+      "element": "comment",
+      "key": "parentId",
+      "code": "unsupported_capability",
+      "followUp": "0335-F2",
+      "reason": "comment replies (the commentsExtended parent link) are not read or authored; an add or set naming parentId is refused"
+    },
+    {
+      "subject": "property",
+      "element": "comment",
+      "key": "done",
+      "code": "unsupported_capability",
+      "followUp": "0335-F2",
+      "reason": "comment resolution (commentsExtended w15:done) is not read or authored; an add or set naming done is refused"
     },
     {
       "subject": "property",

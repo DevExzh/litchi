@@ -1951,10 +1951,11 @@ fn classify_prepared_mode(
         {
             continue;
         }
+        // A comment on an empty cell materialises it too (record 0329).
         let materialized = group.iter().any(|change| {
             matches!(
                 change.change,
-                BncChange::Set(_) | BncChange::FormulaSet { .. }
+                BncChange::Set(_) | BncChange::FormulaSet { .. } | BncChange::CommentSet { .. }
             )
         });
         if !materialized {
@@ -2553,7 +2554,7 @@ fn prepare_canonical_row<'source>(
         }
         if !matches!(
             change.change,
-            BncChange::Set(_) | BncChange::FormulaSet { .. }
+            BncChange::Set(_) | BncChange::FormulaSet { .. } | BncChange::CommentSet { .. }
         ) {
             continue;
         }
