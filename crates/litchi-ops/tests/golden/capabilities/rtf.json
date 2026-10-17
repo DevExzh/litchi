@@ -164,6 +164,22 @@
         {
           "element": "numbering",
           "pathSegment": "numbering"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "bookmark",
+          "pathSegment": "bookmark"
+        },
+        {
+          "element": "field",
+          "pathSegment": "field"
+        },
+        {
+          "element": "toc",
+          "pathSegment": "toc"
         }
       ],
       "properties": {}
@@ -192,6 +208,14 @@
         {
           "element": "table",
           "pathSegment": "tbl"
+        },
+        {
+          "element": "textbox",
+          "pathSegment": "textbox"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
         }
       ],
       "properties": {},
@@ -240,6 +264,10 @@
         {
           "element": "picture",
           "pathSegment": "picture"
+        },
+        {
+          "element": "tab",
+          "pathSegment": "tab"
         }
       ],
       "properties": {
@@ -1272,6 +1300,486 @@
           "type"
         ]
       }
+    },
+    {
+      "format": "rtf",
+      "element": "section",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/section[N]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "continuous",
+            "nextColumn",
+            "nextPage",
+            "evenPage",
+            "oddPage"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "pageWidth": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "pageHeight": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "orientation": {
+          "type": "enum",
+          "values": [
+            "portrait",
+            "landscape"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "marginTop": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "marginBottom": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "marginLeft": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "marginRight": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "marginHeader": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "marginFooter": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "marginGutter": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "columns": {
+          "type": "int",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "columnSpace": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "columns.separator": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "titlePage": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "pageNumFmt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "pageStart": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "vAlign": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "both",
+            "bottom"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "bookmark",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/bookmark[@name=X]"
+        ],
+        "positional": [
+          "/bookmark[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "field",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/field[N]"
+        ]
+      },
+      "properties": {
+        "fieldType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "instruction": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fldLock": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "evaluated": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "toc",
+      "parent": "document",
+      "elementAliases": [
+        "tableofcontents"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/toc[N]"
+        ]
+      },
+      "properties": {
+        "levels": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hyperlinks": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "pageNumbers": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "instruction": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "tab",
+      "parent": "paragraph",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/tab[M]"
+        ]
+      },
+      "properties": {
+        "pos": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "val": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "decimal",
+            "bar"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leader": {
+          "type": "enum",
+          "values": [
+            "none",
+            "dot",
+            "hyphen",
+            "underscore",
+            "heavy",
+            "middleDot",
+            "equal"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "textbox",
+      "parent": "body",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/textbox[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "shape",
+      "parent": "body",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/shape[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "anchor.x": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "anchor.y": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "wrap": {
+          "type": "enum",
+          "values": [
+            "none",
+            "square",
+            "tight",
+            "through",
+            "topAndBottom",
+            "behind",
+            "front"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "behindDoc": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
     }
   ],
   "gaps": [
@@ -1304,38 +1812,10 @@
     },
     {
       "subject": "element",
-      "element": "shape",
-      "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "textbox",
-      "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "field",
-      "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
-    },
-    {
-      "subject": "element",
       "element": "formfield",
       "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "bookmark",
-      "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+      "followUp": "record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes",
+      "reason": "RTF form fields are read by the native model but not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
@@ -1348,22 +1828,29 @@
       "subject": "element",
       "element": "equation",
       "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+      "followUp": "record 0328 follow-up: RTF EQ fields and math zones as equation nodes",
+      "reason": "RTF equation fields and math zones are read by the native model but not yet projected"
     },
     {
       "subject": "element",
       "element": "revision",
       "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+      "followUp": "record 0328 follow-up: RTF revision nodes and accept/reject (P2)",
+      "reason": "RTF revision marks are read by the native model but not yet projected"
     },
     {
       "subject": "element",
-      "element": "section",
+      "element": "sdt",
+      "code": "unsupported_path",
+      "followUp": "none: content controls are DOCX-only",
+      "reason": "Rich Text Format has no structured document tags"
+    },
+    {
+      "subject": "element",
+      "element": "watermark",
       "code": "unsupported_capability",
-      "followUp": "unified RTF retained-node projection",
-      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+      "followUp": "record 0328 follow-up: the RTF header WordArt watermark",
+      "reason": "a watermark is a header shape the story reads do not project"
     },
     {
       "subject": "operation",

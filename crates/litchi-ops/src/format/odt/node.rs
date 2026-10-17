@@ -31,7 +31,9 @@ impl Step {
     fn positional(self) -> PathStep<'static> {
         use crate::path::navigate::ElementKind;
         match self.kind {
-            Kind::Body | Kind::Styles | Kind::Metadata => PathStep::new(self.kind.name()),
+            Kind::Body | Kind::Styles | Kind::Metadata | Kind::Numbering => {
+                PathStep::new(self.kind.name())
+            },
             kind => PathStep::at(kind.name(), Position::new(self.ordinal as usize)),
         }
     }
@@ -95,6 +97,34 @@ pub(crate) enum Target<'f> {
     Body(Body<'f>, NodeId),
     /// A common style.
     Style(Style<'f>),
+    /// A part of record 0328, read through the handle's part index.
+    Part(Part),
+}
+
+/// A part of record 0328: an index into the handle's part index
+/// ([`litchi_odt::body::Parts`]), its fields or its equations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Part {
+    /// `/numbering`.
+    Numbering,
+    /// A header or footer region (index among every region).
+    Region(u32),
+    /// A list style, as a definition or an instance.
+    List(u32),
+    /// A level (list style, level index).
+    Level(u32, u32),
+    /// A body text field (index among [`litchi_odt::body::fields`]).
+    Field(u32),
+    /// A table of contents.
+    Toc(u32),
+    /// A tab stop (paragraph, index among its stops).
+    Tab(NodeId, u32),
+    /// A drawing shape.
+    Shape(u32),
+    /// An equation (index among the handle's equations).
+    Equation(u32),
+    /// A table column (table, column ordinal).
+    Column(NodeId, u32),
 }
 
 // Record 0287: nodes move through every query; keep this one no larger
@@ -175,6 +205,14 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// The part a part node stands on.
+    pub(crate) fn part(&self) -> Option<Part> {
+        match self.target {
+            Target::Part(part) => Some(part),
+            _ => None,
+        }
+    }
+
     pub(crate) fn id(&self) -> Option<NodeId> {
         match self.target {
             Target::Body(_, id) => Some(id),
@@ -192,6 +230,9 @@ impl<'f> Node<'f> {
     ///
     /// Returns `corrupt_file` when the node's markup cannot be read.
     pub fn text(&self) -> Result<Option<Cow<'f, str>>> {
+        if let Target::Part(part) = self.target {
+            return super::parts::text(self.odt, part);
+        }
         let Some(leaf) = self.leaf() else {
             return Ok(None);
         };
@@ -253,9 +294,11 @@ impl<'f> Node<'f> {
         self.path()
     }
 
-    /// The node's children, in document order.
+    /// The node's children, in document order: the structural kinds (the
+    /// parts of record 0328 under a structural parent are reached by path
+    /// and query only).
     pub fn children(&self) -> ViewChildren<'_, 'f> {
-        match Children::of(self, crate::path::navigate::KindSet::ALL) {
+        match Children::view(self) {
             Ok(children) => ViewChildren::odt(children),
             Err(error) => ViewChildren::failed(error),
         }
@@ -319,9 +362,7 @@ impl<'f> Project<'f> for Node<'f> {
         let count = match (self.kind, self.target) {
             (Kind::Document, _) => 3,
             (Kind::Styles, _) => self.odt.body()?.common_styles().count(),
-            (_, Target::Body(..)) => {
-                Children::of(self, crate::path::navigate::KindSet::ALL)?.count()
-            },
+            (_, Target::Body(..) | Target::Part(_)) => Children::view(self)?.count(),
             _ => 0,
         };
         Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
@@ -347,6 +388,17 @@ impl<'f> Project<'f> for Node<'f> {
             Kind::Bookmark => spec::BOOKMARK_PROPS,
             Kind::Style => spec::STYLE_PROPS,
             Kind::Metadata => spec::METADATA_PROPS,
+            Kind::Header | Kind::Footer => spec::STORY_PROPS,
+            Kind::Numbering => spec::NUMBERING_PROPS,
+            Kind::AbstractNum => spec::ABSTRACT_NUM_PROPS,
+            Kind::Num => spec::NUM_PROPS,
+            Kind::Level => spec::LEVEL_PROPS,
+            Kind::Field => spec::FIELD_PROPS,
+            Kind::Toc => spec::TOC_PROPS,
+            Kind::Tab => spec::TAB_PROPS,
+            Kind::Shape => spec::SHAPE_PROPS,
+            Kind::Equation => spec::EQUATION_PROPS,
+            Kind::Column => spec::COLUMN_PROPS,
             Kind::Document | Kind::Body | Kind::Styles => return Ok(Format::empty()),
         };
         let source = Props::of(self)?;

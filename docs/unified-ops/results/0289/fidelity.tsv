@@ -132,7 +132,7 @@ iwork/pages/source-built-table-stylesheet-before.pages	pages	exact		byte-exact	/
 iwork/pages/source-built-table-stylesheet-native-saved.pages	pages	exact		value-exact	/section[1] name: 37712 -> 37713 bytes, first difference at 14	value-exact	paragraph add+remove: 37712 -> 37713 bytes, first difference at 14
 iwork/synthetic/numbers/bench-grid.numbers	numbers	exact		value-exact	/sheet[1] name: 11482 -> 11482 bytes, first difference at 8540	value-exact	table add+remove, row add+remove: 11482 -> 11482 bytes, first difference at 8540
 iwork/synthetic/numbers/custom-focused.numbers	numbers	exact		value-exact	/sheet[1] name: 2246 -> 1841 bytes, first difference at 1003	refused	table add+remove, row add+remove: invalid_input: rooted table-lifecycle source is invalid
-libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp	odp	exact		value-exact	/slide[1] name: 16945 -> 16948 bytes, first difference at 9192	-	
+libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp	odp	exact		value-exact	/slide[1] name: 16945 -> 16948 bytes, first difference at 9192	none	
 libreoffice-core/chart2/qa/extras/data/xls/chart.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: a position-locked drawing anchor is not shiftable without row and column sizes
 libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx	xlsx	exact		value-exact	/sheet[1] name: 13397 -> 13382 bytes, first difference at 1771	-	
 libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx	xlsx	exact		value-exact	/sheet[1] name: 18486 -> 18479 bytes, first difference at 1841	-	
@@ -212,14 +212,14 @@ libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx	xlsx	exact		va
 libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx	xlsx	exact		value-exact	/sheet[1] name: 11360 -> 11379 bytes, first difference at 3898	-	
 libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx	xlsx	exact		value-exact	/sheet[1]/B7 formula: 15414 -> 14359 bytes, first difference at 6	-	
 libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx	pptx	exact		value-exact	/slide[1]/shape[1] font: 67477 -> 67509 bytes, first difference at 2673	none	
-libreoffice-core/sd/qa/unit/data/draw-image-link.fodp	odp	exact		refused	/slide[1] name: unsupported_capability: Invalid format: draw:master-page-name cannot be empty	-	
-libreoffice-core/sd/qa/unit/data/draw-object-link.fodp	odp	exact		refused	/slide[1] name: unsupported_capability: Invalid format: draw:master-page-name cannot be empty	-	
+libreoffice-core/sd/qa/unit/data/draw-image-link.fodp	odp	exact		refused	/slide[1] name: unsupported_capability: Invalid format: draw:master-page-name cannot be empty	none	
+libreoffice-core/sd/qa/unit/data/draw-object-link.fodp	odp	exact		refused	/slide[1] name: unsupported_capability: Invalid format: draw:master-page-name cannot be empty	none	
 libreoffice-core/sd/qa/unit/data/odg/FitToFrameText.odg	odg	exact		value-exact	/page[1] name: 11847 -> 10101 bytes, first difference at 7	-	
-libreoffice-core/sd/qa/unit/data/odp/Math.fodp	odp	exact		byte-exact	/slide[1] name	-	
-libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp	odp	exact		value-exact	/slide[1] name: 10429 -> 10437 bytes, first difference at 5834	-	
-libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	odp	exact		value-exact	/slide[1] name: 18926 -> 18925 bytes, first difference at 11904	-	
-libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp	odp	exact		value-exact	/slide[1] name: 13158 -> 13170 bytes, first difference at 5025	-	
-libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp	odp	exact		value-exact	/slide[1] name: 11416 -> 11428 bytes, first difference at 5907	-	
+libreoffice-core/sd/qa/unit/data/odp/Math.fodp	odp	exact		byte-exact	/slide[1] name	none	
+libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp	odp	exact		value-exact	/slide[1] name: 10429 -> 10437 bytes, first difference at 5834	none	
+libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	odp	exact		value-exact	/slide[1] name: 18926 -> 18925 bytes, first difference at 11904	none	
+libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp	odp	exact		value-exact	/slide[1] name: 13158 -> 13170 bytes, first difference at 5025	none	
+libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp	odp	exact		value-exact	/slide[1] name: 11416 -> 11428 bytes, first difference at 5907	value-exact	linebreak add+remove: 11416 -> 11428 bytes, first difference at 5907
 libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	pptx	exact		refused	/slide[1]/shape[1] font: unsupported_capability: unsafe PPTX edit during set_text_properties: text property edits do not support markup-c...	byte-exact	slide move+back
 libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	pptx	exact		value-exact	/slide[7]/shape[1] font: 138108 -> 138094 bytes, first difference at 74356	byte-exact	slide move+back
@@ -229,34 +229,34 @@ libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx	pptx	exact		byte-exact	/sli
 libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
 libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx	pptx	exact		byte-exact	/slidemaster[1]/slidelayout[1] name	none	
-libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp	odp	exact		byte-exact	/slide[1] name	-	
+libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp	odp	exact		byte-exact	/slide[1] name	byte-exact	linebreak add+remove
 libreoffice-core/starmath/qa/extras/data/tdf151842.odf	odf	exact		value-exact	/ starmath: 6073 -> 4725 bytes, first difference at 7	-	
 libreoffice-core/svx/qa/unit/data/FontWork.odg	odg	exact		value-exact	/page[1] name: 10515 -> 9088 bytes, first difference at 7	-	
 libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/core/data/rtf/pass/fdo80924.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf	rtf	exact		value-exact	/body/p[1]/r[1] text: 43363 -> 43377 bytes, first difference at 15239	none	
 libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	value-exact	bookmark+hyperlink add+remove: 66048 -> 117760 bytes, first difference at 44
-libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt	odt	exact		byte-exact	/body/tbl[1] name	-	
-libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
+libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt	odt	exact		byte-exact	/body/tbl[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	value-exact	tab add+remove: 9644 -> 7737 bytes, first difference at 7
 libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	docx	exact		byte-exact	/styles/Normal name	-	
 libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf	rtf	exact		none		value-exact	paragraph move+back: 2345 -> 2653 bytes, first difference at 2330
-libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt	odt	exact		byte-exact	/body/p[1] text	-	
+libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf	rtf	exact		none		none	
-libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:variable-set (an element with ...	-	
+libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:variable-set (an element with ...	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/layout/data/inline-textbox-position.docx	docx	exact		byte-exact	/body/p[1] style	-	
-libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt	odt	exact		value-exact	/body/p[1] text: 1996 -> 1946 bytes, first difference at 1830	-	
-libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt	odt	exact		value-exact	/metadata author: 4863 -> 4467 bytes, first difference at 4	-	
-libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt	odt	exact		byte-exact	/body/h[1] text	-	
-libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1378 -> 1409 bytes, first difference at 1176	-	
-libreoffice-core/sw/qa/extras/odfexport/data/CrossRefHeadingBookmark.fodt	odt	exact		byte-exact	/metadata author	-	
-libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt	odt	exact		value-exact	/metadata author: 25828 -> 24389 bytes, first difference at 7	-	
+libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt	odt	exact		value-exact	/body/p[1] text: 1996 -> 1946 bytes, first difference at 1830	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt	odt	exact		value-exact	/metadata author: 4863 -> 4467 bytes, first difference at 4	value-exact	tab add+remove: 4863 -> 4517 bytes, first difference at 4
+libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt	odt	exact		byte-exact	/body/h[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1378 -> 1409 bytes, first difference at 1176	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/sw/qa/extras/odfexport/data/CrossRefHeadingBookmark.fodt	odt	exact		byte-exact	/metadata author	none	
+libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt	odt	exact		value-exact	/metadata author: 25828 -> 24389 bytes, first difference at 7	value-exact	tab add+remove: 25828 -> 24457 bytes, first difference at 7
 libreoffice-core/sw/qa/extras/odfexport/data/footnote_spacing_hanging_para.rtf	rtf	exact		refused	/footnote[1] text: unsupported_capability: unsupported RTF edit source: canonical destination edits refuse unknown RTF destinations	none	
-libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm	odm	exact		value-exact	/body/section[1] name: 8602 -> 7248 bytes, first difference at 7	-	
+libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm	odm	exact		value-exact	/body/section[1] name: 8602 -> 7248 bytes, first difference at 7	value-exact	tab add+remove: 8602 -> 7304 bytes, first difference at 7
 libreoffice-core/sw/qa/extras/odfexport/data/tdf165315.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	value-exact	paragraph move+back: 54717 -> 55572 bytes, first difference at 22046
-libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 963 -> 943 bytes, first difference at 581	-	
-libreoffice-core/sw/qa/extras/odfimport/data/draw-image-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 908 -> 888 bytes, first difference at 581	-	
-libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 901 -> 881 bytes, first difference at 584	-	
+libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 963 -> 943 bytes, first difference at 581	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+libreoffice-core/sw/qa/extras/odfimport/data/draw-image-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 908 -> 888 bytes, first difference at 581	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt	odt	exact		value-exact	/body/p[1]/frame[1] name: 901 -> 881 bytes, first difference at 584	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_LO_Standard_abc.docx	docx	locked		-		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2010_abc.docx	docx	locked		-		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2013_abc.docx	docx	locked		-		-	
@@ -282,12 +282,12 @@ libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	docx	exact		byt
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTOCFlag_u.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx	docx	exact		byte-exact	/styles/Normal name	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	docx	exact		byte-exact	/styles/Normal name	-	
 libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	docx	exact		byte-exact	/styles/Normal name	-	
-libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	-	
-libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt	odt	exact		byte-exact	/body/p[1] text	-	
+libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/rtfexport/data/4010_min.rtf	rtf	exact		refused	/body/p[2] text: document_protected: RTF document protection (forms) refuses changed publication	refused	paragraph move+back: document_protected: RTF document protection (forms) refuses changed publication
 libreoffice-core/sw/qa/extras/rtfexport/data/FORMDROPDOWN.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	value-exact	paragraph move+back: 5740 -> 6602 bytes, first difference at 5026
 libreoffice-core/sw/qa/extras/rtfexport/data/FWDP90_min.rtf	rtf	exact		value-exact	/body/tbl[1]/tr[1]/tc[1] text: 21847 -> 21846 bytes, first difference at 20309	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: a paragraph ends inside a group that continues with more content
@@ -373,20 +373,20 @@ libreoffice-core/sw/qa/extras/rtfimport/data/tdf167710.rtf	rtf	exact		none		none
 libreoffice-core/sw/qa/extras/rtfimport/data/tdf169298.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	value-exact	paragraph move+back: 188 -> 188 bytes, first difference at 43
 libreoffice-core/sw/qa/extras/rtfimport/data/tdf96308-tabpos.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	none	
 libreoffice-core/sw/qa/extras/rtfimport/data/tdf96326.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	value-exact	paragraph move+back: 479 -> 479 bytes, first difference at 161
-libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm	odm	exact		value-exact	/body/p[1] text: 8336 -> 7014 bytes, first difference at 7	-	
-libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt	odt	exact		byte-exact	/body/section[1] name	-	
+libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm	odm	exact		value-exact	/body/p[1] text: 8336 -> 7014 bytes, first difference at 7	value-exact	tab add+remove: 8336 -> 7068 bytes, first difference at 7
+libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt	odt	exact		byte-exact	/body/section[1] name	none	
 libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx	docx	exact		byte-exact	/styles/Normal name	-	
 libreoffice-core/sw/qa/extras/uiwriter/data/tdf147006.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/extras/uiwriter/data/tdf86639.rtf	rtf	exact		value-exact	/body/p[1] text: 188 -> 188 bytes, first difference at 185	none	
-libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt	odt	exact		byte-exact	/body/tbl[1] name	-	
-libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt	odt	exact		byte-exact	/body/p[1] text	-	
+libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt	odt	exact		byte-exact	/body/tbl[1] name	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	doc	exact		value-exact	/body/p[1]/r[1] text: 13312 -> 14848 bytes, first difference at 516	value-exact	bookmark+hyperlink add+remove: 13312 -> 13824 bytes, first difference at 516
-libreoffice-core/sw/qa/uibase/shells/data/ole-save-preview-update.odt	odt	exact		value-exact	/metadata author: 16006 -> 14628 bytes, first difference at 7	-	
-libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:a (an element with text of its...	-	
+libreoffice-core/sw/qa/uibase/shells/data/ole-save-preview-update.odt	odt	exact		value-exact	/metadata author: 16006 -> 14628 bytes, first difference at 7	value-exact	tab add+remove: 16006 -> 14688 bytes, first difference at 7
+libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:a (an element with text of its...	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[2]/tc[2] text	none	
-libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt	odt	exact		byte-exact	/body/section[1] name	-	
-libreoffice-core/sw/qa/uitest/data/tdf145178.fodt	odt	exact		byte-exact	/body/section[1] name	-	
+libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt	odt	exact		byte-exact	/body/section[1] name	none	
+libreoffice-core/sw/qa/uitest/data/tdf145178.fodt	odt	exact		byte-exact	/body/section[1] name	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 libreoffice-core/sw/qa/writerfilter/dmapper/data/NoFirstPageHeadFooter.rtf	rtf	exact		value-exact	/header[1] text: 24644 -> 24642 bytes, first difference at 22545	value-exact	paragraph move+back: 24644 -> 27773 bytes, first difference at 24242
 libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	docx	exact		byte-exact	/numbering/abstractNum[1]/level[1] format	-	
 libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx	docx	exact		none		-	
@@ -399,92 +399,92 @@ libreoffice-core/sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-pa
 libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf	rtf	exact		value-exact	/endnote[1] text: 253 -> 252 bytes, first difference at 197	none	
 libreoffice-core/sw/qa/writerfilter/rtftok/data/floating-table.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	value-exact	paragraph move+back: 410 -> 423 bytes, first difference at 88
 libreoffice-core/sw/qa/writerfilter/rtftok/data/floattable-tbl-overlap.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: the spliced paragraph segments do not parse as RTF
-libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt	odt	exact		byte-exact	/metadata author	-	
-libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt	odt	exact		byte-exact	/metadata title	-	
-libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt	odt	exact		byte-exact	/metadata title	-	
-libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm	odm	exact		value-exact	/metadata author: 22304 -> 20649 bytes, first difference at 7	-	
-libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt	odt	exact		byte-exact	/body/p[2] text	-	
-libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:ruby (an element with text of ...	-	
-libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 2173 -> 2171 bytes, first difference at 1419	-	
-libreoffice-core/xmloff/qa/unit/data/floattable-wrap-all-pages2.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt	odt	exact		byte-exact	/metadata title	-	
-libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	odt	exact		value-exact	/metadata language: 14711 -> 12890 bytes, first difference at 7	-	
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt	odt	exact		byte-exact	/metadata author	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm	odm	exact		value-exact	/metadata author: 22304 -> 20649 bytes, first difference at 7	value-exact	tab add+remove: 22304 -> 20682 bytes, first difference at 7
+libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt	odt	exact		byte-exact	/body/p[2] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt	odt	exact		refused	/body/p[1] text: unsupported_capability: Unsupported feature: an ODT Paragraph text set would replace text:ruby (an element with text of ...	value-exact	tab add+remove: 8307 -> 6914 bytes, first difference at 7
+libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 2173 -> 2171 bytes, first difference at 1419	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+libreoffice-core/xmloff/qa/unit/data/floattable-wrap-all-pages2.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	odt	exact		value-exact	/metadata language: 14711 -> 12890 bytes, first difference at 7	value-exact	tab add+remove: 14711 -> 12936 bytes, first difference at 7
 libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg	odg	exact		byte-exact	/page[1] name	-	
 libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
-libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14503 -> 13672 bytes, first difference at 7	-	
+libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14503 -> 13672 bytes, first difference at 7	value-exact	tab add+remove: 14503 -> 13717 bytes, first difference at 7
 libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg	odg	exact		value-exact	/page[1] name: 32729 -> 31132 bytes, first difference at 7	-	
-libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt	odt	exact		value-exact	/metadata author: 11023 -> 9087 bytes, first difference at 7	-	
+libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt	odt	exact		value-exact	/metadata author: 11023 -> 9087 bytes, first difference at 7	value-exact	tab add+remove: 11023 -> 9142 bytes, first difference at 7
 libreoffice-core/xmlsecurity/qa/unit/signing/data/odb_signed_macros.odb	odb	exact		none		-	
-libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
+libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	refused	tab add+remove: unsupported_capability: Unsupported feature: packaged ODT transactions preserve signed snapshots only as exact no-ops
 odf/corpus/calc-cell-styles.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'manifest.rdf'	-	
 odf/corpus/calc-formulas.ods	ods	exact		value-exact	/sheet[1]/A3 formula: 6837 -> 6859 bytes, first difference at 91	-	
 odf/corpus/calc-two-sheets.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'manifest.rdf'	-	
 odf/corpus/calc-unicode-chinese.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
-odf/corpus/impress-basic.odp	odp	exact		value-exact	/slide[1] name: 14940 -> 14956 bytes, first difference at 92	-	
-odf/corpus/impress-embedded-spreadsheet.odp	odp	exact		value-exact	/slide[1] name: 16403 -> 16406 bytes, first difference at 1001	-	
-odf/corpus/impress-master-layouts.odp	odp	exact		value-exact	/slide[1] name: 18026 -> 18039 bytes, first difference at 572	-	
-odf/corpus/writer-definition-lists.odt	odt	exact		value-exact	/metadata author: 7824 -> 6774 bytes, first difference at 10	-	
-odf/corpus/writer-header-footer.odt	odt	exact		value-exact	/metadata author: 7177 -> 6145 bytes, first difference at 10	-	
-odf/corpus/writer-images-frames.odt	odt	exact		value-exact	/metadata author: 16975 -> 15545 bytes, first difference at 10	-	
-odf/corpus/writer-paragraph-styles.odt	odt	exact		value-exact	/metadata author: 7194 -> 6217 bytes, first difference at 10	-	
-odf/corpus/writer-table-of-contents.odt	odt	exact		value-exact	/body/p[1] text: 44598 -> 43136 bytes, first difference at 7	-	
-odf/corpus/writer-table.odt	odt	exact		value-exact	/metadata author: 7055 -> 6019 bytes, first difference at 10	-	
-odf/corpus/writer-user-fields.odt	odt	exact		value-exact	/metadata author: 19410 -> 18398 bytes, first difference at 10	-	
+odf/corpus/impress-basic.odp	odp	exact		value-exact	/slide[1] name: 14940 -> 14956 bytes, first difference at 92	value-exact	linebreak add+remove: 14940 -> 14956 bytes, first difference at 92
+odf/corpus/impress-embedded-spreadsheet.odp	odp	exact		value-exact	/slide[1] name: 16403 -> 16406 bytes, first difference at 1001	value-exact	linebreak add+remove: 16403 -> 16406 bytes, first difference at 1001
+odf/corpus/impress-master-layouts.odp	odp	exact		value-exact	/slide[1] name: 18026 -> 18039 bytes, first difference at 572	value-exact	linebreak add+remove: 18026 -> 18039 bytes, first difference at 572
+odf/corpus/writer-definition-lists.odt	odt	exact		value-exact	/metadata author: 7824 -> 6774 bytes, first difference at 10	value-exact	tab add+remove: 7824 -> 6838 bytes, first difference at 10
+odf/corpus/writer-header-footer.odt	odt	exact		value-exact	/metadata author: 7177 -> 6145 bytes, first difference at 10	value-exact	tab add+remove: 7177 -> 6197 bytes, first difference at 10
+odf/corpus/writer-images-frames.odt	odt	exact		value-exact	/metadata author: 16975 -> 15545 bytes, first difference at 10	value-exact	tab add+remove: 16975 -> 15611 bytes, first difference at 10
+odf/corpus/writer-paragraph-styles.odt	odt	exact		value-exact	/metadata author: 7194 -> 6217 bytes, first difference at 10	value-exact	tab add+remove: 7194 -> 6266 bytes, first difference at 10
+odf/corpus/writer-table-of-contents.odt	odt	exact		value-exact	/body/p[1] text: 44598 -> 43136 bytes, first difference at 7	value-exact	tab add+remove: 44598 -> 43175 bytes, first difference at 7
+odf/corpus/writer-table.odt	odt	exact		value-exact	/metadata author: 7055 -> 6019 bytes, first difference at 10	value-exact	tab add+remove: 7055 -> 6073 bytes, first difference at 10
+odf/corpus/writer-user-fields.odt	odt	exact		value-exact	/metadata author: 19410 -> 18398 bytes, first difference at 10	value-exact	tab add+remove: 19410 -> 18490 bytes, first difference at 10
 odf/drawing/fill-image-inline.fodg	odg	exact		none		-	
-odf/drawing/fill-image-linked.fodp	odp	exact		none		-	
+odf/drawing/fill-image-linked.fodp	odp	exact		none		none	
 odf/drawing/marker-flat.fods	ods	exact		byte-exact	/sheet[1] name	-	
 odf/drawing/opacity-angles.fodg	odg	exact		none		-	
-odf/drawing/opacity-extension-stops.fodt	odt	exact		byte-exact	/body/p[1] text	-	
+odf/drawing/opacity-extension-stops.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
 odf/native-resave/libreoffice-resaved/calc-two-sheets-litchi.ods	ods	exact		value-exact	/sheet[1]/A1 formula: 8969 -> 9006 bytes, first difference at 3171	-	
 odf/native-resave/libreoffice-resaved/font-styles-litchi.odf	odf	exact		value-exact	/ starmath: 3666 -> 3324 bytes, first difference at 7	-	
 odf/native-resave/libreoffice-resaved/rhbz1870501-litchi.odg	odg	exact		value-exact	/page[1] name: 421219 -> 412539 bytes, first difference at 7	-	
-odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp	odp	exact		one-way	/slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...	-	
-odf/native-resave/libreoffice-resaved/writer-header-footer-litchi.odt	odt	exact		value-exact	/metadata author: 9636 -> 8989 bytes, first difference at 7	-	
+odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp	odp	exact		one-way	/slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...	value-exact	linebreak add+remove: 17198 -> 17206 bytes, first difference at 9941
+odf/native-resave/libreoffice-resaved/writer-header-footer-litchi.odt	odt	exact		value-exact	/metadata author: 9636 -> 8989 bytes, first difference at 7	value-exact	tab add+remove: 9636 -> 9052 bytes, first difference at 7
 odf/native-resave/litchi-changed/calc-two-sheets-litchi.ods	ods	exact		value-exact	/sheet[1]/A1 formula: 8739 -> 8771 bytes, first difference at 127	-	
 odf/native-resave/litchi-changed/font-styles-litchi.odf	odf	exact		value-exact	/ starmath: 4992 -> 4862 bytes, first difference at 86	-	
 odf/native-resave/litchi-changed/rhbz1870501-litchi.odg	odg	exact		value-exact	/page[1] name: 401547 -> 401241 bytes, first difference at 87	-	
-odf/native-resave/litchi-changed/tdf169979-litchi.odp	odp	exact		one-way	/slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...	-	
-odf/native-resave/litchi-changed/writer-header-footer-litchi.odt	odt	exact		value-exact	/metadata author: 5871 -> 5717 bytes, first difference at 83	-	
+odf/native-resave/litchi-changed/tdf169979-litchi.odp	odp	exact		one-way	/slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...	byte-exact	linebreak add+remove
+odf/native-resave/litchi-changed/writer-header-footer-litchi.odt	odt	exact		value-exact	/metadata author: 5871 -> 5717 bytes, first difference at 83	value-exact	tab add+remove: 5871 -> 5813 bytes, first difference at 83
 odf/native-resave/source/font-styles.odf	odf	exact		value-exact	/ starmath: 6311 -> 4924 bytes, first difference at 7	-	
 odf/native-resave/source/rhbz1870501.odg	odg	exact		value-exact	/page[1] name: 403275 -> 401240 bytes, first difference at 4	-	
 odf/odc-producer-evidence/odfdom-created.odc	odc	exact		value-exact	/axis[1] name: 2352 -> 2195 bytes, first difference at 4	-	
 odf/odc-producer-evidence/odfdom-resaved.odc	odc	exact		value-exact	/axis[1] name: 2361 -> 2206 bytes, first difference at 4	-	
-odf/odp/cellspan.odp	odp	exact		value-exact	/slide[1] name: 13489 -> 13496 bytes, first difference at 7344	-	
-odf/odp/tdf102223.odp	odp	exact		value-exact	/slide[1] name: 17335 -> 17343 bytes, first difference at 12913	-	
-odf/odp/tdf105502.odp	odp	exact		value-exact	/slide[1] name: 11629 -> 11639 bytes, first difference at 3579	-	
-odf/odp/tdf169979.odp	odp	exact		value-exact	/slide[1] name: 12568 -> 12603 bytes, first difference at 755	-	
-odf/odp/text-in-image.odp	odp	exact		value-exact	/slide[1] name: 13584 -> 13591 bytes, first difference at 5250	-	
+odf/odp/cellspan.odp	odp	exact		value-exact	/slide[1] name: 13489 -> 13496 bytes, first difference at 7344	none	
+odf/odp/tdf102223.odp	odp	exact		value-exact	/slide[1] name: 17335 -> 17343 bytes, first difference at 12913	none	
+odf/odp/tdf105502.odp	odp	exact		value-exact	/slide[1] name: 11629 -> 11639 bytes, first difference at 3579	none	
+odf/odp/tdf169979.odp	odp	exact		value-exact	/slide[1] name: 12568 -> 12603 bytes, first difference at 755	value-exact	linebreak add+remove: 12568 -> 12603 bytes, first difference at 755
+odf/odp/text-in-image.odp	odp	exact		value-exact	/slide[1] name: 13584 -> 13591 bytes, first difference at 5250	none	
 odf/ods/conditional-formats.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
 odf/ods/grid-padding-package.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'Configurations2/accelerator/curr...	-	
 odf/ods/grid-padding.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: authored XML fragment rejected: noncompact XML FormattingWhitespace at byte 50	-	
 odf/ods/rich-text-hyperlinks.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
 odf/ods/sheet-shapes.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
 odf/ods/sparklines.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses MCE or unknown namespace owners	-	
-odf/odt/drawing-style-resources.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-odf/odt/font-face-declarations-flat.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-odf/odt/form-controls.fodt	odt	exact		value-exact	/body/p[1] text: 3431 -> 3430 bytes, first difference at 3279	-	
-odf/odt/libreoffice-linked-object-compact.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	-	
-odf/odt/libreoffice-page-columns-compact.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-odf/odt/libreoffice-user-field-compact.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1283 -> 1314 bytes, first difference at 1091	-	
-odf/odt/nested-frame-paragraphs.fodt	odt	exact		byte-exact	/body/p[1] text	-	
-odf/odt/note-drawing.fodt	odt	exact		refused	/body/p[1]/footnote[1]/p[1] style: invalid_value: the ODT style does not exist	-	
-odf/odt/note-hyperlink-host.fodt	odt	exact		value-exact	/body/p[1] text: 5033 -> 5033 bytes, first difference at 3564	-	
-odf/odt/note-nested.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	-	
-odf/odt/note-ordinary-numbering.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 1966 -> 1964 bytes, first difference at 1341	-	
-odf/odt/note-tracked-changes.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	-	
-odf/odt/outline-ten-level-extension.fodt	odt	exact		none		-	
-odf/odt/ruby-hyperlink.fodt	odt	exact		byte-exact	/body/p[1]/hyperlink[1] text	-	
-odf/odt/shape-text-in-paragraph.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
-odf/odt/table-cell-column-span.odt	odt	exact		value-exact	/body/tbl[1] name: 9254 -> 7863 bytes, first difference at 7	-	
-odf/odt/title-field-invalidate.fodt	odt	exact		byte-exact	/metadata title	-	
-odfdo/tests/samples/forms.odt	odt	exact		value-exact	/body/p[1] text: 19727 -> 19547 bytes, first difference at 10	-	
-odfdo/tests/samples/images.fodt	odt	exact		byte-exact	/body/p[1] text	-	
+odf/odt/drawing-style-resources.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+odf/odt/font-face-declarations-flat.fodt	odt	exact		byte-exact	/body/p[1] text	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+odf/odt/form-controls.fodt	odt	exact		value-exact	/body/p[1] text: 3431 -> 3430 bytes, first difference at 3279	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+odf/odt/libreoffice-linked-object-compact.fodt	odt	exact		byte-exact	/body/p[1]/frame[1] name	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+odf/odt/libreoffice-page-columns-compact.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/libreoffice-user-field-compact.fodt	odt	exact		value-exact	/body/p[1]/r[1] text: 1283 -> 1314 bytes, first difference at 1091	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/nested-frame-paragraphs.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/note-drawing.fodt	odt	exact		refused	/body/p[1]/footnote[1]/p[1] style: invalid_value: the ODT style does not exist	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/note-hyperlink-host.fodt	odt	exact		value-exact	/body/p[1] text: 5033 -> 5033 bytes, first difference at 3564	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/note-nested.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	refused	tab add+remove: unsupported_capability: Unsupported feature: the edit added or removed a top-level element of a flat ODF part
+odf/odt/note-ordinary-numbering.fodt	odt	exact		value-exact	/body/list[1]/listItem[1] text: 1966 -> 1964 bytes, first difference at 1341	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/note-tracked-changes.fodt	odt	exact		byte-exact	/body/p[1]/r[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/outline-ten-level-extension.fodt	odt	exact		none		none	
+odf/odt/ruby-hyperlink.fodt	odt	exact		byte-exact	/body/p[1]/hyperlink[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odf/odt/shape-text-in-paragraph.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	value-exact	tab add+remove: 9046 -> 7626 bytes, first difference at 7
+odf/odt/table-cell-column-span.odt	odt	exact		value-exact	/body/tbl[1] name: 9254 -> 7863 bytes, first difference at 7	value-exact	tab add+remove: 9254 -> 7917 bytes, first difference at 7
+odf/odt/title-field-invalidate.fodt	odt	exact		byte-exact	/metadata title	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
+odfdo/tests/samples/forms.odt	odt	exact		value-exact	/body/p[1] text: 19727 -> 19547 bytes, first difference at 10	value-exact	tab add+remove: 19727 -> 19607 bytes, first difference at 10
+odfdo/tests/samples/images.fodt	odt	exact		byte-exact	/body/p[1] text	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 odfdo/tests/samples/simple_table_named_range.ods	ods	exact		refused	/sheet[1] name: unsupported_capability: a formula or named range still references the sheet; the ODS writer rewrites no reference	-	
 odfdo/tests/samples/test_flat_lo.fods	ods	exact		refused	/sheet[1] name: unsupported_capability: Invalid format: ODS sheet copy refuses dependent package member 'settings.xml'	-	
-odfdo/tests/samples/variable.odt	odt	exact		value-exact	/metadata title: 10236 -> 8877 bytes, first difference at 7	-	
-odfpy/tests/examples/simpletable.odt	odt	exact		value-exact	/metadata author: 7055 -> 6019 bytes, first difference at 10	-	
-odfpy/xml2odf/definitionlists.xml	odt	exact		byte-exact	/metadata author	-	
+odfdo/tests/samples/variable.odt	odt	exact		value-exact	/metadata title: 10236 -> 8877 bytes, first difference at 7	value-exact	tab add+remove: 10236 -> 8967 bytes, first difference at 7
+odfpy/tests/examples/simpletable.odt	odt	exact		value-exact	/metadata author: 7055 -> 6019 bytes, first difference at 10	value-exact	tab add+remove: 7055 -> 6073 bytes, first difference at 10
+odfpy/xml2odf/definitionlists.xml	odt	exact		byte-exact	/metadata author	one-way	tab add+remove: the inverse is refused: unsupported_capability: Unsupported feature: the edit changed one shared flat ODF element differe...
 office-interop/libreoffice-resaved/45543-transition-litchi.ppt	ppt	exact		none		-	
 office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx	xlsx	exact		value-exact	/sheet[1] name: 7311 -> 7314 bytes, first difference at 303	-	
 office-interop/libreoffice-resaved/document-properties-litchi.docx	docx	exact		byte-exact	/body/p[1] style	-	
@@ -999,12 +999,17 @@ rtf/testUnicode.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: 
 rtf/testUpr.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body has mixed run or paragraph formatting	value-exact	paragraph move+back: 8874 -> 9448 bytes, first difference at 8218
 rtf/typed_hyperlinks_and_references.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	none	
 rtf/watermark.rtf	rtf	exact		none		none	
-unified-ops/0294/comments.odp	odp	exact		value-exact	/slide[1] name: 2157 -> 2180 bytes, first difference at 91	-	
+unified-ops/0294/comments.odp	odp	exact		value-exact	/slide[1] name: 2157 -> 2180 bytes, first difference at 91	value-exact	linebreak add+remove: 2157 -> 2180 bytes, first difference at 91
 unified-ops/0294/connectors.ppt	ppt	exact		none		-	
 unified-ops/0294/elements.ppt	ppt	exact		none		-	
-unified-ops/0294/frames.odm	odm	exact		byte-exact	/body/p[1] text	-	
-unified-ops/0294/frames.oth	oth	exact		byte-exact	/body/p[1] text	-	
+unified-ops/0294/frames.odm	odm	exact		byte-exact	/body/p[1] text	value-exact	tab add+remove: 1218 -> 1313 bytes, first difference at 98
+unified-ops/0294/frames.oth	oth	exact		byte-exact	/body/p[1] text	value-exact	tab add+remove: 1639 -> 1746 bytes, first difference at 95
 unified-ops/0294/layers.odg	odg	exact		byte-exact	/page[1] name	-	
 unified-ops/0294/marks.doc	doc	exact		value-exact	/body/p[1] text: 15360 -> 17920 bytes, first difference at 540	value-exact	bookmark+hyperlink add+remove: 15360 -> 17408 bytes, first difference at 540
 unified-ops/0294/modern-comments.pptx	pptx	exact		byte-exact	/slidemaster[1] name	byte-exact	slide move+back
+unified-ops/0294/parts.odm	odm	exact		value-exact	/body/h[1] text: 3223 -> 3222 bytes, first difference at 2647	value-exact	tab add+remove: 3223 -> 3265 bytes, first difference at 98
+unified-ops/0294/parts.odp	odp	exact		value-exact	/slide[1] name: 3196 -> 3218 bytes, first difference at 91	value-exact	linebreak add+remove: 3196 -> 3218 bytes, first difference at 91
+unified-ops/0294/parts.odt	odt	exact		value-exact	/body/h[1] text: 3212 -> 3211 bytes, first difference at 2640	value-exact	tab add+remove: 3212 -> 3254 bytes, first difference at 91
+unified-ops/0294/parts.oth	oth	exact		value-exact	/body/h[1] text: 3219 -> 3218 bytes, first difference at 2644	value-exact	tab add+remove: 3219 -> 3261 bytes, first difference at 95
+unified-ops/0294/parts.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
 unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	byte-exact	note add+remove

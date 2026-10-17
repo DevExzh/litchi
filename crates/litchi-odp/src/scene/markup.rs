@@ -171,6 +171,25 @@ impl<'a> StartTag<'a> {
         Ok(Self { name, attributes })
     }
 
+    /// The qualified key of the first attribute whose local name is
+    /// `local`.
+    pub(super) fn key_of_local(&self, local: &str) -> Option<&'a str> {
+        self.attributes
+            .iter()
+            .map(|attribute| attribute.key)
+            .find(|key| key.rsplit(':').next() == Some(local))
+    }
+
+    /// The prefix an `xmlns:` declaration of the tag binds to `uri`.
+    pub(super) fn prefix_of(&self, uri: &str) -> Option<&'a str> {
+        self.attributes.iter().find_map(|attribute| {
+            attribute
+                .key
+                .strip_prefix("xmlns:")
+                .filter(|_| attribute.value == uri)
+        })
+    }
+
     /// Write the tag with `changes` applied (`None` removes an attribute;
     /// an absent attribute is appended), as an open tag or a self-closing
     /// one, dropping identity attributes when `strip_ids` is set.

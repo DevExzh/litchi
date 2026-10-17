@@ -619,6 +619,23 @@ impl SourceBackedPresentation {
         Ok(Some(bytes))
     }
 
+    /// Read one package member (an embedded object's part) on demand, or
+    /// `None` when the package has no member at `path` (record 0328).
+    ///
+    /// # Errors
+    /// Returns an error when the source changed or the member cannot be read.
+    pub fn member_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        self.check_source()?;
+        if !self.package.has_file(path)? {
+            self.check_source()?;
+            return Ok(None);
+        }
+        let bytes = self.package.get_file(path)?;
+        let observed = self.source.version()?;
+        ensure_current(self.source_version, observed)?;
+        Ok(Some(bytes))
+    }
+
     /// Materialize the exact source into the established mutable presentation
     /// owner.  This is an explicit transition; read-only source operations do
     /// not allocate a complete package buffer.

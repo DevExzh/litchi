@@ -116,9 +116,111 @@ impl<'f> Nav<'f> {
                         | Kind::Connector
                         | Kind::Ole
                         | Kind::Media
+                        | Kind::Video
+                        | Kind::Audio
+                        | Kind::Equation
                 ) =>
             {
                 self.tree(parent, tree, step.select)?
+            },
+            (Item::Object(object, Kind::Shape), Kind::Hyperlink) => {
+                match step.select {
+                    Select::None | Select::Last => {},
+                    Select::Ordinal(position) if position.get() == 0 => {},
+                    Select::Ordinal(_) => return Ok(Lookup::Missing),
+                    _ => return Ok(Lookup::NotApplicable),
+                }
+                if super::parts::shape_has_link(self.file, scene, object)? {
+                    Lookup::Found(parent.child(Item::ShapeLink(object.clone()), "hyperlink", None))
+                } else {
+                    Lookup::Missing
+                }
+            },
+            (Item::Run(story, paragraph, run), Kind::Hyperlink) => {
+                match step.select {
+                    Select::None | Select::Last => {},
+                    Select::Ordinal(position) if position.get() == 0 => {},
+                    Select::Ordinal(_) => return Ok(Lookup::Missing),
+                    _ => return Ok(Lookup::NotApplicable),
+                }
+                let link = scene
+                    .story(story)
+                    .and_then(|story| story.paragraphs().get(*paragraph))
+                    .and_then(|paragraph| paragraph.runs().get(*run))
+                    .is_some_and(|run| run.kind() == litchi_odp::scene::RunKind::Link);
+                if link {
+                    Lookup::Found(parent.child(
+                        Item::RunLink(story.clone(), *paragraph, *run),
+                        "hyperlink",
+                        None,
+                    ))
+                } else {
+                    Lookup::Missing
+                }
+            },
+            (Item::Paragraph(story, paragraph), Kind::LineBreak) => {
+                let count = super::parts::line_break_count(self.file, scene, story, *paragraph)?;
+                let story = story.clone();
+                let paragraph = *paragraph;
+                Self::indexed(parent, count, step.select, kind, |index| {
+                    Item::LineBreak(story, paragraph, index)
+                })
+            },
+            (Item::Object(object, Kind::Table), Kind::Col) => {
+                let count = super::parts::column_count(self.file, scene, object)?;
+                let object = object.clone();
+                Self::indexed(parent, count, step.select, kind, |index| {
+                    Item::Column(object, index)
+                })
+            },
+            (Item::Object(object, Kind::Chart), Kind::Series) => {
+                let count = self
+                    .file
+                    .parts()?
+                    .chart(object)
+                    .map_or(0, |chart| chart.series.len());
+                let object = object.clone();
+                Self::indexed(parent, count, step.select, kind, |index| {
+                    Item::Series(object, index)
+                })
+            },
+            (Item::Object(object, Kind::Chart), Kind::Axis) => {
+                let parts = self.file.parts()?;
+                let axes = parts.chart(object).map_or(&[][..], |chart| &chart.axes[..]);
+                if let Select::Identity(identities) = step.select {
+                    let mut found = None;
+                    let mut matches = 0;
+                    for (index, axis) in axes.iter().enumerate() {
+                        let all = identities.iter().all(|(identity, value)| {
+                            identity.key.eq_ignore_ascii_case("role")
+                                && (axis
+                                    .role()
+                                    .is_some_and(|role| identity.case.matches(role, value))
+                                    || axis.dimension.is_some_and(|dimension| {
+                                        identity.case.matches(dimension, value)
+                                    }))
+                        });
+                        if all {
+                            matches += 1;
+                            found = Some(index);
+                        }
+                    }
+                    if matches > 1 {
+                        return Ok(Lookup::Ambiguous(matches));
+                    }
+                    return Ok(match found {
+                        Some(index) => Lookup::Found(parent.child(
+                            Item::Axis(object.clone(), index),
+                            kind.name(),
+                            Some(index),
+                        )),
+                        None => Lookup::Missing,
+                    });
+                }
+                let object = object.clone();
+                Self::indexed(parent, axes.len(), step.select, kind, |index| {
+                    Item::Axis(object, index)
+                })
             },
             (Item::Object(_, Kind::Shape) | Item::Notes(_) | Item::Cell(..), Kind::Paragraph) => {
                 let Some(story) = parent.own_story() else {
@@ -189,17 +291,41 @@ impl<'f> Nav<'f> {
         } else {
             scene.object(&list).map_or(&[][..], Object::children)
         };
+        // Video, audio and formula objects are addressed among the media
+        // and embedded objects they are (record 0328).
+        let semantic: Vec<Option<Kind>> =
+            if matches!(kind, Kind::Video | Kind::Audio | Kind::Equation) {
+                let mut kinds = Vec::with_capacity(objects.len());
+                for (index, object) in objects.iter().enumerate() {
+                    let mut path = list.path.clone();
+                    path.push(index);
+                    let reference = ObjectRef {
+                        page: list.page,
+                        scope: list.scope,
+                        path,
+                    };
+                    kinds.push(super::parts::semantic_kind(self.file, &reference, object)?);
+                }
+                kinds
+            } else {
+                Vec::new()
+            };
         let mut counters = [0_usize; Kind::COUNT];
         let candidates = objects.iter().enumerate().filter_map(|(index, object)| {
             let physical = object_kind(object);
-            let ordinal = counters[physical as usize];
-            counters[physical as usize] += 1;
+            let found = if semantic.is_empty() {
+                physical
+            } else {
+                semantic[index].unwrap_or(physical)
+            };
+            let ordinal = counters[found as usize];
+            counters[found as usize] += 1;
             let matches = if kind == Kind::Placeholder {
                 is_placeholder(object)
             } else {
-                physical == kind
+                found == kind
             };
-            matches.then_some((index, physical, ordinal))
+            matches.then_some((index, found, ordinal))
         });
         let mut candidates = candidates;
         let selected = match select {
@@ -315,7 +441,16 @@ impl<'f> Nav<'f> {
                     .map_or(0, |row| row.cells().len());
                 out.kind(Kind::Cell.name(), count);
             },
-            Item::Run(..) | Item::Comment(_) | Item::Master(_) | Item::Layout(_) => {},
+            Item::Run(..)
+            | Item::Comment(_)
+            | Item::Master(_)
+            | Item::Layout(_)
+            | Item::ShapeLink(_)
+            | Item::RunLink(..)
+            | Item::LineBreak(..)
+            | Item::Column(..)
+            | Item::Series(..)
+            | Item::Axis(..) => {},
         }
         Ok(())
     }

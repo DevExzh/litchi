@@ -31,7 +31,12 @@
 //! properties and runs, every table unchanged, and every other collection
 //! unchanged (or, for a removal, smaller by what the removed segment held,
 //! with no bookmark or comment range cut). Anything else is a typed refusal
-//! that names what moved. Section breaks are still refused.
+//! that names what moved.
+//!
+//! A root-level section break (`\sect` and the section controls after it)
+//! is a block of its own that keeps its place among the paragraphs, like a
+//! table row; every section must read back with its properties and headers
+//! unchanged (record 0328).
 
 use std::ops::Range;
 
@@ -253,6 +258,11 @@ fn check_text(source: &Package, position: usize, text: &str) -> Result<(), Error
     }
 }
 
+/// The source segment of each body paragraph (record 0328).
+pub(super) fn paragraph_ranges(source: &Package, input: &str) -> Result<Vec<Range<usize>>, Error> {
+    Ok(segments(source, input)?.ranges)
+}
+
 /// Cuts the body into one source segment per paragraph.
 fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
     let arena = Bump::new();
@@ -286,7 +296,23 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
     let mut in_row = false;
     let mut rows: Vec<bool> = Vec::new();
     let mut unknown = Vec::new();
+    // A root-level `\sect` and the section controls after it, through the
+    // next paragraph reset, text or group, are a block of their own that is
+    // not a body paragraph (record 0328, the follow-up of record 0308).
+    let mut in_section = false;
     for (token, span) in tokens.iter().zip(&spans) {
+        if in_section {
+            match token {
+                Token::Control(control) if depth == 1 && !matches!(control, ControlWord::Pard) => {
+                    continue;
+                },
+                _ => {
+                    boundaries.push(span.start);
+                    rows.push(true);
+                    in_section = false;
+                },
+            }
+        }
         if depth == 1 {
             match token {
                 Token::OpenBrace => {
@@ -426,9 +452,27 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                     "producer paragraph splicing refuses table rows that do not open and close at the body's root",
                 ));
             },
+            Token::Control(ControlWord::SectionBreak)
+                if depth == 1 && !in_destination && !in_row && !pending_group_par =>
+            {
+                let start =
+                    boundaries
+                        .last()
+                        .copied()
+                        .or(first_start)
+                        .ok_or(Error::UnsupportedSource(
+                            "a section break precedes the body's first paragraph",
+                        ))?;
+                // `\sect` ends the paragraph it follows when no `\par` did.
+                if tail_has_content(bytes.get(start..span.start).unwrap_or_default()) {
+                    boundaries.push(span.start);
+                    rows.push(false);
+                }
+                in_section = true;
+            },
             Token::Control(ControlWord::SectionBreak) if !in_destination => {
                 return Err(Error::UnsupportedSource(
-                    "producer paragraph splicing refuses bodies with section breaks",
+                    "producer paragraph splicing refuses section breaks inside groups or table rows",
                 ));
             },
             _ => {},
@@ -1132,6 +1176,17 @@ fn verify(
     if !same_tables {
         return Err(Error::UnsupportedSource(
             "a table of the body does not read back unchanged",
+        ));
+    }
+    let same_sections = source.sections().len() == candidate.sections().len()
+        && source
+            .sections()
+            .iter()
+            .zip(candidate.sections())
+            .all(|(left, right)| format!("{left:?}") == format!("{right:?}"));
+    if !same_sections {
+        return Err(Error::UnsupportedSource(
+            "a section of the body does not read back unchanged",
         ));
     }
     let same_collections = source.tables().len() == candidate.tables().len()

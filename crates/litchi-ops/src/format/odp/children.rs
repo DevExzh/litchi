@@ -16,6 +16,17 @@ pub(crate) struct Children<'f> {
     counters: [usize; Kind::COUNT],
     /// Annotation inventory indices of a slide, read once.
     comments: Vec<usize>,
+    /// The parts of record 0328 listed after the structural children, when
+    /// a query names them.
+    tail: Option<std::vec::IntoIter<Node<'f>>>,
+}
+
+/// Whether `kinds` is a view's or a wildcard's set rather than a query
+/// naming kinds: the parts of record 0328 are listed only when asked for
+/// by name, so views and `*` list the structural children they listed
+/// before.
+fn wildcard(kinds: KindSet<Kind>) -> bool {
+    kinds.contains(Kind::Connector) && kinds.contains(Kind::Comment)
 }
 
 enum Axis {
@@ -65,7 +76,16 @@ impl<'f> Children<'f> {
             },
             Item::Paragraph(story, index) => Axis::Runs(story.clone(), *index),
             Item::Row(object, row) => Axis::Cells(object.clone(), *row),
-            Item::Run(..) | Item::Comment(_) | Item::Master(_) | Item::Layout(_) => Axis::Empty,
+            Item::Run(..)
+            | Item::Comment(_)
+            | Item::Master(_)
+            | Item::Layout(_)
+            | Item::ShapeLink(_)
+            | Item::RunLink(..)
+            | Item::LineBreak(..)
+            | Item::Column(..)
+            | Item::Series(..)
+            | Item::Axis(..) => Axis::Empty,
         };
         Ok(Self {
             parent: parent.clone(),
@@ -74,7 +94,92 @@ impl<'f> Children<'f> {
             next: 0,
             counters: [0; Kind::COUNT],
             comments,
+            tail: None,
         })
+    }
+
+    /// The part children of the parent the query asks for (record 0328).
+    fn extras(&self) -> Result<Vec<Node<'f>>> {
+        let kinds = self.kinds;
+        if wildcard(kinds) {
+            return Ok(Vec::new());
+        }
+        let parent = &self.parent;
+        let scene = parent.scene();
+        let file = parent.file();
+        let mut out = Vec::new();
+        match parent.item() {
+            Item::Object(object, Kind::Shape) if kinds.contains(Kind::Hyperlink) => {
+                if super::parts::shape_has_link(file, scene, object)? {
+                    out.push(parent.child(Item::ShapeLink(object.clone()), "hyperlink", None));
+                }
+            },
+            Item::Run(story, paragraph, run) if kinds.contains(Kind::Hyperlink) => {
+                let link = scene
+                    .story(story)
+                    .and_then(|story| story.paragraphs().get(*paragraph))
+                    .and_then(|paragraph| paragraph.runs().get(*run))
+                    .is_some_and(|run| run.kind() == litchi_odp::scene::RunKind::Link);
+                if link {
+                    out.push(parent.child(
+                        Item::RunLink(story.clone(), *paragraph, *run),
+                        "hyperlink",
+                        None,
+                    ));
+                }
+            },
+            Item::Paragraph(story, paragraph) if kinds.contains(Kind::LineBreak) => {
+                for index in 0..super::parts::line_break_count(file, scene, story, *paragraph)? {
+                    out.push(parent.child(
+                        Item::LineBreak(story.clone(), *paragraph, index),
+                        Kind::LineBreak.name(),
+                        Some(index),
+                    ));
+                }
+            },
+            Item::Object(object, Kind::Table) if kinds.contains(Kind::Col) => {
+                for index in 0..super::parts::column_count(file, scene, object)? {
+                    out.push(parent.child(
+                        Item::Column(object.clone(), index),
+                        Kind::Col.name(),
+                        Some(index),
+                    ));
+                }
+            },
+            Item::Object(object, Kind::Chart) => {
+                let parts = file.parts()?;
+                if let Some(chart) = parts.chart(object) {
+                    if kinds.contains(Kind::Series) {
+                        for index in 0..chart.series.len() {
+                            out.push(parent.child(
+                                Item::Series(object.clone(), index),
+                                Kind::Series.name(),
+                                Some(index),
+                            ));
+                        }
+                    }
+                    if kinds.contains(Kind::Axis) {
+                        for index in 0..chart.axes.len() {
+                            out.push(parent.child(
+                                Item::Axis(object.clone(), index),
+                                Kind::Axis.name(),
+                                Some(index),
+                            ));
+                        }
+                    }
+                }
+            },
+            _ => {},
+        }
+        Ok(out)
+    }
+
+    /// The next part child, once the structural children are listed.
+    fn next_extra(&mut self) -> Result<Option<Node<'f>>> {
+        if self.tail.is_none() {
+            self.tail = Some(self.extras()?.into_iter());
+        }
+        Ok(self.tail.as_mut().and_then(Iterator::next))
     }
 
     fn objects(&self, list: &ObjectRef) -> &'f [Object] {
@@ -128,14 +233,7 @@ impl<'f> Children<'f> {
                     let index = self.next;
                     self.next += 1;
                     let object = &objects[index];
-                    let kind = object_kind(object);
-                    let ordinal = self.counters[kind as usize];
-                    self.counters[kind as usize] += 1;
-                    let wanted = self.kinds.contains(kind)
-                        || (is_placeholder(object) && self.kinds.contains(Kind::Placeholder));
-                    if !wanted {
-                        continue;
-                    }
+                    let physical = object_kind(object);
                     let mut path = list.path.clone();
                     path.push(index);
                     let reference = ObjectRef {
@@ -143,6 +241,32 @@ impl<'f> Children<'f> {
                         scope: list.scope,
                         path,
                     };
+                    // A query naming video, audio or equation objects (and
+                    // not the media or embedded objects they are) lists
+                    // them as such (record 0328).
+                    let mut kind = physical;
+                    if !wildcard(self.kinds)
+                        && ((physical == Kind::Media
+                            && !self.kinds.contains(Kind::Media)
+                            && (self.kinds.contains(Kind::Video)
+                                || self.kinds.contains(Kind::Audio)))
+                            || (physical == Kind::Ole
+                                && !self.kinds.contains(Kind::Ole)
+                                && self.kinds.contains(Kind::Equation)))
+                    {
+                        if let Some(semantic) =
+                            super::parts::semantic_kind(self.parent.file(), &reference, object)?
+                        {
+                            kind = semantic;
+                        }
+                    }
+                    let ordinal = self.counters[kind as usize];
+                    self.counters[kind as usize] += 1;
+                    let wanted = self.kinds.contains(kind)
+                        || (is_placeholder(object) && self.kinds.contains(Kind::Placeholder));
+                    if !wanted {
+                        continue;
+                    }
                     return Ok(Some(self.parent.child(
                         Item::Object(reference, kind),
                         kind.name(),
@@ -186,7 +310,7 @@ impl<'f> Children<'f> {
     fn step(&mut self) -> Result<Option<Node<'f>>> {
         let scene = self.parent.scene();
         match std::mem::replace(&mut self.axis, Axis::Empty) {
-            Axis::Empty => Ok(None),
+            Axis::Empty => self.next_extra(),
             Axis::Root(phase) => {
                 self.axis = Axis::Root(phase);
                 self.next_root(phase)
@@ -204,7 +328,7 @@ impl<'f> Children<'f> {
                     .story(&story)
                     .map_or(0, |story| story.paragraphs().len());
                 if !self.kinds.contains(Kind::Paragraph) || self.next >= count {
-                    return Ok(None);
+                    return self.next_extra();
                 }
                 let index = self.next;
                 self.next += 1;
@@ -222,7 +346,7 @@ impl<'f> Children<'f> {
                     .and_then(|story| story.paragraphs().get(paragraph))
                     .map_or(0, |paragraph| paragraph.runs().len());
                 if !self.kinds.contains(Kind::Run) || self.next >= count {
-                    return Ok(None);
+                    return self.next_extra();
                 }
                 let index = self.next;
                 self.next += 1;
@@ -240,7 +364,7 @@ impl<'f> Children<'f> {
                     .and_then(Object::table)
                     .map_or(0, |table| table.rows().len());
                 if !self.kinds.contains(Kind::Row) || self.next >= count {
-                    return Ok(None);
+                    return self.next_extra();
                 }
                 let index = self.next;
                 self.next += 1;

@@ -48,23 +48,23 @@ pub enum Kind {
     Ole,
     /// A plugin (audio or video) frame.
     Media,
-    /// Video (gap: plugins are media).
+    /// A video plugin frame (record 0328), addressed among media.
     Video,
-    /// Audio (gap: plugins are media).
+    /// An audio plugin frame (record 0328), addressed among media.
     Audio,
     /// A paragraph of a text story.
     Paragraph,
     /// A run of a paragraph.
     Run,
-    /// A line break (gap: projected as `\n` in text).
+    /// A `text:line-break` of a paragraph (record 0328).
     LineBreak,
-    /// A hyperlink (gap: links are runs).
+    /// A shape's click action or a link run's target (record 0328).
     Hyperlink,
     /// A slide's speaker notes.
     Notes,
     /// A slide annotation.
     Comment,
-    /// A formula object (gap).
+    /// A formula object frame (record 0328), addressed among objects.
     Equation,
     /// A master page.
     SlideMaster,
@@ -76,11 +76,11 @@ pub enum Kind {
     NoteSlide,
     /// An animation (gap).
     Animation,
-    /// A chart series (gap).
+    /// A chart series (record 0328).
     Series,
-    /// A chart axis (gap).
+    /// A chart axis (record 0328).
     Axis,
-    /// A table column (gap).
+    /// A declared table column (record 0328).
     Col,
 }
 
@@ -347,6 +347,73 @@ pub(crate) const LAYOUT_PROPS: &[PropSpec] = &[
     PropSpec::new("displayName", ValueType::Text),
 ];
 
+/// A readable property `set` and `add` write.
+const fn writable(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.set = true;
+    spec.access.add = true;
+    spec
+}
+
+/// A hyperlink (record 0328): a shape's click action or a link run's
+/// target, as PPTX names them.
+pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
+    writable("link", ValueType::Text),
+    writable("tooltip", ValueType::Text),
+];
+
+/// A video or audio plugin frame (record 0328): the frame's keys, then the
+/// media.
+pub(crate) const MEDIA_PROPS: &[PropSpec] = &[
+    PropSpec::new("name", ValueType::Text),
+    raw("id", ValueType::Text),
+    PropSpec::new("alt", ValueType::Text),
+    PropSpec::new("source", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+    PropSpec::new("zorder", ValueType::Int),
+    PropSpec::new("mediaType", ValueType::Text),
+    PropSpec::new("mimeType", ValueType::Text),
+    PropSpec::new("loop", ValueType::Bool),
+    PropSpec::new("mute", ValueType::Bool),
+];
+
+/// A formula object (record 0328): its StarMath (or MathML token) text and
+/// its frame.
+pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Text),
+    PropSpec::new("formula", ValueType::Text),
+    PropSpec::new("name", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+];
+
+/// A declared table column (record 0328).
+pub(crate) const COLUMN_PROPS: &[PropSpec] = &[length("width", LengthSpec::EXTENT)];
+
+/// A chart series (record 0328), with the ODC series keys.
+pub(crate) const SERIES_PROPS: &[PropSpec] = &[
+    PropSpec::new("values", ValueType::Text),
+    PropSpec::new("nameRef", ValueType::Text),
+    PropSpec::new("chartType", ValueType::Text),
+    PropSpec::new("axis", ValueType::Text),
+    PropSpec::new("pointCount", ValueType::Int),
+];
+
+/// A chart axis (record 0328): its PPTX role, then the ODC axis keys.
+pub(crate) const AXIS_PROPS: &[PropSpec] = &[
+    PropSpec::new("role", ValueType::Text),
+    PropSpec::new("title", ValueType::Text),
+    PropSpec::new("dimension", ValueType::Text),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("categories", ValueType::Text),
+    PropSpec::new("style", ValueType::Text),
+];
+
 const TREE_PARENTS: &[Kind] = &[Kind::Slide, Kind::Group];
 
 const TREE: &[Kind] = &[
@@ -361,6 +428,7 @@ const TREE: &[Kind] = &[
     Kind::Media,
     Kind::Video,
     Kind::Audio,
+    Kind::Equation,
 ];
 
 const SHAPE_IDS: &[&str] = &["id", "name"];
@@ -422,31 +490,6 @@ const fn element_gap(
     }
 }
 
-static VIDEO_GAP: GapSpec = element_gap(
-    "video",
-    "M6 ODP media typing",
-    "ODF draw:plugin frames are exposed as media; the scene does not classify their MIME type",
-);
-static AUDIO_GAP: GapSpec = element_gap(
-    "audio",
-    "M6 ODP media typing",
-    "ODF draw:plugin frames are exposed as media; the scene does not classify their MIME type",
-);
-static LINEBREAK_GAP: GapSpec = element_gap(
-    "linebreak",
-    "M6 ODP inline controls",
-    "text:line-break is projected as a newline in paragraph and run text, not as a node",
-);
-static HYPERLINK_GAP: GapSpec = element_gap(
-    "hyperlink",
-    "M6 ODP hyperlink nodes",
-    "text:a links are exposed as runs with a `link` property; shape-level draw:a links are not nodes",
-);
-static EQUATION_GAP: GapSpec = element_gap(
-    "equation",
-    "M6 ODP formula objects (litchi-odf-formula)",
-    "embedded ODF formula objects are listed as ole frames; their MathML is not projected",
-);
 static NOTES_MASTER_GAP: GapSpec = element_gap(
     "notesMaster",
     "M6 ODP notes master",
@@ -462,21 +505,16 @@ static ANIMATION_GAP: GapSpec = element_gap(
     "M6 ODP animation nodes",
     "the leaf keeps slide animation trees inert; they are not projected as nodes",
 );
-static SERIES_GAP: GapSpec = element_gap(
-    "series",
-    "M6 ODP chart CRUD (litchi_odp::charts)",
-    "chart series of embedded chart objects are not projected through the unified adapter",
-);
-static AXIS_GAP: GapSpec = element_gap(
-    "axis",
-    "M6 ODP chart CRUD (litchi_odp::charts)",
-    "chart axes of embedded chart objects are not projected through the unified adapter",
-);
-static COL_GAP: GapSpec = element_gap(
-    "col",
-    "M6 ODP table columns",
-    "table columns are counted on the table node (`cols`) but are not nodes",
-);
+
+/// A PresentationML concept ODF has no counterpart of (record 0328).
+const fn pptx_only(element: &'static str) -> GapSpec {
+    GapSpec {
+        subject: Subject::Element(element),
+        code: Code::UnsupportedPath,
+        follow_up: "none: a PresentationML-only concept",
+        reason: "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames",
+    }
+}
 
 static SHAPE_FILL_GAP: GapSpec = GapSpec {
     subject: Subject::Property {
@@ -645,21 +683,25 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/media[N]"],
             FRAME_PROPS,
         ),
-        gap(
+        element(
             Kind::Video,
             "video",
             &["video"],
             TREE_PARENTS,
+            &[],
+            SHAPE_IDS,
             &["/slide[N]/video[N]"],
-            &VIDEO_GAP,
+            MEDIA_PROPS,
         ),
-        gap(
+        element(
             Kind::Audio,
             "audio",
             &["audio"],
             TREE_PARENTS,
+            &[],
+            SHAPE_IDS,
             &["/slide[N]/audio[N]"],
-            &AUDIO_GAP,
+            MEDIA_PROPS,
         ),
         element(
             Kind::Paragraph,
@@ -676,26 +718,33 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "run",
             &["r", "run"],
             &[Kind::Paragraph],
-            &[],
+            &[Kind::Hyperlink],
             &[],
             &["/slide[N]/shape[N]/paragraph[N]/run[N]"],
             RUN_PROPS,
         ),
-        gap(
+        element(
             Kind::LineBreak,
             "linebreak",
             &["br", "linebreak"],
             &[Kind::Paragraph],
+            &[],
+            &[],
             &["/slide[N]/shape[N]/paragraph[N]/linebreak[N]"],
-            &LINEBREAK_GAP,
+            &[],
         ),
-        gap(
+        element(
             Kind::Hyperlink,
             "hyperlink",
             &["hlink", "hyperlink"],
-            &[Kind::Shape],
-            &["/slide[N]/shape[N]/hyperlink"],
-            &HYPERLINK_GAP,
+            &[Kind::Shape, Kind::Run],
+            &[],
+            &[],
+            &[
+                "/slide[N]/shape[N]/hyperlink",
+                "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink",
+            ],
+            HYPERLINK_PROPS,
         ),
         element(
             Kind::Notes,
@@ -717,13 +766,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/comment[N]"],
             COMMENT_PROPS,
         ),
-        gap(
+        element(
             Kind::Equation,
             "equation",
             &["equation", "formula", "math"],
-            &[Kind::Slide],
+            TREE_PARENTS,
+            &[],
+            SHAPE_IDS,
             &["/slide[N]/equation[N]"],
-            &EQUATION_GAP,
+            EQUATION_PROPS,
         ),
         element(
             Kind::SlideMaster,
@@ -769,32 +820,48 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/animation[N]"],
             &ANIMATION_GAP,
         ),
-        gap(
+        element(
             Kind::Series,
             "series",
             &["series"],
             &[Kind::Chart],
+            &[],
+            &[],
             &["/slide[N]/chart[N]/series[N]"],
-            &SERIES_GAP,
+            SERIES_PROPS,
         ),
-        gap(
+        element(
             Kind::Axis,
             "axis",
             &["axis"],
             &[Kind::Chart],
-            &["/slide[N]/chart[N]/axis[@role=ROLE]"],
-            &AXIS_GAP,
+            &[],
+            &["role"],
+            &[
+                "/slide[N]/chart[N]/axis[N]",
+                "/slide[N]/chart[N]/axis[@role=ROLE]",
+            ],
+            AXIS_PROPS,
         ),
-        gap(
+        element(
             Kind::Col,
             "col",
             &["col", "column"],
             &[Kind::Table],
+            &[],
+            &[],
             &["/slide[N]/table[N]/col[N]"],
-            &COL_GAP,
+            COLUMN_PROPS,
         ),
     ],
-    gaps: &[SHAPE_FILL_GAP, STATS_FONT_GAP],
+    gaps: &[
+        SHAPE_FILL_GAP,
+        STATS_FONT_GAP,
+        pptx_only("theme"),
+        pptx_only("modernComment"),
+        pptx_only("model3d"),
+        pptx_only("zoom"),
+    ],
 };
 
 check_format_spec!(SPEC);

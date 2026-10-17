@@ -263,6 +263,11 @@ pub(crate) struct BodyEdits {
     fields: Vec<(Range<usize>, String)>,
     /// The body's text field ranges, scanned on the first field edit.
     field_ranges: Option<Vec<Range<usize>>>,
+    /// Header and footer text replacements (record 0328): splices of
+    /// `styles.xml`.
+    regions: Vec<(Range<usize>, String)>,
+    /// The part index, built on the first region edit.
+    parts: Option<Box<super::Parts>>,
 }
 
 /// Names and counters for generated tables, sections and notes.
@@ -478,6 +483,43 @@ impl BodyEdits {
         self.claim(body, pseudo, range.clone(), Claim::Whole)?;
         let markup = super::fields::render(body, range.clone(), text);
         self.fields.push((range, markup));
+        Ok(())
+    }
+
+    /// Replace the text of the header or footer region at `range` (a
+    /// [`super::parts::Region::range`] of this body's part index) with one
+    /// paragraph (record 0328).
+    pub(crate) fn set_region_text(
+        &mut self,
+        body: Body<'_>,
+        range: Range<usize>,
+        text: &str,
+    ) -> Result<()> {
+        xml::check_text(text, "text")?;
+        if self.parts.is_none() {
+            self.parts = Some(Box::new(super::Parts::build(body)?));
+        }
+        let parts = self
+            .parts
+            .as_deref()
+            .ok_or_else(|| invalid("ODT part index"))?;
+        let region = parts
+            .view(body)
+            .regions()
+            .find(|region| region.range() == range)
+            .ok_or_else(|| {
+                invalid("the ODT header or footer region does not exist in this document")
+            })?;
+        if self.regions.iter().any(|(held, _)| {
+            overlaps(held, &range) || held.start == range.start || range.contains(&held.start)
+        }) {
+            return Err(invalid(
+                "an ODT header or footer region is edited twice in one transaction",
+            ));
+        }
+        if let Some(splice) = region.text_replacement(text)? {
+            self.regions.push(splice);
+        }
         Ok(())
     }
 
@@ -1525,9 +1567,17 @@ impl StyleAllocator {
         let paragraph_changes = paragraph
             .map(ParagraphPropertyEdit::attributes)
             .unwrap_or_default();
+        let tabs = paragraph.and_then(|paragraph| paragraph.tab_stops_xml(prefixes));
         let automatic = base.and_then(|base| body.automatic_style(base));
         let definition = match automatic {
-            Some(style) => clone_style(style, prefixes, &name, &text_changes, &paragraph_changes),
+            Some(style) => clone_style(
+                style,
+                prefixes,
+                &name,
+                &text_changes,
+                &paragraph_changes,
+                tabs.as_deref(),
+            ),
             None => {
                 let mut out = String::from("<");
                 prefixes.push_name(&mut out, Ns::Style, "style");
@@ -1543,12 +1593,12 @@ impl StyleAllocator {
                     }
                 }
                 out.push('>');
-                if !paragraph_changes.is_empty() {
-                    push_property(
+                if !paragraph_changes.is_empty() || tabs.is_some() {
+                    push_paragraph_properties(
                         &mut out,
                         prefixes,
-                        "paragraph-properties",
                         &paragraph_changes,
+                        tabs.as_deref(),
                     );
                 }
                 if !text_changes.is_empty() {
@@ -1581,15 +1631,45 @@ fn push_property(
     out.push_str("/>");
 }
 
+/// A `style:paragraph-properties` element with `attributes` and, when
+/// given, the `style:tab-stops` child `tabs`.
+fn push_paragraph_properties(
+    out: &mut String,
+    prefixes: &Prefixes,
+    attributes: &[(Ns, &'static str, String)],
+    tabs: Option<&str>,
+) {
+    let Some(tabs) = tabs else {
+        push_property(out, prefixes, "paragraph-properties", attributes);
+        return;
+    };
+    out.push('<');
+    prefixes.push_name(out, Ns::Style, "paragraph-properties");
+    for (ns, name, value) in attributes {
+        push_attribute(out, prefixes, *ns, name, value);
+    }
+    out.push('>');
+    out.push_str(tabs);
+    out.push_str("</");
+    prefixes.push_name(out, Ns::Style, "paragraph-properties");
+    out.push('>');
+}
+
 /// Copy an automatic style under a new name with changed properties. The
 /// copy is rebuilt from its tags, so it is compact whatever the source
-/// formatting.
+/// formatting. `tabs`, when given, replaces the paragraph properties'
+/// `style:tab-stops` (record 0328).
+#[allow(
+    clippy::too_many_lines,
+    reason = "one event loop over the declaration, kept whole so the depth bookkeeping reads in one place"
+)]
 fn clone_style(
     style: Style<'_>,
     prefixes: &Prefixes,
     name: &str,
     text: &[(Ns, &'static str, String)],
     paragraph: &[(Ns, &'static str, String)],
+    tabs: Option<&str>,
 ) -> String {
     let source = style.xml();
     let mut reader = Reader::from_str(source);
@@ -1598,7 +1678,16 @@ fn clone_style(
     let mut out = String::with_capacity(source.len() + 128);
     let mut depth = 0usize;
     let mut seen_text = false;
-    let mut seen_paragraph = false;
+    // A declaration that has paragraph properties has them rewritten in
+    // place; only one without gains a new element (record 0328: the copy
+    // used to gain a second `style:paragraph-properties` as well).
+    let mut seen_paragraph = style.data().paragraph.is_some();
+    let paragraph_wanted = !paragraph.is_empty() || tabs.is_some();
+    // The tab stops still to write, and the depth of the open paragraph
+    // properties' children; a source `style:tab-stops` there is skipped.
+    let mut tabs_pending = tabs;
+    let mut paragraph_children: Option<usize> = None;
+    let mut skip = 0usize;
     let changes = |list: &[(Ns, &'static str, String)]| -> Vec<(Ns, &'static str, Option<String>)> {
         list.iter()
             .map(|(ns, local, value)| (*ns, *local, Some(value.clone())))
@@ -1611,18 +1700,36 @@ fn clone_style(
         };
         let end = usize::try_from(reader.buffer_position()).unwrap_or(0);
         let raw = &source[start..end];
+        if skip > 0 {
+            match event {
+                Event::Start(_) => skip += 1,
+                Event::End(_) => skip -= 1,
+                _ => {},
+            }
+            continue;
+        }
         match event {
             Event::Start(_) | Event::Empty(_) => {
                 let empty = matches!(event, Event::Empty(_));
                 let tag_name = xml::tag_name(raw);
+                if paragraph_children == Some(depth)
+                    && tabs_pending.is_some()
+                    && prefixes.is(tag_name.as_bytes(), Ns::Style, "tab-stops")
+                {
+                    out.push_str(tabs_pending.take().unwrap_or_default());
+                    if !empty {
+                        skip = 1;
+                    }
+                    continue;
+                }
                 let tag = if depth == 0 {
                     let renamed =
                         rewrite_tag(raw, prefixes, &[(Ns::Style, "name", Some(name.to_owned()))]);
-                    if empty && (!text.is_empty() || !paragraph.is_empty()) {
+                    if empty && (!text.is_empty() || paragraph_wanted) {
                         // Grow the empty declaration to hold properties.
                         out.push_str(&open_form(&renamed));
-                        if !paragraph.is_empty() {
-                            push_property(&mut out, prefixes, "paragraph-properties", paragraph);
+                        if paragraph_wanted {
+                            push_paragraph_properties(&mut out, prefixes, paragraph, tabs);
                         }
                         if !text.is_empty() {
                             push_property(&mut out, prefixes, "text-properties", text);
@@ -1639,14 +1746,24 @@ fn clone_style(
                 } else if depth == 1
                     && prefixes.is(tag_name.as_bytes(), Ns::Style, "paragraph-properties")
                 {
-                    seen_paragraph = true;
-                    rewrite_tag(raw, prefixes, &changes(paragraph))
+                    let rewritten = rewrite_tag(raw, prefixes, &changes(paragraph));
+                    if empty && tabs_pending.is_some() {
+                        // Grow the empty properties to hold the tab stops.
+                        out.push_str(&open_form(&rewritten));
+                        out.push_str(tabs_pending.take().unwrap_or_default());
+                        out.push_str(&end_tag(&rewritten));
+                        continue;
+                    }
+                    if !empty {
+                        paragraph_children = Some(2);
+                    }
+                    rewritten
                 } else {
                     normalize_tag(raw)
                 };
-                if depth == 0 && !seen_paragraph && !paragraph.is_empty() {
+                if depth == 0 && !seen_paragraph && paragraph_wanted {
                     out.push_str(&tag);
-                    push_property(&mut out, prefixes, "paragraph-properties", paragraph);
+                    push_paragraph_properties(&mut out, prefixes, paragraph, tabs_pending.take());
                     seen_paragraph = true;
                 } else {
                     out.push_str(&tag);
@@ -1656,6 +1773,14 @@ fn clone_style(
                 }
             },
             Event::End(_) => {
+                if paragraph_children == Some(depth) {
+                    // The paragraph properties close: write tab stops the
+                    // source did not declare.
+                    if let Some(tabs) = tabs_pending.take() {
+                        out.push_str(tabs);
+                    }
+                    paragraph_children = None;
+                }
                 depth = depth.saturating_sub(1);
                 if depth == 0 && !seen_text && !text.is_empty() {
                     push_property(&mut out, prefixes, "text-properties", text);
@@ -1801,6 +1926,23 @@ pub(crate) fn apply(document: &Document, edits: BodyEdits) -> Result<Option<Vec<
             let source = &content.as_bytes()[splice.range.clone()];
             let proof = part.checked_range(splice.range.clone(), source)?;
             publication.replace(proof, classify(splice.bytes, splice.start_tag)?)?;
+        }
+        publications.push(publication);
+    }
+    if !edits.regions.is_empty() {
+        let part = XmlSourcePart::load(package, crate::constants::ODF_STYLES)?;
+        if part.bytes() != body.styles.as_bytes() {
+            return Err(invalid(
+                "ODT styles.xml changed between indexing and publication",
+            ));
+        }
+        let mut regions = std::mem::take(&mut edits.regions);
+        regions.sort_by_key(|(range, _)| range.start);
+        let mut publication = XmlSplicePublication::new(part.clone());
+        for (range, bytes) in regions {
+            let source = &body.styles.as_bytes()[range.clone()];
+            let proof = part.checked_range(range, source)?;
+            publication.replace(proof, classify(bytes, false)?)?;
         }
         publications.push(publication);
     }

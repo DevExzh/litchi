@@ -123,6 +123,37 @@ pub(crate) enum Item<'f> {
     AbstractNum(&'f List<'f>),
     Num(&'f ListOverride),
     Level(&'f ListLevel<'f>),
+    /// A section with its native index (record 0328).
+    Section {
+        index: usize,
+        value: &'f litchi_rtf::Section<'f>,
+    },
+    /// A bookmark with its native index.
+    Bookmark {
+        index: usize,
+        value: &'f litchi_rtf::Bookmark<'f>,
+    },
+    /// A field (or a `TOC` field) with its native index.
+    Field {
+        index: usize,
+        value: &'f Field<'f>,
+    },
+    /// A tab stop of a main-story paragraph, by value.
+    Tab {
+        index: usize,
+        value: litchi_rtf::TabStop,
+    },
+    /// A text box: a text-box shape, or a legacy (`\dptxbx`) text box.
+    ShapeTextBox {
+        value: &'f litchi_rtf::Shape<'f>,
+    },
+    LegacyTextBox {
+        value: &'f litchi_rtf::LegacyTextBox<'f>,
+    },
+    /// A drawing shape.
+    Shape {
+        value: &'f litchi_rtf::Shape<'f>,
+    },
 }
 
 // Record 0287: nodes move through every query; keep this one no larger
@@ -319,6 +350,12 @@ impl<'f> Node<'f> {
             Item::Note { value, .. } => Some(Cow::Borrowed(value.content.as_ref())),
             Item::Comment { value, .. } => Some(Cow::Borrowed(value.text.as_ref())),
             Item::Hyperlink(field) => Some(Cow::Borrowed(field.result.as_ref())),
+            Item::Field { value, .. } => Some(Cow::Borrowed(value.result.as_ref())),
+            Item::Bookmark { value, .. } => Some(Cow::Borrowed(value.content.as_ref())),
+            Item::ShapeTextBox { value, .. } | Item::Shape { value, .. } => {
+                Some(Cow::Borrowed(value.text.as_ref()))
+            },
+            Item::LegacyTextBox { value, .. } => Some(Cow::Borrowed(value.text.as_ref())),
             Item::Bare
             | Item::Table { .. }
             | Item::Row { .. }
@@ -326,7 +363,9 @@ impl<'f> Node<'f> {
             | Item::Style(_)
             | Item::AbstractNum(_)
             | Item::Num(_)
-            | Item::Level(_) => None,
+            | Item::Level(_)
+            | Item::Section { .. }
+            | Item::Tab { .. } => None,
         })
     }
 
@@ -431,6 +470,21 @@ impl<'f> Node<'f> {
             Item::AbstractNum(list) => (spec::ABSTRACT_NUM_PROPS, Props::AbstractNum(list)),
             Item::Num(list) => (spec::NUM_PROPS, Props::Num(list)),
             Item::Level(level) => (spec::LEVEL_PROPS, Props::Level(level)),
+            Item::Section { value, .. } => (spec::SECTION_PROPS, Props::Section(value)),
+            Item::Bookmark { value, .. } => (spec::BOOKMARK_PROPS, Props::Bookmark(value)),
+            Item::Field { value, .. } => {
+                if self.kind == Kind::Toc {
+                    (spec::TOC_PROPS, Props::Toc(value))
+                } else {
+                    (spec::FIELD_PROPS, Props::Field(value))
+                }
+            },
+            Item::Tab { value, .. } => (spec::TAB_PROPS, Props::Tab(value)),
+            Item::ShapeTextBox { value, .. } => (spec::TEXT_BOX_PROPS, Props::ShapeTextBox(value)),
+            Item::LegacyTextBox { value, .. } => {
+                (spec::TEXT_BOX_PROPS, Props::LegacyTextBox(value))
+            },
+            Item::Shape { value, .. } => (spec::SHAPE_PROPS, Props::Shape(value)),
             Item::Bare => return Format::empty(),
         };
         Format::new(props, crate::node::Source::Rtf(source)).without(&["text"])
@@ -461,6 +515,13 @@ pub(super) const fn kind_step(kind: Kind) -> &'static str {
         Kind::AbstractNum => "abstractNum",
         Kind::Num => "num",
         Kind::Level => "level",
+        Kind::Section => "section",
+        Kind::Bookmark => "bookmark",
+        Kind::Field => "field",
+        Kind::Toc => "toc",
+        Kind::Tab => "tab",
+        Kind::TextBox => "textbox",
+        Kind::Shape => "shape",
     }
 }
 
@@ -496,6 +557,14 @@ pub(crate) enum Props<'a> {
     AbstractNum(&'a List<'a>),
     Num(&'a ListOverride),
     Level(&'a ListLevel<'a>),
+    Section(&'a litchi_rtf::Section<'a>),
+    Bookmark(&'a litchi_rtf::Bookmark<'a>),
+    Field(&'a Field<'a>),
+    Toc(&'a Field<'a>),
+    Tab(litchi_rtf::TabStop),
+    ShapeTextBox(&'a litchi_rtf::Shape<'a>),
+    LegacyTextBox(&'a litchi_rtf::LegacyTextBox<'a>),
+    Shape(&'a litchi_rtf::Shape<'a>),
 }
 
 impl<'a> Props<'a> {
@@ -716,8 +785,32 @@ impl<'a> Props<'a> {
                 3 => Some(Value::Int(i64::from(level.start_at))),
                 _ => None,
             },
+            Self::Section(section) => super::parts::section_value(&section.properties, index),
+            Self::Bookmark(bookmark) => match index {
+                0 => Some(Value::Text(Cow::Borrowed(bookmark.name.as_ref()))),
+                _ => None,
+            },
+            Self::Field(field) => super::parts::field_value(field, index),
+            Self::Toc(field) => super::parts::toc_value(field, index),
+            Self::Tab(stop) => super::parts::tab_value(stop, index),
+            Self::ShapeTextBox(shape) => match index {
+                0 => twips_length(shape.geometry.width),
+                1 => twips_length(shape.geometry.height),
+                _ => None,
+            },
+            Self::LegacyTextBox(text_box) => match index {
+                0 => text_box.width.and_then(twips_length),
+                1 => text_box.height.and_then(twips_length),
+                _ => None,
+            },
+            Self::Shape(shape) => super::parts::shape_value(shape, index),
         }
     }
+}
+
+/// A nonnegative twips extent as a length; a negative one reads as absent.
+fn twips_length(twips: i32) -> Option<crate::node::Value<'static>> {
+    (twips >= 0).then(|| crate::node::Value::Length(crate::value::Length::from_twips(twips)))
 }
 
 const fn merge_name(role: litchi_rtf::table::TableCellMergeRole) -> crate::node::Value<'static> {

@@ -2698,3 +2698,28 @@ the verbs extend `Edit`, and `commit()` keeps its triad.
 | `sheet_features::{read, Features, Drawing, DrawingKind, Validation, AutoFilter, Rect, format_styles, FormatStyle}` | `calcext:conditional-format`, `table:content-validation` bound by `table:content-validation-name`, `table:database-range` with filter buttons, `fo:break-before` row/column styles, `draw:frame`/`draw:custom-shape` | ✅ 0327 |
 | `sheet_features::{ValidationSpec, DrawingSpec, DrawingChange, parse_address, address, column_letters, to_odff, from_odff}` | authored values and ODF address / OpenFormula reference conversion | ✅ 0327 |
 | `Edit::{add_sheet_format, set_sheet_format, remove_sheet_format, add_sheet_validation, set_sheet_validation, remove_sheet_validation, set_sheet_auto_filter, set_sheet_breaks, add_sheet_drawing, set_sheet_drawing, remove_sheet_drawing}` | sheet-scoped verbs of the document transaction; drawings by kind and position | ✅ 0327 |
+
+## ODT, ODP and RTF element parts (record 0328)
+
+`litchi-odt` gains an on-demand part index beside the body index; it keeps
+offsets only and never changes the body index, so every body read and edit
+is unaffected. The primary `Edit` gains the header and footer text set; tab
+stops ride on the existing paragraph-property edit.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_odt::body::{Parts, PartsView}` (`Parts::{build, view}`; `PartsView::{list_styles, list_style, regions, tables_of_contents, shapes, objects, columns}`) | one pass over each of `content.xml` and `styles.xml` | ✅ 0328 |
+| `litchi_odt::body::parts::{ListStyle, ListLevel, ListLevelKind, Region, RegionKind, TableOfContents, Shape, EmbeddedObject, Column, TabStop, tab_stops, formula_text}` | borrowed views; attributes and text read from the source bytes | ✅ 0328 |
+| `litchi_odt::body::fields`, `TextField::at` | every body text field (the `text_fields` set and the variable, reference, sequence, chapter, sender, template, database and conditional fields); `text_fields` keeps its set for field refresh | ✅ 0328 |
+| `litchi_odt::body::TabStopEdit`, `ParagraphPropertyEdit::tab_stops` | replaces an automatic paragraph style's `style:tab-stops` | ✅ 0328 |
+| `litchi_odt::transaction::Edit::set_region_text` | a master-page header or footer region's text as one paragraph; content a text set cannot keep is refused (`Unsupported`) | ✅ 0328 |
+| `litchi_odt::Document::member_data` | the eager counterpart of `SourceBackedDocument::member_data` | ✅ 0328 |
+| `litchi_ops` ODT kinds `Header`, `Footer`, `Numbering`, `AbstractNum`, `Num`, `Level`, `Field`, `Toc`, `Tab`, `Shape`, `Equation`, `Column` | the DOCX element names and paths (`/header[N]`, `/footer[N]`, `/numbering/abstractNum[N]/level[L]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/shape[N]`, `/body/equation[N]`, `/body/tbl[N]/col[C]`), shared by OTH and ODM | ✅ 0328 |
+| `litchi_odp::scene::parts::{TableColumn, table_columns, line_breaks, Plugin, MediaKind, plugin, Click, shape_click, link_title, inline_math, formula_text}` | read the bytes of one indexed scene node on demand; the scene index is unchanged | ✅ 0328 |
+| `litchi_odp::scene::{Change::{SetRunLink, LinkRun, SetShapeClick, InsertLineBreak, RemoveLineBreak}, ShapeAction}` | a link run's target and title (or its removal, keeping the text), a plain run made a link, a shape's click listener or `draw:a` link, and line breaks, as checked scene splices | ✅ 0328 |
+| `litchi_odp::{Presentation, SourceBackedPresentation}::member_data` | one package member (an embedded object's part), `None` when absent | ✅ 0328 |
+| `litchi_ops` ODP kinds `Hyperlink`, `LineBreak`, `Col`, `Video`, `Audio`, `Equation`, `Series`, `Axis` | the PPTX paths of record 0321 (`/slide[N]/shape[M]/hyperlink`, `…/run[L]/hyperlink`, `…/paragraph[K]/linebreak[B]`, `/slide[N]/table[M]/col[C]`, `/slide[N]/video[M]`, `/slide[N]/audio[M]`, `/slide[N]/equation[K]`, `/slide[N]/chart[M]/series[K]`, `/slide[N]/chart[M]/axis[@role=ROLE]`); video, audio and equations are addressed among the media and embedded objects they are, and views list the structural kinds only | ✅ 0328 |
+| `litchi_rtf::edit::Edit::{set_field_instruction, rename_bookmark, remove_bookmark, insert_bookmark, set_paragraph_tab_stops, set_section_values}` | mark edits: each splices only the `\fldinst` text, the `\bkmkstart`/`\bkmkend` groups, the paragraph's tab-stop controls or the section's page-setup controls, then reparses the candidate and refuses any other change; they publish as one `mark.transfer` root transfer, which replays durably; mixing them with body work is `BodyDestinationConflict` | ✅ 0328 |
+| `litchi_rtf::edit::SectionValue` | one section page-setup value (break type, page size, orientation, margins, header and footer distance, columns, column spacing, title page, vertical alignment) | ✅ 0328 |
+| `litchi_rtf::ParagraphFormat::tab_stops` | a paragraph's custom tab stops in declaration order | ✅ 0328 |
+| `litchi_ops` RTF kinds `Section`, `Bookmark`, `Field`, `Toc`, `Tab`, `TextBox`, `Shape` | the DOCX paths (`/section[N]`, `/bookmark[N]`, `/bookmark[@name=X]`, `/field[N]`, `/toc[N]`, `/body/p[N]/tab[M]`, `/body/textbox[N]`, `/body/shape[N]`) over the native collections; sections, bookmark names, field instructions, TOC switches and tab stops are writable, tab stops are added and removed, bookmarks removed | ✅ 0328 |

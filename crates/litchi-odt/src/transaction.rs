@@ -1583,6 +1583,28 @@ impl Edit {
         self.stage_body(|edits, body| edits.set_field_text(body, range, text))
     }
 
+    /// Stages replacing the text of one master-page header or footer region
+    /// ([`crate::body::parts::Region`] of this edit's source) with one
+    /// paragraph that keeps the region's first paragraph start tag; spaces,
+    /// tabs and line feeds are kept as `text:s`, `text:tab` and
+    /// `text:line-break` (record 0328). Setting the text the region shows
+    /// stages nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::Unsupported`] when the region holds
+    /// content a text set cannot keep (a field, a frame, a table, a
+    /// bookmark), and an error for a region of another document, text XML
+    /// cannot carry, or a region edited twice.
+    pub fn set_region_text(
+        &mut self,
+        region: &crate::body::parts::Region<'_>,
+        text: &str,
+    ) -> Result<&mut Self> {
+        let range = region.range();
+        self.stage_body(|edits, body| edits.set_region_text(body, range, text))
+    }
+
     /// Stages setting (`Some`) or removing (`None`) one typed attribute of
     /// a body node.
     ///

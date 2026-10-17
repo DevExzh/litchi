@@ -487,6 +487,9 @@ pub(crate) fn set_with_limits<'p, 'v>(
         }
         return set_metadata(file, &props, limits);
     }
+    if nodes.iter().any(|node| node.element_kind().is_part()) {
+        return set_parts(file, &nodes, &props, limits);
+    }
     let body = file.body()?;
     let mut edit = file.package()?.edit();
     let mut operations = 0usize;
@@ -510,6 +513,269 @@ pub(crate) fn set_with_limits<'p, 'v>(
         stage(&mut edit, id, &staged)?;
     }
     finish(file, edit, operations, limits)
+}
+
+/// One tab stop as the unified keys write it: the leaf edit and its
+/// position in twips (for ordering).
+type TabList = Vec<(Option<i64>, litchi_odt::body::TabStopEdit)>;
+
+/// Apply one tab stop's unified `pos`, `val` and `leader` to `stop`.
+fn tab_props(
+    props: &Props<'_>,
+    stop: &mut (Option<i64>, litchi_odt::body::TabStopEdit),
+    adding: bool,
+) -> Result<usize> {
+    let mut operations = 0;
+    for (key, value) in props.iter() {
+        let name = key.as_str();
+        let Some(spec) = spec::TAB_PROPS
+            .iter()
+            .find(|spec| spec.name.eq_ignore_ascii_case(name))
+        else {
+            return Err(refusal(
+                Code::UnsupportedProperty,
+                "the property is not an ODT tab stop property",
+            )
+            .with_property(name.to_owned()));
+        };
+        let key = spec.name;
+        let coerced = required(coerce(value, spec.ty, key)?, key)?;
+        match (key, coerced) {
+            ("pos", Coerced::Int(twips)) => {
+                let twips = i32::try_from(twips)
+                    .ok()
+                    .filter(|twips| (0..=31_680).contains(twips))
+                    .ok_or_else(|| {
+                        refusal(
+                            Code::OutOfRange,
+                            "an ODT tab stop position runs from 0 to 31680 twips",
+                        )
+                        .with_property(key)
+                    })?;
+                // The same position keeps its spelling (an exact no-op).
+                if stop.0 != Some(i64::from(twips)) {
+                    stop.0 = Some(i64::from(twips));
+                    stop.1.position = odf_length(Length::from_twips(twips));
+                }
+            },
+            ("val", Coerced::Token(token)) => {
+                let (kind, character) = match token {
+                    "center" => (Some("center"), None),
+                    "right" => (Some("right"), None),
+                    "decimal" => (Some("char"), Some(".")),
+                    _ => (None, None),
+                };
+                // A left stop keeps an explicit `left` it was written with.
+                if kind.is_some() || stop.1.kind.as_deref() != Some("left") {
+                    stop.1.kind = kind.map(str::to_owned);
+                }
+                stop.1.character = character.map(str::to_owned);
+            },
+            ("leader", Coerced::Token(token)) => {
+                let (style, text) = match token {
+                    "dot" => (Some("dotted"), Some(".")),
+                    "hyphen" => (Some("dash"), Some("-")),
+                    "underscore" => (Some("solid"), Some("_")),
+                    "middleDot" => (Some("dotted"), Some("·")),
+                    _ => (None, None),
+                };
+                stop.1.leader_style = style.map(str::to_owned);
+                stop.1.leader_text = text.map(str::to_owned);
+            },
+            _ => return Err(wrong(key)),
+        }
+        operations += 1;
+    }
+    if adding && stop.0.is_none() {
+        return Err(missing("pos", "an ODT tab stop needs a `pos` in twips"));
+    }
+    Ok(operations)
+}
+
+/// Stage the tab stops of each paragraph whose list changed.
+fn stage_tabs(edit: &mut Edit, lists: Vec<(NodeId, TabList, TabList)>) -> Result<()> {
+    for (paragraph, before, after) in lists {
+        let unchanged = before.len() == after.len()
+            && before
+                .iter()
+                .zip(&after)
+                .all(|(left, right)| left.1 == right.1);
+        if unchanged {
+            continue;
+        }
+        let mut properties = ParagraphPropertyEdit::new();
+        properties.tab_stops = Some(after.into_iter().map(|(_, stop)| stop).collect());
+        edit.set_paragraph_properties(paragraph, &properties)
+            .map_err(staging_error)?;
+    }
+    Ok(())
+}
+
+/// The tab list of `paragraph` among the lists one call edits, read from
+/// the source on first use.
+fn tab_list<'l>(
+    file: &Odt,
+    lists: &'l mut Vec<(NodeId, TabList, TabList)>,
+    paragraph: NodeId,
+) -> Result<&'l mut TabList> {
+    let index = match lists.iter().position(|(held, _, _)| *held == paragraph) {
+        Some(index) => index,
+        None => {
+            let stops = super::parts::tab_edits(file, paragraph)?;
+            lists.push((paragraph, stops.clone(), stops));
+            lists.len() - 1
+        },
+    };
+    Ok(&mut lists[index].2)
+}
+
+/// Set properties of part targets (record 0328): a header or footer's
+/// text, tab stops. Every other part is read-only.
+fn set_parts(
+    file: &Odt,
+    nodes: &[Node<'_>],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    use super::node::Part;
+    if nodes.iter().any(|node| !node.element_kind().is_part()) {
+        return Err(refusal(
+            Code::InvalidSelector,
+            "an ODT set cannot combine part targets with body elements",
+        ));
+    }
+    let mut edit = file.package()?.edit();
+    let mut operations = 0usize;
+    let mut lists: Vec<(NodeId, TabList, TabList)> = Vec::new();
+    for node in nodes {
+        match (node.element_kind(), node.part()) {
+            (Kind::Header | Kind::Footer, Some(Part::Region(index))) => {
+                let mut text = None;
+                for (key, value) in props.iter() {
+                    let name = key.as_str();
+                    if !name.eq_ignore_ascii_case("text") {
+                        let readable = spec::STORY_PROPS
+                            .iter()
+                            .any(|spec| spec.name.eq_ignore_ascii_case(name));
+                        return Err(if readable {
+                            refusal(
+                                Code::UnsupportedCapability,
+                                "the ODT header or footer property is read-only",
+                            )
+                        } else {
+                            refusal(
+                                Code::UnsupportedProperty,
+                                "the property is not an ODT header or footer property",
+                            )
+                        }
+                        .with_property(name.to_owned()));
+                    }
+                    text = Some(required(coerce_text(value, "text")?, "text")?);
+                }
+                let Some(text) = text else {
+                    continue;
+                };
+                let region = super::parts::region(file, index)?.ok_or_else(|| {
+                    refusal(Code::InternalError, "an ODT region no longer resolves")
+                })?;
+                edit.set_region_text(&region, &text).map_err(text_error)?;
+                operations += 1;
+            },
+            (Kind::Tab, Some(Part::Tab(paragraph, index))) => {
+                let list = tab_list(file, &mut lists, paragraph)?;
+                let stop = list.get_mut(index as usize).ok_or_else(|| {
+                    refusal(Code::InternalError, "an ODT tab stop no longer resolves")
+                })?;
+                operations += tab_props(props, stop, false)?;
+                list.sort_by_key(|(position, _)| position.unwrap_or(i64::MAX));
+            },
+            _ => {
+                return Err(refusal(
+                    Code::UnsupportedCapability,
+                    "this ODT element is read-only",
+                ));
+            },
+        }
+        bound(LimitKind::Operations, operations, limits.max_operations())?;
+    }
+    stage_tabs(&mut edit, lists)?;
+    finish(file, edit, operations, limits)
+}
+
+/// Add one tab stop under a paragraph or heading, in position order.
+fn add_tab(
+    file: &Odt,
+    parent: &Node<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    let Some(paragraph) = parent
+        .id()
+        .filter(|_| matches!(parent.element_kind(), Kind::Paragraph | Kind::Heading))
+    else {
+        return Err(refusal(
+            Code::UnsupportedType,
+            "an ODT tab stop is added under a paragraph or heading",
+        ));
+    };
+    let mut stop = (None, litchi_odt::body::TabStopEdit::new("0pt"));
+    let operations = tab_props(props, &mut stop, true)?;
+    bound(LimitKind::Operations, operations, limits.max_operations())?;
+    let mut lists = Vec::new();
+    let list = tab_list(file, &mut lists, paragraph)?;
+    let position = stop.0;
+    if list.iter().any(|(held, _)| *held == position) {
+        return Err(refusal(
+            Code::InvalidValue,
+            "the ODT paragraph already has a tab stop at this position",
+        )
+        .with_property("pos"));
+    }
+    let ordinal = list
+        .iter()
+        .take_while(|(held, _)| held.unwrap_or(i64::MAX) < position.unwrap_or(0))
+        .count();
+    list.insert(ordinal, stop);
+    let mut edit = file.package()?.edit();
+    stage_tabs(&mut edit, lists)?;
+    let commit = finish(file, edit, operations.max(1), limits)?;
+    Ok((commit, child_path(parent, Kind::Tab, ordinal)))
+}
+
+/// Remove tab stops (record 0328).
+fn remove_tabs(file: &Odt, nodes: &[Node<'_>], limits: &SemanticLimits) -> Result<Commit> {
+    use super::node::Part;
+    let mut lists: Vec<(NodeId, TabList, TabList)> = Vec::new();
+    // Remove the highest index of each paragraph first, so indexes stay
+    // valid.
+    let mut targets: Vec<(NodeId, u32)> = Vec::new();
+    for node in nodes {
+        match node.part() {
+            Some(Part::Tab(paragraph, index)) => targets.push((paragraph, index)),
+            _ => {
+                return Err(refusal(
+                    Code::UnsupportedCapability,
+                    "this ODT element cannot be removed",
+                ));
+            },
+        }
+    }
+    targets.sort_by_key(|target| std::cmp::Reverse(target.1));
+    targets.dedup();
+    for (paragraph, index) in &targets {
+        let list = tab_list(file, &mut lists, *paragraph)?;
+        if (*index as usize) < list.len() {
+            list.remove(*index as usize);
+        }
+    }
+    bound(
+        LimitKind::Operations,
+        targets.len(),
+        limits.max_operations(),
+    )?;
+    let mut edit = file.package()?.edit();
+    stage_tabs(&mut edit, lists)?;
+    finish(file, edit, targets.len(), limits)
 }
 
 /// The `/metadata` keys and the fields they write.
@@ -924,6 +1190,13 @@ pub(crate) fn add_with_limits<'p, 'n>(
             "the element type is not an ODT element",
         )
     })?;
+    if kind == Kind::Tab {
+        let parent = match node.placement() {
+            Some(Placement::Into(path, _)) => body_node(file, path)?,
+            _ => body_node(file, &parent)?,
+        };
+        return add_tab(file, &parent, node.props(), limits);
+    }
     let leaf_child = leaf_kind(kind)
         .ok_or_else(|| refusal(Code::UnsupportedElement, "this ODT element cannot be added"))?;
     let parent = match node.placement() {
@@ -997,6 +1270,15 @@ pub(crate) fn remove_with_limits<'p>(
 ) -> Result<Commit> {
     file.check_source()?;
     let nodes = resolve_targets(file, &target, limits.max_expanded_targets())?;
+    if nodes.iter().any(|node| node.element_kind().is_part()) {
+        if nodes.iter().all(|node| node.element_kind() == Kind::Tab) {
+            return remove_tabs(file, &nodes, limits);
+        }
+        return Err(refusal(
+            Code::UnsupportedCapability,
+            "this ODT element cannot be removed",
+        ));
+    }
     bound(LimitKind::Operations, nodes.len(), limits.max_operations())?;
     let mut edit = file.package()?.edit();
     for node in &nodes {
