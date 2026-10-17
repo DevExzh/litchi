@@ -22,6 +22,11 @@
 //! | `schema <type>` | `litchi_ops::schema` |
 //! | `merge <template> <data> --out <file> [--format json\|csv\|tsv] [--missing keep\|empty] [--no-fields] [--force]`, or OfficeCLI's `merge <template> <output> --data <json\|file>` | `merge::Data::from_json`/`from_csv`, then `File::merge` and `File::save_with` per record (refusing existing outputs unless `--force`); several records need `{n}` in the output name |
 //! | `refresh <file> [--clock DATETIME] [--write-cache] [--require-page-numbers] [--no-dirty] [--out F]` | `File::refresh_with_limits`, then `File::save` (in place, as OfficeCLI) or `File::save_as`; nothing is written when every result is current |
+//! | `dump <file> [/] [--format batch] [--out F]` | `File::dump`; the JSON array on stdout (or `--out`), skipped content as `warning[...]` lines on stderr (record 0336) |
+//! | `raw <file> [<part>] [--out F]` | `File::parts` without a part, else `File::raw`: the XML on stdout, or the bytes to `--out` |
+//! | `raw-set <file> <part> --xpath X --action A [--xml X] [--out F]` | `File::raw_set`, then a save in place (or to `--out`) |
+//! | `add-part <file> <parent> --type T [--name P] [--content-type C --relationship R --data F] [--out F]` | `File::add_part`; prints OfficeCLI's `Created T part: relId=... path=...` |
+//! | `validate <file>` | `File::validate`; exits 1 when the report has an error, and prints the errors on stderr as OfficeCLI does |
 //!
 //! `--at` is accepted as another name of `--index`.
 //!
@@ -101,6 +106,7 @@ mod exit;
 mod formats;
 mod m4;
 mod merge;
+mod raw;
 mod refresh;
 mod render;
 mod run;

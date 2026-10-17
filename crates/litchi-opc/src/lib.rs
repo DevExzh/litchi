@@ -102,7 +102,7 @@ pub use source_backed::{
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
-pub use validation::{validate_read_at, validate_read_at_with_limits};
+pub use validation::{validate_parts, validate_read_at, validate_read_at_with_limits};
 pub use xml_splice::{
     AuthoredXmlFragment, OwnedAttributeUpdate, OwnedChildElement, OwnedElementEdit,
     OwnedElementUpdate, OwnedXmlPart, SourceXmlPart, XmlSourceRange, XmlSplicePublication,

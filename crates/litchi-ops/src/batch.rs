@@ -14,10 +14,13 @@ use crate::props::Text;
 use crate::{Code, Error as OpsError, Props, Result};
 
 mod decode;
+mod dump;
 mod execute;
 pub use decode::{
     Error, SourceLimitKind, SourceLimits, SourceLimitsBuilder, from_bytes, from_bytes_with_limits,
 };
+pub use dump::Dump;
+pub(crate) use dump::support as dump_support;
 pub use execute::{Applied, BatchCommit, ItemResult};
 
 use crate::transaction::SemanticLimits;

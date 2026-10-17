@@ -243,7 +243,7 @@ impl State {
 /// assert!(Verb::Merge.is_edit());
 /// assert!(Verb::Replace.is_edit());
 /// assert!(Verb::Refresh.is_edit());
-/// assert_eq!(Verb::ALL.len(), 18);
+/// assert_eq!(Verb::ALL.len(), 23);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -288,12 +288,25 @@ pub enum Verb {
     Save,
     /// Create a new package of this format (W4).
     Create,
+    /// [`File::dump`]: the document as an OfficeCLI v2 batch (record 0336).
+    Dump,
+    /// [`File::raw`] and [`File::parts`]: package parts as bytes (design
+    /// §12, record 0336).
+    Raw,
+    /// [`File::validate`]: read-only structural validation (record 0336).
+    Validate,
+    /// [`File::add_part`]: a package part with its content type and
+    /// relationship (record 0336).
+    AddPart,
+    /// [`File::raw_set`]: an audited XPath-addressed XML edit of one part
+    /// (record 0336).
+    RawSet,
 }
 
 impl Verb {
     /// Every verb, in declaration order: the reads, then the edits,
     /// publication and creation.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 23] = [
         Self::Get,
         Self::Find,
         Self::Query,
@@ -312,6 +325,11 @@ impl Verb {
         Self::Refresh,
         Self::Save,
         Self::Create,
+        Self::Dump,
+        Self::Raw,
+        Self::Validate,
+        Self::AddPart,
+        Self::RawSet,
     ];
 
     /// The verb's canonical name, using OfficeCLI command names where applicable.
@@ -336,6 +354,11 @@ impl Verb {
             Self::Refresh => "refresh",
             Self::Save => "save",
             Self::Create => "create",
+            Self::Dump => "dump",
+            Self::Raw => "raw",
+            Self::Validate => "validate",
+            Self::AddPart => "add-part",
+            Self::RawSet => "raw-set",
         }
     }
 
@@ -356,14 +379,19 @@ impl Verb {
             | Self::Import
             | Self::Merge
             | Self::Replace
-            | Self::Refresh => true,
+            | Self::Refresh
+            | Self::AddPart
+            | Self::RawSet => true,
             Self::Get
             | Self::Find
             | Self::Query
             | Self::View
             | Self::Evaluate
             | Self::Save
-            | Self::Create => false,
+            | Self::Create
+            | Self::Dump
+            | Self::Raw
+            | Self::Validate => false,
         }
     }
 }
@@ -742,6 +770,9 @@ impl Capabilities {
         if let Some(refusal) = self.read_refusal() {
             return refusal.support();
         }
+        if let Some(support) = self.raw_support(verb) {
+            return support;
+        }
         if verb.is_edit() {
             #[cfg(feature = "doc")]
             if matches!(
@@ -995,6 +1026,9 @@ impl Capabilities {
             Verb::Merge => self.merge_support(),
             Verb::Replace => self.replace_support(),
             Verb::Refresh => self.refresh_support(),
+            Verb::Dump | Verb::Raw | Verb::Validate | Verb::AddPart | Verb::RawSet => {
+                self.raw_support(verb).unwrap_or_else(|| EDITS.support())
+            },
         }
     }
 
@@ -1128,6 +1162,58 @@ impl Capabilities {
         } else {
             CREATE_PENDING.support()
         }
+    }
+
+    /// The raw-layer and dump verbs (record 0336), `None` for the others.
+    fn raw_support(&self, verb: Verb) -> Option<Support> {
+        const NO_PARTS: Refusal = Refusal {
+            code: Code::UnsupportedCapability,
+            follow_up: "record 0336: package parts exist in OOXML and packaged ODF only",
+            reason: "this format has no package parts",
+        };
+        const ODF_WRITES: Refusal = Refusal {
+            code: Code::UnsupportedCapability,
+            follow_up: "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+            reason: "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)",
+        };
+        const IWORK_VALIDATION: Refusal = Refusal {
+            code: Code::UnsupportedCapability,
+            follow_up: "record 0336 follow-up: an iWork package validator from the iWork owners",
+            reason: "iWork packages are validated by their owners on open; no report-producing validator exists",
+        };
+        let format = self.format?;
+        let ooxml = matches!(
+            format,
+            FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx | FileFormat::Xlsb
+        );
+        let odf = matches!(
+            format,
+            FileFormat::Odt
+                | FileFormat::Ods
+                | FileFormat::Odp
+                | FileFormat::Odg
+                | FileFormat::Odc
+                | FileFormat::Odi
+                | FileFormat::Odb
+                | FileFormat::Odf
+                | FileFormat::Oth
+                | FileFormat::Odm
+        );
+        let iwork = matches!(
+            format,
+            FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
+        );
+        Some(match verb {
+            Verb::Dump => crate::batch::dump_support(format),
+            Verb::Raw if ooxml || odf => Support::Supported,
+            Verb::Raw => NO_PARTS.support(),
+            Verb::AddPart | Verb::RawSet if ooxml => Support::Supported,
+            Verb::AddPart | Verb::RawSet if odf => ODF_WRITES.support(),
+            Verb::AddPart | Verb::RawSet => NO_PARTS.support(),
+            Verb::Validate if iwork => IWORK_VALIDATION.support(),
+            Verb::Validate => Support::Supported,
+            _ => return None,
+        })
     }
 
     /// Whether the `mode` view is rendered, or the code it refuses with.

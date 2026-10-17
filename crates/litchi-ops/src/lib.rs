@@ -138,6 +138,7 @@ pub mod path;
 pub mod placement;
 pub mod props;
 pub mod query;
+pub mod raw;
 mod read;
 pub mod refresh;
 mod registry;

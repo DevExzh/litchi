@@ -17,8 +17,8 @@ the built-in exception that fits it (``OSError``, ``ValueError`` or
 and the document-wide reads release the GIL while they run.
 
 Names that start with an underscore (``_NodeView``, ``_Capabilities``,
-``_Support``, ``_Metadata``, ``_ItemResult``, ``_FormatValue``, ``_Props``,
-``_PropValue``) are typing helpers that exist only in this stub: they
+``_Support``, ``_Metadata``, ``_ItemResult``, ``_PartInfo``, ``_Validation``,
+``_ValidationIssue``, ``_FormatValue``, ``_Props``, ``_PropValue``) are typing helpers that exist only in this stub: they
 describe the dicts the API takes and returns.
 """
 
@@ -701,6 +701,44 @@ _PropValue = Union[bool, int, float, str, None]
 #: Properties a write verb takes: a dict (dotted keys are fine) or
 #: OfficeCLI's list of "key=value" strings.
 _Props = Union[Mapping[str, _PropValue], Sequence[str]]
+
+class _PartInfo(TypedDict):
+    """One package part in ``File.parts()`` (stub-only type, record 0336)."""
+
+    name: str
+    """The part name, for example "/word/document.xml"."""
+    contentType: str
+    """The part's content type; empty when the package declares none."""
+
+class _ValidationIssue(TypedDict):
+    """One finding in ``File.validate()["issues"]`` (stub-only type)."""
+
+    id: str
+    check: str
+    code: str
+    """A stable finding code, for example "opc.relationship.target_missing"."""
+    severity: Literal["info", "warning", "error", "fatal"]
+    message: str
+    locations: List[Dict[str, Union[str, int]]]
+    """Where: ``part``, ``path``, ``byte_offset``, ``byte_length``,
+    ``object_index`` (each only when known); never document content."""
+    evidence: List[Dict[str, Any]]
+    specification: NotRequired[Dict[str, str]]
+    compatibility: str
+    repair: Dict[str, str]
+
+class _Validation(TypedDict):
+    """``File.validate()``'s report (stub-only type, record 0336)."""
+
+    format: str
+    valid: bool
+    """No finding of error or fatal severity."""
+    complete: bool
+    """Every check ran to completion."""
+    checks: List[Dict[str, str]]
+    """Each check's ``id`` and ``status`` ("complete", "not_applicable",
+    "blocked" with a ``reason``, "stopped_by" with a ``check``)."""
+    issues: List[_ValidationIssue]
 
 class _ItemResult(TypedDict):
     """One batch item's result in ``Commit.results`` (stub-only type):
@@ -1451,6 +1489,98 @@ class File:
 
         Raises:
             As ``save``, without the path errors
+        """
+        ...
+
+    def dump(self, *, strict: bool = False) -> List[Dict[str, Any]]:
+        """The document as an OfficeCLI v2 batch: item dicts that ``batch``
+        replays onto ``create(format)`` to rebuild it (record 0336).
+
+        The first item is ``{"command": "meta", "dumpVersion": 2}``. Content
+        the write verbs cannot rebuild is skipped, or with ``strict`` raises
+        UnsupportedError ("unsupported_element").
+
+        Raises:
+            UnsupportedError: (a ValueError) If the format cannot be dumped
+            ProtectedError: (a ValueError) If the file is encrypted
+            IoError: (an OSError) If the file is closed or changed on disk
+        """
+        ...
+
+    def parts(self) -> List[_PartInfo]:
+        """The package parts in name order (design §12, record 0336).
+
+        Raises:
+            UnsupportedError: (a ValueError) If the format has no package parts
+            IoError: (an OSError) If the file is closed
+        """
+        ...
+
+    def raw(self, part: str) -> bytes:
+        """One package part's bytes, as the File would publish them
+        (OfficeCLI ``raw``).
+
+        ``part`` is a part name ("/word/document.xml") or alias
+        ("/document", "/styles", "/slide[1]", "/Sheet1", "/content").
+
+        Raises:
+            PathError: (a LookupError) If there is no such part
+            UnsupportedError: (a ValueError) As ``parts``
+        """
+        ...
+
+    def add_part(
+        self,
+        parent: str,
+        type: Optional[str] = None,
+        *,
+        content_type: Optional[str] = None,
+        relationship: Optional[str] = None,
+        data: Optional[bytes] = None,
+        name: Optional[str] = None,
+    ) -> Commit:
+        """Add a package part with its content type and a relationship from
+        ``parent``; the Commit's ``value`` is ``{"part", "relationshipId"}``
+        (OfficeCLI ``add-part``).
+
+        ``type`` "chart", "header" or "footer" adds an empty part of that
+        kind; otherwise pass ``content_type``, ``relationship``, ``data``
+        and ``name``.
+
+        Raises:
+            PathError: (a LookupError) If the parent does not resolve
+            PropertyError: (a ValueError) If an argument is missing or the
+                type is unknown
+            UnsupportedError: (a ValueError) Outside DOCX, XLSX, PPTX and XLSB
+            ProtectedError: (a ValueError) If the File is signed or encrypted
+        """
+        ...
+
+    def raw_set(
+        self, part: str, xpath: str, action: str, xml: Optional[str] = None
+    ) -> Commit:
+        """Edit one part's XML at every element ``xpath`` matches; the
+        Commit's ``value`` is ``{"matched": n}`` (OfficeCLI ``raw-set``).
+
+        ``action`` is append, prepend, insertbefore, insertafter, replace,
+        remove or setattr (``xml`` is then "name=value").
+
+        Raises:
+            PathError: (a LookupError) If the part does not resolve, the
+                XPath is malformed or matches nothing
+            PropertyError: (a ValueError) If the action or fragment is invalid
+            UnsupportedError: (a ValueError) Outside DOCX, XLSX, PPTX and XLSB
+            ProtectedError: (a ValueError) If the File is signed or encrypted
+        """
+        ...
+
+    def validate(self) -> _Validation:
+        """Check the package structure read-only (OfficeCLI ``validate``).
+
+        Raises:
+            UnsupportedError: (a ValueError) For iWork packages
+            ProtectedError: (a ValueError) If the file is encrypted
+            IoError: (an OSError) If the file is closed
         """
         ...
 
