@@ -5,6 +5,8 @@
 //! XML allocation for lossless access while semantic traversal uses one
 //! cached, bounded MCE view when required.
 
+/// The header and footer parts of a document, listed by relationship.
+pub mod catalog;
 mod codec;
 mod model;
 mod package;

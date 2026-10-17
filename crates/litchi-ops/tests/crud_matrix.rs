@@ -86,6 +86,15 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx",
             "ooxml/docx/comment.docx",
             "libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx",
+            // Record 0319: notes, headers and footers, and numbering.
+            "ooxml/docx/footnotes.docx",
+            "ooxml/docx/endnotes.docx",
+            "ooxml/docx/headerFooter.docx",
+            "ooxml/docx/ComplexNumberedLists.docx",
+            // Record 0319: a bookmark, a text box and a watermark.
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
+            "libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx",
+            "libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx",
         ],
     },
     Spec {
@@ -458,6 +467,32 @@ const RECIPES: &[Recipe] = &[
         fixture: "seed",
         parent: "/body/p[1]",
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
+        start: false,
+    },
+    // Record 0319: notes are anchored on a paragraph and need their text; a
+    // level is added to a definition by its ilvl.
+    Recipe {
+        format: "docx",
+        element: "footnote",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("text", "Note")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "endnote",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("text", "End")],
+        start: false,
+    },
+    Recipe {
+        format: "docx",
+        element: "level",
+        fixture: "ooxml/docx/ComplexNumberedLists.docx",
+        parent: "/numbering/abstractNum[1]",
+        props: &[("ilvl", "8"), ("format", "decimal"), ("lvlText", "%9.")],
         start: false,
     },
     // Record 0295: DOCX SmartArt is added under a paragraph from an outline.

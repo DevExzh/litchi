@@ -106,7 +106,8 @@ fn sample_props(kind: &str, key: &'static str) -> Props<'static> {
     if kind == "paragraph" {
         return match key {
             "text" => Props::new().with(key, "added paragraph"),
-            "style" => Props::new().with(key, "Title"),
+            // Record 0319: `styleId` and `styleName` write the style too.
+            "style" | "styleId" | "styleName" => Props::new().with(key, "Title"),
             "align" => Props::new().with(key, "right"),
             "spaceBefore" | "spaceAfter" => Props::new().with(key, Length::from_points(6)),
             "lineSpacing" => Props::new().with(key, "1.15x"),
@@ -195,7 +196,9 @@ fn assert_added(file: &File, path: &str, kind: &str, key: &str) {
             format_contains(file, &run_path, key),
             "initial-run property {key} was not emitted at {run_path}"
         );
-    } else if key == "style" {
+    } else if matches!(key, "style" | "styleId" | "styleName") {
+        // `styleName` reads a display name only through a styles part,
+        // which the fixture lacks; the style id is written either way.
         assert_eq!(
             node.view()
                 .style()

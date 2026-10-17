@@ -125,10 +125,7 @@ pub(super) fn has_comments(docx: &Docx) -> Result<bool> {
             .rels()
             .iter()
             .any(comments)),
-        DocxOwner::Source(package) => package
-            .source_backed_package()
-            .and_then(|source| Ok(source.main_document_part()?.rels().iter().any(comments)))
-            .map_err(Error::from),
+        DocxOwner::Source(package) => package.has_comments().map_err(Error::from),
     };
     docx.owner().finish(result)
 }
@@ -551,6 +548,15 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     Some(None) => Lookup::Missing,
                     None => Lookup::NotApplicable,
                 })
+            },
+            // Styles, numbering, headers, footers and notes (record 0319).
+            (Value::Document | Value::Part(_), kind) if super::parts::is_part_kind(kind) => {
+                super::parts::child(self.docx, parent, step)
+            },
+            // Tab stops, breaks, bookmarks, fields, tables of contents, the
+            // watermark and text boxes (record 0319).
+            (_, kind) if super::marks::is_mark_kind(kind) => {
+                super::marks::child(self.docx, parent, step)
             },
             _ => Ok(Lookup::NotApplicable),
         }

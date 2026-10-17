@@ -42,6 +42,7 @@ pub mod object;
 mod open_options;
 pub mod package;
 pub mod paragraph;
+mod part_scan;
 pub mod parts;
 pub mod properties;
 pub mod redact;

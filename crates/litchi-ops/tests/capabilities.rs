@@ -162,6 +162,13 @@ fn ordinary_reports_hide_native_selection_fields() {
             // Record 0283: charts are added, set and removed.
             "chart" => (true, true, true),
             "sdt" => (false, false, true),
+            // Record 0319: styles, numbering, headers, footers and notes.
+            "style" | "abstractNum" | "num" | "level" | "header" | "footer" | "footnote"
+            | "endnote" => (true, true, true),
+            // Record 0319: tab stops are set, added and removed; breaks
+            // are added and removed.
+            "tab" => (true, true, true),
+            "break" => (false, true, true),
             _ => (false, false, false),
         };
         assert_eq!(operations.set, set, "{} set", element.name());
@@ -222,19 +229,20 @@ fn ordinary_reports_hide_native_selection_fields() {
                 } else if element.name() == "paragraph"
                     && matches!(property.name(), "listStyle" | "start")
                 {
-                    // Record 0251e: list kinds are set through the
-                    // numbering part and not read back yet.
-                    assert!(!property.get(), "{}", property.name());
-                    assert!(property.set(), "{}", property.name());
-                    assert!(!property.add(), "{}", property.name());
-                } else if property.name() != "styleId" {
+                    // Record 0251e sets list kinds through the numbering
+                    // part; record 0319 reads them back.
                     assert!(property.get(), "{}", property.name());
                     assert!(property.set(), "{}", property.name());
-                    assert!(property.add(), "{}", property.name());
-                } else {
+                    assert!(!property.add(), "{}", property.name());
+                } else if element.name() == "paragraph" && property.name() == "numFmt" {
+                    // Record 0319: read through the numbering part.
                     assert!(property.get(), "{}", property.name());
                     assert!(!property.set(), "{}", property.name());
                     assert!(!property.add(), "{}", property.name());
+                } else {
+                    assert!(property.get(), "{}", property.name());
+                    assert!(property.set(), "{}", property.name());
+                    assert!(property.add(), "{}", property.name());
                 }
             } else if element.name() == "hyperlink"
                 && matches!(
@@ -290,6 +298,32 @@ fn ordinary_reports_hide_native_selection_fields() {
                         "layout" | "layoutId" | "nodeCount" | "text"
                     ),
                     "smartart {}",
+                    property.name()
+                );
+            } else if matches!(
+                element.name(),
+                "style"
+                    | "abstractNum"
+                    | "num"
+                    | "level"
+                    | "header"
+                    | "footer"
+                    | "footnote"
+                    | "endnote"
+                    | "tab"
+                    | "break"
+                    | "bookmark"
+                    | "field"
+                    | "toc"
+                    | "watermark"
+                    | "textbox"
+            ) {
+                // Record 0319: the part and mark registries declare each
+                // key.
+                assert!(
+                    property.set() || property.add() || property.get(),
+                    "{} {}",
+                    element.name(),
                     property.name()
                 );
             } else if element.name() == "chart" {

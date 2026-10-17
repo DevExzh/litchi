@@ -185,6 +185,17 @@ impl Note {
         self.note_type
     }
 
+    /// The note's text as OfficeCLI reads it: the text of its runs' `w:t`
+    /// elements, concatenated, without the run holding the reference mark
+    /// (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed.
+    pub fn run_text(&self) -> Result<String> {
+        crate::part_scan::run_text(self.xml_bytes(), &[b"footnoteRef", b"endnoteRef"])
+    }
+
     /// Get the XML bytes of this note.
     ///
     /// The bytes are an XML fragment whose namespace declarations are those in
@@ -328,8 +339,36 @@ impl Note {
         Self::extract_notes_from_part(part, b"endnote")
     }
 
+    /// The footnotes of a footnotes part payload, in part order, without
+    /// separators and continuation notes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a malformed payload.
+    pub fn footnotes_from_xml(xml: Arc<Vec<u8>>) -> Result<Vec<Note>> {
+        Self::extract_notes(&xml, || Arc::clone(&xml), b"footnote")
+    }
+
+    /// The endnotes of an endnotes part payload, in part order, without
+    /// separators and continuation notes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a malformed payload.
+    pub fn endnotes_from_xml(xml: Arc<Vec<u8>>) -> Result<Vec<Note>> {
+        Self::extract_notes(&xml, || Arc::clone(&xml), b"endnote")
+    }
+
     /// Extract notes from a part (generic for footnotes and endnotes).
     fn extract_notes_from_part(part: &dyn Part, note_tag: &[u8]) -> Result<Vec<Note>> {
+        Self::extract_notes(part.blob(), || part.blob_arc(), note_tag)
+    }
+
+    fn extract_notes(
+        blob: &[u8],
+        shared: impl FnOnce() -> Arc<Vec<u8>>,
+        note_tag: &[u8],
+    ) -> Result<Vec<Note>> {
         // `w16du:dateUtc` is a Word 2023 tracked-change attribute and is
         // commonly protected by `mc:Ignorable` in a notes part.  Use the
         // DOCX profile here rather than the format-generic baseline, which
@@ -337,13 +376,13 @@ impl Note {
         let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
         capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
         let source = match litchi_ooxml_common::mce::process_markup_compatibility(
-            part.blob(),
+            blob,
             &capabilities,
             &litchi_ooxml_common::mce::Limits::default(),
         )?
         .xml
         {
-            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Borrowed(_) => shared(),
             std::borrow::Cow::Owned(value) => Arc::new(value),
         };
         let mut notes = Vec::new();

@@ -142,84 +142,84 @@ docx	section	edit	n/a	edit not offered for this element	-
 docx	section	batch	n/a	batch not offered for this element	-
 docx	section	create	supported		ok format
 docx	section	save	supported		ok format
-docx	header	get	gap	L-DOCX-R5	unreached
-docx	header	find	gap	L-DOCX-R5	unreached
-docx	header	query	gap	L-DOCX-R5	unreached
-docx	header	view	gap	L-DOCX-R5	unreached
-docx	header	set	gap	L-DOCX-R5	unreached
-docx	header	add	gap	L-DOCX-R5	-
-docx	header	remove	gap	L-DOCX-R5	unreached
-docx	header	move	gap	L-DOCX-R5	unreached
-docx	header	swap	gap	L-DOCX-R5	unreached
-docx	header	edit	gap	L-DOCX-R5	-
-docx	header	batch	gap	L-DOCX-R5	-
-docx	header	create	gap	L-DOCX-R5	ok format
-docx	header	save	gap	L-DOCX-R5	ok format
-docx	footer	get	gap	L-DOCX-R5	unreached
-docx	footer	find	gap	L-DOCX-R5	unreached
-docx	footer	query	gap	L-DOCX-R5	unreached
-docx	footer	view	gap	L-DOCX-R5	unreached
-docx	footer	set	gap	L-DOCX-R5	unreached
-docx	footer	add	gap	L-DOCX-R5	-
-docx	footer	remove	gap	L-DOCX-R5	unreached
-docx	footer	move	gap	L-DOCX-R5	unreached
-docx	footer	swap	gap	L-DOCX-R5	unreached
-docx	footer	edit	gap	L-DOCX-R5	-
-docx	footer	batch	gap	L-DOCX-R5	-
-docx	footer	create	gap	L-DOCX-R5	ok format
-docx	footer	save	gap	L-DOCX-R5	ok format
-docx	footnotes	get	gap	L-DOCX-R5	unreached
-docx	footnotes	find	gap	L-DOCX-R5	unreached
-docx	footnotes	query	gap	L-DOCX-R5	unreached
-docx	footnotes	view	gap	L-DOCX-R5	unreached
-docx	footnotes	set	gap	L-DOCX-R5	unreached
-docx	footnotes	add	gap	L-DOCX-R5	-
-docx	footnotes	remove	gap	L-DOCX-R5	unreached
-docx	footnotes	move	gap	L-DOCX-R5	unreached
-docx	footnotes	swap	gap	L-DOCX-R5	unreached
-docx	footnotes	edit	gap	L-DOCX-R5	-
-docx	footnotes	batch	gap	L-DOCX-R5	-
-docx	footnotes	create	gap	L-DOCX-R5	ok format
-docx	footnotes	save	gap	L-DOCX-R5	ok format
-docx	footnote	get	gap	L-DOCX-R5	unreached
-docx	footnote	find	gap	L-DOCX-R5	unreached
-docx	footnote	query	gap	L-DOCX-R5	unreached
-docx	footnote	view	gap	L-DOCX-R5	unreached
-docx	footnote	set	gap	L-DOCX-R5	unreached
-docx	footnote	add	gap	L-DOCX-R5	-
-docx	footnote	remove	gap	L-DOCX-R5	unreached
-docx	footnote	move	gap	L-DOCX-R5	unreached
-docx	footnote	swap	gap	L-DOCX-R5	unreached
-docx	footnote	edit	gap	L-DOCX-R5	-
-docx	footnote	batch	gap	L-DOCX-R5	-
-docx	footnote	create	gap	L-DOCX-R5	ok format
-docx	footnote	save	gap	L-DOCX-R5	ok format
-docx	endnotes	get	gap	L-DOCX-R5	unreached
-docx	endnotes	find	gap	L-DOCX-R5	unreached
-docx	endnotes	query	gap	L-DOCX-R5	unreached
-docx	endnotes	view	gap	L-DOCX-R5	unreached
-docx	endnotes	set	gap	L-DOCX-R5	unreached
-docx	endnotes	add	gap	L-DOCX-R5	-
-docx	endnotes	remove	gap	L-DOCX-R5	unreached
-docx	endnotes	move	gap	L-DOCX-R5	unreached
-docx	endnotes	swap	gap	L-DOCX-R5	unreached
-docx	endnotes	edit	gap	L-DOCX-R5	-
-docx	endnotes	batch	gap	L-DOCX-R5	-
-docx	endnotes	create	gap	L-DOCX-R5	ok format
-docx	endnotes	save	gap	L-DOCX-R5	ok format
-docx	endnote	get	gap	L-DOCX-R5	unreached
-docx	endnote	find	gap	L-DOCX-R5	unreached
-docx	endnote	query	gap	L-DOCX-R5	unreached
-docx	endnote	view	gap	L-DOCX-R5	unreached
-docx	endnote	set	gap	L-DOCX-R5	unreached
-docx	endnote	add	gap	L-DOCX-R5	-
-docx	endnote	remove	gap	L-DOCX-R5	unreached
-docx	endnote	move	gap	L-DOCX-R5	unreached
-docx	endnote	swap	gap	L-DOCX-R5	unreached
-docx	endnote	edit	gap	L-DOCX-R5	-
-docx	endnote	batch	gap	L-DOCX-R5	-
-docx	endnote	create	gap	L-DOCX-R5	ok format
-docx	endnote	save	gap	L-DOCX-R5	ok format
+docx	header	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /header[1]
+docx	header	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /header[1]
+docx	header	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
+docx	header	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /header[1]
+docx	header	set	supported		ok `seed + add paragraph + add header` /header[1] {"type":"first"}
+docx	header	add	supported		ok /header[1] on `seed + add paragraph` under / {}
+docx	header	remove	supported		ok `seed + add paragraph + add header` /header[1]
+docx	header	move	format-verb		refused unsupported_capability
+docx	header	swap	format-verb		refused unsupported_capability
+docx	header	edit	supported		ok tx.set
+docx	header	batch	supported		ok set item
+docx	header	create	supported		ok format
+docx	header	save	supported		ok format
+docx	footer	get	supported		ok 8 instances, first `ooxml/docx/headerFooter.docx` /footer[1]
+docx	footer	find	supported		ok 8 instances, first `ooxml/docx/headerFooter.docx` /footer[1]
+docx	footer	query	supported		ok matches in ooxml/docx/headerFooter.docx
+docx	footer	view	supported		ok 8 instances, first `ooxml/docx/headerFooter.docx` /footer[1]
+docx	footer	set	supported		ok `seed + add paragraph + add footer` /footer[1] {"type":"first"}
+docx	footer	add	supported		ok /footer[1] on `seed + add paragraph` under / {}
+docx	footer	remove	supported		ok `seed + add paragraph + add footer` /footer[1]
+docx	footer	move	format-verb		refused unsupported_capability
+docx	footer	swap	format-verb		refused unsupported_capability
+docx	footer	edit	supported		ok tx.set
+docx	footer	batch	supported		ok set item
+docx	footer	create	supported		ok format
+docx	footer	save	supported		ok format
+docx	footnotes	get	supported		ok 2 instances, first `ooxml/docx/footnotes.docx` /footnotes
+docx	footnotes	find	supported		ok 2 instances, first `ooxml/docx/footnotes.docx` /footnotes
+docx	footnotes	query	supported		ok matches in ooxml/docx/footnotes.docx
+docx	footnotes	view	supported		ok 2 instances, first `ooxml/docx/footnotes.docx` /footnotes
+docx	footnotes	set	n/a	set not offered for this element	-
+docx	footnotes	add	n/a	add not offered for this element	-
+docx	footnotes	remove	n/a	remove not offered for this element	-
+docx	footnotes	move	format-verb		unreached
+docx	footnotes	swap	format-verb		unreached
+docx	footnotes	edit	n/a	edit not offered for this element	-
+docx	footnotes	batch	n/a	batch not offered for this element	-
+docx	footnotes	create	supported		ok format
+docx	footnotes	save	supported		ok format
+docx	footnote	get	supported		ok 5 instances, first `ooxml/docx/footnotes.docx` /footnotes/footnote[1]
+docx	footnote	find	supported		ok 5 instances, first `ooxml/docx/footnotes.docx` /footnotes/footnote[1]
+docx	footnote	query	supported		ok matches in ooxml/docx/footnotes.docx
+docx	footnote	view	supported		ok 5 instances, first `ooxml/docx/footnotes.docx` /footnotes/footnote[1]
+docx	footnote	set	supported		ok `seed + add footnote` /footnotes/footnote[1] {"text":"Litchi"}
+docx	footnote	add	supported		ok /footnotes/footnote[1] on `seed` under /body/p[1] {"text":"Note"}
+docx	footnote	remove	supported		ok `seed + add footnote` /footnotes/footnote[1]
+docx	footnote	move	format-verb		refused unsupported_capability
+docx	footnote	swap	format-verb		refused unsupported_capability
+docx	footnote	edit	supported		ok tx.set
+docx	footnote	batch	supported		ok set item
+docx	footnote	create	supported		ok format
+docx	footnote	save	supported		ok format
+docx	endnotes	get	supported		ok 2 instances, first `ooxml/docx/endnotes.docx` /endnotes
+docx	endnotes	find	supported		ok 2 instances, first `ooxml/docx/endnotes.docx` /endnotes
+docx	endnotes	query	supported		ok matches in ooxml/docx/endnotes.docx
+docx	endnotes	view	supported		ok 2 instances, first `ooxml/docx/endnotes.docx` /endnotes
+docx	endnotes	set	n/a	set not offered for this element	-
+docx	endnotes	add	n/a	add not offered for this element	-
+docx	endnotes	remove	n/a	remove not offered for this element	-
+docx	endnotes	move	format-verb		unreached
+docx	endnotes	swap	format-verb		unreached
+docx	endnotes	edit	n/a	edit not offered for this element	-
+docx	endnotes	batch	n/a	batch not offered for this element	-
+docx	endnotes	create	supported		ok format
+docx	endnotes	save	supported		ok format
+docx	endnote	get	supported		ok 4 instances, first `ooxml/docx/endnotes.docx` /endnotes/endnote[1]
+docx	endnote	find	supported		ok 4 instances, first `ooxml/docx/endnotes.docx` /endnotes/endnote[1]
+docx	endnote	query	supported		ok matches in ooxml/docx/endnotes.docx
+docx	endnote	view	supported		ok 4 instances, first `ooxml/docx/endnotes.docx` /endnotes/endnote[1]
+docx	endnote	set	supported		ok `seed + add endnote` /endnotes/endnote[1] {"text":"Litchi"}
+docx	endnote	add	supported		ok /endnotes/endnote[1] on `seed` under /body/p[1] {"text":"End"}
+docx	endnote	remove	supported		ok `seed + add endnote` /endnotes/endnote[1]
+docx	endnote	move	format-verb		refused unsupported_capability
+docx	endnote	swap	format-verb		refused unsupported_capability
+docx	endnote	edit	supported		ok tx.set
+docx	endnote	batch	supported		ok set item
+docx	endnote	create	supported		ok format
+docx	endnote	save	supported		ok format
 docx	comments	get	supported		ok 2 instances, first `ooxml/docx/comment.docx` /comments
 docx	comments	find	supported		ok 2 instances, first `ooxml/docx/comment.docx` /comments
 docx	comments	query	supported		ok matches in ooxml/docx/comment.docx
@@ -246,84 +246,84 @@ docx	comment	edit	n/a	edit not offered for this element	-
 docx	comment	batch	n/a	batch not offered for this element	-
 docx	comment	create	supported		ok format
 docx	comment	save	supported		ok format
-docx	styles	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	add	gap	L-DOCX-R6 (R4x)	-
-docx	styles	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	styles	edit	gap	L-DOCX-R6 (R4x)	-
-docx	styles	batch	gap	L-DOCX-R6 (R4x)	-
-docx	styles	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	styles	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	style	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	add	gap	L-DOCX-R6 (R4x)	-
-docx	style	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	style	edit	gap	L-DOCX-R6 (R4x)	-
-docx	style	batch	gap	L-DOCX-R6 (R4x)	-
-docx	style	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	style	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	numbering	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	add	gap	L-DOCX-R6 (R4x)	-
-docx	numbering	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	numbering	edit	gap	L-DOCX-R6 (R4x)	-
-docx	numbering	batch	gap	L-DOCX-R6 (R4x)	-
-docx	numbering	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	numbering	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	abstractNum	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	add	gap	L-DOCX-R6 (R4x)	-
-docx	abstractNum	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	abstractNum	edit	gap	L-DOCX-R6 (R4x)	-
-docx	abstractNum	batch	gap	L-DOCX-R6 (R4x)	-
-docx	abstractNum	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	abstractNum	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	num	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	add	gap	L-DOCX-R6 (R4x)	-
-docx	num	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	num	edit	gap	L-DOCX-R6 (R4x)	-
-docx	num	batch	gap	L-DOCX-R6 (R4x)	-
-docx	num	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	num	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	level	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	add	gap	L-DOCX-R6 (R4x)	-
-docx	level	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	level	edit	gap	L-DOCX-R6 (R4x)	-
-docx	level	batch	gap	L-DOCX-R6 (R4x)	-
-docx	level	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	level	save	gap	L-DOCX-R6 (R4x)	ok format
+docx	styles	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /styles
+docx	styles	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /styles
+docx	styles	query	supported		ok matches in create()
+docx	styles	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /styles
+docx	styles	set	n/a	set not offered for this element	-
+docx	styles	add	n/a	add not offered for this element	-
+docx	styles	remove	n/a	remove not offered for this element	-
+docx	styles	move	format-verb		unreached
+docx	styles	swap	format-verb		unreached
+docx	styles	edit	n/a	edit not offered for this element	-
+docx	styles	batch	n/a	batch not offered for this element	-
+docx	styles	create	supported		ok format
+docx	styles	save	supported		ok format
+docx	style	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /styles/Custom1
+docx	style	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /styles/Custom1
+docx	style	query	supported		ok matches in create()
+docx	style	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /styles/Custom1
+docx	style	set	supported		ok `seed + add paragraph` /styles/Normal {"name":"Litchi"}
+docx	style	add	supported		ok /styles/CustomStyle on `seed + add paragraph` under /styles {}
+docx	style	remove	supported		ok `seed + add paragraph` /styles/Normal
+docx	style	move	format-verb		refused unsupported_capability
+docx	style	swap	format-verb		refused unsupported_capability
+docx	style	edit	supported		ok tx.set
+docx	style	batch	supported		ok set item
+docx	style	create	supported		ok format
+docx	style	save	supported		ok format
+docx	numbering	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering
+docx	numbering	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering
+docx	numbering	query	supported		ok matches in create()
+docx	numbering	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering
+docx	numbering	set	n/a	set not offered for this element	-
+docx	numbering	add	n/a	add not offered for this element	-
+docx	numbering	remove	n/a	remove not offered for this element	-
+docx	numbering	move	format-verb		unreached
+docx	numbering	swap	format-verb		unreached
+docx	numbering	edit	n/a	edit not offered for this element	-
+docx	numbering	batch	n/a	batch not offered for this element	-
+docx	numbering	create	supported		ok format
+docx	numbering	save	supported		ok format
+docx	abstractNum	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/abstractNum[1]
+docx	abstractNum	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/abstractNum[1]
+docx	abstractNum	query	supported		ok matches in create()
+docx	abstractNum	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/abstractNum[1]
+docx	abstractNum	set	supported		ok `seed + add paragraph` /numbering/abstractNum[1] {"type":"hybridMultilevel"}
+docx	abstractNum	add	supported		ok /numbering/abstractNum[14] on `seed + add paragraph` under /numbering {}
+docx	abstractNum	remove	supported		ok `seed + add paragraph` /numbering/abstractNum[1]
+docx	abstractNum	move	format-verb		refused unsupported_capability
+docx	abstractNum	swap	format-verb		refused unsupported_capability
+docx	abstractNum	edit	supported		ok tx.set
+docx	abstractNum	batch	supported		ok set item
+docx	abstractNum	create	supported		ok format
+docx	abstractNum	save	supported		ok format
+docx	num	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/num[1]
+docx	num	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/num[1]
+docx	num	query	supported		ok matches in create()
+docx	num	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/num[1]
+docx	num	set	supported		ok `seed + add paragraph` /numbering/num[1] {"abstractNumId":"9"}
+docx	num	add	supported		ok /numbering/num[14] on `seed + add paragraph` under /numbering {"abstractNumId":"1","startOverride.0":"1","startOverride.1":"1","startOverride.2":"1","startOverride.3":"1","startOverride.4":"1","startOverride.5":"1","startOverride.6":"1","startOverride.7":"1","startOverride.8":"1","start":"1","continue":"true"}
+docx	num	remove	supported		ok `seed + add paragraph` /numbering/num[1]
+docx	num	move	format-verb		refused unsupported_capability
+docx	num	swap	format-verb		refused unsupported_capability
+docx	num	edit	supported		ok tx.set
+docx	num	batch	supported		ok set item
+docx	num	create	supported		ok format
+docx	num	save	supported		ok format
+docx	level	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/abstractNum[1]/level[1]
+docx	level	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/abstractNum[1]/level[1]
+docx	level	query	supported		ok matches in create()
+docx	level	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx` /numbering/abstractNum[1]/level[1]
+docx	level	set	supported		ok `seed + add paragraph` /numbering/abstractNum[1]/level[1] {"start":"2"}
+docx	level	add	supported		ok /numbering/abstractNum[1]/level[9] on `ooxml/docx/ComplexNumberedLists.docx` under /numbering/abstractNum[1] {"ilvl":"8","format":"decimal","lvlText":"%9."}
+docx	level	remove	supported		ok `seed + add paragraph` /numbering/abstractNum[1]/level[1]
+docx	level	move	format-verb		refused unsupported_capability
+docx	level	swap	format-verb		refused unsupported_capability
+docx	level	edit	supported		ok tx.set
+docx	level	batch	supported		ok set item
+docx	level	create	supported		ok format
+docx	level	save	supported		ok format
 docx	settings	get	gap	L-DOCX-R6 (R4x)	unreached
 docx	settings	find	gap	L-DOCX-R6 (R4x)	unreached
 docx	settings	query	gap	L-DOCX-R6 (R4x)	unreached
@@ -350,32 +350,32 @@ docx	theme	edit	gap	L-DOCX-R6 (R4x)	-
 docx	theme	batch	gap	L-DOCX-R6 (R4x)	-
 docx	theme	create	gap	L-DOCX-R6 (R4x)	ok format
 docx	theme	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	bookmark	get	gap	R4x	unreached
-docx	bookmark	find	gap	R4x	unreached
-docx	bookmark	query	gap	R4x	unreached
-docx	bookmark	view	gap	R4x	unreached
-docx	bookmark	set	gap	R4x	unreached
-docx	bookmark	add	gap	R4x	-
-docx	bookmark	remove	gap	R4x	unreached
-docx	bookmark	move	gap	R4x	unreached
-docx	bookmark	swap	gap	R4x	unreached
-docx	bookmark	edit	gap	R4x	-
-docx	bookmark	batch	gap	R4x	-
-docx	bookmark	create	gap	R4x	ok format
-docx	bookmark	save	gap	R4x	ok format
-docx	field	get	gap	R4x	unreached
-docx	field	find	gap	R4x	unreached
-docx	field	query	gap	R4x	unreached
-docx	field	view	gap	R4x	unreached
-docx	field	set	gap	R4x	unreached
-docx	field	add	gap	R4x	-
-docx	field	remove	gap	R4x	unreached
-docx	field	move	gap	R4x	unreached
-docx	field	swap	gap	R4x	unreached
-docx	field	edit	gap	R4x	-
-docx	field	batch	gap	R4x	-
-docx	field	create	gap	R4x	ok format
-docx	field	save	gap	R4x	ok format
+docx	bookmark	get	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
+docx	bookmark	find	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
+docx	bookmark	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx
+docx	bookmark	view	supported		ok 6 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
+docx	bookmark	set	n/a	set not offered for this element	-
+docx	bookmark	add	n/a	add not offered for this element	-
+docx	bookmark	remove	n/a	remove not offered for this element	-
+docx	bookmark	move	format-verb		refused unsupported_capability
+docx	bookmark	swap	format-verb		refused unsupported_capability
+docx	bookmark	edit	n/a	edit not offered for this element	-
+docx	bookmark	batch	n/a	batch not offered for this element	-
+docx	bookmark	create	supported		ok format
+docx	bookmark	save	supported		ok format
+docx	field	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
+docx	field	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
+docx	field	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx
+docx	field	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
+docx	field	set	n/a	set not offered for this element	-
+docx	field	add	n/a	add not offered for this element	-
+docx	field	remove	n/a	remove not offered for this element	-
+docx	field	move	format-verb		unreached
+docx	field	swap	format-verb		unreached
+docx	field	edit	n/a	edit not offered for this element	-
+docx	field	batch	n/a	batch not offered for this element	-
+docx	field	create	supported		ok format
+docx	field	save	supported		ok format
 docx	formfield	get	gap	R4x	unreached
 docx	formfield	find	gap	R4x	unreached
 docx	formfield	query	gap	R4x	unreached
@@ -428,19 +428,19 @@ docx	ole	edit	gap	R4x	-
 docx	ole	batch	gap	R4x	-
 docx	ole	create	gap	R4x	ok format
 docx	ole	save	gap	R4x	ok format
-docx	toc	get	gap	R4x	unreached
-docx	toc	find	gap	R4x	unreached
-docx	toc	query	gap	R4x	unreached
-docx	toc	view	gap	R4x	unreached
-docx	toc	set	gap	R4x	unreached
-docx	toc	add	gap	R4x	-
-docx	toc	remove	gap	R4x	unreached
-docx	toc	move	gap	R4x	unreached
-docx	toc	swap	gap	R4x	unreached
-docx	toc	edit	gap	R4x	-
-docx	toc	batch	gap	R4x	-
-docx	toc	create	gap	R4x	ok format
-docx	toc	save	gap	R4x	ok format
+docx	toc	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
+docx	toc	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
+docx	toc	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx
+docx	toc	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
+docx	toc	set	n/a	set not offered for this element	-
+docx	toc	add	n/a	add not offered for this element	-
+docx	toc	remove	n/a	remove not offered for this element	-
+docx	toc	move	format-verb		unreached
+docx	toc	swap	format-verb		unreached
+docx	toc	edit	n/a	edit not offered for this element	-
+docx	toc	batch	n/a	batch not offered for this element	-
+docx	toc	create	supported		ok format
+docx	toc	save	supported		ok format
 docx	revision	get	gap	R4x	unreached
 docx	revision	find	gap	R4x	unreached
 docx	revision	query	gap	R4x	unreached
@@ -454,32 +454,32 @@ docx	revision	edit	gap	R4x	-
 docx	revision	batch	gap	R4x	-
 docx	revision	create	gap	R4x	ok format
 docx	revision	save	gap	R4x	ok format
-docx	watermark	get	gap	R4x	unreached
-docx	watermark	find	gap	R4x	unreached
-docx	watermark	query	gap	R4x	unreached
-docx	watermark	view	gap	R4x	unreached
-docx	watermark	set	gap	R4x	unreached
-docx	watermark	add	gap	R4x	-
-docx	watermark	remove	gap	R4x	unreached
-docx	watermark	move	gap	R4x	unreached
-docx	watermark	swap	gap	R4x	unreached
-docx	watermark	edit	gap	R4x	-
-docx	watermark	batch	gap	R4x	-
-docx	watermark	create	gap	R4x	ok format
-docx	watermark	save	gap	R4x	ok format
-docx	textbox	get	gap	R4x	unreached
-docx	textbox	find	gap	R4x	unreached
-docx	textbox	query	gap	R4x	unreached
-docx	textbox	view	gap	R4x	unreached
-docx	textbox	set	gap	R4x	unreached
-docx	textbox	add	gap	R4x	-
-docx	textbox	remove	gap	R4x	unreached
-docx	textbox	move	gap	R4x	unreached
-docx	textbox	swap	gap	R4x	unreached
-docx	textbox	edit	gap	R4x	-
-docx	textbox	batch	gap	R4x	-
-docx	textbox	create	gap	R4x	ok format
-docx	textbox	save	gap	R4x	ok format
+docx	watermark	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx` /watermark
+docx	watermark	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx` /watermark
+docx	watermark	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx
+docx	watermark	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx` /watermark
+docx	watermark	set	n/a	set not offered for this element	-
+docx	watermark	add	n/a	add not offered for this element	-
+docx	watermark	remove	n/a	remove not offered for this element	-
+docx	watermark	move	format-verb		unreached
+docx	watermark	swap	format-verb		unreached
+docx	watermark	edit	n/a	edit not offered for this element	-
+docx	watermark	batch	n/a	batch not offered for this element	-
+docx	watermark	create	supported		ok format
+docx	watermark	save	supported		ok format
+docx	textbox	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx` /body/textbox[1]
+docx	textbox	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx` /body/textbox[1]
+docx	textbox	query	supported		ok matches in libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx
+docx	textbox	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx` /body/textbox[1]
+docx	textbox	set	n/a	set not offered for this element	-
+docx	textbox	add	n/a	add not offered for this element	-
+docx	textbox	remove	n/a	remove not offered for this element	-
+docx	textbox	move	format-verb		unreached
+docx	textbox	swap	format-verb		unreached
+docx	textbox	edit	n/a	edit not offered for this element	-
+docx	textbox	batch	n/a	batch not offered for this element	-
+docx	textbox	create	supported		ok format
+docx	textbox	save	supported		ok format
 docx	shape	get	gap	R4x	unreached
 docx	shape	find	gap	R4x	unreached
 docx	shape	query	gap	R4x	unreached
@@ -493,32 +493,32 @@ docx	shape	edit	gap	R4x	-
 docx	shape	batch	gap	R4x	-
 docx	shape	create	gap	R4x	ok format
 docx	shape	save	gap	R4x	ok format
-docx	break	get	gap	R4x	unreached
-docx	break	find	gap	R4x	unreached
-docx	break	query	gap	R4x	unreached
-docx	break	view	gap	R4x	unreached
-docx	break	set	gap	R4x	unreached
-docx	break	add	gap	R4x	-
-docx	break	remove	gap	R4x	unreached
-docx	break	move	gap	R4x	unreached
-docx	break	swap	gap	R4x	unreached
-docx	break	edit	gap	R4x	-
-docx	break	batch	gap	R4x	-
-docx	break	create	gap	R4x	ok format
-docx	break	save	gap	R4x	ok format
-docx	tab	get	gap	R4x	unreached
-docx	tab	find	gap	R4x	unreached
-docx	tab	query	gap	R4x	unreached
-docx	tab	view	gap	R4x	unreached
-docx	tab	set	gap	R4x	unreached
-docx	tab	add	gap	R4x	-
-docx	tab	remove	gap	R4x	unreached
-docx	tab	move	gap	R4x	unreached
-docx	tab	swap	gap	R4x	unreached
-docx	tab	edit	gap	R4x	-
-docx	tab	batch	gap	R4x	-
-docx	tab	create	gap	R4x	ok format
-docx	tab	save	gap	R4x	ok format
+docx	break	get	supported		ok 2 instances, first `seed + add paragraph + add break` /body/p[1]/break[1]
+docx	break	find	supported		ok 2 instances, first `seed + add paragraph + add break` /body/p[1]/break[1]
+docx	break	query	supported		ok matches in seed + add paragraph + add break
+docx	break	view	supported		ok 2 instances, first `seed + add paragraph + add break` /body/p[1]/break[1]
+docx	break	set	n/a	set not offered for this element	-
+docx	break	add	supported		ok /body/p[1]/break[1] on `seed + add paragraph` under /body/p[1] {}
+docx	break	remove	supported		ok `seed + add paragraph + add break` /body/p[1]/break[1]
+docx	break	move	format-verb		refused unsupported_capability
+docx	break	swap	format-verb		refused unsupported_capability
+docx	break	edit	n/a	edit not offered for this element	-
+docx	break	batch	n/a	batch not offered for this element	-
+docx	break	create	supported		ok format
+docx	break	save	supported		ok format
+docx	tab	get	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /body/sdt[1]/p[2]/tab[1]
+docx	tab	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /body/sdt[1]/p[2]/tab[1]
+docx	tab	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx
+docx	tab	view	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /body/sdt[1]/p[2]/tab[1]
+docx	tab	set	supported		ok `seed + add paragraph + add tab` /body/p[1]/tab[1] {"pos":"1"}
+docx	tab	add	supported		ok /body/p[1]/tab[1] on `seed + add paragraph` under /body/p[1] {}
+docx	tab	remove	supported		ok `seed + add paragraph + add tab` /body/p[1]/tab[1]
+docx	tab	move	format-verb		refused unsupported_capability
+docx	tab	swap	format-verb		refused unsupported_capability
+docx	tab	edit	supported		ok tx.set
+docx	tab	batch	supported		ok set item
+docx	tab	create	supported		ok format
+docx	tab	save	supported		ok format
 docx	smartart	get	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
 docx	smartart	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
 docx	smartart	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx

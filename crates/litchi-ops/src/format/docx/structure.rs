@@ -150,6 +150,10 @@ impl Docx {
             ) => {
                 return self.add_nested(editor, &parent, kind, &node);
             },
+            // Styles, numbering, headers, footers and notes (record 0319).
+            (NewKind::Part(part), _) => return self.add_part(editor, &parent, part, &node),
+            // Tab stops and breaks (record 0319).
+            (NewKind::Mark(mark), _) => return self.add_mark(editor, &parent, mark, &node),
         };
         self.owner().check_source()?;
         let mut edit = WorkEdit::from(editor)?;
@@ -338,6 +342,8 @@ pub(super) enum NewKind {
     Picture,
     Chart,
     SmartArt,
+    Part(super::parts::write::NewPart),
+    Mark(super::marks::write::NewMark),
 }
 
 enum PlannedNode {
@@ -383,6 +389,10 @@ fn new_kind(name: &str) -> Result<NewKind> {
         Ok(NewKind::Chart)
     } else if name.eq_ignore_ascii_case("smartart") {
         Ok(NewKind::SmartArt)
+    } else if let Some(part) = super::parts::write::NewPart::of(name) {
+        Ok(NewKind::Part(part))
+    } else if let Some(mark) = super::marks::write::NewMark::of(name) {
+        Ok(NewKind::Mark(mark))
     } else {
         Err(Error::new(
             Code::UnsupportedElement,

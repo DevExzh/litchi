@@ -47,17 +47,23 @@ impl Docx {
             let nodes = self.resolve_targets(target)?;
             // Charts have their own setter outside the formatting surface
             // (record 0283): the ordinary set path writes them (0289).
-            if nodes
-                .iter()
-                .any(|node| node.element_kind() == crate::format::docx::Kind::Chart)
-            {
+            // So do the part elements (record 0319).
+            if nodes.iter().any(|node| {
+                node.element_kind() == crate::format::docx::Kind::Chart
+                    || super::super::parts::is_part_kind(node.element_kind())
+                    || super::super::marks::is_mark_kind(node.element_kind())
+            }) {
                 return Ok(None);
             }
             let mut targets = admit_targets(&nodes)?;
             let target = targets
                 .pop()
                 .ok_or_else(|| Error::new(Code::InternalError, "direct target is missing"))?;
-            plan(target, props)
+            let mut planned = plan(target, props)?;
+            if let Some(planned) = planned.as_mut() {
+                self.resolve_style_names(&mut planned.assignments)?;
+            }
+            Ok(planned)
         })();
         self.owner().finish(result)
     }
