@@ -115,8 +115,17 @@ impl Pptx {
         let parent_path = crate::node::Project::path(&resolved).to_string();
         drop(resolved);
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        let (rows, _) = super::text::table_shape(&table.handle)?;
-        let columns = super::columns::widths(&table)?.len();
+        let rows = table.table_grid()?.map_or(0, |grid| grid.len());
+        // The grid is read only when a key checks or seeds columns.
+        let columns = if node.props().iter().any(|(key, _)| {
+            key.as_str()
+                .get(..1)
+                .is_some_and(|first| first.eq_ignore_ascii_case("c"))
+        }) {
+            super::columns::widths(&table)?.len()
+        } else {
+            0
+        };
         let position = match node.placement() {
             None | Some(Placement::End) => rows,
             Some(Placement::Start) => 0,

@@ -136,6 +136,7 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
+            admitted: OnceLock::new(),
         }))
         .with_origin(self.origin())
     }

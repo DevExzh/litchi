@@ -63,7 +63,9 @@ pub use text_format::{
     CellFill, CellMargin, MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill,
     TextBody, TextEdit, TextProperties, TextTarget,
 };
-pub(crate) use text_format::{TextChange, stage_text_properties, stage_text_structure};
+pub(crate) use text_format::{
+    TextChange, stage_text_properties, stage_text_property_chunks, stage_text_structure,
+};
 pub use transaction::{Commit, Diagnostics, Edit, MediaFile, SmartArtParts};
 
 pub(crate) use chunks::{

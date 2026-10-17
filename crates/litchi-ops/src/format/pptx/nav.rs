@@ -627,7 +627,7 @@ impl<'f> Nav<'f> {
     }
 
     fn row(self, table: &TreeItem, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
-        let (rows, _) = text::table_shape(&table.handle)?;
+        let rows = table.table_grid()?.map_or(0, |grid| grid.len());
         Ok(match pick_index(rows, select) {
             Pick::Index(row) => Lookup::Found(Node::new(
                 self.file,
@@ -643,7 +643,12 @@ impl<'f> Nav<'f> {
     }
 
     fn cell(self, row: &TableItem, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
-        let cells = text::row_cells(&row.table.handle, row.row)?;
+        let cells = match row.table.table_grid()? {
+            Some(grid) => grid
+                .get(row.row as usize)
+                .map_or(0, |cells| *cells as usize),
+            None => text::row_cells(&row.table.handle, row.row)?,
+        };
         Ok(match pick_index(cells, select) {
             Pick::Index(column) => Lookup::Found(Node::new(
                 self.file,

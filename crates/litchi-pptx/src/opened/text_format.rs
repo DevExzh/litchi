@@ -14,7 +14,6 @@
 //! children follow the schema order of `a:rPr`, `a:pPr`, `a:tcPr` and
 //! `p:spPr` and use the `DrawingML` prefix of the element that receives them.
 
-use std::borrow::Cow;
 use std::ops::Range;
 
 use litchi_core::Position;
@@ -404,6 +403,75 @@ pub(crate) fn stage_text_properties(
             limit: max_text_bytes,
         });
     }
+    stage_admitted_text_edits(xml, edits, max_output_bytes)
+}
+
+/// Stage several already bounded batches of text formatting edits, applied
+/// in order, in one scene read and one read-back (record 0333). Each chunk
+/// keeps the limits of [`stage_text_properties`]; the chunk count is bounded
+/// by the scene's shape limit and the total by 100,000 edits.
+pub(crate) fn stage_text_property_chunks(
+    xml: &[u8],
+    chunks: &[&[TextEdit<'_>]],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
+        return Err(Error::Limit {
+            resource: "opened-presentation text property chunks",
+            limit: crate::shape::Limits::DEFAULT.shapes(),
+        });
+    }
+    let mut total = 0usize;
+    for chunk in chunks {
+        if chunk.len() > super::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
+            return Err(Error::Limit {
+                resource: "opened-presentation text property edits",
+                limit: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+            });
+        }
+        let mut text_bytes = 0usize;
+        for edit in *chunk {
+            validate(edit)?;
+            text_bytes = text_bytes.saturating_add(edit.properties.text.map_or(0, str::len));
+        }
+        if text_bytes > max_text_bytes {
+            return Err(Error::Limit {
+                resource: "opened-presentation aggregate text property bytes",
+                limit: max_text_bytes,
+            });
+        }
+        total = total.saturating_add(chunk.len());
+    }
+    if total > 100_000 {
+        return Err(Error::Limit {
+            resource: "opened-presentation text property edits",
+            limit: 100_000,
+        });
+    }
+    if total == 0 {
+        return Ok((None, 0));
+    }
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(total)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation text property chunks",
+            source,
+        })?;
+    for chunk in chunks {
+        edits.extend_from_slice(chunk);
+    }
+    stage_admitted_text_edits(xml, &edits, max_output_bytes)
+}
+
+/// The staging of admitted text formatting edits: one scene read, the
+/// edited elements rewritten in order, one splice and one read-back.
+fn stage_admitted_text_edits(
+    xml: &[u8],
+    edits: &[TextEdit<'_>],
+    max_output_bytes: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
     let original = crate::shape::Scene::read(xml)?;
     if original.is_rewritten() {
         return Err(Error::UnsafeEdit {
@@ -411,99 +479,127 @@ pub(crate) fn stage_text_properties(
             reason: "text property edits do not support markup-compatibility branch selection",
         });
     }
-    let mut current: Cow<'_, [u8]> = Cow::Borrowed(xml);
+    // Every target is a leaf element of the original scene (a text shape or
+    // a table frame), so their spans are disjoint: each edit rewrites its
+    // shape's current element, and the rewritten elements are spliced into
+    // the part once (record 0333). This keeps a batch proportional to the
+    // part plus the edited elements, rather than reading the scene again
+    // for every edit.
+    let mut elements: Vec<(usize, Range<usize>, Vec<u8>)> = Vec::new();
+    let mut slots: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
     let mut changed = 0;
     for edit in edits {
-        let next = {
-            let scene = crate::shape::Scene::read(&current)?;
-            let index = shape_position(edit.target).get();
-            let shape = scene.at(index)?;
-            let span = shape.common().span()?.range(current.len())?;
-            let is_table = matches!(shape, crate::shape::Shape::Table(_));
-            let element = &current[span.clone()];
-            let cell = match edit.target {
-                TextTarget::Cell { row, column, .. }
-                | TextTarget::CellParagraph { row, column, .. }
-                | TextTarget::CellRun { row, column, .. }
-                | TextTarget::CellRunSpan { row, column, .. } => Some((row.get(), column.get())),
-                _ => None,
-            };
-            let replacement = match cell {
-                Some((row, column)) => {
-                    if !is_table {
-                        return Err(Error::UnsafeEdit {
-                            operation: "set_text_properties",
-                            reason: "a table cell edit requires a table graphic frame",
-                        });
-                    }
-                    rewrite_cell_frame(element, row, column, |cell| match edit.target {
-                        TextTarget::CellParagraph { paragraph, .. } => {
-                            rewrite_cell_paragraph(cell, paragraph.get(), &edit.properties)
-                        },
-                        TextTarget::CellRun { paragraph, run, .. } => rewrite_cell_run(
-                            cell,
-                            paragraph.get(),
-                            run.get(),
-                            None,
-                            &edit.properties,
-                        ),
-                        TextTarget::CellRunSpan {
-                            paragraph,
-                            run,
-                            start,
-                            end,
-                            ..
-                        } => rewrite_cell_run(
-                            cell,
-                            paragraph.get(),
-                            run.get(),
-                            Some(start..end),
-                            &edit.properties,
-                        ),
-                        _ => rewrite_cell(cell, &edit.properties),
-                    })?
-                },
-                None => {
-                    if is_table || edit.properties.has_cell_properties() {
-                        return Err(Error::UnsafeEdit {
-                            operation: "set_text_properties",
-                            reason: "text formatting requires a shape text body; fill applies to table cells",
-                        });
-                    }
-                    rewrite_shape(element, edit.target, &edit.properties)?
-                },
-            };
-            if replacement.as_slice() == element {
-                None
-            } else {
-                let length = current.len() - span.len() + replacement.len();
-                if length > max_output_bytes {
-                    return Err(Error::Limit {
-                        resource: "opened-presentation text property output bytes",
-                        limit: max_output_bytes,
-                    });
-                }
-                let mut output = Vec::new();
-                output
-                    .try_reserve_exact(length)
+        let index = shape_position(edit.target).get();
+        let shape = original.at(index)?;
+        let slot = match slots.get(&index) {
+            Some(slot) => *slot,
+            None => {
+                let span = shape.common().span()?.range(xml.len())?;
+                elements
+                    .try_reserve(1)
                     .map_err(|source| Error::Allocation {
-                        resource: "opened-presentation text property output",
+                        resource: "opened-presentation text property elements",
                         source,
                     })?;
-                output.extend_from_slice(&current[..span.start]);
-                output.extend_from_slice(&replacement);
-                output.extend_from_slice(&current[span.end..]);
-                Some(output)
-            }
+                slots.insert(index, elements.len());
+                elements.push((index, span.clone(), xml[span].to_vec()));
+                elements.len() - 1
+            },
         };
-        if let Some(next) = next {
-            current = Cow::Owned(next);
+        let is_table = matches!(shape, crate::shape::Shape::Table(_));
+        let element = &elements[slot].2;
+        let cell = match edit.target {
+            TextTarget::Cell { row, column, .. }
+            | TextTarget::CellParagraph { row, column, .. }
+            | TextTarget::CellRun { row, column, .. }
+            | TextTarget::CellRunSpan { row, column, .. } => Some((row.get(), column.get())),
+            _ => None,
+        };
+        let replacement = match cell {
+            Some((row, column)) => {
+                if !is_table {
+                    return Err(Error::UnsafeEdit {
+                        operation: "set_text_properties",
+                        reason: "a table cell edit requires a table graphic frame",
+                    });
+                }
+                rewrite_cell_frame(element, row, column, |cell| match edit.target {
+                    TextTarget::CellParagraph { paragraph, .. } => {
+                        rewrite_cell_paragraph(cell, paragraph.get(), &edit.properties)
+                    },
+                    TextTarget::CellRun { paragraph, run, .. } => {
+                        rewrite_cell_run(cell, paragraph.get(), run.get(), None, &edit.properties)
+                    },
+                    TextTarget::CellRunSpan {
+                        paragraph,
+                        run,
+                        start,
+                        end,
+                        ..
+                    } => rewrite_cell_run(
+                        cell,
+                        paragraph.get(),
+                        run.get(),
+                        Some(start..end),
+                        &edit.properties,
+                    ),
+                    _ => rewrite_cell(cell, &edit.properties),
+                })?
+            },
+            None => {
+                if is_table || edit.properties.has_cell_properties() {
+                    return Err(Error::UnsafeEdit {
+                        operation: "set_text_properties",
+                        reason: "text formatting requires a shape text body; fill applies to table cells",
+                    });
+                }
+                rewrite_shape(element, edit.target, &edit.properties)?
+            },
+        };
+        if replacement != *element {
+            elements[slot].2 = replacement;
             changed += 1;
         }
     }
-    let Cow::Owned(candidate) = current else {
+    if changed == 0 {
         return Ok((None, 0));
-    };
+    }
+    elements.sort_unstable_by_key(|(_, span, _)| span.start);
+    if elements
+        .windows(2)
+        .any(|pair| pair[0].1.end > pair[1].1.start)
+    {
+        return Err(Error::UnsafeEdit {
+            operation: "set_text_properties",
+            reason: "text property edits address nested shapes",
+        });
+    }
+    let removed: usize = elements.iter().map(|(_, span, _)| span.len()).sum();
+    let added: usize = elements.iter().map(|(_, _, bytes)| bytes.len()).sum();
+    let length = (xml.len() - removed).saturating_add(added);
+    if length > max_output_bytes {
+        return Err(Error::Limit {
+            resource: "opened-presentation text property output bytes",
+            limit: max_output_bytes,
+        });
+    }
+    let mut candidate = Vec::new();
+    candidate
+        .try_reserve_exact(length)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation text property output",
+            source,
+        })?;
+    let mut cursor = 0;
+    for (_, span, bytes) in &elements {
+        candidate.extend_from_slice(&xml[cursor..span.start]);
+        candidate.extend_from_slice(bytes);
+        cursor = span.end;
+    }
+    candidate.extend_from_slice(&xml[cursor..]);
+    if candidate == xml {
+        return Ok((None, 0));
+    }
     let published = crate::shape::Scene::read(&candidate)?;
     if published.is_rewritten() || published.len() != original.len() {
         return Err(Error::Invalid(

@@ -206,6 +206,72 @@ impl<'a> Table<'a> {
             .collect()
     }
 
+    /// The number of cells of every row, in one pass over the table
+    /// (record 0333): the counts [`Row::cell_count`] gives, without
+    /// resolving each row's namespace scope again.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed table XML or more rows than the
+    /// reader admits.
+    pub fn row_cell_counts(self) -> Result<Vec<usize>> {
+        let Some(context) = self.context else {
+            return Ok(self.rows()?.into_iter().map(Row::cell_count).collect());
+        };
+        let table = self.xml()?;
+        if table.len() > MAX_XML_BYTES {
+            return Err(limit("table XML bytes", MAX_XML_BYTES));
+        }
+        let mut reader = NsReader::from_reader(table);
+        *reader.resolver_mut() = context.resolver()?;
+        // DrawingML local names of the open elements.
+        let mut stack: Vec<Option<Vec<u8>>> = Vec::new();
+        let mut counts = Vec::new();
+        let drawing = |namespace: &ResolveResult<'_>| {
+            matches!(namespace, ResolveResult::Bound(Namespace(value))
+                if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE)
+        };
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let empty = matches!(event, Event::Empty(_));
+            match event {
+                Event::Start(element) | Event::Empty(element) => {
+                    let local = drawing(&namespace).then(|| element.local_name().as_ref().to_vec());
+                    let parent = stack.last().and_then(Option::as_deref);
+                    let grandparent = stack
+                        .len()
+                        .checked_sub(2)
+                        .and_then(|index| stack[index].as_deref());
+                    match (local.as_deref(), parent, grandparent) {
+                        (Some(b"tr"), Some(b"tbl"), _) => {
+                            if counts.len() >= MAX_ROWS {
+                                return Err(limit("table row count", MAX_ROWS));
+                            }
+                            counts.push(0);
+                        },
+                        (Some(b"tc"), Some(b"tr"), Some(b"tbl")) => {
+                            if let Some(count) = counts.last_mut() {
+                                *count += 1;
+                            }
+                        },
+                        _ => {},
+                    }
+                    if !empty {
+                        stack.push(local);
+                    }
+                },
+                Event::End(_) => {
+                    stack.pop();
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        Ok(counts)
+    }
+
     /// Get one cell by zero-based row and column position.
     ///
     /// # Errors

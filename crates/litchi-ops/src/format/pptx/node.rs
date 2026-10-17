@@ -356,6 +356,9 @@ pub(super) struct TreeItem {
 enum FramePart {
     Chart(Arc<Summary>),
     Diagram(Arc<Outline>),
+    /// A table frame's cell count per row (record 0333), so resolving a
+    /// row and then a cell reads the table once.
+    Table(Arc<Vec<u32>>),
 }
 
 impl TreeItem {
@@ -412,6 +415,29 @@ impl TreeItem {
             ordinal,
             body: OnceLock::new(),
             frame: OnceLock::new(),
+        }
+    }
+
+    /// A table frame's cell count per row, read on first use; `None` for
+    /// another element.
+    pub(super) fn table_grid(&self) -> Result<Option<Arc<Vec<u32>>>> {
+        if self.kind != Kind::Table {
+            return Ok(None);
+        }
+        let read = self.frame.get_or_init(|| {
+            let table = self.handle.table().map_err(Error::from)?;
+            let counts = table.row_cell_counts().map_err(Error::from)?;
+            Ok(Some(FramePart::Table(Arc::new(
+                counts
+                    .into_iter()
+                    .map(|count| u32::try_from(count).unwrap_or(u32::MAX))
+                    .collect(),
+            ))))
+        });
+        match read {
+            Ok(Some(FramePart::Table(grid))) => Ok(Some(Arc::clone(grid))),
+            Ok(_) => Ok(None),
+            Err(error) => Err(error.clone()),
         }
     }
 

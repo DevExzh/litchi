@@ -3274,6 +3274,38 @@ impl SourceBackedSlideEdit {
         Ok(1)
     }
 
+    /// Apply several bounded batches of rich text edits to this exact source
+    /// slide in one pass (record 0333); see
+    /// [`crate::opened::Edit::set_text_property_chunks`].
+    pub fn set_text_property_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::TextEdit<'_>]],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        self.refuse_enclosed("set_text_properties")?;
+        if chunks.iter().all(|chunk| chunk.is_empty()) {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "set_text_properties",
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let (xml, changed) = crate::opened::stage_text_property_chunks(
+            self.working.as_bytes(),
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            self.working = SourcePayload::Edited(Arc::new(xml));
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
     /// Add one plain DrawingML text box to this exact source slide.
     ///
     /// The operation is staged against the retained slide bytes and then

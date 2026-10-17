@@ -1683,6 +1683,21 @@ impl Edit {
         .map(|_| ())
     }
 
+    /// Apply several bounded batches of rich text edits to one effective
+    /// slide in one pass, with the semantics of
+    /// [`crate::opened::Edit::set_text_property_chunks`] (record 0333).
+    pub fn set_text_property_chunks(
+        &mut self,
+        slide: impl Into<Position>,
+        chunks: &[&[crate::opened::TextEdit<'_>]],
+    ) -> Result<usize> {
+        self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| edit.set_text_property_chunks(chunks),
+        )
+    }
+
     /// Set (`Some`) or clear (`None`) one effective slide's direct
     /// transition, with the semantics of
     /// [`super::SourceBackedSlideEdit::set_transition`] and

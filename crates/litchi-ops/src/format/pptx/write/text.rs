@@ -105,6 +105,81 @@ impl TextValues {
             && self.geometry.is_none()
     }
 
+    /// Whether a coalesced formatting run can stage these assignments and
+    /// tell their change from the reader's model (record 0333): run and
+    /// paragraph character formatting, alignment and run text, but no
+    /// fills, cell properties or geometry.
+    pub(in crate::format::pptx) fn coalescible(&self) -> bool {
+        !self.is_empty()
+            && self.fill.is_none()
+            && self.valign.is_none()
+            && self.margins.iter().all(Option::is_none)
+            && self.shape_fill.is_none()
+            && self.geometry.is_none()
+    }
+
+    /// Whether the assignments change a run, compared with the local
+    /// properties the reader gives.
+    pub(in crate::format::pptx) fn run_changed(
+        &self,
+        run: &litchi_drawingml::text::body::Run,
+    ) -> bool {
+        let properties = &run.properties;
+        fn face(font: &Option<litchi_drawingml::text::body::Font>) -> Option<&str> {
+            font.as_ref().map(|font| font.typeface.as_str())
+        }
+        let color = properties
+            .fill
+            .as_ref()
+            .map(|fill| match fill.solid_color() {
+                Some(litchi_drawingml::color::Value::Rgb(rgb)) => {
+                    Some(Rgb([rgb.red(), rgb.green(), rgb.blue()]))
+                },
+                _ => None,
+            });
+        self.text.as_deref().is_some_and(|text| text != run.text)
+            || self.bold.is_some_and(|value| value != properties.bold)
+            || self.italic.is_some_and(|value| value != properties.italic)
+            || self
+                .size
+                .is_some_and(|value| value != properties.size.map(|size| size.get()))
+            || self.color.is_some_and(|value| match (value, color) {
+                (None, None) => false,
+                (Some(wanted), Some(Some(current))) => wanted != current,
+                _ => true,
+            })
+            || self
+                .underline
+                .is_some_and(|value| value != properties.underline)
+            || self.strike.is_some_and(|value| value != properties.strike)
+            || self
+                .latin
+                .as_ref()
+                .is_some_and(|value| value.as_deref() != face(&properties.latin))
+            || self.font.as_ref().is_some_and(|value| {
+                let value = value.as_deref();
+                value != face(&properties.latin)
+                    || value != face(&properties.east_asian)
+                    || value != face(&properties.complex_script)
+            })
+    }
+
+    /// Whether the assignments change a paragraph: its alignment, or any of
+    /// its runs. Paragraph text is not coalesced.
+    pub(in crate::format::pptx) fn paragraph_changed(
+        &self,
+        paragraph: &litchi_drawingml::text::body::Paragraph,
+    ) -> bool {
+        let runs = Self {
+            text: None,
+            align: None,
+            ..self.clone()
+        };
+        self.align
+            .is_some_and(|value| value != paragraph.properties.alignment)
+            || (!runs.is_empty() && paragraph.runs.iter().any(|run| runs.run_changed(run)))
+    }
+
     /// The assigned text, if any.
     pub(in crate::format::pptx) fn text(&self) -> Option<&str> {
         self.text.as_deref()
@@ -780,9 +855,8 @@ impl Pptx {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for (slide, edits) in groups {
-                    for chunk in edits.chunks(capacity) {
-                        operations += edit.set_text_properties(Position::new(*slide), chunk)?;
-                    }
+                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(capacity).collect();
+                    operations += edit.set_text_property_chunks(Position::new(*slide), &chunks)?;
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -791,9 +865,8 @@ impl Pptx {
             Editable::Eager(package) => {
                 let mut edit = package.edit()?;
                 for (slide, edits) in groups {
-                    for chunk in edits.chunks(capacity) {
-                        operations += edit.set_text_properties(*slide, chunk)?;
-                    }
+                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(capacity).collect();
+                    operations += edit.set_text_property_chunks(*slide, &chunks)?;
                 }
                 for (slide, edits) in notes {
                     for chunk in edits.chunks(capacity) {

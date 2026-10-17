@@ -626,3 +626,62 @@ fn underline_and_strike_round_trip() -> Result<()> {
     assert_eq!(slide_xml(&cleared)?, slide_xml(&package)?);
     Ok(())
 }
+
+#[test]
+fn row_cell_counts_match_the_row_reader() -> Result<()> {
+    let package = deck()?;
+    let xml = slide_xml(&package)?;
+    let scene = crate::shape::owned::Scene::read(xml)?;
+    let handle = scene
+        .shape(1_usize)
+        .map_err(|_| Error::Invalid("selector".into()))?
+        .expect("table frame");
+    let table = handle.table()?;
+    let counts = table.row_cell_counts()?;
+    let rows: Vec<usize> = table
+        .rows()?
+        .into_iter()
+        .map(|row| row.cell_count())
+        .collect();
+    assert_eq!(counts, rows);
+    assert_eq!(counts, [2, 2]);
+    Ok(())
+}
+
+#[test]
+fn chunked_text_edits_equal_one_call_per_chunk() -> Result<()> {
+    let package = deck()?;
+    let bold = TextProperties::default().with_bold(Some(true));
+    let italic = TextProperties::default().with_italic(Some(true));
+    let first = [TextEdit::new(run(0, 0), bold)];
+    let second = [
+        TextEdit::new(run(0, 0), italic),
+        TextEdit::new(
+            TextTarget::Cell {
+                shape: at(1),
+                row: at(0),
+                column: at(0),
+            },
+            bold,
+        ),
+    ];
+    let mut one = package.edit()?;
+    one.set_text_properties(0usize, &first)?;
+    one.set_text_properties(0usize, &second)?;
+    let expected = slide_xml(&one.commit()?.into_package())?;
+    let mut chunked = package.edit()?;
+    assert_eq!(
+        chunked.set_text_property_chunks(0usize, &[&first[..], &second[..]])?,
+        3
+    );
+    assert_eq!(slide_xml(&chunked.commit()?.into_package())?, expected);
+    let mut empty = package.edit()?;
+    assert_eq!(empty.set_text_property_chunks(0usize, &[])?, 0);
+    let too_many = vec![TextEdit::new(run(0, 0), bold); 257];
+    assert!(
+        empty
+            .set_text_property_chunks(0usize, &[&too_many])
+            .is_err()
+    );
+    Ok(())
+}

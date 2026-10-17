@@ -257,6 +257,11 @@ struct PptxState {
     revision: Option<pptx::source::Package>,
     /// Explicit signature removal never replaces the original source cache.
     unsigned_promotion: OnceLock<Mutex<Option<Arc<pptx::Package>>>>,
+    /// Set once the eager package passed the native edit admission
+    /// (`Package::edit`), which depends on the immutable package only: a
+    /// transaction's admission check then skips a second capture of the
+    /// package (record 0333).
+    admitted: OnceLock<()>,
 }
 
 struct EagerSlide {
@@ -418,6 +423,7 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
+            admitted: OnceLock::new(),
         }))
         .with_origin(self.origin())
     }
@@ -460,6 +466,7 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
+            admitted: OnceLock::new(),
         }))
     }
 
@@ -502,6 +509,7 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: Some(revision),
             unsigned_promotion: OnceLock::new(),
+            admitted: OnceLock::new(),
         }))
         .with_signature(self.signature())
         .with_origin(self.origin());
@@ -897,9 +905,13 @@ impl Pptx {
     /// are retryable; cached results still enforce freshness and execution.
     pub(crate) fn editable(&self) -> Result<Editable> {
         let owner = self.editable_owner()?;
-        if let Editable::Eager(package) = &owner {
+        if let Editable::Eager(package) = &owner
+            && self.0.admitted.get().is_none()
+            && self.signature() != Signature::RemovalAuthorized
+        {
             // Admission-only callers still require the native strict checks.
             drop(package.edit()?);
+            let _ = self.0.admitted.set(());
         }
         Ok(owner)
     }
