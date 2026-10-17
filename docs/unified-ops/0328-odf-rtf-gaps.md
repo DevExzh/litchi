@@ -1,7 +1,8 @@
 # 0328 — ODT, ODP and RTF element gaps against the DOCX and PPTX vocabularies
 
 - Status: implemented on `uo2/odf-rtf-gaps`, cut from `feat/unified-ops-api`
-  at `fc274041da`. Trunk was merged at `84732bed28` (records 0325 and 0326).
+  at `fc274041da`. Trunk was merged twice: at `84732bed28` (records 0325
+  and 0326) and at the merge that follows this record (record 0330).
 - Date: 2026-10-17
 - Input: the ODT, ODP and RTF rows of `officecli-capability-delta.md`.
   - ODT and RTF listed numbering, headers, footers, fields, the TOC,
@@ -337,7 +338,13 @@ attribute scan above.
 Each command was run from the worktree with the build environment sourced.
 Every exit status was checked, not a piped tail.
 
-- `cargo fmt --all --check` → 0 (also re-run after the trunk merge).
+- `cargo fmt --all --check` → 0 (also re-run after each trunk merge).
+- After the second trunk merge (record 0330, `d761892de3`), these were
+  re-run and each → 0, with no file changing:
+  - the registry, capabilities and `unsupported_warn` tests;
+  - both golden blesses, the CRUD and fidelity blesses and the delta;
+  - `cargo clippy -p litchi-ops -p litchi --all-targets --all-features`;
+  - every litchi-ops test (`--lib`, then the 150 targets in groups).
 - `cargo clippy -p litchi-odt -p litchi-odp -p litchi-rtf -p litchi-ops -p
   litchi -p litchi-py --all-targets --all-features -- -D warnings` → 0.
 - `cargo clippy -p litchi-ops --no-default-features [--features

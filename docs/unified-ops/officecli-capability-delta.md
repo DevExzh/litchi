@@ -21,15 +21,15 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `9eb31b777528bbbac652faab27251b654d1dea259cd0aa73453e320d9a7be9bb` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `7759f0cd63b8e1ffdc73e6fac6d070adccf1adaceec3bbf3a7c3e198486773b6` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `9c9015925758c2332b68a118d51bfb7a9f153d475af94fb233b723f78ed821f7` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `1b5404fded785036e25222c15438482644b478e39f9e6ba653e2c67e0498c39e` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `4fddfc467504bf3bf407a791b52c03e624c16c6423615d25cd7e6c91322e5dc2` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `2e0f0a530e324122151d0c4966192b0045a219e9083fa40150cf7e8542bc0877` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `0dcca5a64b3b61a1f442e09dd0dbaf2d33e8ed40daf3acdbba92c04dede6b2d9` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `bbcb48b620ebb64871dd628c613438c692d5126b0d7ff1d24da6cf8a157dfe5b` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `5f7fd859d62b6f570a465c859cfc1b26d5218386a4eb6c251a63678a71e446fc` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `2fdded1c92e64c56696c48a388dd03c27c4f6297468640ffa1133bd113bc8529` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `bcfba00773c28a5c08f4a081185dd93e258334c1e625a6e812ac48cac651beac` |
@@ -133,7 +133,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 250 | 38 | 508 | 0 | 242 | 192 |
+| docx | 249 | 39 | 508 | 0 | 242 | 192 |
 | doc | 10 | 29 | 757 | 0 | 27 | 197 |
 | rtf | 15 | 35 | 746 | 0 | 23 | 178 |
 | xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
@@ -1357,7 +1357,7 @@ Property writes:
 | cell | `border.tl2br` | string | asg |  | missing | gap |  |
 | cell | `border.top` | string | -s- |  | write-only | gap |  |
 | cell | `border.tr2bl` | string | asg |  | missing | gap |  |
-| cell | `text` | string | asg | as- | write-only | supported |  |
+| cell | `text` | string | asg | -s- | write-only | partial |  |
 | column | `width` | length | a-- |  | write-only | gap |  |
 | column | `text` | string | a-- |  | write-only | gap |  |
 | row | `height.exact` | length | as- |  | write-only | gap |  |
@@ -6202,6 +6202,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
+| `remove` | `namedrange` | `earlier-name` | only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references | XLSB defined-name index renumbering (record 0330) |
 | `create` | `workbook` | `template` | the XLSB creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSB template creation |
 | `create` | `workbook` | `strict-conformance` | the XLSB creator emits Transitional packages and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `workbook` | `unrepresentable-initial-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | CreateOptions::metadata (OOXML document properties, record 0253) |

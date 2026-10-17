@@ -17,8 +17,8 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 |---|---|---|---|---|---|---|---|---|---|
 | docx | 41 | 302 | 302 | 0 | 0 | 78 | 83 | 8 | 36 |
 | xlsx | 26 | 191 | 191 | 0 | 0 | 78 | 29 | 2 | 20 |
-| pptx | 37 | 262 | 262 | 0 | 0 | 65 | 90 | 2 | 40 |
-| xlsb | 26 | 175 | 175 | 0 | 0 | 78 | 45 | 2 | 18 |
+| pptx | 37 | 279 | 279 | 0 | 0 | 65 | 73 | 2 | 40 |
+| xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
 | ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
@@ -122,7 +122,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## pptx
 
-- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `libreoffice-core/oox/qa/unit/data/import-mce.pptx`, `poi/test-data/slideshow/EmbeddedAudio.pptx`, `poi/test-data/slideshow/EmbeddedVideo.pptx`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `create() + add slide + add video`, `create() + add slide + add audio`, `create() + add slide + add media`, `create() + add slide + add shape + add hyperlink`, `ooxml/pptx/shapes.pptx + add col`, `create() + add slide + add smartart + add node`
+- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `libreoffice-core/oox/qa/unit/data/import-mce.pptx`, `poi/test-data/slideshow/EmbeddedAudio.pptx`, `poi/test-data/slideshow/EmbeddedVideo.pptx`, `create() + add slide`, `create() + add slide + add shape`, `ooxml/pptx/shapes.pptx + add picture`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `ooxml/pptx/shapes.pptx + add comment`, `create() + add slide + add video`, `create() + add slide + add audio`, `create() + add slide + add media`, `create() + add slide + add shape + add hyperlink`, `ooxml/pptx/shapes.pptx + add picture + add col`, `create() + add slide + add smartart + add node`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -131,20 +131,20 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | placeholder | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
-| picture | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
+| picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| tc | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | group | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | connector | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
 | smartart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | ole | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
-| paragraph | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| run | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| paragraph | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| run | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | linebreak | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| notes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| comment | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| comment | ok | ok | ok | ok | ok | ok | n/a | refused | refused | ok | ok | ok | ok |
 | video | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 | audio | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 | media | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
@@ -167,7 +167,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## xlsb
 
-- fixtures: `create()`, `ooxml/xlsb/date.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb`, `poi/test-data/spreadsheet/testVarious.xlsb`, `unified-ops/0294/table.xlsb`, `create() + add sheet`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
+- fixtures: `create()`, `ooxml/xlsb/date.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb`, `libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb`, `poi/test-data/spreadsheet/testVarious.xlsb`, `unified-ops/0294/table.xlsb`, `create() + add sheet`, `create() + add namedrange`, `create() + add comment`, `create() + add dataValidation`, `create() + add conditionalFormatting`, `create() + add autofilter`, `create() + add hyperlink`, `create() + add picture`, `create() + add shape`, `create() + add rowbreak`, `create() + add colbreak`
 - document views on `ooxml/xlsb/date.xlsb`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -179,7 +179,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | column | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| namedrange | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| namedrange | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | series | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |

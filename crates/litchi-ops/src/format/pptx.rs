@@ -113,6 +113,13 @@ pub(crate) const SETTABLE: &[&str] = &[
     // Their click action (record 0325).
     "picture",
     "group",
+    // Text and rich formatting through the native text edits (record
+    // 0252), speaker-notes text, and legacy comments (record 0252 §6).
+    "tc",
+    "paragraph",
+    "run",
+    "notes",
+    "comment",
 ];
 
 /// The non-slide elements `add` creates when the owner admits shape adds.
@@ -126,6 +133,9 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     "video",
     "audio",
     "media",
+    // Pictures (`src`) and legacy comments (record 0252).
+    "picture",
+    "comment",
 ];
 
 /// The non-slide elements `remove` deletes when the owner admits shape
