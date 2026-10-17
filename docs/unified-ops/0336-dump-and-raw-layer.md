@@ -1,9 +1,11 @@
 # 0336 — `dump` and the raw layer: parts, raw, add-part, raw-set, validate (audit WP5)
 
 - Status: implemented on `uo2/dump-raw`, cut from `feat/unified-ops-api` at
-  `0056b9cccd`; trunk merged at `3537339d66` (records 0334, 0335; the
-  capability delta table conflicted and was regenerated, every golden
-  re-blessed to no change).
+  `0056b9cccd`; trunk merged at `3537339d66` (records 0334, 0335) and at
+  `f2d89af7c2` (records 0333, 0337). Both merges conflicted only in the
+  generated reports (and once in a corpus tool test); the reports were
+  regenerated, every golden re-blessed to no change, and the corpus
+  re-recorded to no change.
 - Date: 2026-10-17
 - Input: the definition-of-done audit of 2026-10-17 (§1 item 5, WP5); the
   goal's "OfficeCLI-compatible `apply`/`batch`/`dump`"; design §12 (raw
@@ -31,9 +33,9 @@
 | CLI | — | `dump`, `raw`, `raw-set`, `add-part`, `validate` |
 | Python | — | `File.dump`, `parts`, `raw`, `add_part`, `raw_set`, `validate`; stubs synced |
 | `capabilities()` verbs | 18 | 23 (`dump`, `raw`, `validate`, `add-part`, `raw-set`) |
-| OfficeCLI corpus: passed / gap / bug | 3,948 / 663 / 0 | **4,086 / 525 / 0** |
+| OfficeCLI corpus: passed / gap / bug (against the trunk at `f2d89af7c2`'s parent) | 4,255 / 537 / 0 | **4,393 / 399 / 0** |
 | corpus G1 (missing verbs) | 138 lines | **0** |
-| v1 subset: passed / open | 1,877 / 625 | **1,934 / 568**; the 57 "planned WP5" lines are closed |
+| v1 subset: passed / open | 2,184 / 105 | **2,241 / 48**; the 57 "planned WP5" lines are closed |
 
 `raw_set` is implemented, not deferred: it writes through the audited OPC
 publication path the brief names (§3.3).
@@ -253,17 +255,24 @@ one predicate; `raw::tests::docx_with_a_chart_validates`).
 
 ## 5. OfficeCLI corpus and dispositions
 
-Re-recorded after the trunk merge. Before is trunk's committed report.
+Re-recorded after each trunk merge. "Before" is the trunk's committed
+report at the time; the first row pair is against the base trunk
+(`0056b9cccd`), the second against the trunk of the final merge (records
+0333 and 0337 had moved other classes).
 
 | | Lines | Passed | Warned | Gap | Delta | Cascade | Bug |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| before | 6,431 | 3,948 | 1,178 | 663 | 201 | 441 | 0 |
-| after | 6,431 | **4,086** | 1,178 | **525** | 201 | 441 | 0 |
+| base trunk | 6,431 | 3,948 | 1,178 | 663 | 201 | 441 | 0 |
+| + this record | 6,431 | 4,086 | 1,178 | 525 | 201 | 441 | 0 |
+| final trunk | 6,431 | 4,255 | 1,287 | 537 | 201 | 151 | 0 |
+| + this record | 6,431 | **4,393** | 1,287 | **399** | 201 | 151 | 0 |
 
 - G1 "missing verbs": 138 → 0 (`validate` 88, `raw-set` 48, `add-part` 1,
   `dump` 1). G1 still classifies any OfficeCLI verb the CLI lacks.
-- v1 subset: 3,443 lines, passed 1,877 → 1,934, accounted 941 → 941, open
-  625 → 568; the "planned WP5" blocker (57 lines) is gone.
+- v1 subset (3,443 lines): against the base trunk passed 1,877 → 1,934,
+  open 625 → 568; against the final trunk passed 2,184 → 2,241, accounted
+  1,154 → 1,154, open 105 → 48. The "planned WP5" blocker (57 lines) is
+  gone.
 - `tools/officecli_dispositions.json`: the stale `raw-layer-verbs` entry
   and the `corpus:G1|dump`/`corpus:G1|*` tiers are removed; `raw-layer`
   (`delta:*:raw`) becomes `out-of-scope` (ref 0336): the raw layer is a set
@@ -328,20 +337,23 @@ processes:
 
 ## 8. Gates
 
+Run in full before the final merge and again after it (the clippy feature
+subsets after it: none and `pptx`). Every exit status is 0.
+
 | Gate | Command | Exit |
 |---|---|---:|
 | fmt | `cargo fmt --all --check` | 0 |
 | clippy | `cargo clippy -p litchi-opc -p litchi-docx -p litchi-ops -p litchi -p litchi-py -p litchi-cli --all-targets --all-features -- -D warnings` | 0 |
 | clippy subsets | `cargo clippy -p litchi-ops --no-default-features [--features F] --all-targets -- -D warnings`, F ∈ none, docx, xlsx, pptx, xlsb, doc, xls, ppt, rtf, odt, ods, odp, odg, pages | 0 each |
 | rustdoc | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-opc -p litchi-ops -p litchi-cli -p litchi-docx -p litchi` | 0 |
-| tests | `cargo test -p litchi-opc --all-features`; `-p litchi-docx --all-features --lib --test validation`; `-p litchi-cli --all-features`; `-p litchi-ops --all-features` (`--lib`, `--doc`, then each `--test`, 154 targets); `-p litchi --all-features` | 0 each |
+| tests | `cargo test -p litchi-opc --all-features`; `-p litchi-docx --all-features --lib --test validation`; `-p litchi-cli --all-features`; `-p litchi-ops --all-features` (`--lib`, `--doc`, then each `--test`, 160 targets after the final merge); `-p litchi --all-features` | 0 each |
 | goldens | `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test capabilities --test registry`, and with every feature but `encryption` | re-blessed (verbs only) |
 | corpus | `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test officecli_corpus`; `python3 tools/officecli_corpus.py --check` | 0 |
 | delta | `python3 tools/officecli_capability_delta.py --officecli …/3rdparty/OfficeCLI --check` | 0 |
 | boundaries | `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0 |
 | glossary | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 0 |
 | tool units | `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate` | 0 |
-| Python | `crates/pyo3-litchi/tests/run_tests.sh` (291 tests) | 0 |
+| Python | `crates/pyo3-litchi/tests/run_tests.sh` (292 tests after the final merge) | 0 |
 | harness | `cd tools/perf-baseline && cargo check --locked --all-targets` (lock gains `quick-xml` under `litchi-ops`) | 0 |
 
 ## 9. Not claimed
