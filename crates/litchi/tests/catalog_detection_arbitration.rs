@@ -77,7 +77,11 @@ fn pptx_package() -> Vec<u8> {
     ])
 }
 
-#[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+#[cfg(any(
+    all(feature = "docx", feature = "odt", any(unix, windows)),
+    feature = "ods",
+    feature = "odp"
+))]
 fn odf_package(mimetype: &str, content: &[u8]) -> Vec<u8> {
     let mut writer = litchi::odf_common::core::PackageWriter::new();
     writer.set_mimetype(mimetype).expect("ODF MIME is valid");

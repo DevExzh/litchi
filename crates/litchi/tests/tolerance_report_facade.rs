@@ -7,6 +7,7 @@
 //! `Presentation` and `Workbook` types; the fixtures and expected repairs
 //! are unchanged.
 
+#![cfg(litchi_unified)]
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,

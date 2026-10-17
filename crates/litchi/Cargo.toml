@@ -248,7 +248,9 @@ litchi-xlsx = { workspace = true, optional = true } # SpreadsheetML support
 serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
 
 [build-dependencies]
-# (none) — iwa proto compilation lives in `crates/litchi-iwa-protos/build.rs`.
+# (none) — `build.rs` derives `cfg(litchi_unified)` from the format features
+# above without dependencies (record 0334); iwa proto compilation lives in
+# `crates/litchi-iwa-protos/build.rs`.
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -264,7 +266,7 @@ required-features = ["docx", "automatic-fonts"]
 
 [[example]]
 name = "core_props_office"
-required-features = ["opc", "ooxml-common"]
+required-features = ["docx", "pptx", "xlsx"]
 
 [[example]]
 name = "minimal_font_test"

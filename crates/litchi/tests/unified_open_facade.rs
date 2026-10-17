@@ -13,22 +13,7 @@
 //! these tests compare the handles with the recorded values. Step S9 deleted
 //! the format-family types, so the goldens are fixed reference data.
 
-#![cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "rtf",
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "pages",
-    feature = "keynote",
-    feature = "numbers"
-))]
+#![cfg(litchi_unified)]
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
