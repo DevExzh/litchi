@@ -252,7 +252,7 @@ impl Doc {
 }
 
 /// The text of every cell of a table, in order.
-fn table_texts(nav: &Nav<'_>, table: &Node<'_>) -> Result<Vec<String>> {
+fn table_texts<'f>(nav: &Nav<'f>, table: &Node<'f>) -> Result<Vec<String>> {
     let mut texts = Vec::new();
     for row in nav.children(table, KindSet::of(Kind::Row))? {
         for cell in nav.children(&row?, KindSet::of(Kind::Cell))? {

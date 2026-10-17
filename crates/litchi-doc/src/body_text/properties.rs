@@ -652,11 +652,20 @@ impl Edit {
         if text_revision_intersects(&self.editor, at, next)? {
             return Err(Error::Refused(Refusal::TrackedText));
         }
+        self.length_change_admitted(at, at, 1)?;
+        // The formatting of the text the link is inserted before, else of
+        // the text before it; a producer whose CHPX leaves both uncovered
+        // gets the style's formatting.
+        let base = self
+            .editor
+            .character_grpprl_at(at)
+            .or_else(|_error| match at.checked_sub(1) {
+                Some(previous) => self.editor.character_grpprl_at(previous),
+                None => Ok(Vec::new()),
+            })
+            .unwrap_or_default();
         let base = grpprl_without(
-            &self
-                .editor
-                .character_grpprl_at(at)
-                .map_err(Error::Invalid)?,
+            &base,
             &[
                 SPRM_C_F_SPEC,
                 SPRM_C_F_OBJ,
@@ -712,6 +721,15 @@ impl Edit {
         Ok(())
     }
 
+    /// Refuse a main-story length change that an unmodeled CP-indexed table
+    /// or an ambiguous saved selection depends on, as text replacement does.
+    fn length_change_admitted(&self, start: u32, end: u32, added: usize) -> Result<()> {
+        if let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first() {
+            return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
+        }
+        self.prepare_saved_selection_length_change(start, end, added)
+    }
+
     /// Remove the whole main-story field that begins at `start_cp`, with
     /// its instruction, its result and every field nested in it.
     ///
@@ -730,6 +748,7 @@ impl Edit {
         if text_revision_intersects(&self.editor, start_cp, after)? {
             return Err(Error::Refused(Refusal::TrackedText));
         }
+        self.length_change_admitted(start_cp, after, 0)?;
         self.ensure_operation_capacity()?;
         self.editor
             .delete_range_with_fields(start_cp, after)

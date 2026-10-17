@@ -58,22 +58,32 @@ impl Steps {
     }
 
     /// Step `index`, written as the path spells it.
-    fn step(&self, index: usize) -> PathStep<'static> {
-        step_of(self.kinds[index], Position::new(self.positions[index]))
+    fn step<'f>(&self, index: usize, doc: &'f Doc) -> PathStep<'f> {
+        step_of(self.kinds[index], Position::new(self.positions[index]), doc)
     }
 
     /// The last step, `None` at the root.
-    pub(super) fn last(&self) -> Option<PathStep<'static>> {
-        self.len().checked_sub(1).map(|index| self.step(index))
+    pub(super) fn last<'f>(&self, doc: &'f Doc) -> Option<PathStep<'f>> {
+        self.len().checked_sub(1).map(|index| self.step(index, doc))
     }
 }
 
-/// The path step of `kind` at `position`: the collections are bare.
-const fn step_of(kind: Kind, position: Position) -> PathStep<'static> {
+/// The path step of `kind` at `position`: the collections are bare, and a
+/// style is its identifier (`/styles/Heading1`; record 0324).
+fn step_of(kind: Kind, position: Position, doc: &Doc) -> PathStep<'_> {
     match kind {
         Kind::Document => PathStep::new("document"),
         Kind::Body => PathStep::new("body"),
         Kind::Comments => PathStep::new("comments"),
+        Kind::Styles => PathStep::new("styles"),
+        Kind::Numbering => PathStep::new("numbering"),
+        Kind::Style => match u16::try_from(position.get())
+            .ok()
+            .and_then(|istd| doc.style_id(istd))
+        {
+            Some(id) => PathStep::new(id),
+            None => PathStep::at(kind_step(kind), position),
+        },
         kind => PathStep::at(kind_step(kind), position),
     }
 }
@@ -124,6 +134,27 @@ pub(crate) enum Item<'f> {
         /// The note's 1-based ordinal (`footnote[N]`); 0 for other stories.
         number: usize,
     },
+    /// A style (`istd`) and its direct properties, parsed on first read.
+    Style(u16, OnceLock<Arc<super::parts::StyleView>>),
+    /// A list definition, by index into `PlfLst`.
+    AbstractNum(usize),
+    /// A list instance, by index into `PlfLfo`.
+    Num(usize),
+    /// Level `level` of definition `definition`, with its properties.
+    Level {
+        definition: usize,
+        level: &'f litchi_doc::ListLevel,
+        view: OnceLock<Arc<super::parts::LevelView>>,
+    },
+    Hyperlink(Arc<super::marks::Link>),
+    Bookmark(Arc<litchi_doc::Bookmark>),
+    Field(Arc<litchi_doc::FieldText>),
+    Toc(Arc<litchi_doc::FieldText>),
+    Section(&'f litchi_doc::section::Section),
+    /// A tab stop of a paragraph.
+    Tab(litchi_doc::parts::pap::TabStop),
+    TextBox(Arc<super::marks::TextBox>),
+    Shape(&'f litchi_doc::parts::spa::ShapeAnchor),
 }
 
 // Record 0287: nodes move through every query; keep this one no larger
@@ -140,7 +171,7 @@ pub struct Node<'f> {
     pub(super) steps: Steps,
     /// The spelled-out steps of a path deeper than [`NodePath`] carries by
     /// value, built on the first read of such a path.
-    paths: OnceLock<Box<[PathStep<'static>]>>,
+    paths: OnceLock<Box<[PathStep<'f>]>>,
 }
 
 impl<'f> Node<'f> {
@@ -338,6 +369,11 @@ impl<'f> Node<'f> {
                 text.truncate(end);
                 Ok(Some(Cow::Owned(text)))
             },
+            Item::Hyperlink(link) => Ok(Some(link.text())),
+            Item::Field(field) | Item::Toc(field) => {
+                Ok(field.result.as_deref().map(super::marks::result_text))
+            },
+            Item::TextBox(text_box) => Ok(Some(visible(&text_box.text_box.text))),
             _ => Ok(None),
         }
     }
@@ -355,18 +391,50 @@ impl<'f> Node<'f> {
     #[must_use]
     pub fn path(&self) -> NodePath<'_> {
         let len = self.steps.len();
-        if let Some(path) = NodePath::inline_with(len, |index| self.steps.step(index)) {
+        let doc = self.doc;
+        if let Some(path) = NodePath::inline_with(len, |index| self.steps.step(index, doc)) {
             return path;
         }
         NodePath::new(
             self.paths
-                .get_or_init(|| (0..len).map(|index| self.steps.step(index)).collect()),
+                .get_or_init(|| (0..len).map(|index| self.steps.step(index, doc)).collect()),
         )
     }
 
     /// The node's own last path step; `None` for the root.
-    pub(super) fn last_step(&self) -> Option<PathStep<'static>> {
-        self.steps.last()
+    pub(super) fn last_step(&self) -> Option<PathStep<'f>> {
+        self.steps.last(self.doc)
+    }
+
+    /// The body position of the ordinary main-story paragraph this node is,
+    /// or is a run, hyperlink or tab stop of, read from the node's path.
+    pub(crate) fn body_paragraph_of(&self) -> Option<Position> {
+        let steps = &self.steps;
+        (steps.len() >= 2 && steps.kinds[0] == Kind::Body && steps.kinds[1] == Kind::Paragraph)
+            .then(|| Position::new(steps.positions[1]))
+    }
+
+    /// The node's own position among its kind's siblings.
+    pub(crate) fn own_position(&self) -> Option<Position> {
+        let len = self.steps.len();
+        len.checked_sub(1)
+            .map(|last| Position::new(self.steps.positions[last]))
+    }
+
+    /// The node's native value.
+    pub(crate) const fn item(&self) -> &Item<'f> {
+        &self.item
+    }
+
+    /// A top-level part or mark node (`/styles`, `/bookmark[N]`).
+    pub(super) fn top(doc: &'f Doc, kind: Kind, item: Item<'f>, position: Position) -> Self {
+        Self {
+            doc,
+            kind,
+            item,
+            steps: Steps::EMPTY.then(kind, position),
+            paths: OnceLock::new(),
+        }
     }
 
     #[must_use]
@@ -387,9 +455,13 @@ impl<'f> Node<'f> {
     }
 
     pub(super) fn format_props(&self) -> Result<Format<'_>> {
+        let doc = self.doc;
         let (props, source) = match &self.item {
             Item::BodyParagraph { .. } | Item::Paragraph(_) => match self.native_paragraph()? {
-                Some(paragraph) => (spec::PARAGRAPH_PROPS, NodeProps::Paragraph(paragraph)),
+                Some(paragraph) => (
+                    spec::PARAGRAPH_PROPS,
+                    NodeProps::Paragraph { paragraph, doc },
+                ),
                 None => return Ok(Format::empty()),
             },
             Item::Run { run, .. } => (spec::RUN_PROPS, NodeProps::Run { run, doc: self.doc }),
@@ -401,7 +473,82 @@ impl<'f> Node<'f> {
                 Story::Note(_) => (spec::NOTE_PROPS, NodeProps::Note(*number)),
                 Story::Comment(story) => (spec::COMMENT_PROPS, NodeProps::Comment(story)),
             },
-            Item::Bare => return Ok(Format::empty()),
+            Item::Bare => match self.kind {
+                Kind::Styles => (
+                    spec::STYLES_PROPS,
+                    NodeProps::Count(
+                        doc.reader()?
+                            .stylesheet()
+                            .map_or(0, |sheet| sheet.styles().iter().flatten().count()),
+                        0,
+                    ),
+                ),
+                Kind::Numbering => (
+                    spec::NUMBERING_PROPS,
+                    NodeProps::Count(
+                        super::parts::structures(doc).len(),
+                        super::parts::num_count(doc),
+                    ),
+                ),
+                _ => return Ok(Format::empty()),
+            },
+            Item::Style(istd, view) => {
+                let view = match view.get() {
+                    Some(view) => view,
+                    None => {
+                        let Some(style) = doc
+                            .reader()?
+                            .stylesheet()
+                            .and_then(|sheet| sheet.get(*istd))
+                        else {
+                            return Ok(Format::empty());
+                        };
+                        let _ = view.set(Arc::new(super::parts::StyleView::of(style)));
+                        view.get().ok_or_else(|| {
+                            crate::Error::new(crate::Code::InternalError, "DOC style view missing")
+                        })?
+                    },
+                };
+                (
+                    spec::STYLE_PROPS,
+                    NodeProps::Style {
+                        doc,
+                        istd: *istd,
+                        view,
+                    },
+                )
+            },
+            Item::AbstractNum(at) => (
+                spec::ABSTRACT_NUM_PROPS,
+                NodeProps::AbstractNum { doc, at: *at },
+            ),
+            Item::Num(at) => (spec::NUM_PROPS, NodeProps::Num { doc, at: *at }),
+            Item::Level {
+                definition,
+                level,
+                view,
+            } => {
+                let view = view.get_or_init(|| {
+                    Arc::new(super::parts::LevelView::of(doc, *definition, level.level))
+                });
+                (
+                    spec::LEVEL_PROPS,
+                    NodeProps::Level {
+                        doc,
+                        definition: *definition,
+                        level,
+                        view,
+                    },
+                )
+            },
+            Item::Hyperlink(link) => (spec::HYPERLINK_PROPS, NodeProps::Hyperlink { doc, link }),
+            Item::Bookmark(bookmark) => (spec::BOOKMARK_PROPS, NodeProps::Bookmark(bookmark)),
+            Item::Field(field) => (spec::FIELD_PROPS, NodeProps::Field(field)),
+            Item::Toc(field) => (spec::TOC_PROPS, NodeProps::Toc(field)),
+            Item::Section(section) => (spec::SECTION_PROPS, NodeProps::Section(section)),
+            Item::Tab(stop) => (spec::TAB_PROPS, NodeProps::Tab(stop)),
+            Item::TextBox(text_box) => (spec::TEXT_BOX_PROPS, NodeProps::TextBox(text_box)),
+            Item::Shape(anchor) => (spec::SHAPE_PROPS, NodeProps::Shape(anchor)),
         };
         Ok(Format::new(props, Source::Doc(source)).without(&["text"]))
     }
@@ -423,6 +570,20 @@ const fn kind_step(kind: Kind) -> &'static str {
         Kind::Endnote => "endnote",
         Kind::Comments => "comments",
         Kind::Comment => "comment",
+        Kind::Styles => "styles",
+        Kind::Style => "style",
+        Kind::Numbering => "numbering",
+        Kind::AbstractNum => "abstractNum",
+        Kind::Num => "num",
+        Kind::Level => "level",
+        Kind::Hyperlink => "hyperlink",
+        Kind::Bookmark => "bookmark",
+        Kind::Field => "field",
+        Kind::Toc => "toc",
+        Kind::Section => "section",
+        Kind::Tab => "tab",
+        Kind::TextBox => "textbox",
+        Kind::Shape => "shape",
     }
 }
 
@@ -447,7 +608,10 @@ fn visible(text: &str) -> Cow<'_, str> {
 /// order.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum NodeProps<'a> {
-    Paragraph(&'a litchi_doc::Paragraph),
+    Paragraph {
+        paragraph: &'a litchi_doc::Paragraph,
+        doc: &'a Doc,
+    },
     Run {
         run: &'a litchi_doc::Run,
         doc: &'a Doc,
@@ -458,6 +622,39 @@ pub(crate) enum NodeProps<'a> {
     HeaderFooter(&'a litchi_doc::HeaderFooter),
     Note(usize),
     Comment(&'a litchi_doc::Comment),
+    /// `/styles` (style count) or `/numbering` (definition and instance
+    /// counts).
+    Count(usize, usize),
+    Style {
+        doc: &'a Doc,
+        istd: u16,
+        view: &'a super::parts::StyleView,
+    },
+    AbstractNum {
+        doc: &'a Doc,
+        at: usize,
+    },
+    Num {
+        doc: &'a Doc,
+        at: usize,
+    },
+    Level {
+        doc: &'a Doc,
+        definition: usize,
+        level: &'a litchi_doc::ListLevel,
+        view: &'a super::parts::LevelView,
+    },
+    Hyperlink {
+        doc: &'a Doc,
+        link: &'a super::marks::Link,
+    },
+    Bookmark(&'a litchi_doc::Bookmark),
+    Field(&'a litchi_doc::FieldText),
+    Toc(&'a litchi_doc::FieldText),
+    Section(&'a litchi_doc::section::Section),
+    Tab(&'a litchi_doc::parts::pap::TabStop),
+    TextBox(&'a super::marks::TextBox),
+    Shape(&'a litchi_doc::parts::spa::ShapeAnchor),
 }
 
 impl<'a> NodeProps<'a> {
@@ -465,7 +662,8 @@ impl<'a> NodeProps<'a> {
     /// it. Text entries are node members and are read through `text`.
     pub(crate) fn get(&self, index: usize) -> Option<Value<'a>> {
         match *self {
-            Self::Paragraph(paragraph) => {
+            Self::Paragraph { paragraph, doc } => {
+                use super::parts::{ParagraphKey as K, paragraph_value};
                 let properties = paragraph.properties();
                 match index {
                     1 => Some(Value::Token(spec::alignment_name(properties.justification))),
@@ -487,6 +685,12 @@ impl<'a> NodeProps<'a> {
                     7 => Some(Value::Bool(properties.keep_with_next)),
                     8 => Some(Value::Bool(properties.keep_on_page)),
                     9 => Some(Value::Bool(properties.page_break_before)),
+                    16 | 17 => paragraph_value(doc, paragraph, K::StyleId),
+                    18 => paragraph_value(doc, paragraph, K::StyleName),
+                    19 => paragraph_value(doc, paragraph, K::NumberFormat),
+                    20 => paragraph_value(doc, paragraph, K::ListStyle),
+                    21 => paragraph_value(doc, paragraph, K::Start),
+                    22 => paragraph_value(doc, paragraph, K::Level),
                     _ => None,
                 }
             },
@@ -515,6 +719,7 @@ impl<'a> NodeProps<'a> {
                 9 => run.small_caps().map(Value::Bool),
                 10 => run.is_superscript().then_some(Value::Bool(true)),
                 11 => run.is_subscript().then_some(Value::Bool(true)),
+                12 => super::parts::run_style(doc, run),
                 _ => None,
             },
             Self::Table(table) => match index {
@@ -553,6 +758,28 @@ impl<'a> NodeProps<'a> {
                 2 => Some(Value::Text(Cow::Borrowed(comment.initials.as_str()))),
                 _ => None,
             },
+            Self::Count(first, second) => match index {
+                0 => i64::try_from(first).ok().map(Value::Int),
+                1 => i64::try_from(second).ok().map(Value::Int),
+                _ => None,
+            },
+            Self::Style { doc, istd, view } => super::parts::style_value(doc, istd, view, index),
+            Self::AbstractNum { doc, at } => super::parts::abstract_num_value(doc, at, index),
+            Self::Num { doc, at } => super::parts::num_value(doc, at, index),
+            Self::Level {
+                doc,
+                definition,
+                level,
+                view,
+            } => super::parts::level_value(doc, definition, level, view, index),
+            Self::Hyperlink { doc, link } => super::marks::link_value(doc, link, index),
+            Self::Bookmark(bookmark) => super::marks::bookmark_value(bookmark, index),
+            Self::Field(field) => super::marks::field_value(field, index),
+            Self::Toc(field) => super::marks::toc_value(field, index),
+            Self::Section(section) => super::marks::section_value(section, index),
+            Self::Tab(stop) => super::marks::tab_value(stop, index),
+            Self::TextBox(text_box) => super::marks::text_box_value(text_box, index),
+            Self::Shape(anchor) => super::marks::shape_value(anchor, index),
         }
     }
 }
@@ -615,6 +842,18 @@ impl<'f> Project<'f> for Node<'f> {
             Item::Row(row) => row.cell_count()?,
             Item::Cell(cell) => cell.paragraphs()?.len(),
             Item::Story { story, .. } => story.paragraphs().len(),
+            Item::Style(..)
+            | Item::Num(_)
+            | Item::Level { .. }
+            | Item::Hyperlink(_)
+            | Item::Bookmark(_)
+            | Item::Field(_)
+            | Item::Toc(_)
+            | Item::Section(_)
+            | Item::Tab(_)
+            | Item::TextBox(_)
+            | Item::Shape(_) => 0,
+            Item::AbstractNum(_) => Children::of(self).count(),
         };
         Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
     }

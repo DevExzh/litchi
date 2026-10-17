@@ -17,7 +17,9 @@
 //! (record 0301): a row inserted and removed, a slide or paragraph moved
 //! and moved back, a Pages paragraph added and removed, a Keynote slide
 //! duplicated and a slide added and both removed, or a Numbers table added
-//! and removed, must read back with the same node texts.
+//! and removed, must read back with the same node texts. DOC (record 0324)
+//! adds a bookmark and a hyperlink to its first body paragraph and removes
+//! both.
 //!
 //! An iWork package directory (the app-authored bundle form, record 0306)
 //! is a corpus entry too: a copy of it goes through `open` → empty `edit`
@@ -474,6 +476,38 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 Box::new(|file: &File| file.move_to("/body/p[1]", Placement::after("/body/p[2]")?)),
                 Box::new(|file: &File| {
                     file.move_to("/body/p[2]", Placement::before("/body/p[1]")?)
+                }),
+            )
+        },
+        // Record 0324: a bookmark and a hyperlink added to the first body
+        // paragraph and removed again, through the DOC bookmark-table and
+        // field editors.
+        Some(FileFormat::Doc) => {
+            if count("/body", "paragraph") == 0 {
+                return ("none", String::new());
+            }
+            (
+                "bookmark+hyperlink add+remove",
+                &["/body/p[1]"],
+                Box::new(|file: &File| {
+                    let marked = file
+                        .add(
+                            "/body/p[1]",
+                            NewNode::new("bookmark").prop("name", "LitchiProbe"),
+                        )?
+                        .file;
+                    marked
+                        .add(
+                            "/body/p[1]",
+                            NewNode::new("hyperlink")
+                                .prop("url", "http://example.com/")
+                                .prop("text", "probe"),
+                        )
+                        .map(|added| added.file)
+                }),
+                Box::new(|file: &File| {
+                    file.remove("/body/p[1]/hyperlink[last()]")?
+                        .remove("/bookmark[@name=LitchiProbe]")
                 }),
             )
         },

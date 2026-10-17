@@ -16,6 +16,7 @@
 //! element works, not that a third-party producer's variant of it does.
 
 #![cfg(all(
+    feature = "doc",
     feature = "pptx",
     feature = "ppt",
     feature = "xlsb",
@@ -196,11 +197,54 @@ fn xlsb_table() -> Vec<u8> {
     bytes.into_inner()
 }
 
+/// Record 0324: a DOC body paragraph with two tab stops, a floating text
+/// box and a closing paragraph (the DOC `tab` and `textbox` cells, with a
+/// sibling pair of tab stops).
+fn doc_marks() -> Vec<u8> {
+    use litchi_doc::parts::pap::{TabAlignment, TabLeader, TabStop};
+    use litchi_doc::writer::{
+        FloatingPosition, Kind as DrawingKind, ParagraphFormatting, Shape as DrawingShape,
+    };
+    let mut builder = litchi_doc::Builder::new();
+    builder
+        .add_formatted_paragraph(
+            "Name\tValue",
+            ParagraphFormatting {
+                tab_stops_to_add: vec![
+                    TabStop {
+                        position: 2880,
+                        alignment: TabAlignment::Left,
+                        leader: TabLeader::None,
+                    },
+                    TabStop {
+                        position: 5760,
+                        alignment: TabAlignment::Right,
+                        leader: TabLeader::Dots,
+                    },
+                ],
+                ..ParagraphFormatting::default()
+            },
+        )
+        .unwrap();
+    builder
+        .insert_floating_text_box(
+            DrawingShape::new(DrawingKind::Rectangle, 3600, 1800).unwrap(),
+            FloatingPosition::new(2500, 1200),
+            "Boxed text",
+        )
+        .unwrap();
+    builder.add_paragraph("after").unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    builder.build().unwrap().write_to(&mut bytes).unwrap();
+    bytes.into_inner()
+}
+
 /// Every generated fixture: file name and bytes.
 fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
     vec![
         ("modern-comments.pptx", presentation::bytes()),
         ("connectors.ppt", ppt_connectors()),
+        ("marks.doc", doc_marks()),
         ("table.xlsb", xlsb_table()),
         ("comments.odp", odp_comments()),
         ("layers.odg", odg_layers()),

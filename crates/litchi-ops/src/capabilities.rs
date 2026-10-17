@@ -2812,7 +2812,7 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::doc::SETTABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "xlsx")]
         let settable = settable
@@ -2939,7 +2939,7 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
-                && self.data().canonical == "p"
+                && crate::format::doc::ADDABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "ppt")]
         let add = add
@@ -3027,7 +3027,7 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::doc::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "rtf")]
         let remove = remove

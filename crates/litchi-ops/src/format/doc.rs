@@ -25,9 +25,12 @@ use crate::{IntoProps, OpenOptions, Result, TargetArg};
 pub(crate) mod children;
 mod edit;
 mod find;
+mod marks;
+mod marks_write;
 mod metadata;
 mod nav;
 mod node;
+mod parts;
 pub(crate) mod refresh;
 mod spec;
 pub(crate) mod views;
@@ -36,7 +39,7 @@ pub(crate) mod write;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::NodeProps;
-pub(crate) use spec::SPEC;
+pub(crate) use spec::{ADDABLE, REMOVABLE, SETTABLE, SPEC};
 
 /// An opened legacy Word (`.doc`) document.
 ///
@@ -51,6 +54,9 @@ struct DocState {
     reader: litchi_doc::Document,
     metadata: Metadata,
     source: DocSource,
+    /// The DOCX-style identifier of each style slot, derived on first use
+    /// (record 0324).
+    style_ids: std::sync::OnceLock<Box<[Box<str>]>>,
 }
 
 /// Retained native owner or explicitly released source.
@@ -96,6 +102,7 @@ impl Doc {
         Self(Opened::new(DocState {
             reader: package.document(),
             metadata: package.metadata().clone(),
+            style_ids: std::sync::OnceLock::new(),
             source: if retain_source {
                 DocSource::Retained(package)
             } else {
@@ -272,6 +279,22 @@ impl Doc {
         })();
         self.check_source()?;
         result
+    }
+
+    /// The DOCX-style identifier of every style slot, by `istd` (record
+    /// 0324).
+    pub(crate) fn style_ids(&self) -> &[Box<str>] {
+        self.0
+            .style_ids
+            .get_or_init(|| parts::style_ids(self.0.reader.stylesheet()))
+    }
+
+    /// The identifier of style `istd`, when the slot holds a style.
+    pub(crate) fn style_id(&self, istd: u16) -> Option<&str> {
+        self.style_ids()
+            .get(usize::from(istd))
+            .map(AsRef::as_ref)
+            .filter(|id| !id.is_empty())
     }
 
     /// The body's children: its ordinary paragraphs and top-level tables.

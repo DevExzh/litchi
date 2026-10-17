@@ -21,6 +21,7 @@ They are part of this repository and carry its license (see the workspace
 | `comments.odp` | 2,157 | `c80b5c8ee9f3c518246d461d27b2f212000ee3f5763511577c14254b0f960c1d` | `litchi_odp::Builder` (one slide), then two page annotations through the leaf edit's `add_annotation` | ODP `comment` |
 | `layers.odg` | 908 | `118de79bef150787a5474aff373b4a0a8ab3980a3837192e25eaf458e8761d04` | `litchi_odf_common::core::PackageWriter` with content XML written in the test: one page with a page-level `draw:layer-set` of two layers | ODG `layer` |
 | `frames.oth` | 1,639 | `3ba59ef90e5fab2ef93596e443302eaff52b6cf5e668c08fc9ad700fb3b0b665` | `PackageWriter`, `text-web` mimetype: a paragraph with two picture frames and a text-box frame, an embedded PNG, and `styles.xml` with two paragraph styles | OTH `frame`, `picture`, `textbox`, `style` |
+| `marks.doc` | 15,360 | `b2697f643b8aade5b675fbc0e0f7b380df3882aee92bb6cbe192cb907ce38ca0` | `litchi_doc::Builder` (record 0324): a body paragraph with two tab stops (`tab_stops_to_add`), a floating text box (`insert_floating_text_box`) and a closing paragraph | DOC `tab`, `textbox` |
 | `frames.odm` | 1,218 | `eb3c61eafbec73e700a464706f151ac939b5eb1389a77c724dd98f5fdb430504` | as `frames.oth`, `text-master` mimetype, no `styles.xml` | ODM `frame`, `picture`, `textbox` |
 
 The embedded PNG is the 4×2 image the checklist's picture recipes use.

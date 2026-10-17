@@ -21,6 +21,8 @@ use crate::path::navigate::KindSet;
 pub(crate) struct Children<'f> {
     doc: &'f Doc,
     state: State<'f>,
+    /// Nodes listed after the streamed body: its text boxes and shapes.
+    tail: Option<std::vec::IntoIter<Node<'f>>>,
 }
 
 enum State<'f> {
@@ -51,20 +53,26 @@ impl<'f> Children<'f> {
 
     /// The children of `parent` of the kinds in `kinds` (and the containers
     /// that lead to them); `None` lists every child.
+    /// Views (`kinds` is `None`) list the structural kinds only; the parts
+    /// and marks of record 0324 are listed when a query asks for them.
     pub(super) fn filtered(parent: &Node<'f>, kinds: Option<KindSet<Kind>>) -> Self {
-        let wants = |kind: Kind| kinds.is_none_or(|kinds| kinds.contains(kind));
+        let wants = |kind: Kind| kinds.map_or(kind.is_structural(), |kinds| kinds.contains(kind));
         let doc = parent.doc;
-        let state = match Self::state(parent, &wants) {
-            Ok(state) => state,
-            Err(error) => State::Error(error),
+        let (state, tail) = match Self::state(parent, &wants) {
+            Ok(state) => match super::nav::tail(parent, &wants) {
+                Ok(tail) => (state, tail.map(Vec::into_iter)),
+                Err(error) => (State::Error(error), None),
+            },
+            Err(error) => (State::Error(error), None),
         };
-        Self { doc, state }
+        Self { doc, state, tail }
     }
 
     pub(super) const fn empty(doc: &'f Doc) -> Self {
         Self {
             doc,
             state: State::Done,
+            tail: None,
         }
     }
 
@@ -115,7 +123,25 @@ impl<'f> Children<'f> {
                 let Some(paragraph) = parent.native_paragraph()? else {
                     return Ok(State::Done);
                 };
-                State::List(run_nodes(parent, paragraph)?.into_iter())
+                let mut nodes = if wants(Kind::Run) {
+                    run_nodes(parent, paragraph)?
+                } else {
+                    Vec::new()
+                };
+                if wants(Kind::Hyperlink) {
+                    nodes.extend(super::nav::link_nodes(parent, paragraph)?);
+                }
+                if wants(Kind::Tab) {
+                    nodes.extend(super::nav::tab_nodes(parent, paragraph));
+                }
+                State::List(nodes.into_iter())
+            },
+            (Item::Bare, Kind::Styles) => State::List(super::nav::style_nodes(parent)?.into_iter()),
+            (Item::Bare, Kind::Numbering) => {
+                State::List(super::nav::numbering_nodes(parent, wants).into_iter())
+            },
+            (Item::AbstractNum(at), _) => {
+                State::List(super::nav::level_nodes(parent, *at).into_iter())
             },
             (Item::Table(table), _) => State::List(
                 table
@@ -201,6 +227,7 @@ fn root_children<'f>(doc: &'f Doc, wants: &dyn Fn(Kind) -> bool) -> Result<Vec<N
     if wants(Kind::Comments) && reader.comment_count() > 0 {
         nodes.push(Node::comments(doc));
     }
+    super::nav::root_marks(doc, wants, &mut nodes)?;
     Ok(nodes)
 }
 
@@ -259,15 +286,22 @@ impl<'f> Iterator for Children<'f> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match &mut self.state {
-                State::Done => return None,
+                State::Done => match self.tail.take() {
+                    Some(tail) => self.state = State::List(tail),
+                    None => return None,
+                },
                 State::Error(_) => {
+                    self.tail = None;
                     let State::Error(error) = std::mem::replace(&mut self.state, State::Done)
                     else {
                         return None;
                     };
                     return Some(Err(error));
                 },
-                State::List(nodes) => return nodes.next().map(Ok),
+                State::List(nodes) => match nodes.next() {
+                    Some(node) => return Some(Ok(node)),
+                    None => self.state = State::Done,
+                },
                 State::Paragraphs { paragraphs, next } => {
                     return match paragraphs.next() {
                         Some(Ok(text)) => {
@@ -281,7 +315,7 @@ impl<'f> Iterator for Children<'f> {
                         },
                         None => {
                             self.state = State::Done;
-                            None
+                            continue;
                         },
                     };
                 },
@@ -294,7 +328,7 @@ impl<'f> Iterator for Children<'f> {
                 } => {
                     let Some(block) = blocks.get(Position::new(*cursor)) else {
                         self.state = State::Done;
-                        return None;
+                        continue;
                     };
                     *cursor = cursor.saturating_add(1);
                     let ordinal = Position::new(block.ordinal());
@@ -330,7 +364,7 @@ impl<'f> Iterator for Children<'f> {
                                 )),
                                 Ok(None) => {
                                     self.state = State::Done;
-                                    return None;
+                                    continue;
                                 },
                                 Err(error) => {
                                     self.state = State::Done;

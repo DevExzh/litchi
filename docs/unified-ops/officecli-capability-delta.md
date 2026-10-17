@@ -23,7 +23,7 @@ differs from the hash recorded below.
 |---|---|---|
 | golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `137339ca055080024cbcc80287ca72cd2eaf31d4c0d1a533c75b59784aabf8cb` |
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `6036228da65ef4bd4889a861832909bfaf95d6fa316df17f2fd703ad232846e1` |
-| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
+| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `0a421039fbf3f008b73f71bf267c946b3cc32c27cbfb111105eb43f6ecf7ef2e` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `63e83c705bcc34b189e0709fd0e0fd9c6291d9952677152fcfd1aac067a4f8aa` |
@@ -82,7 +82,7 @@ Elements:
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
 | docx | 31 | 4 | 0 | 0 | 9 | 2 | 6 |
-| doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
+| doc | 29 | 5 | 0 | 0 | 10 | 2 | 1 |
 | rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 33 | 5 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
@@ -108,7 +108,7 @@ Property reads:
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
 | docx | 291 | 2 | 58 | 0 | 232 | 2 | 376 | 165 |
-| doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
+| doc | 156 | 0 | 59 | 0 | 238 | 1 | 507 | 68 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 333 | 12 | 87 | 0 | 113 | 1 | 145 | 552 |
 | xlsb | 78 | 29 | 489 | 0 | 24 | 1 | 70 | 30 |
@@ -134,7 +134,7 @@ Property writes:
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
 | docx | 227 | 30 | 539 | 0 | 138 | 192 |
-| doc | 1 | 13 | 782 | 0 | 21 | 182 |
+| doc | 10 | 29 | 757 | 0 | 27 | 206 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 211 | 60 | 273 | 0 | 515 | 184 |
 | xlsb | 8 | 26 | 510 | 0 | 31 | 146 |
@@ -1393,9 +1393,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Follow-up |
 |---|---|---|---|
-| abstractNum |  | missing |  |
+| abstractNum | abstractNum | supported |  |
 | body | body | supported |  |
-| bookmark |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| bookmark | bookmark | supported |  |
 | bookmarkEnd |  | missing |  |
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
@@ -1404,19 +1404,19 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | diagram |  | missing |  |
 | document | document | supported |  |
 | endnote | endnote | supported |  |
-| equation |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| equation |  | gap | record 0324 follow-up 4: DOC EQ fields and MTEF equation objects as `equation` nodes |
+| field | field | supported |  |
 | fieldChar |  | missing |  |
 | footer | footer | supported |  |
 | footnote | footnote | supported |  |
-| formfield |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| formfield |  | gap | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
 | header | header | supported |  |
-| hyperlink |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| hyperlink | hyperlink | supported |  |
 | instrText |  | missing |  |
-| level |  | missing |  |
+| level | level | supported |  |
 | markdown |  | out of scope | an add-time import format, not an element of the document |
-| num |  | missing |  |
-| numbering |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| num | num | supported |  |
+| numbering | numbering | supported |  |
 | ole | run | supported |  |
 | pagebreak | run | supported |  |
 | paragraph | paragraph | supported |  |
@@ -1424,21 +1424,21 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | run | supported |  |
 | ptab |  | missing |  |
 | raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
-| revision |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| revision |  | gap | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
 | run | run | supported |  |
-| sdt |  | missing |  |
-| section |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| styles |  | missing |  |
-| tab |  | missing |  |
+| sdt |  | gap | none: content controls are DOCX-only |
+| section | section | supported |  |
+| shape | shape | supported |  |
+| style | style | supported |  |
+| styles | styles | supported |  |
+| tab | tab | supported |  |
 | cell | cell | supported |  |
 | column |  | missing |  |
 | row | row | supported |  |
 | table | table | supported |  |
-| textbox |  | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| toc |  | missing |  |
-| watermark |  | missing |  |
+| textbox | textbox | supported |  |
+| toc | toc | supported |  |
+| watermark |  | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
 |  | comments | litchi-only |  |
 
 ### Properties
@@ -1446,12 +1446,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
 |---|---|---|---|---|---|---|---|
 | abstractNum | `id` | int | a-g |  | missing | gap |  |
-| abstractNum | `type` | enum | asg |  | missing | gap |  |
-| abstractNum | `name` | string | asg |  | missing | gap |  |
+| abstractNum | `type` | enum | asg | --g | supported | gap |  |
+| abstractNum | `name` | string | asg | --g | supported | gap |  |
 | abstractNum | `styleLink` | string | asg |  | missing | gap |  |
 | abstractNum | `numStyleLink` | string | asg |  | missing | gap |  |
 | abstractNum | `format` | string | a-- |  | write-only | gap |  |
-| abstractNum | `text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `text` | string | a-- |  | supported | gap | the node's text |
 | abstractNum | `start` | int | a-- |  | write-only | gap |  |
 | abstractNum | `indent` | int | a-- |  | write-only | gap |  |
 | abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
@@ -1467,9 +1467,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
-| bookmark | `name` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| bookmark | `text` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| bookmark | `id` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| bookmark | `name` | string | asg | asg | supported | supported |  |
+| bookmark | `text` | string | a-- | a-- | write-only | supported |  |
+| bookmark | `id` | string | --g |  | missing | — |  |
 | bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
 | chart-axis | `axisFont` | string | --g |  | missing | — |  |
@@ -1746,20 +1746,20 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | endnote | `size.cs` | font-size | as- |  | write-only | gap |  |
 | endnote | `id` | number | --g |  | missing | — |  |
 | endnote | `number` | int |  | --g | litchi-only | — |  |
-| equation | `mode` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| equation | `formula` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `evaluated` | bool | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `fieldType` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `name` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `id` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `expression` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `trueText` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `falseText` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `hyperlink` | bool | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `format` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `instruction` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `vertAlign` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| field | `fldLock` | bool | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| equation | `mode` | enum | asg |  | element gap | gap | record 0324 follow-up 4: DOC EQ fields and MTEF equation objects as `equation` nodes |
+| equation | `formula` | string | as- |  | element gap | gap | record 0324 follow-up 4: DOC EQ fields and MTEF equation objects as `equation` nodes |
+| field | `evaluated` | bool | --g | --g | supported | — |  |
+| field | `fieldType` | enum | asg | --g | supported | gap |  |
+| field | `name` | string | asg |  | missing | gap |  |
+| field | `id` | string | asg |  | missing | gap |  |
+| field | `expression` | string | as- |  | write-only | gap |  |
+| field | `trueText` | string | as- |  | write-only | gap |  |
+| field | `falseText` | string | as- |  | write-only | gap |  |
+| field | `hyperlink` | bool | as- |  | write-only | gap |  |
+| field | `format` | string | asg |  | missing | gap |  |
+| field | `instruction` | string | asg | --g | supported | gap |  |
+| field | `vertAlign` | enum | a-- |  | write-only | gap |  |
+| field | `fldLock` | bool | a-g | --g | supported | gap |  |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
 | footer | `type` | enum | asg | --g | supported | gap |  |
 | footer | `text` | string | asg | --g | supported | gap |  |
@@ -1782,13 +1782,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | footnote | `size.cs` | font-size | as- |  | write-only | gap |  |
 | footnote | `id` | number | --g |  | missing | — |  |
 | footnote | `number` | int |  | --g | litchi-only | — |  |
-| formfield | `type` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| formfield | `name` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| formfield | `text` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| formfield | `checked` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| formfield | `default` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| formfield | `enabled` | bool | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| formfield | `type` | enum | asg |  | element gap | gap | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
+| formfield | `name` | string | asg |  | element gap | gap | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
+| formfield | `text` | string | asg |  | element gap | gap | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
+| formfield | `checked` | bool | asg |  | element gap | gap | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
+| formfield | `default` | string | --g |  | element gap | — | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
+| formfield | `enabled` | bool | --g |  | element gap | — | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
+| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes |
 | header | `type` | enum | asg | --g | supported | gap |  |
 | header | `text` | string | asg | --g | supported | gap |  |
 | header | `align` | enum | asg |  | missing | gap |  |
@@ -1799,47 +1799,59 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | header | `italic` | bool | asg |  | missing | gap |  |
 | header | `color` | color | asg |  | missing | gap |  |
 | header | `field` | enum | a-- |  | write-only | gap |  |
-| hyperlink | `url` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `anchor` | string | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `tooltip` | string | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `text` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `rStyle` | string | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `color` | color | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `font` | string | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `size` | length | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `underline` | enum | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `bold` | bool | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `italic` | bool | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| hyperlink | `docLocation` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| hyperlink | `url` | string | asg | asg | supported | supported |  |
+| hyperlink | `anchor` | string | a-g | a-g | supported | supported |  |
+| hyperlink | `tooltip` | string | a-g | a-g | supported | supported |  |
+| hyperlink | `text` | string | asg | asg | supported | supported |  |
+| hyperlink | `rStyle` | string | a-g | --g | supported | gap |  |
+| hyperlink | `color` | color | a-g | --g | supported | gap |  |
+| hyperlink | `font` | string | a-g | --g | supported | gap |  |
+| hyperlink | `size` | length | a-g | --g | supported | gap |  |
+| hyperlink | `underline` | enum | a-g | --g | supported | gap |  |
+| hyperlink | `bold` | bool | a-g | --g | supported | gap |  |
+| hyperlink | `italic` | bool | a-g | --g | supported | gap |  |
+| hyperlink | `docLocation` | string | --g |  | missing | — |  |
+| hyperlink | `tgtFrame` | string |  | --g | litchi-only | — |  |
+| hyperlink | `strike` | bool |  | --g | litchi-only | — |  |
 | instrText | `instruction` | string | -sg |  | missing | gap |  |
 | level | `ilvl` | int | a-g |  | missing | gap |  |
-| level | `format` | string | asg |  | missing | gap |  |
-| level | `lvlText` | string | asg |  | missing | gap |  |
-| level | `start` | int | asg |  | missing | gap |  |
-| level | `indent` | int | asg |  | missing | gap |  |
-| level | `hanging` | int | asg |  | missing | gap |  |
-| level | `justification` | enum | asg |  | missing | gap |  |
-| level | `suff` | enum | as- |  | write-only | gap |  |
-| level | `lvlRestart` | int | as- |  | write-only | gap |  |
-| level | `isLgl` | bool | as- |  | write-only | gap |  |
+| level | `format` | string | asg | --g | supported | gap |  |
+| level | `lvlText` | string | asg | --g | supported | gap |  |
+| level | `start` | int | asg | --g | supported | gap |  |
+| level | `indent` | int | asg | --g | supported | gap |  |
+| level | `hanging` | int | asg | --g | supported | gap |  |
+| level | `justification` | enum | asg | --g | supported | gap |  |
+| level | `suff` | enum | as- | --g | supported | gap |  |
+| level | `lvlRestart` | int | as- | --g | supported | gap |  |
+| level | `isLgl` | bool | as- | --g | supported | gap |  |
 | level | `direction` | enum | a-- |  | write-only | gap |  |
-| level | `font` | string | as- |  | write-only | gap |  |
-| level | `size` | font-size | as- |  | write-only | gap |  |
-| level | `color` | color | as- |  | write-only | gap |  |
-| level | `bold` | bool | as- |  | write-only | gap |  |
-| level | `italic` | bool | as- |  | write-only | gap |  |
+| level | `font` | string | as- | --g | supported | gap |  |
+| level | `size` | font-size | as- | --g | supported | gap |  |
+| level | `color` | color | as- | --g | supported | gap |  |
+| level | `bold` | bool | as- | --g | supported | gap |  |
+| level | `italic` | bool | as- | --g | supported | gap |  |
 | num | `id` | int | a-g |  | missing | gap |  |
-| num | `abstractNumId` | int | asg |  | missing | gap |  |
+| num | `abstractNumId` | int | asg | --g | supported | gap |  |
 | num | `format` | string | a-- |  | write-only | gap |  |
-| num | `text` | string | a-- |  | write-only | gap |  |
+| num | `text` | string | a-- |  | supported | gap | the node's text |
 | num | `indent` | int | a-- |  | write-only | gap |  |
-| num | `type` | enum | a-- |  | write-only | gap |  |
+| num | `type` | enum | a-- |  | supported | gap | the node's text |
 | num | `start` | int | a-- |  | write-only | gap |  |
 | num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
 | num | `continue` | bool | a-- |  | write-only | gap |  |
 | num | `numId` | int | --g |  | missing | — |  |
-| numbering | `abstractNumCount` | number | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| numbering | `abstractNumId` | number | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| num | `startOverride.0` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.1` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.2` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.3` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.4` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.5` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.6` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.7` | int |  | --g | litchi-only | — |  |
+| num | `startOverride.8` | int |  | --g | litchi-only | — |  |
+| numbering | `abstractNumCount` | number | --g | --g | supported | — |  |
+| numbering | `abstractNumId` | number | --g |  | missing | — |  |
+| numbering | `numCount` | int |  | --g | litchi-only | — |  |
 | ole | `objectType` | string | --g |  | missing | — |  |
 | ole | `display` | string | --g |  | missing | — |  |
 | ole | `relId` | string | --g |  | missing | — |  |
@@ -1864,6 +1876,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ole | `smallcaps` | bool |  | --g | litchi-only | — |  |
 | ole | `superscript` | bool |  | --g | litchi-only | — |  |
 | ole | `subscript` | bool |  | --g | litchi-only | — |  |
+| ole | `rStyle` | string |  | -sg | litchi-only | litchi-only |  |
 | pagebreak | `type` | enum | a-g |  | supported | gap | the node's text |
 | pagebreak | `breakType` | enum | -sg |  | missing | gap |  |
 | pagebreak | `text` | string |  | -sg | litchi-only | litchi-only |  |
@@ -1878,17 +1891,18 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | pagebreak | `smallcaps` | bool |  | --g | litchi-only | — |  |
 | pagebreak | `superscript` | bool |  | --g | litchi-only | — |  |
 | pagebreak | `subscript` | bool |  | --g | litchi-only | — |  |
+| pagebreak | `rStyle` | string |  | -sg | litchi-only | litchi-only |  |
 | paragraph | `lineRule` | enum | asg |  | missing | gap |  |
 | paragraph | `align` | enum | asg | --g | supported | gap |  |
-| paragraph | `style` | string | asg |  | supported | gap | the node's text |
+| paragraph | `style` | string | asg | -sg | supported | partial |  |
 | paragraph | `spaceBefore` | length | asg | --g | supported | gap |  |
 | paragraph | `spaceAfter` | length | asg | --g | supported | gap |  |
 | paragraph | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
 | paragraph | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
-| paragraph | `listStyle` | enum | asg |  | missing | gap |  |
+| paragraph | `listStyle` | enum | asg | --g | supported | gap |  |
 | paragraph | `numId` | int | asg |  | missing | gap |  |
-| paragraph | `numLevel` | int | asg |  | missing | gap |  |
-| paragraph | `start` | int | as- |  | write-only | gap |  |
+| paragraph | `numLevel` | int | asg | --g | supported | gap |  |
+| paragraph | `start` | int | as- | --g | supported | gap |  |
 | paragraph | `bold` | bool | asg | -s- | write-only | partial |  |
 | paragraph | `italic` | bool | asg | -s- | write-only | partial |  |
 | paragraph | `font` | string | as- | -s- | write-only | partial |  |
@@ -1953,7 +1967,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | paragraph | `effective.underline.src` | string | --g |  | missing | — |  |
 | paragraph | `effective.rtl` | bool | --g |  | missing | — |  |
 | paragraph | `effective.rtl.src` | string | --g |  | missing | — |  |
-| paragraph | `numFmt` | string | --g |  | missing | — |  |
+| paragraph | `numFmt` | string | --g | --g | supported | — |  |
 | paragraph | `fill` | color | asg |  | missing | gap |  |
 | paragraph | `shading.val` | string | -sg |  | missing | gap |  |
 | paragraph | `shading.fill` | string | -sg |  | missing | gap |  |
@@ -2018,6 +2032,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | paragraph | `topLinePunct` | boolean | asg |  | missing | gap |  |
 | paragraph | `indent` | length | asg | --g | supported | gap |  |
 | paragraph | `text` | string | asg | asg | supported | supported |  |
+| paragraph | `styleId` | string |  | -sg | litchi-only | litchi-only |  |
+| paragraph | `styleName` | string |  | -sg | litchi-only | litchi-only |  |
 | permStart | `id` | number | a-g |  | missing | gap |  |
 | permStart | `edGrp` | enum | a-g |  | missing | gap |  |
 | permStart | `ed` | string | a-g |  | missing | gap |  |
@@ -2062,32 +2078,33 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | `smallcaps` | bool |  | --g | litchi-only | — |  |
 | picture | `superscript` | bool |  | --g | litchi-only | — |  |
 | picture | `subscript` | bool |  | --g | litchi-only | — |  |
+| picture | `rStyle` | string |  | -sg | litchi-only | litchi-only |  |
 | ptab | `align` | enum | asg |  | missing | gap |  |
 | ptab | `relativeTo` | enum | asg |  | missing | gap |  |
 | ptab | `leader` | enum | asg |  | missing | gap |  |
-| revision | `type` | enum | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `text` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `author` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `date` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `id` | integer | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `nativePath` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `action` | enum | -s- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `paraMarkIns.author` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `paraMarkIns.date` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `paraMarkIns.id` | int | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `paraMarkDel.author` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `paraMarkDel.date` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `paraMarkDel.id` | int | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `revision.beforeLost` | bool | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `sectPrChange.author` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `sectPrChange.date` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `sectPrChange.id` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `tblPrChange.author` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `tblPrChange.date` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `trPrChange.author` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `trPrChange.date` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `tcPrChange.author` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| revision | `tcPrChange.date` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
+| revision | `type` | enum | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `text` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `author` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `date` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `id` | integer | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `nativePath` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `action` | enum | -s- |  | element gap | gap | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `paraMarkIns.author` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `paraMarkIns.date` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `paraMarkIns.id` | int | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `paraMarkDel.author` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `paraMarkDel.date` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `paraMarkDel.id` | int | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `revision.beforeLost` | bool | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `sectPrChange.author` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `sectPrChange.date` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `sectPrChange.id` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `tblPrChange.author` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `tblPrChange.date` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `trPrChange.author` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `trPrChange.date` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `tcPrChange.author` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
+| revision | `tcPrChange.date` | string | --g |  | element gap | — | record 0324 follow-up 2: DOC revision nodes and accept/reject (P2) |
 | run | `highlight` | color | asg |  | missing | gap |  |
 | run | `strike` | bool | asg | --g | supported | gap |  |
 | run | `dstrike` | bool | asg |  | missing | gap |  |
@@ -2166,171 +2183,184 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `italic` | bool | asg | -sg | supported | partial |  |
 | run | `size` | font-size | asg | -sg | supported | partial |  |
 | run | `text` | string | asg | -sg | supported | partial |  |
-| sdt | `type` | enum | a-g |  | missing | gap |  |
-| sdt | `tag` | string | asg |  | missing | gap |  |
-| sdt | `alias` | string | asg |  | missing | gap |  |
-| sdt | `text` | string | asg |  | missing | gap |  |
-| sdt | `checked` | bool | asg |  | missing | gap |  |
-| sdt | `format` | string | asg |  | missing | gap |  |
-| sdt | `items` | string | asg |  | missing | gap |  |
-| sdt | `lock` | enum | asg |  | missing | gap |  |
-| sdt | `placeholder` | bool | asg |  | missing | gap |  |
-| sdt | `placeholderText` | string | asg |  | missing | gap |  |
-| sdt | `date.fullDate` | string | asg |  | missing | gap |  |
-| sdt | `date.calendar` | string | asg |  | missing | gap |  |
-| sdt | `date.lid` | string | asg |  | missing | gap |  |
-| sdt | `date.storeMappedDataAs` | string | asg |  | missing | gap |  |
-| sdt | `comboBox.lastValue` | string | asg |  | missing | gap |  |
-| sdt | `dropDown.lastValue` | string | asg |  | missing | gap |  |
-| sdt | `id` | number | --g |  | missing | — |  |
-| sdt | `editable` | bool | --g |  | missing | — |  |
-| section | `type` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pageWidth` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pageHeight` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `orientation` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `marginTop` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `marginBottom` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `marginLeft` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `marginRight` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `marginHeader` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `marginFooter` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `marginGutter` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `columns` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `columnSpace` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `titlePage` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pageNumFmt` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `direction` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `rtlGutter` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pageStart` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `lineNumbers` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `lineNumberCountBy` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `lineNumberDistance` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `headerRef` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `headerRef.default` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `headerRef.first` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `headerRef.even` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footerRef` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footerRef.default` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footerRef.first` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footerRef.even` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `colSpaces` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `columns.equalWidth` | bool | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `columns.separator` | bool | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders` | enum | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders.top` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders.left` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders.bottom` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders.right` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders.offsetFrom` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders.zOrder` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `pgBorders.display` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `paperSrc.first` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `paperSrc.other` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `formProt` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `vAlign` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `textDirection` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footnotePr.numFmt` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footnotePr.numRestart` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footnotePr.numStart` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `footnotePr.pos` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `endnotePr.numFmt` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `endnotePr.numRestart` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `endnotePr.numStart` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| section | `endnotePr.pos` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `geometry` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `width` | length | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `height` | length | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `wrap` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `hAlign` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `vAlign` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `hRelative` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `vRelative` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `anchor.x` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `anchor.y` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `fill` | color | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `line` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `line.color` | color | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `line.width` | length | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `line.style` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| shape | `alt` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `id` | string | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `name` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `type` | enum | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `basedOn` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `basedOn.path` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `next` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `linked` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `qFormat` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `uiPriority` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `semiHidden` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `unhideWhenUsed` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `locked` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `customStyle` | bool | a-g |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `align` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `spaceBefore` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `spaceAfter` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `spaceBeforeAuto` | boolean | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `spaceAfterAuto` | boolean | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `font` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `font.ea` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `font.cs` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `font.asciiTheme` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `font.hAnsiTheme` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `font.eaTheme` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `font.csTheme` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `size` | font-size | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `bold` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `italic` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `color` | color | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `underline` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `strike` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `dstrike` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `highlight` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `caps` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `smallCaps` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `vanish` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `rtl` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `vertAlign` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `charSpacing` | length | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `shading` | color | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `lineSpacing` | string | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `lineRule` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `contextualSpacing` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `outlineLvl` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `kinsoku` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `snapToGrid` | bool | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `wordWrap` | bool | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `autoSpaceDE` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `autoSpaceDN` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `bidi` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `direction` | enum | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `overflowPunct` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `topLinePunct` | bool | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `suppressAutoHyphens` | bool | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `suppressLineNumbers` | bool | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `keepNext` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `keepLines` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `pageBreakBefore` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `widowControl` | bool | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `pbdr` | string | -s- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `numId` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `ilvl` | int | asg |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.alignment` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.alignment.src` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.direction` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.direction.src` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.highlight` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.lineSpacing` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.lineSpacing.src` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.spaceBefore` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.spaceBefore.src` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.spaceAfter` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.spaceAfter.src` | string | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| style | `effective.strike` | bool | --g |  | element gap | — | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| styles | `count` | number | --g |  | missing | — |  |
-| tab | `pos` | length | asg |  | missing | gap |  |
-| tab | `val` | enum | asg |  | missing | gap |  |
-| tab | `leader` | enum | asg |  | missing | gap |  |
+| run | `rStyle` | string |  | -sg | litchi-only | litchi-only |  |
+| sdt | `type` | enum | a-g |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `tag` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `alias` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `text` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `checked` | bool | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `format` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `items` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `lock` | enum | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `placeholder` | bool | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `placeholderText` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.fullDate` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.calendar` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.lid` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `date.storeMappedDataAs` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `comboBox.lastValue` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `dropDown.lastValue` | string | asg |  | element gap | gap | none: content controls are DOCX-only |
+| sdt | `id` | number | --g |  | element gap | — | none: content controls are DOCX-only |
+| sdt | `editable` | bool | --g |  | element gap | — | none: content controls are DOCX-only |
+| section | `type` | enum | asg | -sg | supported | partial |  |
+| section | `pageWidth` | length | asg | -sg | supported | partial |  |
+| section | `pageHeight` | length | asg | -sg | supported | partial |  |
+| section | `orientation` | enum | asg | -sg | supported | partial |  |
+| section | `marginTop` | length | asg | -sg | supported | partial |  |
+| section | `marginBottom` | length | asg | -sg | supported | partial |  |
+| section | `marginLeft` | length | asg | -sg | supported | partial |  |
+| section | `marginRight` | length | asg | -sg | supported | partial |  |
+| section | `marginHeader` | length | asg | -sg | supported | partial |  |
+| section | `marginFooter` | length | asg | -sg | supported | partial |  |
+| section | `marginGutter` | length | asg | -sg | supported | partial |  |
+| section | `columns` | int | asg | -sg | supported | partial |  |
+| section | `columnSpace` | length | asg | -sg | supported | partial |  |
+| section | `titlePage` | bool | asg | -sg | supported | partial |  |
+| section | `pageNumFmt` | enum | asg | --g | supported | gap |  |
+| section | `direction` | enum | asg | --g | supported | gap |  |
+| section | `rtlGutter` | bool | asg | --g | supported | gap |  |
+| section | `pageStart` | int | asg | --g | supported | gap |  |
+| section | `lineNumbers` | enum | asg | --g | supported | gap |  |
+| section | `lineNumberCountBy` | int | asg | --g | supported | gap |  |
+| section | `lineNumberDistance` | int | asg | --g | supported | gap |  |
+| section | `headerRef` | string | --g |  | missing | — |  |
+| section | `headerRef.default` | string | --g |  | missing | — |  |
+| section | `headerRef.first` | string | --g |  | missing | — |  |
+| section | `headerRef.even` | string | --g |  | missing | — |  |
+| section | `footerRef` | string | --g |  | missing | — |  |
+| section | `footerRef.default` | string | --g |  | missing | — |  |
+| section | `footerRef.first` | string | --g |  | missing | — |  |
+| section | `footerRef.even` | string | --g |  | missing | — |  |
+| section | `colSpaces` | string | --g |  | missing | — |  |
+| section | `columns.equalWidth` | bool | --g |  | missing | — |  |
+| section | `columns.separator` | bool | --g | --g | supported | — |  |
+| section | `pgBorders` | enum | as- |  | write-only | gap |  |
+| section | `pgBorders.top` | string | asg |  | missing | gap |  |
+| section | `pgBorders.left` | string | asg |  | missing | gap |  |
+| section | `pgBorders.bottom` | string | asg |  | missing | gap |  |
+| section | `pgBorders.right` | string | asg |  | missing | gap |  |
+| section | `pgBorders.offsetFrom` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.zOrder` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.display` | enum | asg |  | missing | gap |  |
+| section | `paperSrc.first` | int | asg |  | missing | gap |  |
+| section | `paperSrc.other` | int | asg |  | missing | gap |  |
+| section | `formProt` | bool | asg |  | missing | gap |  |
+| section | `vAlign` | enum | asg | -sg | supported | partial |  |
+| section | `textDirection` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `footnotePr.pos` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `endnotePr.pos` | enum | asg |  | missing | gap |  |
+| shape | `geometry` | string | as- |  | write-only | gap |  |
+| shape | `width` | length | as- | --g | supported | gap |  |
+| shape | `height` | length | as- | --g | supported | gap |  |
+| shape | `wrap` | enum | a-- | --g | supported | gap |  |
+| shape | `hAlign` | enum | a-- |  | write-only | gap |  |
+| shape | `vAlign` | enum | a-- |  | write-only | gap |  |
+| shape | `hRelative` | enum | a-- | --g | supported | gap |  |
+| shape | `vRelative` | enum | a-- | --g | supported | gap |  |
+| shape | `anchor.x` | length | a-- | --g | supported | gap |  |
+| shape | `anchor.y` | length | a-- | --g | supported | gap |  |
+| shape | `fill` | color | as- |  | write-only | gap |  |
+| shape | `line` | string | as- |  | write-only | gap |  |
+| shape | `line.color` | color | as- |  | write-only | gap |  |
+| shape | `line.width` | length | as- |  | write-only | gap |  |
+| shape | `line.style` | string | as- |  | write-only | gap |  |
+| shape | `alt` | string | a-- |  | write-only | gap |  |
+| shape | `behindDoc` | bool |  | --g | litchi-only | — |  |
+| style | `id` | string | a-g | --g | supported | gap |  |
+| style | `name` | string | asg | --g | supported | gap |  |
+| style | `type` | enum | a-g | --g | supported | gap |  |
+| style | `basedOn` | string | asg | --g | supported | gap |  |
+| style | `basedOn.path` | string | --g |  | missing | — |  |
+| style | `next` | string | asg | --g | supported | gap |  |
+| style | `linked` | string | asg | --g | supported | gap |  |
+| style | `qFormat` | bool | asg | --g | supported | gap |  |
+| style | `uiPriority` | int | asg | --g | supported | gap |  |
+| style | `semiHidden` | bool | asg | --g | supported | gap |  |
+| style | `unhideWhenUsed` | bool | asg | --g | supported | gap |  |
+| style | `locked` | bool | asg | --g | supported | gap |  |
+| style | `customStyle` | bool | a-g | --g | supported | gap |  |
+| style | `align` | enum | asg | --g | supported | gap |  |
+| style | `spaceBefore` | length | asg | --g | supported | gap |  |
+| style | `spaceAfter` | length | asg | --g | supported | gap |  |
+| style | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
+| style | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
+| style | `font` | string | asg | --g | supported | gap |  |
+| style | `font.ea` | string | asg | --g | supported | gap |  |
+| style | `font.cs` | string | asg | --g | supported | gap |  |
+| style | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| style | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| style | `font.eaTheme` | string | asg |  | missing | gap |  |
+| style | `font.csTheme` | string | asg |  | missing | gap |  |
+| style | `size` | font-size | asg | --g | supported | gap |  |
+| style | `bold` | bool | asg | --g | supported | gap |  |
+| style | `italic` | bool | asg | --g | supported | gap |  |
+| style | `color` | color | asg | --g | supported | gap |  |
+| style | `underline` | string | asg | --g | supported | gap |  |
+| style | `strike` | bool | asg | --g | supported | gap |  |
+| style | `dstrike` | bool | asg | --g | supported | gap |  |
+| style | `highlight` | string | asg | --g | supported | gap |  |
+| style | `caps` | bool | asg | --g | supported | gap |  |
+| style | `smallCaps` | bool | asg | --g | supported | gap |  |
+| style | `vanish` | bool | asg | --g | supported | gap |  |
+| style | `rtl` | bool | asg |  | missing | gap |  |
+| style | `vertAlign` | enum | asg |  | missing | gap |  |
+| style | `charSpacing` | length | asg | --g | supported | gap |  |
+| style | `shading` | color | asg |  | missing | gap |  |
+| style | `lineSpacing` | string | asg |  | missing | gap |  |
+| style | `lineRule` | enum | asg |  | missing | gap |  |
+| style | `contextualSpacing` | bool | asg | --g | supported | gap |  |
+| style | `outlineLvl` | int | asg | --g | supported | gap |  |
+| style | `kinsoku` | bool | asg |  | missing | gap |  |
+| style | `snapToGrid` | bool | as- |  | write-only | gap |  |
+| style | `wordWrap` | bool | as- |  | write-only | gap |  |
+| style | `autoSpaceDE` | bool | asg |  | missing | gap |  |
+| style | `autoSpaceDN` | bool | asg |  | missing | gap |  |
+| style | `bidi` | bool | asg |  | missing | gap |  |
+| style | `direction` | enum | asg |  | missing | gap |  |
+| style | `overflowPunct` | bool | asg |  | missing | gap |  |
+| style | `topLinePunct` | bool | as- |  | write-only | gap |  |
+| style | `suppressAutoHyphens` | bool | as- |  | write-only | gap |  |
+| style | `suppressLineNumbers` | bool | as- |  | write-only | gap |  |
+| style | `keepNext` | bool | asg | --g | supported | gap |  |
+| style | `keepLines` | bool | asg | --g | supported | gap |  |
+| style | `pageBreakBefore` | bool | asg | --g | supported | gap |  |
+| style | `widowControl` | bool | asg | --g | supported | gap |  |
+| style | `pbdr` | string | -s- |  | write-only | gap |  |
+| style | `numId` | int | asg |  | missing | gap |  |
+| style | `ilvl` | int | asg |  | missing | gap |  |
+| style | `effective.alignment` | string | --g |  | missing | — |  |
+| style | `effective.alignment.src` | string | --g |  | missing | — |  |
+| style | `effective.direction` | string | --g |  | missing | — |  |
+| style | `effective.direction.src` | string | --g |  | missing | — |  |
+| style | `effective.highlight` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter.src` | string | --g |  | missing | — |  |
+| style | `effective.strike` | bool | --g |  | missing | — |  |
+| style | `default` | bool |  | --g | litchi-only | — |  |
+| style | `autoRedefine` | bool |  | --g | litchi-only | — |  |
+| style | `hidden` | bool |  | --g | litchi-only | — |  |
+| style | `size.cs` | font-size |  | --g | litchi-only | — |  |
+| style | `bold.cs` | bool |  | --g | litchi-only | — |  |
+| style | `italic.cs` | bool |  | --g | litchi-only | — |  |
+| style | `superscript` | bool |  | --g | litchi-only | — |  |
+| style | `subscript` | bool |  | --g | litchi-only | — |  |
+| style | `firstLineIndent` | length |  | --g | litchi-only | — |  |
+| style | `leftIndent` | length |  | --g | litchi-only | — |  |
+| style | `rightIndent` | length |  | --g | litchi-only | — |  |
+| styles | `count` | number | --g | --g | supported | — |  |
+| tab | `pos` | length | asg | asg | supported | supported |  |
+| tab | `val` | enum | asg | asg | supported | supported |  |
+| tab | `leader` | enum | asg | asg | supported | supported |  |
 | cell | `width` | string | asg |  | missing | gap |  |
 | cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
 | cell | `font` | string | -sg |  | missing | gap |  |
@@ -2404,46 +2434,46 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | table | `rows` | int | a-g | --g | supported | gap |  |
 | table | `width` | string | asg |  | missing | gap |  |
 | table | `style` | string | asg |  | supported | gap | the node's text |
-| textbox | `text` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `width` | length | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `height` | length | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `geometry` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `wrap` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `hAlign` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `vAlign` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `hRelative` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `vRelative` | enum | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `anchor.x` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `anchor.y` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `fill` | color | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `fill.gradient` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `fill.opacity` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `line.color` | color | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `line.width` | length | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `line.style` | string | as- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `inset.left` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `inset.top` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `inset.right` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `inset.bottom` | length | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `textDirection` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `textAnchor` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `autoFit` | bool | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `rotation` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `shadow` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| textbox | `alt` | string | a-- |  | element gap | gap | record 0258 follow-up (DOC read+write loop beyond the P0 surface) |
-| toc | `levels` | string | asg |  | missing | gap |  |
+| textbox | `text` | string | a-- |  | supported | gap | the node's text |
+| textbox | `width` | length | as- | --g | supported | gap |  |
+| textbox | `height` | length | as- | --g | supported | gap |  |
+| textbox | `geometry` | string | as- |  | write-only | gap |  |
+| textbox | `wrap` | enum | a-- |  | write-only | gap |  |
+| textbox | `hAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `vAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `hRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `vRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `anchor.x` | length | a-- |  | write-only | gap |  |
+| textbox | `anchor.y` | length | a-- |  | write-only | gap |  |
+| textbox | `fill` | color | as- |  | write-only | gap |  |
+| textbox | `fill.gradient` | string | a-- |  | write-only | gap |  |
+| textbox | `fill.opacity` | string | a-- |  | write-only | gap |  |
+| textbox | `line.color` | color | as- |  | write-only | gap |  |
+| textbox | `line.width` | length | as- |  | write-only | gap |  |
+| textbox | `line.style` | string | as- |  | write-only | gap |  |
+| textbox | `inset.left` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.top` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.right` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.bottom` | length | a-- |  | write-only | gap |  |
+| textbox | `textDirection` | string | a-- |  | write-only | gap |  |
+| textbox | `textAnchor` | string | a-- |  | write-only | gap |  |
+| textbox | `autoFit` | bool | a-- |  | write-only | gap |  |
+| textbox | `rotation` | string | a-- |  | write-only | gap |  |
+| textbox | `shadow` | string | a-- |  | write-only | gap |  |
+| textbox | `alt` | string | a-- |  | write-only | gap |  |
+| toc | `levels` | string | asg | --g | supported | gap |  |
 | toc | `title` | string | asg |  | missing | gap |  |
-| toc | `hyperlinks` | bool | asg |  | missing | gap |  |
-| toc | `pageNumbers` | bool | asg |  | missing | gap |  |
-| watermark | `text` | string | asg |  | missing | gap |  |
-| watermark | `image` | string | as- |  | write-only | gap |  |
-| watermark | `color` | color | asg |  | missing | gap |  |
-| watermark | `font` | string | asg |  | missing | gap |  |
-| watermark | `rotation` | int | asg |  | missing | gap |  |
-| watermark | `opacity` | string | asg |  | missing | gap |  |
-| watermark | `size` | string | asg |  | missing | gap |  |
-| watermark | `width` | string | asg |  | missing | gap |  |
-| watermark | `height` | string | asg |  | missing | gap |  |
+| toc | `hyperlinks` | bool | asg | --g | supported | gap |  |
+| toc | `pageNumbers` | bool | asg | --g | supported | gap |  |
+| watermark | `text` | string | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `image` | string | as- |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `color` | color | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `font` | string | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `rotation` | int | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `opacity` | string | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `size` | string | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `width` | string | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
+| watermark | `height` | string | asg |  | element gap | gap | record 0324 follow-up 6: the DOC header WordArt watermark |
 
 ### Contextual operation gaps
 
