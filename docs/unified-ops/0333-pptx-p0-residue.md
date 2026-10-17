@@ -2,7 +2,7 @@
 
 - Status: implemented on `uo2/pptx-p0`, cut from `feat/unified-ops-api` at
   `d761892de3`; trunk merged at `84ef2cd65e` (records 0327, 0328, 0329,
-  0332).
+  0332) and again at `92d622b38f` (record 0335).
 - Date: 2026-10-17
 - Input: the definition-of-done audit of 2026-10-17 (§2, WP3): in design §13's
   P0 table, PPTX "Basic CRUD verbs" and "Comments" were partly met
@@ -238,7 +238,8 @@ cache would trim it (follow-up F6).
 
 ## 7. Gates
 
-Run on the merged tree (`84ef2cd65e` merged, the record commit on top);
+Run on the merged tree (`92d622b38f` merged, the record commits on top),
+once before the second merge and again, all green, after it;
 cargo through the memory-capped shim, `CARGO_BUILD_JOBS=6`,
 `RUST_TEST_THREADS=8`; every exit status checked
 (`.coord/pptx-p0/gate-logs/summary.txt`).
