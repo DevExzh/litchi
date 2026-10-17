@@ -51,12 +51,18 @@ pub(crate) struct Cache {
     story_kinds: OnceLock<Vec<Option<StoryKind>>>,
     footnotes: OnceLock<Vec<Note>>,
     endnotes: OnceLock<Vec<Note>>,
+    /// The main story's bookmarks and fields, read on first use (record
+    /// 0325; the marks of record 0319).
+    pub(super) bookmarks: OnceLock<Vec<litchi_docx::bookmark::Bookmark>>,
+    pub(super) fields: OnceLock<Vec<litchi_docx::Field>>,
 }
 
 /// One header or footer part, with its payload read on first use.
 pub(crate) struct Story {
     part: StoryPart,
     xml: OnceLock<Arc<Vec<u8>>>,
+    /// The story's block index, built on first use (record 0325).
+    blocks: OnceLock<litchi_docx::Blocks>,
 }
 
 impl Story {
@@ -120,6 +126,7 @@ pub(super) fn stories(docx: &Docx) -> Result<&[Story]> {
         .map(|part| Story {
             part,
             xml: OnceLock::new(),
+            blocks: OnceLock::new(),
         })
         .collect();
     Ok(cache.stories.get_or_init(|| stories))
@@ -269,10 +276,19 @@ fn ordinal_u32(index: usize) -> u32 {
 pub(super) fn story_blocks(docx: &Docx, value: PartValue) -> Result<Option<litchi_docx::Blocks>> {
     let blocks = match value {
         PartValue::Story(index) => {
+            let story = stories(docx)?
+                .get(index as usize)
+                .ok_or_else(|| internal("a DOCX story index is outside the story list"))?;
+            if let Some(blocks) = story.blocks.get() {
+                docx.owner().check_source()?;
+                return Ok(Some(blocks.clone()));
+            }
             let xml = story_xml(docx, index as usize)?;
-            litchi_docx::header_footer::Story::from_shared_bytes(xml, StoryKind::Primary)
-                .and_then(|story| story.blocks())
-                .map_err(Error::from)?
+            let blocks =
+                litchi_docx::header_footer::Story::from_shared_bytes(xml, StoryKind::Primary)
+                    .and_then(|story| story.blocks())
+                    .map_err(Error::from)?;
+            story.blocks.get_or_init(|| blocks).clone()
         },
         PartValue::Note(kind, index) => notes(docx, kind)?
             .get(index as usize)

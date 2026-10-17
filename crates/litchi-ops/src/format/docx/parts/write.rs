@@ -908,16 +908,13 @@ impl Docx {
         let WorkEdit::Eager(eager) = &mut edit else {
             return Err(refusal("numbering needs the owning package editor"));
         };
-        let added = eager.add_abstract_num(&definition).map_err(Error::from)?;
+        // The schema puts every definition before the instances, and the
+        // leaf appends a new one after the last (record 0325): its ordinal
+        // is the handle's definition count, read without reparsing the
+        // committed part.
+        let ordinal = super::numbering(self)?.map_or(0, |catalog| catalog.abstract_nums().len());
+        let _ = eager.add_abstract_num(&definition).map_err(Error::from)?;
         let commit = edit.commit(self)?;
-        let ordinal = super::numbering(commit.file())?
-            .and_then(|catalog| {
-                catalog
-                    .abstract_nums()
-                    .iter()
-                    .position(|entry| entry.id() == added)
-            })
-            .ok_or_else(|| refusal("the new numbering definition is not in the numbering part"))?;
         Ok((commit, numbering_path("abstractNum", ordinal)))
     }
 

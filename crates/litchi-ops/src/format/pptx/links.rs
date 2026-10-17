@@ -132,6 +132,10 @@ pub(super) fn of_shape(file: &Pptx, tree: &TreeItem) -> Result<Option<LinkItem>>
     if !matches!(tree.kind, Kind::Shape | Kind::Placeholder) {
         return Ok(None);
     }
+    // Neither the shape nor its runs can carry a click without the markup.
+    if !litchi_pptx::hyperlinks::mentions_click(tree.handle.view().xml()?) {
+        return Ok(None);
+    }
     let Some(slide) = tree.container.slide() else {
         return Ok(None);
     };

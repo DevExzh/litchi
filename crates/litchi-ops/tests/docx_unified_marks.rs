@@ -376,7 +376,8 @@ fn fields_go_into_story_paragraphs_and_take_officecli_types() {
             NewNode::new("field").prop("fieldType", "page"),
         )
         .unwrap();
-    assert_eq!(added.path.to_string(), "/footer[1]/p[1]/r[2]");
+    // The result run, as OfficeCLI returns it.
+    assert_eq!(added.path.to_string(), "/footer[1]/p[1]/r[5]");
     let file = added
         .file
         .add(

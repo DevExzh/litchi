@@ -368,7 +368,7 @@ docx	field	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/
 docx	field	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx
 docx	field	view	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /field[1]
 docx	field	set	supported		ok `seed + add field` /field[1] {"instruction":"Litchi"}
-docx	field	add	supported		ok /field[1] on `seed` under /body/p[1] {"fieldType":"page"}
+docx	field	add	supported		ok /body/p[1]/r[5] on `seed` under /body/p[1] {"fieldType":"page"}
 docx	field	remove	n/a	remove not offered for this element	-
 docx	field	move	format-verb		refused unsupported_capability
 docx	field	swap	format-verb		refused unsupported_capability

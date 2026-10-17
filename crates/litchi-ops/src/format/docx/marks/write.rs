@@ -783,6 +783,16 @@ impl Docx {
     /// The direct run of `parent` (a paragraph) a new inline mark goes
     /// before, from the add's placement: `None` appends.
     fn mark_run_position(&self, parent: &Node<'_>, node: &NewNode<'_>) -> Result<Option<Position>> {
+        Ok(self.mark_run_slot(parent, node)?.0)
+    }
+
+    /// [`Self::mark_run_position`], with the addressable-run ordinal the
+    /// new mark's first run takes.
+    fn mark_run_slot(
+        &self,
+        parent: &Node<'_>,
+        node: &NewNode<'_>,
+    ) -> Result<(Option<Position>, usize)> {
         let Value::Paragraph { paragraph, .. } = &parent.value else {
             return Err(refusal("the mark parent holds no paragraph"));
         };
@@ -795,10 +805,10 @@ impl Docx {
             node.placement(),
         )?;
         match at {
-            None => Ok(None),
-            Some(index) if index >= locations.len() => Ok(None),
+            None => Ok((None, locations.len())),
+            Some(index) if index >= locations.len() => Ok((None, locations.len())),
             Some(index) => match locations.get(index).map(Vec::as_slice) {
-                Some([ElementStep::Run(run)]) => Ok(Some(*run)),
+                Some([ElementStep::Run(run)]) => Ok((Some(*run), index)),
                 _ => Err(refusal(
                     "a bookmark or field goes beside a direct run of the paragraph",
                 )),
@@ -911,8 +921,9 @@ impl Docx {
         Ok((commit, mark_path("bookmark", position)))
     }
 
-    /// `add` of a field: under a paragraph before a run, or under the body
-    /// in a new paragraph.
+    /// `add` of a field: under a paragraph (of the body, a header, a footer
+    /// or a note) before a run, or under the body in a new paragraph. The
+    /// path returned is the field's result run, as OfficeCLI returns it.
     fn add_field(
         &self,
         editor: DocxEditor,
@@ -935,84 +946,82 @@ impl Docx {
             },
         };
         let result = values.text.clone().or(result);
-        // A field in a header, footer or note paragraph (record 0325): its
-        // path is its begin run's.
-        if parent.element_kind() == Kind::Paragraph
-            && let Some((key, path)) = super::super::element::story_path(parent)?
-        {
-            let at = self.mark_run_position(parent, node)?;
-            let Value::Paragraph { paragraph, .. } = &parent.value else {
-                return Err(refusal("the field parent holds no paragraph"));
-            };
-            let ordinal = match at {
-                None => run_locations(self, paragraph)?.len(),
-                Some(run) => run_locations(self, paragraph)?
-                    .iter()
-                    .position(|location| location.as_slice() == [ElementStep::Run(run)])
-                    .unwrap_or(0),
-            };
-            let mut edit = self.eager_work(editor)?;
-            let WorkEdit::Eager(eager) = &mut edit else {
-                return Err(refusal("fields need the owning package editor"));
-            };
-            eager.edit_story(
-                super::super::story::target(&key),
-                |story| -> Result<Position> {
-                    Ok(story.insert_field_at(&path, at, &instruction, result.as_deref())?)
-                },
-            )?;
-            let commit = edit.commit(self)?;
-            return Ok((
-                commit,
-                path_with(parent, Some((Kind::Run, Position::new(ordinal)))),
-            ));
-        }
-        let before = super::fields(self)?;
-        let mut edit;
+        // The result run follows the begin, instruction and separate runs;
+        // without a result, the separate run is the last before the end.
+        let offset = if result.as_deref().is_some_and(|result| !result.is_empty()) {
+            3
+        } else {
+            2
+        };
         match parent.element_kind() {
             Kind::Paragraph => {
-                let path = element_path(parent)?;
-                let at = self.mark_run_position(parent, node)?;
-                edit = self.eager_work(editor)?;
+                let (at, ordinal) = self.mark_run_slot(parent, node)?;
+                let story = super::super::element::story_path(parent)?;
+                let path = match &story {
+                    Some((_, path)) => path.clone(),
+                    None => element_path(parent)?,
+                };
+                let mut edit = self.eager_work(editor)?;
                 let WorkEdit::Eager(eager) = &mut edit else {
                     return Err(refusal("fields need the owning package editor"));
                 };
-                eager
-                    .insert_field_at(&path, at, &instruction, result.as_deref())
-                    .map_err(Error::from)?;
+                match &story {
+                    // A header, footer or note paragraph (record 0325).
+                    Some((key, _)) => {
+                        eager.edit_story(
+                            super::super::story::target(key),
+                            |story| -> Result<Position> {
+                                Ok(story.insert_field_at(
+                                    &path,
+                                    at,
+                                    &instruction,
+                                    result.as_deref(),
+                                )?)
+                            },
+                        )?;
+                    },
+                    None => {
+                        eager
+                            .insert_field_at(&path, at, &instruction, result.as_deref())
+                            .map_err(Error::from)?;
+                    },
+                }
+                let commit = edit.commit(self)?;
+                Ok((
+                    commit,
+                    path_with(parent, Some((Kind::Run, Position::new(ordinal + offset)))),
+                ))
             },
             Kind::Body => {
-                edit = self.eager_work(editor)?;
-                let path = self.new_mark_paragraph(
-                    &mut edit,
-                    node,
-                    &litchi_docx::document::NewParagraph::new(),
-                )?;
+                let mut edit = self.eager_work(editor)?;
+                let anchor = super::super::structure::body_anchor(self, node.placement(), false)?;
+                let position =
+                    edit.insert_paragraph(anchor, &litchi_docx::document::NewParagraph::new())?;
                 let WorkEdit::Eager(eager) = &mut edit else {
                     return Err(refusal("fields need the owning package editor"));
                 };
                 eager
-                    .insert_field_at(&path, None, &instruction, result.as_deref())
+                    .insert_field_at(
+                        &ElementPath::new([ElementStep::Paragraph(position)]),
+                        None,
+                        &instruction,
+                        result.as_deref(),
+                    )
                     .map_err(Error::from)?;
+                let commit = edit.commit(self)?;
+                let paragraph = path_with(parent, Some((Kind::Paragraph, position)));
+                let mut steps = paragraph.steps().to_vec();
+                steps.push(
+                    PathStep::new(Kind::Run.step_name())
+                        .with(Predicate::Index(Position::new(offset))),
+                );
+                Ok((commit, Path::from_steps(steps)))
             },
-            _ => {
-                return Err(error(
-                    Code::UnsupportedCapability,
-                    "a field is added under a paragraph or the body",
-                ));
-            },
+            _ => Err(error(
+                Code::UnsupportedCapability,
+                "a field is added under a paragraph or the body",
+            )),
         }
-        let commit = edit.commit(self)?;
-        let after = super::fields(commit.file())?;
-        let position = before
-            .iter()
-            .zip(&after)
-            .position(|(old, new)| old.instruction() != new.instruction())
-            .unwrap_or(before.len());
-        if after.len() != before.len() + 1 {
-            return Err(refusal("the new field did not read back"));
-        }
-        Ok((commit, mark_path("field", position)))
     }
 
     /// `add` of a table of contents under the body: one paragraph holding a
@@ -1125,6 +1134,36 @@ impl Docx {
         Ok(ordinal)
     }
 
+    /// The index position of a field node when the index lists the fields
+    /// as the read side does: the node's ordinal (among tables of contents,
+    /// for a TOC) names a field of the same instruction.
+    fn direct_field_index(
+        node: &Node<'_>,
+        field: &litchi_docx::Field,
+        index: &Fields,
+    ) -> Option<usize> {
+        let ordinal = node.address.steps().last()?.ordinal as usize;
+        let position = if node.element_kind() == Kind::Toc {
+            index
+                .fields()
+                .iter()
+                .enumerate()
+                .filter(|(_, candidate)| {
+                    candidate
+                        .instruction()
+                        .split_whitespace()
+                        .next()
+                        .is_some_and(|word| word.eq_ignore_ascii_case("TOC"))
+                })
+                .nth(ordinal)?
+                .0
+        } else {
+            ordinal
+        };
+        (index.fields().get(position)?.instruction().trim() == field.instruction().trim())
+            .then_some(position)
+    }
+
     /// `set` of bookmarks (`name`), fields (`instruction`, `text`) and
     /// tables of contents (`levels`, `hyperlinks`, `pageNumbers`), planned
     /// over one field index and spliced in one leaf call.
@@ -1156,8 +1195,6 @@ impl Docx {
                 .with_property("name"));
             }
         }
-        let document = super::fields(self)?;
-        let read_bookmarks = super::bookmarks(self)?;
         let mut edit = self.eager_work(editor)?;
         let WorkEdit::Eager(eager) = &mut edit else {
             return Err(refusal(
@@ -1165,6 +1202,9 @@ impl Docx {
             ));
         };
         let index = eager.fields().map_err(Error::from)?;
+        // The read side's field list, only when a field's position in the
+        // index is not proven from the node alone.
+        let mut document: Option<&[litchi_docx::Field]> = None;
         let mut updates = Vec::with_capacity(nodes.len() * 2);
         for node in nodes {
             let Value::Mark(mark) = &node.value else {
@@ -1176,7 +1216,7 @@ impl Docx {
                         continue;
                     };
                     if name != bookmark.name()
-                        && read_bookmarks.iter().any(|other| other.name() == name)
+                        && index.bookmarks().iter().any(|other| other.name() == name)
                     {
                         return Err(
                             error(Code::DuplicateName, "a bookmark with this name exists")
@@ -1191,13 +1231,22 @@ impl Docx {
                     });
                 },
                 MarkValue::Field(field) | MarkValue::Toc(field) => {
-                    let wanted = Self::field_position(node, &document)?;
-                    let position = field_index(&document, &index, wanted).ok_or_else(|| {
-                        error(
-                            Code::UnsupportedCapability,
-                            "this field is not one the field index can rewrite",
-                        )
-                    })?;
+                    let position = match Self::direct_field_index(node, field, &index) {
+                        Some(position) => position,
+                        None => {
+                            let document = match &mut document {
+                                Some(document) => document,
+                                slot => slot.insert(super::fields(self)?),
+                            };
+                            let wanted = Self::field_position(node, document)?;
+                            field_index(document, &index, wanted).ok_or_else(|| {
+                                error(
+                                    Code::UnsupportedCapability,
+                                    "this field is not one the field index can rewrite",
+                                )
+                            })?
+                        },
+                    };
                     let instruction = match kind {
                         Kind::Toc => (values.levels.is_some()
                             || values.hyperlinks.is_some()
@@ -1275,8 +1324,8 @@ impl Docx {
                     .map_err(Error::from)?;
             },
             MarkValue::Toc(_) => {
-                let wanted = Self::field_position(node, &document)?;
-                let position = field_index(&document, &index, wanted)
+                let wanted = Self::field_position(node, document)?;
+                let position = field_index(document, &index, wanted)
                     .ok_or_else(|| error(Code::PathNotFound, "the table of contents is gone"))?;
                 let (first, last) = index.fields()[position].paragraphs();
                 let paragraphs = index.paragraphs();

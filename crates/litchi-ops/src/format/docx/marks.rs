@@ -97,20 +97,34 @@ fn source_or<T>(
     docx.owner().finish(result)
 }
 
-pub(super) fn bookmarks(docx: &Docx) -> Result<Vec<Bookmark>> {
-    source_or(
+/// The main story's bookmarks, read once per handle.
+pub(super) fn bookmarks(docx: &Docx) -> Result<&[Bookmark]> {
+    let cache = &docx.parts().bookmarks;
+    if let Some(bookmarks) = cache.get() {
+        docx.owner().check_source()?;
+        return Ok(bookmarks);
+    }
+    let loaded = source_or(
         docx,
         |package| package.document()?.bookmarks(),
         |package| package.document()?.bookmarks(),
-    )
+    )?;
+    Ok(cache.get_or_init(|| loaded))
 }
 
-pub(super) fn fields(docx: &Docx) -> Result<Vec<Field>> {
-    source_or(
+/// The main story's fields, read once per handle.
+pub(super) fn fields(docx: &Docx) -> Result<&[Field]> {
+    let cache = &docx.parts().fields;
+    if let Some(fields) = cache.get() {
+        docx.owner().check_source()?;
+        return Ok(fields);
+    }
+    let loaded = source_or(
         docx,
         |package| package.document()?.fields(),
         |package| package.document()?.fields(),
-    )
+    )?;
+    Ok(cache.get_or_init(|| loaded))
 }
 
 pub(super) fn is_toc(field: &Field) -> bool {
@@ -258,8 +272,8 @@ pub(super) fn child<'f>(
         },
         (Value::Document, Kind::Field | Kind::Toc) => {
             let toc = kind == Kind::Toc;
-            let all: Vec<Field> = fields(docx)?
-                .into_iter()
+            let all: Vec<&Field> = fields(docx)?
+                .iter()
                 .filter(|field| !toc || is_toc(field))
                 .collect();
             found(pick(all.len(), select).map(|index| {
@@ -409,10 +423,10 @@ impl Children {
             },
             Pending::Document { address, kinds } => {
                 if kinds.contains(Kind::Bookmark) {
-                    for (index, mark) in bookmarks(docx)?.into_iter().enumerate() {
+                    for (index, mark) in bookmarks(docx)?.iter().enumerate() {
                         nodes.push((
                             Kind::Bookmark,
-                            MarkValue::Bookmark(mark),
+                            MarkValue::Bookmark(mark.clone()),
                             address.with(Step::new(Kind::Bookmark, ordinal(index))),
                         ));
                     }
@@ -429,10 +443,10 @@ impl Children {
                         }
                     }
                     if kinds.contains(Kind::Toc) {
-                        for (index, field) in all.into_iter().filter(is_toc).enumerate() {
+                        for (index, field) in all.iter().filter(|field| is_toc(field)).enumerate() {
                             nodes.push((
                                 Kind::Toc,
-                                MarkValue::Toc(field),
+                                MarkValue::Toc(field.clone()),
                                 address.with(Step::new(Kind::Toc, ordinal(index))),
                             ));
                         }
