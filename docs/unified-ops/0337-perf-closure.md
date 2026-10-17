@@ -364,8 +364,37 @@ view), then one migration of `litchi-ops`: follow-up **F-0337-PATH**.
 
 ## 8. Gates
 
-See the final section of the merge hand-off; every command below was run
-on the tree that merges trunk, exit status checked.
+Tree: this branch with trunk `1d2a8e47c0` (records 0334, 0335) merged at
+`10a6e9d5ec`. Build environment per the rules (`CARGO_BUILD_JOBS=6`,
+`RUST_TEST_THREADS=8`, the memory-capped cargo shim, one cargo command at a
+time); every exit status checked (`.coord/perf-closure/gates.sh`, not
+committed).
+
+| Command | Exit |
+|---|---:|
+| `cargo fmt --all --check` (and `cargo fmt --check` in the harness) | 0 |
+| `cargo clippy -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features xls] --all-targets -- -D warnings` | 0 each |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ops` | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib` (929), `--doc`, the 153 test targets in five groups (1,383), includes the query-corpus differential, corpus fidelity, the CRUD checklist goldens and the new XLS stale-run test | 0 each |
+| `cargo test -p litchi-ops --all-features --test capabilities --test registry` (not re-blessed) | 0 |
+| the same with `--no-default-features --features` every litchi-ops feature but `encryption` (not re-blessed) | 0 |
+| `cargo test -p litchi --all-features` | 0 |
+| `python3 tools/check_crate_boundaries.py` | 0 |
+| `python3 tools/non_iwork_gate.py verify` | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target/glossary` (40 profiles, 2,313 bans, 253 families) | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` (285 tests) | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `cargo clippy` / `cargo check --locked --offline --manifest-path tools/perf-baseline/unified-batch-closure/Cargo.toml --all-targets` | 0 each |
+| `python3 tools/unified_bench_matrix.py --check` | 0 |
+| `python3 tools/test_no_3rdparty_references.py` | 0 |
+
+No capability, registry or OfficeCLI-visible behaviour changed, so the
+delta table and the OfficeCLI corpus were not regenerated. No public name
+was added or changed (the XLS change is crate-private; the harness is a
+tool); no glossary row changes. The harness adds no dependency beyond
+those of the workspace lock (its own `Cargo.lock` is the workspace's,
+trimmed).
 
 ## 9. Not claimed
 
