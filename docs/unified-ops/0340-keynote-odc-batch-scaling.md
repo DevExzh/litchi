@@ -1,7 +1,7 @@
 # 0340 — Keynote paragraph-set batches and ODC series batches scale linearly
 
 - Status: implemented on `uo2/keynote-batch`, cut from `feat/unified-ops-api`
-  at `2083926091` (trunk `c31198a5af` merged at `a95014098b`).
+  at `2083926091` (trunk merged three times: `c31198a5af`, `4282e69000` (record 0338), `ed832736c3` (record 0336)).
 - Date: 2026-10-17
 - Input: record [0337](0337-perf-closure.md) follow-ups **F-0337-KEYNOTE**
   (the only 1k-batch budget miss: 21.9–22.4× at 1k, 387–390× at 10k,
@@ -171,7 +171,7 @@ trunk states).
 
 ## 5. Gates
 
-Tree: this branch with trunk `c31198a5af` merged. Build environment per the
+Tree: the full set below ran on this branch with trunk `4282e69000` (record 0338) merged. Trunk then gained record 0336 (`ed832736c3`: the raw layer and `File::dump`, which touch no file of this record); after that merge the focused set at the end of this section ran again. Build environment per the
 rules (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`, the memory-capped
 cargo shim, one cargo command at a time); every exit status checked.
 
@@ -181,9 +181,9 @@ cargo shim, one cargo command at a time); every exit status checked.
 | `cargo clippy -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features [--features keynote / odc / odg / odi / odb / odf-formula / pages / numbers] --all-targets -- -D warnings` | 0 each |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ops` | 0 |
-| `cargo test -p litchi-ops --all-features`: `--lib` (931), `--doc` (210), the 159 test targets in five groups (1,406; includes the query-corpus differential, corpus fidelity, the CRUD checklist goldens, `capabilities` and `registry`, not re-blessed) | 0 each |
+| `cargo test -p litchi-ops --all-features`: `--lib` (935), `--doc` (210), the test targets in five groups (1,417; includes the query-corpus differential, corpus fidelity, the CRUD checklist goldens, `capabilities` and `registry`, not re-blessed) | 0 each |
 | `cargo test -p litchi-ops --no-default-features --features` every litchi-ops feature but `encryption` `--test capabilities --test registry` (not re-blessed) | 0 |
-| `LITCHI_BATCH_EQUIVALENCE_CASES=60 cargo test -p litchi-ops --features keynote,pages,numbers,odc,odg,odi,odb,odf-formula --test iwork_batch_equivalence --test keynote_unified --test odf_objects_unified --test iwork_unified --lib` (before the trunk merge; the merge touched no file of this record) | 0 |
+| `LITCHI_BATCH_EQUIVALENCE_CASES=60 cargo test -p litchi-ops --features keynote,pages,numbers,odc,odg,odi,odb,odf-formula --test iwork_batch_equivalence --test keynote_unified --test odf_objects_unified --test iwork_unified --lib` (before the first trunk merge), and `LITCHI_BATCH_EQUIVALENCE_CASES=60 cargo test -p litchi-ops --features keynote,pages,numbers --test iwork_batch_equivalence` on the merged tree (710 s) | 0 each |
 | `cargo test -p litchi --all-features` (234) | 0 |
 | `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0 each |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target/glossary` (40 profiles, 2,313 bans, 253 families) | 0 |
@@ -193,6 +193,15 @@ cargo shim, one cargo command at a time); every exit status checked.
 | `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate` | 0 |
 | `python3 tools/officecli_capability_delta.py --check`; `python3 tools/officecli_corpus.py --check` | 0 each |
 | `python3 tools/unified_bench_matrix.py --check`; `python3 tools/check_feature_matrix.py` | 0 each |
+
+After the record 0336 merge (`ed832736c3`), the focused set, exit 0 each:
+`cargo fmt --all --check`; the all-features clippy above and the
+`--no-default-features` one; `cargo doc` of litchi-ops; `cargo test -p
+litchi-ops --all-features --lib` and `--test iwork_batch_equivalence --test
+keynote_unified --test odf_objects_unified --test iwork_unified --test
+capabilities --test registry --test charts`; `cargo test -p litchi
+--all-features`; the crate-boundary, non-iWork, tool unit-test,
+capability-delta, corpus, bench-matrix and feature-matrix checks.
 
 No capability, registry, public name or OfficeCLI-visible behaviour
 changed, so the goldens were not re-blessed, the delta table and the
