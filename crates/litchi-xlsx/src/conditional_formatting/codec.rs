@@ -555,7 +555,16 @@ fn parse_rule(raw: &[u8], source: Source) -> Result<Rule> {
             },
             Event::Empty(element) => {
                 let name = element.local_name();
-                if (spreadsheet(&namespace) || exact(&namespace, X14)) && name.as_ref() == b"cfvo" {
+                if name.as_ref() == b"cfRule"
+                    && ((source == Source::Core && spreadsheet(&namespace))
+                        || (source == Source::Office2010 && exact(&namespace, X14)))
+                {
+                    // A rule without formulas or payload (`duplicateValues`,
+                    // `uniqueValues`, `aboveAverage`) is often an empty element.
+                    parse_rule_attributes(&element, decoder, &mut rule)?;
+                } else if (spreadsheet(&namespace) || exact(&namespace, X14))
+                    && name.as_ref() == b"cfvo"
+                {
                     payload.cfvo(&element, decoder)?;
                 } else if (spreadsheet(&namespace) || exact(&namespace, X14))
                     && is_color_element(name.as_ref())
@@ -1349,7 +1358,7 @@ fn optional_u32_from_raw(raw: &[u8], name: &[u8]) -> Result<Option<u32>> {
     loop {
         let d = r.decoder();
         match r.read_event().map_err(xml_error)? {
-            Event::Start(e) if e.local_name().as_ref() == b"cfRule" => {
+            Event::Start(e) | Event::Empty(e) if e.local_name().as_ref() == b"cfRule" => {
                 return optional_u32(&e, name, d);
             },
             Event::Eof => return Ok(None),

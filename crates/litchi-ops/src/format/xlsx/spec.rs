@@ -823,7 +823,53 @@ const fn cell_write_only_count() -> usize {
     count
 }
 
-const CELL_CAPABILITY_LEN: usize = CELL_PROPS.len() + cell_write_only_count();
+/// The cell hyperlink setters (record 0320): `link` (alias `url`),
+/// `tooltip` (alias `screentip`) and `display`, written through the cell
+/// edit; `null`, an empty link or `none` removes the cell's hyperlink.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CellLinkSetter {
+    Link,
+    Tooltip,
+    Display,
+}
+
+pub(crate) const CELL_LINK_TABLE: Table<CellLinkSetter, 3, 2> = Table::new(
+    [
+        Entry {
+            spec: write_only("link", ValueType::Text),
+            access: Access::Set(CellLinkSetter::Link),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: write_only("tooltip", ValueType::Text),
+            access: Access::Set(CellLinkSetter::Tooltip),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: write_only("display", ValueType::Text),
+            access: Access::Set(CellLinkSetter::Display),
+            constraint: Constraint::None,
+            clear: true,
+        },
+    ],
+    [
+        Alias {
+            name: "screentip",
+            entry: 1,
+        },
+        Alias {
+            name: "url",
+            entry: 0,
+        },
+    ],
+);
+
+const CELL_LINK_PROPS: &[PropSpec] = &CELL_LINK_TABLE.readable();
+
+const CELL_CAPABILITY_LEN: usize =
+    CELL_PROPS.len() + cell_write_only_count() + CELL_LINK_PROPS.len();
 
 const fn cell_capability_array() -> [PropSpec; CELL_CAPABILITY_LEN] {
     let mut props = [PropSpec::new("", ValueType::Text); CELL_CAPABILITY_LEN];
@@ -870,6 +916,12 @@ const fn cell_capability_array() -> [PropSpec; CELL_CAPABILITY_LEN] {
             next += 1;
         }
         write_index += 1;
+    }
+    let mut link_index = 0;
+    while link_index < CELL_LINK_PROPS.len() {
+        props[next] = CELL_LINK_PROPS[link_index];
+        next += 1;
+        link_index += 1;
     }
     props
 }
@@ -927,8 +979,26 @@ pub(crate) static RANGE_CAPABILITY_PROPS: &[PropSpec] = &range_capability_array(
 /// very-hidden policy is exposed by a later adapter.  Keeping this merge
 /// derived from the write table prevents capability metadata and admission
 /// from drifting apart.
-const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len() + 1] {
-    let mut props = [PropSpec::new("", ValueType::Text); SHEET_PROPS.len() + 1];
+/// The sheet-level auto-filter setter (record 0320): `autoFilter=A1:B5`
+/// sets the worksheet's auto-filter range; `null`, `none` or `false`
+/// removes it. The filter itself is the `autofilter` element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SheetFilterSetter {
+    AutoFilter,
+}
+
+pub(crate) const SHEET_FILTER_TABLE: Table<SheetFilterSetter, 1, 0> = Table::new(
+    [Entry {
+        spec: write_only("autoFilter", ValueType::Text),
+        access: Access::Set(SheetFilterSetter::AutoFilter),
+        constraint: Constraint::None,
+        clear: true,
+    }],
+    [],
+);
+
+const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len() + 2] {
+    let mut props = [PropSpec::new("", ValueType::Text); SHEET_PROPS.len() + 2];
     let mut index = 0;
     while index < SHEET_PROPS.len() {
         let mut prop = SHEET_PROPS[index];
@@ -948,6 +1018,7 @@ const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len() + 1] {
     let mut merge = MERGE_WRITE_PROPS[0];
     merge.access.get = false;
     props[SHEET_PROPS.len()] = merge;
+    props[SHEET_PROPS.len() + 1] = SHEET_FILTER_TABLE.readable()[0];
     props
 }
 
@@ -1149,13 +1220,29 @@ const fn with_props(
 const fn is_range_merge_gap(gap: &GapSpec) -> bool {
     match gap.subject {
         Subject::Property { element, key } => {
+            // Cell hyperlinks and the sheet auto-filter are write-only
+            // setters (record 0320); their read gaps stay.
             same_name(element, "range") && same_name(key, "merge")
         },
         _ => false,
     }
 }
 
-const XLSX_GAP_COUNT: usize = workbook::SPEC.gaps.len();
+const fn removed_gap_count() -> usize {
+    let source = workbook::SPEC.gaps;
+    let mut count = 0;
+    let mut index = 0;
+    while index < source.len() {
+        if is_range_merge_gap(&source[index]) {
+            count += 1;
+        }
+        index += 1;
+    }
+    count
+}
+
+/// The shared gaps XLSX keeps, plus its gradient-fill gap.
+const XLSX_GAP_COUNT: usize = workbook::SPEC.gaps.len() - removed_gap_count() + 1;
 
 const fn xlsx_gaps() -> [GapSpec; XLSX_GAP_COUNT] {
     let source = workbook::SPEC.gaps;
@@ -1208,6 +1295,16 @@ const XLSX_AXIS: ElementSpec<Kind> = ElementSpec {
     ..workbook::SPEC.elements[11]
 };
 
+/// A shared element gap XLSX reads and writes as a worksheet feature
+/// (record 0320).
+const fn feature(index: usize, props: &'static [PropSpec]) -> ElementSpec<Kind> {
+    ElementSpec {
+        props,
+        gap: None,
+        ..workbook::SPEC.elements[index]
+    }
+}
+
 // Keep the shared workbook topology and all non-XLSX-specific gaps, replacing
 // only the range property table and its former capability gap.  XLSB retains
 // the shared range gap in its own local SPEC.
@@ -1241,10 +1338,7 @@ static XLSX_ELEMENTS: [ElementSpec<Kind>; 26] = [
         &workbook::SPEC.elements[7],
         workbook::SPEC.elements[7].props,
     ),
-    with_props(
-        &workbook::SPEC.elements[8],
-        workbook::SPEC.elements[8].props,
-    ),
+    feature(8, super::features::COMMENT_PROPS),
     XLSX_CHART,
     XLSX_SERIES,
     XLSX_AXIS,
@@ -1260,46 +1354,22 @@ static XLSX_ELEMENTS: [ElementSpec<Kind>; 26] = [
         &workbook::SPEC.elements[14],
         workbook::SPEC.elements[14].props,
     ),
-    with_props(
-        &workbook::SPEC.elements[15],
-        workbook::SPEC.elements[15].props,
-    ),
-    with_props(
-        &workbook::SPEC.elements[16],
-        workbook::SPEC.elements[16].props,
-    ),
-    with_props(
-        &workbook::SPEC.elements[17],
-        workbook::SPEC.elements[17].props,
-    ),
-    with_props(
-        &workbook::SPEC.elements[18],
-        workbook::SPEC.elements[18].props,
-    ),
+    feature(15, super::features::VALIDATION_PROPS),
+    feature(16, super::features::CF_PROPS),
+    feature(17, super::features::AUTOFILTER_PROPS),
+    feature(18, super::features::HYPERLINK_PROPS),
     with_props(
         &workbook::SPEC.elements[19],
         workbook::SPEC.elements[19].props,
     ),
-    with_props(
-        &workbook::SPEC.elements[20],
-        workbook::SPEC.elements[20].props,
-    ),
-    with_props(
-        &workbook::SPEC.elements[21],
-        workbook::SPEC.elements[21].props,
-    ),
+    feature(20, super::features::PICTURE_PROPS),
+    feature(21, super::features::SHAPE_PROPS),
     with_props(
         &workbook::SPEC.elements[22],
         workbook::SPEC.elements[22].props,
     ),
-    with_props(
-        &workbook::SPEC.elements[23],
-        workbook::SPEC.elements[23].props,
-    ),
-    with_props(
-        &workbook::SPEC.elements[24],
-        workbook::SPEC.elements[24].props,
-    ),
+    feature(23, super::features::ROW_BREAK_PROPS),
+    feature(24, super::features::COL_BREAK_PROPS),
     with_props(
         &workbook::SPEC.elements[25],
         workbook::SPEC.elements[25].props,

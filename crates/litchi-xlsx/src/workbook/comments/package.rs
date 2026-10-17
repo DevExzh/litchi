@@ -41,6 +41,44 @@ pub fn load_from_worksheet(
     }))
 }
 
+/// Load the notes of one worksheet of a source-backed package: only the
+/// worksheet's relationships and its comments part are read.
+pub(crate) fn load_from_source(
+    package: &litchi_opc::SourceBackedPackage,
+    worksheet_part: &PackURI,
+) -> Result<Option<Comments>> {
+    package.check_execution()?;
+    let worksheet = package.part(worksheet_part)?;
+    let mut relationships = worksheet
+        .rels()
+        .iter()
+        .filter(|relationship| is_comments_relationship(relationship.reltype()));
+    let Some(relationship) = relationships.next() else {
+        return Ok(None);
+    };
+    if relationships.next().is_some() {
+        return Err(invalid(
+            "worksheet has multiple classic comments relationships",
+        ));
+    }
+    if relationship.is_external() {
+        return Err(invalid(
+            "worksheet comments relationship cannot be external",
+        ));
+    }
+    let part = package.part(&relationship.target_partname()?)?;
+    if part.content_type() != COMMENTS_CONTENT_TYPE {
+        return Err(invalid("worksheet comments target is not a comments part"));
+    }
+    if part.declared_uncompressed_size()? > super::MAX_PART_BYTES as u64 {
+        return Err(invalid("classic comments part exceeds the size limit"));
+    }
+    let data = part.data()?;
+    let xml = std::str::from_utf8(data.as_bytes())
+        .map_err(|error| invalid(format!("classic comments XML is not UTF-8: {error}")))?;
+    parse_comments(xml).map(Some)
+}
+
 /// Store or replace the worksheet's sole classic comments part.
 ///
 /// Storing always writes the part, so a signed package is refused with

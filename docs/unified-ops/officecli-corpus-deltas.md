@@ -26,7 +26,7 @@ Kinds:
 
 | Family | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 1484 | 0 | 21 | 124 | 4 | 0 | 0 | 20 | 20/20 |
+| excel | 1633 | 1552 | 0 | 26 | 51 | 4 | 0 | 0 | 20 | 20/20 |
 | excel/charts | 743 | 451 | 0 | 255 | 22 | 15 | 0 | 0 | 32 | 32/32 |
 | ppt | 310 | 129 | 32 | 37 | 143 | 0 | 1 | 0 | 10 | 12/12 |
 | ppt/charts | 735 | 318 | 113 | 402 | 14 | 1 | 0 | 0 | 28 | 28/28 |
@@ -38,7 +38,7 @@ Kinds:
 | ppt/textboxes | 132 | 50 | 10 | 17 | 65 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
 | word | 1133 | 629 | 3 | 183 | 248 | 6 | 67 | 0 | 24 | 32/32 |
-| **total** | **6431** | **3847** | **344** | **1172** | **779** | **169** | **464** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3915** | **344** | **1177** | **706** | **169** | **464** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -48,8 +48,8 @@ The format is the extension of the document each call names.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | docx | 949 | 479 | 0 | 180 | 217 | 6 | 67 | 0 | 22 | 30/30 |
 | pptx | 2959 | 1286 | 344 | 716 | 416 | 144 | 397 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 2082 | 0 | 276 | 146 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **3847** | **344** | **1172** | **779** | **169** | **464** | **0** | **177** | **200/200** |
+| xlsx | 2523 | 2150 | 0 | 281 | 73 | 19 | 0 | 0 | 56 | 56/56 |
+| **total** | **6431** | **3915** | **344** | **1177** | **706** | **169** | **464** | **0** | **177** | **200/200** |
 
 ## Deltas
 
@@ -496,10 +496,7 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `title.size` | 35 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:209`, `excel/charts/charts-basic.sh:83` |
 | add | chart | `warned` | `title.bold` | 33 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:209`, `excel/charts/charts-basic.sh:83` |
 | add | chart | `warned` | `title.font` | 30 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:209`, `excel/charts/charts-bar.sh:412` |
-| add | conditionalFormatting | `unsupported_element` | - | 25 | registry gap M1-extended (R4x) | `excel/conditional-formatting.sh:32`, `excel/conditional-formatting.sh:33` |
 | add | chart | `warned` | `transparency` | 22 | not in the registry; OfficeCLI documents it | `excel/charts/charts-advanced.sh:210`, `excel/charts/charts-area.sh:109` |
-| add | dataValidation | `unsupported_element` | - | 22 | registry gap M1-extended (R4x) | `excel/data-validation.sh:42`, `excel/data-validation.sh:44` |
-| add | shape | `unsupported_element` | - | 20 | registry gap L-XLSX-R7 | `excel/shapes.sh:39`, `excel/shapes.sh:44` |
 | add | chart | `warned` | `plotFill` | 19 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:152`, `excel/charts/charts-area.sh:254` |
 | add | chart | `warned` | `fill` | 18 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-boxwhisker.sh:121`, `excel/charts/charts-histogram.sh:120` |
 | add | pivottable | `unsupported_element` | - | 18 | registry gap M1-extended (R4x) | `excel/pivot-tables.sh:121`, `excel/pivot-tables.sh:138` |
@@ -542,7 +539,6 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `style` | 5 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:170`, `excel/charts/charts-basic.sh:141` |
 | add | chart | `warned` | `trendline` | 5 | not in the registry; OfficeCLI documents it | `excel/charts.sh:183`, `excel/charts/charts-bubble.sh:175` |
 | add | chart | `warned` | `updownbars` | 5 | not in the registry; OfficeCLI documents it | `excel/charts.sh:271`, `excel/charts/charts-line.sh:513` |
-| get | shape | `unsupported_capability` | - | 5 | registry gap L-XLSX-R7 | `excel/shapes.sh:186`, `excel/shapes.sh:187` |
 | add | chart | `warned` | `dataLabels.numFmt` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-basic.sh:311`, `excel/charts/charts-column.sh:290` |
 | add | chart | `warned` | `dataTable` | 4 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:430`, `excel/charts/charts-basic.sh:194` |
 | add | chart | `warned` | `series1.marker` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-advanced.sh:63`, `excel/charts/charts-scatter.sh:92` |
@@ -571,7 +567,6 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `point3.color` | 2 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-basic.sh:297`, `excel/charts/charts-pie.sh:35` |
 | add | chart | `warned` | `showMarker` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-scatter.sh:73`, `excel/charts/charts-scatter.sh:141` |
 | add | chart | `warned` | `tickLabelPos` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-basic.sh:184`, `excel/charts/charts-line.sh:187` |
-| set | sheet | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `excel/sheet-settings.sh:71`, `excel/sheet-settings.sh:110` |
 | add | chart | `skipped` | `dataLabels.numFmt` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-area.sh:275` |
 | add | chart | `skipped` | `fill` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-histogram.sh:460` |
 | add | chart | `skipped` | `gradients` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-pie.sh:125` |
@@ -617,15 +612,21 @@ The format is the extension of the document each call names.
 | add | chart | `warned` | `title.overlay` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-pie.sh:171` |
 | add | chart | `warned` | `valAxisVisible` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:449` |
 | add | chart | `warned` | `valaxis.line` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-boxwhisker.sh:104` |
+| add | conditionalFormatting | `warned` | `axisColor` | 1 | registry: `axisColor` is not add-able; OfficeCLI documents it | `excel/conditional-formatting.sh:58` |
+| add | conditionalFormatting | `warned` | `axisPosition` | 1 | registry: `axisPosition` is not add-able; OfficeCLI documents it | `excel/conditional-formatting.sh:58` |
+| add | conditionalFormatting | `warned` | `negativeColor` | 1 | registry: `negativeColor` is not add-able; OfficeCLI documents it | `excel/conditional-formatting.sh:58` |
+| add | shape | `warned` | `glow` | 1 | registry: `glow` is not add-able; OfficeCLI documents it | `excel/shapes.sh:123` |
+| add | shape | `warned` | `gradientFill` | 1 | registry: `gradientFill` is not add-able; OfficeCLI documents it | `excel/shapes.sh:128` |
+| add | shape | `warned` | `reflection` | 1 | registry: `reflection` is not add-able; OfficeCLI documents it | `excel/shapes.sh:133` |
+| add | shape | `warned` | `shadow` | 1 | registry: `shadow` is not add-able; OfficeCLI documents it | `excel/shapes.sh:138` |
+| add | shape | `warned` | `softEdge` | 1 | registry: `softEdge` is not add-able; OfficeCLI documents it | `excel/shapes.sh:138` |
 | add | sheet | `warned` | `tabColor` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:128` |
-| query | shape | `unsupported_capability` | - | 1 | registry gap L-XLSX-R7 | `excel/shapes.sh:185` |
 | set | axis | `warned` | `format` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:263` |
 | set | axis | `warned` | `labelRotation` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:263` |
 | set | axis | `warned` | `majorGridlines` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:263` |
 | set | cell | `warned` | `arrayformula` | 1 | registry: `arrayformula` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:166` |
-| set | cell | `warned` | `link` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
-| set | cell | `warned` | `tooltip` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
-| set | sheet | `warned` | `autoFilter` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:110` |
+| set | sheet | `warned` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/sheet-settings.sh:71` |
+| set | sheet | `warned` | `direction` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:110` |
 | set | sheet | `warned` | `fitToPage` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:71` |
 | set | sheet | `warned` | `footer` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:94` |
 | set | sheet | `warned` | `freeze` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:55` |
@@ -644,7 +645,10 @@ The format is the extension of the document each call names.
 
 ## Bugs
 
-None: every refusal is a recorded delta, a gap the registry agrees with, or a cascade.
+| Script line | Verb | Format | Element | Refusal | Detail | Note |
+|---|---|---|---|---|---|---|
+| `excel/cell-formatting.sh:158` | set | xlsx | A9 | `unsupported_property` | link | skipped link: the registry lists `link` as set-able |
+| `excel/cell-formatting.sh:158` | set | xlsx | A9 | `unsupported_property` | tooltip | skipped tooltip: the registry lists `tooltip` as set-able |
 
 ## Passed calls the registry does not claim
 
@@ -656,7 +660,7 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1172 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1177 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
 | F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 132 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
@@ -685,10 +689,10 @@ None.
 | `excel/charts/charts-scatter.sh` | 33 | 11 | 0 | 21 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-stock.sh` | 18 | 6 | 0 | 11 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-waterfall.sh` | 23 | 10 | 0 | 12 | 1 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/conditional-formatting.sh` | 165 | 139 | 0 | 0 | 26 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/data-validation.sh` | 88 | 65 | 0 | 0 | 23 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/conditional-formatting.sh` | 165 | 163 | 0 | 1 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/data-validation.sh` | 88 | 87 | 0 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/pivot-tables.sh` | 586 | 568 | 0 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/shapes.sh` | 62 | 35 | 0 | 0 | 27 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/shapes.sh` | 62 | 57 | 0 | 4 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/sheet-settings.sh` | 104 | 96 | 0 | 7 | 1 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/slicers.sh` | 60 | 54 | 0 | 0 | 6 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/sparklines.sh` | 114 | 106 | 0 | 0 | 8 | 0 | 0 | 0 | 2 | 2/2 |
@@ -763,4 +767,4 @@ None.
 | `word/sections.sh` | 33 | 24 | 0 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 210 | 3 | 108 | 39 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **3847** | **344** | **1172** | **779** | **169** | **464** | **0** | **177** | **200/200** |
+| **total** | **6431** | **3915** | **344** | **1177** | **706** | **169** | **464** | **0** | **177** | **200/200** |

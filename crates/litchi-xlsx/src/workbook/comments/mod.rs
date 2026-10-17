@@ -9,6 +9,7 @@
 //! metadata; this owner never allocates, interprets, or rewrites VML shapes.
 
 pub mod codec;
+pub mod edit;
 pub mod model;
 pub mod package;
 pub mod patch;

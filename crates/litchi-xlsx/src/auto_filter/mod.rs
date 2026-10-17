@@ -5,6 +5,7 @@
 //! inert bounded data and replayed in its original child position.
 
 mod codec;
+pub mod edit;
 mod model;
 mod package;
 mod patch;

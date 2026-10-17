@@ -2526,3 +2526,20 @@ through common styles, a run over its paragraph.
 | Canonical name | Notes | Status |
 | --- | --- | --- |
 | `litchi_xls::WorksheetDefect::{ZoomLevel, SharedFormulaFlag}`, `Defect::Worksheet` | Excel-compatible repairs under every `Leniency`: a WINDOW2 zoom outside `10..=400` reads as the default; a stale `fShrFmla` on a formula with its own tokens is ignored | ✅ 0316 |
+
+## XLSX worksheet feature families (record 0320)
+
+Five scoped families publish worksheet features through immutable
+part-level edits sharing one staged engine: each `Edit` stages part
+replacements, `commit()` returns the triad `package()`, `patch()`,
+`diagnostics()` with `into_package()`/`into_parts()`, and an unchanged
+staging returns the source package (an exact no-op keeps every byte).
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_xlsx::conditional_formatting::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_conditional_formats, apply_conditional_formats}` | `Edit::{formats, set_formats, add_differential}`; `DifferentialStyle::{read, is_empty}`, `Underline` | ✅ 0320; family registered in the gate |
+| `litchi_xlsx::data_validation::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_data_validations, apply_data_validations}` | `Edit::{validations, set_validations}` | ✅ 0320; family registered in the gate |
+| `litchi_xlsx::auto_filter::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_auto_filter, apply_auto_filter}` | `Edit::{auto_filter, set_auto_filter}` | ✅ 0320; family registered in the gate |
+| `litchi_xlsx::workbook::comments::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_comments, apply_comments}` | `Edit::{comments, set, add, remove}` (`add` refuses an annotated cell and returns the row-major position); splices notes and their VML note shapes, keeping the other notes' bytes | ✅ 0320; family registered in the gate |
+| `litchi_xlsx::drawing::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{drawing_elements, edit_drawings, apply_drawings}` | `Edit::{elements, add_picture, add_shape, set, remove}`; read model `Element`, `ElementKind`, `Placement`, `Marker`, `Image`, `Fill`, `Line`, `Font`, `Align`, `VerticalAlign`; specs `PictureSpec`, `ShapeSpec`, `Change` | ✅ 0320; family registered in the gate |
+| `litchi_xlsx::Worksheet::comments`, `SourceWorksheet::{comments, page_breaks, drawing_elements}` | reads on both owners | ✅ 0320 |

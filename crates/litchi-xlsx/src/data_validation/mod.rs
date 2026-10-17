@@ -4,6 +4,7 @@
 /// model, bounded XML/MCE conversion in codec, and worksheet replacement/transaction
 /// operations in package.
 mod codec;
+pub mod edit;
 mod model;
 mod package;
 mod patch;

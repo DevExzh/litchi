@@ -49,11 +49,15 @@ impl Xlsx {
         // The element kind first (record 0269, finding X1): a kind the
         // workbook cannot add is `unsupported_element` whatever its parent;
         // an addable kind under the wrong parent is `unsupported_type`.
-        let kind = new_kind(node.kind())?;
+        let kind = new_kind(node.kind(), node.props())?;
         let parent = resolve_path(self, &parent)?;
         if matches!(kind, NewKind::Chart) {
             drop(source);
             return self.add_chart(&parent, node);
+        }
+        if let NewKind::Feature(kind, implied) = kind {
+            drop(source);
+            return self.add_feature(&parent, kind, implied, node);
         }
         if parent.element() != Kind::Workbook {
             return Err(Error::new(
@@ -114,6 +118,9 @@ impl Xlsx {
 
     fn remove_inner<'p>(&self, target: TargetArg<'p>, limits: &SemanticLimits) -> Result<Commit> {
         if let Some(commit) = self.try_remove_chart(&target)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_remove_feature(&target)? {
             return Ok(commit);
         }
         let source = self.editor()?;
@@ -208,21 +215,53 @@ enum NewKind {
     Sheet,
     /// A worksheet chart (record 0270), added under its sheet.
     Chart,
+    /// A worksheet feature (record 0320), with the rule type a CF element
+    /// word implies.
+    Feature(Kind, Option<&'static str>),
 }
 
-fn new_kind(name: &str) -> Result<NewKind> {
+fn new_kind(name: &str, props: &crate::props::Props<'_>) -> Result<NewKind> {
     if name.eq_ignore_ascii_case("sheet") {
         Ok(NewKind::Sheet)
     } else if name.eq_ignore_ascii_case("chart") {
         Ok(NewKind::Chart)
+    } else if let Some(implied) = super::feature_write::cf_element(name) {
+        Ok(NewKind::Feature(Kind::Cf, Some(implied)))
+    } else if name.eq_ignore_ascii_case("pagebreak") {
+        // OfficeCLI's dispatcher: a column break when a column is named.
+        let column = props.iter().any(|(key, _)| {
+            key.as_str().eq_ignore_ascii_case("col") || key.as_str().eq_ignore_ascii_case("column")
+        });
+        Ok(NewKind::Feature(
+            if column {
+                Kind::ColBreak
+            } else {
+                Kind::RowBreak
+            },
+            None,
+        ))
+    } else if let Some(kind) = feature_kind(name) {
+        Ok(NewKind::Feature(kind, None))
     } else {
         Err(Error::new(
             Code::UnsupportedElement,
-            "this element kind cannot be added to an XLSX workbook yet; only sheets and charts can",
+            "this element kind cannot be added to an XLSX workbook",
         )
         .with_format(FileFormat::Xlsx)
         .with_suggestion("capabilities() lists the addable elements and the gaps"))
     }
+}
+
+/// The worksheet feature an element word names (`comment`, `note`,
+/// `validation`, `image`, `textbox`).
+fn feature_kind(name: &str) -> Option<Kind> {
+    let canonical = match name.to_ascii_lowercase().as_str() {
+        "img" => "picture",
+        "textbox" => "shape",
+        _ => crate::path::vocabulary::WORKBOOK.canonical(name)?,
+    };
+    let kind = <Kind as crate::path::navigate::ElementKind>::from_name(canonical)?;
+    super::features::is_feature(kind).then_some(kind)
 }
 
 fn resolve_path<'f>(file: &'f Xlsx, path: &PathArg<'_>) -> Result<Node<'f>> {

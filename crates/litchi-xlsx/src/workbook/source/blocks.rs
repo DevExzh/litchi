@@ -216,6 +216,29 @@ impl SourceInner {
     }
 }
 
+impl crate::workbook::source::SourceBackedWorkbook {
+    /// Parse the styles part's differential formats, the formats conditional
+    /// formatting rules reference by `dxfId`; empty without a styles part.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed parse error for malformed `dxfs` markup, and the
+    /// source, cancellation and limit errors of every source-backed read.
+    pub fn differential_formats(&self) -> Result<Vec<crate::conditional_formatting::Differential>> {
+        let inner = &self.inner;
+        inner.execution_check()?;
+        let Some(uri) = inner.styles_uri.as_ref() else {
+            return Ok(Vec::new());
+        };
+        let part = inner.package.part(uri)?;
+        let data = part.data()?;
+        let values = crate::conditional_formatting::parse_differential_formats(data.as_bytes())?;
+        inner.execution_check()?;
+        inner.package.source_version()?;
+        Ok(values)
+    }
+}
+
 impl SourceWorksheet {
     /// Parse this worksheet's data-validation collections.
     ///
@@ -261,6 +284,33 @@ impl SourceWorksheet {
         let value = self
             .blocks()
             .and_then(|blocks| crate::auto_filter::parse_auto_filter(blocks.xml()));
+        self.finish_result(value)
+    }
+
+    /// Parse this worksheet's direct page breaks.
+    ///
+    /// Served from the retained blocks outside `sheetData`, as for
+    /// [`Self::data_validations`]. Values are those of
+    /// [`crate::Worksheet::page_breaks`].
+    pub fn page_breaks(&self) -> Result<crate::page_breaks::PageBreaks> {
+        let value = self
+            .blocks()
+            .and_then(|blocks| crate::page_breaks::parse(blocks.xml()));
+        self.finish_result(value)
+    }
+
+    /// Parse this worksheet's legacy notes; `None` without a comments part.
+    /// Only the worksheet's relationships and its comments part are read.
+    pub fn comments(&self) -> Result<Option<crate::workbook::comments::Comments>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        let value = crate::workbook::comments::package::load_from_source(
+            &self.owner.package,
+            &self.data.part_uri,
+        );
         self.finish_result(value)
     }
 

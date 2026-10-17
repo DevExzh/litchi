@@ -883,6 +883,18 @@ impl SourceWorksheet {
         crate::chart::edit::source_chart_anchor(&self.owner.package, &self.data.part_uri, index)
     }
 
+    /// The top-level objects of this worksheet's drawing, in drawing order
+    /// (see [`crate::drawing::edit`]). Only the worksheet's relationships, its
+    /// drawing part and the image entries are read.
+    pub fn drawing_elements(&self) -> Result<Vec<crate::drawing::edit::Element>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::drawing::edit::source_elements(&self.owner.package, &self.data.part_uri)
+    }
+
     /// Read the worksheet's admitted SpreadsheetML form controls.
     pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
         if self.data.kind != WorksheetKind::Worksheet {
