@@ -478,6 +478,102 @@ pub(crate) fn on_off_element(prefix: &[u8], local: &str, on: bool) -> Vec<u8> {
     val_element(prefix, local, (!on).then_some("0"))
 }
 
+/// Whether `xml` holds an element named in `locals`.
+pub(crate) fn holds_any(xml: &[u8], locals: &[&[u8]]) -> Result<bool> {
+    let mut reader = Reader::from_reader(xml);
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) | Event::Empty(element)
+                if locals.contains(&element.local_name().as_ref()) =>
+            {
+                return Ok(true);
+            },
+            Event::Eof => return Ok(false),
+            _ => {},
+        }
+    }
+}
+
+/// The field markup a text set refuses rather than keep or drop (record
+/// 0304): keeping a field adds its result to the new text, and replacing it
+/// loses it.
+pub(crate) const FIELD_MARKUP: &[&[u8]] = &[b"fldChar", b"instrText", b"fldSimple"];
+
+/// The concatenated `w:t` text of the runs of `xml`, skipping runs that
+/// hold an element named in `skip` and alternate-content fallbacks: the text
+/// OfficeCLI reads from a header, footer or note (record 0319).
+pub(crate) fn run_text(xml: &[u8], skip: &[&[u8]]) -> Result<String> {
+    let mut reader = Reader::from_reader(xml);
+    let mut text = String::new();
+    let mut run = String::new();
+    let mut in_run = 0usize;
+    let mut skipped = false;
+    let mut in_text = false;
+    let mut fallback = 0usize;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => match element.local_name().as_ref() {
+                b"Fallback" => fallback += 1,
+                b"r" if fallback == 0 => {
+                    in_run += 1;
+                    if in_run == 1 {
+                        run.clear();
+                        skipped = false;
+                    }
+                },
+                b"t" if fallback == 0 && in_run > 0 => in_text = true,
+                local if skip.contains(&local) => skipped = true,
+                _ => {},
+            },
+            Event::Empty(element) if skip.contains(&element.local_name().as_ref()) => {
+                skipped = true;
+            },
+            Event::End(element) => match element.local_name().as_ref() {
+                b"Fallback" => fallback = fallback.saturating_sub(1),
+                b"r" if fallback == 0 && in_run > 0 => {
+                    in_run -= 1;
+                    if in_run == 0 && !skipped {
+                        text.push_str(&run);
+                    }
+                },
+                b"t" => in_text = false,
+                _ => {},
+            },
+            Event::Text(content) if in_text => {
+                let decoded = content
+                    .xml10_content()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                run.push_str(&decoded);
+            },
+            Event::GeneralRef(reference) if in_text => {
+                if let Ok(Some(character)) = reference.resolve_char_ref() {
+                    run.push(character);
+                } else {
+                    let name = reference
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    run.push_str(match name.as_ref() {
+                        "amp" => "&",
+                        "lt" => "<",
+                        "gt" => ">",
+                        "quot" => "\"",
+                        "apos" => "'",
+                        _ => "",
+                    });
+                }
+            },
+            Event::Eof => return Ok(text),
+            _ => {},
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -506,6 +602,12 @@ mod tests {
         assert_eq!(on_off(None), Some(true));
         assert_eq!(on_off(Some("0")), Some(false));
         assert_eq!(on_off(Some("maybe")), None);
+    }
+
+    #[test]
+    fn run_text_concatenates_runs_and_skips_marks_and_fallbacks() {
+        let xml = br#"<w:ftn xmlns:w="w" xmlns:mc="m"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t>A &amp; </w:t></w:r><mc:AlternateContent><mc:Fallback><w:r><w:t>X</w:t></w:r></mc:Fallback></mc:AlternateContent><w:r><w:t>B&#65;</w:t></w:r></w:p></w:ftn>"#;
+        assert_eq!(run_text(xml, &[b"footnoteRef"]).unwrap(), "A & BA");
     }
 
     #[test]

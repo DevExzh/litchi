@@ -1001,21 +1001,34 @@ impl Package {
     /// Returns an error when the source changed or the comments part is
     /// unreadable or malformed.
     pub fn comments(&self) -> Result<Vec<crate::comment::Comment>> {
-        let package = self.source_backed_package()?;
-        let main = package.main_document_part()?;
-        let Some(relationship) = main.rels().iter().find(|relationship| {
-            !relationship.is_external()
-                && matches!(
-                    relationship.reltype(),
-                    litchi_opc::constants::relationship_type::COMMENTS
-                        | litchi_opc::constants::relationship_type::STRICT_COMMENTS
-                )
-        }) else {
+        let target = self.with_main_relationships(|relationships| {
+            relationships
+                .iter()
+                .find(|relationship| is_comments_relationship(relationship))
+                .map(litchi_opc::rel::Relationship::target_partname)
+                .transpose()
+                .map_err(Error::from)
+        })?;
+        let Some(target) = target else {
             return Ok(Vec::new());
         };
-        let target = relationship.target_partname()?;
-        let payload = package.part(&target)?.data()?.into_arc()?;
+        let payload = self
+            .effective_part_xml(&target)?
+            .ok_or_else(|| Error::PartNotFound(target.as_str().to_owned()))?;
         crate::comment::Comment::extract_from_payload(&payload)
+    }
+
+    /// Whether the main document relates a comments part; retained edits
+    /// are included (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the relationships cannot
+    /// be read.
+    pub fn has_comments(&self) -> Result<bool> {
+        self.with_main_relationships(|relationships| {
+            Ok(relationships.iter().any(is_comments_relationship))
+        })
     }
 
     /// The styles part, located, or `None` when the document has none; only
@@ -1055,9 +1068,28 @@ impl Package {
     /// Returns an error when the source changed or the relationships cannot
     /// be read.
     pub fn header_footer_entries(&self) -> Result<Vec<crate::header_footer::catalog::Entry>> {
-        let package = self.source_backed_package()?;
-        let main = package.main_document_part()?;
-        crate::header_footer::catalog::entries_of(main.rels())
+        self.with_main_relationships(crate::header_footer::catalog::entries_of)
+    }
+
+    /// The header and footer references of every section, in document
+    /// order, each with its role; only the main part is read (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the main part is not
+    /// well-formed.
+    pub fn header_footer_references(
+        &self,
+    ) -> Result<Vec<(crate::header_footer::Role, crate::section::Reference)>> {
+        let payload = match &self.effective {
+            Some(topology) => Arc::new(topology.main_document_part()?.data()?.as_bytes().to_vec()),
+            None => {
+                let package = self.source_backed_package()?;
+                let name = package.main_document_part()?.partname().clone();
+                package.part(&name)?.data()?.into_arc()?
+            },
+        };
+        crate::header_footer::catalog::references_of(&payload)
     }
 
     /// The payload of part `name`, or `None` when the package has no such
@@ -1067,12 +1099,8 @@ impl Package {
     ///
     /// Returns an error when the source changed or the name is invalid.
     pub fn part_xml(&self, name: &str) -> Result<Option<Arc<Vec<u8>>>> {
-        let package = self.source_backed_package()?;
         let uri = PackURI::new(name.to_owned()).map_err(Error::Invalid)?;
-        match package.part(&uri) {
-            Ok(part) => Ok(Some(part.data()?.into_arc()?)),
-            Err(_) => Ok(None),
-        }
+        self.effective_part_xml(&uri)
     }
 
     /// The footnotes of the main document, in part order, without
@@ -1105,15 +1133,50 @@ impl Package {
     /// The payload of the first internal part the main part relates by a
     /// relationship type ending in `suffix`.
     fn related_xml(&self, suffix: &str) -> Result<Option<Arc<Vec<u8>>>> {
-        let package = self.source_backed_package()?;
-        let main = package.main_document_part()?;
-        let Some(relationship) = main.rels().iter().find(|relationship| {
-            !relationship.is_external() && relationship.reltype().ends_with(suffix)
-        }) else {
-            return Ok(None);
-        };
-        let target = relationship.target_partname()?;
-        Ok(Some(package.part(&target)?.data()?.into_arc()?))
+        let target = self.with_main_relationships(|relationships| {
+            relationships
+                .iter()
+                .find(|relationship| {
+                    !relationship.is_external() && relationship.reltype().ends_with(suffix)
+                })
+                .map(litchi_opc::rel::Relationship::target_partname)
+                .transpose()
+                .map_err(Error::from)
+        })?;
+        match target {
+            Some(target) => self.effective_part_xml(&target),
+            None => Ok(None),
+        }
+    }
+
+    /// Run `read` over the main part's relationships as this owner's
+    /// effective graph has them: retained edits included (record 0319).
+    fn with_main_relationships<T>(
+        &self,
+        read: impl FnOnce(&litchi_opc::Relationships) -> Result<T>,
+    ) -> Result<T> {
+        match &self.effective {
+            Some(topology) => read(topology.main_document_part()?.rels()),
+            None => {
+                let package = self.source_backed_package()?;
+                read(package.main_document_part()?.rels())
+            },
+        }
+    }
+
+    /// The payload of part `uri` in this owner's effective graph, or `None`
+    /// when it has no such part (record 0319).
+    fn effective_part_xml(&self, uri: &PackURI) -> Result<Option<Arc<Vec<u8>>>> {
+        match &self.effective {
+            Some(topology) => match topology.part(uri) {
+                Ok(part) => Ok(Some(Arc::new(part.data()?.as_bytes().to_vec()))),
+                Err(_) => Ok(None),
+            },
+            None => match self.source_backed_package()?.part(uri) {
+                Ok(part) => Ok(Some(part.data()?.into_arc()?)),
+                Err(_) => Ok(None),
+            },
+        }
     }
 
     /// The header, footer, footnotes, endnotes and comments parts the main
@@ -3999,4 +4062,14 @@ impl Document {
         self.check_execution()?;
         Ok(snapshot)
     }
+}
+
+/// Whether `relationship` relates a comments part.
+fn is_comments_relationship(relationship: &litchi_opc::rel::Relationship) -> bool {
+    !relationship.is_external()
+        && matches!(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::COMMENTS
+                | litchi_opc::constants::relationship_type::STRICT_COMMENTS
+        )
 }

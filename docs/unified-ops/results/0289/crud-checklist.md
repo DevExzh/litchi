@@ -15,7 +15,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused |
 |---|---|---|---|---|---|---|---|---|---|
-| docx | 41 | 127 | 127 | 0 | 0 | 325 | 49 | 8 | 10 |
+| docx | 41 | 239 | 239 | 0 | 0 | 169 | 69 | 8 | 26 |
 | xlsx | 26 | 92 | 92 | 0 | 0 | 195 | 29 | 2 | 14 |
 | pptx | 37 | 189 | 189 | 0 | 0 | 156 | 86 | 2 | 32 |
 | xlsb | 26 | 58 | 58 | 0 | 0 | 234 | 30 | 2 | 6 |
@@ -39,7 +39,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## docx
 
-- fixtures: `create()`, `seed`, `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`, `ooxml/docx/Hyperlink.docx`, `officecli/examples/word/revisions.docx`, `ooxml/docx/table-indent.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`, `ooxml/docx/comment.docx`, `libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`, `seed + add paragraph`, `seed + add paragraph + add run`, `seed + add hyperlink`, `seed + add table`, `seed + add table + add row`, `seed + add comment`, `seed + add picture`, `seed + add chart`, `seed + add smartart`
+- fixtures: `create()`, `seed`, `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`, `ooxml/docx/Hyperlink.docx`, `officecli/examples/word/revisions.docx`, `ooxml/docx/table-indent.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`, `ooxml/docx/comment.docx`, `libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`, `ooxml/docx/footnotes.docx`, `ooxml/docx/endnotes.docx`, `ooxml/docx/headerFooter.docx`, `ooxml/docx/ComplexNumberedLists.docx`, `seed + add paragraph`, `seed + add paragraph + add run`, `seed + add hyperlink`, `seed + add table`, `seed + add table + add row`, `seed + add paragraph + add header`, `seed + add paragraph + add footer`, `seed + add footnote`, `seed + add endnote`, `seed + add comment`, `seed + add paragraph + add style`, `seed + add paragraph + add abstractNum`, `seed + add paragraph + add num`, `ooxml/docx/ComplexNumberedLists.docx + add level`, `seed + add picture`, `seed + add chart`, `seed + add smartart`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -55,20 +55,20 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | sdt | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | equation | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | section | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| header | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| footer | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| footnotes | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| footnote | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| endnotes | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| endnote | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| header | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| footnotes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| footnote | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| endnotes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| endnote | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | comments | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | comment | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
-| styles | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| style | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| numbering | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| abstractNum | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| num | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
-| level | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
+| styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| style | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| abstractNum | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| num | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| level | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | settings | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | theme | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | bookmark | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |

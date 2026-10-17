@@ -352,8 +352,10 @@ fn misses_and_foreign_axes_have_their_codes() {
         ("/body/p[text~=x]", Code::InvalidPath),
         // Pictures are read since record 0251d; the report has none.
         ("/body/p[1]/picture[1]", Code::PathNotFound),
-        ("/styles/Heading1", Code::UnsupportedCapability),
-        ("/numbering", Code::UnsupportedCapability),
+        // The report has no styles or numbering part (record 0319).
+        ("/styles/Heading1", Code::PathNotFound),
+        ("/numbering", Code::PathNotFound),
+        ("/theme", Code::UnsupportedCapability),
     ];
     for (at, code) in cases {
         let error = get(docx, at).expect_err(at);
@@ -602,12 +604,13 @@ fn query_diagnostics_and_refusals() {
             .code(),
         Code::UnsupportedPath
     );
+    // `styleName` is read since record 0319.
     let style_name = Query::parse("p[styleName=Title]").unwrap();
-    assert_eq!(
+    assert!(
         Plan::compile(&style_name, FileFormat::Docx)
-            .unwrap_err()
-            .code(),
-        Code::UnsupportedCapability
+            .unwrap()
+            .diagnostics()
+            .is_empty()
     );
 }
 
@@ -1068,8 +1071,64 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a SmartArt graphic")
         .into_file();
+    // And the part elements (record 0319).
+    let parted = file
+        .add("/styles", crate::NewNode::new("style").prop("id", "Accent"))
+        .or_else(|_| file.add("/", crate::NewNode::new("style").prop("id", "Accent")))
+        .expect("add a style")
+        .into_file();
+    let parted = parted
+        .add("/numbering", crate::NewNode::new("abstractNum"))
+        .or_else(|_| parted.add("/", crate::NewNode::new("abstractNum")))
+        .expect("add a numbering definition")
+        .into_file();
+    let parted = parted
+        .add(
+            "/numbering",
+            crate::NewNode::new("num").prop("abstractNumId", 0),
+        )
+        .expect("add a numbering instance")
+        .into_file();
+    let parted = parted
+        .add("/", crate::NewNode::new("header").prop("text", "Head"))
+        .expect("add a header")
+        .into_file();
+    let parted = parted
+        .add("/", crate::NewNode::new("footer").prop("text", "Foot"))
+        .expect("add a footer")
+        .into_file();
+    let parted = parted
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("footnote").prop("text", "Note"),
+        )
+        .expect("add a footnote")
+        .into_file();
+    let parted = parted
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("endnote").prop("text", "End"),
+        )
+        .expect("add an endnote")
+        .into_file();
     let file_for = |name: &str| {
-        if matches!(name, "comments" | "comment") {
+        if matches!(
+            name,
+            "styles"
+                | "style"
+                | "numbering"
+                | "abstractNum"
+                | "num"
+                | "level"
+                | "header"
+                | "footer"
+                | "footnotes"
+                | "footnote"
+                | "endnotes"
+                | "endnote"
+        ) {
+            &parted
+        } else if matches!(name, "comments" | "comment") {
             &commented
         } else if name == "picture" {
             &pictured
@@ -1086,7 +1145,14 @@ fn capabilities_match_live_paths_queries_and_views() {
             continue;
         }
         for (template, _) in element.paths() {
+            // Native identities need raw paths; they are checked elsewhere.
+            if template.contains("Id=") || template.contains("[@id=") {
+                continue;
+            }
             let path = template
+                .replace("<id or name>", "Accent")
+                .replace("[@type=T]", "[@type=default]")
+                .replace("[L]", "[1]")
                 .replace("[N]", "[1]")
                 .replace("[M]", "[1]")
                 .replace("[K]", "[1]")
@@ -1101,7 +1167,11 @@ fn capabilities_match_live_paths_queries_and_views() {
                 .unwrap_or_else(|error| panic!("{path}: {error}"));
             assert_eq!(node.kind(), element.name());
             for entry in node.view().format().unwrap() {
-                assert!(element.property(entry.key()).is_some());
+                assert!(
+                    element.property(entry.key()).is_some(),
+                    "{path}: {}",
+                    entry.key()
+                );
             }
         }
         if element.operations().query {

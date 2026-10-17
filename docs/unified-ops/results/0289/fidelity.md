@@ -19,7 +19,7 @@ was refused (typed), `none` nothing to move.
 | format | exact | differs | refused | error | signed-exact | signed-differs | signed-error | locked | revert byte-exact | revert value-exact | revert mismatch | revert one-way | revert refused | revert none | structure byte-exact | structure value-exact | structure mismatch | structure one-way | structure refused | structure none |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | doc | 44 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 37 | 0 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
-| docx | 74 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 39 | 0 | 0 | 0 | 6 | 29 | 0 | 0 | 0 | 0 | 0 | 0 |
+| docx | 74 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 59 | 4 | 0 | 0 | 10 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | keynote | 57 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 55 | 0 | 0 | 0 | 0 | 0 | 14 | 0 | 0 | 42 | 0 |
 | numbers | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 40 | 0 | 0 | 0 | 0 | 0 | 38 | 0 | 1 | 1 | 0 |
 | odb | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -38,7 +38,7 @@ was refused (typed), `none` nothing to move.
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 112 | 3 | 0 | 0 | 4 | 0 | 92 | 5 | 0 | 0 | 22 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 985 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 235 | 455 | 0 | 4 | 161 | 127 | 148 | 99 | 0 | 2 | 84 | 157 |
+| **all** | 985 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 255 | 459 | 0 | 4 | 165 | 99 | 148 | 99 | 0 | 2 | 84 | 157 |
 
 ## Office-extension files the unified layer does not open
 

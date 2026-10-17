@@ -185,6 +185,17 @@ impl Note {
         self.note_type
     }
 
+    /// The note's text as OfficeCLI reads it: the text of its runs' `w:t`
+    /// elements, concatenated, without the run holding the reference mark
+    /// (record 0319).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed.
+    pub fn run_text(&self) -> Result<String> {
+        crate::part_scan::run_text(self.xml_bytes(), &[b"footnoteRef", b"endnoteRef"])
+    }
+
     /// Get the XML bytes of this note.
     ///
     /// The bytes are an XML fragment whose namespace declarations are those in

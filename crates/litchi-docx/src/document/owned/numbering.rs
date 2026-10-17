@@ -321,27 +321,17 @@ impl Edit<Package> {
         Ok(self)
     }
 
-    /// Remove abstract definition `id`; a definition an instance still uses
-    /// is refused.
+    /// Remove abstract definition `id` and the numbering instances of it.
+    /// Paragraphs that name a removed instance keep the reference, which
+    /// Word reads as no numbering.
     ///
     /// # Errors
     ///
-    /// Returns [`Refusal::BlockNotFound`] for an unknown definition and
-    /// [`Refusal::StoryReference`] for one an instance uses.
+    /// Returns [`Refusal::BlockNotFound`] for an unknown definition.
     pub fn remove_abstract_num(&mut self, id: u32) -> Result<&mut Self> {
         let (name, catalog) = self.numbering_part()?.ok_or_else(not_found)?;
         if catalog.abstract_num(id).is_none() {
             return Err(not_found());
-        }
-        if catalog
-            .nums()
-            .iter()
-            .any(|num| num.abstract_num_id() == Some(id))
-        {
-            return Err(Error::Refused {
-                position: 0,
-                reason: Refusal::StoryReference,
-            });
         }
         let updated = catalog
             .with_abstract_num_removed(id)

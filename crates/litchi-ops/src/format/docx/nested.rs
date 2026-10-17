@@ -222,6 +222,14 @@ impl Docx {
         if !nodes.is_empty() && nodes.iter().all(|node| node.element_kind() == Kind::Chart) {
             return self.remove_charts(editor, nodes);
         }
+        // Styles, numbering, headers, footers and notes (record 0319).
+        if !nodes.is_empty()
+            && nodes
+                .iter()
+                .all(|node| super::parts::is_part_kind(node.element_kind()))
+        {
+            return self.remove_parts(editor, nodes);
+        }
         let mut paths = Vec::with_capacity(nodes.len());
         let mut comments = Vec::new();
         for node in nodes {
@@ -532,7 +540,7 @@ fn moved_anchor(
 /// The visible sibling position a run or row placement names, as an
 /// insertion index among `count` existing siblings of `kind` (`None` is the
 /// end).
-fn sibling_position(
+pub(super) fn sibling_position(
     docx: &Docx,
     parent: &Node<'_>,
     kind: Kind,

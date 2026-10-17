@@ -2515,6 +2515,19 @@ check_capabilities!(crate::format::doc::SPEC);
 #[cfg(feature = "docx")]
 check_capabilities!(crate::format::docx::SPEC);
 
+/// The DOCX part elements `set`, `add` and `remove` write (record 0319).
+#[cfg(feature = "docx")]
+const DOCX_PART_WRITES: &[&str] = &[
+    "style",
+    "abstractNum",
+    "num",
+    "level",
+    "header",
+    "footer",
+    "footnote",
+    "endnote",
+];
+
 #[cfg(feature = "xlsx")]
 check_capabilities!(crate::format::xlsx::SPEC);
 
@@ -2777,13 +2790,17 @@ impl Element {
         let settable = {
             #[cfg(feature = "docx")]
             {
-                self.adapter == Adapter::Docx
+                (self.adapter == Adapter::Docx
                     && self.retains_source != Some(false)
                     && matches!(
                         self.data().canonical,
                         "p" | "r" | "hyperlink" | "tc" | "chart"
                     )
-                    && readable
+                    && readable)
+                    || (self.adapter == Adapter::Docx
+                        && self.retains_source != Some(false)
+                        && DOCX_PART_WRITES.contains(&self.data().canonical)
+                        && readable)
             }
             #[cfg(not(feature = "docx"))]
             {
@@ -2913,7 +2930,8 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "picture" | "chart" | "smartart")
+                && (matches!(self.data().canonical, "picture" | "chart" | "smartart")
+                    || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
         let add = add
@@ -2997,7 +3015,8 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "tc" | "sdt" | "chart")
+                && (matches!(self.data().canonical, "tc" | "sdt" | "chart")
+                    || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
         let remove = remove

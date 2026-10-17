@@ -133,8 +133,7 @@ fn numbering_definitions_instances_and_levels_round_trip() {
     );
 
     let mut edit = changed.edit().unwrap();
-    assert!(edit.remove_abstract_num(definition).is_err());
-    edit.remove_num(num).unwrap();
+    // The definition goes with its instance.
     edit.remove_abstract_num(definition).unwrap();
     let emptied = edit.commit().unwrap().into_package();
     let catalog = emptied.numbering_catalog().unwrap().unwrap();

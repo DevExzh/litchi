@@ -661,19 +661,29 @@ impl Catalog {
         Ok(part_scan::splice(&self.xml, node.start, node.end, &[]))
     }
 
-    /// The payload without abstract definition `id`. A definition that a
-    /// numbering instance still uses is refused.
+    /// The payload without abstract definition `id` and the numbering
+    /// instances of it, which cannot exist without it.
     pub(crate) fn with_abstract_num_removed(&self, id: u32) -> Result<Vec<u8>> {
         let definition = self
             .abstract_num(id)
             .ok_or_else(|| missing("no abstract definition has this identifier"))?;
-        if self.nums.iter().any(|num| num.abstract_num_id == Some(id)) {
-            return Err(Error::InvalidFormat(
-                "a numbering instance uses the abstract definition".into(),
-            ));
-        }
+        let mut ranges: Vec<(usize, usize)> = self
+            .nums
+            .iter()
+            .filter(|num| num.abstract_num_id == Some(id))
+            .map(|num| {
+                let node = &self.tree.elements[num.element];
+                (node.start, node.end)
+            })
+            .collect();
         let node = &self.tree.elements[definition.element];
-        Ok(part_scan::splice(&self.xml, node.start, node.end, &[]))
+        ranges.push((node.start, node.end));
+        ranges.sort_unstable_by(|left, right| right.cmp(left));
+        let mut output = self.xml.to_vec();
+        for (start, end) in ranges {
+            output = part_scan::splice(&output, start, end, &[]);
+        }
+        Ok(output)
     }
 
     /// The payload without level `ilvl` of abstract definition `id`.
@@ -1346,7 +1356,11 @@ mod tests {
         let retargeted = with_num.with_num_retargeted(2, 0).unwrap().unwrap();
         let retargeted = Catalog::from_xml(Arc::new(retargeted)).unwrap();
         assert_eq!(retargeted.num(2).unwrap().abstract_num_id(), Some(0));
-        assert!(retargeted.with_abstract_num_removed(0).is_err());
+        // Removing a definition removes its instances.
+        let cascaded =
+            Catalog::from_xml(Arc::new(retargeted.with_abstract_num_removed(0).unwrap())).unwrap();
+        assert!(cascaded.abstract_num(0).is_none());
+        assert!(cascaded.num(1).is_none() && cascaded.num(2).is_none());
         let removed =
             Catalog::from_xml(Arc::new(retargeted.with_abstract_num_removed(1).unwrap())).unwrap();
         assert!(removed.abstract_num(1).is_none());

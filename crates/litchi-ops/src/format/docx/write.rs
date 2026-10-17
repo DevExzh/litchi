@@ -233,6 +233,11 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
+        // Styles, numbering, headers, footers and notes (record 0319).
+        let editor = match self.try_set_parts(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
         let controls = command_text && crate::batch::has_text_controls(&props);
         if controls
             && nodes
@@ -256,6 +261,7 @@ impl Docx {
             return O::publish(WorkEdit::from(editor)?, self);
         }
         let mut assignments = admit_assignments(targets[0].kind, &props)?;
+        self.resolve_style_names(&mut assignments)?;
         let request = list_request(&mut assignments)?;
         self.owner().check_source()?;
         // A hyperlink target change stages a relationship, which only the
@@ -334,6 +340,27 @@ impl Docx {
             },
             editor => Ok(editor),
         }
+    }
+
+    /// A paragraph or run style named by display name is written as the
+    /// style's identifier; an unknown name is written as given (record 0319,
+    /// M1-Δ4).
+    fn resolve_style_names(&self, assignments: &mut [Assignment<'_>]) -> Result<()> {
+        for assignment in assignments {
+            if !matches!(
+                assignment.entry.access,
+                crate::registry::Access::SetAndAdd(Setter::ParagraphStyle | Setter::RunStyle)
+            ) {
+                continue;
+            }
+            if let PropValue::Text(text) = &assignment.value {
+                let id = super::parts::write::resolve_style_id(self, text)?;
+                if id != text.as_ref() {
+                    assignment.value = PropValue::from(id);
+                }
+            }
+        }
+        Ok(())
     }
 
     pub(super) fn resolve_targets<'f>(&'f self, target: &TargetArg<'_>) -> Result<Few<Node<'f>>> {

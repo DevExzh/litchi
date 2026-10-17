@@ -168,6 +168,7 @@ pub struct NewStory {
     text: String,
     paragraph: properties::Paragraph,
     run: properties::Run,
+    field: Option<String>,
 }
 
 impl NewStory {
@@ -192,6 +193,14 @@ impl NewStory {
     #[must_use]
     pub fn with_run(mut self, run: properties::Run) -> Self {
         self.run = run;
+        self
+    }
+
+    /// Follow the text with a complex field of `instruction` (` PAGE `),
+    /// whose cached result is `1`, as OfficeCLI writes a header field.
+    #[must_use]
+    pub fn with_field(mut self, instruction: impl Into<String>) -> Self {
+        self.field = Some(instruction.into());
         self
     }
 
@@ -502,16 +511,19 @@ impl Edit<Package> {
         Ok(self)
     }
 
-    /// Replace the text of the story part `name`'s first paragraph, as
-    /// OfficeCLI does: its runs that are not part of a complex field are
-    /// replaced by one run with `text`, which keeps the first such run's
-    /// properties and goes before the first field run; other paragraphs are
-    /// kept.
+    /// Replace the text of the story part `name`: its first paragraph's
+    /// runs are replaced by one run with `text`, which keeps the first run's
+    /// properties, as OfficeCLI writes a header's text.
+    ///
+    /// A story holding a field, or text outside its first paragraph's direct
+    /// runs, is refused rather than left beside the new text (record 0304).
     ///
     /// # Errors
     ///
-    /// Returns [`Refusal::BlockNotFound`] for a missing part, and
-    /// [`Refusal::InvalidPropertyValue`] for text XML cannot carry.
+    /// Returns [`Refusal::BlockNotFound`] for a missing part,
+    /// [`Refusal::ComplexContent`] for a story the set cannot replace
+    /// whole, and [`Refusal::InvalidPropertyValue`] for text XML cannot
+    /// carry.
     pub fn set_story_text(&mut self, name: &str, text: &str) -> Result<&mut Self> {
         let xml = self.part_payload(name)?.ok_or_else(not_found)?;
         let updated = story_with_text(&xml, text, self.inner.is_strict())?;
@@ -799,7 +811,43 @@ fn paragraph_markup(prefix: &[u8], story: &NewStory, strict: bool) -> Result<Vec
     let run = properties::run_properties_element(prefix, &story.run)
         .map_err(splice_error)
         .map_err(Error::Document)?;
-    xml.extend_from_slice(&text_run(prefix, run.as_deref(), &story.text)?);
+    if !story.text.is_empty() || story.field.is_none() {
+        xml.extend_from_slice(&text_run(prefix, run.as_deref(), &story.text)?);
+    }
+    if let Some(instruction) = &story.field {
+        if instruction
+            .chars()
+            .any(|character| character.is_control() && character != '\t')
+        {
+            return Err(invalid_value());
+        }
+        let q = |local: &str| qualified(prefix, local);
+        let properties = run
+            .as_deref()
+            .map(String::from_utf8_lossy)
+            .unwrap_or_default();
+        let marker = |kind: &str| {
+            format!(
+                r#"<{r}>{properties}<{c} {t}="{kind}"/></{r}>"#,
+                r = q("r"),
+                c = q("fldChar"),
+                t = q("fldCharType"),
+            )
+        };
+        xml.extend_from_slice(marker("begin").as_bytes());
+        xml.extend_from_slice(
+            format!(
+                r#"<{r}>{properties}<{i} xml:space="preserve">{}</{i}></{r}>"#,
+                escape(instruction),
+                r = q("r"),
+                i = q("instrText"),
+            )
+            .as_bytes(),
+        );
+        xml.extend_from_slice(marker("separate").as_bytes());
+        xml.extend_from_slice(&text_run(prefix, run.as_deref(), "1")?);
+        xml.extend_from_slice(marker("end").as_bytes());
+    }
     xml.extend_from_slice(format!("</{}>", qualified(prefix, "p")).as_bytes());
     Ok(xml)
 }
@@ -845,7 +893,31 @@ pub(crate) fn text_run(prefix: &[u8], properties: Option<&[u8]>, text: &str) -> 
 /// A story part with its first paragraph's text replaced (see
 /// [`Edit::set_story_text`]).
 fn story_with_text(xml: &[u8], text: &str, strict: bool) -> Result<Vec<u8>> {
+    // A text set replaces the story's text and keeps or refuses everything
+    // else (record 0304): a field is refused, and so is text the first
+    // paragraph's direct runs do not hold, which the set would leave
+    // beside the new text.
+    if part_scan::holds_any(xml, part_scan::FIELD_MARKUP).map_err(Error::Document)? {
+        return Err(complex_content());
+    }
     let tree = part_scan::scan(xml, 3).map_err(Error::Document)?;
+    let total = part_scan::run_text(xml, &[]).map_err(Error::Document)?;
+    let mut direct = String::new();
+    if let Some(first) = tree.child(0, b"p") {
+        for run in tree
+            .children(first)
+            .filter(|child| tree.elements[*child].is(b"r"))
+        {
+            let element = &tree.elements[run];
+            direct.push_str(
+                &part_scan::run_text(&xml[element.start..element.end], &[])
+                    .map_err(Error::Document)?,
+            );
+        }
+    }
+    if total != direct {
+        return Err(complex_content());
+    }
     let root = tree.root().map_err(Error::Document)?;
     let prefix = root.prefix.to_vec();
     let Some(paragraph) = tree.child(0, b"p") else {
@@ -1058,6 +1130,13 @@ fn apply(xml: &[u8], edits: Vec<(usize, usize, Vec<u8>)>) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+const fn complex_content() -> Error {
+    Error::Refused {
+        position: 0,
+        reason: Refusal::ComplexContent,
+    }
+}
+
 const fn invalid_value() -> Error {
     Error::Refused {
         position: 0,
@@ -1079,16 +1158,20 @@ mod tests {
     const HEADER: &str = r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Old</w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t>tail</w:t></w:r></w:p><w:p><w:r><w:t>Second</w:t></w:r></w:p></w:hdr>"#;
 
     #[test]
-    fn text_keeps_fields_properties_and_later_paragraphs() {
+    fn text_refuses_fields_and_text_beside_the_first_paragraph() {
+        assert!(story_with_text(HEADER.as_bytes(), "New", false).is_err());
+        let plain = r#"<w:hdr xmlns:w="w"><w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Old</w:t></w:r><w:r><w:t>tail</w:t></w:r></w:p><w:p/></w:hdr>"#;
         let updated =
-            String::from_utf8(story_with_text(HEADER.as_bytes(), "New\tText", false).unwrap())
+            String::from_utf8(story_with_text(plain.as_bytes(), "New\tText", false).unwrap())
                 .unwrap();
-        assert!(updated.contains(r#"<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">New</w:t><w:tab/><w:t xml:space="preserve">Text</w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/>"#), "{updated}");
-        assert!(updated.contains("<w:instrText> PAGE </w:instrText>"));
-        assert!(updated.contains("<w:t>1</w:t>"));
+        assert!(
+            updated.contains(r#"<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">New</w:t><w:tab/><w:t xml:space="preserve">Text</w:t></w:r></w:p>"#),
+            "{updated}"
+        );
         assert!(!updated.contains("Old") && !updated.contains("tail"));
-        assert!(updated.contains("Second"));
-        assert!(story_with_text(HEADER.as_bytes(), "bad\u{1}", false).is_err());
+        assert!(story_with_text(plain.as_bytes(), "bad\u{1}", false).is_err());
+        let beside = r#"<w:hdr xmlns:w="w"><w:p><w:r><w:t>A</w:t></w:r></w:p><w:p><w:r><w:t>B</w:t></w:r></w:p></w:hdr>"#;
+        assert!(story_with_text(beside.as_bytes(), "C", false).is_err());
     }
 
     #[test]

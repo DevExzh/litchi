@@ -230,12 +230,23 @@ impl Edit<Package> {
     ///
     /// # Errors
     ///
-    /// Returns [`Refusal::BlockNotFound`] for an unknown note, and
+    /// Returns [`Refusal::BlockNotFound`] for an unknown note,
+    /// [`Refusal::ComplexContent`] for a note holding a field, and
     /// [`Refusal::InvalidPropertyValue`] for text XML cannot carry.
     pub fn set_note_text(&mut self, kind: NoteKind, id: u32, text: &str) -> Result<&mut Self> {
         let (name, xml) = self.notes_part(kind)?;
         let tree = part_scan::scan(&xml, 3).map_err(Error::Document)?;
         let note = find_note(&tree, kind, id).ok_or_else(not_found)?;
+        // A field is refused rather than kept or dropped (record 0304).
+        let element = &tree.elements[note];
+        if part_scan::holds_any(&xml[element.start..element.end], part_scan::FIELD_MARKUP)
+            .map_err(Error::Document)?
+        {
+            return Err(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexContent,
+            });
+        }
         let mut edits: Vec<(usize, usize, Vec<u8>)> = Vec::new();
         let mut first_content = true;
         let paragraphs: Vec<usize> = tree

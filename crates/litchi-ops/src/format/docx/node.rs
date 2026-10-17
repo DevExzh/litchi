@@ -49,8 +49,9 @@ pub struct Node<'f> {
     pub(super) kind: Kind,
     pub(super) value: Value,
     pub(super) address: Address,
-    /// The rendered positional path, built on first use.
-    paths: OnceLock<Box<[PathStep<'static>]>>,
+    /// The rendered positional path, built on first use; a style's step
+    /// borrows its identifier from the handle's styles part.
+    paths: OnceLock<Box<[PathStep<'f>]>>,
 }
 
 /// The leaf value of a node.
@@ -90,6 +91,8 @@ pub(super) enum Value {
     Chart(Arc<super::chart::ChartValue>),
     /// A SmartArt graphic (record 0295).
     SmartArt(Arc<super::smartart::SmartArtValue>),
+    /// A styles, numbering, story or note element (record 0319).
+    Part(super::parts::PartValue),
 }
 
 /// One direct child of a block container: the container's index and the
@@ -502,21 +505,30 @@ impl<'f> Node<'f> {
     }
 
     /// The last positional step, without allocating a complete path.
-    pub(super) fn last_step(&self) -> Option<PathStep<'static>> {
-        self.address.steps().last().map(|step| step.positional())
+    pub(super) fn last_step(&self) -> Option<PathStep<'f>> {
+        self.address.steps().last().map(|step| self.step(*step))
     }
 
-    fn paths(&self) -> &[PathStep<'static>] {
+    fn paths(&self) -> &[PathStep<'f>] {
         self.paths.get_or_init(|| self.build_paths())
     }
 
-    /// Canonical semantic paths use positions; native identities require raw input.
-    fn build_paths(&self) -> Box<[PathStep<'static>]> {
+    /// Canonical semantic paths use positions; native identities require
+    /// raw input. A style is addressed by its identifier (`/styles/Normal`).
+    fn build_paths(&self) -> Box<[PathStep<'f>]> {
         self.address
             .steps()
             .iter()
-            .map(|step| step.positional())
+            .map(|step| self.step(*step))
             .collect()
+    }
+
+    fn step(&self, step: Step) -> PathStep<'f> {
+        match step.kind {
+            Kind::Style => super::parts::style_step(self.docx, step.ordinal)
+                .unwrap_or_else(|| step.positional()),
+            _ => step.positional(),
+        }
     }
 }
 

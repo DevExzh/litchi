@@ -126,6 +126,17 @@ impl Story {
         })
     }
 
+    /// The story's text as OfficeCLI reads a header or footer: the text of
+    /// its runs' `w:t` elements, concatenated without paragraph separators
+    /// (record 0319); alternate-content fallbacks are skipped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed.
+    pub fn run_text(&self) -> Result<String> {
+        crate::part_scan::run_text(&self.xml_bytes, &[])
+    }
+
     /// Construct a story over a shared XML allocation (a part payload read
     /// once and kept by its owner).
     ///

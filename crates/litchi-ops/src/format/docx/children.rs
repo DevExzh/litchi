@@ -3,7 +3,8 @@
 //!
 //! | Parent | Children |
 //! |---|---|
-//! | `/` | `body` (its blocks are read when it is entered), the comments part, then the SmartArt graphics (record 0295) |
+//! | `/` | `body` (its blocks are read when it is entered), the styles part, the headers, the footers, the numbering part, the footnotes and endnotes parts (record 0319), the comments part, then the SmartArt graphics (record 0295) |
+//! | a styles, numbering or notes part, a definition | its styles; its definitions, then its instances; its notes; its levels (record 0319) |
 //! | `body`, a cell, a content control | paragraphs, tables, content controls, display equations and (in the body) section breaks, in visible order; `w:customXml` wrappers flattened; `w:altChunk` anchors and unknown children skipped |
 //! | a table | rows |
 //! | a row | cells |
@@ -36,8 +37,16 @@ pub(crate) struct Children<'f> {
 
 enum Source {
     Done,
-    /// The root's children: the body, then the comments part.
+    /// The root's children: the body, then the part elements (record
+    /// 0319), then the comments part.
     Root,
+    /// The root's styles, header, footer, numbering and notes parts, or the
+    /// children of one of them (record 0319).
+    Parts {
+        children: Box<super::parts::Children>,
+        /// Whether the comments part follows (the root's listing).
+        root: bool,
+    },
     /// The root's comments part, when the document has one.
     CommentsRoot,
     /// The root's SmartArt graphics, read when the first is needed
@@ -120,8 +129,16 @@ impl<'f> Children<'f> {
     pub(super) fn of(parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
         let source = match &parent.value {
             Value::Document if kinds.contains(Kind::Body) => Source::Root,
+            Value::Document if super::parts::Children::wants_root(kinds) => Source::Parts {
+                children: Box::new(super::parts::Children::root(kinds)),
+                root: true,
+            },
             Value::Document if kinds.contains(Kind::Comments) => Source::CommentsRoot,
             Value::Document if kinds.contains(Kind::SmartArt) => Source::SmartArtRoot,
+            Value::Part(value) => Source::Parts {
+                children: Box::new(super::parts::Children::of(parent, *value, kinds)),
+                root: false,
+            },
             Value::Comments if kinds.contains(Kind::Comment) => Source::Comments {
                 comments: nav::comments(parent.docx)?.into_iter(),
                 next: 0,
@@ -178,7 +195,10 @@ impl<'f> Children<'f> {
             match &mut self.source {
                 Source::Done => return None,
                 Source::Root => {
-                    self.source = Source::CommentsRoot;
+                    self.source = Source::Parts {
+                        children: Box::new(super::parts::Children::root(self.kinds)),
+                        root: true,
+                    };
                     if !self.kinds.contains(Kind::Body) {
                         continue;
                     }
@@ -188,6 +208,16 @@ impl<'f> Children<'f> {
                         Value::Body(std::sync::OnceLock::new()),
                         self.address.with(Step::new(Kind::Body, 0)),
                     )));
+                },
+                Source::Parts { children, root } => match children.next_node(self.docx) {
+                    Some(item) => return Some(item),
+                    None => {
+                        self.source = if *root {
+                            Source::CommentsRoot
+                        } else {
+                            Source::Done
+                        };
+                    },
                 },
                 Source::CommentsRoot => {
                     self.source = Source::SmartArtRoot;

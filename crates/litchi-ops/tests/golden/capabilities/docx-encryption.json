@@ -135,6 +135,30 @@
           "pathSegment": "body"
         },
         {
+          "element": "styles",
+          "pathSegment": "styles"
+        },
+        {
+          "element": "header",
+          "pathSegment": "header"
+        },
+        {
+          "element": "footer",
+          "pathSegment": "footer"
+        },
+        {
+          "element": "numbering",
+          "pathSegment": "numbering"
+        },
+        {
+          "element": "footnotes",
+          "pathSegment": "footnotes"
+        },
+        {
+          "element": "endnotes",
+          "pathSegment": "endnotes"
+        },
+        {
           "element": "comments",
           "pathSegment": "comments"
         },
@@ -301,8 +325,14 @@
         },
         "styleId": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "styleName": {
+          "type": "string",
+          "add": true,
+          "set": true,
           "get": true
         },
         "align": {
@@ -478,17 +508,23 @@
           "set": true,
           "get": true
         },
+        "numFmt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "listStyle": {
           "type": "string",
           "add": false,
           "set": true,
-          "get": false
+          "get": true
         },
         "start": {
           "type": "int",
           "add": false,
           "set": true,
-          "get": false
+          "get": true
         },
         "outlineLvl": {
           "type": "int",
@@ -1975,22 +2011,146 @@
       "element": "header",
       "parent": "document",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
+        "stable": [
+          "/header[@type=T]"
+        ],
         "positional": [
           "/header[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "header stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "default",
+            "first",
+            "even"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "field": {
+          "type": "enum",
+          "values": [
+            "page",
+            "numpages",
+            "date",
+            "author",
+            "title",
+            "time",
+            "filename"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1998,22 +2158,146 @@
       "element": "footer",
       "parent": "document",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
+        "stable": [
+          "/footer[@type=T]"
+        ],
         "positional": [
           "/footer[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "footer stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "default",
+            "first",
+            "even"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "field": {
+          "type": "enum",
+          "values": [
+            "page",
+            "numpages",
+            "date",
+            "author",
+            "title",
+            "time",
+            "filename"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2023,8 +2307,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -2032,11 +2316,19 @@
           "/footnotes"
         ]
       },
+      "children": [
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        }
+      ],
       "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "the footnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2047,23 +2339,68 @@
         "footnotes"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/footnote[N]",
-          "/footnotes/footnote[N]"
+          "/footnotes/footnote[N]",
+          "/footnote[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "footnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "properties": {
+        "id": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2073,8 +2410,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -2082,11 +2419,19 @@
           "/endnotes"
         ]
       },
+      "children": [
+        {
+          "element": "endnote",
+          "pathSegment": "endnote"
+        }
+      ],
       "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "the endnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2097,23 +2442,68 @@
         "endnotes"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/endnote[N]",
-          "/endnotes/endnote[N]"
+          "/endnotes/endnote[N]",
+          "/endnote[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "properties": {
+        "id": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2210,8 +2600,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -2219,11 +2609,26 @@
           "/styles"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
-        "reason": "the styles part has no node adapter yet"
+      "children": [
+        {
+          "element": "style",
+          "pathSegment": "<id or name>"
+        }
+      ],
+      "properties": {
+        "count": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2231,18 +2636,565 @@
       "element": "style",
       "parent": "styles",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
-      "paths": {},
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
-        "reason": "styles have no node adapter yet"
+      "paths": {
+        "stable": [
+          "/styles/<id or name>"
+        ]
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "paragraph",
+            "character",
+            "table",
+            "numbering"
+          ],
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "default": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "basedOn": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "basedOn.path": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "next": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "linked": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "autoRedefine": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "qFormat": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "uiPriority": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "semiHidden": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "unhideWhenUsed": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "locked": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "customStyle": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ascii": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsi": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ea": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.cs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.asciiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.eaTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.csTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size.cs": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold.cs": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic.cs": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline.color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dstrike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "caps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smallCaps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "vanish": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "charSpacing": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.latin": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.ea": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.cs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeAuto": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterAuto": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineSpacing": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineRule": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "exact",
+            "atLeast"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeLines": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterLines": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leftIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leftChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "outlineLvl": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepLines": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "widowControl": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contextualSpacing": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numId": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numLevel": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2252,8 +3204,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -2261,11 +3213,36 @@
           "/numbering"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
-        "reason": "the numbering part has no node adapter yet"
+      "children": [
+        {
+          "element": "abstractNum",
+          "pathSegment": "abstractNum"
+        },
+        {
+          "element": "num",
+          "pathSegment": "num"
+        }
+      ],
+      "properties": {
+        "abstractNumCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "numCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2273,18 +3250,84 @@
       "element": "abstractNum",
       "parent": "numbering",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
-      "paths": {},
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
-        "reason": "numbering definitions have no node adapter yet"
+      "paths": {
+        "positional": [
+          "/numbering/abstractNum[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "level",
+          "pathSegment": "level"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "hybridMultilevel",
+            "multilevel",
+            "singleLevel"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "styleLink": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numStyleLink": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2292,18 +3335,97 @@
       "element": "num",
       "parent": "numbering",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
-      "paths": {},
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
-        "reason": "numbering instances have no node adapter yet"
+      "paths": {
+        "positional": [
+          "/numbering/num[N]"
+        ]
+      },
+      "properties": {
+        "abstractNumId": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "startOverride.0": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.1": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.2": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.3": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.4": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.5": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.6": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.7": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.8": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "continue": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2314,18 +3436,121 @@
         "lvl"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
-      "paths": {},
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
-        "reason": "numbering levels have no node adapter yet"
+      "paths": {
+        "positional": [
+          "/numbering/abstractNum[N]/level[L]"
+        ]
+      },
+      "properties": {
+        "start": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lvlText": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lvlRestart": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "isLgl": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "indent": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hanging": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -3576,90 +4801,6 @@
   "gaps": [
     {
       "subject": "element",
-      "element": "header",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "header stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "footer",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "footer stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "footnotes",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "the footnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "footnote",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "footnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "endnotes",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "the endnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "endnote",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "styles",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "the styles part has no node adapter yet"
-    },
-    {
-      "subject": "element",
-      "element": "style",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "styles have no node adapter yet"
-    },
-    {
-      "subject": "element",
-      "element": "numbering",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "the numbering part has no node adapter yet"
-    },
-    {
-      "subject": "element",
-      "element": "abstractNum",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "numbering definitions have no node adapter yet"
-    },
-    {
-      "subject": "element",
-      "element": "num",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "numbering instances have no node adapter yet"
-    },
-    {
-      "subject": "element",
-      "element": "level",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "numbering levels have no node adapter yet"
-    },
-    {
-      "subject": "element",
       "element": "settings",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-R6 (R4x)",
@@ -3748,22 +4889,6 @@
       "code": "unsupported_capability",
       "followUp": "R4x",
       "reason": "tab characters are read as run content, not addressed yet"
-    },
-    {
-      "subject": "property",
-      "element": "paragraph",
-      "key": "styleName",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "a style's display name needs the styles part, which the node view does not read yet; `style` is the style id (M1-Δ4)"
-    },
-    {
-      "subject": "property",
-      "element": "paragraph",
-      "key": "numFmt",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "list formats need the numbering part, which the node view does not read yet"
     },
     {
       "subject": "property",

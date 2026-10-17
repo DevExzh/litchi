@@ -49,6 +49,19 @@ impl Package {
         crate::header_footer::catalog::entries_of(main.rels())
     }
 
+    /// The header and footer references of every section, in document
+    /// order, each with its role; only the main part is read.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a main part that is not well-formed.
+    pub fn header_footer_references(
+        &self,
+    ) -> Result<Vec<(crate::header_footer::Role, crate::section::Reference)>> {
+        let main = self.opc.main_document_part()?;
+        crate::header_footer::catalog::references_of(main.blob())
+    }
+
     /// The payload of part `name`, or `None` when the package has no such
     /// part.
     ///

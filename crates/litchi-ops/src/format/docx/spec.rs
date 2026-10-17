@@ -25,7 +25,7 @@ use super::setters::Setter;
 
 /// The element kinds of a DOCX document.
 ///
-/// The first eleven are read by this adapter. The others exist in
+/// Most kinds are read by this adapter. The others exist in
 /// WordprocessingML and OfficeCLI but are capability gaps here: resolving
 /// one is `unsupported_capability` with its follow-up.
 ///
@@ -33,7 +33,8 @@ use super::setters::Setter;
 /// use litchi_ops::format::docx::Kind;
 ///
 /// assert_eq!(Kind::Paragraph.type_name(), "paragraph");
-/// assert!(Kind::Header.is_gap());
+/// assert!(Kind::Theme.is_gap());
+/// assert!(!Kind::Header.is_gap());
 /// assert!(!Kind::Run.is_gap());
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -62,33 +63,33 @@ pub enum Kind {
     Equation,
     /// A body-level section break (`w:sectPr`), `section[N]`.
     Section,
-    /// A header story (gap).
+    /// A header part (record 0319).
     Header,
-    /// A footer story (gap).
+    /// A footer part (record 0319).
     Footer,
-    /// The footnotes part (gap).
+    /// The footnotes part (record 0319).
     Footnotes,
-    /// A footnote story (gap).
+    /// A footnote (record 0319).
     Footnote,
-    /// The endnotes part (gap).
+    /// The endnotes part (record 0319).
     Endnotes,
-    /// An endnote story (gap).
+    /// An endnote (record 0319).
     Endnote,
-    /// The comments part (gap).
+    /// The comments part (record 0251c).
     Comments,
-    /// A comment story (gap).
+    /// A comment (record 0251c).
     Comment,
-    /// The styles part (gap).
+    /// The styles part (record 0319).
     Styles,
-    /// One style (gap).
+    /// One style (record 0319).
     Style,
-    /// The numbering part (gap).
+    /// The numbering part (record 0319).
     Numbering,
-    /// An abstract numbering definition (gap).
+    /// An abstract numbering definition (record 0319).
     AbstractNum,
-    /// A numbering instance (gap).
+    /// A numbering instance (record 0319).
     Num,
-    /// A numbering level (gap).
+    /// A numbering level (record 0319).
     Level,
     /// The settings part (gap).
     Settings,
@@ -100,7 +101,7 @@ pub enum Kind {
     Field,
     /// A legacy form field (gap).
     FormField,
-    /// A picture (gap).
+    /// An inline picture (record 0251d).
     Picture,
     /// A chart of a paragraph (record 0283).
     Chart,
@@ -181,7 +182,15 @@ impl Kind {
 
     /// Whether a path step names the kind without an index (`/body`).
     pub(crate) const fn is_singleton(self) -> bool {
-        matches!(self, Self::Body | Self::Comments)
+        matches!(
+            self,
+            Self::Body
+                | Self::Comments
+                | Self::Styles
+                | Self::Numbering
+                | Self::Footnotes
+                | Self::Endnotes
+        )
     }
 }
 
@@ -481,26 +490,24 @@ const fn add_only(
     }
 }
 
-/// One write-only property declaration.  Text has a dedicated write handler
-/// but is intentionally absent from the read model; the appended registry
-/// row keeps all pre-existing paragraph/run read indices stable.
-/// A property that `set` writes and `get` does not read.
-const fn set_only(
+/// A property that `get` reads and `set` writes, and `add` does not seed.
+const fn read_set(
     name: &'static str,
     ty: ValueType,
     setter: Setter,
     constraint: Constraint,
 ) -> crate::registry::Entry<Setter> {
-    let mut spec = PropSpec::new(name, ty);
-    spec.access.get = false;
     crate::registry::Entry {
-        spec,
+        spec: PropSpec::new(name, ty),
         access: crate::registry::Access::Set(setter),
         constraint,
         clear: false,
     }
 }
 
+/// One write-only property declaration.  Text has a dedicated write handler
+/// but is intentionally absent from the read model; the appended registry
+/// row keeps all pre-existing paragraph/run read indices stable.
 const fn write_only(
     name: &'static str,
     ty: ValueType,
@@ -538,7 +545,10 @@ crate::registry::registry! {
     pub(crate) PARAGRAPH_PROPS, PARAGRAPH_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("paraId", ValueType::Text)),
     writable("style", ValueType::Text, Setter::ParagraphStyle, Constraint::NotEmpty, true),
-    crate::registry::Entry::read(PropSpec::new("styleId", ValueType::Text)),
+    // Record 0319: `styleId` writes the id; `styleName` reads the style's
+    // display name and writes a style named by id or display name.
+    writable("styleId", ValueType::Text, Setter::ParagraphStyle, Constraint::NotEmpty, true),
+    writable("styleName", ValueType::Text, Setter::ParagraphStyle, Constraint::NotEmpty, true),
     writable("align", ValueType::Token(&ALIGN), Setter::ParagraphAlign, Constraint::None, true),
     writable("spaceBefore", ValueType::Length(SPACING), Setter::ParagraphSpaceBefore, Constraint::None, true),
     writable("spaceAfter", ValueType::Length(SPACING), Setter::ParagraphSpaceAfter, Constraint::None, true),
@@ -564,10 +574,11 @@ crate::registry::registry! {
     writable("contextualSpacing", ValueType::Bool, Setter::ParagraphContextualSpacing, Constraint::None, true),
     writable("numId", ValueType::Text, Setter::ParagraphNumId, Constraint::NotEmpty, true),
     writable("numLevel", ValueType::Text, Setter::ParagraphNumLevel, Constraint::NotEmpty, true),
-    // Record 0251e: list kinds are written through the numbering part;
-    // reading them back needs that part in the node view (L-DOCX-R6).
-    set_only("listStyle", ValueType::Text, Setter::ParagraphListStyle, Constraint::NotEmpty),
-    set_only("start", ValueType::Int, Setter::ParagraphListStart, Constraint::Int { min: 0, max: 32_767 }),
+    // Record 0319: the numbering part answers the paragraph's list format,
+    // kind and start (record 0251e writes the kind and start).
+    crate::registry::Entry::read(PropSpec::new("numFmt", ValueType::Text)),
+    read_set("listStyle", ValueType::Text, Setter::ParagraphListStyle, Constraint::NotEmpty),
+    read_set("start", ValueType::Int, Setter::ParagraphListStart, Constraint::Int { min: 0, max: 32_767 }),
     writable("outlineLvl", ValueType::Int, Setter::ParagraphOutlineLevel, Constraint::Int { min: 0, max: 9 }, true),
     write_only("text", ValueType::Text, Setter::ParagraphText),
     // A paragraph may carry one initial run.  Its direct run formatting is
@@ -848,18 +859,6 @@ macro_rules! gaps {
 }
 
 gaps! {
-    HEADER_GAP: "header", "L-DOCX-R5", "header stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    FOOTER_GAP: "footer", "L-DOCX-R5", "footer stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    FOOTNOTES_GAP: "footnotes", "L-DOCX-R5", "the footnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    FOOTNOTE_GAP: "footnote", "L-DOCX-R5", "footnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    ENDNOTES_GAP: "endnotes", "L-DOCX-R5", "the endnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    ENDNOTE_GAP: "endnote", "L-DOCX-R5", "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    STYLES_GAP: "styles", "L-DOCX-R6 (R4x)", "the styles part has no node adapter yet";
-    STYLE_GAP: "style", "L-DOCX-R6 (R4x)", "styles have no node adapter yet";
-    NUMBERING_GAP: "numbering", "L-DOCX-R6 (R4x)", "the numbering part has no node adapter yet";
-    ABSTRACT_NUM_GAP: "abstractNum", "L-DOCX-R6 (R4x)", "numbering definitions have no node adapter yet";
-    NUM_GAP: "num", "L-DOCX-R6 (R4x)", "numbering instances have no node adapter yet";
-    LEVEL_GAP: "level", "L-DOCX-R6 (R4x)", "numbering levels have no node adapter yet";
     SETTINGS_GAP: "settings", "L-DOCX-R6 (R4x)", "the settings part has no node adapter yet";
     THEME_GAP: "theme", "L-DOCX-R6 (R4x)", "the theme part has no node adapter yet";
     BOOKMARK_GAP: "bookmark", "R4x", "bookmarks have no located reader yet";
@@ -947,7 +946,17 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "document",
                 &["document"],
                 &[],
-                &[K::Body, K::Comments, K::SmartArt],
+                &[
+                    K::Body,
+                    K::Styles,
+                    K::Header,
+                    K::Footer,
+                    K::Numbering,
+                    K::Footnotes,
+                    K::Endnotes,
+                    K::Comments,
+                    K::SmartArt,
+                ],
                 &["/"],
                 DOCUMENT_PROPS,
             ),
@@ -1052,53 +1061,81 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/body/section[N]"],
                 &[],
             ),
-            gap(
-                K::Header,
-                "header",
-                &["header"],
-                &[K::Document],
-                &["/header[N]"],
-                &HEADER_GAP,
+            // Story paragraphs are not listed children: unscoped `p`
+            // queries stay in the main story (record 0319).
+            identities(
+                element(
+                    K::Header,
+                    "header",
+                    &["header"],
+                    &[K::Document],
+                    &[],
+                    &["/header[N]", "/header[@type=T]"],
+                    super::parts::STORY_PROPS,
+                ),
+                &["type"],
             ),
-            gap(
-                K::Footer,
-                "footer",
-                &["footer"],
-                &[K::Document],
-                &["/footer[N]"],
-                &FOOTER_GAP,
+            identities(
+                element(
+                    K::Footer,
+                    "footer",
+                    &["footer"],
+                    &[K::Document],
+                    &[],
+                    &["/footer[N]", "/footer[@type=T]"],
+                    super::parts::STORY_PROPS,
+                ),
+                &["type"],
             ),
-            gap(
+            element(
                 K::Footnotes,
                 "footnotes",
                 &["footnotes"],
                 &[K::Document],
+                &[K::Footnote],
                 &["/footnotes"],
-                &FOOTNOTES_GAP,
+                &[],
             ),
-            gap(
-                K::Footnote,
-                "footnote",
-                &["footnote"],
-                &[K::Document, K::Footnotes],
-                &["/footnote[N]", "/footnotes/footnote[N]"],
-                &FOOTNOTE_GAP,
+            identities(
+                element(
+                    K::Footnote,
+                    "footnote",
+                    &["footnote"],
+                    &[K::Document, K::Footnotes],
+                    &[],
+                    &[
+                        "/footnotes/footnote[N]",
+                        "/footnote[N]",
+                        "/footnote[@footnoteId=N]",
+                    ],
+                    super::parts::NOTE_PROPS,
+                ),
+                &["footnoteId"],
             ),
-            gap(
+            element(
                 K::Endnotes,
                 "endnotes",
                 &["endnotes"],
                 &[K::Document],
+                &[K::Endnote],
                 &["/endnotes"],
-                &ENDNOTES_GAP,
+                &[],
             ),
-            gap(
-                K::Endnote,
-                "endnote",
-                &["endnote"],
-                &[K::Document, K::Endnotes],
-                &["/endnote[N]", "/endnotes/endnote[N]"],
-                &ENDNOTE_GAP,
+            identities(
+                element(
+                    K::Endnote,
+                    "endnote",
+                    &["endnote"],
+                    &[K::Document, K::Endnotes],
+                    &[],
+                    &[
+                        "/endnotes/endnote[N]",
+                        "/endnote[N]",
+                        "/endnote[@endnoteId=N]",
+                    ],
+                    super::parts::NOTE_PROPS,
+                ),
+                &["endnoteId"],
             ),
             element(
                 K::Comments,
@@ -1121,53 +1158,68 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 ),
                 &["commentId"],
             ),
-            gap(
+            element(
                 K::Styles,
                 "styles",
                 &["styles"],
                 &[K::Document],
+                &[K::Style],
                 &["/styles"],
-                &STYLES_GAP,
+                super::parts::STYLES_PROPS,
             ),
-            gap(
+            element(
                 K::Style,
                 "style",
                 &["style"],
                 &[K::Styles],
-                &["/styles/<id>"],
-                &STYLE_GAP,
+                &[],
+                &["/styles/<id or name>"],
+                super::parts::STYLE_PROPS,
             ),
-            gap(
+            element(
                 K::Numbering,
                 "numbering",
                 &["numbering"],
                 &[K::Document],
+                &[K::AbstractNum, K::Num],
                 &["/numbering"],
-                &NUMBERING_GAP,
+                super::parts::NUMBERING_PROPS,
             ),
-            gap(
-                K::AbstractNum,
-                "abstractNum",
-                &["abstractnum"],
-                &[K::Numbering],
-                &["/numbering/abstractNum[@id=N]"],
-                &ABSTRACT_NUM_GAP,
+            identities(
+                element(
+                    K::AbstractNum,
+                    "abstractNum",
+                    &["abstractnum"],
+                    &[K::Numbering],
+                    &[K::Level],
+                    &["/numbering/abstractNum[N]", "/numbering/abstractNum[@id=N]"],
+                    super::parts::ABSTRACT_NUM_PROPS,
+                ),
+                &["id"],
             ),
-            gap(
-                K::Num,
-                "num",
-                &["num"],
-                &[K::Numbering],
-                &["/numbering/num[@id=N]"],
-                &NUM_GAP,
+            identities(
+                element(
+                    K::Num,
+                    "num",
+                    &["num"],
+                    &[K::Numbering],
+                    &[],
+                    &["/numbering/num[N]", "/numbering/num[@id=N]"],
+                    super::parts::NUM_PROPS,
+                ),
+                &["id"],
             ),
-            gap(
-                K::Level,
-                "level",
-                &["level", "lvl"],
-                &[K::AbstractNum],
-                &["/numbering/abstractNum[@id=N]/level[L]"],
-                &LEVEL_GAP,
+            identities(
+                element(
+                    K::Level,
+                    "level",
+                    &["level", "lvl"],
+                    &[K::AbstractNum],
+                    &[],
+                    &["/numbering/abstractNum[N]/level[L]"],
+                    super::parts::LEVEL_PROPS,
+                ),
+                &["ilvl"],
             ),
             gap(
                 K::Settings,
@@ -1302,24 +1354,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             ),
         ],
         gaps: &[
-            GapSpec {
-                subject: Subject::Property {
-                    element: "paragraph",
-                    key: "styleName",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-R6 (R4x)",
-                reason: "a style's display name needs the styles part, which the node view does not read yet; `style` is the style id (M1-Δ4)",
-            },
-            GapSpec {
-                subject: Subject::Property {
-                    element: "paragraph",
-                    key: "numFmt",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-R6 (R4x)",
-                reason: "list formats need the numbering part, which the node view does not read yet",
-            },
             GapSpec {
                 subject: Subject::Property {
                     element: "sdt",
