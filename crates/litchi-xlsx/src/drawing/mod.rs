@@ -6,6 +6,7 @@
 //! reuses [`litchi_drawingml`] without copying its vocabulary.
 
 mod codec;
+pub mod edit;
 mod model;
 pub mod source;
 mod svg;

@@ -1023,6 +1023,11 @@ impl Workbook {
         &self.inner.package
     }
 
+    /// The styles part, when the workbook has one.
+    pub(crate) fn styles_part_uri(&self) -> Option<&PackURI> {
+        self.inner.styles_uri.as_ref()
+    }
+
     /// The OPC graph behind this projection, moved out when this is its only
     /// owner and cloned (sharing every part payload) otherwise.
     pub(crate) fn into_opc_package(self) -> OpcPackage {
@@ -1092,6 +1097,21 @@ impl Workbook {
     ) -> Result<Option<crate::workbook_metadata::protection::Metadata>> {
         let workbook = self.inner.package.get_part(&self.inner.workbook_uri)?;
         crate::workbook_metadata::protection::parse_workbook_protection(workbook.blob())
+    }
+
+    /// Parse the styles part's differential formats, the formats conditional
+    /// formatting rules reference by `dxfId`; empty without a styles part.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed parse error for malformed `dxfs` markup.
+    pub fn differential_formats(&self) -> Result<Vec<crate::conditional_formatting::Differential>> {
+        let Some(uri) = self.inner.styles_uri.as_ref() else {
+            return Ok(Vec::new());
+        };
+        crate::conditional_formatting::parse_differential_formats(
+            self.inner.package.get_part(uri)?.blob(),
+        )
     }
 
     /// Shared immutable cell formats in this workbook snapshot.
@@ -1207,6 +1227,25 @@ impl Worksheet {
             });
         }
         crate::form_control::eager_form_controls_for_sheet(&self.owner.package, &self.data.part_uri)
+    }
+
+    /// Parse this worksheet's legacy notes; `None` without a comments part.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotWorksheet`] for a chart or dialog sheet, and a typed error
+    /// for a malformed comments part or relationship.
+    pub fn comments(&self) -> Result<Option<crate::workbook::comments::Comments>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        Ok(crate::workbook::comments::load_from_worksheet(
+            &self.owner.package,
+            &self.data.part_uri,
+        )?
+        .map(|part| part.comments))
     }
 
     /// Read this worksheet's form controls under a caller-owned bounded

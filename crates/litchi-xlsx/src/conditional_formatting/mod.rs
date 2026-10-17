@@ -9,6 +9,7 @@
 //! while binding its workbook, relationship, and styles dependency closure.
 
 mod codec;
+pub mod edit;
 mod model;
 mod package;
 mod patch;
