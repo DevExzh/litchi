@@ -28,8 +28,8 @@ use litchi_pptx::shape::owned::Handles;
 
 use super::Pptx;
 use super::node::{
-    CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node, NotesItem, ReplyItem,
-    SlideItem, TableItem, TextItem, TreeContainer, TreeItem,
+    CellRef, CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node, NotesItem,
+    ReplyItem, SlideItem, TableItem, TextItem, TreeContainer, TreeItem,
 };
 use super::spec::Kind;
 use super::steps;
@@ -398,6 +398,7 @@ impl<'f> Children<'f> {
                             paragraph,
                             run: 0,
                             ordinal: paragraph,
+                            cell: CellRef::NONE,
                         }),
                     )));
                 },
@@ -500,6 +501,9 @@ fn next_tree<'f>(
                     },
                     TreeContainer::Layout { master, position } => {
                         TreeItem::new_layout(master, position, kind, handle, ordinal)
+                    },
+                    container @ TreeContainer::Notes(_) => {
+                        TreeItem::in_container(container, kind, handle, ordinal)
                     },
                 }),
             ));
@@ -642,7 +646,7 @@ impl State {
                     Self::Chart(super::smartart::children(file, parent.item())?.into_iter())
                 },
                 Kind::Table if kinds.contains(Kind::Row) => {
-                    let (rows, _) = text::table_shape(&tree.handle)?;
+                    let rows = tree.table_grid()?.map_or(0, |grid| grid.len());
                     Self::Rows {
                         table: tree.clone(),
                         next: 0,
@@ -665,7 +669,12 @@ impl State {
                 Self::Chart(super::smartart::children(file, parent.item())?.into_iter())
             },
             Item::Row(row) if kinds.contains(Kind::Cell) => {
-                let cells = text::row_cells(&row.table.handle, row.row)?;
+                let cells = match row.table.table_grid()? {
+                    Some(grid) => grid
+                        .get(row.row as usize)
+                        .map_or(0, |cells| *cells as usize),
+                    None => text::row_cells(&row.table.handle, row.row)?,
+                };
                 Self::Cells {
                     row: row.clone(),
                     next: 0,

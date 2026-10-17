@@ -703,10 +703,20 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "geometry"
                 | "link"
                 | "tooltip"
+                | "underline"
+                | "strike"
         ),
         "paragraph" => matches!(
             property,
-            "align" | "size" | "text" | "bold" | "italic" | "color" | "font"
+            "align"
+                | "size"
+                | "text"
+                | "bold"
+                | "italic"
+                | "color"
+                | "font"
+                | "underline"
+                | "strike"
         ),
         "run" => matches!(
             property,
@@ -719,18 +729,68 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "font"
                 | "link"
                 | "tooltip"
+                | "underline"
+                | "strike"
         ),
-        // The click action (record 0325).
-        "picture" | "group" => matches!(property, "link" | "tooltip"),
+        // The click action (record 0325); a picture's frame, alternative
+        // text and image (record 0333).
+        "picture" => matches!(
+            property,
+            "link" | "tooltip" | "x" | "y" | "width" | "height" | "alt" | "src"
+        ),
+        "group" => matches!(property, "link" | "tooltip"),
         "tc" => matches!(
             property,
-            "fill" | "text" | "bold" | "italic" | "size" | "color" | "font" | "align"
+            "fill"
+                | "text"
+                | "bold"
+                | "italic"
+                | "size"
+                | "color"
+                | "font"
+                | "align"
+                | "valign"
+                | "padding"
+                | "padding.left"
+                | "padding.right"
+                | "padding.top"
+                | "padding.bottom"
+                | "underline"
+                | "strike"
         ),
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
         "comment" => matches!(property, "text" | "x" | "y"),
+        // Table rows (record 0333).
+        "tr" => property == "height",
         _ => false,
     }
+}
+
+#[cfg(feature = "pptx")]
+/// What a new paragraph or run takes on `add` (record 0333): its text and
+/// formatting, but not a run's click action.
+fn pptx_text_add(element: &str, property: &str) -> bool {
+    (matches!(element, "paragraph" | "run")
+        && pptx_text_format_set(element, property)
+        && !matches!(property, "link" | "tooltip"))
+        || (element == "tr" && pptx_row_add(property))
+        || (element == "table"
+            && matches!(
+                property,
+                "name" | "rows" | "cols" | "x" | "y" | "width" | "height" | "data"
+            ))
+}
+
+#[cfg(feature = "pptx")]
+/// A new row's keys (record 0333): its height, OfficeCLI's `cols` check and
+/// the `c1`…`c20` seed texts.
+fn pptx_row_add(property: &str) -> bool {
+    matches!(property, "height" | "cols")
+        || property
+            .strip_prefix('c')
+            .and_then(|number| number.parse::<u8>().ok())
+            .is_some_and(|number| (1..=20).contains(&number))
 }
 
 #[cfg(feature = "pptx")]
@@ -744,12 +804,20 @@ fn pptx_shape_add(property: &str) -> bool {
 /// Write-only rich text entries (no ordinary read of the same key).
 fn pptx_write_only(element: &str, property: &str) -> bool {
     match element {
-        "paragraph" => matches!(property, "text" | "bold" | "italic" | "color" | "font"),
+        "paragraph" => matches!(
+            property,
+            "text" | "bold" | "italic" | "color" | "font" | "underline" | "strike"
+        ),
         "run" => matches!(property, "text" | "font"),
-        "tc" => property != "fill",
+        "tc" => !matches!(
+            property,
+            "fill" | "valign" | "padding.left" | "padding.right" | "padding.top" | "padding.bottom"
+        ),
         "slide" => matches!(property, "notes" | "transition"),
         "shape" | "placeholder" => matches!(property, "fill" | "geometry"),
         "picture" => property == "src",
+        "tr" => property != "height" && pptx_row_add(property),
+        "table" => property == "data",
         _ => false,
     }
 }
@@ -817,7 +885,7 @@ fn pptx_reports_selection_and_structural_writes() {
             let picture_add = element.name() == "picture"
                 && matches!(
                     property.name(),
-                    "src" | "name" | "x" | "y" | "width" | "height" | "link" | "tooltip"
+                    "src" | "name" | "alt" | "x" | "y" | "width" | "height" | "link" | "tooltip"
                 );
             let comment_add = element.name() == "comment"
                 && matches!(
@@ -826,7 +894,11 @@ fn pptx_reports_selection_and_structural_writes() {
                 );
             assert_eq!(
                 property.add(),
-                slide_add || shape_add || picture_add || comment_add,
+                slide_add
+                    || shape_add
+                    || picture_add
+                    || comment_add
+                    || pptx_text_add(element.name(), property.name()),
                 "{} / {}",
                 element.name(),
                 property.name()
@@ -1229,6 +1301,13 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "video"
                     | "audio"
                     | "media"
+                    | "paragraph"
+                    | "run"
+                    | "linebreak"
+                    | "tr"
+                    | "comment"
+                    | "modernComment"
+                    | "reply"
             ),
             "{}",
             element.name()
@@ -1268,6 +1347,13 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "video"
                     | "audio"
                     | "media"
+                    | "paragraph"
+                    | "run"
+                    | "linebreak"
+                    | "tr"
+                    | "comment"
+                    | "modernComment"
+                    | "reply"
             ),
             "{}",
             element.name()

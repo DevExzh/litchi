@@ -1,9 +1,13 @@
-//! Table grid columns of a slide graphic frame (record 0321).
+//! Table grid columns and rows of a slide graphic frame (records 0321 and
+//! 0333).
 //!
 //! [`Edit::set_table_column_width`], [`Edit::insert_table_column`] and
 //! [`Edit::remove_table_column`] change one column of a table: its
-//! `a:gridCol` and the cell at its position in every row. The frame's
-//! extent follows the sum of the column widths, as OfficeCLI keeps it.
+//! `a:gridCol` and the cell at its position in every row;
+//! [`Edit::insert_table_row`] and [`Edit::remove_table_row`] change one
+//! `a:tr`. The frame's extent follows the sum of the column widths or row
+//! heights, as OfficeCLI keeps it; merged cells stay consistent where that
+//! is safe.
 
 use litchi_core::Position;
 
@@ -56,7 +60,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing slide or shape, a position past the
-    /// column count, a table with cells merged across columns, invalid
+    /// column count, a position inside cells merged across columns, invalid
     /// text, or markup-compatibility content.
     pub fn insert_table_column<'s, 'k>(
         &mut self,
@@ -84,13 +88,15 @@ impl Edit {
     }
 
     /// Remove the column at a zero-based position of a table frame, with
-    /// its cell in every row. The last column is kept.
+    /// its cell in every row. The last column is kept. A merge across the
+    /// column spans one column less; when its first cell goes, the next
+    /// cell becomes its first.
     ///
     /// # Errors
     ///
-    /// Returns an error for a missing slide, shape or column, a table with
-    /// cells merged across columns, a table with one column, or
-    /// markup-compatibility content.
+    /// Returns an error for a missing slide, shape or column, a column that
+    /// takes part in a merge spanning rows and columns, a table with one
+    /// column, or markup-compatibility content.
     pub fn remove_table_column<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
@@ -103,6 +109,104 @@ impl Edit {
             Change::Remove {
                 column: column.get(),
             },
+        )
+        .map(|_| ())
+    }
+
+    /// Insert a row before a zero-based position (the row count appends)
+    /// of a table frame, with a height in EMU (`None`: the first row's) and
+    /// seed text for its cells by column (missing columns are empty). The
+    /// row holds one cell per grid column.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// let source = litchi_pptx::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// let slide = edit.insert_slide(Position::new(0), "Blank")?;
+    /// let cells = vec![vec!["a".to_owned(), "b".to_owned()]];
+    /// edit.add_table(slide.name(), &cells, (0, 0, 1_828_800, 914_400))?;
+    /// edit.insert_table_row(0_usize, 0_usize, Position::new(1), None, &["c", "d"])?;
+    /// let package = edit.commit()?.into_package();
+    /// # Ok::<(), litchi_pptx::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing slide or shape, a position past the
+    /// row count, a position inside cells merged across rows, more seed
+    /// texts than columns, invalid text, or markup-compatibility content.
+    pub fn insert_table_row<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        position: Position,
+        height: Option<i64>,
+        texts: &[&str],
+    ) -> Result<()> {
+        if !texts.iter().all(|text| {
+            text.chars().all(|ch| {
+                matches!(ch, '\t' | '\n' | '\r' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}' | '\u{10000}'..='\u{10ffff}')
+            })
+        }) {
+            return Err(invalid("table cell text contains a character XML cannot carry"));
+        }
+        self.change_table_columns(
+            slide.into(),
+            shape.into(),
+            Change::InsertRow {
+                position: position.get(),
+                height,
+                texts,
+            },
+        )
+        .map(|_| ())
+    }
+
+    /// Set the height, in EMU, of the row at a zero-based position of a
+    /// table frame (record 0333). Returns whether the slide changed; an
+    /// equal height is an exact no-op. The frame's height follows the sum
+    /// of the row heights.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing slide, shape or row, a height out of
+    /// range, or markup-compatibility content.
+    pub fn set_table_row_height<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        row: Position,
+        height: i64,
+    ) -> Result<bool> {
+        self.change_table_columns(
+            slide.into(),
+            shape.into(),
+            Change::RowHeight {
+                row: row.get(),
+                height,
+            },
+        )
+    }
+
+    /// Remove the row at a zero-based position of a table frame. The last
+    /// row is kept. A merge across the row spans one row less; when its
+    /// first cell goes, the cells below become its first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing slide, shape or row, a table with one
+    /// row, a merge whose covered cells are not in place, or
+    /// markup-compatibility content.
+    pub fn remove_table_row<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        row: Position,
+    ) -> Result<()> {
+        self.change_table_columns(
+            slide.into(),
+            shape.into(),
+            Change::RemoveRow { row: row.get() },
         )
         .map(|_| ())
     }
@@ -136,11 +240,25 @@ impl Edit {
             return Ok(false);
         };
         let staged = crate::shape::Scene::read(&next)?;
-        let delta = |count: usize| match change {
-            Change::Width { .. } => Some(count),
+        let column_delta = |count: usize| match change {
             Change::Insert { .. } => count.checked_add(1),
             Change::Remove { .. } => count.checked_sub(1),
+            Change::Width { .. }
+            | Change::InsertRow { .. }
+            | Change::RemoveRow { .. }
+            | Change::RowHeight { .. } => Some(count),
         };
+        let mut expected_cells: Vec<Option<usize>> = cells.into_iter().map(column_delta).collect();
+        match change {
+            Change::InsertRow { position, .. } => expected_cells.insert(position, Some(before)),
+            Change::RemoveRow { row } => {
+                expected_cells.remove(row);
+            },
+            Change::Width { .. }
+            | Change::Insert { .. }
+            | Change::Remove { .. }
+            | Change::RowHeight { .. } => {},
+        }
         let after = staged.shape(key)?;
         let after = frame_table(&next, after.common().span()?.range(next.len())?)?;
         let staged_cells: Vec<Option<usize>> = after
@@ -148,9 +266,8 @@ impl Edit {
             .iter()
             .map(|row| Some(row.cell_count()))
             .collect();
-        let expected_cells: Vec<Option<usize>> = cells.into_iter().map(delta).collect();
         if staged.len() != scene.len()
-            || Some(after.grid_columns()?.len()) != delta(before)
+            || Some(after.grid_columns()?.len()) != column_delta(before)
             || staged_cells != expected_cells
         {
             return Err(invalid("the table column edit did not round-trip"));

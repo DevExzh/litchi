@@ -230,10 +230,16 @@ impl Pptx {
         if let Some(commit) = self.try_set_column(&target, &props, limits)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_set_row(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_hyperlink(&target, &props, limits)? {
             return Ok(commit);
         }
         if let Some(commit) = self.try_set_click(&target, &props, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = self.try_set_picture(&target, &props, limits)? {
             return Ok(commit);
         }
         if let Some(commit) = self.try_set_chart(&target, &props, limits)? {

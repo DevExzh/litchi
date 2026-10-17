@@ -29,6 +29,8 @@ mod xml;
 #[cfg(test)]
 mod mce_retention_tests;
 #[cfg(test)]
+mod picture_edit_tests;
+#[cfg(test)]
 mod slide_root_memo_tests;
 #[cfg(test)]
 mod tests;
@@ -36,6 +38,8 @@ mod tests;
 mod text_format_tests;
 #[cfg(test)]
 mod text_run_tests;
+#[cfg(test)]
+mod text_structure_tests;
 #[cfg(test)]
 mod transition_edit_tests;
 
@@ -55,10 +59,12 @@ pub use model::{
 };
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
-pub(crate) use text_format::stage_text_properties;
 pub use text_format::{
-    MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill, TextEdit, TextProperties,
-    TextTarget,
+    CellFill, CellMargin, MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill,
+    TextBody, TextEdit, TextProperties, TextTarget,
+};
+pub(crate) use text_format::{
+    TextChange, stage_text_properties, stage_text_property_chunks, stage_text_structure,
 };
 pub use transaction::{Commit, Diagnostics, Edit, MediaFile, SmartArtParts};
 

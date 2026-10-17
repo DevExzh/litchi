@@ -2613,6 +2613,28 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 
 See [0321](unified-ops/0321-pptx-element-gaps.md).
 
+## PPTX P0 residue: text structure, rows, cell properties, comments, pictures (record 0333)
+
+New verbs live on the primary `opened::Edit`, and the slide-local ones also
+on the source primary `source::Edit` (no new transaction family). The verb
+names follow the glossary's `insert_*`/`remove_*`/`set_*` spellings of the
+other text and table owners; positions are `litchi_core::Position`s, and
+native comment identities stay behind the positional verbs.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::opened::TextBody::{Shape, Cell, Notes}`; `opened::Edit::{insert_paragraph, remove_paragraph, insert_run, remove_run}`; `source::Edit::{insert_paragraph, remove_paragraph, insert_run, remove_run}` (slide bodies) | adopted (0333) |
+| `litchi_pptx::opened::TextTarget::CellParagraph` | adopted (0333) |
+| `litchi_pptx::opened::{CellFill, CellMargin}`; `TextProperties::{with_fill(CellFill), with_cell_anchor, with_cell_margin, with_underline, with_strike}` | adopted (0333); `with_fill` takes a `CellFill` (was an `Rgb`) |
+| `litchi_pptx::table::{CellProperties, Cell::properties, Row::height, Table::row_cell_counts}` | adopted (0333) |
+| `litchi_pptx::opened::Edit::{insert_table_row, remove_table_row, set_table_row_height}` | adopted (0333); column insertion and removal keep merged cells consistent where safe |
+| `litchi_pptx::opened::Edit::set_text_property_chunks`; `source::Edit::set_text_property_chunks`; `SourceBackedSlideEdit::set_text_property_chunks` | adopted (0333), the text-formatting sibling of `set_shape_text_chunks` |
+| `litchi_pptx::opened::Edit::{remove_comment_at, remove_modern_comment_at, remove_modern_comment_reply_at}` | adopted (0333), positional siblings of `set_comment_at` |
+| `litchi_pptx::opened::Edit::{set_picture_image, set_shape_description, set_shape_name}` | adopted (0333) |
+| `litchi_ops` PPTX kinds: `paragraph` and `run` under `tc` and `notes` (by path), `tr` (`height`, `cols`, `c1`…`c20`), `table` add (`rows`, `cols`, `data`), `tc` `valign`/`padding.*`, `picture` `alt`/`src`/frame set | adopted (0333) |
+
+See [0333](unified-ops/0333-pptx-p0-residue.md).
+
 ## XLSB worksheet feature families (record 0322)
 
 Seven scoped families publish XLSB worksheet features through immutable

@@ -87,7 +87,7 @@ fn scoped_selector_batches_and_failed_properties_are_atomic() {
             source
                 .set(
                     FIRST,
-                    props! { "text" => "partial", "underline" => "single" }
+                    props! { "text" => "partial", "highlight" => "FFFF00" }
                 )
                 .unwrap_err()
                 .code(),
@@ -157,7 +157,7 @@ fn transactions_replay_inverse_poison_and_detect_net_noop() {
         assert_eq!(noop.file.to_bytes().unwrap(), before);
         let poisoned = source.edit(|edit| {
             edit.set(FIRST, props! { "text" => "discarded" })?;
-            let _ = edit.set(FIRST, props! { "underline" => "single" });
+            let _ = edit.set(FIRST, props! { "highlight" => "FFFF00" });
             Ok(())
         });
         assert!(poisoned.is_err());
