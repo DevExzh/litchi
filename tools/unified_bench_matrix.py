@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0326 (`docs/unified-ops/02[4-9]*.md`, `03[0-2]*.md`)
+operations records 0249-0337 (`docs/unified-ops/02[4-9]*.md`, `03[0-3]*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -41,7 +41,7 @@ Conventions:
 
 Records 0285-0326 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
-0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315 and 0326 their own) are collected
+0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315, 0326 and 0337 their own) are collected
 only when their record file is on this tree; the Markdown lists every
 record of that range, absent ones as "not on this tree", so the tool can
 be rerun unchanged after later merges.
@@ -982,7 +982,7 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 326)
+FOLLOW_RANGE = (285, 337)
 
 
 def record_file(record: str):
@@ -1823,13 +1823,64 @@ def p0326():
     return out
 
 
+BATCH_0337_SCENARIOS = {
+    "run_bold_set": "run bold sets on distinct paragraphs",
+    "cell_value_set": "cell value sets on distinct cells",
+    "cell_remove": "cell removals on distinct cells",
+    "shape_text_set": "shape text sets on distinct shapes",
+    "paragraph_text_set": "paragraph text sets on distinct paragraphs",
+    "series_label_set": "series label sets on distinct series",
+    "query_command_set": "query command sets on distinct queries",
+    "token_text_set": "token text sets on distinct tokens",
+    "frame_property_set": "every independent frame property",
+}
+STAGES_0337 = {"trunk": ("", 1), "after": ("after record 0337", 2)}
+
+
+def batch_closure(record, paths):
+    """Record 0337's `unified-batch-closure` harness: one JSON document per
+    process (trial); a case is one (format, owner, scenario, operations). The
+    unified leg is one atomic `File::batch` of N items, the leaf leg one
+    hand-written leaf edit (split only where the leaf's own bound forces
+    it); every case was checked equal (exact bytes or decoded members)
+    before timing. Ratios are per trial; leaf/unified are medians of the
+    trials' medians."""
+    groups = {}
+    for p in paths:
+        m = re.search(r"batch-[A-Z]-([a-z]+)-\d+(?:-n\d+)?\.json$", p.name)
+        stage, rank = STAGES_0337["trunk" if m.group(1) in ("trunk", "before") else m.group(1)]
+        for c in load_json(p)["cases"]:
+            k = (c["format"], c["owner"], c["scenario"], c["operations"], stage, rank,
+                 c["fixture_targets"])
+            groups.setdefault(k, []).append((c, p))
+    out = []
+    for (fmt, owner, scen, n, stage, rank, fixture), items in sorted(groups.items()):
+        budget = BATCH if n >= 1000 or fmt == "odi" else SCALING
+        cases = [c for c, _ in items]
+        held = "one frame" if fmt == "odi" else f"fixture of {fixture:,}"
+        out.append(row(record, fmt, "batch", f"{BATCH_0337_SCENARIOS[scen]} ({owner} owner; "
+                       f"one File::batch vs one leaf edit, {held})", f"{n} ops",
+                       us(med(c["leaf_median_ns"] for c in cases)),
+                       us(med(c["unified_median_ns"] for c in cases)),
+                       [c["ratio"] for c in cases], budget,
+                       f"batch_closure:{fmt}:{owner}:{scen}:{n}:fixture{fixture}", src(sorted({p for _, p in items})),
+                       stage=stage, stage_rank=rank))
+    return out
+
+
+@needs("0337")
+def p0337():
+    """Record 0337: 1k-batch evidence for every format (`abba/batch-*.json`)."""
+    return batch_closure("0337", sorted((RES / "0337" / "abba").glob("batch-*.json")))
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
            p0306, p0309, p0310, p0311, p0312,
-           p0313, p0315, p0326]
+           p0313, p0315, p0326, p0337]
 
 
 # ---------------------------------------------------------------- merge
@@ -1847,6 +1898,8 @@ def curated_rows(cur):
                 c.get("explanation", ""))
         r["verdict"] = c.get("verdict")
         r["ratio_text"] = c.get("ratio_text")
+        if c.get("disposition"):
+            r["disposition"] = c["disposition"]
         out.append(r)
     return out
 
@@ -1895,6 +1948,8 @@ def apply_annotations(rows, cur):
                 r["verdict"] = a["verdict"]
             if "superseded_by" in a:
                 r["superseded_by"] = a["superseded_by"]
+            if "disposition" in a:
+                r["disposition"] = a["disposition"]
             if "budget" in a:
                 r["budget_value"], r["budget"] = a.get("budget_value"), a["budget"]
                 r["budget_kind"] = a.get("budget_kind", r["budget_kind"])
@@ -1943,6 +1998,27 @@ def finalize(rows):
                     text += f" Latest explanation ({latest['record']}): {latest['explanation']}"
                 r["explanation"] = (text + (" Original: " + r["explanation"] if r["explanation"] else ""))
     return rows
+
+
+# Record 0337: every open miss names a follow-up or an explained residual.
+# A curated row or annotation may say so explicitly (`disposition`:
+# "follow-up" or "residual"); otherwise the explanation's wording decides.
+FOLLOW_UP_WORDS = re.compile(r"follow-?up|\bF\d+\b|-F\d+\b", re.I)
+RESIDUAL_WORDS = re.compile(r"inherent|owner decision|owner-accepted|explained residual", re.I)
+DISPOSITIONS = ("follow-up", "residual")
+
+
+def disposition(r):
+    d = r.get("disposition")
+    if d:
+        if d not in DISPOSITIONS:
+            raise SystemExit(f"unknown disposition {d!r}: {r['record']} {r['series']}")
+        return d
+    if FOLLOW_UP_WORDS.search(r["explanation"]):
+        return "follow-up"
+    if RESIDUAL_WORDS.search(r["explanation"]):
+        return "residual"
+    return ""
 
 
 # ---------------------------------------------------------------- output
@@ -2012,7 +2088,7 @@ def to_md(rows, conflicts, agreements, cur):
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
       "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
       "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306; "
-      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; records 0315 and 0326 their own.")
+      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; records 0315, 0326 and 0337 their own.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "
@@ -2084,6 +2160,12 @@ def to_md(rows, conflicts, agreements, cur):
     sup_m = [r for r in rows if r["status"].startswith("miss (")]
     a(f"### Open misses ({len(open_m)})")
     a("")
+    n_fu = sum(disposition(r) == "follow-up" for r in open_m)
+    n_res = sum(disposition(r) == "residual" for r in open_m)
+    a(f"Dispositions (record 0337): {n_fu} name a follow-up, {n_res} are an explained "
+      f"residual (inherent to the comparison, or kept by an owner decision), "
+      f"{len(open_m) - n_fu - n_res} name neither. `--check` fails on the last kind.")
+    a("")
     miss_table(open_m)
     a(f"### Superseded misses ({len(sup_m)})")
     a("")
@@ -2131,6 +2213,8 @@ def build():
     apply_annotations(rows, cur)
     rows = sort_rows(finalize(rows))
     problems = [r for r in rows if r["status"].startswith("miss") and not r["explanation"].strip()]
+    problems += [r for r in rows if r["status"] == "miss" and r["explanation"].strip()
+                 and not disposition(r)]
     return rows, conflicts, agreements, cur, problems
 
 
@@ -2148,7 +2232,8 @@ def main(argv=None):
     tsv, md = to_tsv(rows), to_md(rows, conflicts, agreements, cur)
     rc = 0
     for r in problems:
-        print(f"miss without explanation: {r['record']} {r['series']} {r['stage']}", file=sys.stderr)
+        what = "explanation" if not r["explanation"].strip() else "follow-up or residual"
+        print(f"miss without {what}: {r['record']} {r['series']} {r['stage']}", file=sys.stderr)
         rc = 1
     if args.check:
         for path, text in ((OUT_TSV, tsv), (OUT_MD, md)):
