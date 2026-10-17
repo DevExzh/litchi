@@ -936,3 +936,50 @@ fn placeholder_runs_take_character_properties() {
     assert_eq!(text(&reopened, run).as_deref(), Some("Changed"));
     assert_eq!(prop(&reopened, run, "italic").as_deref(), Some("true"));
 }
+
+#[test]
+fn notes_runs_take_character_properties() {
+    // Record 0329: speaker notes list their runs, which take character
+    // properties as placeholder runs do.
+    let file = read("multi-slide.key")
+        .set(
+            "/slide[2]/notes",
+            props! { "text" => "Remember\nthe second point" },
+        )
+        .expect("notes");
+    let file = reopen(&file);
+    let run = "/slide[2]/notes/p[2]/run[1]";
+    assert_eq!(text(&file, run).as_deref(), Some("the second point"));
+    let styled = file
+        .set(run, props! { "bold" => true, "color" => "C01020" })
+        .expect("style a notes run");
+    let reopened = reopen(&styled);
+    assert_eq!(prop(&reopened, run, "bold").as_deref(), Some("true"));
+    assert_eq!(
+        text(&reopened, "/slide[2]/notes"),
+        text(&file, "/slide[2]/notes")
+    );
+    let restored = file
+        .edit(|tx| tx.set(run, props! { "italic" => true }))
+        .expect("edit");
+    let undone = restored
+        .patch
+        .inverse()
+        .apply(&restored.file)
+        .expect("inverse");
+    assert_eq!(undone.to_bytes().unwrap(), file.to_bytes().unwrap());
+    // In a batch, the run addresses the notes text the earlier item wrote.
+    let commit = file
+        .edit(|tx| {
+            tx.set(
+                "/slide[2]/notes",
+                props! { "text" => "Recall\nthe other point" },
+            )?;
+            tx.set(run, props! { "italic" => true })?;
+            Ok(())
+        })
+        .expect("batch");
+    let reopened = reopen(&commit.file);
+    assert_eq!(text(&reopened, run).as_deref(), Some("the other point"));
+    assert_eq!(prop(&reopened, run, "italic").as_deref(), Some("true"));
+}

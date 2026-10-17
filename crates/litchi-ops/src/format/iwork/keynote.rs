@@ -207,14 +207,7 @@ const fn operation_gap(
     }
 }
 
-static OPERATION_GAPS: [GapSpec; 9] = [
-    operation_gap(
-        "set",
-        "run",
-        "speaker-notes runs",
-        "record 0312 follow-ups",
-        "character properties are written on runs of text boxes, shapes and title and body placeholders (record 0312); speaker notes list no runs and keep their styles",
-    ),
+static OPERATION_GAPS: [GapSpec; 8] = [
     operation_gap(
         "add",
         "run",
@@ -607,6 +600,8 @@ struct Deferred {
     /// The paragraph items, in text order.
     paragraphs: Vec<u32>,
     slide: usize,
+    /// The drawable holding the text, or [`NONE`] for the speaker notes
+    /// (record 0329).
     drawable: usize,
 }
 
@@ -668,7 +663,16 @@ fn runs(tree: &mut TreeBuilder<Kind>, deferred: &Deferred, runs: &[TextRun]) {
                     )
                     .prop("font.latin", text(style.font_name.as_deref()))
                     .text(piece)
-                    .leaf([deferred.slide, DRAWABLE, line, deferred.drawable])
+                    .leaf([
+                        deferred.slide,
+                        if deferred.drawable == NONE {
+                            NOTES
+                        } else {
+                            DRAWABLE
+                        },
+                        line,
+                        deferred.drawable,
+                    ])
                     .done();
             }
             if span.end() <= end {
@@ -884,7 +888,12 @@ pub(crate) fn build_slide(
             .text(notes)
             .leaf([index, NOTES, 0, NONE])
             .done();
-        paragraphs(&mut tree, item, notes, [index, NOTES, NONE]);
+        let lines = paragraphs(&mut tree, item, notes, [index, NOTES, NONE]);
+        deferred.push(Deferred {
+            paragraphs: lines,
+            slide: index,
+            drawable: NONE,
+        });
     }
     let mut tables = drawables
         .iter()
@@ -946,10 +955,15 @@ pub(crate) fn build_slide(
     if with_runs {
         tree.defer();
         for text in &deferred {
-            let Ok(read) = package.slide_drawable_text_runs(
-                SlideSelector::index(text.slide),
-                litchi_keynote::DrawableSelector::index(text.drawable),
-            ) else {
+            let read = if text.drawable == NONE {
+                package.slide_notes_text_runs(SlideSelector::index(text.slide))
+            } else {
+                package.slide_drawable_text_runs(
+                    SlideSelector::index(text.slide),
+                    litchi_keynote::DrawableSelector::index(text.drawable),
+                )
+            };
+            let Ok(read) = read else {
                 continue;
             };
             runs(&mut tree, text, &read);

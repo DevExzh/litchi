@@ -642,9 +642,9 @@ impl Pending {
         true
     }
 
-    /// Stage one character property of a run of a text box, shape, or
-    /// title or body placeholder: the run's characters in its drawable's
-    /// text (records 0309, 0312).
+    /// Stage one character property of a run of a text box, shape, title
+    /// or body placeholder, or the speaker notes: the run's characters in
+    /// its text (records 0309, 0312, 0329).
     fn stage_run_style(
         &mut self,
         file: &Iwork,
@@ -657,15 +657,16 @@ impl Pending {
         let unsupported = || {
             refusal(
                 Code::UnsupportedCapability,
-                "character properties are written on runs of text boxes, shapes and title and body placeholders; speaker-notes runs keep their styles",
+                "character properties are written on runs of text boxes, shapes, title and body placeholders and speaker notes",
             )
             .with_property(key.to_owned())
         };
-        if container != DRAWABLE || drawable == NONE {
+        let notes = container == NOTES;
+        if !notes && (container != DRAWABLE || drawable == NONE) {
             return Err(unsupported());
         }
-        // The text holding the run: a shape's, or a placeholder's whose
-        // frame is the run's drawable.
+        // The text holding the run: a shape's, a placeholder's whose frame
+        // is the run's drawable, or the slide's notes (record 0329).
         let slide_at = file
             .kids(super::super::At::ROOT)
             .get(slide)
@@ -675,11 +676,19 @@ impl Pending {
             .iter()
             .find(|&child| {
                 let item = file.stand_in(child);
+                if notes {
+                    return item.type_name() == "notes";
+                }
                 matches!(item.type_name(), "shape" | "placeholder")
                     && item.leaf()[3] as usize == drawable
             })
             .ok_or_else(unsupported)?;
         let text = match file.stand_in(shape).leaf()[1] as usize {
+            NOTES if notes => Text {
+                slide,
+                container: NOTES,
+                drawable: NONE,
+            },
             slot @ (TITLE | BODY) if file.stand_in(shape).type_name() == "placeholder" => Text {
                 slide,
                 container: slot,
@@ -939,12 +948,20 @@ impl Pending {
                     .map_err(at(*index))?;
                 }
                 for ((slide, drawable, start, end), (style, index)) in &self.styles {
-                    edit.set_text_style(
-                        SlideSelector::index(*slide),
-                        DrawableSelector::index(*drawable),
-                        DrawableSpan::new(*start, *end),
-                        style.clone(),
-                    )
+                    if *drawable == NONE {
+                        edit.set_notes_text_style(
+                            SlideSelector::index(*slide),
+                            DrawableSpan::new(*start, *end),
+                            style.clone(),
+                        )
+                    } else {
+                        edit.set_text_style(
+                            SlideSelector::index(*slide),
+                            DrawableSelector::index(*drawable),
+                            DrawableSpan::new(*start, *end),
+                            style.clone(),
+                        )
+                    }
                     .map_err(at(*index))?;
                 }
                 for ((slide, drawable, row, column), (value, index)) in &self.cells {

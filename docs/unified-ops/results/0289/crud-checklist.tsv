@@ -5138,7 +5138,7 @@ keynote	run	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key`
 keynote	run	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
 keynote	run	query	supported		ok matches in create()
 keynote	run	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
-keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
+keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes/paragraph[1]/run[1] {"bold":"true"}
 keynote	run	add	n/a	add not offered for this element	-
 keynote	run	remove	n/a	remove not offered for this element	-
 keynote	run	move	format-verb		unreached

@@ -31,7 +31,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `4feb37072541ce3dc7ec1ebd0994aae5abc0facd72bf360055b72da7b3526369` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `e36b1632c9b0cbefd90979cde43b59b8134f2080134ef57479bdc10ca8d832cc` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `104f4afa7068abc7bbe1d9e51861f007ee37cb23f5ff4fad6537de7fbcecff14` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `9c4afdf165334e207de69da99cdc335356d3ed7ec6ff012885c95f067bdf8398` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
@@ -8777,7 +8777,6 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `run` | `speaker-notes runs` | character properties are written on runs of text boxes, shapes and title and body placeholders (record 0312); speaker notes list no runs and keep their styles | record 0312 follow-ups |
 | `add` | `run` | `a new character run` | a run is a styled span of a paragraph; add a paragraph or set its text | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
 | `set` | `tc` | `cells in a formula graph` | slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale | record 0309 follow-ups |
 | `add` | `table` | `a deck without a slide table` | a new table copies the structure (styles, header counts, storage layout) of the deck's first slide table; a deck without one has none to copy | record 0329 follow-up: a built-in table template |

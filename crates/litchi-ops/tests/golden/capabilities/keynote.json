@@ -1182,15 +1182,6 @@
   "gaps": [
     {
       "subject": "operation",
-      "verb": "set",
-      "element": "run",
-      "context": "speaker-notes runs",
-      "code": "unsupported_capability",
-      "followUp": "record 0312 follow-ups",
-      "reason": "character properties are written on runs of text boxes, shapes and title and body placeholders (record 0312); speaker notes list no runs and keep their styles"
-    },
-    {
-      "subject": "operation",
       "verb": "add",
       "element": "run",
       "context": "a new character run",
