@@ -216,6 +216,8 @@ const SPECS: &[Spec] = &[
             "poi/test-data/slideshow/headers_footers_2007.ppt",
             "poi/test-data/slideshow/testPPT_oleWorkbook.ppt",
             "poi/test-data/slideshow/sound.ppt",
+            // Record 0341: POI's sound frame rewritten to play a movie.
+            "unified-ops/0294/video.ppt",
         ],
     },
     Spec {
@@ -386,6 +388,8 @@ const SPECS: &[Spec] = &[
             "iwork/keynote/image-adjustments-native.key",
             "iwork/keynote/media-lifecycle-audio-remove-native.key",
             "iwork/keynote/media-lifecycle-remove-native.key",
+            // Record 0341: a line and a group (generated).
+            "unified-ops/0294/shapes.key",
         ],
     },
     Spec {

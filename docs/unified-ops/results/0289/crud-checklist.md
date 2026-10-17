@@ -21,7 +21,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 |
 | xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 |
-| ppt | 36 | 170 | 166 | 0 | 4 | 169 | 83 | 2 | 22 |
+| ppt | 36 | 170 | 170 | 0 | 0 | 169 | 83 | 2 | 22 |
 | rtf | 28 | 214 | 214 | 0 | 0 | 0 | 94 | 2 | 14 |
 | odt | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 29 | 25 |
 | ods | 26 | 166 | 166 | 0 | 0 | 117 | 21 | 2 | 14 |
@@ -34,7 +34,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | odm | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 11 | 91 | 91 | 0 | 0 | 0 | 30 | 2 | 14 |
-| keynote | 16 | 132 | 123 | 0 | 9 | 0 | 44 | 16 | 4 |
+| keynote | 16 | 132 | 132 | 0 | 0 | 0 | 44 | 16 | 4 |
 | numbers | 7 | 61 | 61 | 0 | 0 | 7 | 16 | 2 | 3 |
 
 ## docx
@@ -273,7 +273,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## ppt
 
-- fixtures: `create()`, `poi/test-data/slideshow/incorrect_slide_order.ppt`, `poi/test-data/slideshow/WithComments.ppt`, `ole/ppt/text_shapes.ppt`, `ole/ppt/ppt_with_png.ppt`, `poi/test-data/slideshow/headers_footers.ppt`, `poi/test-data/slideshow/basic_test_ppt_file.ppt`, `poi/test-data/slideshow/42485.ppt`, `poi/test-data/slideshow/bug61881.ppt`, `unified-ops/0294/connectors.ppt`, `unified-ops/0294/elements.ppt`, `poi/test-data/slideshow/headers_footers_2007.ppt`, `poi/test-data/slideshow/testPPT_oleWorkbook.ppt`, `poi/test-data/slideshow/sound.ppt`, `create() + add slide`, `unified-ops/0294/elements.ppt + add comment`, `unified-ops/0294/elements.ppt + add hyperlink`
+- fixtures: `create()`, `poi/test-data/slideshow/incorrect_slide_order.ppt`, `poi/test-data/slideshow/WithComments.ppt`, `ole/ppt/text_shapes.ppt`, `ole/ppt/ppt_with_png.ppt`, `poi/test-data/slideshow/headers_footers.ppt`, `poi/test-data/slideshow/basic_test_ppt_file.ppt`, `poi/test-data/slideshow/42485.ppt`, `poi/test-data/slideshow/bug61881.ppt`, `unified-ops/0294/connectors.ppt`, `unified-ops/0294/elements.ppt`, `poi/test-data/slideshow/headers_footers_2007.ppt`, `poi/test-data/slideshow/testPPT_oleWorkbook.ppt`, `poi/test-data/slideshow/sound.ppt`, `unified-ops/0294/video.ppt`, `create() + add slide`, `unified-ops/0294/elements.ppt + add comment`, `unified-ops/0294/elements.ppt + add hyperlink`
 - document views on `poi/test-data/slideshow/incorrect_slide_order.ppt`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -296,7 +296,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | linebreak | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| video | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| video | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | audio | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | media | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | equation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
@@ -627,7 +627,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## keynote
 
-- fixtures: `create()`, `seed`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`, `iwork/keynote/slide-table-read-native.key + add table`
+- fixtures: `create()`, `seed`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `unified-ops/0294/shapes.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`, `iwork/keynote/slide-table-read-native.key + add table`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -640,14 +640,14 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | run | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| connector | unreached | unreached | unreached | unreached | n/a | n/a | unreached | no pair | no pair | n/a | n/a | ok | ok |
+| connector | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | video | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
 | audio | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
 | table | ok | ok | ok | ok | n/a | ok | n/a | ok | ok | n/a | n/a | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| group | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| group | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 
 ## numbers
 
