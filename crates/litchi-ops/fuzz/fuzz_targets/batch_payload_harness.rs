@@ -5,17 +5,17 @@
 //! items that
 //! - carry a non-blank command (`BatchItem::validate`);
 //! - serialize to the canonical wire form, which decodes back to equal items
-//!   (a JSON number may drift a few ULPs; see `same_items`) and stays
-//!   stable when serialized again;
+//!   (numbers included, record 0338 F1) and serializes to the same bytes
+//!   again;
 //! - stay equal after `into_owned`;
-//! - lower each path field through `PathArg::parse` (whose canonical spelling
-//!   reparses to the same path) and the selector through `Query::parse`
-//!   (a display fixed point), or end in a typed path/selector refusal.
+//! - lower each path field through `PathArg::parse` and the selector through
+//!   `Query::parse`, each to a display fixed point, or end in a typed
+//!   path/selector refusal.
 //!
 //! Decoding never executes a command; `batch_apply` covers execution.
 
 use litchi_ops::batch::{self, SourceLimits};
-use litchi_ops::path::{Path, PathArg};
+use litchi_ops::path::PathArg;
 use litchi_ops::query::Query;
 use litchi_ops::{BatchItem, Code, PropValue};
 
@@ -110,19 +110,16 @@ fn check_item(item: &BatchItem<'_>) {
 fn lower_path(text: &str) {
     match PathArg::parse(text) {
         Ok(path) => {
-            // The canonical spelling reparses through the core grammar, as in
-            // the `paths` target. It is not always a fixed point of
-            // `PathArg::parse`: a relative name that needs no quotes in the
-            // core grammar but contains `!` reads back as Excel sheet
-            // notation (`'bod! my'` -> `bod! my` -> `/bod/ my`; record 0334
-            // finding F2).
+            // The canonical spelling is a fixed point of `PathArg::parse`
+            // (record 0338 F2).
             let canonical = path.to_string();
-            let again = if path.is_absolute() {
-                Path::parse(&canonical)
-            } else {
-                Path::parse_relative(&canonical)
-            };
-            assert_eq!(again.expect("canonical path parses"), *path.path());
+            let again = PathArg::parse(&canonical).expect("canonical path parses");
+            assert_eq!(again.path(), path.path(), "canonical path reparses");
+            assert_eq!(
+                again.to_string(),
+                canonical,
+                "path display is not a fixed point"
+            );
         },
         Err(error) => assert!(
             matches!(
@@ -138,53 +135,10 @@ fn lower_path(text: &str) {
 fn check_round_trip(items: &[BatchItem<'_>]) {
     let wire = serde_json::to_vec(items).expect("decoded items serialize");
     let again = batch::from_bytes(&wire).expect("canonical wire form decodes");
-    assert!(
-        same_items(&again, items),
-        "wire round trip changed the items"
-    );
+    // Numbers too: `serde_json` parses correctly rounded (record 0338 F1).
+    assert!(again == items, "wire round trip changed the items");
     let rewire = serde_json::to_vec(&again).expect("round-tripped items serialize");
     let third = batch::from_bytes(&rewire).expect("canonical wire form decodes again");
-    assert!(
-        same_items(&third, &again),
-        "canonical wire form is not stable"
-    );
-}
-
-/// How far a JSON number may drift per comparison, in units in the last place.
-const MAX_ULPS: u64 = 4;
-
-/// Item equality, except that a JSON number may come back a few ULPs away.
-///
-/// The workspace's `serde_json` is built without `float_roundtrip`, so its
-/// decimal-to-`f64` conversion is not always correctly rounded: a long
-/// literal (for example an integer past `u64::MAX`) and its shortest
-/// re-serialization can decode to different doubles, and each further round
-/// trip can move the value again (observed: 1 and 2 ULPs). Record 0334
-/// reports this as finding F1; the harness tolerates that drift and nothing
-/// else.
-fn same_items(left: &[BatchItem<'_>], right: &[BatchItem<'_>]) -> bool {
-    left.len() == right.len()
-        && left.iter().zip(right).all(|(left, right)| {
-            if left == right {
-                return true;
-            }
-            let (Some(left_props), Some(right_props)) = (&left.props, &right.props) else {
-                return false;
-            };
-            let mut left_rest = left.clone();
-            let mut right_rest = right.clone();
-            left_rest.props = None;
-            right_rest.props = None;
-            left_rest == right_rest
-                && left_props.len() == right_props.len()
-                && left_props
-                    .iter()
-                    .zip(right_props.iter())
-                    .all(|((lk, lv), (rk, rv))| {
-                        lk == rk
-                            && (lv == rv
-                                || matches!((lv, rv), (PropValue::Number(l), PropValue::Number(r))
-                                if l.to_bits().abs_diff(r.to_bits()) <= MAX_ULPS))
-                    })
-        })
+    assert!(third == again, "canonical wire form is not stable");
+    assert_eq!(rewire, wire, "canonical wire form is not a fixed point");
 }

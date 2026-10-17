@@ -45,8 +45,12 @@ corpus/batch_payload` from this directory, with build output outside the
 checkout as in `../../litchi-core/fuzz/README.md`.
 
 `regression-*.json` are libFuzzer finds of record 0334: a relative path whose
-canonical spelling reads back as sheet notation (finding F2) and long numbers
-that drift by ULPs across wire round trips (finding F1).
+canonical spelling read back as sheet notation (finding F2) and long numbers
+that drifted by ULPs across wire round trips (finding F1). Record 0338 fixed
+both, and the harness now requires exact fixed points: the path display
+reparses through `PathArg::parse` to the same path and spelling, and the wire
+form decodes to equal items (numbers included) and re-serializes to the same
+bytes.
 
 Without nightly or `cargo-fuzz`, the libFuzzer targets still build and run on
 the stable toolchain with LLVM's coverage pass (this is how record 0334 ran
