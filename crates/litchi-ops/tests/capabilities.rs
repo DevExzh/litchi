@@ -1273,6 +1273,9 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "run"
                     | "linebreak"
                     | "tr"
+                    | "comment"
+                    | "modernComment"
+                    | "reply"
             ),
             "{}",
             element.name()
@@ -1316,6 +1319,9 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "run"
                     | "linebreak"
                     | "tr"
+                    | "comment"
+                    | "modernComment"
+                    | "reply"
             ),
             "{}",
             element.name()

@@ -171,6 +171,10 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "run",
     "linebreak",
     "tr",
+    // Legacy and modern comments and replies (record 0333).
+    "comment",
+    "modernComment",
+    "reply",
 ];
 
 /// The capability property table of an element whose writable keys extend

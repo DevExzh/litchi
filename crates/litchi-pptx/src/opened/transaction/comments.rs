@@ -1,4 +1,5 @@
-//! Positional legacy-comment verbs for the unified API (record 0252).
+//! Positional legacy- and modern-comment verbs for the unified API (records
+//! 0252 and 0333).
 
 use litchi_core::Position;
 
@@ -160,4 +161,147 @@ impl Edit {
         }
         Ok(true)
     }
+
+    /// Remove the comment at `position` in the slide's legacy comment list
+    /// (record 0333). The slide's comments part and its relationship go
+    /// when the last comment does; the comment authors are kept, since
+    /// other slides may name them, and so is each author's last index, so
+    /// a later comment takes a fresh index. Returns whether anything
+    /// changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IndexOutOfBounds`] for a missing comment, an error
+    /// for a signed package, and the errors of the comment codec. A failure
+    /// leaves the edit unchanged.
+    pub fn remove_comment_at<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        position: Position,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let conformance = self.comment_conformance(&selected.part_name)?;
+        let graph = crate::comments::load_presentation_comments_strict(&self.working)?;
+        let comments = graph
+            .as_ref()
+            .and_then(|graph| {
+                graph
+                    .slides
+                    .iter()
+                    .find(|list| list.slide_part_name == selected.part_name.as_str())
+            })
+            .map_or(&[][..], |list| list.comments.as_slice());
+        let current = comments
+            .get(position.get())
+            .ok_or(Error::IndexOutOfBounds {
+                index: position.get(),
+                len: comments.len(),
+            })?;
+        let before = self.working.clone();
+        match crate::comments::remove_presentation_comment(
+            &mut self.working,
+            selected.part_name.as_str(),
+            current.author_id,
+            current.index,
+            conformance,
+        ) {
+            Ok(changed) => Ok(changed),
+            Err(error) => {
+                self.working = before;
+                Err(error)
+            },
+        }
+    }
+
+    /// Remove the modern (threaded) comment at `position` in the slide's
+    /// modern comment list, with its replies (record 0333). The slide's
+    /// comment part goes with its last comment; authors are kept.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IndexOutOfBounds`] for a missing comment, an error
+    /// for a signed package, and the errors of the modern-comment owner.
+    pub fn remove_modern_comment_at<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        position: Position,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let id = self.modern_comment_id(&selected.part_name, position)?;
+        let mut candidate = self.working.clone();
+        let changed = crate::modern_comments::remove_modern_comment(
+            &mut candidate,
+            &selected.part_name,
+            &id,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(changed)
+    }
+
+    /// Remove the reply at `reply` of the modern comment at `comment` in the
+    /// slide's modern comment list (record 0333).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IndexOutOfBounds`] for a missing comment or reply,
+    /// an error for a signed package, and the errors of the modern-comment
+    /// owner.
+    pub fn remove_modern_comment_reply_at<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        comment: Position,
+        reply: Position,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let graph = crate::modern_comments::load_modern_comment_graph(&self.working)?;
+        let comments = modern_comments_of(&graph, &selected.part_name);
+        let record = comments.get(comment.get()).ok_or(Error::IndexOutOfBounds {
+            index: comment.get(),
+            len: comments.len(),
+        })?;
+        let target = record
+            .replies
+            .get(reply.get())
+            .ok_or(Error::IndexOutOfBounds {
+                index: reply.get(),
+                len: record.replies.len(),
+            })?;
+        let (comment_id, reply_id) = (record.id.clone(), target.id.clone());
+        let mut candidate = self.working.clone();
+        let changed = crate::modern_comments::remove_modern_comment_reply(
+            &mut candidate,
+            &selected.part_name,
+            &comment_id,
+            &reply_id,
+        )?;
+        crate::modern_comments::load_modern_comment_graph(&candidate)?;
+        self.working = candidate;
+        Ok(changed)
+    }
+
+    /// The stable identifier of the modern comment at `position` of a slide.
+    fn modern_comment_id(&self, slide: &litchi_opc::PackURI, position: Position) -> Result<String> {
+        let graph = crate::modern_comments::load_modern_comment_graph(&self.working)?;
+        let comments = modern_comments_of(&graph, slide);
+        comments
+            .get(position.get())
+            .map(|comment| comment.id.clone())
+            .ok_or(Error::IndexOutOfBounds {
+                index: position.get(),
+                len: comments.len(),
+            })
+    }
+}
+
+/// The modern comments of one slide part, in document order.
+fn modern_comments_of<'g>(
+    graph: &'g crate::modern_comments::Graph,
+    slide: &litchi_opc::PackURI,
+) -> &'g [crate::modern_comments::Comment] {
+    graph
+        .comments
+        .iter()
+        .find(|part| part.slide_part_name == slide.as_str())
+        .map_or(&[][..], |part| part.comments.comments.as_slice())
 }

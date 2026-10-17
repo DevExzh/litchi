@@ -67,6 +67,9 @@ impl Pptx {
         if let Some(commit) = self.try_remove_text(&target, limits)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_remove_comment(&target, limits)? {
+            return Ok(commit);
+        }
         let mut positions = resolve_targets(self, &target, limits)?;
         admit_remove_targets(positions.len(), limits)?;
         reject_overlaps(&positions)?;
