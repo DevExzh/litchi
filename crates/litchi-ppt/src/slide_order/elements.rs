@@ -371,3 +371,240 @@ impl Transaction {
         Ok(())
     }
 }
+
+impl Transaction {
+    /// The persist ID and the `OfficeArt` shape ID of the top-level shape at
+    /// `target`, and the shape's text runs in the working artifact.
+    fn shape_runs(
+        &self,
+        target: crate::text_edit::Target,
+    ) -> Result<(
+        u32,
+        u32,
+        Option<crate::text_edit::TextRuns>,
+        crate::Presentation,
+    )> {
+        let presentation = self.working_presentation()?;
+        let persist_id = self
+            .document
+            .slides()?
+            .get(target.slide().get())
+            .ok_or(Error::Refused(Refusal::SlideNotFound {
+                position: target.slide(),
+            }))?
+            .persist_id();
+        let slide = presentation
+            .slides()?
+            .into_iter()
+            .find(|slide| slide.persist_id() == persist_id)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let shapes = slide.shapes()?;
+        let shape_id = shapes
+            .get(target.shape().get())
+            .map(crate::text_edit::native_shape_id)
+            .ok_or(Error::Refused(Refusal::ElementNotFound {
+                element: "shape",
+            }))?;
+        let runs = slide.shape_text_runs(shape_id)?;
+        drop(slide);
+        Ok((persist_id, shape_id, runs, presentation))
+    }
+
+    /// Apply character formatting to the UTF-16 units `start..start +
+    /// length` of the text of the top-level shape at `target` (record 0323).
+    ///
+    /// The body's `StyleTextPropAtom` runs are split at the range ends and
+    /// the format applied to the runs inside; a body without a style atom
+    /// gains one. An outline-backed placeholder's slide-list body is edited
+    /// in the live document. A range that already shows the format is an
+    /// exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an absent slide or shape, a shape without
+    /// editable text, a range outside its text, an unrepresentable size, a
+    /// style atom the run model does not reproduce byte for byte, or a
+    /// changed signed source.
+    pub fn set_run_format(
+        &mut self,
+        target: crate::text_edit::Target,
+        start: usize,
+        length: usize,
+        format: &crate::text_edit::RunFormat,
+    ) -> Result<()> {
+        self.require_position(target.slide())?;
+        if format.size.is_some_and(|size| !(1..=4000).contains(&size)) {
+            return Err(Error::Refused(Refusal::InvalidElementValue {
+                element: "run",
+                reason: "a font size is 1 to 4000 points",
+            }));
+        }
+        let (persist_id, shape_id, runs, _) = self.shape_runs(target)?;
+        let runs = runs.ok_or(Error::Refused(Refusal::ElementNotFound { element: "run" }))?;
+        let end = start
+            .checked_add(length)
+            .filter(|end| length > 0 && *end <= runs.text().encode_utf16().count() + 1)
+            .ok_or(Error::Refused(Refusal::InvalidElementValue {
+                element: "run",
+                reason: "the range is outside the shape's text",
+            }))?;
+        self.stage_records(Some(target.slide()), true, |view| {
+            let slide = view.slide.ok_or_else(missing_record)?;
+            let document = view.document.ok_or_else(missing_record)?;
+            let (slide, document) = crate::text_edit::runs::rewrite(
+                slide.bytes,
+                document,
+                persist_id,
+                shape_id,
+                &|records| crate::text_edit::runs::format_body(records, start, end, format),
+            )?;
+            Ok(Replacement { slide, document })
+        })
+        .map(drop)
+    }
+
+    /// Set (`Some`) or remove (`None`) the click hyperlink over exactly the
+    /// UTF-16 units `start..start + length` of the text of the top-level
+    /// shape at `target` (record 0323), as an `InteractiveInfo` and
+    /// `TextInteractiveInfoAtom` pair; definitions follow
+    /// [`Self::set_shape_hyperlink`]. An equal link is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an absent slide or shape, a range outside
+    /// the text or overlapping another link, an invalid target, or a changed
+    /// signed source.
+    pub fn set_text_hyperlink(
+        &mut self,
+        target: crate::text_edit::Target,
+        start: usize,
+        length: usize,
+        click: Option<&crate::hyperlink::Click>,
+    ) -> Result<()> {
+        use crate::hyperlink::Target as LinkTarget;
+        use crate::hyperlink::edit::{Definition, add_definition, click_atom, click_container};
+
+        self.require_position(target.slide())?;
+        let (persist_id, shape_id, runs, presentation) = self.shape_runs(target)?;
+        let runs = runs.ok_or(Error::Refused(Refusal::ElementNotFound { element: "run" }))?;
+        let end = start
+            .checked_add(length)
+            .filter(|end| length > 0 && *end <= runs.text().encode_utf16().count() + 1)
+            .ok_or(Error::Refused(Refusal::InvalidElementValue {
+                element: "hyperlink",
+                reason: "the range is outside the shape's text",
+            }))?;
+        let current = runs
+            .links()
+            .iter()
+            .filter(|link| link.start == start && link.end == end)
+            .find_map(|link| presentation.resolve_click(&link.interaction).transpose())
+            .transpose()?;
+        if current.as_ref() == click {
+            return Ok(());
+        }
+        let invalid = |reason| {
+            Error::Refused(Refusal::InvalidElementValue {
+                element: "hyperlink",
+                reason,
+            })
+        };
+        let slide_location = match click.map(|click| &click.target) {
+            Some(LinkTarget::Url(url)) if url.is_empty() || url.contains('\0') => {
+                return Err(invalid("the URL is empty or holds a NUL character"));
+            },
+            Some(LinkTarget::Slide(position)) => {
+                let slide_id = self
+                    .document
+                    .slides()?
+                    .get(position.get())
+                    .ok_or(invalid("the target slide is outside the presentation"))?
+                    .slide_id();
+                let number = position.get() + 1;
+                Some((
+                    format!("Slide {number}"),
+                    format!("{slide_id},{number},Slide {number}"),
+                ))
+            },
+            Some(LinkTarget::Jump(
+                crate::hyperlink::InteractionJump::None
+                | crate::hyperlink::InteractionJump::LastSlideViewed,
+            )) => return Err(invalid("the jump is not a hyperlink target")),
+            _ => None,
+        };
+        if click.is_some_and(|click| {
+            click.tooltip.is_some()
+                && !matches!(click.target, LinkTarget::Url(_) | LinkTarget::Slide(_))
+        }) {
+            return Err(invalid("a slide-show jump has no screen tip"));
+        }
+        self.stage_records(Some(target.slide()), true, |view| {
+            let slide = view.slide.ok_or_else(missing_record)?;
+            let mut document = view.document.ok_or_else(missing_record)?.to_vec();
+            let mut document_changed = false;
+            let container = match click {
+                None => None,
+                Some(click) => {
+                    let definition = match &click.target {
+                        LinkTarget::Url(url) => Some(Definition {
+                            friendly_name: url,
+                            target: Some(url),
+                            location: None,
+                            tooltip: click.tooltip.as_deref(),
+                        }),
+                        LinkTarget::Slide(_) => {
+                            let (friendly, location) =
+                                slide_location.as_ref().ok_or_else(missing_record)?;
+                            Some(Definition {
+                                friendly_name: friendly,
+                                target: None,
+                                location: Some(location),
+                                tooltip: click.tooltip.as_deref(),
+                            })
+                        },
+                        LinkTarget::Jump(_) => None,
+                    };
+                    let id = match definition {
+                        Some(definition) => {
+                            let (record, id) = add_definition(&document, &definition)?;
+                            document = record;
+                            document_changed = true;
+                            id
+                        },
+                        None => 0,
+                    };
+                    Some(click_container(&click_atom(&click.target, id))?)
+                },
+            };
+            let (slide, outline) = crate::text_edit::runs::rewrite(
+                slide.bytes,
+                &document,
+                persist_id,
+                shape_id,
+                &|records| {
+                    crate::text_edit::runs::link_body(records, start, end, container.as_deref())
+                },
+            )?;
+            let document = match outline {
+                Some(outline) => Some(outline),
+                None => document_changed.then_some(document),
+            };
+            Ok(Replacement { slide, document })
+        })?;
+        let (_, _, runs, presentation) = self.shape_runs(target)?;
+        let published = runs
+            .ok_or_else(missing_record)?
+            .links()
+            .iter()
+            .filter(|link| link.start == start && link.end == end)
+            .find_map(|link| presentation.resolve_click(&link.interaction).transpose())
+            .transpose()?;
+        if published.as_ref() != click {
+            return Err(PackageError::Corrupted(
+                "published PPT text hyperlink did not read back".into(),
+            )
+            .into());
+        }
+        Ok(())
+    }
+}

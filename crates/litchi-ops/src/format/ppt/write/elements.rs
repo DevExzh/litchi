@@ -426,24 +426,41 @@ fn admit_link(
     Ok(out)
 }
 
-/// The native owner of one hyperlink node or shape parent.
-fn link_owner(node: &Node<'_>) -> Result<litchi_ppt::text_edit::Target> {
-    node.native_shape_target()
-        .ok_or_else(|| unsupported_target("nested PPT group hyperlink writes are not integrated"))
+/// What one hyperlink write targets: a shape's click, or a click over a
+/// UTF-16 range of its text.
+#[derive(Clone, Copy)]
+struct LinkOwner {
+    target: litchi_ppt::text_edit::Target,
+    range: Option<(usize, usize)>,
+}
+
+/// The native owner of one hyperlink node, or of a shape or run parent.
+fn link_owner(node: &Node<'_>) -> Result<LinkOwner> {
+    let target = node.native_shape_target().ok_or_else(|| {
+        unsupported_target("nested PPT group hyperlink writes are not integrated")
+    })?;
+    let range = match node.element_item() {
+        Some(Element::Hyperlink { run, .. }) => *run,
+        Some(Element::Run { piece, .. }) => Some((piece.start, piece.end)),
+        _ => None,
+    };
+    Ok(LinkOwner { target, range })
 }
 
 /// Write `click` (`None` removes) on every owner in one native edit.
 fn write_links(
     file: &Ppt,
-    owners: Vec<(
-        litchi_ppt::text_edit::Target,
-        Option<litchi_ppt::hyperlink::Click>,
-    )>,
+    owners: Vec<(LinkOwner, Option<litchi_ppt::hyperlink::Click>)>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
     let native = stage_structural(file, owners.len(), limits, |edit| {
-        for (target, click) in &owners {
-            edit.set_shape_hyperlink(*target, click.as_ref())?;
+        for (owner, click) in &owners {
+            match owner.range {
+                None => edit.set_shape_hyperlink(owner.target, click.as_ref())?,
+                Some((start, end)) => {
+                    edit.set_text_hyperlink(owner.target, start, end - start, click.as_ref())?;
+                },
+            }
         }
         Ok(())
     })?;
@@ -504,10 +521,11 @@ pub(super) fn add_hyperlink(
     node: &crate::NewNode<'_>,
     limits: &SemanticLimits,
 ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
-    if parent.element() != Kind::Shape || parent.element_item().is_some() {
+    let shape_parent = parent.element() == Kind::Shape && parent.element_item().is_none();
+    if !shape_parent && parent.element() != Kind::Run {
         return Err(Error::new(
             Code::UnsupportedType,
-            "a PPT hyperlink requires a shape parent",
+            "a PPT hyperlink requires a shape or run parent",
         )
         .with_format(FileFormat::Ppt));
     }
@@ -534,4 +552,160 @@ pub(super) fn add_hyperlink(
                 .with_format(FileFormat::Ppt)
         })?;
     Ok((commit, path))
+}
+
+/// Set the formatting and/or text of every selected run in one native edit.
+///
+/// Formatting splits the body's character runs at the run's ends. A text
+/// replaces the run's characters within its shape's whole text, so a changed
+/// length follows the shape-text closure rules (refused over several
+/// formatting runs).
+pub(super) fn set_runs(
+    file: &Ppt,
+    nodes: &[Node<'_>],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    use super::super::spec::{RUN_WRITE_TABLE, RunSetter};
+    use litchi_ppt::text_edit::RunFormat;
+
+    let mut format = RunFormat::default();
+    let mut text = None;
+    let mut assigned = 0_u32;
+    for (key, value) in props.iter() {
+        let (index, entry) = RUN_WRITE_TABLE.resolve(key.as_str()).map_err(|error| {
+            error
+                .with_format(FileFormat::Ppt)
+                .with_property(key.as_str().to_owned())
+        })?;
+        let bit = 1_u32 << index;
+        if assigned & bit != 0 {
+            return Err(Error::new(
+                Code::InvalidArgument,
+                "a PPT run property was assigned more than once",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_property(entry.spec.name));
+        }
+        assigned |= bit;
+        entry
+            .prepare(Operation::Set, value, |setter, scalar| {
+                match (setter, scalar) {
+                    (RunSetter::Text, scalar) => {
+                        let value = match scalar {
+                            Some(Scalar::Text(value)) => value,
+                            _ => "",
+                        };
+                        bound(
+                            LimitKind::StagedBytes,
+                            value.len(),
+                            limits.max_staged_bytes(),
+                        )?;
+                        text = Some(value.to_owned());
+                    },
+                    (RunSetter::Bold, Some(Scalar::Bool(value))) => format.bold = Some(value),
+                    (RunSetter::Italic, Some(Scalar::Bool(value))) => format.italic = Some(value),
+                    (RunSetter::Underline, Some(Scalar::Token(value))) => {
+                        format.underline = Some(value != "none");
+                    },
+                    (RunSetter::Size, Some(Scalar::Length(length))) => {
+                        let points = length.points();
+                        if !(1.0..=4000.0).contains(&points) || points.fract() != 0.0 {
+                            return Err(invalid(
+                                "a PPT run size is a whole number of points from 1 to 4000",
+                            ));
+                        }
+                        // In range by the check above.
+                        format.size = Some(points as u16);
+                    },
+                    (RunSetter::Color, Some(Scalar::Color(color))) => match color.base() {
+                        crate::value::Base::Rgb(rgba) if rgba.alpha() == 255 => {
+                            format.color = Some([rgba.red(), rgba.green(), rgba.blue()]);
+                        },
+                        _ => {
+                            return Err(invalid("a PPT run color is an opaque RGB color")
+                                .with_suggestion("for example 1F4E79"));
+                        },
+                    },
+                    _ => unreachable!("PPT run coercion returned an unexpected scalar"),
+                }
+                Ok(())
+            })
+            .map_err(|error| error.with_format(FileFormat::Ppt))?;
+    }
+    let formatted = format != RunFormat::default();
+    let mut formats = Vec::new();
+    let mut texts = std::collections::BTreeMap::<
+        (usize, usize),
+        (litchi_ppt::text_edit::Target, Vec<u16>, Vec<(usize, usize)>),
+    >::new();
+    for node in nodes {
+        let (Some(target), Some(Element::Run { body, piece, .. })) =
+            (node.native_shape_target(), node.element_item())
+        else {
+            return Err(unsupported_target(
+                "nested PPT group run writes are not integrated",
+            ));
+        };
+        if formatted {
+            formats.push((target, piece.start, piece.end - piece.start));
+        }
+        if text.is_some() {
+            let entry = texts
+                .entry((target.slide().get(), target.shape().get()))
+                .or_insert_with(|| (target, body.text().encode_utf16().collect(), Vec::new()));
+            entry.2.push((piece.start, piece.end));
+        }
+    }
+    let mut replacements = Vec::with_capacity(texts.len());
+    if let Some(text) = &text {
+        let units = text.encode_utf16().collect::<Vec<_>>();
+        for (target, mut body, mut ranges) in texts.into_values() {
+            ranges.sort_unstable_by(|left, right| right.cmp(left));
+            for (start, end) in ranges {
+                body.splice(start..end, units.iter().copied());
+            }
+            replacements.push((target, String::from_utf16_lossy(&body)));
+        }
+    }
+    let operations = formats.len() + replacements.len();
+    let native = stage_structural(file, operations, limits, |edit| {
+        for (target, start, length) in &formats {
+            edit.set_run_format(*target, *start, *length, &format)?;
+        }
+        for (target, text) in replacements {
+            edit.set_shape_text(target, text)?;
+        }
+        Ok(())
+    })?;
+    file.check_source()?;
+    finish_commit(file, native, limits)
+}
+
+/// Dispatch a `set` whose targets are record-0323 elements; `None` for other
+/// targets. One call's targets share one element kind.
+pub(super) fn set(
+    file: &Ppt,
+    nodes: &[Node<'_>],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Option<Result<WriteCommit>> {
+    let kind = nodes.first()?.element();
+    if !matches!(
+        kind,
+        Kind::Comment | Kind::Cell | Kind::Hyperlink | Kind::Run
+    ) {
+        return None;
+    }
+    if nodes.iter().any(|node| node.element() != kind) {
+        return Some(Err(unsupported_target(
+            "one PPT write cannot mix element kinds",
+        )));
+    }
+    Some(match kind {
+        Kind::Comment => set_comments(file, nodes, props, limits),
+        Kind::Cell => set_cells(file, nodes, props, limits),
+        Kind::Hyperlink => set_hyperlinks(file, nodes, props, limits),
+        _ => set_runs(file, nodes, props, limits),
+    })
 }

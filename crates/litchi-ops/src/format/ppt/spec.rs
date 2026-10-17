@@ -12,7 +12,7 @@ use crate::node::spec::{
 };
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
-use crate::value::{LengthSpec, ValueType};
+use crate::value::{ColorContext, LengthSpec, Tokens, ValueType};
 
 /// A node kind in a legacy PowerPoint presentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -304,6 +304,22 @@ pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
     length("y", LengthSpec::POSITION),
 ];
 
+/// Run underline (record 0323): the binary format's `CFStyle` underline is
+/// single or none, printed as the PPTX `underline` tokens.
+pub(crate) static UNDERLINE: Tokens = Tokens::new("underline", &["single", "none"], &[("sng", 0)]);
+
+/// A text run (record 0323): one `StyleTextPropAtom` character run's piece
+/// of a paragraph, in the PPTX run vocabulary. `font.latin` is the
+/// `FontCollection` typeface; `color` reads an sRGB color only.
+pub(crate) const RUN_PROPS: &[PropSpec] = &[
+    PropSpec::new("font.latin", ValueType::Text),
+    PropSpec::new("size", ValueType::Length(LengthSpec::FONT_SIZE)),
+    PropSpec::new("bold", ValueType::Bool),
+    PropSpec::new("italic", ValueType::Bool),
+    PropSpec::new("underline", ValueType::Token(&UNDERLINE)),
+    PropSpec::new("color", ValueType::Color(ColorContext::Drawing)),
+];
+
 /// A click hyperlink (record 0323), in the PPTX vocabulary: `link` is a URL,
 /// `slide[N]`, or `firstslide`, `lastslide`, `nextslide`, `previousslide`,
 /// `endshow`; `tooltip` is the screen tip.
@@ -414,16 +430,6 @@ static OLE_GAP: GapSpec = element_gap(
     "ole",
     "M1-extended",
     "legacy PPT object frames are retained as picture metadata only",
-);
-static RUN_GAP: GapSpec = element_gap(
-    "run",
-    "M1-extended",
-    "legacy PPT exposes aggregate shape text, not text-run nodes",
-);
-static LINEBREAK_GAP: GapSpec = element_gap(
-    "linebreak",
-    "M1-extended",
-    "legacy PPT exposes normalized shape text, not line-break nodes",
 );
 static VIDEO_GAP: GapSpec = element_gap(
     "video",
@@ -703,23 +709,25 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/shape[N]/paragraph[N]"],
             PARAGRAPH_PROPS,
         ),
-        gap(
+        element(
             Kind::Run,
             "run",
             &["r", "run"],
             &[Kind::Paragraph],
             &[Kind::Hyperlink],
-            &["/slide[N]/shape[N]/run[N]"],
-            &RUN_GAP,
+            &[],
+            &["/slide[N]/shape[N]/paragraph[N]/run[N]"],
+            RUN_PROPS,
         ),
-        gap(
+        element(
             Kind::LineBreak,
             "linebreak",
             &["br", "linebreak"],
             &[Kind::Paragraph],
             &[],
-            &["/slide[N]/shape[N]/linebreak[N]"],
-            &LINEBREAK_GAP,
+            &[],
+            &["/slide[N]/shape[N]/paragraph[N]/linebreak[N]"],
+            &[],
         ),
         element(
             Kind::Notes,
@@ -1171,3 +1179,62 @@ pub(super) const HYPERLINK_WRITE_TABLE: crate::registry::Table<HyperlinkSetter, 
         }],
     );
 pub(crate) const HYPERLINK_CAPABILITY_PROPS: &[PropSpec] = &HYPERLINK_WRITE_TABLE.readable();
+
+/// Run assignments (record 0323): the write-only `text` key and the
+/// character formatting the binary `TextCFException` holds.
+#[derive(Clone, Copy)]
+pub(super) enum RunSetter {
+    Text,
+    Size,
+    Bold,
+    Italic,
+    Underline,
+    Color,
+}
+
+const RUN_WRITE_COUNT: usize = RUN_PROPS.len() + 1;
+const fn run_write_entries() -> [crate::registry::Entry<RunSetter>; RUN_WRITE_COUNT] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+
+    let mut entries = [Entry::read(RUN_PROPS[0]); RUN_WRITE_COUNT];
+    let mut index = 0;
+    while index < RUN_PROPS.len() {
+        let spec = RUN_PROPS[index];
+        let setter = if same_name(spec.name, "size") {
+            Some(RunSetter::Size)
+        } else if same_name(spec.name, "bold") {
+            Some(RunSetter::Bold)
+        } else if same_name(spec.name, "italic") {
+            Some(RunSetter::Italic)
+        } else if same_name(spec.name, "underline") {
+            Some(RunSetter::Underline)
+        } else if same_name(spec.name, "color") {
+            Some(RunSetter::Color)
+        } else {
+            None
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: WriteAccess::Set(setter),
+                constraint: Constraint::None,
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    let mut text = PropSpec::new("text", ValueType::Text);
+    text.access.get = false;
+    entries[RUN_PROPS.len()] = Entry {
+        spec: text,
+        access: WriteAccess::Set(RunSetter::Text),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    entries
+}
+
+pub(super) const RUN_WRITE_TABLE: crate::registry::Table<RunSetter, RUN_WRITE_COUNT, 0> =
+    crate::registry::Table::new(run_write_entries(), []);
+pub(crate) const RUN_CAPABILITY_PROPS: &[PropSpec] = &RUN_WRITE_TABLE.readable();

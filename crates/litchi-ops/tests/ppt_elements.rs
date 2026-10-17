@@ -391,3 +391,120 @@ fn hyperlink_refusals_are_typed() {
         Code::UnsupportedType
     );
 }
+
+/// A deck with one text box of two paragraphs and a line break.
+fn text_deck() -> Vec<u8> {
+    let mut writer = litchi_ppt::writer::Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer
+        .add_textbox(
+            slide,
+            10,
+            10,
+            400,
+            60,
+            "Hello brave\u{b}new world\rSecond line",
+        )
+        .unwrap();
+    writer.add_slide().unwrap();
+    let mut output = std::io::Cursor::new(Vec::new());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
+    output.into_inner()
+}
+
+#[test]
+fn runs_and_line_breaks_read_like_pptx() {
+    let deck = eager(&text_deck());
+    let paragraph = "/slide[1]/shape[1]/paragraph[1]";
+    assert_eq!(text(&deck, &format!("{paragraph}/run[1]")), "Hello brave");
+    assert_eq!(text(&deck, &format!("{paragraph}/run[2]")), "new world");
+    assert!(deck.get(&format!("{paragraph}/linebreak[1]")).is_ok());
+    assert_eq!(
+        deck.get(&format!("{paragraph}/linebreak[2]"))
+            .unwrap_err()
+            .code(),
+        Code::PathNotFound
+    );
+    assert_eq!(
+        text(&deck, "/slide[1]/shape[1]/paragraph[2]/run[1]"),
+        "Second line"
+    );
+    assert_eq!(
+        paths(&deck, &format!("{paragraph} > run")),
+        [format!("{paragraph}/run[1]"), format!("{paragraph}/run[2]")]
+    );
+
+    let sample = eager(&fixture(SAMPLE));
+    let italic = "/slide[1]/shape[@name=Another Subtitle]/paragraph[3]/run[1]";
+    assert_eq!(text(&sample, italic), "This bit is in italic green");
+    assert_eq!(prop(&sample, italic, "italic").as_deref(), Some("true"));
+}
+
+#[test]
+fn run_formatting_and_text_set_round_trip() {
+    each_owner(&text_deck(), |source| {
+        let before = source.to_bytes().unwrap();
+        let run = "/slide[1]/shape[1]/paragraph[1]/run[2]";
+        let changed = source
+            .set(
+                run,
+                props! { "bold" => true, "size" => "28pt", "color" => "1F4E79", "underline" => "single" },
+            )
+            .expect("run format");
+        let read = reopen(&changed);
+        assert_eq!(text(&read, run), "new world");
+        assert_eq!(prop(&read, run, "bold").as_deref(), Some("true"));
+        assert_eq!(prop(&read, run, "size").as_deref(), Some("28pt"));
+        assert_eq!(prop(&read, run, "color").as_deref(), Some("#1F4E79"));
+        assert_eq!(prop(&read, run, "underline").as_deref(), Some("single"));
+        assert_eq!(
+            prop(&read, "/slide[1]/shape[1]/paragraph[1]/run[1]", "bold"),
+            None
+        );
+        assert_eq!(source.to_bytes().unwrap(), before);
+
+        // The same text length keeps every run; a changed length over
+        // several runs refuses with a typed error.
+        let same = reopen(&read.set(run, props! { "text" => "NEW WORLD" }).unwrap());
+        assert_eq!(text(&same, run), "NEW WORLD");
+        assert_eq!(prop(&same, run, "bold").as_deref(), Some("true"));
+        assert!(
+            read.set(run, props! { "text" => "much longer text" })
+                .is_err()
+        );
+
+        // A run hyperlink.
+        let linked = source
+            .add(
+                "/slide[1]/shape[1]/paragraph[2]/run[1]",
+                NewNode::new("hyperlink").prop("link", "https://example.com/run"),
+            )
+            .expect("run hyperlink");
+        assert_eq!(
+            linked.path.to_string(),
+            "/slide[1]/shape[1]/paragraph[2]/run[1]/hyperlink"
+        );
+        let linked = reopen(&linked.file);
+        assert_eq!(
+            prop(
+                &linked,
+                "/slide[1]/shape[1]/paragraph[2]/run[1]/hyperlink",
+                "link"
+            )
+            .as_deref(),
+            Some("https://example.com/run")
+        );
+        let removed = reopen(
+            &linked
+                .remove("/slide[1]/shape[1]/paragraph[2]/run[1]/hyperlink")
+                .unwrap(),
+        );
+        assert_eq!(
+            removed
+                .get("/slide[1]/shape[1]/paragraph[2]/run[1]/hyperlink")
+                .unwrap_err()
+                .code(),
+            Code::PathNotFound
+        );
+    });
+}

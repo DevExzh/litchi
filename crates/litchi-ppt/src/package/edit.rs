@@ -610,6 +610,34 @@ impl Edit {
         self.stage(1, |inner| inner.set_shape_hyperlink(target, click))
     }
 
+    /// Apply character formatting to a UTF-16 range of one top-level
+    /// shape's text (record 0323).
+    pub fn set_run_format(
+        &mut self,
+        target: Target,
+        start: usize,
+        length: usize,
+        format: &crate::text_edit::RunFormat,
+    ) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_run_format(target, start, length, format)
+        })
+    }
+
+    /// Set or remove the click hyperlink over a UTF-16 range of one
+    /// top-level shape's text (record 0323).
+    pub fn set_text_hyperlink(
+        &mut self,
+        target: Target,
+        start: usize,
+        length: usize,
+        click: Option<&crate::hyperlink::Click>,
+    ) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_text_hyperlink(target, start, length, click)
+        })
+    }
+
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;

@@ -766,10 +766,33 @@ impl Presentation {
         Hyperlinks::parse(&self.live_document_record()?)
     }
 
+    /// Resolve a click interaction (record 0323): a URL, a slide of this
+    /// presentation or a slide-show jump, with its screen tip. `None` when
+    /// the action is not a hyperlink.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document's hyperlink records are malformed.
+    pub fn resolve_click(
+        &self,
+        interaction: &crate::hyperlink::Interaction,
+    ) -> Result<Option<crate::hyperlink::Click>> {
+        let hyperlinks = self.hyperlinks()?;
+        let slide_ids = self
+            .slide_directory()
+            .entries()
+            .iter()
+            .map(crate::SlideDirectoryEntry::slide_id)
+            .collect::<Vec<_>>();
+        Ok(crate::hyperlink::Click::resolve(
+            interaction,
+            &hyperlinks,
+            &slide_ids,
+        ))
+    }
+
     /// The click hyperlink of the shape with `OfficeArt` ID `shape_id` on
-    /// the slide at zero-based `position` (record 0323): a URL, a slide of
-    /// this presentation or a slide-show jump, with its screen tip. `None`
-    /// when the shape has no click action or its action is not a hyperlink.
+    /// the slide at zero-based `position`; see [`Self::resolve_click`].
     ///
     /// # Errors
     ///

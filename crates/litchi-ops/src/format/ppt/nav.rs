@@ -71,6 +71,56 @@ impl<'f> Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
+            (Item::Paragraph(paragraph), Kind::Run) => {
+                let Some(body) = super::elements::shape_runs(parent)? else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let pieces = super::elements::pieces(&body, paragraph.index);
+                Ok(match ordinal(step.select, pieces.len()) {
+                    Some(Some(index)) => Lookup::Found(run_node(
+                        parent,
+                        &paragraph.shape,
+                        paragraph.index,
+                        index,
+                        std::sync::Arc::new(body),
+                        pieces[index],
+                    )),
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Item::Paragraph(paragraph), Kind::LineBreak) => {
+                let text = parent.text_member()?.unwrap_or_default();
+                let count = super::elements::line_breaks(&text, 0);
+                Ok(match ordinal(step.select, count) {
+                    Some(Some(index)) => Lookup::Found(Node::element_node(
+                        parent.file(),
+                        parent.steps(),
+                        PathStep::at(Kind::LineBreak.name(), Position::new(index)),
+                        super::elements::Element::LineBreak {
+                            shape: paragraph.shape.clone(),
+                        },
+                    )),
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Item::Element(element), Kind::Hyperlink) => match element.as_ref() {
+                super::elements::Element::Run { shape, .. } => {
+                    let found = super::elements::run_click(parent)?;
+                    Ok(match ordinal(step.select, usize::from(found.is_some())) {
+                        Some(Some(_)) => match found {
+                            Some((range, click)) => {
+                                Lookup::Found(hyperlink_node(parent, shape, Some(range), click))
+                            },
+                            None => Lookup::Missing,
+                        },
+                        Some(None) => Lookup::Missing,
+                        None => Lookup::NotApplicable,
+                    })
+                },
+                _ => Ok(Lookup::NotApplicable),
+            },
             (Item::Element(element), Kind::Cell) => match element.as_ref() {
                 super::elements::Element::Row { shape, row } => {
                     self.cell(parent, shape, *row, step.select)
@@ -531,6 +581,29 @@ pub(crate) fn hyperlink_node<'f>(
             shape: shape.clone(),
             run,
             click: std::sync::Arc::new(click),
+        },
+    )
+}
+
+/// The node of one run piece of a paragraph.
+pub(crate) fn run_node<'f>(
+    paragraph_node: &Node<'f>,
+    shape: &ShapeItem,
+    paragraph: usize,
+    run: usize,
+    body: std::sync::Arc<litchi_ppt::text_edit::TextRuns>,
+    piece: super::elements::Piece,
+) -> Node<'f> {
+    Node::element_node(
+        paragraph_node.file(),
+        paragraph_node.steps(),
+        PathStep::at(Kind::Run.name(), Position::new(run)),
+        super::elements::Element::Run {
+            shape: shape.clone(),
+            paragraph,
+            run,
+            body,
+            piece,
         },
     )
 }

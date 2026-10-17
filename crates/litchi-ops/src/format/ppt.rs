@@ -44,7 +44,7 @@ pub(crate) use spec::SPEC;
 use spec::{
     CELL_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS, HYPERLINK_CAPABILITY_PROPS,
     NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
-    SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS,
+    RUN_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS,
 };
 
 /// PPT elements the unified `set` verb writes.
@@ -57,6 +57,7 @@ pub(crate) const SETTABLE: &[&str] = &[
     "comment",
     "tc",
     "hyperlink",
+    "run",
 ];
 
 /// PPT elements the unified `add` verb creates.
@@ -77,12 +78,43 @@ pub(crate) fn capability_props(name: &str) -> Option<&'static [PropSpec]> {
         "comment" => COMMENT_CAPABILITY_PROPS,
         "tc" => CELL_CAPABILITY_PROPS,
         "hyperlink" => HYPERLINK_CAPABILITY_PROPS,
+        "run" => RUN_CAPABILITY_PROPS,
         _ => return None,
     })
 }
 
 /// Operation gaps of the PPT write surface, listed in `capabilities()`.
 pub(crate) const WRITE_GAPS: &[GapSpec] = &[
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "run",
+            context: "text-positions",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        reason: "inserting or removing a run or line break changes the text length, which every position-dependent record (style, special-information and interaction runs, fields) of the body would have to follow; runs are formatted and their text replaced in place",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "run",
+            context: "text-positions",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        reason: "removing a run changes the text length that the body's position-dependent records hold",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "linebreak",
+            context: "text-positions",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        reason: "a line break is a vertical-tab character of the text atom; inserting one changes the text length that the body's position-dependent records hold",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "add",

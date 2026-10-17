@@ -218,6 +218,49 @@ impl<'f> Children<'f> {
                 Err(error) => failed = Some(error),
             }
         }
+        if let Item::Paragraph(paragraph) = parent.item()
+            && (kinds.contains(Kind::Run) || kinds.contains(Kind::LineBreak))
+        {
+            if kinds.contains(Kind::Run) {
+                match super::elements::shape_runs(parent) {
+                    Ok(Some(body)) => {
+                        let body = Arc::new(body);
+                        for (index, piece) in super::elements::pieces(&body, paragraph.index)
+                            .into_iter()
+                            .enumerate()
+                        {
+                            extra.push(super::nav::run_node(
+                                parent,
+                                &paragraph.shape,
+                                paragraph.index,
+                                index,
+                                Arc::clone(&body),
+                                piece,
+                            ));
+                        }
+                    },
+                    Ok(None) => {},
+                    Err(error) => failed = Some(error),
+                }
+            }
+        }
+        if let Item::Element(element) = parent.item()
+            && kinds.contains(Kind::Hyperlink)
+            && let super::elements::Element::Run { shape, .. } = element.as_ref()
+        {
+            match super::elements::run_click(parent) {
+                Ok(Some((range, click))) => {
+                    extra.push(super::nav::hyperlink_node(
+                        parent,
+                        shape,
+                        Some(range),
+                        click,
+                    ));
+                },
+                Ok(None) => {},
+                Err(error) => failed = Some(error),
+            }
+        }
         if !extra.is_empty() || failed.is_some() {
             children.extra = Some(Box::new(Extra {
                 nodes: extra.into_iter(),

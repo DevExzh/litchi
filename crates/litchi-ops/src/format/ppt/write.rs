@@ -124,6 +124,12 @@ enum TargetIdentity {
         shape: usize,
         run: Option<(usize, usize)>,
     },
+    Run {
+        slide: usize,
+        shape: usize,
+        paragraph: usize,
+        run: usize,
+    },
     Paragraph {
         slide: usize,
         shape: usize,
@@ -170,38 +176,8 @@ pub(crate) fn set_with_limits<'p, 'v>(
         return file.set_metadata(&props, limits);
     }
     let nodes = resolve_nodes(file, &target, limits)?;
-    if nodes
-        .first()
-        .is_some_and(|node| node.element() == Kind::Comment)
-    {
-        if nodes.iter().any(|node| node.element() != Kind::Comment) {
-            return Err(unsupported_target(
-                "one PPT write cannot mix comments with other targets",
-            ));
-        }
-        return elements::set_comments(file, &nodes, &props, limits);
-    }
-    if nodes
-        .first()
-        .is_some_and(|node| node.element() == Kind::Hyperlink)
-    {
-        if nodes.iter().any(|node| node.element() != Kind::Hyperlink) {
-            return Err(unsupported_target(
-                "one PPT write cannot mix hyperlinks with other targets",
-            ));
-        }
-        return elements::set_hyperlinks(file, &nodes, &props, limits);
-    }
-    if nodes
-        .first()
-        .is_some_and(|node| node.element() == Kind::Cell)
-    {
-        if nodes.iter().any(|node| node.element() != Kind::Cell) {
-            return Err(unsupported_target(
-                "one PPT write cannot mix table cells with other targets",
-            ));
-        }
-        return elements::set_cells(file, &nodes, &props, limits);
+    if let Some(commit) = elements::set(file, &nodes, &props, limits) {
+        return commit;
     }
     let plans = build_plans(nodes, &props, limits)?;
     let native = stage_plans(file, plans, limits)?;
@@ -694,6 +670,21 @@ fn append_node<'f>(
             _ => {
                 return Err(unsupported_target(
                     "nested PPT group hyperlink writes are not integrated",
+                ));
+            },
+        },
+        Kind::Run => match (node.native_shape_target(), node.element_item()) {
+            (Some(target), Some(super::elements::Element::Run { paragraph, run, .. })) => {
+                TargetIdentity::Run {
+                    slide: target.slide().get(),
+                    shape: target.shape().get(),
+                    paragraph: *paragraph,
+                    run: *run,
+                }
+            },
+            _ => {
+                return Err(unsupported_target(
+                    "nested PPT group run writes are not integrated",
                 ));
             },
         },

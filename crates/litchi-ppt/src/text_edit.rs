@@ -43,7 +43,10 @@ use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 mod readback;
 #[cfg(test)]
 mod readback_tests;
+pub(crate) mod runs;
 mod source_range;
+
+pub use runs::{CharacterRun, RunFormat, TextLink, TextRuns};
 
 const PPT_HEADER_LEN: usize = 8;
 const OFFICEART_SP_CONTAINER: u16 = 0xF004;

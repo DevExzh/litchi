@@ -37,13 +37,77 @@ pub(crate) enum Element {
     },
     /// A table column: the table shape and the zero-based column.
     Column { shape: ShapeItem, column: usize },
-    /// A click hyperlink of a shape (`run: None`) or of one text run (its
-    /// paragraph and run indexes).
+    /// A click hyperlink of a shape (`run: None`) or of a text range (the
+    /// UTF-16 range it covers).
     Hyperlink {
         shape: ShapeItem,
         run: Option<(usize, usize)>,
         click: Arc<litchi_ppt::hyperlink::Click>,
     },
+    /// A text run: a piece of one paragraph with one character format.
+    Run {
+        shape: ShapeItem,
+        paragraph: usize,
+        run: usize,
+        body: Arc<litchi_ppt::text_edit::TextRuns>,
+        piece: Piece,
+    },
+    /// A line break (`\u{b}`) of one paragraph.
+    LineBreak { shape: ShapeItem },
+}
+
+/// One run piece: its UTF-16 range in the body and its character format's
+/// index among the body's runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Piece {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) format: usize,
+}
+
+/// The run pieces of one paragraph: its text between line breaks, cut at
+/// character-run boundaries. A paragraph is the text between `\r` marks;
+/// its mark belongs to no run, as a PPTX paragraph's end properties.
+pub(crate) fn pieces(body: &litchi_ppt::text_edit::TextRuns, paragraph: usize) -> Vec<Piece> {
+    let units = body.text().encode_utf16().collect::<Vec<_>>();
+    let mut start = 0usize;
+    for (index, part) in units.split(|unit| *unit == 0x000D).enumerate() {
+        if index == paragraph {
+            let end = start + part.len();
+            let mut out = Vec::new();
+            let mut segment = start;
+            let breaks = part
+                .iter()
+                .enumerate()
+                .filter(|(_, unit)| **unit == 0x000B)
+                .map(|(index, _)| start + index)
+                .chain(std::iter::once(end));
+            for offset in breaks {
+                for (format, run) in body.runs().iter().enumerate() {
+                    let piece_start = segment.max(run.start);
+                    let piece_end = offset.min(run.start + run.length);
+                    if piece_start < piece_end {
+                        out.push(Piece {
+                            start: piece_start,
+                            end: piece_end,
+                            format,
+                        });
+                    }
+                }
+                segment = offset + 1;
+            }
+            return out;
+        }
+        start += part.len() + 1;
+    }
+    Vec::new()
+}
+
+/// The number of line breaks in one paragraph of `text`.
+pub(crate) fn line_breaks(text: &str, paragraph: usize) -> usize {
+    text.split('\r')
+        .nth(paragraph)
+        .map_or(0, |part| part.matches('\u{b}').count())
 }
 
 /// The values one element's `format` projection answers, in its property
@@ -66,6 +130,8 @@ impl Element {
             Self::Cell { .. } => Kind::Cell,
             Self::Column { .. } => Kind::Col,
             Self::Hyperlink { .. } => Kind::Hyperlink,
+            Self::Run { .. } => Kind::Run,
+            Self::LineBreak { .. } => Kind::LineBreak,
         }
     }
 
@@ -75,7 +141,9 @@ impl Element {
             Self::Row { shape, .. }
             | Self::Cell { shape, .. }
             | Self::Column { shape, .. }
-            | Self::Hyperlink { shape, .. } => Some(shape.slide),
+            | Self::Hyperlink { shape, .. }
+            | Self::Run { shape, .. }
+            | Self::LineBreak { shape, .. } => Some(shape.slide),
         }
     }
 
@@ -85,7 +153,9 @@ impl Element {
             Self::Row { shape, .. }
             | Self::Cell { shape, .. }
             | Self::Column { shape, .. }
-            | Self::Hyperlink { shape, .. } => Some(shape),
+            | Self::Hyperlink { shape, .. }
+            | Self::Run { shape, .. }
+            | Self::LineBreak { shape, .. } => Some(shape),
         }
     }
 
@@ -95,7 +165,13 @@ impl Element {
             Self::Cell { row, column, .. } => table(node)?
                 .cell(*row, *column)
                 .map(|text| Cow::Owned(text.to_owned())),
-            Self::Row { .. } | Self::Column { .. } | Self::Hyperlink { .. } => None,
+            Self::Run { body, piece, .. } => Some(Cow::Owned(String::from_utf16_lossy(
+                &body.text().encode_utf16().collect::<Vec<_>>()[piece.start..piece.end],
+            ))),
+            Self::Row { .. }
+            | Self::Column { .. }
+            | Self::Hyperlink { .. }
+            | Self::LineBreak { .. } => None,
         })
     }
 
@@ -109,7 +185,9 @@ impl Element {
             Self::Comment { .. }
             | Self::Cell { .. }
             | Self::Column { .. }
-            | Self::Hyperlink { .. } => 0,
+            | Self::Hyperlink { .. }
+            | Self::LineBreak { .. } => 0,
+            Self::Run { .. } => usize::from(run_click(node)?.is_some()),
         })
     }
 
@@ -141,6 +219,23 @@ impl Element {
                     .collect()
             },
             Self::Cell { .. } => Vec::new(),
+            Self::LineBreak { .. } => Vec::new(),
+            Self::Run { body, piece, .. } => {
+                let format = &body.runs()[piece.format].format;
+                let font = match format.font_ref() {
+                    Some(index) => node
+                        .file()
+                        .reader()
+                        .fonts()?
+                        .get_base(index)
+                        .map(|font| font.name.clone()),
+                    None => None,
+                };
+                props
+                    .iter()
+                    .map(|prop| run_value(format, font.as_deref(), prop.name))
+                    .collect()
+            },
             Self::Hyperlink { click, .. } => props
                 .iter()
                 .map(|prop| match prop.name {
@@ -241,4 +336,67 @@ pub(crate) fn shape_click(node: &Node<'_>) -> Result<Option<litchi_ppt::hyperlin
         return Ok(None);
     }
     Ok(node.file().reader().shape_click(item.slide, shape.id())?)
+}
+
+fn run_value<'a>(
+    format: &litchi_ppt::text_format_exception::TextCFException,
+    font: Option<&str>,
+    key: &str,
+) -> Option<Value<'a>> {
+    let style = format.font_style();
+    let flag = |mask: u32, value: fn(&litchi_ppt::text_format_exception::CFStyle) -> bool| {
+        (format.masks() & mask != 0).then(|| style.as_ref().is_some_and(value))
+    };
+    match key {
+        "font.latin" => font.map(|font| Value::Text(Cow::Owned(font.to_owned()))),
+        "size" => format
+            .font_size()
+            .map(|size| Value::Length(crate::value::Length::from_points(i32::from(size)))),
+        "bold" => flag(0x0001, litchi_ppt::text_format_exception::CFStyle::bold).map(Value::Bool),
+        "italic" => {
+            flag(0x0002, litchi_ppt::text_format_exception::CFStyle::italic).map(Value::Bool)
+        },
+        "underline" => flag(
+            0x0004,
+            litchi_ppt::text_format_exception::CFStyle::underline,
+        )
+        .map(|on| Value::Token(if on { "single" } else { "none" })),
+        "color" => format.color().and_then(|color| {
+            (color.kind == litchi_ppt::slide_show_settings::ColorIndexKind::Srgb)
+                .then(|| Value::Color(crate::value::Color::rgb(color.red, color.green, color.blue)))
+        }),
+        _ => None,
+    }
+}
+
+/// The text runs of a shape node's text body, or `None`.
+pub(crate) fn shape_runs(node: &Node<'_>) -> Result<Option<litchi_ppt::text_edit::TextRuns>> {
+    let (Some(shape), Some(item)) = (node.shape(), node.shape_item()) else {
+        return Ok(None);
+    };
+    if item.kind != Kind::Shape {
+        return Ok(None);
+    }
+    let Some(slide) = node.file().reader().slide_at(item.slide)? else {
+        return Ok(None);
+    };
+    Ok(slide.shape_text_runs(shape.id())?)
+}
+
+/// The click hyperlink of a run node: the text link whose range holds the
+/// run's start, with that range.
+pub(crate) fn run_click(
+    node: &Node<'_>,
+) -> Result<Option<((usize, usize), litchi_ppt::hyperlink::Click)>> {
+    let Some(Element::Run { body, piece, .. }) = node.element_item() else {
+        return Ok(None);
+    };
+    for link in body.links() {
+        if link.start <= piece.start && piece.start < link.end {
+            if let Some(click) = node.file().reader().resolve_click(&link.interaction)? {
+                return Ok(Some(((link.start, link.end), click)));
+            }
+        }
+    }
+    Ok(None)
 }
