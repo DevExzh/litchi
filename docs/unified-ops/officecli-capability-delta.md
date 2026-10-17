@@ -25,15 +25,15 @@ row has no disposition.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `9c9015925758c2332b68a118d51bfb7a9f153d475af94fb233b723f78ed821f7` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `1b5404fded785036e25222c15438482644b478e39f9e6ba653e2c67e0498c39e` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `2083eea65a4a4391a55849eda202ea2ef4a5457e250666195aaef613bd2d4bb1` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `61c9304cc0e1ab3992e1062a25e59d905b5d89970dbd80d8ebcbfa1b0af78159` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `453a3983fa7d23b86d91fa9ffea4bdc1d5917e31905218b1ddc3714b2369a7c9` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c94c03b8741c2f1552cf30bf0326ff148312b8d696afde42ec62edee6183e65c` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `13d09c4cfd2e7db4542ff05e8c66dc2f31650045761b760cf386071704a92313` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `4fddfc467504bf3bf407a791b52c03e624c16c6423615d25cd7e6c91322e5dc2` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `456328bd718fdf2c24e154b8548069f96170d9ea2bdffdb54a78c77ef82cf4bb` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `ee3294b75f1127c4713bfe8fdfd468db2c92857504805c8b773f580f48728bac` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `0dcca5a64b3b61a1f442e09dd0dbaf2d33e8ed40daf3acdbba92c04dede6b2d9` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `6769b6e588c2abedd1e298586c7c90cd0741f3bf4147db3a12cf1ff7f2abe77c` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `5f7fd859d62b6f570a465c859cfc1b26d5218386a4eb6c251a63678a71e446fc` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `264c125d573ab6fc72f3c7e1a5b4ca8e9264b101986b98cfb9873d61d68077ad` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `9e5e188f9e61ec44d18b258feebc227cd776ff3350fa484d959e6564cff264a0` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `104f4afa7068abc7bbe1d9e51861f007ee37cb23f5ff4fad6537de7fbcecff14` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `9c4afdf165334e207de69da99cdc335356d3ed7ec6ff012885c95f067bdf8398` |
@@ -138,13 +138,13 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 249 | 39 | 508 | 0 | 242 | 192 |
+| docx | 255 | 39 | 502 | 0 | 246 | 188 |
 | doc | 10 | 29 | 757 | 0 | 27 | 197 |
 | rtf | 15 | 35 | 746 | 0 | 23 | 178 |
-| xlsx | 212 | 60 | 272 | 0 | 522 | 184 |
+| xlsx | 223 | 60 | 261 | 0 | 524 | 182 |
 | xlsb | 165 | 40 | 339 | 0 | 390 | 187 |
 | xls | 157 | 24 | 363 | 0 | 359 | 188 |
-| pptx | 112 | 34 | 415 | 0 | 149 | 246 |
+| pptx | 123 | 34 | 404 | 0 | 151 | 244 |
 | ppt | 6 | 23 | 532 | 0 | 15 | 160 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -205,13 +205,13 @@ Property gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 96 | 533 | 35 | 0 | 19 | 0 |
+| docx | 90 | 533 | 35 | 0 | 19 | 0 |
 | doc | 0 | 882 | 35 | 0 | 19 | 0 |
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
-| xlsx | 23 | 318 | 79 | 0 | 1 | 0 |
+| xlsx | 12 | 318 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
 | xls | 189 | 219 | 79 | 0 | 1 | 0 |
-| pptx | 55 | 438 | 57 | 0 | 12 | 0 |
+| pptx | 44 | 438 | 57 | 0 | 12 | 0 |
 | ppt | 0 | 608 | 58 | 0 | 12 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -231,7 +231,7 @@ All gap rows by tier:
 
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| P0 | 89 | 0 | 0 | 0 | 4 | 0 |
+| P0 | 61 | 0 | 0 | 0 | 4 | 0 |
 | v1 | 39 | 0 | 0 | 0 | 0 | 0 |
 | P1 | 453 | 6044 | 0 | 0 | 44 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
@@ -264,7 +264,6 @@ properties share its entry unless an entry names the property):
 | mermaid-diagram | out-of-scope |  | 83 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
 | complex-field-parts | out-of-scope |  | 16 | `delta:*:fieldChar`, `delta:*:instrText` | Litchi models a complex field as one `field` node (field refresh, record 0279); its `fldChar`/`instrText` runs are raw markup (design §12) |
 | numbering-native-ids | out-of-scope |  | 20 | `delta:*:abstractNum.id`, `delta:*:abstractNum.abstractNumId`, `delta:*:num.id`, `delta:*:num.numId`, `delta:*:level.ilvl` | a numbering identifier is a native identity, addressed only by raw paths (ADR 0034, record 0319) |
-| metadata-root | planned | WP16 | 28 | `delta:docx:document.author`, `delta:docx:document.title`, `delta:docx:document.subject`, `delta:docx:document.keywords`, `delta:docx:document.description`, `delta:docx:document.lastModifiedBy`, `delta:xlsx:workbook.author`, `delta:xlsx:workbook.title`, `delta:xlsx:workbook.subject`, `delta:xlsx:workbook.keywords`, `delta:xlsx:workbook.description`, `delta:xlsx:workbook.category`, `delta:xlsx:workbook.lastModifiedBy`, `delta:xlsx:workbook.revisionNumber`, `delta:pptx:presentation.author`, `delta:pptx:presentation.title`, `delta:pptx:presentation.subject`, `delta:pptx:presentation.keywords`, `delta:pptx:presentation.description`, `delta:pptx:presentation.category`, `delta:pptx:presentation.lastModifiedBy`, `delta:pptx:presentation.revisionNumber`, `delta:xlsx:workbook.extended.company`, `delta:xlsx:workbook.extended.manager`, `delta:xlsx:workbook.extended.template`, `delta:pptx:presentation.extended.company`, `delta:pptx:presentation.extended.manager`, `delta:pptx:presentation.extended.template` | Litchi writes metadata through the `/metadata` node (records 0253, 0254) and reads it at the root; OfficeCLI writes it at the root (`set / title=...`), which the read-only root refuses. WP16 (proposed in record 0332) routes root-level metadata keys to `/metadata` |
 | docx-app-metadata | planned | 0253 | 11 | `delta:docx:document.extended.*` | DOCX application properties on the root node (record 0253 follow-up F3) |
 
 ## docx
@@ -326,7 +325,7 @@ properties share its entry unless an entry names the property):
 |  | theme | litchi-only |  |  | L-DOCX-R6 (R4x) |
 |  | smartart | litchi-only |  |  |  |
 
-Properties: 1230 rows, 683 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
+Properties: 1230 rows, 677 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
 
 ### Contextual operation gaps
 
@@ -590,7 +589,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | workbook | workbook | supported |  |  |  |
 |  | mergeCell | litchi-only |  |  | M1-extended (R4x) |
 
-Properties: 1250 rows, 421 of them gaps, in [`xlsx.md`](officecli-capability-delta/xlsx.md).
+Properties: 1250 rows, 410 of them gaps, in [`xlsx.md`](officecli-capability-delta/xlsx.md).
 
 ### Contextual operation gaps
 
@@ -836,7 +835,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | notesMaster | litchi-only |  |  | M1-extended |
 |  | node | litchi-only |  |  |  |
 
-Properties: 956 rows, 562 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
+Properties: 956 rows, 551 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
 
 ### Contextual operation gaps
 

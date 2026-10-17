@@ -120,7 +120,16 @@ pub(crate) const SETTABLE: &[&str] = &[
     "run",
     "notes",
     "comment",
+    // Document properties on the root, through the metadata writer (record
+    // 0338).
+    "presentation",
 ];
+
+/// The root's capability table: its document-property keys are settable on
+/// `/` (record 0338).
+static PRESENTATION_CAPABILITY_PROPS: [crate::node::spec::PropSpec;
+    spec::PRESENTATION_PROPS.len()] =
+    crate::format::metadata::root_capability(spec::PRESENTATION_PROPS);
 
 /// The non-slide elements `add` creates when the owner admits shape adds.
 pub(crate) const SHAPE_ADDABLE: &[&str] = &[
@@ -162,6 +171,7 @@ pub(crate) const REMOVABLE: &[&str] = &[
 /// its read table; `None` keeps the spec's.
 pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::spec::PropSpec]> {
     Some(match element {
+        "presentation" => &PRESENTATION_CAPABILITY_PROPS,
         "shape" => SHAPE_CAPABILITY_PROPS,
         "placeholder" => PLACEHOLDER_CAPABILITY_PROPS,
         "slide" => SLIDE_CAPABILITY_PROPS,

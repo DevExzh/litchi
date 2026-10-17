@@ -75,13 +75,17 @@ impl Pptx {
 }
 
 impl Pptx {
-    /// Set document properties on `/metadata`; `None` for other targets.
+    /// Set document properties on `/metadata`, or on `/` when a property
+    /// is a metadata key (OfficeCLI's spelling, record 0338); `None` for
+    /// other targets.
     pub(super) fn try_set_metadata(
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Commit>> {
-        if !metadata::is_target(target) {
+        if !metadata::is_target(target)
+            && !(metadata::is_root(target) && metadata::names_metadata(props))
+        {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Pptx)?;

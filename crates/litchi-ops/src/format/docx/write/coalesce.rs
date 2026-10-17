@@ -40,7 +40,8 @@ impl Docx {
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Plan>> {
-        if target.path().is_none() || props.is_empty() {
+        // A metadata set publishes through its own writer (record 0338).
+        if target.path().is_none() || props.is_empty() || Self::is_metadata_set(target, props) {
             return Ok(None);
         }
         let result = (|| {

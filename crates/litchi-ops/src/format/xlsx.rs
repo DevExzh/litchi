@@ -88,7 +88,7 @@ pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
     CELL_CAPABILITY_PROPS, COLUMN_CAPABILITY_PROPS, RANGE_CAPABILITY_PROPS, ROW_CAPABILITY_PROPS,
-    SHEET_CAPABILITY_PROPS, SPEC,
+    SHEET_CAPABILITY_PROPS, SPEC, WORKBOOK_CAPABILITY_PROPS,
 };
 pub(crate) use spec::{CELL_WRITE_TABLE, COLUMN_WRITE_TABLE, ROW_WRITE_TABLE};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};

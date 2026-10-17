@@ -554,6 +554,12 @@ crate::registry::registry! {
     }
 }
 
+/// The root's capability table: the core-property keys are settable,
+/// through the metadata writer on `/` and `/metadata` (record 0338). Same
+/// order as [`DOCUMENT_PROPS`], so reads index either.
+pub(crate) static DOCUMENT_ROOT_PROPS: [PropSpec; DOCUMENT_PROPS.len()] =
+    crate::format::metadata::root_capability(DOCUMENT_PROPS);
+
 // `ParagraphToNode`, in its order. `numId` and `numLevel` are strings
 // there, `outlineLvl` an int.
 crate::registry::registry! {
@@ -970,7 +976,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     K::Watermark,
                 ],
                 &["/"],
-                DOCUMENT_PROPS,
+                &DOCUMENT_ROOT_PROPS,
             ),
             element(
                 K::Body,

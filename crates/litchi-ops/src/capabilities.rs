@@ -2794,7 +2794,7 @@ impl Element {
                     && self.retains_source != Some(false)
                     && matches!(
                         self.data().canonical,
-                        "p" | "r" | "hyperlink" | "tc" | "chart"
+                        "p" | "r" | "hyperlink" | "tc" | "chart" | "document"
                     )
                     && readable)
                     || (self.adapter == Adapter::Docx
@@ -2823,7 +2823,15 @@ impl Element {
                 && self.retains_source != Some(false)
                 && (matches!(
                     self.data().canonical,
-                    "cell" | "range" | "sheet" | "row" | "col" | "chart" | "series" | "axis"
+                    "workbook"
+                        | "cell"
+                        | "range"
+                        | "sheet"
+                        | "row"
+                        | "col"
+                        | "chart"
+                        | "series"
+                        | "axis"
                 ) || crate::format::xlsx::FEATURE_ELEMENTS.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
@@ -3141,6 +3149,7 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         #[cfg(feature = "xlsx")]
         let props = if adapter == Adapter::Xlsx {
             match crate::path::navigate::ElementKind::name(element.kind) {
+                "workbook" => &crate::format::xlsx::WORKBOOK_CAPABILITY_PROPS,
                 "cell" => crate::format::xlsx::CELL_CAPABILITY_PROPS,
                 "range" => crate::format::xlsx::RANGE_CAPABILITY_PROPS,
                 "sheet" => crate::format::xlsx::SHEET_CAPABILITY_PROPS,

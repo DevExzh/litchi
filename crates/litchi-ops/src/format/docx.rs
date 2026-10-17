@@ -84,6 +84,7 @@ mod few;
 mod lists;
 mod marks;
 pub(crate) mod merge;
+mod metadata;
 mod nav;
 mod nested;
 mod node;

@@ -496,15 +496,15 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | placeholder | `tooltip` | string |  | -sg | litchi-only | litchi-only |  |  |  |
 | placeholder | `fill` | string |  | -s- | litchi-only | litchi-only |  |  |  |
 | placeholder | `geometry` | string |  | -s- | litchi-only | litchi-only |  |  |  |
-| presentation | `title` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| presentation | `author` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| presentation | `keywords` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| presentation | `description` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| presentation | `category` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| presentation | `lastModifiedBy` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| presentation | `revisionNumber` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| presentation | `created` | string | --g | --g | supported | — |  |  |  |
-| presentation | `modified` | string | --g | --g | supported | — |  |  |  |
+| presentation | `title` | string | -sg | -sg | supported | supported |  |  |  |
+| presentation | `author` | string | -sg | -sg | supported | supported |  |  |  |
+| presentation | `keywords` | string | -sg | -sg | supported | supported |  |  |  |
+| presentation | `description` | string | -sg | -sg | supported | supported |  |  |  |
+| presentation | `category` | string | -sg | -sg | supported | supported |  |  |  |
+| presentation | `lastModifiedBy` | string | -sg | -sg | supported | supported |  |  |  |
+| presentation | `revisionNumber` | string | -sg | -sg | supported | supported |  |  |  |
+| presentation | `created` | string | --g | -sg | supported | litchi-only |  |  |  |
+| presentation | `modified` | string | --g | -sg | supported | litchi-only |  |  |  |
 | presentation | `slideWidth` | string | -sg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | presentation | `slideHeight` | string | -sg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | presentation | `slideSize` | string | -sg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
@@ -526,15 +526,15 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | presentation | `removePersonalInfo` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | presentation | `extended.applicationVersion` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | presentation | `extended.characters` | number | --g | --g | supported | — |  |  |  |
-| presentation | `extended.company` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| presentation | `extended.company` | string | -sg | -sg | supported | supported |  |  |  |
 | presentation | `extended.lines` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| presentation | `extended.manager` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| presentation | `extended.manager` | string | -sg | -sg | supported | supported |  |  |  |
 | presentation | `extended.pages` | number | --g | --g | supported | — |  |  |  |
 | presentation | `extended.paragraphs` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| presentation | `extended.template` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| presentation | `extended.template` | string | -sg | -sg | supported | supported |  |  |  |
 | presentation | `extended.totalTime` | number | --g | --g | supported | — |  |  |  |
 | presentation | `extended.words` | number | --g | --g | supported | — |  |  |  |
-| presentation | `subject` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| presentation | `subject` | string | -sg | -sg | supported | supported |  |  |  |
 | presentation | `theme.color.accent1` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | presentation | `theme.color.accent2` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | presentation | `theme.color.accent3` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |

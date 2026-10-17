@@ -227,8 +227,23 @@ impl Docx {
         // this makes an empty property list honor the same security policy as
         // a non-empty write.
         let editor = self.edit()?;
+        // Core document properties on `/` or `/metadata` (record 0338).
+        let props = if crate::format::metadata::is_target(target)
+            || crate::format::metadata::is_root(target)
+        {
+            let props = Props::from_props(props)?;
+            if Self::is_metadata_set(target, &props) {
+                return self.set_metadata(editor, &props).map(O::from_commit);
+            }
+            Ok(props)
+        } else {
+            Err(props)
+        };
         let nodes = self.resolve_targets(target)?;
-        let props = Props::from_props(props)?;
+        let props = match props {
+            Ok(props) => props,
+            Err(props) => Props::from_props(props)?,
+        };
         let editor = match self.try_set_chart(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,

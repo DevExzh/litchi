@@ -162,6 +162,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             // Record 0283: charts are added, set and removed.
             "chart" => (true, true, true),
             "sdt" => (false, false, true),
+            // Record 0338: the root sets the core document properties.
+            "document" => (true, false, false),
             // Record 0319: styles, numbering, headers, footers and notes.
             "style" | "abstractNum" | "num" | "level" | "header" | "footer" | "footnote"
             | "endnote" => (true, true, true),
@@ -330,6 +332,12 @@ fn ordinary_reports_hide_native_selection_fields() {
                     element.name(),
                     property.name()
                 );
+            } else if element.name() == "document" {
+                // Record 0338: every root key is a core document property,
+                // set through the metadata writer.
+                assert!(property.get(), "document {}", property.name());
+                assert!(property.set(), "document {}", property.name());
+                assert!(!property.add(), "document {}", property.name());
             } else if element.name() == "chart" {
                 // Record 0283: chart keys seed a new chart and most are
                 // also settable; the registry declares each.
@@ -546,11 +554,14 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
-        // Chart writes have their own report test (`tests/charts.rs`), and
-        // worksheet features theirs (`tests/xlsx_features.rs`, record 0320).
+        // Chart writes have their own report test (`tests/charts.rs`),
+        // worksheet features theirs (`tests/xlsx_features.rs`, record 0320),
+        // and the root's metadata keys theirs (`tests/root_metadata.rs`,
+        // record 0338).
         if matches!(
             element.name(),
-            "chart"
+            "workbook"
+                | "chart"
                 | "series"
                 | "axis"
                 | "comment"
@@ -751,10 +762,12 @@ fn pptx_reports_selection_and_structural_writes() {
         }));
         // Chart (record 0270), SmartArt (record 0284) and the record 0321
         // elements' writes have their own report tests (`tests/charts.rs`,
-        // `tests/smartart.rs`, `tests/pptx_elements.rs`).
+        // `tests/smartart.rs`, `tests/pptx_elements.rs`), and so do the
+        // root's metadata keys (`tests/root_metadata.rs`, record 0338).
         if matches!(
             element.name(),
-            "chart"
+            "presentation"
+                | "chart"
                 | "series"
                 | "axis"
                 | "smartart"

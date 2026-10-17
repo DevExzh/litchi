@@ -1196,21 +1196,21 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | validation | `error` | string | asg | asg | supported | supported |  |  |  |
 | workbook | `defaultFont` | string | --- |  | write-only | — |  |  |  |
 | workbook | `defaultFontSize` | length | --- |  | write-only | — |  |  |  |
-| workbook | `author` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| workbook | `title` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| workbook | `author` | string | -sg | -sg | supported | supported |  |  |  |
+| workbook | `title` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `calc.mode` | enum | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
 | workbook | `calc.iterate` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `calc.iterateCount` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `calc.iterateDelta` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `calc.fullPrecision` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| workbook | `lastModifiedBy` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| workbook | `created` | string | --g | --g | supported | — |  |  |  |
-| workbook | `modified` | string | --g | --g | supported | — |  |  |  |
+| workbook | `lastModifiedBy` | string | -sg | -sg | supported | supported |  |  |  |
+| workbook | `created` | string | --g | -sg | supported | litchi-only |  |  |  |
+| workbook | `modified` | string | --g | -sg | supported | litchi-only |  |  |  |
 | workbook | `extended.application` | string | --g | --g | supported | — |  |  |  |
-| workbook | `category` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| workbook | `description` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| workbook | `keywords` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| workbook | `revisionNumber` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| workbook | `category` | string | -sg | -sg | supported | supported |  |  |  |
+| workbook | `description` | string | -sg | -sg | supported | supported |  |  |  |
+| workbook | `keywords` | string | -sg | -sg | supported | supported |  |  |  |
+| workbook | `revisionNumber` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `activeTab` | number | --g | --g | supported | — |  |  |  |
 | workbook | `firstSheet` | number | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
 | workbook | `calc.fullCalcOnLoad` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
@@ -1226,15 +1226,15 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | workbook | `workbook.password` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `extended.applicationVersion` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `extended.characters` | number | --g | --g | supported | — |  |  |  |
-| workbook | `extended.company` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| workbook | `extended.company` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `extended.lines` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| workbook | `extended.manager` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| workbook | `extended.manager` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `extended.pages` | number | --g | --g | supported | — |  |  |  |
 | workbook | `extended.paragraphs` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| workbook | `extended.template` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| workbook | `extended.template` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `extended.totalTime` | number | --g | --g | supported | — |  |  |  |
 | workbook | `extended.words` | number | --g | --g | supported | — |  |  |  |
-| workbook | `subject` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| workbook | `subject` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `theme.color.accent1` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `theme.color.accent2` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `theme.color.accent3` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |

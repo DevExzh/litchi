@@ -287,15 +287,15 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | diagram | `layout` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `look` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
 | diagram | `background` | string | a-- |  | write-only | gap | P2 | out-of-scope (mermaid-diagram) |  |
-| document | `author` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| document | `title` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| document | `keywords` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| document | `description` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| document | `lastModifiedBy` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
-| document | `category` | string | --g | --g | supported | — |  |  |  |
-| document | `revisionNumber` | string | --g | --g | supported | — |  |  |  |
-| document | `created` | string | --g | --g | supported | — |  |  |  |
-| document | `modified` | string | --g | --g | supported | — |  |  |  |
+| document | `author` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `title` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `keywords` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `description` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `lastModifiedBy` | string | -sg | -sg | supported | supported |  |  |  |
+| document | `category` | string | --g | -sg | supported | litchi-only |  |  |  |
+| document | `revisionNumber` | string | --g | -sg | supported | litchi-only |  |  |  |
+| document | `created` | string | --g | -sg | supported | litchi-only |  |  |  |
+| document | `modified` | string | --g | -sg | supported | litchi-only |  |  |  |
 | document | `protection` | enum | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `protectionEnforced` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `docGrid.type` | enum | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -364,7 +364,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | document | `extended.template` | string | -sg |  | unlisted | gap | P0 | planned 0253 (docx-app-metadata) |  |
 | document | `extended.totalTime` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
 | document | `extended.words` | number | --g |  | unlisted | — | P1 | planned 0253 (docx-app-metadata) |  |
-| document | `subject` | string | -sg | --g | supported | gap | P0 | planned WP16 (metadata-root) |  |
+| document | `subject` | string | -sg | -sg | supported | supported |  |  |  |
 | document | `theme.color.accent1` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `theme.color.accent2` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | document | `theme.color.accent3` | color | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |

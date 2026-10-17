@@ -21,7 +21,7 @@ pub mod doc;
 pub mod docx;
 #[cfg(feature = "iwork-adapter")]
 pub mod iwork;
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub(crate) mod metadata;
 #[cfg(any(feature = "ods", feature = "odp", feature = "odf-objects"))]
 pub(crate) mod odf_metadata;
