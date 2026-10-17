@@ -6,6 +6,104 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0343 | [ADR 0034 glossary closure and docs hygiene](0343-glossary-closure.md) | Implemented on `uo2/glossary-closure` (audit WP14): pending glossary rows renamed or deferred to the owner memo, records index 0249–0343, facade/README/feature-matrix docs |
+| 0339 | [Parity residue: corpus detail, capability rows for unlisted elements, SmartArt decisions (record 0332 F1/F2, audit WP12)](0339-parity-residue.md) | Merged (R17 `uo2/parity-residue`, `69b2af2c77`): full corpus skip lists, 42 capability gap rows, SmartArt decisions |
+| 0338 | [XLSX P0 residue, root-level metadata writes, exact JSON numbers and a PathArg display fixed point (WP16; record 0334 F1, F2)](0338-xlsx-p0-root-metadata-json-paths.md) | Merged (R17 `uo2/xlsx-p0-meta`, `4282e69000`): XLSX runs/cell add/type/picture src, root metadata writes, JSON float round trip, PathArg display |
+| 0337 | [Performance closure: 1k-batch evidence for every format, follow-ups for every open miss, the `Path` size](0337-perf-closure.md) | Merged (R16 `uo2/perf-closure`, `2083926091`): 1k-batch evidence for 21 formats, XLS file-backed batch fix |
+| 0336 | [`dump` and the raw layer: parts, raw, add-part, raw-set, validate (audit WP5)](0336-dump-and-raw-layer.md) | Merged (R17 `uo2/dump-raw`, `ed832736c3`): File::dump, raw layer (parts/raw/add_part/raw_set/validate), CLI and Python |
+| 0335 | [DOCX P0 residue: picture, comment and SmartArt writes; chart series and axes (audit WP4)](0335-docx-p0-residue.md) | Merged (R16 `uo2/docx-p0`, `92d622b38f`): DOCX picture/comment set, SmartArt nodes, chart series/axis |
+| 0334 | [Facade feature gates, feature-matrix check, batch-payload fuzz targets](0334-facade-features-and-batch-fuzz.md) | Merged (R16 `uo2/facade-fuzz`, `d165759e4a`): facade features from Cargo, feature matrix, batch fuzz targets |
+| 0333 | [PPTX P0 residue (audit WP3)](0333-pptx-p0-residue.md) | Merged (R16 `uo2/pptx-p0`, `e39d0a75a4`): PPTX paragraph/run/row CRUD, cell fill, comment remove, picture set, coalesced batches |
+| 0332 | [OfficeCLI parity dispositions and the v1 corpus subset (audit WP1 + WP13)](0332-officecli-parity-dispositions.md) | Merged (R15 `uo2/dispositions`, `0056b9cccd`): OfficeCLI parity dispositions, v1 corpus subset |
+| 0331 | [Owner decision memo (2026-10-17)](0331-owner-decision-memo.md) | Awaiting owner confirmation; every item is already in effect as the adopted default |
+| 0330 | [Registry self-consistency and the XLSX cell link bug (audit WP2)](0330-registry-self-consistency.md) | Merged (R15 `uo2/registry-consistency`, `d761892de3`): element claims match property flags, XLSX batched cell links |
+| 0329 | [Keynote and Pages table creation, Numbers `#REF!`, shared-formula splits, structural clears, comment edge cases, Keynote notes run styles](0329-iwork-table-creation-and-ref-errors.md) | Merged (R15 `uo2/iwork-tables2`, `84ef2cd65e`): Keynote/Pages table creation, Numbers #REF!, notes run styles |
+| 0328 | [ODT, ODP and RTF element gaps against the DOCX and PPTX vocabularies](0328-odf-rtf-gaps.md) | Merged (R15 `uo2/odf-rtf-gaps`, `3bec513e6a`): ODT/ODP/RTF element gaps |
+| 0327 | [XLS and ODS worksheet features (the nodes of records 0320 and 0322)](0327-xls-ods-worksheet-features.md) | Merged (R15 `uo2/xls-ods-features`, `243aab0e0b`): XLS and ODS worksheet feature nodes |
+| 0326 | [PPTX query regression, path-text parser, typed coercion, element read misses](0326-pptx-regression-path-parser-typed-coercion-read-misses.md) | Merged (R14 `uo2/perf-r13`, `593d1b9fcd`): PPTX query-node size regression, path fast path, typed coercion, read misses |
+| 0325 | [OOXML write follow-ups of records 0319–0322 (tier 1)](0325-ooxml-write-follow-ups.md) | Merged (R14 `uo2/ooxml-followups`, `16b800350b`): DOCX story paragraphs and marks, PPTX links, XLSX note runs, shared spreadsheet drawing |
+| 0324 | [DOC element gaps against the DOCX vocabulary (tier 2)](0324-doc-element-gaps.md) | Merged (R13 `uo2/doc-gaps`, `34cb2c3a5f`): DOC styles, numbering, hyperlinks, bookmarks, fields, sections, tabs |
+| 0323 | [PPT element gaps against the PPTX vocabulary (tier 2)](0323-ppt-element-gaps.md) | Merged (R13 `uo2/ppt-gaps`, `69fd64aacd`): PPT comments, hyperlinks, table cells, runs, theme/chart reads |
+| 0322 | [XLSB worksheet features (the nodes of record 0320) and XLSX follow-ups](0322-xlsb-worksheet-features.md) | Merged (R13 `uo2/xlsb-features`, `a4a045b48a`): XLSB worksheet feature nodes and chart reads, XLSX fixes |
+| 0321 | [PPTX element gaps for OfficeCLI tier-1 parity](0321-pptx-element-gaps.md) | Merged (R12 `uo2/pptx-p1`, `ba7669242a`): PPTX theme, columns, hyperlinks, media, equations, master/layout writes |
+| 0320 | [XLSX P0/P1 worksheet features (OfficeCLI parity, tier 1)](0320-xlsx-worksheet-features.md) | Merged (R12 `uo2/xlsx-p0p1`, `931def6027`): XLSX notes, hyperlinks, drawings, CF, validation, autofilter, breaks |
+| 0319 | [DOCX P0 and P1 elements for OfficeCLI parity (tier 1)](0319-docx-p0-p1-elements.md) | Merged (R12 `uo2/docx-p0p1`, `708e88727c`): DOCX styles, numbering, headers/footers, notes, tabs, breaks |
+| 0318 | [Numbers formula-coordinate shift, Numbers cell comments; iWork table creation not started](0318-numbers-formula-shift-and-comments.md) | Merged (R12 `uo2/iwork-numbers2`, `3fa22ff1a4`): Numbers formula-coordinate shift and cell comments |
+| 0317 | [Audit-proof follow-ups: retained proofs for DOCX commits, derived indexes for chains, depth-3 slide indexes](0317-opc-audit-proof-follow-ups.md) | Merged (R11 `uo2/opc-proofs`, `e81a4661f9`): proof hand-off, chained successor proofs, depth-3 PPTX indexes |
+| 0316 | [XLS and ODP structural follow-ups (record 0308)](0316-xls-odp-structural-follow-ups.md) | Merged (R11 `uo2/xls-odp-gaps`, `588007818c`): AnchorBehavior names, XLS CF/DV/Array/Table shifts, ODP shape formatting |
+| 0315 | [Query walker and read-path misses (record 0310 groups G4–G9)](0315-query-walker-read-path-misses.md) | Merged (R13 `uo2/query-walker`, `71212c8beb`): walker fast step, DOCX fenced children, XLS sheet-step cache |
+| 0314 | [iWork batches: equivalence with one-at-a-time application, batch costs, and the open element gaps](0314-iwork-batch-equivalence.md) | Merged (R11 `uo2/iwork-batch`, `cbbdcd1fde`): iWork batch equivalence fixes, Pages paragraph-style loss |
+| 0313 | [DOCX insertion audit proof: successor proofs from recorded content boundaries](0313-docx-insertion-audit-proof.md) | Merged (R10 `uo2/docx-insert`, `09a57ed610`): xml-minifier successor proofs for DOCX insertions |
+| 0312 | [Lazy iWork tables, direct cell writes, Pages sections and Keynote placeholder styles](0312-iwork-lazy-tables.md) | Merged (R10 `uo2/iwork-tables`, `1100472b75`): lazy iWork tables, Pages sections, Keynote placeholder styles |
+| 0311 | [Remaining single-op misses: the OPC double audit, the DOC adapter, the ODP and ODT wall-time puzzles](0311-single-op-performance-misses.md) | Merged (R10 `uo2/perf-opc`, `aefbcf2689`): verified OPC publication, DOC body snapshot |
+| 0310 | [Open benchmark misses: root causes, re-measurement, cheap fixes](0310-miss-sweep.md) | Merged (R10 `uo2/miss-sweep`, `a4a09b30b8`): bench-miss triage, XLSB/XLSX query freshness, XLS axis writes |
+| 0309 | [iWork element gaps (rows and columns, character styling, table cells)](0309-iwork-elements.md) | Merged (R9 `uo2/iwork-elements`, `a41adc99cf`): Numbers rows/columns, iWork character styling and table cells |
+| 0308 | [Remaining non-iWork structural gaps (XLS, RTF, ODP, DOC, ODG)](0308-office-structural-gaps.md) | Merged (R9 `uo2/office-gaps`, `dd9ab70af5`): XLS producer shifts, RTF splice, ODP character formatting |
+| 0307 | [DOCX run-level markup compatibility](0307-docx-run-markup-compatibility.md) | Merged (R8 `uo2/docx-mc`, `bcdcadadf0`): DOCX run-level markup compatibility |
+| 0306 | [`litchi::iwork::Document` retired; iWork package directories and open options through `File`](0306-iwork-facade-retirement.md) | Merged (M6 `uo2/iwork-facade`, `18513c994c`): retire litchi::iwork::Document; Keynote/Numbers bundle directories |
+| 0305 | [Lazy iWork trees, the DOCX single-set cost, the RTF `&Query` route](0305-lazy-iwork-trees-and-docx-single-set.md) | Merged (R9 `uo2/perf-lazy`, `5b8ebff53f`): lazy iWork parts, DOCX single set and source-backed snapshot memo |
+| 0304 | [No silent content loss on text sets](0304-no-silent-loss-on-text-sets.md) | Merged (R8 `uo2/text-loss`, `123f07ac3e`): no silent content loss on text sets |
+| 0303 | [PPTX/DOCX structural gaps on files from other producers](0303-pptx-docx-producer-structure-gaps.md) | Merged (R8 `uo2/pptx-gaps`, `c9017fc9e9`): PPTX owned-part slide removal, sections, F3 OLE removal |
+| 0302 | [Residual single-op and batch performance misses](0302-residual-performance.md) | Merged (M6 `uo2/perf-residual`, `94f8047602`): residual single-op and batch performance |
+| 0301 | [iWork structural leaf APIs (Numbers and Pages)](0301-iwork-structure.md) | Merged (M6 `uo2/iwork-structure`, `f24868dfb5`): Numbers sheet/table lifecycle, Pages directory save |
+| 0300 | [iWork and tooling hygiene](0300-iwork-tooling-hygiene.md) | Merged (M6 `uo2/iwork-hygiene`, `420a04842f`): iWork and tooling hygiene |
+| 0299 | [Pages to parity in the unified layer (M6)](0299-pages-parity.md) | Merged (M6 `uo2/iwork-pages`, `b44c03fdd3`): Pages W1 and unified parity |
+| 0298 | [Keynote W1 and unified Keynote parity (M6)](0298-keynote-parity.md) | Merged (M6 `uo2/iwork-keynote`, `8cf481f5fd`): Keynote W1 and unified parity |
+| 0297 | [Numbers to parity in the unified layer (M6)](0297-numbers-parity.md) | Merged (M6 `uo2/iwork-numbers`, `aabd78ac5f`): Numbers W1 and unified parity |
+| 0296 | [iWork joins `File`: Pages, Keynote and Numbers (M6 foundation)](0296-iwork-joins-file.md) | Merged (M6 `uo2/iwork-found`, `52eca6c117`): iWork joins File; iWork-free gate removed |
+| 0295 | [M4 engines on more formats, DOCX SmartArt, XLSX rich-text find](0295-m4-engines-on-more-formats.md) | Merged (R7 `uo2/m4-ext`, `8a6e6968e1`): find/merge/refresh on more formats, ODS import, DOCX SmartArt |
+| 0294 | [Acceptance follow-ups: Python mirror, fixtures for unreached cells, benchmark matrix through 0302](0294-acceptance-follow-ups.md) | Merged (R7 `uo2/acceptance2`, `4139b28e13`): Python CRUD/fidelity mirror, fixtures for unreached cells, bench matrix through 0297 |
+| 0293 | [Structural edits on files from other producers](0293-producer-structure.md) | Merged (R7 `uo2/producer-structure`, `873cbb31e0`): structural edits on producer XLS/PPTX/RTF files |
+| 0292 | [ODF object-format verbs and flat ODF](0292-odf-verbs-and-flat-odf.md) | Merged (R7 `uo2/odf-verbs`, `622bf1ed98`): ODF object-format verbs and flat ODF |
+| 0291 | [Shared target, path and plan performance](0291-shared-target-path-plan-performance.md) | Merged (R7 `uo2/perf-path`, `173b1f9fc4`): shared target/path/plan performance |
+| 0290 | [Phase G checklist failures and metadata `language`](0290-checklist-failures-and-metadata-language.md) | Merged (R7 `uo2/checklist-fixes`, `dbd990cad1`): Phase G failures F1/F2/F4/F6/F7, ODF metadata language |
+| 0289 | [Phase G acceptance evidence: CRUD checklist, corpus fidelity, benchmark matrix](0289-phase-g-acceptance-evidence.md) | Merged (R6 `uo2/phase-g`, `474810b463`): Phase G acceptance evidence |
+| 0288 | [ODF follow-ups: shared metadata family, producer drawings, chart and image writes, object-format coalescing](0288-odf-follow-ups.md) | Merged (R6 `uo2/odf-gaps`, `742420f6f9`): ODF metadata family, ODG/ODC/ODI writes, tree coalescing |
+| 0287 | [Remaining query performance misses](0287-remaining-query-performance.md) | Merged (R6 `uo2/perf-query2`, `e304079b78`): node size, walker moves, ODS/RTF/XLS query costs |
+| 0286 | [OOXML adapter performance misses](0286-ooxml-adapter-performance.md) | Merged (R6 `uo2/perf-ooxml`, `9f63c06d63`): OOXML adapter performance |
+| 0285 | [Find/replace fixes and consolidation with template merge](0285-find-merge-consolidation.md) | Merged (R6 `uo2/find2`, `f5918148a8`): find/merge consolidation, TOC field fix, story coverage |
+| 0284 | [Typed SmartArt CRUD through the unified API](0284-typed-smartart-crud.md) | Merged (R5 `uo2/smartart`, `d9260e3692`): typed SmartArt CRUD for PPTX |
+| 0283 | [DOCX charts, extended chart types and chart `set` coverage](0283-docx-charts-and-chartex.md) | Merged (R5 `uo2/charts-docx`, `055d6f6237`): DOCX charts, chartex types, chart set coverage |
+| 0282 | [The remaining ODF formats in `File`: OTH, ODM, ODG, ODC, ODI, ODB and ODF formula](0282-remaining-odf-formats.md) | Merged (R5 `uo2/odf-leaves`, `dbb3d6f260`): remaining ODF formats into File |
+| 0281 | [Per-format write performance misses](0281-per-format-write-performance.md) | Merged (R5 `uo2/perf-writes`, `bca745f391`): per-format write performance |
+| 0280 | [Shared query and transaction performance](0280-shared-query-transaction-performance.md) | Merged (R5 `uo2/perf-query`, `b70335dc61`): shared query/transaction performance |
+| 0279 | [Field and table-of-contents refresh (plan step 20c, M4 engine 3 of 3)](0279-field-refresh.md) | Merged (R5 `uo2/s20-refresh`, `491ca96c2f`): field/TOC refresh |
+| 0278 | [ODP unified adapter: reads and writes over a scene index](0278-odp-unified-adapter.md) | Merged (R4 `uo2/s23-odp`, `223948be32`): unified ODP adapter |
+| 0277 | [Unified ODS adapter (read + write)](0277-ods-unified-adapter.md) | Merged (R4 `uo2/s23-ods`, `f7e3ee888b`): unified ODS adapter: reads, writes, flat ODS read |
+| 0276 | [Unified ODT adapter: body index, reads and writes](0276-odt-unified-adapter.md) | Merged (R4 `uo2/s23-odt`, `fcc4fe5266`): unified ODT adapter |
+| 0275 | [RTF to parity (plan step 21)](0275-rtf-parity.md) | Merged (R4 `uo2/s21-rtf`, `3ea25405dc`): RTF tables, stories, links, pictures, styles, lists; source splicing |
+| 0274 | [Template merge (plan step 20b, M4 engine 2 of 3)](0274-template-merge.md) | Merged (R4 `uo2/s20-merge`, `3cb803e29c`): template merge for DOCX/PPTX/XLSX |
+| 0273 | [Formatting-aware find/replace (plan step 20a, M4 engine 1 of 3)](0273-find-replace.md) | Merged (R4 `uo2/s20-find`, `10f44c5a13`): formatting-aware find/replace on set |
+| 0272 | [The perf-baseline harness test suite is green on trunk again](0272-perf-harness-green.md) | Merged (`uo2/harness-green`, `22d2ea5595`): perf-harness tests green on trunk, PPT aggregate routes v3, CI lint |
+| 0271 | [Dotted chart series keys and honest warn-mode failures](0271-chart-series-keys-and-warn-failures.md) | Merged (`uo2/chart-series`, `92b0023604`): OfficeCLI dotted series keys, warn-mode failure honesty |
+| 0270 | [Typed chart CRUD through the unified API](0270-typed-chart-crud.md) | Merged (R3 `uo2/s19-charts`, `33de040170`): typed chart CRUD for PPTX and XLSX |
+| 0269 | [Closing the largest OfficeCLI corpus gaps](0269-officecli-corpus-parity.md) | Merged (R3 `uo2/corpus-parity`, `4a5f259a18`): apply-the-rest-and-warn, cell text alias, PPTX shape formatting and transitions |
+| 0268 | [ODF W3: package split, atomic save and limits](0268-odf-w3-package-split.md) | Merged (R3 `uo2/s22-odf-w3`, `fd49666493`): ADR 0034 wave W3 owner split for ODT/ODS/ODP |
+| 0267 | [Streaming worksheet cell cursors, small XLSB nodes, fence analysis](0267-streaming-cell-cursors.md) | Merged (R3 `uo2/stream-cursor`, `48bd7bedc4`): streaming cell cursors for early-stopping queries |
+| 0266 | [CSV/TSV import and formula evaluation (plan step 18, M4)](0266-csv-import-and-formula-evaluation.md) | Merged (R3 `uo2/s18-csv-eval`, `047e8ff775`): CSV/TSV import and formula evaluation |
+| 0265 | [The OfficeCLI example-corpus harness](0265-officecli-example-corpus.md) | Merged (R3 `uo2/s17-corpus`, `f592aecf28`): OfficeCLI example-corpus harness |
+| 0264 | [PPT shape-text writes without whole-slide re-parses](0264-ppt-scale.md) | Merged (R2 `uo2/ppt-scale`, `4bcc2668b7`): incremental PPT commit verification and slide-memo reuse |
+| 0263 | [Registry schema export and golden snapshots](0263-registry-schema-export.md) | Merged (R2 `uo2/p16-schema`, `3973a88a7e`): registry schema export and goldens |
+| 0262 | [Query walker performance, eager PPTX scenes, source PPTX metadata](0262-query-walker-performance.md) | Merged (R2 `uo2/p8-perf`, `80915b091b`): query walker speedups and the 0252/0253 write misses |
+| 0261 | [XLSB W2 residue, source-backed metadata and P0 writes](0261-xlsb-w2-residue-and-p0-writes.md) | Merged (R2 `uo2/p7d-xlsb`, `ab7e4b7480`): XLSB W2 residue, source-backed metadata and P0 writes |
+| 0260 | [PPT reaches the P0 read and write surface (plan step 13)](0260-ppt-p0-surface.md) | Merged (R2 `uo2/p13-ppt`, `d6252a2411`): PPT P0 surface and W4 residue |
+| 0259 | [XLS unified P0 read and write](0259-xls-unified-p0.md) | Merged (R2 `uo2/p12-xls`, `a804529f04`): XLS P0 surface and W4 residue |
+| 0258 | [DOC P0 read+write surface through the unified API](0258-doc-p0-surface.md) | Merged (R2 `uo2/p11-doc`, `0cf3c61f43`): DOC P0 surface and W4 residue |
+| 0257 | [No code references the untracked upstream checkouts](0257-no-3rdparty-references.md) | Merged (R2 `uo2/fix-3rdparty`, `e072df4db4`): fixtures vendored into test-data, guard |
+| 0256 | [The `litchi` command line](0256-cli.md) | Merged (R1 `uo2/p15-cli`, `8288737b90`): litchi CLI |
+| 0255 | [Python M3 surface (plan 0248 step 14)](0255-python-m3-surface.md) | Merged (R1 `uo2/p14-python`, `8def70fbcf`): Python M3 surface |
+| 0254 | [Legacy OLE metadata for DOC, XLS and PPT](0254-legacy-ole-metadata.md) | Merged (R1 `uo2/p10-ole-meta`, `3f0df8f7e4`): legacy DOC/XLS/PPT metadata |
+| 0253 | [Shared OOXML metadata](0253-ooxml-metadata.md) | Merged (R1 `uo2/p6-ooxml-meta`, `e81374672d`): shared OOXML metadata |
+| 0252 | [PPTX ADR 0034 W2 residue and P0 writes](0252-pptx-w2-residue-and-p0-writes.md) | Merged (R1 `uo2/p7c-pptx`, `c3f3f11a8c`): pptx W2 residue and P0 writes |
+| 0251f | [DOCX 10,000-paragraph fanout and the single-set overhead](0251f-docx-fanout-and-single-set.md) | Merged (R1 `uo2/p7a-docx`, `14acad03b6`): docx W2 residue and P0 writes |
+| 0251e | [DOCX list definitions and `listStyle`](0251e-docx-lists.md) | Merged (R1 `uo2/p7a-docx`, `14acad03b6`): docx W2 residue and P0 writes |
+| 0251d | [DOCX inline pictures: read and add](0251d-docx-pictures.md) | Merged (R1 `uo2/p7a-docx`, `14acad03b6`): docx W2 residue and P0 writes |
+| 0251c | [DOCX comments: read, add and remove](0251c-docx-comments.md) | Merged (R1 `uo2/p7a-docx`, `14acad03b6`): docx W2 residue and P0 writes |
+| 0251b | [DOCX package-graph changes and hyperlink writes](0251b-docx-hyperlink-writes.md) | Merged (R1 `uo2/p7a-docx`, `14acad03b6`): docx W2 residue and P0 writes |
+| 0251a | [DOCX element-path writes: nested paragraphs/runs, hyperlink text, table structure](0251a-docx-element-writes.md) | Merged (R1 `uo2/p7a-docx`, `14acad03b6`): docx W2 residue and P0 writes |
+| 0251 | [DOCX metadata transaction, Builder and stream output (ADR 0034 W2 residue)](0251-docx-metadata-builder.md) | Merged (R1 `uo2/p7a-docx`, `14acad03b6`): docx W2 residue and P0 writes |
+| 0250 | [XLSX W2 owner reshape (ADR 0034 §2–§4)](0250-xlsx-w2-owner-reshape.md) | Merged (R1 `uo2/p4-xlsx-w2`, `b3e04abd1b`): xlsx Package owner and Workbook projection |
+| 0249 | [Glossary gate hardening and truthful capabilities](0249-glossary-gate-and-truthful-capabilities.md) | Merged (R1 `uo2/a23-gate`, `3c374cea6d`): glossary gate hardening and truthful capabilities |
 | 0248 | [Coordinator restart plan](0248-coordinator-restart-plan.md) | Claude resumes as sole coordinator (owner decision 2026-10-13). Survey of trunk 97ba48dcd7: 8 of 21 formats read+write, 13 still whole-format refused; trunk gates restored; prioritized steps P1–P10 |
 | 0247 | [RTF direct-set coalescing](0247-rtf-direct-set-coalescing.md) | Bounded native batch planning and sequential failure/axis semantics; 1,764 full-facade / 629 RTF-only tests, tooling and gates pass; three trials pass 90 output checks and all 1k cases meet 2×, while native paragraph-text scaling, tiny-input overhead and full goal remain open |
 | 0246 | [Native-backed RTF run insertion](0246-rtf-run-add.md) | Typed native insertion, unified placements/formatting, exact opaque/history preservation; 1,525 native / 1,746 full-facade / 611 RTF-only tests pass; three paired trials pass 108 output checks, with tiny-input overhead, scaling and full-goal gaps open |

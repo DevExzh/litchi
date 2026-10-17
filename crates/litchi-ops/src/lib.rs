@@ -79,19 +79,15 @@
 //!
 //! # Status
 //!
-//! M0a delivers the open and read surface: [`File`], the family views
-//! (`DocumentView`, `PresentationView`, `WorkbookView`), the
-//! [`ToleranceReport`], Markdown output, and `detect`. The element
-//! wrappers in [`compat`] are scheduled for deletion in M1, when the node
-//! view replaces them. The generic [`node`] projection and [`value`] coercion
-//! primitives and DOCX/XLSX/PPTX/XLSB read adapters are available. Property
-//! inputs ([`PropValue`], [`IntoProps`], [`props!`]) and strict registry
-//! admission support immutable DOCX paragraph/run edits through [`File::set`].
-//! DOCX snapshots publish through [`File::to_bytes`] and [`File::write_to`].
-//! DOCX creation, structural edits and atomic path saving are available.
-//! Batch payloads use [`BatchItem`]. Batch execution and other format write handlers
-//! remain under implementation; capability reports list the current gaps.
-
+//! Every format reads and writes through [`File`]: paths, queries and views;
+//! [`File::set`], [`File::add`], [`File::remove`], [`File::move_to`] and
+//! [`File::swap`], each returning a new [`File`]; [`File::edit`] transactions
+//! with exact inverse patches; [`batch`] payloads of [`BatchItem`]s; and
+//! publication through [`File::save`], [`File::save_as`], [`File::to_bytes`]
+//! and [`File::write_to`]. [`create`] starts a new file. Coverage differs per
+//! element and format; [`File::capabilities`] reports the supported verbs and
+//! properties and the typed gaps of each handle. The element wrappers in
+//! [`compat`] are retained for the facade's family views.
 #![forbid(unsafe_code)]
 
 pub mod batch;

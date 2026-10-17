@@ -180,21 +180,45 @@
 //!
 //! # Unified operations
 //!
-//! [`File`] provides typed reads, paths, queries and views. DOCX also supports
-//! immutable paragraph/run edits, creation, stream publication and atomic path
-//! saving. [`File::capabilities`] lists the supported verbs and contextual
-//! gaps for the current handle. Batches and the other formats' unified write
-//! handlers are still in progress; the format modules expose their leaf APIs.
+//! Every format reads and writes through [`File`]: DOC, DOCX, RTF, ODT, OTH
+//! and ODM documents; PPT, PPTX and ODP presentations; XLS, XLSX, XLSB and
+//! ODS workbooks; the ODG, ODC, ODI, ODB and ODF formula objects; and Pages,
+//! Keynote and Numbers. Reads are paths ([`File::get`]), queries
+//! ([`File::query`]) and the family views. Writes are immutable: `set`,
+//! `add`, `remove`, `move_to` and `swap` each return a new [`File`] and leave
+//! the input unchanged; [`File::edit`] stages several of them as one
+//! transaction whose patch inverts and re-applies exactly; [`batch`] runs a
+//! list of [`BatchItem`]s. A snapshot publishes through `save`, `save_as`,
+//! `to_bytes` and `write_to`, and [`create`] starts a new file.
+//!
+//! ```
+//! # #[cfg(feature = "docx")]
+//! # {
+//! use litchi::{FileFormat, NewNode, props};
+//!
+//! let file = litchi::create(FileFormat::Docx)?;
+//! let added = file.add("/body", NewNode::new("paragraph").prop("text", "Hello"))?;
+//! let file = added.file.set(&added.path, props! { "text" => "Hello, world" })?;
+//! assert_eq!(file.text()?.trim(), "Hello, world");
+//! # }
+//! # Ok::<(), litchi::Error>(())
+//! ```
+//!
+//! Not every element supports every verb in every format. [`File::capabilities`]
+//! lists the verbs and properties the current handle supports and the typed
+//! gaps it refuses; an unsupported request fails with
+//! [`Code::UnsupportedCapability`], never with a silent partial write.
 //!
 //! # Low-level modules
 //!
 //! Each format crate is re-exported under its own module for format-specific
 //! reading and writing: `doc`, `ppt` and `xls` for the legacy binary formats,
 //! `docx`, `pptx`, `xlsx` and `xlsb` for the OOXML owners, `odt`, `ods` and
-//! `odp` for OpenDocument, and `rtf`. [`common`] holds the shared vocabulary
+//! `odp` for OpenDocument, `pages`, `keynote` and `numbers` for Apple iWork,
+//! and `rtf`. [`common`] holds the shared vocabulary
 //! ([`common::ShapeType`], [`common::RGBColor`], [`common::Length`], ...).
-//! Most users need only [`open`], and reach for these modules when they
-//! write a document or need a format-specific feature.
+//! Most users need only [`open`] and [`create`], and reach for these modules
+//! when they need a format-specific feature the unified API does not cover.
 
 #![forbid(unsafe_code)]
 
