@@ -3575,10 +3575,11 @@ fn changed(steps: &[Step]) -> Result<bool> {
         #[cfg(feature = "pptx")]
         (Leaf::Pptx(first), Leaf::Pptx(last)) => Ok(!first.source.same_content(&last.target)?),
         #[cfg(feature = "docx")]
-        (Leaf::Docx(first), Leaf::Docx(last)) => {
+        (Leaf::Docx(first_patch), Leaf::Docx(last_patch)) => {
             // A template merge can change only a header or other story
             // part: a package-graph change is a change (record 0274).
-            Ok(first.source().xml_bytes() != last.target().xml_bytes()
+            Ok(
+                first_patch.source().xml_bytes() != last_patch.target().xml_bytes()
                 || steps.iter().any(|step| match &step.leaf {
                     Leaf::Docx(patch) => patch.operations().iter().any(|operation| {
                         matches!(
@@ -3588,12 +3589,28 @@ fn changed(steps: &[Step]) -> Result<bool> {
                     }),
                     #[allow(unreachable_patterns)]
                     _ => false,
-                }))
+                })
+                // A metadata step changes only the core-properties part
+                // (record 0338).
+                || docx_metadata_changed(&first.before, &last.after)?,
+            )
         },
         #[cfg(feature = "xlsx")]
         (Leaf::Xlsx(first), Leaf::Xlsx(last)) => Ok(!first.source.same_content(&last.target)?),
         #[allow(unreachable_patterns)]
         _ => Err(Error::PatchConflict.into()),
+    }
+}
+
+/// Whether two DOCX endpoints carry different core properties (record 0338).
+#[cfg(feature = "docx")]
+fn docx_metadata_changed(before: &File, after: &File) -> Result<bool> {
+    match (before, after) {
+        (File::Docx(before), File::Docx(after)) => {
+            Ok(!before.same_snapshot(after) && before.metadata()? != after.metadata()?)
+        },
+        #[allow(unreachable_patterns)]
+        _ => Ok(false),
     }
 }
 

@@ -60,6 +60,7 @@ use crate::options::{OpenOptions, SourceMode};
 pub mod __unified;
 #[cfg(feature = "eval")]
 pub(crate) mod calc;
+mod cell_add;
 mod chart;
 mod children;
 pub(crate) mod create;
@@ -72,6 +73,7 @@ mod metadata;
 mod nav;
 mod node;
 mod publish;
+mod runs;
 mod selection;
 mod sheet;
 mod sheet_write;
@@ -86,9 +88,10 @@ pub(crate) use features::FEATURE_ELEMENTS;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
+pub(crate) use runs::RUN_WRITE_TABLE;
 pub(crate) use spec::{
     CELL_CAPABILITY_PROPS, COLUMN_CAPABILITY_PROPS, RANGE_CAPABILITY_PROPS, ROW_CAPABILITY_PROPS,
-    SHEET_CAPABILITY_PROPS, SPEC,
+    SHEET_CAPABILITY_PROPS, SPEC, WORKBOOK_CAPABILITY_PROPS,
 };
 pub(crate) use spec::{CELL_WRITE_TABLE, COLUMN_WRITE_TABLE, ROW_WRITE_TABLE};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};

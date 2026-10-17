@@ -251,11 +251,76 @@ impl<'p, 'q: 'p> From<&'p Path<'q>> for PathArg<'p> {
     }
 }
 
-/// The canonical spelling of the path.
+/// The canonical spelling of the path: a fixed point of [`PathArg::parse`]
+/// (record 0338 F2).
+///
+/// It is the core grammar's spelling, except for a relative path whose first
+/// step name the core grammar writes bare but [`PathArg::parse`] would read
+/// as Excel sheet notation (`bod! my`, read back as `/bod/ my`): that name is
+/// written quoted (`"bod! my"`), which both grammars read as the same step.
+///
+/// ```
+/// use litchi_ops::path::PathArg;
+///
+/// let arg = PathArg::parse("'bod! my'")?;
+/// assert_eq!(arg.to_string(), "\"bod! my\"");
+/// let again = arg.to_string();
+/// assert_eq!(PathArg::parse(&again)?.path(), arg.path());
+/// # Ok::<(), litchi_ops::Error>(())
+/// ```
 impl fmt::Display for PathArg<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.path().fmt(formatter)
+        let path = self.path();
+        match path.steps().first() {
+            Some(first) if !path.is_absolute() && reads_as_sheet(first) => {
+                write_quoted(formatter, first.name())?;
+                for predicate in first.predicates() {
+                    fmt::Display::fmt(predicate, formatter)?;
+                }
+                for step in &path.steps()[1..] {
+                    formatter.write_str("/")?;
+                    fmt::Display::fmt(step, formatter)?;
+                }
+                Ok(())
+            },
+            _ => path.fmt(formatter),
+        }
     }
+}
+
+/// Whether the core grammar's spelling of a relative path starting with
+/// `first` is read by [`split_sheet`] as sheet notation. The core grammar
+/// writes a name bare only when it has no leading quote and no `/`, `[` or
+/// `]`, so the first `!` of the spelling, if `split_sheet` finds one before
+/// any `/`, `[`, `]` or `"`, is in that name; the byte after it is the
+/// name's next byte, or the `[`, `/` or end that follows the name.
+fn reads_as_sheet(first: &Step<'_>) -> bool {
+    let name = first.name();
+    let Some(bang) = name.find('!') else {
+        return false;
+    };
+    let bytes = name.as_bytes();
+    let bare = bytes
+        .first()
+        .is_some_and(|&byte| byte != b'"' && byte != b'\'')
+        && !bytes
+            .iter()
+            .any(|&byte| matches!(byte, b'/' | b'[' | b']') || byte.is_ascii_control());
+    bare && bang > 0 && !bytes[..bang].contains(&b'"') && bytes.get(bang + 1) != Some(&b'=')
+}
+
+/// Writes `text` double-quoted with `"` and `\` escaped, as the core grammar
+/// writes a name that needs quotes.
+fn write_quoted(formatter: &mut fmt::Formatter<'_>, text: &str) -> fmt::Result {
+    use fmt::Write as _;
+    formatter.write_char('"')?;
+    for c in text.chars() {
+        if c == '"' || c == '\\' {
+            formatter.write_char('\\')?;
+        }
+        formatter.write_char(c)?;
+    }
+    formatter.write_char('"')
 }
 
 /// Splits Excel notation into the sheet name and the byte offset just past
@@ -537,5 +602,84 @@ mod spelling_tests {
             }
         }
         assert!(checked > 30);
+    }
+}
+
+/// The canonical spelling is a fixed point of [`PathArg::parse`] (record
+/// 0338 F2): reparsing it gives the same path, and spelling that again gives
+/// the same text.
+#[cfg(test)]
+mod display_tests {
+    use litchi_core::selector::{Path, Step};
+    use proptest::prelude::*;
+
+    use super::PathArg;
+
+    fn assert_fixed_point(arg: &PathArg<'_>, origin: &str) {
+        let canonical = arg.to_string();
+        let again = PathArg::parse(&canonical)
+            .unwrap_or_else(|error| panic!("{origin:?} -> {canonical:?}: {error}"));
+        assert_eq!(again.path(), arg.path(), "{origin:?} -> {canonical:?}");
+        assert_eq!(again.to_string(), canonical, "{origin:?}");
+    }
+
+    #[test]
+    fn a_relative_name_with_a_bang_is_quoted() {
+        for (text, canonical) in [
+            ("'bod! my'", "\"bod! my\""),
+            ("\"a!b\"[2]/c", "\"a!b\"[2]/c"),
+            ("'x!'/y", "\"x!\"/y"),
+            // Not sheet notation as spelled: unchanged.
+            ("\"a!=b\"", "a!=b"),
+            ("\"!a\"", "!a"),
+            ("a/b!c", "a/b!c"),
+            ("shape[@name=Hello!]", "shape[@name=Hello!]"),
+        ] {
+            let arg = PathArg::parse(text).unwrap_or_else(|error| panic!("{text}: {error}"));
+            assert_eq!(arg.to_string(), canonical, "{text}");
+            assert_fixed_point(&arg, text);
+        }
+        // Absolute paths and sheet notation keep the core spelling.
+        let arg = PathArg::parse("'Q1!Results'!A1").expect("sheet notation");
+        assert_eq!(arg.to_string(), "/Q1!Results/A1");
+        assert_fixed_point(&arg, "'Q1!Results'!A1");
+        // A typed relative path whose bare spelling ends at `!`.
+        let typed = Path::relative([Step::new("abc!")]);
+        assert!(!typed.is_absolute());
+        let arg = PathArg::from(&typed);
+        assert_eq!(arg.to_string(), "\"abc!\"");
+        assert_fixed_point(&arg, "abc!");
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(4096))]
+
+        /// Text over the bytes that matter to sheet notation and quoting.
+        #[test]
+        fn parsed_text_spells_a_fixed_point(text in "[a1 !'\"/=\\[\\]:@\\\\]{1,12}") {
+            if let Ok(arg) = PathArg::parse(&text) {
+                assert_fixed_point(&arg, &text);
+            }
+        }
+
+        /// Typed relative and absolute paths from arbitrary step names.
+        #[test]
+        fn typed_paths_spell_a_fixed_point(
+            names in proptest::collection::vec("[a1 !'\"=:\\[\\]/]{1,6}", 1..4),
+            absolute in any::<bool>(),
+        ) {
+            let steps = names.iter().map(|name| Step::new(name.as_str()));
+            let path = if absolute {
+                Path::from_steps(steps)
+            } else {
+                Path::relative(steps)
+            };
+            let arg = PathArg::from(&path);
+            let canonical = arg.to_string();
+            if let Ok(again) = PathArg::parse(&canonical) {
+                prop_assert_eq!(again.path(), &path, "{:?}", canonical);
+                prop_assert_eq!(again.to_string(), canonical);
+            }
+        }
     }
 }

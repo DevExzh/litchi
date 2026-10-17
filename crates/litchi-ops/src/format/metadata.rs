@@ -1,8 +1,10 @@
 //! The `/metadata` set path of the OOXML formats (XLSX, PPTX, XLSB), record
-//! 0253.
+//! 0253, and DOCX's core properties (record 0338).
 //!
 //! `set("/metadata", props)` stages document properties through each
-//! format's leaf `metadata` transaction. The keys are the 22 OfficeCLI
+//! format's leaf `metadata` transaction. OfficeCLI's spelling, a set on the
+//! root `/` (`set / title=...`), routes to the same writer for DOCX, XLSX
+//! and PPTX (record 0338); [`is_root`] and [`names_metadata`] decide it. The keys are the 22 OfficeCLI
 //! root-metadata spellings the legacy OLE formats accept on the same path
 //! (record 0254; matched ASCII case-insensitively), plus `custom.<name>` for
 //! custom properties. `null` removes a property. A key no OOXML part stores
@@ -10,6 +12,14 @@
 //! field. Unlike OfficeCLI, a set never stamps `modified` (ADR 0006,
 //! determinism). The path is set-only; reads go through `File::metadata()`
 //! and the root node's properties.
+
+#![cfg_attr(
+    not(any(feature = "pptx", feature = "xlsx", feature = "xlsb")),
+    allow(
+        dead_code,
+        reason = "a DOCX-only build uses the core-properties admission only"
+    )
+)]
 
 use litchi_core::FileFormat;
 use litchi_core::metadata::{Metadata, Timestamp};
@@ -113,6 +123,16 @@ const fn ascii_lower_cmp(left: &str, right: &str) -> std::cmp::Ordering {
     }
 }
 
+impl Field {
+    /// Whether the core-properties part stores the field.
+    const fn is_core(self) -> bool {
+        !matches!(
+            self,
+            Self::Application | Self::Company | Self::ContentType | Self::Manager | Self::Template
+        )
+    }
+}
+
 fn lookup(name: &str) -> Option<Field> {
     KEYS.binary_search_by(|(key, _)| ascii_lower_cmp(key, name))
         .ok()
@@ -128,6 +148,63 @@ pub(crate) fn is_target(target: &TargetArg<'_>) -> bool {
             && matches!(path.steps(), [step]
                 if step.predicates().is_empty() && step.name().eq_ignore_ascii_case(SEGMENT))
     })
+}
+
+/// Whether `target` is the document root `/`: OfficeCLI's spelling of a
+/// metadata set (record 0338).
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx"))]
+pub(crate) fn is_root(target: &TargetArg<'_>) -> bool {
+    target.path().is_some_and(|path| {
+        let path = path.path();
+        path.is_absolute() && path.steps().is_empty()
+    })
+}
+
+/// Whether any of `props` is a metadata key or `custom.<name>`.
+#[cfg(feature = "pptx")]
+pub(crate) fn names_metadata(props: &Props<'_>) -> bool {
+    props.iter().any(|(key, _)| {
+        let name = key.as_str();
+        lookup(name).is_some() || strip_custom(name).is_some()
+    })
+}
+
+/// Whether `name` is one of the metadata keys, ASCII case-insensitively
+/// (usable in `const` tables).
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx"))]
+const fn is_key(name: &str) -> bool {
+    let mut index = 0;
+    while index < KEYS.len() {
+        if ascii_lower_cmp(KEYS[index].0, name).is_eq() {
+            return true;
+        }
+        index += 1;
+    }
+    false
+}
+
+/// `props` with every metadata key settable: the root element's capability
+/// table, whose set route is the metadata writer (record 0338). The keys
+/// stay in their read order; only `access.set` changes.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx"))]
+pub(crate) const fn root_capability<const N: usize>(
+    props: &[crate::node::spec::PropSpec],
+) -> [crate::node::spec::PropSpec; N] {
+    assert!(
+        props.len() == N,
+        "the root capability table keeps every key"
+    );
+    let mut out = [crate::node::spec::PropSpec::new("", crate::value::ValueType::Text); N];
+    let mut index = 0;
+    while index < N {
+        let mut prop = props[index];
+        if is_key(prop.name) {
+            prop.access.set = true;
+        }
+        out[index] = prop;
+        index += 1;
+    }
+    out
 }
 
 /// One admitted value.
@@ -225,6 +302,27 @@ impl Assignments {
 /// `unsupported_property` for an unknown key (with a suggestion), and
 /// `invalid_value` for a value of the wrong kind.
 pub(crate) fn admit(props: &Props<'_>, format: FileFormat) -> Result<Assignments> {
+    admit_with(props, format, Scope::Package)
+}
+
+/// The fields a format's metadata writer stores.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Scope {
+    /// Core, application and custom properties (PPTX, XLSX, XLSB).
+    Package,
+    /// The core properties only: DOCX's leaf metadata transaction wraps the
+    /// core-properties part (records 0251, 0253 F3).
+    #[cfg_attr(not(feature = "docx"), allow(dead_code, reason = "DOCX only"))]
+    Core,
+}
+
+/// [`admit`] for the fields `scope` stores: a key of another part is
+/// refused with `unsupported_property` naming it.
+pub(crate) fn admit_with(
+    props: &Props<'_>,
+    format: FileFormat,
+    scope: Scope,
+) -> Result<Assignments> {
     if props.is_empty() {
         return Err(Error::new(
             Code::InvalidArgument,
@@ -236,6 +334,9 @@ pub(crate) fn admit(props: &Props<'_>, format: FileFormat) -> Result<Assignments
     for (key, value) in props.iter() {
         let name = key.as_str();
         if let Some(custom) = strip_custom(name) {
+            if scope == Scope::Core {
+                return Err(outside_core(name, format));
+            }
             if assignments
                 .custom
                 .iter()
@@ -257,6 +358,9 @@ pub(crate) fn admit(props: &Props<'_>, format: FileFormat) -> Result<Assignments
             .with_format(format)
             .with_suggestion("use a root-metadata key such as `title`, or `custom.<name>`"));
         };
+        if scope == Scope::Core && !field.is_core() {
+            return Err(outside_core(name, format));
+        }
         if assignments.fields.iter().any(|(seen, _)| *seen == field) {
             return Err(repeated(name, format));
         }
@@ -304,6 +408,16 @@ fn custom_value(
         PropValue::Text(text) => custom::Value::Text(text.to_string()),
         _ => return Err(wrong_kind(key, format)),
     }))
+}
+
+fn outside_core(key: &str, format: FileFormat) -> Error {
+    Error::new(
+        Code::UnsupportedProperty,
+        "only core document properties are written for this format",
+    )
+    .with_property(key.to_owned())
+    .with_format(format)
+    .with_suggestion("core keys: title, author, subject, keywords, description, category, lastModifiedBy, revisionNumber, created, modified, contentStatus, language, version, lastPrinted")
 }
 
 fn repeated(key: &str, format: FileFormat) -> Error {

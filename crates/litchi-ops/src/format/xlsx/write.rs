@@ -107,12 +107,31 @@ impl std::fmt::Debug for Commit {
 enum CellOperation {
     Set(xlsx::cell::Content),
     Clear,
+    /// Rich-text runs, written as the cell's inline rich string (record
+    /// 0338).
+    Rich(xlsx::RichText),
+    /// `type` without a value: each target's stored value is converted
+    /// (record 0338).
+    Retype(CellType),
+}
+
+/// A cell `type` (record 0338).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CellType {
+    String,
+    Number,
+    Boolean,
+    Date,
+    Error,
+    RichText,
 }
 
 /// Validated authored assignments; absent and explicit clear stay distinct.
 #[derive(Debug, Default)]
 struct CellAssignments {
     payload: Option<CellOperation>,
+    cell_type: Option<CellType>,
+    runs: Option<xlsx::RichText>,
     bold: Option<Option<bool>>,
     italic: Option<Option<bool>>,
     strike: Option<Option<bool>>,
@@ -229,6 +248,10 @@ impl Xlsx {
     ) -> Result<Commit> {
         let props = Props::from_props(props)?;
         if let Some(commit) = self.try_set_metadata(&target, &props)? {
+            return Ok(commit);
+        }
+        // Rich-text runs (record 0338).
+        if let Some(commit) = self.try_set_run(&target, &props)? {
             return Ok(commit);
         }
         if let Some(commit) = self.try_set_chart(&target, &props)? {
@@ -655,6 +678,7 @@ fn operation_payload_bytes(operation: &CellOperation) -> usize {
             _ => 0,
         },
         CellOperation::Set(xlsx::cell::Content::Formula(formula)) => formula.text().len(),
+        CellOperation::Rich(rich) => rich.runs().iter().map(|run| run.text().len()).sum(),
         _ => 0,
     }
 }
@@ -1461,6 +1485,46 @@ fn admit_properties_inner(props: &Props<'_>, limits: &SemanticLimits) -> Result<
                         *direction = Some(admit_border_bool(value, entry.spec.name)?);
                         return Ok(());
                     },
+                    CellSetter::Type => {
+                        if operation.cell_type.is_some() {
+                            return Err(duplicate_property(entry.spec.name));
+                        }
+                        operation.cell_type = Some(match value {
+                            Some(Scalar::Token("string")) => CellType::String,
+                            Some(Scalar::Token("number")) => CellType::Number,
+                            Some(Scalar::Token("boolean")) => CellType::Boolean,
+                            Some(Scalar::Token("date")) => CellType::Date,
+                            Some(Scalar::Token("error")) => CellType::Error,
+                            Some(Scalar::Token("richtext")) => CellType::RichText,
+                            _ => {
+                                return Err(invalid_property(
+                                    entry.spec.name,
+                                    "the cell type is string, number, boolean, date, error or richtext",
+                                ));
+                            },
+                        });
+                        return Ok(());
+                    },
+                    CellSetter::Runs => {
+                        if operation.runs.is_some() {
+                            return Err(duplicate_property(entry.spec.name));
+                        }
+                        let Some(Scalar::Text(text)) = value else {
+                            return Err(invalid_property(
+                                entry.spec.name,
+                                "runs is a JSON array of run objects",
+                            ));
+                        };
+                        check_format_text_staging(text.len(), limits)?;
+                        operation.runs = Some(super::runs::parse_runs(text, entry.spec.name)?);
+                        return Ok(());
+                    },
+                    CellSetter::Ref => {
+                        return Err(invalid_property(
+                            entry.spec.name,
+                            "ref names the cell an add creates",
+                        ));
+                    },
                     _ => {},
                 }
                 if let Some(previous) = payload_setter {
@@ -1492,8 +1556,126 @@ fn admit_properties_inner(props: &Props<'_>, limits: &SemanticLimits) -> Result<
     }
 
     validate_border_assignments(&operation)?;
+    resolve_cell_type(&mut operation)?;
 
     Ok(operation)
+}
+
+/// Combine `type` and `runs` with the payload (record 0338), as OfficeCLI's
+/// `Set`/`AddCell` do: `runs` (with or without `type=richtext`) writes the
+/// runs; `type=richtext` with a text value writes one unformatted run; any
+/// other type converts the value, or each target's stored value when no
+/// value is given.
+fn resolve_cell_type(operation: &mut CellAssignments) -> Result<()> {
+    let conflict = |message: &'static str| {
+        Error::new(Code::InvalidArgument, message)
+            .with_property("type")
+            .with_format(FileFormat::Xlsx)
+    };
+    if let Some(runs) = operation.runs.take() {
+        if !matches!(operation.cell_type, None | Some(CellType::RichText)) {
+            return Err(conflict("runs is valid only with type=richtext"));
+        }
+        if operation.payload.is_some() {
+            return Err(conflict("runs replaces the cell value: give one of them"));
+        }
+        operation.payload = Some(CellOperation::Rich(runs));
+        return Ok(());
+    }
+    let Some(cell_type) = operation.cell_type else {
+        return Ok(());
+    };
+    operation.payload = Some(match operation.payload.take() {
+        None if cell_type == CellType::RichText => {
+            return Err(Error::new(
+                Code::MissingProperty,
+                "type=richtext needs runs, or a text value",
+            )
+            .with_property("runs")
+            .with_format(FileFormat::Xlsx));
+        },
+        None => CellOperation::Retype(cell_type),
+        Some(CellOperation::Set(xlsx::cell::Content::Value(value))) => {
+            if cell_type == CellType::RichText {
+                let text = value_text(&value)
+                    .ok_or_else(|| invalid_property("type", "an error value has no runs"))?;
+                CellOperation::Rich(xlsx::RichText::plain(text))
+            } else {
+                CellOperation::Set(xlsx::cell::Content::Value(typed_value(value, cell_type)?))
+            }
+        },
+        Some(CellOperation::Set(xlsx::cell::Content::Formula(_))) => {
+            return Err(conflict("type applies to a value, not a formula"));
+        },
+        Some(_) => return Err(conflict("type applies to a value, not clear")),
+    });
+    Ok(())
+}
+
+/// The text of a value, for a string or rich-text retype.
+fn value_text(value: &xlsx::cell::Value) -> Option<String> {
+    Some(match value {
+        xlsx::cell::Value::Text(text) => text.as_str().to_owned(),
+        xlsx::cell::Value::Number(number) => number.as_str().to_owned(),
+        xlsx::cell::Value::Bool(value) => if *value { "TRUE" } else { "FALSE" }.to_owned(),
+        xlsx::cell::Value::Date(date) => date.as_str().to_owned(),
+        _ => return None,
+    })
+}
+
+/// `value` stored as `cell_type` (OfficeCLI's cell type switch): a refusal
+/// when the value has no such form.
+fn typed_value(value: xlsx::cell::Value, cell_type: CellType) -> Result<xlsx::cell::Value> {
+    use xlsx::cell::{ErrorValue, Value};
+    let refused = |message: &'static str| invalid_property("type", message);
+    Ok(match (cell_type, value) {
+        (CellType::String | CellType::RichText, value) => Value::text(
+            value_text(&value).ok_or_else(|| refused("an error value has no text form"))?,
+        ),
+        (CellType::Number, Value::Number(number)) => Value::Number(number),
+        (CellType::Number, Value::Text(text)) => {
+            let number = xlsx::cell::Number::new(text.as_str().trim())
+                .map_err(|_| refused("the value is not a number"))?;
+            Value::Number(number)
+        },
+        (CellType::Number, _) => return Err(refused("the value is not a number")),
+        (CellType::Boolean, Value::Bool(value)) => Value::Bool(value),
+        (CellType::Boolean, Value::Text(text)) => {
+            match text.as_str().trim().to_ascii_lowercase().as_str() {
+                "true" | "yes" | "1" => Value::Bool(true),
+                "false" | "no" | "0" => Value::Bool(false),
+                _ => return Err(refused("a boolean is true/false, yes/no or 1/0")),
+            }
+        },
+        (CellType::Boolean, Value::Number(number)) => match number.as_str() {
+            "1" => Value::Bool(true),
+            "0" => Value::Bool(false),
+            _ => return Err(refused("a boolean is true/false, yes/no or 1/0")),
+        },
+        (CellType::Boolean, _) => return Err(refused("a boolean is true/false, yes/no or 1/0")),
+        (CellType::Date, Value::Date(date)) => Value::Date(date),
+        (CellType::Date, Value::Number(number)) => Value::Number(number),
+        (CellType::Date, Value::Text(text)) => Value::date(text.as_str().trim())
+            .map_err(|_| refused("a date is an ISO 8601 date or date-time"))?,
+        (CellType::Date, _) => return Err(refused("a date is an ISO 8601 date or date-time")),
+        (CellType::Error, Value::Error(error)) => Value::Error(error),
+        (CellType::Error, Value::Text(text)) => Value::Error(match text.as_str().trim() {
+            "#NULL!" => ErrorValue::Null,
+            "#DIV/0!" => ErrorValue::DivZero,
+            "#VALUE!" => ErrorValue::Value,
+            "#REF!" => ErrorValue::Ref,
+            "#NAME?" => ErrorValue::Name,
+            "#NUM!" => ErrorValue::Num,
+            "#N/A" => ErrorValue::NotAvailable,
+            "#GETTING_DATA" => ErrorValue::GettingData,
+            _ => {
+                return Err(refused(
+                    "an error value is #NULL!, #DIV/0!, #VALUE!, #REF!, #NAME?, #NUM!, #N/A or #GETTING_DATA",
+                ));
+            },
+        }),
+        (CellType::Error, _) => return Err(refused("the value is not an error value")),
+    })
 }
 
 fn authored_operation(
@@ -1557,6 +1739,10 @@ fn authored_operation(
             key,
             "font properties are not cell payloads",
         )),
+        CellSetter::Type | CellSetter::Runs | CellSetter::Ref => Err(invalid_property(
+            key,
+            "type, runs and ref are combined with the payload",
+        )),
     }
 }
 
@@ -1615,7 +1801,7 @@ fn authored_clear(value: Option<Scalar<'_>>, key: &str) -> Result<CellOperation>
     }
 }
 
-fn validate_text(value: &str, key: &str) -> Result<()> {
+pub(super) fn validate_text(value: &str, key: &str) -> Result<()> {
     if value.chars().count() > 32_767 {
         return Err(invalid_property(key, "the cell text is too long"));
     }
@@ -1629,7 +1815,7 @@ fn validate_font_name(value: &str, key: &str) -> Result<()> {
     validate_xml_text(value, key)
 }
 
-fn native_font_color(
+pub(super) fn native_font_color(
     value: crate::value::Color,
     key: &str,
 ) -> Result<xlsx::style::stylesheet::font::FontColor> {
@@ -2531,6 +2717,14 @@ fn apply_operation(
                 Some(CellOperation::Clear) => {
                     worksheet.clear(target.address).map_err(native_error)?;
                 },
+                Some(CellOperation::Rich(rich)) => {
+                    worksheet
+                        .set_rich_text(target.address, rich.clone())
+                        .map_err(native_error)?;
+                },
+                Some(CellOperation::Retype(cell_type)) => {
+                    retype(&mut worksheet, target.address, *cell_type)?;
+                },
                 None => {},
             };
             if !font.is_empty() {
@@ -2574,17 +2768,54 @@ fn apply_operation(
     Ok(())
 }
 
-fn invalid_property(key: &str, message: &'static str) -> Error {
+/// Convert the value stored at `address` to `cell_type` (record 0338): an
+/// empty coordinate is left alone, and a formula cell is refused.
+fn retype(
+    worksheet: &mut xlsx::WorksheetEdit<'_>,
+    address: Address,
+    cell_type: CellType,
+) -> Result<()> {
+    let state = worksheet.state(address).map_err(native_error)?;
+    let xlsx::State::Cell { content, .. } = state else {
+        return Ok(());
+    };
+    match content {
+        xlsx::Cell::Value(value) => {
+            let content = if cell_type == CellType::RichText {
+                let text = value_text(&value)
+                    .ok_or_else(|| invalid_property("type", "an error value has no runs"))?;
+                worksheet
+                    .set_rich_text(address, xlsx::RichText::plain(text))
+                    .map_err(native_error)?;
+                return Ok(());
+            } else {
+                typed_value(value, cell_type)?
+            };
+            worksheet
+                .set(address, xlsx::cell::Content::Value(content))
+                .map_err(native_error)?;
+            Ok(())
+        },
+        _ => Err(Error::new(
+            Code::InvalidArgument,
+            "type converts a stored value, not a formula",
+        )
+        .with_property("type")
+        .with_format(FileFormat::Xlsx)),
+    }
+}
+
+pub(super) fn invalid_property(key: &str, message: &'static str) -> Error {
     Error::new(Code::InvalidValue, message)
         .with_format(FileFormat::Xlsx)
         .with_property(key.to_owned())
 }
 
-fn native_error(error: xlsx::Error) -> Error {
+pub(super) fn native_error(error: xlsx::Error) -> Error {
     Error::from(error).with_format(FileFormat::Xlsx)
 }
 
-fn native_property_error(error: xlsx::Error, key: &str) -> Error {
+pub(super) fn native_property_error(error: xlsx::Error, key: &str) -> Error {
     native_error(error)
         .caused_by_argument(Code::InvalidValue)
         .with_property(key.to_owned())
@@ -2830,6 +3061,10 @@ pub(crate) mod coalesce {
                 let Some(operation) = assignments.payload else {
                     return Ok(None);
                 };
+                // Runs and retypes have their own staging (record 0338).
+                if matches!(operation, CellOperation::Rich(_) | CellOperation::Retype(_)) {
+                    return Ok(None);
+                }
                 // Mutation already requires native promotion. Resolve
                 // against that owner so a retained source does not stream
                 // the worksheet again for each command in this run.
@@ -2960,6 +3195,9 @@ pub(crate) mod coalesce {
                 CellOperation::Clear => {
                     worksheet.clear(plan.target.address).map_err(native_error)?
                 },
+                CellOperation::Rich(_) | CellOperation::Retype(_) => {
+                    return Err(not_coalesced());
+                },
             };
             let after = worksheet.state(plan.target.address).map_err(native_error)?;
             Ok(before != after)
@@ -3028,8 +3266,14 @@ pub(crate) mod coalesce {
                 .set(plan.target.address, content.clone())
                 .map_err(native_error)?,
             CellOperation::Clear => worksheet.clear(plan.target.address).map_err(native_error)?,
+            CellOperation::Rich(_) | CellOperation::Retype(_) => return Err(not_coalesced()),
         };
         Ok(())
+    }
+
+    fn not_coalesced() -> Error {
+        Error::new(Code::InternalError, "runs and retypes are not coalesced")
+            .with_format(FileFormat::Xlsx)
     }
 
     fn locate_failure(base: &Xlsx, source: &xlsx::Package, items: &[Item], error: Error) -> Error {

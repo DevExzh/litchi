@@ -483,6 +483,9 @@ pub struct Spec {
     binding: Binding,
     appearance: Appearance,
     series_kinds: Vec<Kind>,
+    /// Per-series worksheet references (record 0338): `(series index,
+    /// values reference, categories reference)`.
+    series_references: Vec<(usize, String, Option<String>)>,
 }
 
 const CHART_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
@@ -564,6 +567,7 @@ impl Spec {
             binding: Binding::Literal,
             appearance: Appearance::default(),
             series_kinds: Vec::new(),
+            series_references: Vec::new(),
         }
     }
 
@@ -739,6 +743,38 @@ impl Spec {
         self
     }
 
+    /// Bind the values of series `index` to the worksheet range `values`
+    /// (`Sheet1!$B$2:$B$13`), and its categories to `categories` when
+    /// given; the series keeps its cached values (record 0338). Each
+    /// reference overrides the [`Binding`]'s for that series, so a chart can
+    /// refer to ranges anywhere in a workbook, another sheet included. A
+    /// scatter or bubble chart ignores them.
+    ///
+    /// ```
+    /// use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
+    ///
+    /// let spec = Spec::new(Variant::new(Kind::Line))
+    ///     .with_categories(["Jan", "Feb"])
+    ///     .with_series(Series::new("East", vec![120.0, 135.0]))
+    ///     .with_series_reference(0, "Sheet1!$B$2:$B$3", Some("Sheet1!$A$2:$A$3".into()));
+    /// let xml = String::from_utf8(spec.to_xml(None)?)?;
+    /// assert!(xml.contains("<c:f>Sheet1!$B$2:$B$3</c:f>"));
+    /// assert!(xml.contains("<c:f>Sheet1!$A$2:$A$3</c:f>"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[must_use]
+    pub fn with_series_reference(
+        mut self,
+        index: usize,
+        values: impl Into<String>,
+        categories: Option<String>,
+    ) -> Self {
+        self.series_references.retain(|(held, _, _)| *held != index);
+        self.series_references
+            .push((index, values.into(), categories));
+        self
+    }
+
     /// Check the spec against the variant's data shape and the bounds.
     ///
     /// # Errors
@@ -756,6 +792,18 @@ impl Spec {
         }
         if self.series.is_empty() {
             return Err(Error::Invalid("a chart needs at least one series".into()));
+        }
+        for (index, values, categories) in &self.series_references {
+            if *index >= self.series.len() {
+                return Err(Error::Invalid("a series reference names no series".into()));
+            }
+            for reference in std::iter::once(values).chain(categories) {
+                if reference.is_empty() || reference.len() > MAX_TEXT_BYTES {
+                    return Err(Error::Invalid(
+                        "a series reference needs 1 to MAX_TEXT_BYTES bytes".into(),
+                    ));
+                }
+            }
         }
         if self.series.len() > MAX_SERIES {
             return Err(Error::Limit {
@@ -1282,10 +1330,24 @@ impl Spec {
                         built.bubble_sizes = Some(self.numbers(first + 2, series.values.clone()));
                     }
                 } else {
+                    let reference = self
+                        .series_references
+                        .iter()
+                        .find(|(held, _, _)| *held == index);
                     if !self.categories.is_empty() {
-                        built.categories = Some(self.labels(self.categories.clone()));
+                        let mut labels = self.labels(self.categories.clone());
+                        if let Some((_, _, Some(categories))) = reference {
+                            labels.source_ref =
+                                Some(crate::chart::data::DataSourceRef::new(categories.clone()));
+                        }
+                        built.categories = Some(labels);
                     }
-                    built.values = Some(self.numbers(index + 1, series.values.clone()));
+                    let mut values = self.numbers(index + 1, series.values.clone());
+                    if let Some((_, reference, _)) = reference {
+                        values.source_ref =
+                            Some(crate::chart::data::DataSourceRef::new(reference.clone()));
+                    }
+                    built.values = Some(values);
                 }
                 built
             })

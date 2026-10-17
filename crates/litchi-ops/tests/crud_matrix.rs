@@ -428,6 +428,15 @@ const MP4: &str = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t";
 const MP3: &str = "data:audio/mpeg;base64,SUQzAwAAAAAAAA==";
 
 const RECIPES: &[Recipe] = &[
+    // Record 0338: an added XLSX cell names its address and a value.
+    Recipe {
+        format: "xlsx",
+        element: "cell",
+        fixture: "create()",
+        parent: "/sheet[1]",
+        props: &[("ref", "H8"), ("value", "added")],
+        start: false,
+    },
     // Record 0324: a DOC hyperlink names exactly one of `url` and `anchor`.
     Recipe {
         format: "doc",

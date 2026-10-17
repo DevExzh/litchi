@@ -167,6 +167,7 @@ pub(crate) fn prop_aliases(adapter: Adapter, canonical: &str) -> &'static [PropA
     if adapter == Adapter::Xlsx {
         return match canonical {
             "cell" | "range" => XLSX_CELL_ALIASES,
+            "run" => XLSX_RUN_ALIASES,
             "row" => XLSX_ROW_ALIASES,
             "col" => XLSX_COLUMN_ALIASES,
             _ => &[],
@@ -218,6 +219,8 @@ const ODS_CELL_ALIASES: &[PropAlias] = &crate::format::ods::CELL_WRITE_TABLE.pro
 const XLSX_CELL_ALIASES: &[PropAlias] = &crate::format::xlsx::CELL_WRITE_TABLE.prop_aliases();
 #[cfg(feature = "xlsx")]
 const XLSX_ROW_ALIASES: &[PropAlias] = &crate::format::xlsx::ROW_WRITE_TABLE.prop_aliases();
+#[cfg(feature = "xlsx")]
+const XLSX_RUN_ALIASES: &[PropAlias] = &crate::format::xlsx::RUN_WRITE_TABLE.prop_aliases();
 #[cfg(feature = "xlsx")]
 const XLSX_COLUMN_ALIASES: &[PropAlias] = &crate::format::xlsx::COLUMN_WRITE_TABLE.prop_aliases();
 

@@ -180,7 +180,13 @@ fn capabilities_name_the_set_only_metadata_path_and_the_root_reads() {
             let property = root
                 .property(key)
                 .unwrap_or_else(|| panic!("{format:?} {key}"));
-            assert!(property.get() && !property.set(), "{format:?} {key}");
+            // XLSX and PPTX also set them on the root, as OfficeCLI spells
+            // it (record 0338); XLSB writes them through `/metadata` only.
+            let root_set = format != FileFormat::Xlsb;
+            assert!(
+                property.get() && property.set() == root_set,
+                "{format:?} {key}"
+            );
         }
     }
 }
