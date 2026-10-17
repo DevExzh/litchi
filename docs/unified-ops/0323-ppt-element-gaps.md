@@ -125,7 +125,28 @@ path, as the read budget asks), but the ratio misses. Follow-up 0323-F12:
 cache a slide's comments and a shape's runs per node handle, and pair the
 run leg with the same piece construction.
 
-## 6. Not claimed
+## 6. Verification (after merging trunk `fde847fe90`)
+
+| Gate | Exit |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-ppt -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features ppt] --all-targets -- -D warnings` | 0, 0 |
+| `cargo test -p litchi-ppt --all-features` (1,499 tests) | 0 |
+| `cargo test -p litchi-ops --all-features` in `--lib` (922), `--tests` (2,236), `--doc` (210) chunks | 0 |
+| `cargo test -p litchi --all-features` (230) | 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ppt -p litchi-ops` | 0 |
+| `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0, 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (40 profiles, 2,313 bans, 252 families) | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` (282 tests) | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| goldens (`LITCHI_BLESS=1 … --test capabilities --test registry`, both feature sets), `python3 tools/officecli_capability_delta.py --officecli …/3rdparty/OfficeCLI`, `PYTHONPATH=. python3 tools/test_officecli_capability_delta.py` | 0 |
+| `cargo test -p litchi-cli --all-features --test officecli_corpus` (PPT is outside the corpus; unchanged, not re-blessed) | 0 |
+
+No code, test or tool references `3rdparty/`; every fixture is under
+`test-data/`.
+
+## 7. Not claimed
 
 - Rendering in PowerPoint; LibreOffice was checked for the cases in §4.
 - Byte parity with PowerPoint's own serialization of new comments, links
