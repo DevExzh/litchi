@@ -755,6 +755,46 @@ impl BncCell {
         Ok(())
     }
 
+    /// Replaces a formula's cached result with an error result (cell type
+    /// 8, no value fields), as a formula whose reference was deleted
+    /// evaluates (record 0329). The formula and its formula-error key stay.
+    ///
+    /// Returns the string-list key the replaced text cache held, which the
+    /// caller releases.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell has no formula or caches rich text.
+    pub fn set_formula_cached_error(&mut self) -> Result<Option<u32>> {
+        let formula = self.formula_identifier()?;
+        if self.fields.contains_key(&RICH_TEXT_FLAG) {
+            return Err(Error::InvalidFormat(
+                "Numbers formula error cache over a rich-text cache".to_owned(),
+            ));
+        }
+        let released = self.u32_field(STRING_FLAG);
+        for flag in [DECIMAL_FLAG, NUMBER_FLAG, DATE_FLAG, STRING_FLAG] {
+            self.fields.remove(&flag);
+        }
+        self.prefix[1] = CELL_TYPE_ERROR;
+        self.fields
+            .insert(FORMULA_FLAG, formula.to_le_bytes().to_vec());
+        Ok(released)
+    }
+
+    /// Point the cell at another formula-list entry (record 0329: a shared
+    /// formula split when its cells diverge).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell has no formula.
+    pub fn set_formula_identifier(&mut self, identifier: u32) -> Result<()> {
+        self.formula_identifier()?;
+        self.fields
+            .insert(FORMULA_FLAG, identifier.to_le_bytes().to_vec());
+        Ok(())
+    }
+
     #[must_use]
     pub fn formula_error_identifier(&self) -> Option<u32> {
         self.u32_field(FORMULA_ERROR_FLAG)
