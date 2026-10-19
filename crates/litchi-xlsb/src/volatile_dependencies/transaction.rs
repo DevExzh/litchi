@@ -9,12 +9,12 @@ use crate::package::error::{Error, Result};
 
 /// A bounded draft detached from an immutable Volatile Dependencies snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     dependencies: Option<Arc<Dependencies>>,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(before: Snapshot) -> Self {
         Self {
             dependencies: before.dependencies_arc(),

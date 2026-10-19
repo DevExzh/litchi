@@ -77,8 +77,8 @@ impl Snapshot {
 
     /// Start a detached transaction against this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             base: self.clone(),
             graph: self.graph.clone(),
         }
@@ -101,12 +101,12 @@ impl Eq for Snapshot {}
 
 /// A detached, source-checked threaded-comments/persons transaction.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     base: Snapshot,
     graph: Graph,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the currently staged graph.
     #[must_use]
     pub const fn graph(&self) -> &Graph {

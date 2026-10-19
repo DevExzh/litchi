@@ -6,12 +6,12 @@ use crate::package::error::{Error, Result};
 
 /// A bounded draft detached from an immutable Calculation Chain snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     remove: bool,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(before: Snapshot) -> Self {
         Self {
             remove: !before.is_present(),

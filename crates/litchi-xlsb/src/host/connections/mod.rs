@@ -23,7 +23,7 @@ pub use model::{
     ReconnectionType, SourceType, UnknownRecord, WebProperties, WebTableItem,
 };
 pub use parse::parse_connections_part;
-pub use transaction::{Commit, Patch, Snapshot, Transaction, apply, read};
+pub use transaction::{Commit, Edit, Patch, Snapshot, apply, read};
 
 pub type Result<T> = crate::package::error::Result<T>;
 

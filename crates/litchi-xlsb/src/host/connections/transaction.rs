@@ -83,13 +83,13 @@ impl Snapshot {
 }
 
 /// A detached, failure-atomic transaction over inert connection metadata.
-pub struct Transaction<'a> {
+pub struct Edit<'a> {
     target: &'a mut OpcPackage,
     before: Snapshot,
     draft: Option<Connections>,
 }
 
-impl<'a> Transaction<'a> {
+impl<'a> Edit<'a> {
     /// Start a transaction against a validated package.
     pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
         let before = Snapshot::read(target)?;

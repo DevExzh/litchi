@@ -75,8 +75,8 @@ impl Snapshot {
     /// Start a detached source-bound transaction. Missing owners can be
     /// created through `replace` on the returned transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Exact finite limits retained by this snapshot.

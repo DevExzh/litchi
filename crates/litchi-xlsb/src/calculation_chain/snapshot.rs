@@ -91,8 +91,8 @@ impl Snapshot {
     /// Start a detached source-bound transaction. The only supported change
     /// is removal of the optional cache owner.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Exact finite limits retained by this snapshot.

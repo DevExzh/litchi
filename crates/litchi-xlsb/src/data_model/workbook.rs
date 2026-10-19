@@ -15,15 +15,12 @@ impl crate::Workbook {
     }
 
     /// Start a detached, source-bound Data Model transaction.
-    pub fn edit_data_model(&self) -> Result<super::Transaction> {
+    pub fn edit_data_model(&self) -> Result<super::Edit> {
         Ok(self.data_model()?.edit())
     }
 
     /// Start a detached Data Model transaction with explicit limits.
-    pub fn edit_data_model_with_limits(
-        &self,
-        limits: SemanticLimits,
-    ) -> Result<super::Transaction> {
+    pub fn edit_data_model_with_limits(&self, limits: SemanticLimits) -> Result<super::Edit> {
         Ok(self.data_model_with_limits(limits)?.edit())
     }
 

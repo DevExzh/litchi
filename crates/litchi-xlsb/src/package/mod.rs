@@ -378,16 +378,16 @@ impl Package {
     }
 
     /// Start a detached source-bound Custom Data transaction.
-    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package(self.0.clone())
+    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Edit> {
+        crate::custom_data::Edit::from_package(self.0.clone())
     }
 
     /// Start a detached Custom Data transaction with an explicit finite policy.
     pub fn edit_custom_data_with_limits(
         &self,
         limits: crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package_with_limits(self.0.clone(), limits)
+    ) -> Result<crate::custom_data::Edit> {
+        crate::custom_data::Edit::from_package_with_limits(self.0.clone(), limits)
     }
 
     /// Start a detached Custom Data transaction with an owned execution context.
@@ -395,8 +395,8 @@ impl Package {
         &self,
         limits: crate::custom_data::Limits,
         context: ExecutionContext,
-    ) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package_with_limits_and_context(
+    ) -> Result<crate::custom_data::Edit> {
+        crate::custom_data::Edit::from_package_with_limits_and_context(
             self.0.clone(),
             limits,
             Some(context),
