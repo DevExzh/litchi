@@ -235,12 +235,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "docx view format: /body/p[2] vs /comments/comment[1]",
             Box::new(|| {
                 let node = file.get("/body/p[2]")?;
-                black_box(node.view().format()?.into_iter().count());
+                black_box(node.view().format()?.count());
                 Ok(())
             }),
             Box::new(|| {
                 let node = file.get("/comments/comment[1]")?;
-                black_box(node.view().format()?.into_iter().count());
+                black_box(node.view().format()?.count());
                 Ok(())
             }),
         )?;

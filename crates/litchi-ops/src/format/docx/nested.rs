@@ -227,11 +227,21 @@ impl Docx {
                 let WorkEdit::Eager(eager) = &mut edit else {
                     return Err(refusal("comments need the owning package editor"));
                 };
-                eager
+                let id = eager
                     .add_comment_at(&paragraph, range, &comment)
                     .map_err(Error::from)?;
                 let commit = edit.commit(self)?;
-                let ordinal = existing.len();
+                // A document's first comment is looked up on the new
+                // handle: its part may be one this reader does not list
+                // (a Strict relationship), which is refused as before.
+                let ordinal = if existing.is_empty() {
+                    super::nav::comments(commit.file())?
+                        .iter()
+                        .position(|comment| comment.id() == id)
+                        .ok_or_else(|| refusal("the new comment is not in the comments part"))?
+                } else {
+                    existing.len()
+                };
                 Ok((commit, comment_path(ordinal)))
             },
             (NewKind::Run, Kind::Paragraph) => {

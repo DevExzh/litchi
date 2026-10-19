@@ -163,7 +163,11 @@ rows is a miss.
   comment add read the comments of the *new* handle to find its ordinal,
   which first builds that handle's document (about 140 µs): the existing
   plain comment add measured **1.65** and a reply 2.23. Both now read the
-  comments before the edit on the warm handle (3 µs).
+  comments before the edit on the warm handle (3 µs). A document's *first*
+  comment still looks itself up on the new handle, because its part may
+  carry a Strict relationship the eager comment reader does not list
+  (`strict.docx` keeps its typed refusal in the fidelity report); that
+  first add pays the old cost.
 - **Existing reads.** A comment's view now also reads `done`, `parentId`
   and `anchoredTo`. Measured with a probe on the public API (`get` +
   `view().format()`, 200 paragraphs, comment at `p[150]`), base
