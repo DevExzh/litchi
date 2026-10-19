@@ -24,10 +24,18 @@ pub(crate) enum Setter {
     HyperlinkText,
     /// A table cell's text, replacing its content with one paragraph.
     CellText,
+    /// A new cell's preferred width, `w:tcW` (record 0345).
+    CellWidth,
+    /// A grid column's width in twips (record 0345).
+    ColumnWidth,
+    /// A new column's cell text (record 0345).
+    ColumnText,
     /// A hyperlink's external target (record 0251b).
     HyperlinkUrl,
     /// A new hyperlink's bookmark target.
     HyperlinkAnchor,
+    /// A hyperlink's screen tip, `w:tooltip` (record 0345).
+    HyperlinkTooltip,
     /// A new table's row count.
     TableRows,
     /// A new table's column count.
@@ -89,6 +97,15 @@ pub(crate) enum Setter {
     CommentDate,
     /// A new comment's text.
     CommentText,
+    /// A comment's resolved state, `w15:done` (record 0345).
+    CommentDone,
+    /// A new comment's reply parent, by comment id (record 0345).
+    CommentParent,
+    /// A new comment's range start: after this 1-based run, 0 for the
+    /// paragraph start (record 0345).
+    CommentRunStart,
+    /// Whether a new comment has range markers (record 0345).
+    CommentRange,
     ParagraphStyle,
     ParagraphAlign,
     ParagraphSpaceBefore,
@@ -820,7 +837,7 @@ fn rounded_units(value: Length, unit: i64) -> Result<i64> {
         .ok_or_else(|| invalid("the length is outside the DOCX integer range"))
 }
 
-fn twips(value: Length) -> Result<direct::Twips> {
+pub(super) fn twips(value: Length) -> Result<direct::Twips> {
     Ok(direct::Twips(rounded_units(value, 635)?))
 }
 

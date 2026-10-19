@@ -255,6 +255,7 @@ with open("presentation.pptx", "rb") as f:
 - **`File.unsign()`**: A `File` that may edit a signed document
 - **`Edit.set(...)`**, **`Edit.add(...)`**, **`Edit.remove(...)`**, **`Edit.move(...)`**, **`Edit.swap(...)`**, **`Edit.get(...)`**, **`Edit.query(...)`**, **`Edit.commit()`**: The transaction's verbs
 - `Commit.file`, `Commit.changed`, `Commit.operations`, `Commit.results`, `Commit.value`: A transaction's or batch's result
+- `Commit.patch`: The change's reversible `Patch` (None for `add_part` and `raw_set`): `Patch.apply(file)` replays it on the File it started from, `Patch.inverse()` undoes it, `Patch.is_noop()`; a Patch applied to any other File raises `invalid_input`
 
 ### Document API
 
@@ -403,7 +404,7 @@ pyo3-litchi/
 │   ├── errors.rs       # LitchiError and its subclasses
 │   ├── file.rs         # File, open(), open_bytes() and create(): the unified API
 │   ├── nodes.rs        # Node views as dicts (get, find, query)
-│   ├── write.rs        # Commit, Edit and the write verbs' shared pieces
+│   ├── write.rs        # Commit, Patch, Edit and the write verbs' shared pieces
 │   ├── props.rs        # Property dicts as litchi Props
 │   ├── pyde.rs         # Python objects read as batch items (serde)
 │   ├── pyser.rs        # serde values (views, capabilities) as Python objects

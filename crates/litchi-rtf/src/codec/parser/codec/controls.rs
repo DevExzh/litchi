@@ -2747,13 +2747,14 @@ impl Parser<'_> {
                     437 => RtfEncoding::Cp437,
                     850 => RtfEncoding::Cp850,
                     _ => {
-                        let page =
-                            u32::try_from(*cp).ok().and_then(Mbcs::new).ok_or_else(|| {
-                                RtfError::MalformedDocument(format!(
-                                    "unsupported RTF ANSI code page {cp}"
-                                ))
-                            })?;
-                        RtfEncoding::Standard(page)
+                        let page = u32::try_from(*cp).map_err(|_| {
+                            RtfError::MalformedDocument(format!("invalid RTF ANSI code page {cp}"))
+                        })?;
+                        // A positive page without an exact codec is refused
+                        // as unsupported, not as malformed (record 0347).
+                        RtfEncoding::Standard(
+                            Mbcs::new(page).ok_or(RtfError::UnsupportedCodePage(page))?,
+                        )
                     },
                 }
             },

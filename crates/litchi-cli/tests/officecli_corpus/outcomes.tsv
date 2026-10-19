@@ -6312,7 +6312,7 @@
 177	set	docx	-	warned	revision.{author,date}	tbl
 183	set	docx	-	warned	revision.{author,date}	tr
 190	set	docx	-	warned	shd,revision.{author,date}	tc
-196	add	docx	cell	unsupported_element	-	-
+196	add	docx	cell	warned	revision.{author,date}	-
 202	remove	docx	-	invalid_argument	-	tc
 207	add	docx	row	warned	revision.{author,date}	-
 216	add	docx	paragraph	ok	-	-

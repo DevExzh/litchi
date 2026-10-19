@@ -269,11 +269,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |  |  |
 | chart | `series20.color` | string |  | as- | litchi-only | litchi-only |  |  |  |
 | comment | `id` | number | --g | --g | supported | — |  |  |  |
-| comment | `anchoredTo` | string | --g |  | unlisted | — | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| comment | `runStart` | int | a-- |  | write-only | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| comment | `range` | bool | a-- |  | write-only | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| comment | `parentId` | number | a-g |  | gap | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) | 0335-F2 |
-| comment | `done` | bool | asg |  | gap | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) | 0335-F2 |
+| comment | `anchoredTo` | string | --g | --g | supported | — |  |  |  |
+| comment | `runStart` | int | a-- | a-- | write-only | supported |  |  |  |
+| comment | `range` | bool | a-- | a-- | write-only | supported |  |  |  |
+| comment | `parentId` | number | a-g | a-g | supported | supported |  |  |  |
+| comment | `done` | bool | asg | asg | supported | supported |  |  |  |
 | comment | `date` | string | asg | asg | supported | supported |  |  |  |
 | comment | `initials` | string | asg | asg | supported | supported |  |  |  |
 | comment | `author` | string | asg | asg | supported | supported |  |  |  |
@@ -444,13 +444,13 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | footnote | `bold` | bool |  | --g | litchi-only | — |  |  |  |
 | footnote | `italic` | bool |  | --g | litchi-only | — |  |  |  |
 | footnote | `color` | color |  | --g | litchi-only | — |  |  |  |
-| formfield | `type` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| formfield | `name` | string | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| formfield | `text` | string | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| formfield | `checked` | bool | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| formfield | `default` | string | --g |  | element gap | — | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| formfield | `enabled` | bool | --g |  | element gap | — | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | P1 | deferred-P1 0332 (docx-breadth) | R4x |
+| formfield | `type` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| formfield | `name` | string | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| formfield | `text` | string | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| formfield | `checked` | bool | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| formfield | `default` | string | --g |  | element gap | — | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| formfield | `enabled` | bool | --g |  | element gap | — | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
 | header | `type` | enum | asg | asg | supported | supported |  |  |  |
 | header | `text` | string | asg | asg | supported | supported |  |  |  |
 | header | `align` | enum | asg | asg | supported | supported |  |  |  |
@@ -464,7 +464,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | header | `underline` | enum |  | asg | litchi-only | litchi-only |  |  |  |
 | hyperlink | `url` | string | asg | asg | supported | supported |  |  |  |
 | hyperlink | `anchor` | string | a-g | a-g | supported | supported |  |  |  |
-| hyperlink | `tooltip` | string | a-g | --g | supported | gap | P0 | planned WP4 (docx-p0-residue) |  |
+| hyperlink | `tooltip` | string | a-g | asg | supported | supported |  |  |  |
 | hyperlink | `text` | string | asg | as- | write-only | supported |  |  |  |
 | hyperlink | `rStyle` | string | a-g | a-g | supported | supported |  |  |  |
 | hyperlink | `color` | color | a-g | a-g | supported | supported |  |  |  |
@@ -620,18 +620,18 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | numbering | `abstractNumCount` | number | --g | --g | supported | — |  |  |  |
 | numbering | `abstractNumId` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | numbering | `numCount` | int |  | --g | litchi-only | — |  |  |  |
-| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `display` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `relId` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `contentType` | string | a-g |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `height` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `width` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
+| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `display` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `relId` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `contentType` | string | a-g |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `height` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `width` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
 | pagebreak | `type` | enum | a-g | a-- | write-only | supported |  |  |  |
 | pagebreak | `breakType` | enum | -sg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | paragraph | `lineRule` | enum | asg | asg | supported | supported |  |  |  |
@@ -819,29 +819,29 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | ptab | `align` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | ptab | `relativeTo` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | ptab | `leader` | enum | asg |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
-| revision | `type` | enum | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `text` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `id` | integer | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `nativePath` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `action` | enum | -s- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `paraMarkIns.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `paraMarkIns.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `paraMarkIns.id` | int | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `paraMarkDel.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `paraMarkDel.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `paraMarkDel.id` | int | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `revision.beforeLost` | bool | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `sectPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `sectPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `sectPrChange.id` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `tblPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `tblPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `trPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `trPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `tcPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
-| revision | `tcPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x |
+| revision | `type` | enum | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `text` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `id` | integer | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `nativePath` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `action` | enum | -s- |  | element gap | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `paraMarkIns.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `paraMarkIns.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `paraMarkIns.id` | int | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `paraMarkDel.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `paraMarkDel.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `paraMarkDel.id` | int | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `revision.beforeLost` | bool | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `sectPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `sectPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `sectPrChange.id` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `tblPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `tblPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `trPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `trPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `tcPrChange.author` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
+| revision | `tcPrChange.date` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
 | run | `highlight` | color | asg | asg | supported | supported |  |  |  |
 | run | `strike` | bool | asg | asg | supported | supported |  |  |  |
 | run | `dstrike` | bool | asg | asg | supported | supported |  |  |  |
@@ -929,7 +929,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sdt | `checked` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | sdt | `format` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | sdt | `items` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| sdt | `lock` | enum | asg |  | gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
+| sdt | `lock` | enum | asg |  | gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
 | sdt | `placeholder` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | sdt | `placeholderText` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | sdt | `date.fullDate` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -941,7 +941,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sdt | `id` | number | --g |  | raw-only | — | P1 | out-of-scope (native-selection) | ADR 0034: native selection requires explicit raw admission |
 | sdt | `editable` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (docx-breadth) |  |
 | section | `type` | enum | asg |  | supported | gap | P1 | deferred-P1 0332 (docx-breadth) | the node's text |
-| section | `pageWidth` | length | asg |  | gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
+| section | `pageWidth` | length | asg |  | gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
 | section | `pageHeight` | length | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | section | `orientation` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | section | `marginTop` | length | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -993,22 +993,22 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | section | `endnotePr.numRestart` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | section | `endnotePr.numStart` | int | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | section | `endnotePr.pos` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| shape | `geometry` | string | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `width` | length | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `height` | length | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `wrap` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `hAlign` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `vAlign` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `hRelative` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `vRelative` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `anchor.x` | length | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `anchor.y` | length | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `fill` | color | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `line` | string | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `line.color` | color | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `line.width` | length | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `line.style` | string | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
-| shape | `alt` | string | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
+| shape | `geometry` | string | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `width` | length | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `height` | length | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `wrap` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `hAlign` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `vAlign` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `hRelative` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `vRelative` | enum | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `anchor.x` | length | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `anchor.y` | length | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `fill` | color | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `line` | string | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `line.color` | color | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `line.width` | length | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `line.style` | string | as- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
+| shape | `alt` | string | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
 | style | `id` | string | a-g | a-g | supported | supported |  |  |  |
 | style | `name` | string | asg | asg | supported | supported |  |  |  |
 | style | `type` | enum | a-g | a-g | supported | supported |  |  |  |
@@ -1111,7 +1111,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | tab | `pos` | length | asg | asg | supported | supported |  |  |  |
 | tab | `val` | enum | asg | asg | supported | supported |  |  |  |
 | tab | `leader` | enum | asg | asg | supported | supported |  |  |  |
-| cell | `width` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
+| cell | `width` | string | asg | a-g | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `skipGridSync` | bool | -s- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `font` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `size` | font-size | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -1145,9 +1145,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `border.tl2br` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `border.top` | string | -s- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `border.tr2bl` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| cell | `text` | string | asg | -s- | write-only | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| column | `width` | length | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
-| column | `text` | string | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
+| cell | `text` | string | asg | as- | write-only | supported |  |  |  |
+| column | `width` | length | a-- | asg | supported | supported |  |  |  |
+| column | `text` | string | a-- | a-- | write-only | supported |  |  |  |
 | row | `height.exact` | length | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `header` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `cantSplit` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |

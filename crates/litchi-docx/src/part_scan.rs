@@ -124,6 +124,36 @@ impl Tree {
     }
 }
 
+/// Every `paraId` attribute value (any prefix) of `xml` that parses as
+/// hexadecimal: the paragraph identifiers a fresh one must avoid (record
+/// 0345). A plain byte search; values that do not parse are skipped.
+pub(crate) fn paragraph_ids(xml: &[u8]) -> Vec<u32> {
+    const KEY: &[u8] = b"paraId=";
+    let mut ids = Vec::new();
+    let mut at = 0usize;
+    while let Some(found) = xml[at..]
+        .windows(KEY.len())
+        .position(|window| window == KEY)
+    {
+        let value = at + found + KEY.len();
+        at = value;
+        let Some(&quote) = xml.get(value) else { break };
+        if quote != b'"' && quote != b'\'' {
+            continue;
+        }
+        let Some(length) = xml[value + 1..].iter().position(|byte| *byte == quote) else {
+            break;
+        };
+        if let Some(id) = std::str::from_utf8(&xml[value + 1..value + 1 + length])
+            .ok()
+            .and_then(|text| u32::from_str_radix(text.trim(), 16).ok())
+        {
+            ids.push(id);
+        }
+    }
+    ids
+}
+
 /// Scan `xml`, recording every element whose depth is at most `depth`.
 pub(crate) fn scan(xml: &[u8], depth: usize) -> Result<Tree> {
     scan_kept(xml, depth, |_| true)

@@ -303,7 +303,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | paragraph | `lineSpacing` | string | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | paragraph | `text` | string | asg | -s- | write-only | partial | P1 | deferred-P1 0323 (ppt-family) |  |
 | picture | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| picture | `mediaType` | string | --g |  | gap | — | P1 | deferred-P1 0323 (ppt-family) | M1-extended |
+| picture | `mediaType` | string | --g |  | gap | — | P1 | deferred-P1 0323 (ppt-family) | M1-extended → 0323 |
 | picture | `x` | length | asg | --g | supported | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | picture | `y` | length | asg | --g | supported | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | picture | `width` | length | asg | --g | supported | gap | P1 | deferred-P1 0323 (ppt-family) |  |
@@ -530,7 +530,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | shape | `align` | string | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | shape | `bold` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | shape | `color` | color | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| shape | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0323 (ppt-family) | M1-extended |
+| shape | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0323 (ppt-family) | M1-extended → 0323 |
 | shape | `font` | string | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | shape | `italic` | bool | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | shape | `line` | string | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
@@ -667,7 +667,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | textbox | `bold` | bool | as- |  | write-only | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | textbox | `italic` | bool | as- |  | write-only | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | textbox | `color` | color | as- |  | write-only | gap | P1 | deferred-P1 0323 (ppt-family) |  |
-| textbox | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0323 (ppt-family) | M1-extended |
+| textbox | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0323 (ppt-family) | M1-extended → 0323 |
 | textbox | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0323 (ppt-family) |  |
 | textbox | `width` | length | asg | -sg | supported | partial | P1 | deferred-P1 0323 (ppt-family) |  |
 | textbox | `height` | length | asg | -sg | supported | partial | P1 | deferred-P1 0323 (ppt-family) |  |

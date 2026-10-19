@@ -48,10 +48,13 @@ with ``item == 1``, the File, its file on disk and two refused save
 destinations unchanged. The composition row makes both edits on two
 threads from one File and requires both orders to hold both values and to
 give the same bytes (or, where the Rust row says the bytes differ, the same
-text and node views). The bindings expose no patch object (``Commit`` has
-no ``patch``), so the patch-inverse row is checked only as far as Python
-reaches: the forward edit changes the bytes and leaves its source File
-byte-identical; the inverse and its conflicts are Rust-only.
+text and node views), and each edit's ``Commit.patch`` applied to the other
+edit's result to be refused with the recorded codes. The patch-inverse row
+(record 0347) requires ``Commit.patch`` to replay onto its source File
+(the commit's bytes), its ``inverse()`` to restore the exact source bytes,
+the patch on its own result to be refused with the recorded code, and a
+byte-identical, separately opened copy to refuse or accept the patch as the
+Rust row reports.
 
 Rerun: ``crates/pyo3-litchi/tests/run_tests.sh --no-build -k crud_mirror``;
 set ``LITCHI_MIRROR_VERBOSE=1`` to print the replayed cells per verb.
@@ -582,11 +585,44 @@ class Adr0008MirrorTest(unittest.TestCase):
         before = file.to_bytes()
         props = props_of(row["props"])
         commit = file.edit(lambda tx: tx.set(row["path"], props))
-        if not commit.changed or commit.file.to_bytes() == before:
+        after = commit.file.to_bytes()
+        if not commit.changed or after == before:
             raise AssertionError("the edit changed nothing")
         if file.to_bytes() != before:
             raise AssertionError("the edit changed its source File")
         republish(commit.file)
+        patch = commit.patch
+        if patch is None or patch.is_noop():
+            raise AssertionError("the changing edit has no patch")
+        if patch.apply(file).to_bytes() != after:
+            raise AssertionError("the patch replayed onto its source differs from the commit")
+        inverse = patch.inverse()
+        if inverse.is_noop():
+            raise AssertionError("the inverse of a change is a no-op")
+        if inverse.apply(commit.file).to_bytes() != before:
+            raise AssertionError("the inverse does not restore the exact source bytes")
+        if file.to_bytes() != before or commit.file.to_bytes() != after:
+            raise AssertionError("applying a patch changed its input")
+        try:
+            patch.apply(commit.file)
+        except L.LitchiError as error:
+            if error.code != row["code"]:
+                raise AssertionError(
+                    f"the patch on its own result refused {error.code}, Rust recorded "
+                    f"{row['code']}") from error
+        else:
+            raise AssertionError("the patch applied to its own result")
+        foreign = L.open_bytes(before)
+        try:
+            applied = patch.apply(foreign)
+        except L.LitchiError:
+            copy = "refuses (owner-bound)"
+        else:
+            if applied.to_bytes() != after:
+                raise AssertionError("a byte-identical copy took the patch to other bytes")
+            copy = "accepts (content-checked)"
+        if f"a byte-identical reopened copy {copy}" not in row["note"]:
+            raise AssertionError(f"a byte-identical reopened copy {copy}; Rust: {row['note']}")
 
     @staticmethod
     def _compose(cl, row):
@@ -595,8 +631,22 @@ class Adr0008MirrorTest(unittest.TestCase):
         file = cl.fixture(row["format"], row["fixture"])
         a, b = (row["path"], props_of(row["props"])), (row["path2"], props_of(row["props2"]))
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-            first, second = pool.map(lambda edit: file.set(edit[0], edit[1]), [a, b])
+            commits = list(pool.map(
+                lambda edit: file.edit(lambda tx: tx.set(edit[0], edit[1])), [a, b]))
+        first, second = commits[0].file, commits[1].file
         ab, ba = first.set(*b), second.set(*a)
+        # Neither edit can be silently dropped: each patch refuses the
+        # other's result, with the codes the Rust row records.
+        codes = []
+        for commit, other in ((commits[0], second), (commits[1], first)):
+            try:
+                commit.patch.apply(other)
+            except L.LitchiError as error:
+                codes.append(error.code)
+            else:
+                raise AssertionError("a patch applied to the other edit's result")
+        if "/".join(codes) != row["code"]:
+            raise AssertionError(f"stale patches refused {'/'.join(codes)}, Rust {row['code']}")
 
         def value(target, edit):
             view = target.get(edit[0], 0)

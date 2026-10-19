@@ -139,6 +139,30 @@ pub(super) fn comments(docx: &Docx) -> Result<Vec<litchi_docx::comment::Comment>
     docx.owner().finish(result)
 }
 
+/// The `commentsExtended` entries of the main document (record 0345);
+/// empty when the part is absent. A part the leaf refuses as malformed
+/// reads as empty, so a comment's other properties stay readable.
+pub(super) fn comments_extended(
+    docx: &Docx,
+) -> Result<Arc<[litchi_docx::modern_comments::Extended]>> {
+    if let Some(entries) = docx.parts().comment_threads.get() {
+        return Ok(Arc::clone(entries));
+    }
+    let result = match docx.owner() {
+        DocxOwner::Eager(package) => {
+            Ok(package.document()?.comments_extended().unwrap_or_default())
+        },
+        DocxOwner::Source(package) => {
+            package.check_source().map_err(Error::from)?;
+            Ok(package.comments_extended().unwrap_or_default())
+        },
+    };
+    let entries: Arc<[_]> = docx.owner().finish(result)?.into();
+    Ok(Arc::clone(
+        docx.parts().comment_threads.get_or_init(|| entries),
+    ))
+}
+
 /// What a container selection picked.
 enum Pick {
     /// The block, from the container's index.
@@ -461,6 +485,10 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     Some(None) => Lookup::Missing,
                     None => Lookup::NotApplicable,
                 })
+            },
+            // Grid columns (record 0345).
+            (Value::Table(block), Kind::Column) => {
+                super::column::pick_column(self.docx, parent, block, &step.select)
             },
             (Value::Row(row), Kind::Cell) => {
                 if let Select::Ordinal(position) = step.select {

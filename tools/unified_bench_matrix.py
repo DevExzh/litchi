@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337, 0340).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337, 0340, 0344).
 
 The matrix collects every paired measurement recorded by the unified
-operations records 0249-0340 (`docs/unified-ops/02[4-9]*.md`, `03[0-4]*.md`)
+operations records from 0249 on (`docs/unified-ops/02[4-9]*.md`, `03*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
 status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
@@ -41,14 +41,22 @@ Conventions:
 
 Records 0285-0326 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
-0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315, 0326, 0337 and 0340 their own) are collected
-only when their record file is on this tree; the Markdown lists every
-record of that range, absent ones as "not on this tree", so the tool can
-be rerun unchanged after later merges.
+0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315, 0326, 0337 and 0340 their own;
+record 0344 those of 0307, 0308, 0314, 0316-0318, 0323-0325, 0328-0330,
+0333, 0335, 0336, 0338 and 0342) are collected only when their record file
+is on this tree; the range ends at the highest record on the tree, and the
+Markdown lists every record of it, absent ones as "not on this tree", so
+the tool can be rerun unchanged after later merges.
 
-Outputs: docs/unified-ops/results/0289/bench-matrix.tsv and bench-matrix.md.
+Outputs: docs/unified-ops/results/0289/bench-matrix.tsv, bench-matrix.md and
+one page per format under bench-matrix/ (record 0344: each file stays below
+the repository's 1 MiB evidence limit, which `--check` enforces).
 `--check` regenerates in memory and exits non-zero when the committed
-outputs differ or when a miss lacks an explanation.
+outputs differ, when a miss lacks an explanation, when an open miss names
+neither a follow-up nor an explained residual (record 0337), or when a
+record's evidence under `results/` (a `<record>/` directory or a
+`<record>-*` entry, records 0249 on) contributes no rows and the curated
+`evidence_without_rows` gives no reason (record 0344).
 """
 
 from __future__ import annotations
@@ -69,6 +77,10 @@ OUT_DIR = RES / "0289"
 CURATED = OUT_DIR / "bench-matrix-curated.json"
 OUT_TSV = OUT_DIR / "bench-matrix.tsv"
 OUT_MD = OUT_DIR / "bench-matrix.md"
+# Record 0344: the per-format row tables, one page each, so that every
+# generated file stays below the repository's 1 MiB evidence limit.
+OUT_FORMAT_DIR = OUT_DIR / "bench-matrix"
+SIZE_LIMIT = 1 << 20
 
 # Budgets: (numeric value or None, text, kind)
 OPEN = (1.05, "1.05 or +20 µs (open)", "open")
@@ -257,7 +269,7 @@ APP_LINE = re.compile(r"^xlsx open: (\d+) ns; app\.xml read (\d+) ns")
 def ooxml_metadata(record, paths):
     acc: dict = {}
     for p in paths:
-        for line in open(p, encoding="utf-8"):
+        for line in Path(p).read_text(encoding="utf-8").splitlines():
             m = META_LINE.match(line)
             if m:
                 fmt, owner = m.group(1).lower(), m.group(2)
@@ -591,7 +603,7 @@ def p0268():
         files = trials((RES / "0268" / sub).glob("*.tsv"))
         for f in files:
             tag = "before" if "before" in f.name else "after"
-            for line in open(f, encoding="utf-8"):
+            for line in Path(f).read_text(encoding="utf-8").splitlines():
                 if not line.strip():
                     continue
                 k, v = line.split("\t")
@@ -813,7 +825,7 @@ ODT_LINE = re.compile(r"^\s*(\S+)\s+(\d+)\s+leaf\s+([\d.]+) µs\s+unified\s+([\d
 def odt_text(record, paths):
     acc: dict = {}
     for p in paths:
-        for line in open(p, encoding="utf-8"):
+        for line in Path(p).read_text(encoding="utf-8").splitlines():
             m = ODT_LINE.match(line)
             if m:
                 acc.setdefault((m.group(1), int(m.group(2))), []).append(
@@ -982,12 +994,21 @@ def p0284():
 # this tree (`needs`), so the tool can be rerun unchanged after later merges;
 # absent records are listed in the Markdown output as "not on this tree".
 
-FOLLOW_RANGE = (285, 340)
-
-
 def record_file(record: str):
     hits = sorted(UO.glob(f"{record}-*.md"))
     return hits[0] if hits else None
+
+
+def last_record() -> int:
+    """The highest record number on this tree (record 0344: the range
+    follows the tree, so a newly merged record is listed, and checked,
+    without editing the tool)."""
+    numbers = [int(m.group(1)) for p in UO.glob("[0-9][0-9][0-9][0-9]*-*.md")
+               if (m := re.match(r"(\d{4})", p.name))]
+    return max([340, *numbers])
+
+
+FOLLOW_RANGE = (285, last_record())
 
 
 def needs(record: str):
@@ -1056,7 +1077,7 @@ def odf_lines(record, paths, family):
     """odf_gaps_bench / odf_verbs_bench text output (records 0288, 0291, 0292)."""
     acc: dict = {}
     for p in paths:
-        for line in open(p, encoding="utf-8"):
+        for line in Path(p).read_text(encoding="utf-8").splitlines():
             m = ODF_LINE.match(line)
             if m:
                 acc.setdefault((m.group(1), m.group(2)), []).append(
@@ -1145,7 +1166,7 @@ def rtf_eight_runs(record, text_path, json_paths):
         for c in doc:
             times.setdefault((c["family"], c["count"]), []).append(c)
     section, out = None, []
-    for line in open(text_path, encoding="utf-8"):
+    for line in Path(text_path).read_text(encoding="utf-8").splitlines():
         if line.startswith("=="):
             section = line.split()[1]
             continue
@@ -1293,6 +1314,11 @@ NUMBERS_SCEN = {
     # Record 0314's routes, first parsed by record 0326.
     "batch_1000_owned": ("batch set", "batch 1000, items copied outside the clock", BATCH),
     "batch_1000_parsed": ("batch set", "batch 1000, paths parsed outside the clock", BATCH),
+    # Record 0347's swaps: the leaf's moves (four steps across sheets).
+    "sheet_swap": ("swap (sheet)", "sheet swap (three sheets; two leaf moves)", SINGLE),
+    "table_swap": ("swap (table)", "table swap within a sheet (two leaf moves)", SINGLE),
+    "table_swap_sheets": ("swap (table)",
+                          "table swap across sheets (two relocations, two moves)", SINGLE),
 }
 
 
@@ -1479,7 +1505,7 @@ def docx_large(record, paths):
     runs = []
     for p in paths:
         values = {}
-        for line in open(p, encoding="utf-8"):
+        for line in Path(p).read_text(encoding="utf-8").splitlines():
             parts = line.split()
             if len(parts) == 3 and parts[2] == "us":
                 values[parts[0]] = float(parts[1])
@@ -1884,13 +1910,605 @@ def p0340():
                          stages={"after": ("", 1)})
 
 
+# ------------------------------------------------- record 0344's parsers
+#
+# Records 0307-0342 whose evidence the matrix did not read (second
+# definition-of-done audit §5). Each reads the after legs of its record's
+# own harness; "before" legs of a before/after-build comparison give the
+# comparison's denominator only.
+
+def slug(text):
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+
+
+@needs("0307")
+def p0307():
+    """Record 0307 §6 (`docx_mc_bench`, twelve runs alternated before/after):
+    unified/leaf in the after build, and after/before of each leg (medians
+    of the six runs of each binary, as the record compares them). The
+    1,000-paragraph text set and add on the default owner are the series of
+    `docx_large_bench` (records 0305, 0311, 0313): the same scenario on the
+    same owner, measured again after the 0305/0311 fixes."""
+    base = RES / "0307"
+    paths = trials(base.glob("run*-*.json"))
+    runs = {"before": [], "after": []}
+    for p in paths:
+        runs["after" if p.stem.endswith("after") else "before"].append(load_json(p))
+    out = []
+    large = {"text_set": ("set", "auto", "text set, default (source-backed) owner"),
+             "add_paragraph": ("add", "auto", "paragraph add, default (source-backed) owner")}
+    for scen, (op, owner, label) in large.items():
+        after = [i for d in runs["after"] for i in d if i["scenario"] == scen]
+        out.append(row("0307", "docx", op, label, "1,000 paragraphs",
+                       med(i["leaf_us"] for i in after), med(i["unified_us"] for i in after),
+                       [i["unified_us"] / i["leaf_us"] for i in after], SINGLE,
+                       f"docx_large:{op}:{owner}", src(paths)))
+    labels = {"text_set": ("set", "text set, middle paragraph"),
+              "add_paragraph": ("add", "paragraph add, middle"),
+              "run_bold": ("set", "run bold set (compacts the paragraph)"),
+              "find": ("find/replace", "find/replace over the body")}
+    for scen, (op, label) in labels.items():
+        for leg in ("leaf", "unified"):
+            before = [i[f"{leg}_us"] for d in runs["before"] for i in d
+                      if i["scenario"] == scen and i.get(f"{leg}_us") is not None]
+            after = [i[f"{leg}_us"] for d in runs["after"] for i in d
+                     if i["scenario"] == scen and i.get(f"{leg}_us") is not None]
+            if not before or not after:
+                continue
+            b, a = med(before), med(after)
+            out.append(row("0307", "docx", op, f"{label} ({leg} leg; docx_mc_bench)",
+                           "1,000 paragraphs", b, a, [a / b],
+                           regression("0307"), f"docx_mc:{scen}:{leg}", src(paths),
+                           comparison=f"after/before ({leg} leg)"))
+    return out
+
+
+# office_gaps_bench (record 0308) and xls_odp_followups_bench (record 0316):
+# scenario -> (format, operation, label, budget of the unified/native pair).
+GAPS_SCEN = {
+    "xls_complete_open_20k": ("xls", "open", "complete open, 20k cells"),
+    "xls_complete_open_formula_eval": ("xls", "open", "complete open, FormulaEvalTestData"),
+    "xls_source_visit_20k": ("xls", "query", "source-backed walk, 20k cells"),
+    "xls_row_insert_10k": ("xls", "add (row)", "row insert, 10k cells"),
+    "xls_row_insert_images": ("xls", "add (row)", "row insert, SimpleWithImages.xls"),
+    "xls_row_insert_unindexed": ("xls", "add (row)", "row insert, sheet without INDEX"),
+    "xls_row_insert_owners_10k": ("xls", "add (row)", "row insert, 10k cells + array formula + data table"),
+    "xls_row_insert_conditional_formats": ("xls", "add (row)", "row insert, WithConditionalFormatting.xls (CF, CFEx)"),
+    "xls_row_insert_validations": ("xls", "add (row)", "row insert, validation.xls (DV PtgRefN)"),
+    "xls_row_insert_cf12": ("xls", "add (row)", "row insert, NewStyleConditionalFormattings.xls (CF12)"),
+    "xls_row_insert_locked_anchors": ("xls", "add (row)", "row insert, SimpleWithComments.xls (position-locked)"),
+    "rtf_move_plain_1k": ("rtf", "move", "move, 1k plain paragraphs"),
+    "rtf_move_producer_1k": ("rtf", "move", "move, 1k producer paragraphs (exact splice)"),
+    "rtf_producer_insert_1k": ("rtf", "add", "producer insert, 1k paragraphs"),
+    "rtf_producer_replay_1k": ("rtf", "move", "value-exact move (replayed state), 1k paragraphs"),
+    "odp_scene_parse_200": ("odp", "open (leaf Scene::parse)", "Scene::parse, 200 slides, 400 styles"),
+    "odp_run_read_200": ("odp", "get", "bold of 200 runs (unified, resolved)"),
+    "odp_run_format_200": ("odp", "set", "bold + size on one run, 200 slides"),
+    "odp_shape_format_200": ("odp", "set", "bold on a whole shape, 200 slides"),
+    "odp_shape_read_200": ("odp", "query", "open + shared bold of 200 shapes"),
+    "doc_text_set": ("doc", "set", "paragraph text set (against the body-text snapshot leaf)"),
+}
+
+
+def gaps_runs(record, harness, before, after, new=(), stage="", stage_rank=1,
+              only=None, pair_budget=None):
+    """office_gaps-style JSONL runs: one line per scenario, either one leg
+    (`median_us`) or a native/unified pair. `before`/`after` are run files of
+    the base and the record's build: after/before rows per leg, the median
+    of the after runs over the median of the before runs (the records'
+    own comparison; one noisy run of a shared host does not decide it). Pairs give unified/native rows from the after
+    runs, and `new` files (after-only scenarios) unified/native rows."""
+    def lines(paths):
+        return [r for p in paths for r in load_jsonl(p) if only is None or r["scenario"] in only]
+    b_rows, a_rows = lines(before), lines(after)
+    out = []
+    srcs = src(list(before) + list(after))
+    for scen, a_items in group_cases([a_rows], lambda r: r["scenario"]).items():
+        fmt, op, label = GAPS_SCEN[scen]
+        b_items = [r for r in b_rows if r["scenario"] == scen]
+        legs = (("", "median_us"),) if "median_us" in a_items[0] else \
+            (("leaf", "native_median_us"), ("unified", "unified_median_us"))
+        for leg, field in legs:
+            base = med(r[field] for r in b_items)
+            if base is None:
+                continue
+            after = med(r[field] for r in a_items)
+            out.append(row(record, fmt, op, label + (f" ({leg} leg)" if leg else ""), "",
+                           base, after, [after / base], regression(record),
+                           f"{harness}:{scen}" + (f":{leg}" if leg else ""), srcs,
+                           stage, stage_rank,
+                           comparison="after/before" + (f" ({leg} leg)" if leg else "")))
+        if "ratio" in a_items[0]:
+            out.append(row(record, fmt, op, label, "",
+                           med(r["native_median_us"] for r in a_items),
+                           med(r["unified_median_us"] for r in a_items),
+                           [r["ratio"] for r in a_items], (pair_budget or {}).get(scen, SINGLE),
+                           f"office_gaps:{scen}" if scen == "doc_text_set" else f"{harness}:{scen}:pair",
+                           srcs, stage, stage_rank, comparison="unified/native"))
+    n_rows = lines(new)
+    for scen, items in group_cases([n_rows], lambda r: r["scenario"]).items():
+        fmt, op, label = GAPS_SCEN[scen]
+        out.append(row(record, fmt, op, label, "",
+                       med(r["native_median_us"] for r in items),
+                       med(r["unified_median_us"] for r in items),
+                       [r["ratio"] for r in items], (pair_budget or {}).get(scen, SINGLE),
+                       f"{harness}:{scen}:pair", src(new), comparison="unified/native"))
+    return out
+
+
+@needs("0308")
+def p0308():
+    """Record 0308 §7: the final `r2-*` runs (base trunk 6c8d517eff against
+    the record's second build), the new-path harness `r2-new*`, and the ODP
+    scene re-measured on the third build (`odp-*`, a later stage)."""
+    base = RES / "0308"
+    out = gaps_runs("0308", "office_gaps", trials(base.glob("r2-run*-before.jsonl")),
+                    trials(base.glob("r2-run*-after2.jsonl")), trials(base.glob("r2-new*.jsonl")))
+    out += gaps_runs("0308", "office_gaps", trials(base.glob("odp-run*-before.jsonl")),
+                     trials(base.glob("odp-run*-after3.jsonl")),
+                     stage="after3 (scan check limited to depth ≤ 2)", stage_rank=2,
+                     only={"odp_scene_parse_200"})
+    return out
+
+
+IWORK_0344 = {
+    "table_add": ("add (table)", "table add", SINGLE),
+    "notes_run_style": ("set (notes run style)", "speaker-notes run character style", SINGLE),
+}
+NUMBERS_SCEN.update({
+    "row_insert_formulas": ("add (row)", "insert a row above formulas", SINGLE),
+    "comment_set": ("set (comment)", "set a cell comment", SINGLE),
+    "row_remove_ref": ("remove (row)", "remove a row that formulas reference (#REF!)", SINGLE),
+    "comment_empty": ("set (comment)", "comment edge case: empty text", SINGLE),
+})
+
+
+def iwork_after(record, base, glob_fmt):
+    """keynote_bench, pages_bench and numbers_unified_bench after legs
+    (records 0314, 0318, 0329); `glob_fmt` names a format's after files."""
+    out = []
+    keynote = trials(base.glob(glob_fmt.format(fmt="keynote", ext="jsonl")))
+    if keynote:
+        out += iwork_summary(record, keynote, lambda f, s: "multi-slide.key",
+                             {**KEYNOTE_SCEN, **IWORK_0309, **IWORK_0326, **IWORK_0344})
+    pages = trials(base.glob(glob_fmt.format(fmt="pages", ext="jsonl")))
+    if pages:
+        out += iwork_summary(record, pages,
+                             lambda f, s: "10,000-paragraph document" if s.startswith("batch_")
+                             else "basic.pages", {**IWORK_0309, **IWORK_0326, **IWORK_0344})
+    numbers = trials(base.glob(glob_fmt.format(fmt="numbers", ext="json")))
+    if numbers:
+        out += numbers_docs(record, [load_json(p)["scenarios"] for p in numbers], numbers)
+    return out
+
+
+@needs("0314")
+def p0314():
+    """Record 0314 §3: the after legs (`out/*-after-*`) of its B A A B run."""
+    return iwork_after("0314", RES / "0314" / "out", "{fmt}-after-*.{ext}")
+
+
+@needs("0316")
+def p0316():
+    """Record 0316 §6: the final `r3-*` runs (base 30eed270b5 against the
+    merged tree) and the new-path harness `r3-new*`."""
+    base = RES / "0316"
+    return gaps_runs("0316", "xls_odp_followups", trials(base.glob("r3-run*-before.jsonl")),
+                     trials(base.glob("r3-run*-after.jsonl")), trials(base.glob("r3-new*.jsonl")),
+                     pair_budget={"odp_shape_read_200": QUERY_TRIGGER})
+
+
+PPTX_LARGE = (("set", "unified_set_write", "shape text set + write"),
+              ("add", "unified_add_write", "shape add + write"),
+              ("set", "committed_set_write", "shape text set + write, committed handle"),
+              ("add", "committed_add_write", "shape add + write, committed handle"))
+
+
+@needs("0317")
+def p0317():
+    """Record 0317 §4: the after legs of docx_large_bench and of the new
+    pptx_large_bench (1,000-shape slide; µs lines like docx_large_bench)."""
+    base = RES / "0317"
+    out = docx_large("0317", trials(base.glob("docx-large-after-*.txt")))
+    paths = trials(base.glob("pptx-large-after-*.txt"))
+    runs = []
+    for p in paths:
+        values = {}
+        for line in Path(p).read_text(encoding="utf-8").splitlines():
+            parts = line.split()
+            if len(parts) == 3 and parts[2] == "us":
+                values[parts[0]] = float(parts[1])
+        runs.append(values)
+    for op, unified, label in PPTX_LARGE:
+        leaf = f"leaf_{op}_write"
+        items = [r for r in runs if leaf in r and unified in r]
+        out.append(row("0317", "pptx", op, label, "1,000 shapes",
+                       med(r[leaf] for r in items), med(r[unified] for r in items),
+                       [r[unified] / r[leaf] for r in items], SINGLE,
+                       f"pptx_large:{unified}", src(paths)))
+    return out
+
+
+@needs("0318")
+def p0318():
+    """Record 0318 §4: numbers_unified_bench after legs."""
+    return iwork_after("0318", RES / "0318", "{fmt}-*-after.{ext}")
+
+
+READ_POINT = (1.10, "1.10 (point read; records 0319-0328 count a read above 10 % as a miss)", "read")
+PPT_ELEMENTS = {
+    "ppt_comment_set_v1": ("set (comment)", "comment text set"),
+    "ppt_comment_add_v1": ("add (comment)", "comment add"),
+    "ppt_cell_text_set_v1": ("set (table cell text)", "table cell text set"),
+    "ppt_hyperlink_add_v1": ("add (hyperlink)", "hyperlink add"),
+    "ppt_run_format_v1": ("set (run)", "run format set"),
+    "ppt_comment_get_v1": ("get", "comment get + format"),
+    "ppt_run_get_v1": ("get", "run get + format"),
+}
+
+
+@needs("0323")
+def p0323():
+    """Record 0323 §5: ppt_elements_probe, two runs."""
+    paths = trials((RES / "0323").glob("ppt-elements*.json"))
+    out = []
+    for (scen, n), items in group_cases([load_json(p) for p in paths],
+                                        lambda r: (r["scenario"], r["slides"])).items():
+        op, label = PPT_ELEMENTS[scen]
+        out.append(row("0323", "ppt", op, label, f"{n} slides",
+                       med(i["native_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items),
+                       [i["pair_ratio_median"] for i in items],
+                       READ_POINT if op == "get" else SINGLE, f"ppt_elements:{scen}:{n}",
+                       src(paths), comparison="unified/native"))
+    return out
+
+
+def parts_trials(record, harness, paths, fmt_of, ops):
+    """`*_parts_bench` trials (records 0324, 0328, 0335): `cases` with leaf
+    and unified medians and the ratio; reads carry the point-read budget."""
+    docs = [load_json(p)["cases"] for p in paths]
+    out = []
+    for case, items in group_cases(docs, lambda c: c["case"]).items():
+        op, budget = ops(case)
+        out.append(row(record, fmt_of(case), op, case, "",
+                       us(med(i["leaf_median_ns"] for i in items)),
+                       us(med(i["unified_median_ns"] for i in items)),
+                       [i["ratio"] for i in items], budget, f"{harness}:{case}", src(paths)))
+    return out
+
+
+def part_op(case):
+    if case.endswith(("_get_format", "_list_format")):
+        return "get", READ_POINT
+    if "_add" in case:
+        return "add", SINGLE
+    if "_remove" in case:
+        return "remove", SINGLE
+    return "set", SINGLE
+
+
+def view_sections(path, header, after_label):
+    """`== <name> <label>` sections of `<key>\\t<ns>` lines (records 0324,
+    0325, 0335): per key, the after and before values."""
+    acc: dict = {}
+    current = None
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.rstrip("\n")
+        m = header.match(line)
+        if m:
+            current = "after" if m.group("label") == after_label else "before"
+            continue
+        if current and "\t" in line:
+            k, v = line.rsplit("\t", 1)
+            acc.setdefault(k, {"before": [], "after": []})[current].append(float(v))
+    return acc
+
+
+def view_rows(record, fmt_of, harness, acc, source, labels=None):
+    out = []
+    for k, legs in acc.items():
+        b, a = med(legs["before"]), med(legs["after"])
+        out.append(row(record, fmt_of(k), "get (view)", (labels or {}).get(k, k), "", b, a,
+                       [a / b], regression(record), f"{harness}:{k}", source,
+                       comparison="after/before", unit="ns"))
+    return out
+
+
+@needs("0324")
+def p0324():
+    """Record 0324 §6: doc_parts_bench trials and doc_view_regression (two
+    runs, B = before)."""
+    base = RES / "0324"
+    out = parts_trials("0324", "doc_parts", trials(base.glob("parts-trial-*.json")),
+                       lambda c: "doc", part_op)
+    path = base / "view-regression.txt"
+    header = re.compile(r"^== round(?P<round>\d+) view-\d+-(?P<label>[AB])\.tsv$")
+    rounds: dict = {}
+    current = None
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.rstrip("\n")
+        m = header.match(line)
+        if m:
+            current = (m.group("round"), "after" if m.group("label") == "A" else "before")
+            continue
+        if current and "\t" in line:
+            k, v = line.split("\t")
+            rounds.setdefault(k, {}).setdefault(current, []).append(float(v))
+    for k, legs in rounds.items():
+        ratios = [med(legs[(r, "after")]) / med(legs[(r, "before")]) for r in ("1", "2")]
+        b = med(legs[("1", "before")] + legs[("2", "before")])
+        a = med(legs[("1", "after")] + legs[("2", "after")])
+        out.append(row("0324", "doc", "set (view)" if k.endswith("_set") else "get (view)",
+                       k, "", b, a, ratios, regression("0324"), f"doc_view:{k}",
+                       src([path]), comparison="after/before", unit="ns"))
+    return out
+
+
+OOXML_0325 = {
+    "story_paragraph_set": ("docx", "set"), "story_text_set": ("docx", "set"),
+    "bookmark_rename": ("docx", "set"), "field_instruction_set": ("docx", "set"),
+    "field_add": ("docx", "add"), "levels_add": ("docx", "add"),
+    "shape_link_set": ("pptx", "set"), "note_runs_add": ("xlsx", "add"),
+    "note_font_set": ("xlsx", "set"), "note_text_set": ("xlsx", "set"),
+    "rich_comment_get": ("xlsx", "get"),
+}
+
+
+@needs("0325")
+def p0325():
+    """Record 0325 §6: ooxml_followups_bench (three runs) and the public-API
+    read probe (B A A B B A; `A` sections are the after build)."""
+    base = RES / "0325"
+    path = base / "followups-bench.jsonl"
+    out = []
+    for scen, items in group_cases([load_jsonl(path)], lambda r: r["scenario"]).items():
+        fmt, op = OOXML_0325[scen]
+        out.append(row("0325", fmt, op, scen, "", med(i["leaf_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items), [i["ratio"] for i in items],
+                       READ_POINT if op == "get" else SINGLE, f"ooxml_followups:{scen}",
+                       src([path])))
+    probe = base / "read-regression.txt"
+    acc = view_sections(probe, re.compile(r"^## (?P<label>[AB])\.\d+\.tsv$"), "A")
+    out += view_rows("0325", lambda k: k.split()[0], "ooxml_read_probe", acc, src([probe]))
+    return out
+
+
+@needs("0328")
+def p0328():
+    """Record 0328 §6: odf_rtf_parts_bench trials and the summary of
+    odf_rtf_view_regression (two runs; before/after min-max ranges)."""
+    base = RES / "0328"
+    out = parts_trials("0328", "odf_rtf_parts", trials(base.glob("parts-trial-*.json")),
+                       lambda c: c.split("_", 1)[0], part_op)
+    path = base / "view-regression.txt"
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) != 5 or parts[0] == "scenario":
+            continue
+        k, before, after, r1, r2 = parts
+
+        def mid(span):
+            lo, hi = span.split("-")
+            return (float(lo) + float(hi)) / 2
+
+        out.append(row("0328", k.split("_", 1)[0], "set (view)" if k.endswith("_set") else "get (view)",
+                       k, "", mid(before), mid(after), [float(r1), float(r2)],
+                       regression("0328"), f"odf_rtf_view:{k}", src([path]),
+                       comparison="after/before", unit="ns (mid-range)"))
+    return out
+
+
+@needs("0329")
+def p0329():
+    """Record 0329 §7: the after legs of keynote_bench, pages_bench and
+    numbers_unified_bench (processes 2 and 3 of B A A B)."""
+    return iwork_after("0329", RES / "0329", "{fmt}-*-after.{ext}")
+
+
+@needs("0330")
+def p0330():
+    """Record 0330 §5: one 1,000-item coalesced XLSX cell batch, before and
+    after the claim-list check (ABBA × 4, `abba.txt`)."""
+    path = RES / "0330" / "abba.txt"
+    legs = {"before": [], "after": []}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] in legs:
+            legs[parts[0]].append(float(parts[1]) / 1000)
+    b, a = statistics.mean(legs["before"]), statistics.mean(legs["after"])
+    return [row("0330", "xlsx", "batch", "1,000 cell value sets on create(Xlsx), coalesced",
+                "1000 ops", b, a, [a / b], regression("0330"), "registry_check:xlsx_batch_1000",
+                src([path]), comparison="after/before (mean of 8 medians)")]
+
+
+@needs("0333")
+def p0333():
+    """Record 0333 §6: pptx_p0_bench, two runs (batches against one leaf
+    edit staging the N text edits; single operations against the leaf
+    verb)."""
+    paths = trials((RES / "0333").glob("pptx-p0-bench-run*.jsonl"))
+    out = []
+    for scen, items in group_cases([load_jsonl(p) for p in paths], lambda r: r["scenario"]).items():
+        if "/" in scen:
+            family, owner, n = scen.split("/")
+            n = int(n)
+            op, label = "batch", f"{family.replace('_', ' ')} ({owner} owner; one File::batch vs one leaf edit)"
+            size, budget = f"{n} ops", BATCH if n >= 1000 else SCALING
+        else:
+            op = "add" if "_add" in scen else "remove" if "_remove" in scen else "set"
+            label, size, budget = scen, "", SINGLE
+        out.append(row("0333", "pptx", op, label, size, med(i["leaf_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items), [i["ratio"] for i in items],
+                       budget, f"pptx_p0:{scen}", src(paths)))
+    path = RES / "0333" / "batch-before-after.txt"
+    vals: dict = {}
+    for m in re.finditer(r"^(base|new)\s+eager n=(\d+) median_ms=([\d.]+)\s+source n=\d+ median_ms=([\d.]+)",
+                         path.read_text(encoding="utf-8"), re.M):
+        vals.setdefault(int(m.group(2)), {})[m.group(1)] = (float(m.group(3)), float(m.group(4)))
+    for n, legs in sorted(vals.items()):
+        if "base" not in legs:
+            continue
+        for i, owner in enumerate(("eager", "source")):
+            b, a = legs["base"][i] * 1000, legs["new"][i] * 1000
+            out.append(row("0333", "pptx", "batch",
+                           f"run format batch ({owner} owner; per-item commits before, coalesced after)",
+                           f"{n} ops", b, a, [a / b], regression("0333"),
+                           f"pptx_p0_batch_build:{owner}:{n}", src([path]),
+                           comparison="after/before (unified)"))
+    return out
+
+
+@needs("0335")
+def p0335():
+    """Record 0335 §6: docx_p0_residue_bench trials (warm handle; `_cold`
+    cases open the bytes in both legs; `open_control` times the open alone)
+    and docx_view_regression on two fixtures (B = before)."""
+    base = RES / "0335"
+
+    def ops(case):
+        if case == "open_control":
+            return "open", OPEN
+        if case.endswith("_cold"):
+            return "set (first write, cold handle)", SINGLE
+        return part_op(case)
+
+    out = parts_trials("0335", "docx_p0_residue", trials(base.glob("trial-*.json")),
+                       lambda c: "docx", ops)
+    for name in ("strict", "heading123"):
+        path = base / f"view-{name}.txt"
+        acc = view_sections(path, re.compile(rf"^== {name} (?P<label>[AB])$"), "A")
+        out += view_rows("0335", lambda k: "docx", f"docx_view_0335:{name}",
+                         {f"{name}.docx {k}": v for k, v in acc.items()}, src([path]))
+    return out
+
+
+@needs("0336")
+def p0336():
+    """Record 0336 §6: `File::dump` against a traversal reading what dump
+    reads (three processes; the goal has no dump budget)."""
+    path = RES / "0336" / "dump_bench.jsonl"
+    labels = {"docx": "DOCX, 400 paragraphs (drawing.docx)",
+              "xlsx": "XLSX, 75,770 cells (no_drawing_patriarch.xlsx)",
+              "pptx": "PPTX, 200 generated slides"}
+    out = []
+    for scen, items in group_cases([load_jsonl(path)], lambda r: r["scenario"]).items():
+        out.append(row("0336", scen, "dump", labels[scen], f"{items[0]['items']} items",
+                       med(i["traverse_median_us"] for i in items),
+                       med(i["dump_median_us"] for i in items), [i["ratio"] for i in items],
+                       (None, "none (record 0336 §6: no dump budget in the goal)", "none"),
+                       f"dump:{scen}", src([path]), comparison="dump/traversal"))
+    return out
+
+
+NATIVE_LINE = re.compile(r"^(\w+) (.+?): native (\d+) ns, unified (\d+) ns, ratio ([\d.]+)$")
+
+
+def native_lines(record, harness, path, ops):
+    """`<format> <scenario>: native N ns, unified N ns, ratio R` lines, one
+    block per run (records 0338, 0342); `ops` maps a scenario to (operation,
+    budget, comparison)."""
+    acc: dict = {}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        m = NATIVE_LINE.match(line.strip())
+        if m:
+            acc.setdefault((m.group(1), m.group(2)), []).append(
+                (int(m.group(3)), int(m.group(4)), float(m.group(5))))
+    out = []
+    for (fmt, scen), items in acc.items():
+        op, budget, comparison = ops.get(scen, ("set", SINGLE, "unified/native"))
+        out.append(row(record, fmt, op, scen, "", us(med(i[0] for i in items)),
+                       us(med(i[1] for i in items)), [i[2] for i in items], budget,
+                       f"{harness}:{fmt}:{slug(scen)}", src([path]), comparison=comparison))
+    return out
+
+
+@needs("0338")
+def p0338():
+    """Record 0338 §6 (p0_residue_bench, two runs) and §3 (json_number_bench,
+    two builds, 6 ABBA blocks: after/before of the medians of 12 runs)."""
+    base = RES / "0338"
+    out = native_lines("0338", "p0_residue", base / "p0-residue-bench.txt", {
+        "set / title": ("metadata set", SINGLE, "unified/native"),
+        "set /metadata title vs set / title": ("metadata set", SINGLE,
+                                               "set / title vs set /metadata title (one writer)"),
+        "add cell (ref, value)": ("add", SINGLE, "unified/native"),
+    })
+    path = base / "json-number-bench.txt"
+    legs: dict = {}
+    for m in re.finditer(r"^(before|after) ([\w-]+): (\d+) ns median, (\d+) items, (\d+) bytes",
+                         path.read_text(encoding="utf-8"), re.M):
+        legs.setdefault((m.group(2), m.group(4), m.group(5)), {"before": [], "after": []})[
+            m.group(1)].append(int(m.group(3)))
+    labels = {"seeds": "OfficeCLI seeds (numbers as strings)",
+              "cells-10k-short": "10k cell sets, short decimals",
+              "cells-10k-long": "10k cell sets, 17-digit decimals with exponents",
+              "cells-10k-int": "10k cell sets, integers"}
+    for (payload, items, size), v in legs.items():
+        b, a = us(med(v["before"])), us(med(v["after"]))
+        out.append(row("0338", "batch", "decode", f"batch::from_bytes, {labels[payload]}",
+                       f"{items} items, {int(size):,} bytes", b, a, [a / b], regression("0338"),
+                       f"json_number:{payload}", src([path]),
+                       comparison="after/before (float_roundtrip; medians of 12 runs)"))
+    return out
+
+
+@needs("0342")
+def p0342():
+    """Record 0342 §6: v1_closure_bench, two runs. The table-vs-row path
+    resolution leg is an attribution of the row set's cost, not a pair."""
+    return native_lines("0342", "v1_closure", RES / "0342" / "v1-closure-bench.txt", {
+        "set / extended.company": ("metadata set", SINGLE, "unified/native"),
+        "set / title": ("metadata set", SINGLE, "unified/native"),
+        "resolve table vs row path (attribution)": (
+            "resolve", (None, "none (record 0342 §6: attribution leg)", "none"),
+            "row path/table path resolution"),
+        "add paragraph listStyle=bullet": ("add", SINGLE, "unified/native"),
+    })
+
+
+@needs("0345")
+def p0345():
+    """Record 0345 §6: docx_p0_final_bench, three runs. The resolution,
+    leaf-read and view legs are attributions, not unified/leaf pairs."""
+    attribution = (None, "none (record 0345 §6: attribution leg)", "none")
+    return native_lines("0345", "p0_final", RES / "0345" / "docx-p0-final-bench.txt", {
+        "add cell": ("add", SINGLE, "unified/native"),
+        "add column": ("add", SINGLE, "unified/native"),
+        "add comment reply": ("add", SINGLE, "unified/native"),
+        "add plain comment": ("add", SINGLE, "unified/native"),
+        "resolve /body/tbl[1] vs /body/tbl[1]/col[1]": (
+            "resolve", attribution, "column path/table path resolution"),
+        "leaf document() vs document().comments()": (
+            "read", attribution, "comments read/document handle (leaf)"),
+        "view format: /body/p[2] vs /comments/comment[1]": (
+            "view", attribution, "comment view/paragraph view"),
+    })
+
+
+@needs("0347")
+def p0347():
+    """Record 0347 §6: numbers_unified_bench swaps (two runs, with the
+    sheet and table moves as controls) and the p0_residue_bench picture
+    `set src` after the 0338-P1 fix (the bench's other rows are unchanged
+    paths, recorded under 0338)."""
+    base = RES / "0347"
+    paths = trials(base.glob("numbers-swap-run*.json"))
+    out = numbers_docs("0347", [load_json(p)["scenarios"] for p in paths], paths)
+    out += [r for r in native_lines("0347", "p0_residue", base / "p0-residue-bench.txt", {})
+            if "picture" in r["scenario"]]
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
            p0283, p0284, p0285, p0286, p0287, p0288, p0289, p0290, p0291, p0292,
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
-           p0306, p0309, p0310, p0311, p0312,
-           p0313, p0315, p0326, p0337, p0340]
+           p0306, p0307, p0308, p0309, p0310, p0311, p0312,
+           p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
+           p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345,
+           p0347]
 
 
 # ---------------------------------------------------------------- merge
@@ -2005,7 +2623,9 @@ def finalize(rows):
                     for x in later)
                 text = f"Re-measured later — {chain}."
                 if nxt["explanation"] and latest["status"] != "meets":
-                    text += f" Latest explanation ({latest['record']}): {latest['explanation']}"
+                    # Record 0344: the latest row carries its own explanation;
+                    # repeating it here pushed the outputs past 1 MiB.
+                    text += f" Latest explanation: the record {latest['record']} row."
                 r["explanation"] = (text + (" Original: " + r["explanation"] if r["explanation"] else ""))
     return rows
 
@@ -2098,7 +2718,9 @@ def to_md(rows, conflicts, agreements, cur):
       "regenerate, and check with `python3 tools/unified_bench_matrix.py --check`. "
       "Records 0249–0284 were collected by record 0289, records 0285–0302 by record 0294; "
       "record 0306 added the parsers of 0298, 0301, 0302, 0303, 0304 and 0306; "
-      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; records 0315, 0326, 0337 and 0340 their own.")
+      "record 0310 those of 0305, 0309, 0310, 0311, 0312 and 0313; records 0315, 0326, 0337 and 0340 their own; "
+      "record 0344 those of 0307, 0308, 0314, 0316–0318, 0323–0325, 0328–0330, 0333, 0335, 0336, 0338 and 0342, "
+      "and the check that every record's evidence contributes rows.")
     a("")
     a("- Ratio = unified / leaf, or the comparison the `comparison` column names. "
       "With several trials or runs the ratio is the worst (largest) value and the "
@@ -2120,16 +2742,21 @@ def to_md(rows, conflicts, agreements, cur):
     a("")
     a(f"## Records {FOLLOW_RANGE[0]:04d}–{FOLLOW_RANGE[1]:04d}")
     a("")
-    a("| record | file | rows | parsed | curated | open misses |")
-    a("|---|---|---:|---:|---:|---:|")
+    evidence = evidence_records()
+    exempt = {e["record"]: e["reason"] for e in cur.get("evidence_without_rows", [])}
+    a("| record | file | evidence | rows | parsed | curated | open misses |")
+    a("|---|---|---|---:|---:|---:|---:|")
     for n in range(FOLLOW_RANGE[0], FOLLOW_RANGE[1] + 1):
         rec = f"{n:04d}"
         f = record_file(rec)
         if f is None:
-            a(f"| {rec} | not on this tree | | | | |")
+            a(f"| {rec} | not on this tree | | | | | |")
             continue
         rr = [r for r in rows if r["record"] == rec]
-        a(f"| {rec} | `{f.name}` | {len(rr)} | "
+        ev = ", ".join(f"`{e}`" for e in evidence.get(rec, [])) or "—"
+        if rec in exempt:
+            ev += f" (no rows: {exempt[rec]})"
+        a(f"| {rec} | `{f.name}` | {md_cell(ev)} | {len(rr)} | "
           f"{sum(r['source'].startswith('parsed') for r in rr)} | "
           f"{sum(r['source'].startswith('curated') for r in rr)} | "
           f"{sum(r['status'] == 'miss' for r in rr)} |")
@@ -2196,22 +2823,89 @@ def to_md(rows, conflicts, agreements, cur):
                 f"{fmt_num(c['ratio_min'])}–{fmt_num(c['ratio'])}",
                 f"{fmt_num(p['ratio_min'])}–{fmt_num(p['ratio'])}", c["source"])) + " |")
         a("")
+    a("## Rows by format")
+    a("")
+    a("Each format's rows are on their own page (record 0344), under `bench-matrix/`:")
+    a("")
     for f in fmts:
-        fr = [r for r in rows if r["format"] == f]
-        a(f"## {f}")
-        a("")
-        a("| operation | scenario | size | comparison | stage | leaf µs | unified µs | ratio | range | budget | status | record | source |")
-        a("|---|---|---|---|---|---:|---:|---:|---|---|---|---|---|")
-        for r in fr:
-            unit_note = "" if r["unit"] == "µs" else f" {r['unit']}"
-            a("| " + " | ".join(md_cell(x) for x in (
-                r["operation"], r["scenario"], r["size"], r["comparison"], r["stage"],
-                fmt_num(r["leaf"]) + (unit_note if r["leaf"] is not None else ""),
-                fmt_num(r["unified"]) + (unit_note if r["unified"] is not None else ""),
-                fmt_ratio(r), fmt_range(r), r["budget"], r["status"], r["record"],
-                r["source"])) + " |")
-        a("")
+        a(f"- [{f}](bench-matrix/{f}.md) ({sum(r['format'] == f for r in rows)} rows)")
     return "\n".join(L).rstrip() + "\n"
+
+
+def format_page(f, rows):
+    """One format's rows (record 0344 moved them out of bench-matrix.md)."""
+    L = []
+    a = L.append
+    a(f"# Unified-vs-leaf benchmark matrix: {f}")
+    a("")
+    a("Generated by `tools/unified_bench_matrix.py`; do not edit by hand. Conventions, "
+      "budgets and the misses are in [bench-matrix.md](../bench-matrix.md).")
+    a("")
+    a("| operation | scenario | size | comparison | stage | leaf µs | unified µs | ratio | range | budget | status | record | source |")
+    a("|---|---|---|---|---|---:|---:|---:|---|---|---|---|---|")
+    for r in rows:
+        if r["format"] != f:
+            continue
+        unit_note = "" if r["unit"] == "µs" else f" {r['unit']}"
+        a("| " + " | ".join(md_cell(x) for x in (
+            r["operation"], r["scenario"], r["size"], r["comparison"], r["stage"],
+            fmt_num(r["leaf"]) + (unit_note if r["leaf"] is not None else ""),
+            fmt_num(r["unified"]) + (unit_note if r["unified"] is not None else ""),
+            fmt_ratio(r), fmt_range(r), r["budget"], r["status"], r["record"],
+            r["source"])) + " |")
+    return "\n".join(L).rstrip() + "\n"
+
+
+def outputs(rows, conflicts, agreements, cur):
+    """Every generated file and its text."""
+    files = {OUT_TSV: to_tsv(rows), OUT_MD: to_md(rows, conflicts, agreements, cur)}
+    for f in sorted({r["format"] for r in rows}):
+        files[OUT_FORMAT_DIR / f"{f}.md"] = format_page(f, rows)
+    return files
+
+
+# Record 0344: evidence under `results/` belongs to the record its name
+# starts with (`0328/`, `0255-python-overhead.json`, `0251a-docx-…/`).
+EVIDENCE_NAME = re.compile(r"^(\d{4}[a-z]?)(?=[-.]|$)")
+# The matrix collects records from 0249 on (record 0289).
+FIRST_RECORD = 249
+
+
+def evidence_records(res=None):
+    """Record id -> its evidence entries under `results/` (directories with
+    at least one file, or files), for records the matrix covers."""
+    res = res or RES
+    found: dict = {}
+    for entry in sorted(res.iterdir()):
+        m = EVIDENCE_NAME.match(entry.name)
+        if not m or int(m.group(1)[:4]) < FIRST_RECORD:
+            continue
+        if entry.is_dir() and not any(p.is_file() for p in entry.rglob("*")):
+            continue
+        found.setdefault(m.group(1), []).append(entry.name)
+    return found
+
+
+def coverage_problems(rows, cur, evidence):
+    """Records whose evidence contributes no row (record 0344), unless the
+    curated `evidence_without_rows` says why; and stale exemptions."""
+    with_rows = {r["record"] for r in rows}
+    exempt = {e["record"]: e for e in cur.get("evidence_without_rows", [])}
+    problems = []
+    for rec, entries in sorted(evidence.items()):
+        if rec in with_rows or rec in exempt:
+            continue
+        problems.append(f"record {rec}: results/{entries[0]} holds evidence but the record "
+                        f"contributes no rows; parse it, curate it, or add it to "
+                        f"`evidence_without_rows` with the reason")
+    for rec, e in sorted(exempt.items()):
+        if not e.get("reason", "").strip():
+            problems.append(f"record {rec}: `evidence_without_rows` entry has no reason")
+        if rec in with_rows:
+            problems.append(f"record {rec}: listed in `evidence_without_rows` but contributes rows")
+        elif rec not in evidence:
+            problems.append(f"record {rec}: listed in `evidence_without_rows` but has no evidence")
+    return problems
 
 
 def build():
@@ -2225,6 +2919,7 @@ def build():
     problems = [r for r in rows if r["status"].startswith("miss") and not r["explanation"].strip()]
     problems += [r for r in rows if r["status"] == "miss" and r["explanation"].strip()
                  and not disposition(r)]
+    problems += coverage_problems(rows, cur, evidence_records())
     return rows, conflicts, agreements, cur, problems
 
 
@@ -2234,27 +2929,43 @@ def main(argv=None):
                                  epilog="Outputs: " + rel(OUT_TSV) + ", " + rel(OUT_MD) +
                                  " (paths relative to docs/unified-ops/results/).")
     ap.add_argument("--check", action="store_true",
-                    help="regenerate in memory; exit 1 if the committed outputs differ "
-                         "or a miss lacks an explanation")
+                    help="regenerate in memory; exit 1 if the committed outputs differ, "
+                         "a miss lacks an explanation or a disposition, or a record's "
+                         "evidence contributes no rows")
     ap.add_argument("--stats", action="store_true", help="print row counts per format and source")
     args = ap.parse_args(argv)
     rows, conflicts, agreements, cur, problems = build()
-    tsv, md = to_tsv(rows), to_md(rows, conflicts, agreements, cur)
+    files = outputs(rows, conflicts, agreements, cur)
     rc = 0
+    for path, text in files.items():
+        if len(text.encode("utf-8")) >= SIZE_LIMIT:
+            print(f"{path.relative_to(ROOT)} would be {len(text.encode('utf-8'))} bytes, "
+                  f"at or above the 1 MiB limit", file=sys.stderr)
+            rc = 1
     for r in problems:
-        what = "explanation" if not r["explanation"].strip() else "follow-up or residual"
-        print(f"miss without {what}: {r['record']} {r['series']} {r['stage']}", file=sys.stderr)
+        if isinstance(r, str):
+            print(r, file=sys.stderr)
+        else:
+            what = "explanation" if not r["explanation"].strip() else "follow-up or residual"
+            print(f"miss without {what}: {r['record']} {r['series']} {r['stage']}", file=sys.stderr)
         rc = 1
+    stale_pages = sorted(set(OUT_FORMAT_DIR.glob("*.md")) - set(files)) if OUT_FORMAT_DIR.is_dir() else []
     if args.check:
-        for path, text in ((OUT_TSV, tsv), (OUT_MD, md)):
+        for path, text in files.items():
             if not path.is_file() or path.read_text(encoding="utf-8") != text:
                 print(f"{path.relative_to(ROOT)} is stale; run tools/unified_bench_matrix.py",
                       file=sys.stderr)
                 rc = 1
+        for path in stale_pages:
+            print(f"{path.relative_to(ROOT)} is no longer generated; run tools/unified_bench_matrix.py",
+                  file=sys.stderr)
+            rc = 1
         return rc
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    OUT_TSV.write_text(tsv, encoding="utf-8")
-    OUT_MD.write_text(md, encoding="utf-8")
+    OUT_FORMAT_DIR.mkdir(parents=True, exist_ok=True)
+    for path, text in files.items():
+        path.write_text(text, encoding="utf-8")
+    for path in stale_pages:
+        path.unlink()
     n_p = sum(r["source"].startswith("parsed") for r in rows)
     print(f"{len(rows)} rows ({n_p} parsed, {len(rows) - n_p} curated); "
           f"{len(conflicts)} conflicts, {len(agreements)} agreements; "

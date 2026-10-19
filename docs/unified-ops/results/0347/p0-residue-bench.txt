@@ -1,0 +1,22 @@
+# record 0347: p0_residue_bench after the 0338-P1 fix (replace_element_image); taskset -c 7; ABBA, median of 41 rounds per leg
+# cargo build --release -p litchi-ops --features docx,xlsx,pptx --example p0_residue_bench; base 926cbde41e + this branch
+## run 1
+docx set / title: native 12130 ns, unified 12420 ns, ratio 1.024
+xlsx set / title: native 8680 ns, unified 9030 ns, ratio 1.040
+xlsx set /metadata title vs set / title: native 8830 ns, unified 8800 ns, ratio 0.997
+pptx set / title: native 71031 ns, unified 71791 ns, ratio 1.011
+xlsx set cell value+type=number: native 27780 ns, unified 29080 ns, ratio 1.047
+xlsx set cell value (plain): native 27940 ns, unified 29160 ns, ratio 1.044
+xlsx add cell (ref, value): native 28060 ns, unified 29900 ns, ratio 1.066
+xlsx set run bold: native 1820 ns, unified 2450 ns, ratio 1.346
+xlsx set picture src (both decode the data URI): native 16580 ns, unified 17690 ns, ratio 1.067
+## run 2
+docx set / title: native 11980 ns, unified 12280 ns, ratio 1.025
+xlsx set / title: native 8590 ns, unified 8970 ns, ratio 1.044
+xlsx set /metadata title vs set / title: native 8750 ns, unified 8760 ns, ratio 1.001
+pptx set / title: native 70771 ns, unified 71971 ns, ratio 1.017
+xlsx set cell value+type=number: native 27460 ns, unified 28600 ns, ratio 1.042
+xlsx set cell value (plain): native 27760 ns, unified 28891 ns, ratio 1.041
+xlsx add cell (ref, value): native 27661 ns, unified 29380 ns, ratio 1.062
+xlsx set run bold: native 1800 ns, unified 2460 ns, ratio 1.367
+xlsx set picture src (both decode the data URI): native 16420 ns, unified 17580 ns, ratio 1.071

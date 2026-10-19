@@ -65,7 +65,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `protection.locked` | bool | --g | asg | supported | litchi-only |  |  |  |
 | cell | `protection.hidden` | bool | --g | asg | supported | litchi-only |  |  |  |
 | cell | `numFmtId` | number | --g |  | raw-only | — | P1 | out-of-scope (native-selection) | ADR 0034: native selection requires explicit raw admission |
-| cell | `phonetic` | string | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| cell | `phonetic` | string | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | cell | `quotePrefix` | bool | --g | asg | supported | litchi-only |  |  |  |
 | cell | `alignment.horizontal` | enum | asg | asg | supported | supported |  |  |  |
 | cell | `alignment.vertical` | enum | asg | asg | supported | supported |  |  |  |
@@ -82,7 +82,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `shift` | string | a-- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `arrayformula` | string | as- | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `cachedValue` | string | --g | --g | supported | — |  |  |  |
-| cell | `computedValue` | string | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M4 follow-up: project computed values in cell views |
+| cell | `computedValue` | string | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M4 follow-up: project computed values in cell views → 0266 |
 | cell | `evaluated` | bool | --g | --g | supported | — |  |  |  |
 | cell | `alignment.indent` | number | asg | asg | supported | supported |  |  |  |
 | cell | `alignment.shrinkToFit` | bool | asg | asg | supported | supported |  |  |  |
@@ -101,11 +101,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `arrayref` | string | --g | --g | supported | — |  |  |  |
 | cell | `mergeAnchor` | bool | --g | --g | supported | — |  |  |  |
 | cell | `empty` | bool | --g | --g | supported | — |  |  |  |
-| cell | `richtext` | bool | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| cell | `richtext` | bool | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | cell | `subscript` | bool | asg | asg | supported | supported |  |  |  |
 | cell | `superscript` | bool | asg | asg | supported | supported |  |  |  |
 | cell | `image` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| cell | `alt` | string | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| cell | `alt` | string | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | cell | `image.contentType` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `image.fileSize` | int | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | cell | `border.left.color` | color |  | asg | litchi-only | litchi-only |  |  |  |
@@ -504,7 +504,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | column | `hidden` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | column | `outline` | int | -s- | -s- | write-only | supported |  |  |  |
 | column | `collapsed` | bool | -sg | -sg | supported | supported |  |  |  |
-| column | `numberformat` | string | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| column | `numberformat` | string | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | column | `customWidth` | bool | --g | --g | supported | — |  |  |  |
 | column | `autofit` | bool | -s- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | column | `outlineLevel` | int |  | -sg | litchi-only | litchi-only |  |  |  |
@@ -821,16 +821,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | namedrange | `scope` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | namedrange | `comment` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | namedrange | `volatile` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| ole | `anchor` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `shapeId` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `contentType` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
+| ole | `anchor` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `shapeId` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `contentType` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | pagebreak | `row` | int | a-- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | pagebreak | `col` | string | a-- | asg | supported | supported |  |  |  |
 | pagebreak | `manual` | bool |  | asg | litchi-only | litchi-only |  |  |  |
@@ -874,45 +874,45 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `fileSize` | number | --g | --g | supported | — |  |  |  |
 | picture | `relId` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | picture | `src` | string | as- | as- | write-only | supported |  |  |  |
-| pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `style` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `rows` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `cols` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `filters` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `values` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `location` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
+| pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `style` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `rows` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `cols` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `filters` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `values` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `location` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | range | `merge` | bool | -sg | -sg | supported | supported |  |  |  |
 | range | `font.bold` | bool | -s- | -s- | write-only | supported |  |  |  |
 | range | `fill` | color | -s- | -s- | write-only | supported |  |  |  |
@@ -1024,15 +1024,15 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | shape | `alt` | string |  | asg | litchi-only | litchi-only |  |  |  |
 | sheet | `name` | string | asg | asg | supported | supported |  |  |  |
 | sheet | `autoFilter` | string | asg | -s- | write-only | partial | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| sheet | `tabColor` | color | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| sheet | `tabColor` | color | asg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | sheet | `hidden` | bool | asg | asg | supported | supported |  |  |  |
-| sheet | `freeze` | string | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| sheet | `freeze` | string | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | sheet | `direction` | enum | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| sheet | `zoom` | number | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| sheet | `zoom` | number | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | sheet | `gridlines` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `headings` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `visibility` | enum | --g | --g | supported | — |  |  |  |
-| sheet | `protect` | bool | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| sheet | `protect` | bool | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | sheet | `password` | string | -s- |  | write-only | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `passwordHash` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `protection.algorithm` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
@@ -1044,7 +1044,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sheet | `orientation` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `paperSize` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `fitToPage` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
-| sheet | `printArea` | string | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| sheet | `printArea` | string | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | sheet | `margin.top` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `margin.bottom` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `margin.left` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
@@ -1057,36 +1057,36 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sheet | `rowBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `colBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | sheet | `merge` | scalar |  | -s- | litchi-only | litchi-only |  |  |  |
-| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `field` | string | a-g |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `caption` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `itemCount` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| slicer | `cache` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `type` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `location` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `color` | color | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
-| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
+| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `field` | string | a-g |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `caption` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `itemCount` | number | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| slicer | `cache` | string | --g |  | element gap | — | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `type` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `location` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `color` | color | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
+| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | table | `ref` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | table | `displayName` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | table | `headerRow` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
@@ -1203,7 +1203,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | workbook | `defaultFontSize` | length | --- |  | write-only | — |  |  |  |
 | workbook | `author` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `title` | string | -sg | -sg | supported | supported |  |  |  |
-| workbook | `calc.mode` | enum | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| workbook | `calc.mode` | enum | -sg |  | gap | gap | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | workbook | `calc.iterate` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `calc.iterateCount` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `calc.iterateDelta` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (xlsx-breadth) |  |
@@ -1217,7 +1217,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | workbook | `keywords` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `revisionNumber` | string | -sg | -sg | supported | supported |  |  |  |
 | workbook | `activeTab` | number | --g | --g | supported | — |  |  |  |
-| workbook | `firstSheet` | number | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) |
+| workbook | `firstSheet` | number | --g |  | gap | — | P1 | deferred-P1 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | workbook | `calc.fullCalcOnLoad` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `calc.refMode` | string | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |
 | workbook | `workbook.backupFile` | bool | --g |  | unlisted | — | P1 | deferred-P1 0332 (xlsx-breadth) |  |

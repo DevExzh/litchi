@@ -129,6 +129,9 @@ pub enum Kind {
     Axis,
     /// A content node of a SmartArt graphic (record 0335).
     Node,
+    /// A grid column of a table, `col[N]` (record 0345): a `w:gridCol` of
+    /// `w:tblGrid` and the cells at its slot.
+    Column,
 }
 
 impl Kind {
@@ -273,6 +276,7 @@ names! {
     Series => "series",
     Axis => "axis",
     Node => "node",
+    Column => "col",
 }
 
 // ---------------------------------------------------------------------------
@@ -585,20 +589,6 @@ const fn write_only(
     }
 }
 
-/// A write-only property that `set` writes and `add` does not seed: a cell's
-/// text, since a single cell is never added (rows bring their cells; record
-/// 0330).
-const fn set_only_text(setter: Setter) -> crate::registry::Entry<Setter> {
-    let mut spec = PropSpec::new("text", ValueType::Text);
-    spec.access.get = false;
-    crate::registry::Entry {
-        spec,
-        access: crate::registry::Access::Set(setter),
-        constraint: Constraint::None,
-        clear: true,
-    }
-}
-
 // `GetRootNode`: the core document properties.
 crate::registry::registry! {
     pub(crate) DOCUMENT_PROPS, DOCUMENT_REGISTRY: () {
@@ -780,7 +770,8 @@ crate::registry::registry! {
     },
     read_add("anchor", ValueType::Text, Setter::HyperlinkAnchor, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("docLocation", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("tooltip", ValueType::Text)),
+    // Record 0345: the screen tip is written by add and set; `null` removes it.
+    writable("tooltip", ValueType::Text, Setter::HyperlinkTooltip, Constraint::None, true),
     crate::registry::Entry::read(PropSpec::new("tgtFrame", ValueType::Text)),
     read_add("font", ValueType::Text, Setter::RunFontLatin, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("font.cs", ValueType::Text)),
@@ -862,11 +853,23 @@ crate::registry::registry! {
     }
 }
 
+// A table grid column (record 0345), after OfficeCLI's virtual `column`
+// element: `width` (twips) and `text` seed a new column; Litchi also reads
+// and sets the width (the `w:gridCol`).
+crate::registry::registry! {
+    pub(crate) COLUMN_PROPS, COLUMN_REGISTRY: Setter {
+    read_set_add("width", ValueType::Text, Setter::ColumnWidth, Constraint::NotEmpty),
+    add_only("text", ValueType::Text, Setter::ColumnText, Constraint::None),
+    }
+}
+
 // `ReadCellProps`, in its order. `width` is a string (`"2880dxa"`,
 // `"50%"`, `"auto"`, `"nil"`) there.
 crate::registry::registry! {
     pub(crate) CELL_PROPS, CELL_REGISTRY: Setter {
-    crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
+    // Record 0345: `width` and `text` seed a new cell (OfficeCLI's
+    // `AddCell` honours only these two at add time).
+    read_add("width", ValueType::Text, Setter::CellWidth, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("valign", ValueType::Token(&VALIGN))),
     crate::registry::Entry::read(PropSpec::new("vmerge", ValueType::Token(&MERGE))),
     crate::registry::Entry::read(PropSpec::new("hmerge", ValueType::Token(&MERGE))),
@@ -879,7 +882,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("nowrap", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("hideMark", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("tcFitText", ValueType::Bool)),
-    set_only_text(Setter::CellText),
+    write_only("text", ValueType::Text, Setter::CellText),
     }
 }
 
@@ -959,16 +962,84 @@ pub(crate) const PICTURE_PROPS: &[PropSpec] = &PICTURE_REGISTRY.readable();
 
 // A comment of the comments part (record 0251c): its identity, author and
 // text; `text` and the author's details seed a new comment and are set
-// (record 0335).
-crate::registry::registry! {
-    pub(crate) COMMENT_PROPS, COMMENT_REGISTRY: Setter {
-    crate::registry::Entry::read(PropSpec::new("id", ValueType::Int)),
-    writable("author", ValueType::Text, Setter::CommentAuthor, Constraint::NotEmpty, false),
-    writable("initials", ValueType::Text, Setter::CommentInitials, Constraint::NotEmpty, false),
-    writable("date", ValueType::Text, Setter::CommentDate, Constraint::NotEmpty, false),
-    writable("text", ValueType::Text, Setter::CommentText, Constraint::None, false),
-    }
-}
+// (record 0335). Record 0345, after OfficeCLI's comment schema: the
+// anchor's path (`anchoredTo`), the resolved state (`done`, alias
+// `resolved`; set too) and the reply parent (`parentId`, the parent's
+// comment id) from `commentsExtended`, and the anchor controls `runStart`
+// and `range` on add.
+pub(crate) const COMMENT_REGISTRY: crate::registry::Table<Setter, 10, 1> =
+    crate::registry::Table::new(
+        [
+            crate::registry::Entry::read(PropSpec::new("id", ValueType::Int)),
+            writable(
+                "author",
+                ValueType::Text,
+                Setter::CommentAuthor,
+                Constraint::NotEmpty,
+                false,
+            ),
+            writable(
+                "initials",
+                ValueType::Text,
+                Setter::CommentInitials,
+                Constraint::NotEmpty,
+                false,
+            ),
+            writable(
+                "date",
+                ValueType::Text,
+                Setter::CommentDate,
+                Constraint::NotEmpty,
+                false,
+            ),
+            writable(
+                "text",
+                ValueType::Text,
+                Setter::CommentText,
+                Constraint::None,
+                false,
+            ),
+            crate::registry::Entry::read(PropSpec::new("anchoredTo", ValueType::Text)),
+            writable(
+                "done",
+                ValueType::Bool,
+                Setter::CommentDone,
+                Constraint::None,
+                false,
+            ),
+            read_add(
+                "parentId",
+                ValueType::Int,
+                Setter::CommentParent,
+                Constraint::Int {
+                    min: 0,
+                    max: u32::MAX as i64,
+                },
+            ),
+            add_only(
+                "runStart",
+                ValueType::Int,
+                Setter::CommentRunStart,
+                Constraint::Int {
+                    min: 0,
+                    max: 1 << 20,
+                },
+            ),
+            add_only(
+                "range",
+                ValueType::Bool,
+                Setter::CommentRange,
+                Constraint::None,
+            ),
+        ],
+        [crate::registry::Alias {
+            name: "resolved",
+            entry: 6,
+        }],
+    );
+
+/// The comment element's properties.
+pub(crate) const COMMENT_PROPS: &[PropSpec] = &COMMENT_REGISTRY.readable();
 
 // `SdtBlockToNode`: the content control's identity.
 crate::registry::registry! {
@@ -1588,6 +1659,17 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/smartart[N]/node[K]", "/smartart[N]/node[K]/node[J]"],
                 super::smartart::NODE_PROPS,
             ),
+            // Not a listed table child: table views and child counts stay
+            // the rows (record 0345).
+            element(
+                K::Column,
+                "column",
+                &["col", "column"],
+                &[K::Table],
+                &[],
+                &["/body/tbl[N]/col[M]"],
+                COLUMN_PROPS,
+            ),
         ],
         gaps: &[
             // OfficeCLI elements this adapter does not list as kinds
@@ -1608,11 +1690,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "positional tabs (w:ptab) are kept in their runs but not projected as nodes",
             ),
             unlisted_gap(
-                "col",
-                "WP4 (record 0335 F8)",
-                "table columns are not nodes yet: the grid widths are read on the table and the widths of cells on each cell",
-            ),
-            unlisted_gap(
                 "fieldChar",
                 "none: out of scope (record 0332)",
                 "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements",
@@ -1627,24 +1704,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 code: Code::UnsupportedPath,
                 follow_up: "none: out of scope (record 0332, design §10)",
                 reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
-            },
-            GapSpec {
-                subject: Subject::Property {
-                    element: "comment",
-                    key: "parentId",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "0335-F2",
-                reason: "comment replies (the commentsExtended parent link) are not read or authored; an add or set naming parentId is refused",
-            },
-            GapSpec {
-                subject: Subject::Property {
-                    element: "comment",
-                    key: "done",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "0335-F2",
-                reason: "comment resolution (commentsExtended w15:done) is not read or authored; an add or set naming done is refused",
             },
             GapSpec {
                 subject: Subject::Property {
@@ -1832,26 +1891,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
                 reason: "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors",
-            },
-            GapSpec {
-                subject: Subject::Operation {
-                    verb: "add",
-                    element: "cell",
-                    context: "cell-insertion",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "M2 (DOCX table grid editing)",
-                reason: "a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated",
-            },
-            GapSpec {
-                subject: Subject::Operation {
-                    verb: "set",
-                    element: "table/row",
-                    context: "table-properties",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "M2 (DOCX table properties)",
-                reason: "table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated",
             },
             GapSpec {
                 subject: Subject::Operation {

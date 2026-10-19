@@ -16,6 +16,7 @@ use quick_xml::events::Event;
 use super::super::{ElementPath, Error, Refusal, Result};
 use super::Edit;
 use super::stories::text_run;
+use super::threads::keyed_paragraph_id;
 use crate::Package;
 use crate::part_scan::{self, qualified};
 
@@ -49,6 +50,14 @@ pub struct NewComment {
     initials: Option<String>,
     date: Option<String>,
     text: String,
+    /// The comment this one replies to (record 0345).
+    parent: Option<u32>,
+    /// The resolved state (record 0345).
+    done: Option<bool>,
+    /// The direct run a whole-paragraph range starts after (record 0345).
+    start_after: Option<Position>,
+    /// Whether the comment has range markers (record 0345).
+    range: bool,
 }
 
 impl NewComment {
@@ -60,7 +69,47 @@ impl NewComment {
             initials: None,
             date: None,
             text: text.into(),
+            parent: None,
+            done: None,
+            start_after: None,
+            range: true,
         }
+    }
+
+    /// Make the comment a reply to comment `parent` (its native
+    /// identifier), threaded through `commentsExtended`
+    /// (`w15:paraIdParent`) as Word threads replies (record 0345).
+    #[must_use]
+    pub const fn with_parent(mut self, parent: u32) -> Self {
+        self.parent = Some(parent);
+        self
+    }
+
+    /// Set the comment's resolved state (`w15:done` in `commentsExtended`,
+    /// record 0345).
+    #[must_use]
+    pub const fn with_done(mut self, done: bool) -> Self {
+        self.done = Some(done);
+        self
+    }
+
+    /// For a whole-paragraph anchor, start the comment's range after the
+    /// paragraph's direct run `run` instead of at the paragraph start
+    /// (OfficeCLI's `runStart`, record 0345). A run the paragraph lacks
+    /// keeps the paragraph start.
+    #[must_use]
+    pub const fn with_start_after(mut self, run: Position) -> Self {
+        self.start_after = Some(run);
+        self
+    }
+
+    /// Whether the comment spans a range (`true`, the default: range
+    /// markers and a reference run) or is a point comment carrying only
+    /// its reference run (`false`; OfficeCLI's `range=false`, record 0345).
+    #[must_use]
+    pub const fn with_range(mut self, range: bool) -> Self {
+        self.range = range;
+        self
     }
 
     /// Set the author's initials.
@@ -106,6 +155,7 @@ pub struct CommentChange {
     initials: Option<String>,
     date: Option<String>,
     text: Option<String>,
+    done: Option<bool>,
 }
 
 impl CommentChange {
@@ -144,6 +194,14 @@ impl CommentChange {
         self
     }
 
+    /// The new resolved state (`w15:done` in `commentsExtended`, record
+    /// 0345).
+    #[must_use]
+    pub const fn with_done(mut self, done: bool) -> Self {
+        self.done = Some(done);
+        self
+    }
+
     /// Whether the change sets nothing.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
@@ -151,6 +209,7 @@ impl CommentChange {
             && self.initials.is_none()
             && self.date.is_none()
             && self.text.is_none()
+            && self.done.is_none()
     }
 }
 
@@ -213,10 +272,32 @@ impl Edit<Package> {
                     reason: Refusal::InvalidPropertyValue,
                 })
             })?;
-        self.inner.anchor_comment_at(paragraph, range, id)?;
+        self.inner
+            .anchor_comment_at(paragraph, range, id, comment.start_after, !comment.range)?;
+        // Replies and resolution (record 0345): the comment's paragraph
+        // takes a fresh identifier, which `commentsExtended` keys on.
+        let threaded = comment.parent.is_some() || comment.done.is_some();
+        let mut current = current.map(|xml| xml.as_ref().clone());
+        let mut fresh = self.fresh_paragraph_ids(current.as_deref())?;
+        let parent = match comment.parent {
+            Some(parent) => {
+                let xml = current.as_mut().ok_or(Error::Refused {
+                    position: 0,
+                    reason: Refusal::BlockNotFound,
+                })?;
+                Some(
+                    keyed_paragraph_id(xml, parent, &mut fresh)?.ok_or(Error::Refused {
+                        position: 0,
+                        reason: Refusal::BlockNotFound,
+                    })?,
+                )
+            },
+            None => None,
+        };
+        let paragraph_id = threaded.then(|| fresh.next()).transpose()?;
         match (part, current) {
             (Some((name, _)), Some(xml)) => {
-                let updated = append_comment(&xml, id, comment)?;
+                let updated = append_comment(&xml, id, comment, paragraph_id)?;
                 self.replace_part(&name, updated)?;
             },
             _ => {
@@ -228,7 +309,7 @@ impl Edit<Package> {
                 let empty = format!(
                     r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="{namespace}"></w:comments>"#
                 );
-                let xml = append_comment(empty.as_bytes(), id, comment)?;
+                let xml = append_comment(empty.as_bytes(), id, comment, paragraph_id)?;
                 self.stage_related_part(
                     comments_relationship(strict),
                     ("", "comments", ".xml"),
@@ -237,6 +318,24 @@ impl Edit<Package> {
                     xml,
                 )?;
             },
+        }
+        if let Some(paragraph_id) = paragraph_id {
+            let mut entries = Vec::with_capacity(2);
+            if let Some(parent) = parent {
+                // Word writes an entry for every comment: the thread's
+                // root gets one when it has none.
+                entries.push(super::threads::Entry {
+                    paragraph: parent,
+                    parent: None,
+                    done: None,
+                });
+            }
+            entries.push(super::threads::Entry {
+                paragraph: paragraph_id,
+                parent,
+                done: Some(comment.done.unwrap_or(false)),
+            });
+            self.upsert_comment_entries(&entries, &fresh.assigned)?;
         }
         Ok(id)
     }
@@ -444,8 +543,28 @@ impl Edit<Package> {
             cursor = end;
         }
         output.extend_from_slice(&xml[cursor..]);
+        // The resolved state (record 0345): the comment's last paragraph
+        // keys its `commentsExtended` entry, given an identifier if it has
+        // none.
+        let mut threaded = false;
+        if let Some(done) = change.done {
+            let mut fresh = self.fresh_paragraph_ids(Some(&output))?;
+            let paragraph =
+                keyed_paragraph_id(&mut output, id, &mut fresh)?.ok_or(Error::Refused {
+                    position: 0,
+                    reason: Refusal::ComplexContent,
+                })?;
+            threaded = self.upsert_comment_entries(
+                &[super::threads::Entry {
+                    paragraph,
+                    parent: None,
+                    done: Some(done),
+                }],
+                &fresh.assigned,
+            )?;
+        }
         if output.as_slice() == xml.as_slice() {
-            return Ok(false);
+            return Ok(threaded);
         }
         self.replace_part(&name, output)?;
         Ok(true)
@@ -572,8 +691,15 @@ fn comment_range(xml: &[u8], id: u32) -> Result<Option<(usize, usize)>> {
         .map(|(range, _)| range))
 }
 
-/// The comments part with `comment` appended as comment `id`.
-fn append_comment(xml: &[u8], id: u32, comment: &NewComment) -> Result<Vec<u8>> {
+/// The comments part with `comment` appended as comment `id`; its
+/// paragraph carries `paragraph_id` (`w14:paraId`) when given (record
+/// 0345).
+fn append_comment(
+    xml: &[u8],
+    id: u32,
+    comment: &NewComment,
+    paragraph_id: Option<u32>,
+) -> Result<Vec<u8>> {
     let (_, close, prefix) = comments(xml)?;
     let prefix = String::from_utf8(prefix).map_err(|_| invalid("invalid comments prefix"))?;
     let q = |local: &str| {
@@ -604,8 +730,12 @@ fn append_comment(xml: &[u8], id: u32, comment: &NewComment) -> Result<Vec<u8>> 
     if let Some(initials) = &comment.initials {
         entry.push_str(&format!(r#" {}="{}""#, q("initials"), escape(initials)));
     }
+    let paragraph_attributes = match paragraph_id {
+        Some(paragraph_id) => super::threads::paragraph_id_attributes(xml, paragraph_id),
+        None => String::new(),
+    };
     entry.push_str(&format!(
-        r#"><{p}><{ppr}><{style} {val}="CommentText"/></{ppr}><{r}><{rpr}><{rstyle} {val}="CommentReference"/></{rpr}><{annotation}/></{r}><{r}><{t} xml:space="preserve">{text}</{t}></{r}></{p}></{c}>"#,
+        r#"><{p}{paragraph_attributes}><{ppr}><{style} {val}="CommentText"/></{ppr}><{r}><{rpr}><{rstyle} {val}="CommentReference"/></{rpr}><{annotation}/></{r}><{r}><{t} xml:space="preserve">{text}</{t}></{r}></{p}></{c}>"#,
         p = q("p"),
         ppr = q("pPr"),
         style = q("pStyle"),
@@ -730,7 +860,7 @@ mod tests {
     fn comments_parts_are_appended_and_entries_removed() {
         let xml = br#"<w:comments xmlns:w="urn:w"><w:comment w:id="3" w:author="A"><w:p w14:paraId="1A"/></w:comment></w:comments>"#;
         assert_eq!(comment_ids(xml).unwrap(), [3]);
-        let appended = append_comment(xml, 4, &NewComment::new("B & C", "x<y")).unwrap();
+        let appended = append_comment(xml, 4, &NewComment::new("B & C", "x<y"), None).unwrap();
         let text = String::from_utf8(appended.clone()).unwrap();
         assert!(text.contains(r#"<w:comment w:id="4" w:author="B &amp; C">"#));
         assert!(text.contains("x&lt;y"));

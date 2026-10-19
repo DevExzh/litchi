@@ -50,7 +50,7 @@ was refused (typed), `none` nothing to move.
 | fodp | corrupt_file ×1 |
 | fods | corrupt_file ×2 |
 | odt | corrupt_file ×1 |
-| rtf | corrupt_file ×14, unsupported_format ×1 |
+| rtf | corrupt_file ×12, unsupported_capability ×2, unsupported_format ×1 |
 | xls | corrupt_file ×2, unsupported_format ×2 |
 
 ### Each file, classified (record 0341)
@@ -92,8 +92,8 @@ was refused (typed), `none` nothing to move.
 | `poi/test-data/spreadsheet/57456.xls` | `corrupt_file` | invalid input | an SST declaring 1,761 unique strings and 0 total |
 | `poi/test-data/spreadsheet/SharedFormulaTest.xls` | `corrupt_file` | invalid input | an XFCRC record declaring 72 XF records where 62 are present |
 | `rtf/binary-garbage-nested-groups.rtf` | `unsupported_format` | fuzzed input | binary garbage after an opening brace |
-| `rtf/test10001Encoding.rtf` | `corrupt_file` | reader gap | \ansicpg10001 (Mac Japanese) is not a supported code page; the refusal should be typed unsupported, not corrupt |
-| `rtf/test10007Encoding.rtf` | `corrupt_file` | reader gap | \ansicpg10007 (Mac Cyrillic) is not a supported code page; the refusal should be typed unsupported, not corrupt |
+| `rtf/test10001Encoding.rtf` | `unsupported_capability` | reader gap | \ansicpg10001 (Mac Japanese) has no exact codec; refused as unsupported (record 0347) |
+| `rtf/test10007Encoding.rtf` | `unsupported_capability` | reader gap | \ansicpg10007 (Mac Cyrillic) has no exact codec; refused as unsupported (record 0347) |
 
 ## Every no-op that is not exact, and every revert that is not exact
 

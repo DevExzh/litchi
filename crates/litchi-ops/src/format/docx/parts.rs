@@ -62,6 +62,11 @@ pub(crate) struct Cache {
     /// 0335): a chart's series and axes resolve against its projection.
     pub(super) charts:
         std::sync::Mutex<Vec<(Box<str>, Option<Arc<crate::format::chart::Summary>>)>>,
+    /// Each comment's anchor path by comment id, from one walk of the main
+    /// story on first use (record 0345).
+    pub(super) comment_anchors: OnceLock<Arc<std::collections::HashMap<u32, String>>>,
+    /// The `commentsExtended` entries, read on first use (record 0345).
+    pub(super) comment_threads: OnceLock<Arc<[litchi_docx::modern_comments::Extended]>>,
 }
 
 /// One header or footer part, with its payload read on first use.

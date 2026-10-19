@@ -1558,9 +1558,12 @@ impl Xlsx {
                 .map_err(authored)?;
         }
         if let Some((bytes, content_type, extension)) = image {
-            edit.replace_image(
+            // Path resolution read the picture; the leaf does not read the
+            // drawing again to find its image (record 0347).
+            edit.replace_element_image(
                 sheet,
                 feature.index as usize,
+                element,
                 bytes,
                 content_type,
                 extension,

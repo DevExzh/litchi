@@ -190,7 +190,7 @@ impl File {
 
     /// A clone of the open handle (one reference count), so the read runs
     /// without holding the lock; the closed-file failure after `close()`.
-    fn handle(&self) -> Result<litchi::File, Failure> {
+    pub(crate) fn handle(&self) -> Result<litchi::File, Failure> {
         self.handle
             .read()
             .unwrap_or_else(PoisonError::into_inner)
@@ -686,6 +686,7 @@ impl File {
         Commit::new(
             py,
             commit.file,
+            Some(write::Patch::one(commit.patch)),
             commit.diagnostics.changed(),
             commit.diagnostics.operations(),
             Some(results),
@@ -712,6 +713,7 @@ impl File {
         Commit::new(
             py,
             commit.file,
+            Some(write::Patch::one(commit.patch)),
             commit.diagnostics.changed(),
             commit.diagnostics.operations(),
             Some(results),
@@ -1165,6 +1167,7 @@ impl File {
         Commit::new(
             py,
             added.file,
+            None,
             true,
             1,
             None,
@@ -1209,6 +1212,7 @@ impl File {
         Commit::new(
             py,
             edited.file,
+            None,
             true,
             1,
             None,

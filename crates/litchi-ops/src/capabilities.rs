@@ -987,15 +987,10 @@ impl Capabilities {
                     Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
                     Verb::Add if !writes.addable.is_empty() => Support::Supported,
                     Verb::Remove if !writes.removable.is_empty() => Support::Supported,
-                    Verb::Move if !writes.movable.is_empty() => Support::Supported,
                     // Pages exchanges paragraphs (record 0299); Keynote slides,
-                    // paragraphs and drawables (record 0298).
-                    Verb::Swap
-                        if matches!(self.format, Some(FileFormat::Pages | FileFormat::Keynote))
-                            && !writes.movable.is_empty() =>
-                    {
-                        Support::Supported
-                    },
+                    // paragraphs and drawables (record 0298); Numbers sheets
+                    // and tables (record 0347).
+                    Verb::Move | Verb::Swap if !writes.movable.is_empty() => Support::Supported,
                     _ => IWORK_STRUCTURE.support(),
                 };
             }
@@ -2894,6 +2889,8 @@ impl Element {
                             | "smartart"
                             | "node"
                             | "document"
+                            // Table grid columns (record 0345).
+                            | "col"
                     )
                     && readable)
                     || (self.adapter == Adapter::Docx
@@ -3054,6 +3051,9 @@ impl Element {
                         | "bookmark"
                         | "field"
                         | "toc"
+                        // Cells and grid columns (record 0345).
+                        | "tc"
+                        | "col"
                 ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
@@ -3122,8 +3122,8 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let remove = structural;
-        // DOCX cells and content controls are removable but not yet
-        // addable (record 0251a).
+        // DOCX content controls are removable but not yet addable (record
+        // 0251a); cells and grid columns are both (record 0345).
         #[cfg(feature = "docx")]
         let remove = remove
             || (self.adapter == Adapter::Docx
@@ -3131,6 +3131,7 @@ impl Element {
                 && (matches!(
                     self.data().canonical,
                     "tc" | "sdt"
+                        | "col"
                         | "chart"
                         | "picture"
                         | "smartart"

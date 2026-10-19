@@ -90,6 +90,22 @@ impl Docx {
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Row, raw)))))
             },
+            // A single cell, after OfficeCLI's `AddCell` (record 0345).
+            (NewKind::Cell, Kind::Row) => {
+                let row = element_path(parent)?;
+                let Value::Row(value) = &parent.value else {
+                    return Err(refusal("the cell parent holds no row"));
+                };
+                let cells = value.cell_count().map_err(Error::from)?;
+                let at = sibling_position(self, parent, Kind::Cell, cells, placement)?;
+                let cell = new_cell(node.props())?;
+                self.owner().check_source()?;
+                let mut edit = WorkEdit::from(editor)?;
+                let position = edit.insert_cell_at(&row, at.map(Position::new), &cell)?;
+                let commit = edit.commit(self)?;
+                Ok((commit, path_with(parent, Some((Kind::Cell, position)))))
+            },
+            (NewKind::Column, Kind::Table) => self.add_column(editor, parent, node),
             (NewKind::Hyperlink, Kind::Paragraph) => {
                 let owner = element_path(parent)?;
                 let Value::Paragraph { paragraph, .. } = &parent.value else {
@@ -109,7 +125,7 @@ impl Docx {
                         },
                     },
                 };
-                let (target, run) = new_hyperlink(node.props())?;
+                let (target, run, tooltip) = new_hyperlink(node.props())?;
                 // The hyperlink's position is its ordinal among the
                 // paragraph's direct hyperlinks.
                 self.owner().check_source()?;
@@ -120,6 +136,15 @@ impl Docx {
                 let position = eager
                     .insert_hyperlink_at(&owner, direct, &target, &run)
                     .map_err(Error::from)?;
+                // The screen tip (record 0345), in the same transaction.
+                if let Some(tooltip) = tooltip.as_deref() {
+                    eager
+                        .set_hyperlink_tooltip_at(
+                            &owner.child(ElementStep::Hyperlink(position)),
+                            Some(tooltip),
+                        )
+                        .map_err(Error::from)?;
+                }
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Hyperlink, position)))))
             },
@@ -182,6 +207,21 @@ impl Docx {
                     }
                 };
                 let comment = new_comment(node.props())?;
+                // The comments before the edit, read on this (warm) handle:
+                // a reply names one of them (OfficeCLI refuses `parentId`
+                // without one, record 0345), and the leaf appends the new
+                // comment after them, so their count is its ordinal.
+                let existing = super::nav::comments(self)?;
+                if let Some(parent) = reply_parent(node.props())
+                    && !existing.iter().any(|comment| comment.id() == parent)
+                {
+                    return Err(Error::new(
+                        Code::InvalidValue,
+                        "parentId names no comment to reply to",
+                    )
+                    .with_property("parentId")
+                    .with_format(FileFormat::Docx));
+                }
                 self.owner().check_source()?;
                 let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
                 let WorkEdit::Eager(eager) = &mut edit else {
@@ -191,10 +231,17 @@ impl Docx {
                     .add_comment_at(&paragraph, range, &comment)
                     .map_err(Error::from)?;
                 let commit = edit.commit(self)?;
-                let ordinal = super::nav::comments(commit.file())?
-                    .iter()
-                    .position(|comment| comment.id() == id)
-                    .ok_or_else(|| refusal("the new comment is not in the comments part"))?;
+                // A document's first comment is looked up on the new
+                // handle: its part may be one this reader does not list
+                // (a Strict relationship), which is refused as before.
+                let ordinal = if existing.is_empty() {
+                    super::nav::comments(commit.file())?
+                        .iter()
+                        .position(|comment| comment.id() == id)
+                        .ok_or_else(|| refusal("the new comment is not in the comments part"))?
+                } else {
+                    existing.len()
+                };
                 Ok((commit, comment_path(ordinal)))
             },
             (NewKind::Run, Kind::Paragraph) => {
@@ -257,6 +304,10 @@ impl Docx {
                 .all(|node| matches!(node.element_kind(), Kind::SmartArt | Kind::Node))
         {
             return self.remove_smartarts(editor, nodes);
+        }
+        // Table grid columns (record 0345).
+        if !nodes.is_empty() && nodes.iter().all(|node| node.element_kind() == Kind::Column) {
+            return self.remove_columns(editor, nodes);
         }
         // Styles, numbering, headers, footers and notes (record 0319).
         if !nodes.is_empty()
@@ -752,17 +803,19 @@ fn new_table(
     Ok((table, borders.borders))
 }
 
-/// A new hyperlink's target and run from its add properties: exactly one of
-/// `url` and `anchor`, its `text`, and its run formatting. Without explicit
-/// formatting the run gets OfficeCLI's fallback hyperlink look (color
-/// `0563C1`, single underline).
+/// A new hyperlink's target, run and screen tip from its add properties:
+/// exactly one of `url` and `anchor`, its `text`, its `tooltip` (record
+/// 0345), and its run formatting. Without explicit formatting the run gets
+/// OfficeCLI's fallback hyperlink look (color `0563C1`, single underline).
 fn new_hyperlink(
     props: &Props<'_>,
 ) -> Result<(
     litchi_docx::document::HyperlinkTarget,
     litchi_docx::document::NewRun,
+    Option<String>,
 )> {
     use super::setters::Setter;
+    let mut tooltip = None::<String>;
     let mut url = None::<String>;
     let mut anchor = None::<String>;
     let mut text = String::new();
@@ -784,6 +837,9 @@ fn new_hyperlink(
                 match setter {
                     Setter::HyperlinkUrl => url = Some(as_text(value)),
                     Setter::HyperlinkAnchor => anchor = Some(as_text(value)),
+                    Setter::HyperlinkTooltip => {
+                        tooltip = value.is_some().then(|| as_text(value));
+                    },
                     Setter::HyperlinkText => text = as_text(value),
                     other => {
                         styled |= matches!(
@@ -826,6 +882,7 @@ fn new_hyperlink(
     Ok((
         target,
         litchi_docx::document::NewRun::new(text).with_properties(properties),
+        tooltip,
     ))
 }
 
@@ -838,21 +895,67 @@ fn comment_path(ordinal: usize) -> Path<'static> {
     ])
 }
 
+/// The comment id a new comment's `parentId` names, if any.
+fn reply_parent(props: &Props<'_>) -> Option<u32> {
+    props.iter().find_map(|(key, value)| {
+        let (_, entry) = super::spec::COMMENT_REGISTRY.lookup(key.as_str())?;
+        if !matches!(
+            entry.access,
+            crate::registry::Access::Add(super::setters::Setter::CommentParent)
+        ) {
+            return None;
+        }
+        let mut parent = None;
+        entry
+            .prepare(Operation::Add, value, |_, value| {
+                if let Some(crate::value::Scalar::Int(id)) = value {
+                    parent = u32::try_from(id).ok();
+                }
+                Ok(())
+            })
+            .ok()?;
+        parent
+    })
+}
+
 /// A new comment from its add properties: `author` is required, `text`,
-/// `initials` and `date` are optional.
+/// `initials` and `date` are optional; `parentId`, `done`, `runStart` and
+/// `range` follow OfficeCLI's comment schema (record 0345).
 fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
     use super::setters::Setter;
     let mut author = None::<String>;
     let mut initials = None::<String>;
     let mut date = None::<String>;
     let mut text = String::new();
+    let mut parent = None::<u32>;
+    let mut done = None::<bool>;
+    let mut run_start = None::<usize>;
+    let mut range = true;
     for (key, value) in props.iter() {
-        refuse_reply(key.as_str())?;
         let (_, entry) = super::spec::COMMENT_REGISTRY
             .resolve(key.as_str())
             .map_err(|error| error.with_property(key.as_str().to_owned()))?;
         entry
             .prepare(Operation::Add, value, |setter, value| {
+                match (setter, value) {
+                    (Setter::CommentDone, Some(crate::value::Scalar::Bool(flag))) => {
+                        done = Some(flag);
+                        return Ok(());
+                    },
+                    (Setter::CommentRange, Some(crate::value::Scalar::Bool(flag))) => {
+                        range = flag;
+                        return Ok(());
+                    },
+                    (Setter::CommentParent, Some(crate::value::Scalar::Int(id))) => {
+                        parent = u32::try_from(id).ok();
+                        return Ok(());
+                    },
+                    (Setter::CommentRunStart, Some(crate::value::Scalar::Int(run))) => {
+                        run_start = usize::try_from(run).ok();
+                        return Ok(());
+                    },
+                    _ => {},
+                }
                 let value = match value {
                     Some(crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text)) => {
                         text.to_owned()
@@ -894,25 +997,18 @@ fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
     if let Some(date) = date {
         comment = comment.with_date(date);
     }
-    Ok(comment)
-}
-
-/// Comment replies and resolution (OfficeCLI's `parentId` and `done`)
-/// live in the modern-comment parts, which Litchi does not author yet: a
-/// call naming them is refused rather than silently writing a plain
-/// comment (record 0335).
-fn refuse_reply(key: &str) -> Result<()> {
-    let names = ["parentId", "done", "resolved"];
-    match names.iter().find(|name| name.eq_ignore_ascii_case(key)) {
-        Some(name) => Err(Error::new(
-            Code::UnsupportedCapability,
-            "comment replies and resolution are not authored yet",
-        )
-        .with_property(*name)
-        .with_format(FileFormat::Docx)
-        .with_suggestion("add the reply as its own comment, or edit it in Word")),
-        None => Ok(()),
+    if let Some(parent) = parent {
+        comment = comment.with_parent(parent);
     }
+    if let Some(done) = done {
+        comment = comment.with_done(done);
+    }
+    // OfficeCLI's `runStart=N` starts the range after the Nth (1-based)
+    // run; 0 keeps the paragraph start.
+    if let Some(run) = run_start.and_then(|run| run.checked_sub(1)) {
+        comment = comment.with_start_after(Position::new(run));
+    }
+    Ok(comment.with_range(range))
 }
 
 impl Docx {
@@ -936,12 +1032,17 @@ impl Docx {
         }
         let mut change = CommentChange::new();
         for (key, value) in props.iter() {
-            refuse_reply(key.as_str())?;
             let (_, entry) = super::spec::COMMENT_REGISTRY
                 .resolve(key.as_str())
                 .map_err(|error| error.with_property(key.as_str().to_owned()))?;
             entry
                 .prepare(Operation::Set, value, |setter, value| {
+                    if let (Setter::CommentDone, Some(crate::value::Scalar::Bool(done))) =
+                        (setter, value)
+                    {
+                        change = std::mem::take(&mut change).with_done(done);
+                        return Ok(());
+                    }
                     let value = match value {
                         Some(
                             crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text),
@@ -992,6 +1093,93 @@ impl Docx {
         }
         edit.commit(self).map(Ok)
     }
+}
+
+/// A new cell from its add properties (record 0345): `text`, one
+/// paragraph, and `width` (twips, `N%`, `auto`, `nil`, or a length).
+fn new_cell(props: &Props<'_>) -> Result<litchi_docx::document::NewCell> {
+    use super::setters::Setter;
+    let mut cell = litchi_docx::document::NewCell::new();
+    for (key, value) in props.iter() {
+        let (_, entry) = super::spec::CELL_REGISTRY
+            .resolve(key.as_str())
+            .map_err(|error| error.with_property(key.as_str().to_owned()))?;
+        entry
+            .prepare(Operation::Add, value, |setter, value| {
+                let text = match value {
+                    Some(crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text)) => {
+                        text.to_owned()
+                    },
+                    Some(scalar) => scalar.to_string(),
+                    None => String::new(),
+                };
+                let current = std::mem::take(&mut cell);
+                cell = match setter {
+                    Setter::CellText => current.with_text(text),
+                    Setter::CellWidth => current.with_width(cell_width(&text)?),
+                    _ => {
+                        return Err(Error::new(
+                            Code::UnsupportedProperty,
+                            "the property does not seed a DOCX cell",
+                        ));
+                    },
+                };
+                Ok(())
+            })
+            .map_err(|error| {
+                error
+                    .with_property(key.as_str().to_owned())
+                    .with_format(FileFormat::Docx)
+            })?;
+    }
+    Ok(cell)
+}
+
+/// A cell width as OfficeCLI's `AddCell` reads it: `N%` (fiftieths of a
+/// percent in the file), `nil`, `auto`, twips with an optional `dxa`
+/// suffix, or a length such as `2cm`.
+pub(super) fn cell_width(text: &str) -> Result<litchi_docx::properties::Width> {
+    use litchi_docx::properties::{Twips, Width};
+    let text = text.trim();
+    if text.eq_ignore_ascii_case("nil") {
+        return Ok(Width::Nil);
+    }
+    if text.eq_ignore_ascii_case("auto") {
+        return Ok(Width::Auto);
+    }
+    let invalid = || {
+        Error::new(
+            Code::InvalidValue,
+            "a cell width is twips, N%, auto, nil or a length such as 2cm",
+        )
+    };
+    if let Some(percent) = text.strip_suffix('%') {
+        let percent: f64 = percent.trim().parse().map_err(|_| invalid())?;
+        if !percent.is_finite() || percent < 0.0 {
+            return Err(invalid());
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        return Ok(Width::Percent((percent * 50.0).round() as i64));
+    }
+    Ok(Width::Twips(Twips(i64::from(
+        twips_length(text).ok_or_else(invalid)?,
+    ))))
+}
+
+/// Twips from a bare number (with an optional `dxa` suffix) or a length.
+pub(super) fn twips_length(text: &str) -> Option<u32> {
+    let bare = text
+        .strip_suffix("dxa")
+        .or_else(|| text.strip_suffix("DXA"))
+        .unwrap_or(text)
+        .trim();
+    if let Ok(twips) = bare.parse::<u32>() {
+        return Some(twips);
+    }
+    let length =
+        crate::value::Length::parse_in(text, crate::value::LengthContext::WordSpacing).ok()?;
+    let twips = super::setters::twips(length).ok()?;
+    u32::try_from(twips.0).ok()
 }
 
 /// A new row's cell count from its add properties.

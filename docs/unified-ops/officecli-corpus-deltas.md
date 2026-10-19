@@ -30,7 +30,7 @@ Every delta, named gap and element/property group carries a disposition (`tools/
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | excel | 1633 | 1580 | 0 | 20 | 29 | 4 | 0 | 0 | 20 | 20/20 |
 | excel/charts | 743 | 470 | 0 | 258 | 0 | 15 | 0 | 0 | 32 | 32/32 |
-| ppt | 310 | 189 | 41 | 26 | 92 | 2 | 1 | 0 | 10 | 12/12 |
+| ppt | 310 | 180 | 32 | 35 | 92 | 2 | 1 | 0 | 10 | 12/12 |
 | ppt/charts | 735 | 332 | 113 | 402 | 0 | 1 | 0 | 0 | 28 | 28/28 |
 | ppt/ole | 26 | 20 | 2 | 0 | 4 | 0 | 2 | 0 | 6 | 6/6 |
 | ppt/pictures | 68 | 37 | 5 | 0 | 1 | 24 | 6 | 0 | 2 | 2/2 |
@@ -39,8 +39,8 @@ Every delta, named gap and element/property group carries a disposition (`tools/
 | ppt/templates | 452 | 33 | 0 | 152 | 46 | 119 | 102 | 0 | 11 | 24/24 |
 | ppt/textboxes | 132 | 92 | 10 | 40 | 0 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 516 | 127 | 6 | 0 | 0 | 0 | 0 | 18 | 18/18 |
-| word | 1133 | 690 | 3 | 195 | 172 | 36 | 40 | 0 | 24 | 32/32 |
-| **total** | **6431** | **4435** | **353** | **1283** | **361** | **201** | **151** | **0** | **177** | **200/200** |
+| word | 1133 | 690 | 3 | 196 | 171 | 36 | 40 | 0 | 24 | 32/32 |
+| **total** | **6431** | **4426** | **344** | **1293** | **360** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -48,10 +48,10 @@ The format is the extension of the document each call names.
 
 | Format | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| docx | 949 | 540 | 0 | 191 | 142 | 36 | 40 | 0 | 22 | 30/30 |
-| pptx | 2959 | 1698 | 353 | 814 | 190 | 146 | 111 | 0 | 99 | 114/114 |
+| docx | 949 | 540 | 0 | 192 | 141 | 36 | 40 | 0 | 22 | 30/30 |
+| pptx | 2959 | 1689 | 344 | 823 | 190 | 146 | 111 | 0 | 99 | 114/114 |
 | xlsx | 2523 | 2197 | 0 | 278 | 29 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **4435** | **353** | **1283** | **361** | **201** | **151** | **0** | **177** | **200/200** |
+| **total** | **6431** | **4426** | **344** | **1293** | **360** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## v1-scope subset (design §14)
 
@@ -100,7 +100,7 @@ None.
 | D1 | Created-path form captured by the script | `add` prints the new paragraph as `/body/p[@paraId=...]`, which the script greps to address it later | `add` prints the positional path `/body/p[N]` (record 0256 §3), so the capture is empty and the dependent `set` has no path (`missing_argument`) | 6 | `word/revisions.sh:286`, `word/revisions.sh:296`, `word/revisions.sh:305` | wontfix (delta-positional-paths) | `add` prints the positional path (record 0256 §3); paragraph identities are native selection metadata (ADR 0034) |
 | D1b | Created numbering-instance path captured by the script | `add --type num` prints `/numbering/num[@id=N]`, which the script greps for the new `numId` | `add` prints the positional path `/numbering/num[K]`: a numbering identifier is a native identity, addressed only by raw paths (record 0319), so the capture is empty and the dependent `numId=` is `invalid_value` | 28 | `word/numbering.sh:76`, `word/numbering.sh:79`, `word/numbering.sh:82` | wontfix (delta-numbering-identity) | a numbering identifier is a native identity, addressed only by raw paths (record 0319, ADR 0034) |
 | D11 | Re-adding a built-in style | `add --type style` with the id of a built-in style the document already has (`Heading1`, `Normal`, ...) replaces that definition (upsert) | an existing style id is refused (`duplicate_name`, record 0319): `add` never drops an existing definition; `set /styles/<id>` changes it | 2 | `word/fields.sh:37`, `word/fields.sh:40` | wontfix (delta-style-upsert) | `add` never drops an existing style definition; `set /styles/<id>` changes it (record 0319; awaiting owner confirmation, audit §7) |
-| D4 | Bare slide insertion | `add / --type slide` picks the deck's first layout; layout-type words (`blank`, `title`) also select a layout | `layout` names a layout exactly (record 0256 D4); the harness adds `layout=Title Slide` (the first layout of Litchi's blank deck) or maps `title` and `blank` to `Title Slide` and `Blank`, and counts the line as translated | 353 | `ppt/animations.sh:32`, `ppt/animations.sh:46`, `ppt/animations.sh:74` | wontfix (delta-exact-layout) | `layout` names a slide layout exactly (record 0256 D4); the harness translates command-line insertions only |
+| D4 | Bare slide insertion | `add / --type slide` picks the deck's first layout; layout-type words (`blank`, `title`) also select a layout | `layout` names a layout exactly (record 0256 D4); the harness adds `layout=Title Slide` (the first layout of Litchi's blank deck) or maps `title` and `blank` to `Title Slide` and `Blank`, and counts the line as translated | 344 | `ppt/animations.sh:32`, `ppt/charts/charts-3d.sh:38`, `ppt/charts/charts-3d.sh:46` | wontfix (delta-exact-layout) | `layout` names a slide layout exactly (record 0256 D4); the harness translates command-line insertions only |
 | D4b | Bare slide insertion inside a batch | a batch `add` of a slide without `layout`, or with a layout-type word (`blank`), picks a layout as on the command line | the harness translates only command-line slide insertions (D4), not batch items, so the batch refuses (`missing_property` layout, or `not_found` for `layout=blank`) once its other properties are admitted (record 0269) | 2 | `ppt/templates/styles/brand--aura-coffee-dark/build.sh:157`, `ppt/templates/styles/science--space-exploration/build.sh:16` | wontfix (delta-exact-layout) | `layout` names a slide layout exactly (record 0256 D4); the harness translates command-line insertions only |
 | D5 | Resident mode | `open`/`close` start and stop a resident process that later commands reuse | absent (record 0256 D5); every command opens and saves the file, so the harness treats both as no-ops (counted as resident, not run) | 177 | `excel/cell-formatting.sh:27`, `excel/cell-formatting.sh:190`, `excel/charts.sh:17` | wontfix (delta-resident-mode) | no resident process: every command opens, edits and saves the file (record 0256 D5) |
 | D7 | Stray words on the command line | System.CommandLine leaves unmatched words unparsed and OfficeCLI ignores them; the examples pass unquoted values (`--prop categories=Product A,Product B`) that the shell splits | the argument parser refuses the command line (usage, exit 2): Litchi is strict by default (record 0015 D4) | 5 | `excel/charts/charts-bar.sh:203`, `excel/charts/charts-bar.sh:289`, `excel/charts/charts-bar.sh:303` | wontfix (delta-strict-parsing) | the command line is parsed strictly; stray words are refused, not ignored (record 0015 D4) |
@@ -167,7 +167,8 @@ None.
 | set | document | `warned` | `pageWidth` | 2 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:32`, `word/sections.sh:137` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.pageWidth` |
 | set | revision | `unsupported_capability` | - | 2 | registry gap R4x | `word/revisions.sh:398`, `word/revisions.sh:431` | P2 | deferred-P2 0332 (docx-breadth) via delta `revision` |
 | set | run | `warned` | `revision.id` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:145`, `word/revisions.sh:150` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
-| add | cell | `unsupported_element` | - | 1 | registry: no add on cell | `word/revisions.sh:196` | P0 | planned WP4 (docx-structure-writes) |
+| add | cell | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:196` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
+| add | cell | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:196` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | chart | `warned` | `areafill` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:119` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.areafill` |
 | add | chart | `warned` | `chartFill` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:215` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.chartFill` |
 | add | chart | `warned` | `dispUnits` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:215` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.dispUnits` |
@@ -389,6 +390,7 @@ None.
 | add | chart | `warned` | `axisnumfmt` | 10 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:57`, `ppt/charts/charts-bar.sh:67` | P1 | deferred-P1 0332 (pptx-breadth) via delta `chart.axisnumfmt` |
 | add | chart | `warned` | `gradient` | 10 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:89`, `ppt/charts/charts-area.sh:66` | P1 | deferred-P1 0332 (pptx-breadth) via delta `chart.gradient` |
 | add | chart | `warned` | `labelrotation` | 10 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:59`, `ppt/charts/charts-bar.sh:69` | P1 | deferred-P1 0332 (pptx-breadth) via delta `chart.labelrotation` |
+| add | slide | `warned` | `title` | 9 | not in the registry; OfficeCLI documents it | `ppt/animations.sh:46`, `ppt/animations.sh:74` | P0 | planned 0333 (pptx-p0-residue) via delta `slide.title` |
 | set | shape | `skipped` | `animation` | 9 | not in the registry; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:133`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:134` | P1 | deferred-P1 0332 (pptx-breadth) via delta `shape.animation` |
 | add | chart | `warned` | `gradients` | 8 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:91`, `ppt/charts/charts-area.sh:67` | P1 | deferred-P1 0332 (pptx-breadth) via delta `chart.gradients` |
 | add | chart | `warned` | `shape` | 8 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:72`, `ppt/charts/charts-3d.sh:73` | P1 | deferred-P1 0332 (pptx-breadth) via delta `chart.shape` |
@@ -851,7 +853,7 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1283 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1293 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
 | F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 72 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
@@ -889,7 +891,7 @@ None.
 | `excel/sparklines.sh` | 114 | 107 | 0 | 0 | 7 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/workbook-settings.sh` | 25 | 17 | 0 | 4 | 0 | 4 | 0 | 0 | 2 | 2/2 |
 | `ppt/3d-model.sh` | 35 | 2 | 0 | 8 | 25 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/animations.sh` | 119 | 68 | 7 | 7 | 44 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/animations.sh` | 119 | 62 | 1 | 13 | 44 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/charts/charts-3d.sh` | 50 | 24 | 8 | 26 | 0 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/charts/charts-advanced.sh` | 61 | 25 | 8 | 36 | 0 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/charts/charts-area.sh` | 51 | 19 | 8 | 31 | 0 | 1 | 0 | 0 | 2 | 2/2 |
@@ -943,7 +945,7 @@ None.
 | `ppt/transitions/transitions-random.sh` | 17 | 17 | 4 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/transitions/transitions-shapes.sh` | 57 | 57 | 14 | 0 | 0 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/transitions/transitions-timing.sh` | 37 | 35 | 9 | 2 | 0 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/video.sh` | 20 | 13 | 4 | 5 | 0 | 2 | 0 | 0 | 2 | 2/2 |
+| `ppt/video.sh` | 20 | 10 | 1 | 8 | 0 | 2 | 0 | 0 | 2 | 2/2 |
 | `word/charts.sh` | 46 | 38 | 0 | 8 | 0 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/content-controls.sh` | 21 | 12 | 0 | 0 | 8 | 0 | 1 | 0 | 2 | 2/2 |
 | `word/diagram.sh` | 50 | 27 | 0 | 0 | 23 | 0 | 0 | 0 | 0 | 2/2 |
@@ -953,9 +955,9 @@ None.
 | `word/numbering.sh` | 70 | 39 | 0 | 0 | 3 | 28 | 0 | 0 | 1 | 2/2 |
 | `word/paragraph-formatting.sh` | 78 | 57 | 0 | 21 | 0 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/pictures.sh` | 31 | 25 | 0 | 6 | 0 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/revisions.sh` | 73 | 36 | 0 | 17 | 14 | 6 | 0 | 0 | 2 | 2/2 |
+| `word/revisions.sh` | 73 | 36 | 0 | 18 | 13 | 6 | 0 | 0 | 2 | 2/2 |
 | `word/run-formatting.sh` | 80 | 57 | 0 | 23 | 0 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/sections.sh` | 33 | 29 | 0 | 1 | 3 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 220 | 3 | 107 | 30 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 17 | 0 | 0 | 11 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **4435** | **353** | **1283** | **361** | **201** | **151** | **0** | **177** | **200/200** |
+| **total** | **6431** | **4426** | **344** | **1293** | **360** | **201** | **151** | **0** | **177** | **200/200** |
