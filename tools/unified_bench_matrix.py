@@ -43,7 +43,7 @@ Records 0285-0326 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
 0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315, 0326, 0337 and 0340 their own;
 record 0344 those of 0307, 0308, 0314, 0316-0318, 0323-0325, 0328-0330,
-0333, 0335, 0336, 0338 and 0342) are collected only when their record file
+0333, 0335, 0336, 0338 and 0342; record 0348 its own) are collected only when their record file
 is on this tree; the range ends at the highest record on the tree, and the
 Markdown lists every record of it, absent ones as "not on this tree", so
 the tool can be rerun unchanged after later merges.
@@ -2514,6 +2514,31 @@ def p0346():
     return out
 
 
+@needs("0348")
+def p0348():
+    """Record 0348 §6: every PPTX batch route re-measured, three runs each:
+    pptx_p0_final_bench (record 0346's routes, cold and warm handles) and
+    the batch routes of pptx_p0_bench (record 0333's), under the series of
+    those records, which these rows supersede."""
+    base = RES / "0348"
+    out = []
+    for prefix, series, glob in (("pptx_p0_final", "pptx_p0_final", "pptx-p0-final-bench-run*.jsonl"),
+                                 ("pptx_p0", "pptx_p0", "pptx-p0-bench-run*.jsonl")):
+        paths = trials(base.glob(glob))
+        for scen, items in group_cases([load_jsonl(p) for p in paths], lambda r: r["scenario"]).items():
+            if "/" not in scen:
+                continue
+            family, owner, n, *handle = scen.split("/")
+            n = int(n)
+            state = f", {handle[0]} handle" if handle else ""
+            label = f"{family.replace('_', ' ')} ({owner} owner{state}; one File::batch vs one leaf edit)"
+            out.append(row("0348", "pptx", "batch", label, f"{n} ops",
+                           med(i["leaf_median_us"] for i in items),
+                           med(i["unified_median_us"] for i in items), [i["ratio"] for i in items],
+                           BATCH if n >= 1000 else SCALING, f"{series}:{scen}", src(paths)))
+    return out
+
+
 @needs("0347")
 def p0347():
     """Record 0347 §6: numbers_unified_bench swaps (two runs, with the
@@ -2536,7 +2561,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347]
+           p0347, p0348]
 
 
 # ---------------------------------------------------------------- merge
