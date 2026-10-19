@@ -5058,8 +5058,8 @@
         "threadedcomment"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -5078,20 +5078,29 @@
       "properties": {
         "text": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "author": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": true,
+          "set": true,
           "get": true
         },
         "created": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "startDate": {
@@ -5123,6 +5132,12 @@
           "set": false,
           "get": true
         },
+        "resolved": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
         "progress": {
           "type": "number",
           "add": false,
@@ -5142,6 +5157,15 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "parent": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": true
         }
       },
       "predicates": {
@@ -5158,7 +5182,7 @@
       "parent": "modernComment",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -5172,19 +5196,28 @@
         "text": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "author": {
           "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
           "add": false,
-          "set": false,
+          "set": true,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": false,
+          "set": true,
           "get": true
         },
         "created": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "status": {
@@ -5194,6 +5227,12 @@
             "resolved",
             "closed"
           ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "parent": {
+          "type": "string",
           "add": false,
           "set": false,
           "get": true

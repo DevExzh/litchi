@@ -122,6 +122,9 @@ pub(crate) const SETTABLE: &[&str] = &[
     "run",
     "notes",
     "comment",
+    // Modern comment threads and replies (record 0346).
+    "modernComment",
+    "reply",
     // Table row height (record 0333).
     "tr",
     // Table name and style switches (record 0342).
@@ -151,6 +154,9 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     // Pictures (`src`) and legacy comments (record 0252).
     "picture",
     "comment",
+    // Modern comment threads and replies (`parent`), speaker notes and
+    // placeholders (record 0346).
+    "modernComment",
     // Paragraphs and runs of shape, cell and notes bodies, tables and table
     // rows (record 0333).
     "paragraph",
@@ -202,6 +208,9 @@ pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::s
         "tc" => CELL_CAPABILITY_PROPS,
         "notes" => NOTES_CAPABILITY_PROPS,
         "comment" => COMMENT_CAPABILITY_PROPS,
+        // Modern comment add and set, reply set (record 0346).
+        "modernComment" => spec::MODERN_COMMENT_CAPABILITY_PROPS,
+        "reply" => spec::REPLY_CAPABILITY_PROPS,
         "picture" => PICTURE_CAPABILITY_PROPS,
         "group" => GROUP_CAPABILITY_PROPS,
         "chart" => CHART_CAPABILITY_PROPS,

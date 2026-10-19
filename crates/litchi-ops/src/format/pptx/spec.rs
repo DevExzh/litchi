@@ -840,29 +840,40 @@ props_values! {
     }
 }
 
-props_values! {
-    /// A modern threaded comment, with replies as child nodes.
-    MODERN_COMMENT_PROPS {
+props! {
+    /// A modern threaded comment, with replies as child nodes. `initials`,
+    /// `resolved` (the thread's `resolved` status) and `parent` (a reply's
+    /// thread; never set on a thread, add only) follow OfficeCLI's
+    /// `ModernCommentToNode` (record 0346); the native GUID `id` is raw.
+    MODERN_COMMENT_PROPS, ModernCommentKey {
         Text = "text": ValueType::Text,
         Author = "author": ValueType::Text,
+        Initials = "initials": ValueType::Text,
         Created = "created": ValueType::Text,
         StartDate = "startDate": ValueType::Text,
         DueDate = "dueDate": ValueType::Text,
         Title = "title": ValueType::Text,
         Status = "status": ValueType::Token(&MODERN_STATUS),
+        Resolved = "resolved": ValueType::Bool,
         Progress = "progress": ValueType::Number,
         X = "x": POSITION,
         Y = "y": POSITION,
+        Parent = "parent": ValueType::Text,
+        Id = "id": ValueType::Text; raw,
     }
 }
 
-props_values! {
-    /// A reply in a modern threaded comment.
-    REPLY_PROPS {
+props! {
+    /// A reply in a modern threaded comment; `parent` is its thread's path
+    /// (record 0346), and the native GUID `id` is raw.
+    REPLY_PROPS, ReplyKey {
         Text = "text": ValueType::Text,
         Author = "author": ValueType::Text,
+        Initials = "initials": ValueType::Text,
         Created = "created": ValueType::Text,
         Status = "status": ValueType::Token(&MODERN_STATUS),
+        Parent = "parent": ValueType::Text,
+        Id = "id": ValueType::Text; raw,
     }
 }
 
@@ -2201,6 +2212,96 @@ pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
     }],
 );
 pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
+
+/// Modern comment and reply assignments (record 0346).
+#[derive(Clone, Copy)]
+pub(super) enum ModernSetter {
+    Text,
+    Author,
+    Initials,
+    Created,
+    /// The thread's resolution (threads only).
+    Resolved,
+    /// The thread a new comment replies to (`add` only).
+    Parent,
+}
+const fn modern_comment_write_entries()
+-> [crate::registry::Entry<ModernSetter>; MODERN_COMMENT_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(MODERN_COMMENT_PROPS[0]); MODERN_COMMENT_PROPS.len()];
+    let mut index = 0;
+    while index < MODERN_COMMENT_PROPS.len() {
+        let spec = MODERN_COMMENT_PROPS[index];
+        let access = match ModernCommentKey::ALL[index] {
+            ModernCommentKey::Text => Some(Access::SetAndAdd(ModernSetter::Text)),
+            ModernCommentKey::Author => Some(Access::SetAndAdd(ModernSetter::Author)),
+            ModernCommentKey::Initials => Some(Access::SetAndAdd(ModernSetter::Initials)),
+            ModernCommentKey::Created => Some(Access::SetAndAdd(ModernSetter::Created)),
+            ModernCommentKey::Resolved => Some(Access::SetAndAdd(ModernSetter::Resolved)),
+            ModernCommentKey::Parent => Some(Access::Add(ModernSetter::Parent)),
+            _ => None,
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if matches!(
+                    ModernCommentKey::ALL[index],
+                    ModernCommentKey::Author | ModernCommentKey::Parent
+                ) {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const MODERN_COMMENT_WRITE_TABLE: crate::registry::Table<
+    ModernSetter,
+    { MODERN_COMMENT_PROPS.len() },
+    0,
+> = crate::registry::Table::new(modern_comment_write_entries(), []);
+pub(crate) const MODERN_COMMENT_CAPABILITY_PROPS: &[PropSpec] =
+    &MODERN_COMMENT_WRITE_TABLE.readable();
+
+const fn reply_write_entries() -> [crate::registry::Entry<ModernSetter>; REPLY_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(REPLY_PROPS[0]); REPLY_PROPS.len()];
+    let mut index = 0;
+    while index < REPLY_PROPS.len() {
+        let spec = REPLY_PROPS[index];
+        let setter = match ReplyKey::ALL[index] {
+            ReplyKey::Text => Some(ModernSetter::Text),
+            ReplyKey::Author => Some(ModernSetter::Author),
+            ReplyKey::Initials => Some(ModernSetter::Initials),
+            ReplyKey::Created => Some(ModernSetter::Created),
+            _ => None,
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: Access::Set(setter),
+                constraint: if matches!(ReplyKey::ALL[index], ReplyKey::Author) {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const REPLY_WRITE_TABLE: crate::registry::Table<ModernSetter, { REPLY_PROPS.len() }, 0> =
+    crate::registry::Table::new(reply_write_entries(), []);
+pub(crate) const REPLY_CAPABILITY_PROPS: &[PropSpec] = &REPLY_WRITE_TABLE.readable();
 
 /// Picture insertion assignments (`add` only).
 #[derive(Clone, Copy)]

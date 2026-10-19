@@ -367,13 +367,13 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | model3d | `width` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
 | model3d | `height` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
 | model3d | `rotation` | string | asg |  | element gap | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
-| modernComment | `author` | string | asg | --g | supported | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| modernComment | `initials` | string | asg |  | unlisted | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| modernComment | `text` | string | asg | --g | supported | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| modernComment | `resolved` | bool | asg |  | unlisted | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| modernComment | `created` | string | asg | --g | supported | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| modernComment | `parent` | string | a-g |  | unlisted | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| modernComment | `id` | string | --g |  | unlisted | — | P0 | planned 0333 (pptx-p0-residue) |  |
+| modernComment | `author` | string | asg | asg | supported | supported |  |  |  |
+| modernComment | `initials` | string | asg | asg | supported | supported |  |  |  |
+| modernComment | `text` | string | asg | asg | supported | supported |  |  |  |
+| modernComment | `resolved` | bool | asg | asg | supported | supported |  |  |  |
+| modernComment | `created` | string | asg | asg | supported | supported |  |  |  |
+| modernComment | `parent` | string | a-g | a-g | supported | supported |  |  |  |
+| modernComment | `id` | string | --g |  | unlisted | — | P0 | out-of-scope (pptx-native-comment-ids) |  |
 | modernComment | `startDate` | string |  | --g | litchi-only | — |  |  |  |
 | modernComment | `dueDate` | string |  | --g | litchi-only | — |  |  |  |
 | modernComment | `title` | string |  | --g | litchi-only | — |  |  |  |

@@ -1383,7 +1383,10 @@ impl<'f> Node<'f> {
                 None => (Kind::ModernComment.spec().props, PropKind::Empty),
             },
             Item::Reply(reply) => match reply.reply() {
-                Some(record) => (Kind::Reply.spec().props, PropKind::Reply(record)),
+                Some(record) => (
+                    Kind::Reply.spec().props,
+                    PropKind::Reply(record, reply.slide, reply.comment),
+                ),
                 None => (Kind::Reply.spec().props, PropKind::Empty),
             },
             Item::Theme(item) => (THEME_PROPS, PropKind::Theme(&item.theme)),
@@ -1566,7 +1569,8 @@ enum PropKind<'a> {
     Row(Option<i64>),
     Comment(&'a Comment),
     ModernComment(&'a ModernComment),
-    Reply(&'a ModernReply),
+    /// A reply, its slide and its thread's position (record 0346).
+    Reply(&'a ModernReply, u32, u32),
     Theme(&'a litchi_drawingml::theme::Theme),
     Column(&'a super::columns::ColumnItem),
     Hyperlink(&'a super::links::LinkItem),
@@ -2088,7 +2092,7 @@ impl<'a> Props<'a> {
             PropKind::Master(facts) => master_value(facts, index),
             PropKind::Layout(facts) => layout_value(facts, index),
             PropKind::ModernComment(comment) => modern_comment_value(comment, index),
-            PropKind::Reply(reply) => reply_value(reply, index),
+            PropKind::Reply(reply, slide, comment) => reply_value(reply, *slide, *comment, index),
             PropKind::Theme(theme) => super::theme::value(theme, index),
             PropKind::Column(item) => super::columns::value(item, index),
             PropKind::Hyperlink(item) => super::links::value(item, index),
@@ -2233,40 +2237,60 @@ fn layout_value(facts: &LayoutFacts, index: usize) -> Option<Value<'_>> {
 }
 
 fn modern_comment_value(comment: &ModernComment, index: usize) -> Option<Value<'_>> {
-    let key = Kind::ModernComment.spec().props.get(index)?.name;
-    match key {
-        "text" => comment.text().map(|text| Value::Text(Cow::Borrowed(text))),
-        "author" | "authorName" => comment
+    use super::spec::ModernCommentKey as Key;
+    match Key::at(index)? {
+        Key::Text => comment.text().map(|text| Value::Text(Cow::Borrowed(text))),
+        Key::Author => comment
             .author_name()
             .map(|name| Value::Text(Cow::Borrowed(name))),
-        "created" | "date" => Some(Value::Text(Cow::Borrowed(comment.created()))),
-        "startDate" => comment
+        Key::Initials => comment
+            .author_initials()
+            .map(|initials| Value::Text(Cow::Borrowed(initials))),
+        Key::Created => Some(Value::Text(Cow::Borrowed(comment.created()))),
+        Key::StartDate => comment
             .start_date()
             .map(|date| Value::Text(Cow::Borrowed(date))),
-        "dueDate" => comment
+        Key::DueDate => comment
             .due_date()
             .map(|date| Value::Text(Cow::Borrowed(date))),
-        "title" => comment
+        Key::Title => comment
             .title()
             .map(|title| Value::Text(Cow::Borrowed(title))),
-        "status" => Some(Value::Token(status_token(comment.status()))),
-        "progress" => Value::number(f64::from(comment.progress().thousandths()) / 1_000.0),
-        "x" => comment.location().map(|(x, _)| length(x)),
-        "y" => comment.location().map(|(_, y)| length(y)),
-        _ => None,
+        Key::Status => Some(Value::Token(status_token(comment.status()))),
+        Key::Resolved => Some(Value::Bool(comment.status() == ModernStatus::Resolved)),
+        Key::Progress => Value::number(f64::from(comment.progress().thousandths()) / 1_000.0),
+        Key::X => comment.location().map(|(x, _)| length(x)),
+        Key::Y => comment.location().map(|(_, y)| length(y)),
+        // A thread replies to nothing: OfficeCLI's `parent` is null.
+        Key::Parent => None,
+        // The native GUID, for raw-admitted queries only.
+        Key::Id => Some(Value::Text(Cow::Borrowed(
+            litchi_pptx::presentation::modern_comments::raw::comment_id(comment),
+        ))),
     }
 }
 
-fn reply_value(reply: &ModernReply, index: usize) -> Option<Value<'_>> {
-    let key = Kind::Reply.spec().props.get(index)?.name;
-    match key {
-        "text" => reply.text().map(|text| Value::Text(Cow::Borrowed(text))),
-        "author" | "authorName" => reply
+fn reply_value(reply: &ModernReply, slide: u32, comment: u32, index: usize) -> Option<Value<'_>> {
+    use super::spec::ReplyKey as Key;
+    match Key::at(index)? {
+        Key::Text => reply.text().map(|text| Value::Text(Cow::Borrowed(text))),
+        Key::Author => reply
             .author_name()
             .map(|name| Value::Text(Cow::Borrowed(name))),
-        "created" | "date" => Some(Value::Text(Cow::Borrowed(reply.created()))),
-        "status" => Some(Value::Token(status_token(reply.status()))),
-        _ => None,
+        Key::Initials => reply
+            .author_initials()
+            .map(|initials| Value::Text(Cow::Borrowed(initials))),
+        Key::Created => Some(Value::Text(Cow::Borrowed(reply.created()))),
+        Key::Status => Some(Value::Token(status_token(reply.status()))),
+        // The thread's path, as OfficeCLI's `parent` (record 0346).
+        Key::Parent => Some(Value::Text(Cow::Owned(format!(
+            "/slide[{}]/moderncomment[{}]",
+            u64::from(slide) + 1,
+            u64::from(comment) + 1
+        )))),
+        Key::Id => Some(Value::Text(Cow::Borrowed(
+            litchi_pptx::presentation::modern_comments::raw::reply_id(reply),
+        ))),
     }
 }
 

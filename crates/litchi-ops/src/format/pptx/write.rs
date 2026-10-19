@@ -221,6 +221,10 @@ impl Pptx {
             };
             return self.set_comment(comment.slide, comment.index, &props, limits);
         }
+        // Modern comment threads and replies (record 0346).
+        if let Some(commit) = self.try_set_modern_comment(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_theme(&target, &props, limits)? {
             return Ok(commit);
         }

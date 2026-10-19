@@ -48,6 +48,7 @@ struct CommentData {
     id: String,
     author_id: String,
     author_display: Option<Arc<str>>,
+    author_initials: Option<Arc<str>>,
     text: Option<String>,
     status: codec::Status,
     status_wire: Option<codec::Status>,
@@ -78,6 +79,7 @@ struct ReplyData {
     id: String,
     author_id: String,
     author_display: Option<Arc<str>>,
+    author_initials: Option<Arc<str>>,
     text: Option<String>,
     status: codec::Status,
     status_wire: Option<codec::Status>,
@@ -87,7 +89,8 @@ struct ReplyData {
     extension_xml: Option<Vec<u8>>,
 }
 
-type AuthorIndex<'a> = HashMap<&'a str, Arc<str>>;
+/// An author's display name and optional initials, by author identifier.
+type AuthorIndex<'a> = HashMap<&'a str, (Arc<str>, Option<Arc<str>>)>;
 
 impl fmt::Debug for List {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -214,6 +217,13 @@ impl Comment {
         self.data.author_display.as_deref()
     }
 
+    /// The resolved author's initials, when the author part supplied them
+    /// (record 0346).
+    #[must_use]
+    pub fn author_initials(&self) -> Option<&str> {
+        self.data.author_initials.as_deref()
+    }
+
     /// The authored creation timestamp.
     #[must_use]
     pub fn created(&self) -> &str {
@@ -287,6 +297,12 @@ impl Reply {
         self.data.author_display.as_deref()
     }
 
+    /// The resolved author's initials, when available (record 0346).
+    #[must_use]
+    pub fn author_initials(&self) -> Option<&str> {
+        self.data.author_initials.as_deref()
+    }
+
     /// The authored creation timestamp.
     #[must_use]
     pub fn created(&self) -> &str {
@@ -325,7 +341,7 @@ fn project_comment<'a>(
         text_body_xml,
         extension_xml,
     } = comment;
-    let author_display = author_display(author_index, &author_id);
+    let (author_display, author_initials) = author_display(author_index, &author_id);
     let text = body_text(
         text_body_xml.as_deref(),
         root_prefix,
@@ -361,6 +377,7 @@ fn project_comment<'a>(
             id,
             author_id,
             author_display,
+            author_initials,
             text,
             status: status.unwrap_or(codec::Status::Active),
             status_wire: status,
@@ -400,7 +417,7 @@ fn project_reply<'a>(
         text_body_xml,
         extension_xml,
     } = reply;
-    let author_display = author_display(author_index, &author_id);
+    let (author_display, author_initials) = author_display(author_index, &author_id);
     let text = body_text(
         text_body_xml.as_deref(),
         root_prefix,
@@ -414,6 +431,7 @@ fn project_reply<'a>(
             id,
             author_id,
             author_display,
+            author_initials,
             text,
             status: status.unwrap_or(codec::Status::Active),
             status_wire: status,
@@ -437,13 +455,24 @@ fn author_index<'a>(authors: Option<&'a codec::Authors>) -> Result<Option<Author
             source,
         })?;
     for author in &authors.authors {
-        index.insert(author.id.as_str(), Arc::<str>::from(author.name.as_str()));
+        index.insert(
+            author.id.as_str(),
+            (
+                Arc::<str>::from(author.name.as_str()),
+                author.initials.as_deref().map(Arc::<str>::from),
+            ),
+        );
     }
     Ok(Some(index))
 }
 
-fn author_display(authors: Option<&AuthorIndex<'_>>, id: &str) -> Option<Arc<str>> {
-    authors.and_then(|authors| authors.get(id).cloned())
+fn author_display(
+    authors: Option<&AuthorIndex<'_>>,
+    id: &str,
+) -> (Option<Arc<str>>, Option<Arc<str>>) {
+    authors
+        .and_then(|authors| authors.get(id).cloned())
+        .map_or((None, None), |(name, initials)| (Some(name), initials))
 }
 
 fn body_text(

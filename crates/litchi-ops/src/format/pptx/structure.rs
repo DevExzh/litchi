@@ -72,7 +72,7 @@ impl Pptx {
                 "this element kind cannot be added to a PPTX presentation yet",
             )
             .with_suggestion(
-                "addable: slide, shape (textbox), picture, chart, table (and its rows and columns), smartart (and its nodes), hyperlink, media, comment, paragraph and run; capabilities() lists the gaps",
+                "addable: slide, shape (textbox), picture, chart, table (and its rows and columns), smartart (and its nodes), hyperlink, media, comment, modernComment, paragraph and run; capabilities() lists the gaps",
             ));
         }
         if ["picture", "image", "img"]
@@ -106,6 +106,12 @@ impl Pptx {
         }
         if node.kind().eq_ignore_ascii_case("comment") {
             return self.add_comment(parent, node, limits);
+        }
+        if MODERN_KINDS
+            .iter()
+            .any(|kind| node.kind().eq_ignore_ascii_case(kind))
+        {
+            return self.add_modern_comment(parent, node, limits);
         }
         if node.kind().eq_ignore_ascii_case("tr") || node.kind().eq_ignore_ascii_case("row") {
             return self.add_row(parent, node, limits);
@@ -283,6 +289,14 @@ impl Pptx {
         ))
     }
 }
+/// The modern comment kind and its aliases (record 0346).
+const MODERN_KINDS: &[&str] = &[
+    "moderncomment",
+    "modern-comment",
+    "thread",
+    "threadedcomment",
+];
+
 /// The element kinds a PPTX `add` creates (with their aliases).
 const ADDABLE: &[&str] = &[
     "slide",
@@ -293,6 +307,10 @@ const ADDABLE: &[&str] = &[
     "img",
     "chart",
     "comment",
+    "moderncomment",
+    "modern-comment",
+    "thread",
+    "threadedcomment",
     "smartart",
     "node",
     "col",

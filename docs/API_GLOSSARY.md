@@ -2832,5 +2832,8 @@ raw query surface only).
 |---|---|
 | `litchi_pptx::opened::Edit::{set_comment_date_at, set_comment_author_at}` | adopted (0346), positional siblings of `set_comment_at`; re-attribution renames an author only when the comment is their only one, otherwise moves the comment to an author of that name and initials at the author's next index |
 | `litchi_ops` PPTX `comment` `author`/`initials`/`date` set, `direction` (alias `dir`) on add | adopted (0346) |
+| `litchi_pptx::opened::Edit::{add_modern_comment_text, add_modern_comment_reply_text, set_modern_comment_at}`, `opened::ModernCommentChange` | adopted (0346), positional siblings of `remove_modern_comment_at`; new identities are GUIDs derived from the edit's inputs, unique in the comment graph (no clock or random source) |
+| `litchi_pptx::presentation::modern_comments::{Comment, Reply}::author_initials` | adopted (0346), beside `author_name` |
+| `litchi_ops` PPTX `modernComment` add (`text`, `author`, `initials`, `created`, `resolved`, `parent`) and set; `reply` set; reads `initials`, `resolved`, `parent`; raw `id` | adopted (0346); `created` is required on add (no clock) |
 
 See [0346](unified-ops/0346-pptx-p0-final.md).

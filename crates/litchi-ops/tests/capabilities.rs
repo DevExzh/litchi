@@ -828,6 +828,12 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
         ),
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
+        // Modern comment threads and replies (record 0346).
+        "modernComment" => matches!(
+            property,
+            "text" | "author" | "initials" | "created" | "resolved"
+        ),
+        "reply" => matches!(property, "text" | "author" | "initials" | "created"),
         // Author, initials and date since record 0346.
         "comment" => matches!(
             property,
@@ -980,12 +986,18 @@ fn pptx_reports_selection_and_structural_writes() {
                     property.name(),
                     "text" | "author" | "initials" | "date" | "x" | "y" | "direction"
                 );
+            let modern_add = element.name() == "modernComment"
+                && matches!(
+                    property.name(),
+                    "text" | "author" | "initials" | "created" | "resolved" | "parent"
+                );
             assert_eq!(
                 property.add(),
                 slide_add
                     || shape_add
                     || picture_add
                     || comment_add
+                    || modern_add
                     || pptx_text_add(element.name(), property.name()),
                 "{} / {}",
                 element.name(),

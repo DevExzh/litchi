@@ -66,7 +66,7 @@ pub use text_format::{
 pub(crate) use text_format::{
     TextChange, stage_text_properties, stage_text_property_chunks, stage_text_structure,
 };
-pub use transaction::{Commit, Diagnostics, Edit, MediaFile, SmartArtParts};
+pub use transaction::{Commit, Diagnostics, Edit, MediaFile, ModernCommentChange, SmartArtParts};
 
 pub(crate) use chunks::{
     ChunkAdmission, admit_shape_property_chunks, admit_shape_text_chunks,

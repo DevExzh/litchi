@@ -17,7 +17,9 @@
 //! owners are promoted to an eager package for the edit, since comment
 //! parts are separate parts the source-backed slide edit does not stage.
 use super::node::Item;
-use super::spec::{COMMENT_WRITE_TABLE, CommentSetter};
+use super::spec::{
+    COMMENT_WRITE_TABLE, CommentSetter, MODERN_COMMENT_WRITE_TABLE, ModernSetter, REPLY_WRITE_TABLE,
+};
 use super::structure::{bound, error};
 use super::write::{Commit, Proof, validate_text};
 use super::{Editable, Nav, Pptx};
@@ -79,7 +81,7 @@ fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Re
                     bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())?;
                     validate_text(text)?;
                     if matches!(setter, CommentSetter::Date) {
-                        validate_date(text)?;
+                        validate_date_time(text, "date")?;
                     }
                     let owned = Some(text.to_owned());
                     match setter {
@@ -100,11 +102,11 @@ fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Re
     Ok(values)
 }
 
-/// A comment `date` is an XML `dateTime`, as the comments part requires;
-/// anything else is refused here rather than failing as a corrupt part when
-/// the edit serializes it (record 0330). The accepted forms are the leaf
-/// codec's.
-fn validate_date(value: &str) -> Result<()> {
+/// A comment `date` (or a modern comment's `created`) is an XML
+/// `dateTime`, as the comments part requires; anything else is refused here
+/// rather than failing as a corrupt part when the edit serializes it
+/// (record 0330). The accepted forms are the leaf codec's.
+fn validate_date_time(value: &str, property: &'static str) -> Result<()> {
     if chrono::DateTime::parse_from_rfc3339(value).is_ok()
         || chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
     {
@@ -114,7 +116,7 @@ fn validate_date(value: &str) -> Result<()> {
             Code::InvalidValue,
             "a comment date is an XML dateTime such as 2026-10-17T09:30:00Z",
         )
-        .with_property("date"))
+        .with_property(property))
     }
 }
 
@@ -334,3 +336,291 @@ impl Pptx {
         }))
     }
 }
+
+/// The admitted assignments of a modern comment or reply (record 0346).
+#[derive(Default)]
+struct ModernValues {
+    text: Option<String>,
+    author: Option<String>,
+    initials: Option<String>,
+    created: Option<String>,
+    resolved: Option<bool>,
+    parent: Option<String>,
+}
+
+fn admit_modern<const N: usize>(
+    table: &crate::registry::Table<ModernSetter, N, 0>,
+    props: &Props<'_>,
+    operation: Operation,
+    limits: &SemanticLimits,
+) -> Result<ModernValues> {
+    let mut values = ModernValues::default();
+    let mut assigned = 0_u32;
+    let mut staged = 0_usize;
+    for (key, value) in props.iter() {
+        let (index, entry) = table
+            .resolve(key.as_str())
+            .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+        let bit = 1_u32 << index;
+        if assigned & bit != 0 {
+            return Err(error(
+                Code::InvalidArgument,
+                "a modern comment property was assigned more than once",
+            )
+            .with_property(entry.spec.name));
+        }
+        assigned |= bit;
+        entry.prepare(operation, value, |setter, scalar| {
+            match (setter, scalar) {
+                (ModernSetter::Resolved, Some(Scalar::Bool(resolved))) => {
+                    values.resolved = Some(resolved);
+                },
+                (setter, Some(Scalar::Text(text))) => {
+                    staged = staged.saturating_add(text.len());
+                    bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())?;
+                    validate_text(text)?;
+                    if matches!(setter, ModernSetter::Created) {
+                        validate_date_time(text, "created")?;
+                    }
+                    let owned = Some(text.to_owned());
+                    match setter {
+                        ModernSetter::Text => values.text = owned,
+                        ModernSetter::Author => values.author = owned,
+                        ModernSetter::Initials => values.initials = owned,
+                        ModernSetter::Created => values.created = owned,
+                        ModernSetter::Parent => values.parent = owned,
+                        ModernSetter::Resolved => unreachable!("a boolean setter"),
+                    }
+                },
+                _ => unreachable!("modern comment property coercion"),
+            }
+            Ok(())
+        })?;
+    }
+    Ok(values)
+}
+
+/// OfficeCLI's default initials: the first character of each word.
+fn derived_initials(author: &str) -> String {
+    author
+        .split_whitespace()
+        .filter_map(|word| word.chars().next())
+        .collect()
+}
+
+impl Pptx {
+    /// A `set` of a modern comment or reply path; `None` for other targets
+    /// (record 0346).
+    pub(super) fn try_set_modern_comment(
+        &self,
+        target: &crate::target::TargetArg<'_>,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
+        let Some(path) = target.path() else {
+            return Ok(None);
+        };
+        if !path.path().steps().last().is_some_and(|step| {
+            MODERN_STEPS
+                .iter()
+                .chain(&["reply"])
+                .any(|name| step.name().eq_ignore_ascii_case(name))
+        }) {
+            return Ok(None);
+        }
+        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        let (slide, comment, reply, current) = match node.item() {
+            Item::ModernComment(item) => (
+                item.slide,
+                item.index,
+                None,
+                item.comment().and_then(|comment| comment.text()),
+            ),
+            Item::Reply(item) => (
+                item.slide,
+                item.comment,
+                Some(item.index),
+                item.reply().and_then(|reply| reply.text()),
+            ),
+            _ => return Ok(None),
+        };
+        let mut values = if reply.is_some() {
+            admit_modern(&REPLY_WRITE_TABLE, props, Operation::Set, limits)?
+        } else {
+            admit_modern(&MODERN_COMMENT_WRITE_TABLE, props, Operation::Set, limits)?
+        };
+        // An equal text keeps the body (and its formatting) byte for byte.
+        if values.text.is_some() && values.text.as_deref() == current {
+            values.text = None;
+        }
+        drop(node);
+        bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+        let source = self.editable_owner()?;
+        let base = Self::eager_base(&source)?;
+        let mut edit = base.edit()?;
+        let change = litchi_pptx::opened::ModernCommentChange {
+            text: values.text.as_deref(),
+            author: values.author.as_deref(),
+            initials: values.initials.as_deref(),
+            created: values.created.as_deref(),
+            resolved: values.resolved,
+        };
+        let changed = edit.set_modern_comment_at(
+            slide as usize,
+            Position::new(comment as usize),
+            reply.map(|reply| Position::new(reply as usize)),
+            &change,
+        )?;
+        let (target, patch) = edit.commit()?.into_parts();
+        let target = Arc::new(target);
+        let after = if changed {
+            self.adopt_eager(Arc::clone(&target))
+        } else {
+            self.clone()
+        };
+        Ok(Some(Commit {
+            after,
+            source,
+            target: Editable::Eager(target),
+            proof: Proof::Eager(patch),
+            operations: usize::from(changed),
+        }))
+    }
+
+    /// `add(/slide[N], modernComment, {text, author, initials, created,
+    /// resolved, parent})`: a new thread, or with `parent` a reply to that
+    /// thread (record 0346).
+    pub(super) fn add_modern_comment(
+        &self,
+        parent: PathArg<'_>,
+        node: NewNode<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<(Commit, Path<'static>)> {
+        let nav = Nav::new(self);
+        let parent = crate::path::resolve::get(&nav, &parent)?;
+        let Item::Slide(slide) = parent.item() else {
+            return Err(error(
+                Code::UnsupportedType,
+                "modern comments require a slide parent",
+            ));
+        };
+        let slide = slide.position;
+        drop(parent);
+        if !matches!(node.placement(), None | Some(Placement::End)) {
+            return Err(error(
+                Code::UnsupportedCapability,
+                "modern comment insertion supports end placement",
+            )
+            .with_suggestion("omit placement or use Placement::End"));
+        }
+        bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+        let values = admit_modern(
+            &MODERN_COMMENT_WRITE_TABLE,
+            node.props(),
+            Operation::Add,
+            limits,
+        )?;
+        let author = values.author.ok_or_else(|| {
+            error(Code::MissingProperty, "modern comments require an author")
+                .with_property("author")
+        })?;
+        // The editor reads no clock (ADR 0034): the stamp is the caller's.
+        let created = values.created.ok_or_else(|| {
+            error(
+                Code::MissingProperty,
+                "modern comments require a creation stamp",
+            )
+            .with_property("created")
+            .with_suggestion("pass created=<xsd:dateTime>, for example 2026-10-19T09:30:00Z")
+        })?;
+        let initials = values.initials.unwrap_or_else(|| derived_initials(&author));
+        let thread = match values.parent.as_deref() {
+            None => None,
+            Some(path) => {
+                let path = PathArg::parse(path).map_err(|error| error.with_property("parent"))?;
+                let node = crate::path::resolve::get(&nav, &path)
+                    .map_err(|error| error.with_property("parent"))?;
+                let Item::ModernComment(thread) = node.item() else {
+                    return Err(error(
+                        Code::InvalidValue,
+                        "a reply's parent is a top-level modern comment",
+                    )
+                    .with_property("parent"));
+                };
+                if thread.slide != slide {
+                    return Err(error(
+                        Code::InvalidValue,
+                        "a reply's parent is a modern comment of the same slide",
+                    )
+                    .with_property("parent"));
+                }
+                if values.resolved.is_some() {
+                    return Err(error(
+                        Code::InvalidArgument,
+                        "resolution is a thread-level state; a reply has none",
+                    )
+                    .with_property("resolved"));
+                }
+                Some(thread.index)
+            },
+        };
+        let text = values.text.unwrap_or_default();
+        let source = self.editable_owner()?;
+        let base = Self::eager_base(&source)?;
+        let mut edit = base.edit()?;
+        let slide_step = Step::new("slide").with(Predicate::Index(Position::new(slide as usize)));
+        let path = match thread {
+            None => {
+                let position = edit.add_modern_comment_text(
+                    slide as usize,
+                    &author,
+                    Some(&initials),
+                    &text,
+                    &created,
+                    values.resolved == Some(true),
+                )?;
+                Path::from_steps([
+                    slide_step,
+                    Step::new("moderncomment").with(Predicate::Index(position)),
+                ])
+            },
+            Some(thread) => {
+                let position = edit.add_modern_comment_reply_text(
+                    slide as usize,
+                    Position::new(thread as usize),
+                    &author,
+                    Some(&initials),
+                    &text,
+                    &created,
+                )?;
+                Path::from_steps([
+                    slide_step,
+                    Step::new("moderncomment")
+                        .with(Predicate::Index(Position::new(thread as usize))),
+                    Step::new("reply").with(Predicate::Index(position)),
+                ])
+            },
+        };
+        let (target, patch) = edit.commit()?.into_parts();
+        let target = Arc::new(target);
+        let after = self.adopt_eager(Arc::clone(&target));
+        Ok((
+            Commit {
+                after,
+                source,
+                target: Editable::Eager(target),
+                proof: Proof::Eager(patch),
+                operations: 1,
+            },
+            path,
+        ))
+    }
+}
+
+/// The step names of a modern comment path.
+const MODERN_STEPS: &[&str] = &[
+    "moderncomment",
+    "modern-comment",
+    "thread",
+    "threadedcomment",
+];
