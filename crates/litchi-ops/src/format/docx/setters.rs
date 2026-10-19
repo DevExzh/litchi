@@ -97,6 +97,15 @@ pub(crate) enum Setter {
     CommentDate,
     /// A new comment's text.
     CommentText,
+    /// A comment's resolved state, `w15:done` (record 0345).
+    CommentDone,
+    /// A new comment's reply parent, by comment id (record 0345).
+    CommentParent,
+    /// A new comment's range start: after this 1-based run, 0 for the
+    /// paragraph start (record 0345).
+    CommentRunStart,
+    /// Whether a new comment has range markers (record 0345).
+    CommentRange,
     ParagraphStyle,
     ParagraphAlign,
     ParagraphSpaceBefore,

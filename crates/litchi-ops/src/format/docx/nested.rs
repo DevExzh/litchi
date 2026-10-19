@@ -207,6 +207,20 @@ impl Docx {
                     }
                 };
                 let comment = new_comment(node.props())?;
+                // A reply names an existing comment (OfficeCLI refuses
+                // `parentId` without one, record 0345).
+                if let Some(parent) = reply_parent(node.props())
+                    && !super::nav::comments(self)?
+                        .iter()
+                        .any(|existing| existing.id() == parent)
+                {
+                    return Err(Error::new(
+                        Code::InvalidValue,
+                        "parentId names no comment to reply to",
+                    )
+                    .with_property("parentId")
+                    .with_format(FileFormat::Docx));
+                }
                 self.owner().check_source()?;
                 let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
                 let WorkEdit::Eager(eager) = &mut edit else {
@@ -873,21 +887,67 @@ fn comment_path(ordinal: usize) -> Path<'static> {
     ])
 }
 
+/// The comment id a new comment's `parentId` names, if any.
+fn reply_parent(props: &Props<'_>) -> Option<u32> {
+    props.iter().find_map(|(key, value)| {
+        let (_, entry) = super::spec::COMMENT_REGISTRY.lookup(key.as_str())?;
+        if !matches!(
+            entry.access,
+            crate::registry::Access::Add(super::setters::Setter::CommentParent)
+        ) {
+            return None;
+        }
+        let mut parent = None;
+        entry
+            .prepare(Operation::Add, value, |_, value| {
+                if let Some(crate::value::Scalar::Int(id)) = value {
+                    parent = u32::try_from(id).ok();
+                }
+                Ok(())
+            })
+            .ok()?;
+        parent
+    })
+}
+
 /// A new comment from its add properties: `author` is required, `text`,
-/// `initials` and `date` are optional.
+/// `initials` and `date` are optional; `parentId`, `done`, `runStart` and
+/// `range` follow OfficeCLI's comment schema (record 0345).
 fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
     use super::setters::Setter;
     let mut author = None::<String>;
     let mut initials = None::<String>;
     let mut date = None::<String>;
     let mut text = String::new();
+    let mut parent = None::<u32>;
+    let mut done = None::<bool>;
+    let mut run_start = None::<usize>;
+    let mut range = true;
     for (key, value) in props.iter() {
-        refuse_reply(key.as_str())?;
         let (_, entry) = super::spec::COMMENT_REGISTRY
             .resolve(key.as_str())
             .map_err(|error| error.with_property(key.as_str().to_owned()))?;
         entry
             .prepare(Operation::Add, value, |setter, value| {
+                match (setter, value) {
+                    (Setter::CommentDone, Some(crate::value::Scalar::Bool(flag))) => {
+                        done = Some(flag);
+                        return Ok(());
+                    },
+                    (Setter::CommentRange, Some(crate::value::Scalar::Bool(flag))) => {
+                        range = flag;
+                        return Ok(());
+                    },
+                    (Setter::CommentParent, Some(crate::value::Scalar::Int(id))) => {
+                        parent = u32::try_from(id).ok();
+                        return Ok(());
+                    },
+                    (Setter::CommentRunStart, Some(crate::value::Scalar::Int(run))) => {
+                        run_start = usize::try_from(run).ok();
+                        return Ok(());
+                    },
+                    _ => {},
+                }
                 let value = match value {
                     Some(crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text)) => {
                         text.to_owned()
@@ -929,25 +989,18 @@ fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
     if let Some(date) = date {
         comment = comment.with_date(date);
     }
-    Ok(comment)
-}
-
-/// Comment replies and resolution (OfficeCLI's `parentId` and `done`)
-/// live in the modern-comment parts, which Litchi does not author yet: a
-/// call naming them is refused rather than silently writing a plain
-/// comment (record 0335).
-fn refuse_reply(key: &str) -> Result<()> {
-    let names = ["parentId", "done", "resolved"];
-    match names.iter().find(|name| name.eq_ignore_ascii_case(key)) {
-        Some(name) => Err(Error::new(
-            Code::UnsupportedCapability,
-            "comment replies and resolution are not authored yet",
-        )
-        .with_property(*name)
-        .with_format(FileFormat::Docx)
-        .with_suggestion("add the reply as its own comment, or edit it in Word")),
-        None => Ok(()),
+    if let Some(parent) = parent {
+        comment = comment.with_parent(parent);
     }
+    if let Some(done) = done {
+        comment = comment.with_done(done);
+    }
+    // OfficeCLI's `runStart=N` starts the range after the Nth (1-based)
+    // run; 0 keeps the paragraph start.
+    if let Some(run) = run_start.and_then(|run| run.checked_sub(1)) {
+        comment = comment.with_start_after(Position::new(run));
+    }
+    Ok(comment.with_range(range))
 }
 
 impl Docx {
@@ -971,12 +1024,17 @@ impl Docx {
         }
         let mut change = CommentChange::new();
         for (key, value) in props.iter() {
-            refuse_reply(key.as_str())?;
             let (_, entry) = super::spec::COMMENT_REGISTRY
                 .resolve(key.as_str())
                 .map_err(|error| error.with_property(key.as_str().to_owned()))?;
             entry
                 .prepare(Operation::Set, value, |setter, value| {
+                    if let (Setter::CommentDone, Some(crate::value::Scalar::Bool(done))) =
+                        (setter, value)
+                    {
+                        change = std::mem::take(&mut change).with_done(done);
+                        return Ok(());
+                    }
                     let value = match value {
                         Some(
                             crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text),

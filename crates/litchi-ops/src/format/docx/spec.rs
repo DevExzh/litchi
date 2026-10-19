@@ -962,16 +962,84 @@ pub(crate) const PICTURE_PROPS: &[PropSpec] = &PICTURE_REGISTRY.readable();
 
 // A comment of the comments part (record 0251c): its identity, author and
 // text; `text` and the author's details seed a new comment and are set
-// (record 0335).
-crate::registry::registry! {
-    pub(crate) COMMENT_PROPS, COMMENT_REGISTRY: Setter {
-    crate::registry::Entry::read(PropSpec::new("id", ValueType::Int)),
-    writable("author", ValueType::Text, Setter::CommentAuthor, Constraint::NotEmpty, false),
-    writable("initials", ValueType::Text, Setter::CommentInitials, Constraint::NotEmpty, false),
-    writable("date", ValueType::Text, Setter::CommentDate, Constraint::NotEmpty, false),
-    writable("text", ValueType::Text, Setter::CommentText, Constraint::None, false),
-    }
-}
+// (record 0335). Record 0345, after OfficeCLI's comment schema: the
+// anchor's path (`anchoredTo`), the resolved state (`done`, alias
+// `resolved`; set too) and the reply parent (`parentId`, the parent's
+// comment id) from `commentsExtended`, and the anchor controls `runStart`
+// and `range` on add.
+pub(crate) const COMMENT_REGISTRY: crate::registry::Table<Setter, 10, 1> =
+    crate::registry::Table::new(
+        [
+            crate::registry::Entry::read(PropSpec::new("id", ValueType::Int)),
+            writable(
+                "author",
+                ValueType::Text,
+                Setter::CommentAuthor,
+                Constraint::NotEmpty,
+                false,
+            ),
+            writable(
+                "initials",
+                ValueType::Text,
+                Setter::CommentInitials,
+                Constraint::NotEmpty,
+                false,
+            ),
+            writable(
+                "date",
+                ValueType::Text,
+                Setter::CommentDate,
+                Constraint::NotEmpty,
+                false,
+            ),
+            writable(
+                "text",
+                ValueType::Text,
+                Setter::CommentText,
+                Constraint::None,
+                false,
+            ),
+            crate::registry::Entry::read(PropSpec::new("anchoredTo", ValueType::Text)),
+            writable(
+                "done",
+                ValueType::Bool,
+                Setter::CommentDone,
+                Constraint::None,
+                false,
+            ),
+            read_add(
+                "parentId",
+                ValueType::Int,
+                Setter::CommentParent,
+                Constraint::Int {
+                    min: 0,
+                    max: u32::MAX as i64,
+                },
+            ),
+            add_only(
+                "runStart",
+                ValueType::Int,
+                Setter::CommentRunStart,
+                Constraint::Int {
+                    min: 0,
+                    max: 1 << 20,
+                },
+            ),
+            add_only(
+                "range",
+                ValueType::Bool,
+                Setter::CommentRange,
+                Constraint::None,
+            ),
+        ],
+        [crate::registry::Alias {
+            name: "resolved",
+            entry: 6,
+        }],
+    );
+
+/// The comment element's properties.
+pub(crate) const COMMENT_PROPS: &[PropSpec] = &COMMENT_REGISTRY.readable();
 
 // `SdtBlockToNode`: the content control's identity.
 crate::registry::registry! {
@@ -1636,24 +1704,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 code: Code::UnsupportedPath,
                 follow_up: "none: out of scope (record 0332, design §10)",
                 reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
-            },
-            GapSpec {
-                subject: Subject::Property {
-                    element: "comment",
-                    key: "parentId",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "0335-F2",
-                reason: "comment replies (the commentsExtended parent link) are not read or authored; an add or set naming parentId is refused",
-            },
-            GapSpec {
-                subject: Subject::Property {
-                    element: "comment",
-                    key: "done",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "0335-F2",
-                reason: "comment resolution (commentsExtended w15:done) is not read or authored; an add or set naming done is refused",
             },
             GapSpec {
                 subject: Subject::Property {

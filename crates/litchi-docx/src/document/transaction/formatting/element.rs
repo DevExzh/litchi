@@ -1844,11 +1844,19 @@ impl Edit {
     /// Anchor comment `id` in the paragraph at `paragraph`: a range around
     /// its direct runs `range` (inclusive), or around all its content for
     /// `None`, followed by the comment's reference run.
+    ///
+    /// Record 0345, after OfficeCLI's `AddComment`: for a whole-paragraph
+    /// anchor, `start_after` starts the range after that direct run (a run
+    /// the paragraph lacks keeps the paragraph start); `reference_only`
+    /// writes the reference run alone, with no range markers, at the end
+    /// of the range (after `start_after` for a whole paragraph).
     pub(crate) fn anchor_comment_at(
         &mut self,
         paragraph: &ElementPath,
         range: Option<(Position, Position)>,
         id: u32,
+        start_after: Option<Position>,
+        reference_only: bool,
     ) -> Result<&mut Self> {
         self.ensure_unmanaged("add_comment_at")?;
         let (located, inherited) = self.element_with_scope(paragraph, b"p")?;
@@ -1877,14 +1885,24 @@ impl Edit {
                     .ok_or_else(|| refusal(Refusal::RunNotFound))?;
                 (start, end + 1)
             },
-            None => (
-                layout
-                    .children
-                    .iter()
-                    .position(|child| child.2.as_deref() != Some(b"pPr"))
-                    .unwrap_or(layout.children.len()),
-                layout.children.len(),
-            ),
+            None => {
+                let after = start_after
+                    .and_then(|run| layout.index_of(b"r", run))
+                    .map(|child| child + 1);
+                let start = after.unwrap_or_else(|| {
+                    layout
+                        .children
+                        .iter()
+                        .position(|child| child.2.as_deref() != Some(b"pPr"))
+                        .unwrap_or(layout.children.len())
+                });
+                // A reference-only comment sits where the range would
+                // start when a run names the place, else at the end.
+                match (reference_only, after) {
+                    (true, Some(after)) => (after, after),
+                    _ => (start, layout.children.len()),
+                }
+            },
         };
         let start = layout
             .insertion_offset(start_child)
@@ -1932,8 +1950,11 @@ impl Edit {
         attribute(&mut reference, &prefix, "id", &id.to_string());
         reference.extend_from_slice(b"/>");
         close(&mut reference, &prefix, "r");
-        let start_marker = marker("commentRangeStart");
-        let end_marker = marker("commentRangeEnd");
+        let (start_marker, end_marker) = if reference_only {
+            (Vec::new(), Vec::new())
+        } else {
+            (marker("commentRangeStart"), marker("commentRangeEnd"))
+        };
         let mut after = buffer(staging_add(
             base.len(),
             start_marker.len() + end_marker.len() + reference.len(),
@@ -2036,6 +2057,12 @@ impl Edit {
 
     /// The largest comment identifier the main document's range markers and
     /// references use.
+    /// Every `paraId` value of the projected main document, for choosing
+    /// a fresh paragraph identifier (record 0345).
+    pub(crate) fn paragraph_ids(&self) -> Vec<u32> {
+        crate::part_scan::paragraph_ids(self.projected.xml_bytes())
+    }
+
     pub(crate) fn max_comment_marker_id(&self) -> Result<Option<u32>> {
         let mut maximum = None;
         scan_comment_markers(self.projected.xml_bytes(), |_, id, _| {

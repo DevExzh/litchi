@@ -139,6 +139,24 @@ pub(super) fn comments(docx: &Docx) -> Result<Vec<litchi_docx::comment::Comment>
     docx.owner().finish(result)
 }
 
+/// The `commentsExtended` entries of the main document (record 0345);
+/// empty when the part is absent. A part the leaf refuses as malformed
+/// reads as empty, so a comment's other properties stay readable.
+pub(super) fn comments_extended(
+    docx: &Docx,
+) -> Result<Vec<litchi_docx::modern_comments::Extended>> {
+    let result = match docx.owner() {
+        DocxOwner::Eager(package) => {
+            Ok(package.document()?.comments_extended().unwrap_or_default())
+        },
+        DocxOwner::Source(package) => {
+            package.check_source().map_err(Error::from)?;
+            Ok(package.comments_extended().unwrap_or_default())
+        },
+    };
+    docx.owner().finish(result)
+}
+
 /// What a container selection picked.
 enum Pick {
     /// The block, from the container's index.

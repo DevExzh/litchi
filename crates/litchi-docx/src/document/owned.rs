@@ -20,6 +20,7 @@ mod stories;
 mod story_edit;
 mod styles;
 mod substitute;
+mod threads;
 pub use chart::{NewChart, chart_workbook};
 pub use comments::{CommentChange, NewComment};
 pub use graph::HyperlinkTarget;

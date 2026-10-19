@@ -243,13 +243,21 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
             None => Props::None,
         },
         Value::Equation(_) => Props::Equation,
-        Value::Comment(comment) => Props::Comment(Box::new(CommentProps {
-            id: comment.id(),
-            author: comment.author().to_owned(),
-            initials: comment.initials().map(str::to_owned),
-            date: comment.date().map(str::to_owned),
-            text: comment_text(comment)?,
-        })),
+        Value::Comment(comment) => {
+            let (done, parent) = comment_thread(node.docx, comment)?;
+            Props::Comment(
+                Box::new(CommentProps {
+                    id: comment.id(),
+                    author: comment.author().to_owned(),
+                    initials: comment.initials().map(str::to_owned),
+                    date: comment.date().map(str::to_owned),
+                    text: comment_text(comment)?,
+                    done,
+                    parent,
+                }),
+                node.docx,
+            )
+        },
         Value::Picture(picture) => Props::Picture(Arc::clone(picture)),
         Value::Chart(chart) => Props::Chart(node.docx, Arc::clone(chart)),
         Value::SmartArt(smartart) => Props::SmartArt(Arc::clone(smartart)),
@@ -328,13 +336,16 @@ pub(crate) struct TableProps {
     columns: usize,
 }
 
-/// A comment's identity, author and text.
+/// A comment's identity, author and text, and its `commentsExtended`
+/// state and reply parent (record 0345).
 pub(crate) struct CommentProps {
     id: u32,
     author: String,
     initials: Option<String>,
     date: Option<String>,
     text: String,
+    done: bool,
+    parent: Option<u32>,
 }
 
 /// A content control's identity.
@@ -375,7 +386,8 @@ pub(crate) enum Props<'a> {
     Row(Box<direct::Row>),
     Cell(Box<direct::Cell>),
     Sdt(Box<SdtProps>),
-    Comment(Box<CommentProps>),
+    /// A comment, with the handle its anchor is found through.
+    Comment(Box<CommentProps>, &'a super::Docx),
     Picture(Arc<litchi_docx::image::InlineImage>),
     /// A chart: its frame, and its chart part read through the handle.
     Chart(&'a super::Docx, Arc<super::chart::ChartValue>),
@@ -415,7 +427,7 @@ impl<'a> Props<'a> {
             Self::Row(props) => row(props, index),
             Self::Cell(props) => cell(props, index),
             Self::Sdt(sdt) => sdt_value(sdt, index),
-            Self::Comment(comment) => comment_value(comment, index),
+            Self::Comment(comment, docx) => comment_value(docx, comment, index),
             Self::Picture(picture) => picture_value(picture, index),
             Self::Chart(docx, chart) => super::chart::chart_value(docx, chart, index),
             Self::SmartArt(smartart) => super::smartart::smartart_value(smartart, index),
@@ -446,7 +458,7 @@ impl std::fmt::Debug for Props<'_> {
             Self::Row(_) => "Props::Row",
             Self::Cell(_) => "Props::Cell",
             Self::Sdt(_) => "Props::Sdt",
-            Self::Comment(_) => "Props::Comment",
+            Self::Comment(..) => "Props::Comment",
             Self::Picture(_) => "Props::Picture",
             Self::Chart(..) => "Props::Chart",
             Self::SmartArt(_) => "Props::SmartArt",
@@ -936,19 +948,160 @@ fn comment_text(comment: &litchi_docx::comment::Comment) -> Result<String> {
     Ok(text)
 }
 
-fn comment_value<'a>(comment: &CommentProps, index: usize) -> Option<NodeValue<'a>> {
+fn comment_value<'a>(
+    docx: &super::Docx,
+    comment: &CommentProps,
+    index: usize,
+) -> Option<NodeValue<'a>> {
     const ID: usize = index_of(super::spec::COMMENT_PROPS, "id");
     const AUTHOR: usize = index_of(super::spec::COMMENT_PROPS, "author");
     const INITIALS: usize = index_of(super::spec::COMMENT_PROPS, "initials");
     const DATE: usize = index_of(super::spec::COMMENT_PROPS, "date");
     const TEXT: usize = index_of(super::spec::COMMENT_PROPS, "text");
+    const ANCHORED_TO: usize = index_of(super::spec::COMMENT_PROPS, "anchoredTo");
+    const DONE: usize = index_of(super::spec::COMMENT_PROPS, "done");
+    const PARENT: usize = index_of(super::spec::COMMENT_PROPS, "parentId");
     match index {
         ID => Some(NodeValue::Int(i64::from(comment.id))),
         AUTHOR => text_of(Some(&comment.author)),
         INITIALS => text_of(comment.initials.as_ref()),
         DATE => text_of(comment.date.as_ref()),
         TEXT => Some(owned(&comment.text)),
+        // Read on demand: finding the anchor walks the main story.
+        ANCHORED_TO => comment_anchor(docx, comment.id)
+            .ok()
+            .flatten()
+            .map(|path| NodeValue::Text(Cow::Owned(path))),
+        // OfficeCLI reports `done` on every comment, `parentId` on replies.
+        DONE => Some(NodeValue::Bool(comment.done)),
+        PARENT => comment
+            .parent
+            .map(|parent| NodeValue::Int(i64::from(parent))),
         _ => None,
+    }
+}
+
+/// A comment's resolved state and reply parent (the parent comment's id),
+/// from its first paragraph's `commentsExtended` entry (record 0345):
+/// unresolved and no parent without one.
+fn comment_thread(
+    docx: &super::Docx,
+    comment: &litchi_docx::comment::Comment,
+) -> Result<(bool, Option<u32>)> {
+    let Some(paragraph) = comment.paragraph_id() else {
+        return Ok((false, None));
+    };
+    let entries = super::nav::comments_extended(docx)?;
+    let Some(entry) = entries.iter().find(|entry| entry.paragraph_id == paragraph) else {
+        return Ok((false, None));
+    };
+    let parent = match entry.parent_paragraph_id {
+        Some(parent) => super::nav::comments(docx)?
+            .iter()
+            .find(|other| other.paragraph_id() == Some(parent))
+            .map(litchi_docx::comment::Comment::id),
+        None => None,
+    };
+    Ok((entry.done, parent))
+}
+
+/// The path of the paragraph comment `id` is anchored to, as OfficeCLI's
+/// `FindCommentAnchorPath` finds it: the paragraph holding its range start,
+/// or failing that its reference (a point comment), anywhere in the main
+/// story's body, tables and content controls (record 0345).
+pub(super) fn comment_anchor(docx: &super::Docx, id: u32) -> Result<Option<String>> {
+    let body = super::nav::load_body(docx)?;
+    for marker in [
+        b"commentRangeStart".as_slice(),
+        b"commentReference".as_slice(),
+    ] {
+        if let Some(path) = anchor_in(&body, "/body", marker, id)? {
+            return Ok(Some(path));
+        }
+    }
+    Ok(None)
+}
+
+fn anchor_in(
+    blocks: &litchi_docx::Blocks,
+    prefix: &str,
+    marker: &[u8],
+    id: u32,
+) -> Result<Option<String>> {
+    for block in blocks.iter() {
+        let Some(kind) = Kind::of_block(block.kind()) else {
+            continue;
+        };
+        if !holds(block.xml_bytes(), marker) {
+            continue;
+        }
+        let step = format!(
+            "{prefix}/{}[{}]",
+            kind.step_name(),
+            block.ordinal().get() + 1
+        );
+        match kind {
+            Kind::Paragraph | Kind::Equation => {
+                if marks(block.xml_bytes(), marker, id) {
+                    return Ok(Some(step));
+                }
+            },
+            Kind::Table => {
+                let Some(table) = block.table() else { continue };
+                for (row_index, row) in table.rows()?.iter().enumerate() {
+                    for (cell_index, cell) in row.cells()?.iter().enumerate() {
+                        let cell_prefix =
+                            format!("{step}/tr[{}]/tc[{}]", row_index + 1, cell_index + 1);
+                        if let Some(found) = anchor_in(&cell.blocks()?, &cell_prefix, marker, id)? {
+                            return Ok(Some(found));
+                        }
+                    }
+                }
+            },
+            Kind::Sdt => {
+                if let Some(control) = block.content_control()
+                    && let Some(found) = anchor_in(&control.blocks()?, &step, marker, id)?
+                {
+                    return Ok(Some(found));
+                }
+            },
+            _ => {},
+        }
+    }
+    Ok(None)
+}
+
+fn holds(xml: &[u8], marker: &[u8]) -> bool {
+    xml.windows(marker.len()).any(|window| window == marker)
+}
+
+/// Whether `xml` holds a `marker` element whose `id` is `id`.
+fn marks(xml: &[u8], marker: &[u8], id: u32) -> bool {
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    loop {
+        match reader.read_event() {
+            Ok(
+                quick_xml::events::Event::Start(element) | quick_xml::events::Event::Empty(element),
+            ) if element.local_name().as_ref() == marker => {
+                let found = element
+                    .unchecked_attributes()
+                    .filter_map(std::result::Result::ok)
+                    .find(|attribute| attribute.key.local_name().as_ref() == b"id")
+                    .and_then(|attribute| {
+                        std::str::from_utf8(&attribute.value)
+                            .ok()?
+                            .trim()
+                            .parse::<u32>()
+                            .ok()
+                    });
+                if found == Some(id) {
+                    return true;
+                }
+            },
+            Ok(quick_xml::events::Event::Eof) | Err(_) => return false,
+            _ => {},
+        }
     }
 }
 

@@ -161,6 +161,32 @@ impl Comment {
         self.xml_data.as_bytes()
     }
 
+    /// The `w14:paraId` of the comment's first paragraph, which Word's
+    /// modern-comment parts (`commentsExtended`, `commentsIds`) key the
+    /// comment by (record 0345); `None` when that paragraph has none.
+    #[must_use]
+    pub fn paragraph_id(&self) -> Option<u32> {
+        let mut reader = Reader::from_reader(self.xml_bytes());
+        loop {
+            match reader.read_event() {
+                Ok(Event::Start(element) | Event::Empty(element))
+                    if element.local_name().as_ref() == b"p" =>
+                {
+                    return element
+                        .unchecked_attributes()
+                        .filter_map(std::result::Result::ok)
+                        .find(|attribute| attribute.key.local_name().as_ref() == b"paraId")
+                        .and_then(|attribute| {
+                            u32::from_str_radix(std::str::from_utf8(&attribute.value).ok()?, 16)
+                                .ok()
+                        });
+                },
+                Ok(Event::Eof) | Err(_) => return None,
+                _ => {},
+            }
+        }
+    }
+
     /// This comment's XML with every namespace declaration it inherits from
     /// `word/comments.xml` re-declared on its own `w:comment`, so that it
     /// parses standalone.
