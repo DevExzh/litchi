@@ -28,6 +28,8 @@ pub(crate) enum Setter {
     HyperlinkUrl,
     /// A new hyperlink's bookmark target.
     HyperlinkAnchor,
+    /// A hyperlink's screen tip, `w:tooltip` (record 0345).
+    HyperlinkTooltip,
     /// A new table's row count.
     TableRows,
     /// A new table's column count.

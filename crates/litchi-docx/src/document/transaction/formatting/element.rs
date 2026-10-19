@@ -1773,6 +1773,71 @@ impl Edit {
         self.replace_element(hyperlink, &before, &Arc::new(after))
     }
 
+    /// Set the screen tip (`w:tooltip`) of the hyperlink at `hyperlink` to
+    /// `tooltip`, or remove it for `None` (record 0345). The start tag keeps
+    /// every other attribute as written; an unchanged tip is an exact no-op.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    ///
+    /// let snapshot = Snapshot::from_xml(
+    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:hyperlink w:anchor="Intro"><w:r><w:t>Intro</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#,
+    /// )?;
+    /// let mut edit = snapshot.edit();
+    /// let link = ElementPath::new([
+    ///     ElementStep::Paragraph(Position::new(0)),
+    ///     ElementStep::Hyperlink(Position::new(0)),
+    /// ]);
+    /// edit.set_hyperlink_tooltip_at(&link, Some("Jump to the introduction"))?;
+    /// let commit = edit.commit()?;
+    /// assert!(String::from_utf8_lossy(commit.snapshot().xml_bytes())
+    ///     .contains(r#"w:tooltip="Jump to the introduction""#));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for a missing hyperlink,
+    /// [`Refusal::InvalidPropertyValue`] for a tip holding a control
+    /// character XML cannot carry, or a resource-limit error.
+    pub fn set_hyperlink_tooltip_at(
+        &mut self,
+        hyperlink: &ElementPath,
+        tooltip: Option<&str>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("set_hyperlink_tooltip_at")?;
+        if tooltip.is_some_and(|tip| {
+            tip.chars()
+                .any(|c| c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
+        }) {
+            return Err(refusal(Refusal::InvalidPropertyValue));
+        }
+        let (located, _) = self.element_with_scope(hyperlink, b"hyperlink")?;
+        let before = self.element_bytes(located)?;
+        let (tag_end, _) = super::root_tag(&before)?;
+        let tag = &before[..tag_end];
+        let key = crate::picture_spans::attribute_named(tag, "tooltip").unwrap_or_else(|| {
+            let name = String::from_utf8_lossy(super::tag_name(tag).unwrap_or(b"w:hyperlink"));
+            match name.split_once(':') {
+                Some((prefix, _)) => format!("{prefix}:tooltip"),
+                None => "tooltip".to_owned(),
+            }
+        });
+        let rewritten = match tooltip {
+            Some(tip) => crate::picture_spans::with_attribute(tag, &key, tip),
+            None => crate::picture_spans::without_attribute(tag, &key),
+        }
+        .ok_or_else(|| invalid("invalid hyperlink start tag"))?;
+        if rewritten.as_slice() == tag {
+            return Ok(self);
+        }
+        let mut after = buffer(staging_add(before.len(), rewritten.len())?)?;
+        after.extend_from_slice(&rewritten);
+        after.extend_from_slice(&before[tag_end..]);
+        self.replace_element(hyperlink, &before, &Arc::new(after))
+    }
+
     /// Anchor comment `id` in the paragraph at `paragraph`: a range around
     /// its direct runs `range` (inclusive), or around all its content for
     /// `None`, followed by the comment's reference run.

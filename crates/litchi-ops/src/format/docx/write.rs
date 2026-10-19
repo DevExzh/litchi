@@ -823,6 +823,16 @@ impl WorkEdit {
                             .map_err(Error::from))
                     };
                 }
+                if setter == Setter::HyperlinkTooltip {
+                    let tooltip = match value {
+                        None => None,
+                        value => Some(text_value(value)?),
+                    };
+                    return both!(self, |edit| edit
+                        .set_hyperlink_tooltip_at(path, tooltip.as_deref())
+                        .map(|_| ())
+                        .map_err(Error::from));
+                }
                 if setter == Setter::HyperlinkUrl {
                     let url = text_value(value)?;
                     let Self::Eager(edit) = self else {

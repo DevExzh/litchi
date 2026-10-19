@@ -780,7 +780,8 @@ crate::registry::registry! {
     },
     read_add("anchor", ValueType::Text, Setter::HyperlinkAnchor, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("docLocation", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("tooltip", ValueType::Text)),
+    // Record 0345: the screen tip is written by add and set; `null` removes it.
+    writable("tooltip", ValueType::Text, Setter::HyperlinkTooltip, Constraint::None, true),
     crate::registry::Entry::read(PropSpec::new("tgtFrame", ValueType::Text)),
     read_add("font", ValueType::Text, Setter::RunFontLatin, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("font.cs", ValueType::Text)),

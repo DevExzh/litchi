@@ -109,7 +109,7 @@ impl Docx {
                         },
                     },
                 };
-                let (target, run) = new_hyperlink(node.props())?;
+                let (target, run, tooltip) = new_hyperlink(node.props())?;
                 // The hyperlink's position is its ordinal among the
                 // paragraph's direct hyperlinks.
                 self.owner().check_source()?;
@@ -120,6 +120,15 @@ impl Docx {
                 let position = eager
                     .insert_hyperlink_at(&owner, direct, &target, &run)
                     .map_err(Error::from)?;
+                // The screen tip (record 0345), in the same transaction.
+                if let Some(tooltip) = tooltip.as_deref() {
+                    eager
+                        .set_hyperlink_tooltip_at(
+                            &owner.child(ElementStep::Hyperlink(position)),
+                            Some(tooltip),
+                        )
+                        .map_err(Error::from)?;
+                }
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Hyperlink, position)))))
             },
@@ -752,17 +761,19 @@ fn new_table(
     Ok((table, borders.borders))
 }
 
-/// A new hyperlink's target and run from its add properties: exactly one of
-/// `url` and `anchor`, its `text`, and its run formatting. Without explicit
-/// formatting the run gets OfficeCLI's fallback hyperlink look (color
-/// `0563C1`, single underline).
+/// A new hyperlink's target, run and screen tip from its add properties:
+/// exactly one of `url` and `anchor`, its `text`, its `tooltip` (record
+/// 0345), and its run formatting. Without explicit formatting the run gets
+/// OfficeCLI's fallback hyperlink look (color `0563C1`, single underline).
 fn new_hyperlink(
     props: &Props<'_>,
 ) -> Result<(
     litchi_docx::document::HyperlinkTarget,
     litchi_docx::document::NewRun,
+    Option<String>,
 )> {
     use super::setters::Setter;
+    let mut tooltip = None::<String>;
     let mut url = None::<String>;
     let mut anchor = None::<String>;
     let mut text = String::new();
@@ -784,6 +795,9 @@ fn new_hyperlink(
                 match setter {
                     Setter::HyperlinkUrl => url = Some(as_text(value)),
                     Setter::HyperlinkAnchor => anchor = Some(as_text(value)),
+                    Setter::HyperlinkTooltip => {
+                        tooltip = value.is_some().then(|| as_text(value));
+                    },
                     Setter::HyperlinkText => text = as_text(value),
                     other => {
                         styled |= matches!(
@@ -826,6 +840,7 @@ fn new_hyperlink(
     Ok((
         target,
         litchi_docx::document::NewRun::new(text).with_properties(properties),
+        tooltip,
     ))
 }
 

@@ -342,6 +342,23 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
+    /// Set or remove the screen tip of the hyperlink at `hyperlink` (record
+    /// 0345).
+    ///
+    /// See [`super::snapshot::Edit::set_hyperlink_tooltip_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, value or resource refusal without changing
+    /// the staged document.
+    pub fn set_hyperlink_tooltip_at(
+        &mut self,
+        hyperlink: &super::ElementPath,
+        tooltip: Option<&str>,
+    ) -> Result<&mut Self> {
+        self.inner.set_hyperlink_tooltip_at(hyperlink, tooltip)?;
+        Ok(self)
+    }
+
     /// Insert a run into the paragraph or hyperlink at `owner`.
     ///
     /// See [`super::snapshot::Edit::insert_run_at`].
