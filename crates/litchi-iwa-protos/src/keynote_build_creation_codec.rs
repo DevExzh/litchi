@@ -887,6 +887,7 @@ mod tests {
         );
     }
 
+    #[allow(deprecated)]
     #[test]
     fn movie_and_audio_builds_differ_only_by_the_typed_effect() {
         let audio = write();

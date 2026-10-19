@@ -14,6 +14,8 @@ pub mod binary;
 pub mod bom;
 pub mod bounded;
 pub mod budget;
+/// Canonical JSON bytes that do not depend on `serde_json` features.
+pub mod canonical_json;
 pub mod detection;
 pub mod durability;
 pub mod error;

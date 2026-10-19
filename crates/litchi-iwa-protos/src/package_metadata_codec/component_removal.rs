@@ -872,8 +872,8 @@ mod tests {
         let versioned = component(
             3,
             "old.iwa",
-            &[versioned_current_reference_to_removed.clone()],
-            &[versioned_reference_to_removed.clone()],
+            std::slice::from_ref(&versioned_current_reference_to_removed),
+            std::slice::from_ref(&versioned_reference_to_removed),
             false,
         );
         let source = metadata(&[survivor, removed.clone()], &[versioned]);

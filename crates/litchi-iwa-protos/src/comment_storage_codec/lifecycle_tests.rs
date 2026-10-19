@@ -92,8 +92,7 @@ impl CommentStorageVisitor for Replies {
 fn reply_ids(bytes: &[u8]) -> Vec<u64> {
     let mut replies = Replies::default();
     decode_comment_storage_archive_with_visitor(bytes, options(bytes), &mut replies)
-        .expect("valid comment storage")
-        .0;
+        .expect("valid comment storage");
     replies.identifiers
 }
 

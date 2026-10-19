@@ -1663,6 +1663,8 @@ impl<L, T> fmt::Debug for ThreeWayMergeError<L, T> {
 struct BoundedJsonOutput {
     bytes: Vec<u8>,
     maximum: usize,
+    /// The bound or allocation failure behind the last `io::Write` error.
+    error: Option<PatchError>,
 }
 
 impl BoundedJsonOutput {
@@ -1670,6 +1672,7 @@ impl BoundedJsonOutput {
         Self {
             bytes: Vec::new(),
             maximum,
+            error: None,
         }
     }
 
@@ -1677,7 +1680,7 @@ impl BoundedJsonOutput {
         self.bytes
     }
 
-    fn write(&mut self, bytes: &[u8]) -> Result<(), PatchError> {
+    fn push(&mut self, bytes: &[u8]) -> Result<(), PatchError> {
         let observed = self
             .bytes
             .len()
@@ -1698,6 +1701,22 @@ impl BoundedJsonOutput {
             .try_reserve_exact(bytes.len())
             .map_err(|_allocation_error| PatchError::Allocation)?;
         self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+}
+
+impl std::io::Write for BoundedJsonOutput {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        match self.push(bytes) {
+            Ok(()) => Ok(bytes.len()),
+            Err(error) => {
+                self.error = Some(error);
+                Err(std::io::Error::other("bounded JSON output refused bytes"))
+            },
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
@@ -2558,50 +2577,16 @@ fn validate_json_limits(value: &Value, limits: PatchLimits) -> Result<(), PatchE
 fn canonical_json<T: Serialize>(source: &T, maximum: usize) -> Result<Vec<u8>, PatchError> {
     let json_value = serde_json::to_value(source).map_err(PatchError::Json)?;
     let mut output = BoundedJsonOutput::new(maximum);
-    write_json(&json_value, &mut output)?;
-    Ok(output.into_inner())
-}
-
-fn write_json(value: &Value, output: &mut BoundedJsonOutput) -> Result<(), PatchError> {
-    match value {
-        Value::Null => output.write(b"null")?,
-        Value::Bool(boolean) => {
-            if *boolean {
-                output.write(b"true")?;
-            } else {
-                output.write(b"false")?;
-            }
-        },
-        Value::Number(number) => output.write(number.to_string().as_bytes())?,
-        Value::String(text) => {
-            let encoded = serde_json::to_string(text).map_err(PatchError::Json)?;
-            output.write(encoded.as_bytes())?;
-        },
-        Value::Array(values) => {
-            output.write(b"[")?;
-            for (index, child) in values.iter().enumerate() {
-                if index != 0 {
-                    output.write(b",")?;
-                }
-                write_json(child, output)?;
-            }
-            output.write(b"]")?;
-        },
-        Value::Object(values) => {
-            output.write(b"{")?;
-            for (index, (key, child)) in values.iter().enumerate() {
-                if index != 0 {
-                    output.write(b",")?;
-                }
-                let encoded = serde_json::to_string(key).map_err(PatchError::Json)?;
-                output.write(encoded.as_bytes())?;
-                output.write(b":")?;
-                write_json(child, output)?;
-            }
-            output.write(b"}")?;
-        },
+    // The canonical writer sorts object members itself, so these bytes do not
+    // depend on whether a linked crate enables `serde_json/preserve_order`.
+    if crate::canonical_json::to_writer(&mut output, &json_value).is_err() {
+        return Err(output.error.take().unwrap_or(PatchError::JsonLimit {
+            kind: JsonLimitKind::OutputBytes,
+            observed: usize::MAX,
+            limit: maximum,
+        }));
     }
-    Ok(())
+    Ok(output.into_inner())
 }
 
 fn validate_version(version: u16) -> Result<(), PatchError> {
@@ -2659,6 +2644,51 @@ mod tests {
     fn operation(op: &str, target: &str, value: Value) -> PatchOperation {
         PatchOperation::new(patch_limits(), op, target, BTreeMap::new(), value)
             .expect("valid operation")
+    }
+
+    /// Record 0349: durable bytes must not depend on whether a linked crate
+    /// enables `serde_json/preserve_order`. This crate's tests enable it, so
+    /// the map below iterates in insertion order; the bytes must still list
+    /// members sorted, exactly as a build without the feature produces them.
+    #[test]
+    fn durable_json_ignores_serde_json_map_order() {
+        let mut value = serde_json::Map::new();
+        value.insert("z".to_owned(), json!(2));
+        value.insert("a".to_owned(), json!({"y": 1, "b": 0.5}));
+        assert_eq!(
+            value.keys().map(String::as_str).collect::<Vec<_>>(),
+            ["z", "a"],
+            "litchi-core tests must run with serde_json/preserve_order"
+        );
+        let patch = Patch::<ForwardOnly>::new(
+            patch_limits(),
+            "org.litchi.test",
+            [operation("cell.set", "A1", Value::Object(value))],
+            BlobBundle::new(limits()),
+        )
+        .expect("valid patch");
+        let wire = patch.to_deterministic_json().expect("serialize patch");
+        let text = String::from_utf8(wire.clone()).expect("UTF-8 JSON");
+        assert!(
+            text.contains(r#""value":{"a":{"b":0.5,"y":1},"z":2}"#),
+            "{text}"
+        );
+        // Insertion-ordered input is not canonical and is refused.
+        let reordered = text.replace(
+            r#""value":{"a":{"b":0.5,"y":1},"z":2}"#,
+            r#""value":{"z":2,"a":{"b":0.5,"y":1}}"#,
+        );
+        assert!(matches!(
+            Patch::<ForwardOnly>::from_deterministic_json(reordered.as_bytes(), patch_limits()),
+            Err(PatchError::NonCanonicalJson)
+        ));
+        assert_eq!(
+            Patch::<ForwardOnly>::from_deterministic_json(&wire, patch_limits())
+                .expect("canonical patch parses")
+                .to_deterministic_json()
+                .expect("serialize decoded patch"),
+            wire
+        );
     }
 
     #[test]

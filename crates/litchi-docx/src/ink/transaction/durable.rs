@@ -2993,7 +2993,7 @@ mod tests {
             Value::String(BlobId::of(&restore).as_hex()),
         );
         let forged = CorePatch::<Reversible>::from_deterministic_json(
-            &serde_json::to_vec(&wire).expect("canonical JSON"),
+            &litchi_core::canonical_json::to_vec(&wire),
             limits(),
         )
         .expect("forged patch parses");
@@ -3023,7 +3023,7 @@ mod tests {
         wire["operations"][0]["forward"]["preconditions"]["target_sha256"] =
             Value::String(forged_target_hash);
         let forged = CorePatch::<Reversible>::from_deterministic_json(
-            &serde_json::to_vec(&wire).expect("canonical JSON"),
+            &litchi_core::canonical_json::to_vec(&wire),
             limits(),
         )
         .expect("forged patch parses");

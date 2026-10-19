@@ -3008,7 +3008,7 @@ mod tests {
         for (index, color) in colors.into_iter().enumerate() {
             let author = tsk::AnnotationAuthorArchive {
                 name: Some(format!("native-author-{index}")),
-                color: Some(color.clone()),
+                color: Some(color),
                 public_id: Some(format!("native-public-{index}")),
                 is_public_author: Some(index % 2 == 0),
                 public_ids: vec![format!("native-public-{index}"), "shared".to_owned()],
