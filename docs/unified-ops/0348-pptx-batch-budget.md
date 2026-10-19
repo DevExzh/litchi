@@ -1,8 +1,9 @@
 # 0348 — PPTX batches within budget: leaf-reported changes, one-pass indexes, one-pass notes chunks
 
 - Status: implemented on `uo2/pptx-batch`, cut from `feat/unified-ops-api`
-  at `8ba0c2260f`; trunk merged at `857d5c9976` (docs and dispositions
-  only; no crate changed).
+  at `8ba0c2260f`; trunk merged at `857d5c9976` (docs and dispositions)
+  and at `c065dfafd8` (record 0349: canonical durable JSON, workspace
+  hygiene; the bench-matrix Markdown regenerated).
 - Date: 2026-10-19
 - Input: record 0346 §6 and follow-ups 0346-P1 (cold cell batches over
   the 2× budget: cell paragraphs 2.04–2.16× at 1k and 10k, cell formats
@@ -252,9 +253,10 @@ no ratio budget below 1k (scaling rows).
 
 ## 6. Gates
 
-On the merged tree (`857d5c9976` and the record commit); cargo through the
-memory-capped shim, `CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`; every exit
-status checked.
+On the merged tree `c065dfafd8` (after the review's changes and trunk
+record 0349), rerun in full; cargo through the memory-capped shim,
+`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`; every exit status checked. The
+litchi-ops test chunks include `tests/pptx_batch_equivalence.rs`.
 
 Logs: `.coord/pptx-batch/gate-logs/` (`summary.txt`).
 
