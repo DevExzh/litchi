@@ -2729,7 +2729,21 @@ pub(super) enum TableSetter {
     Width,
     Height,
     Data,
+    /// An `a:tblPr` style switch, by its position in [`TABLE_SWITCHES`]
+    /// (record 0342: set only).
+    Switch(u8),
 }
+
+/// The table style switches a table-level `set` writes (record 0342), in
+/// [`TableSetter::Switch`] order.
+pub(super) const TABLE_SWITCHES: [TableKey; 6] = [
+    TableKey::FirstRow,
+    TableKey::LastRow,
+    TableKey::FirstCol,
+    TableKey::LastCol,
+    TableKey::BandedRows,
+    TableKey::BandedCols,
+];
 const TABLE_WRITE_COUNT: usize = TABLE_PROPS.len() + 1;
 const fn table_write_entries() -> [crate::registry::Entry<TableSetter>; TABLE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
@@ -2752,12 +2766,26 @@ const fn table_write_entries() -> [crate::registry::Entry<TableSetter>; TABLE_WR
         } else if index == TableKey::Height as usize {
             Some(TableSetter::Height)
         } else {
-            None
+            let mut switch = 0;
+            let mut found = None;
+            while switch < TABLE_SWITCHES.len() {
+                if TABLE_SWITCHES[switch] as usize == index {
+                    found = Some(TableSetter::Switch(switch as u8));
+                }
+                switch += 1;
+            }
+            found
         };
         entries[index] = match setter {
             Some(setter) => Entry {
                 spec,
-                access: Access::Add(setter),
+                // Record 0342: `name` is set too, and the style switches
+                // are set only.
+                access: match setter {
+                    TableSetter::Name => Access::SetAndAdd(setter),
+                    TableSetter::Switch(_) => Access::Set(setter),
+                    _ => Access::Add(setter),
+                },
                 constraint: match setter {
                     TableSetter::Rows | TableSetter::Cols => Constraint::Int { min: 1, max: 5_000 },
                     TableSetter::Width | TableSetter::Height => Constraint::Length {

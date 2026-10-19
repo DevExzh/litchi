@@ -2883,6 +2883,9 @@ impl Element {
                         "p" | "r"
                             | "hyperlink"
                             | "tc"
+                            // Table borders, row height and flags (record 0342).
+                            | "tbl"
+                            | "tr"
                             | "chart"
                             | "series"
                             | "axis"

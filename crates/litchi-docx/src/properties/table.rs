@@ -101,6 +101,22 @@ pub struct Height {
     pub rule: Option<HeightRule>,
 }
 
+impl Height {
+    /// A row height of `value` with `rule` (`None`: no `w:hRule`, which
+    /// reads as `auto`).
+    ///
+    /// ```
+    /// use litchi_docx::properties::{Height, HeightRule, Twips};
+    ///
+    /// let height = Height::new(Twips(400), Some(HeightRule::Exact));
+    /// assert_eq!(height.value, Twips(400));
+    /// ```
+    #[must_use]
+    pub const fn new(value: Twips, rule: Option<HeightRule>) -> Self {
+        Self { value, rule }
+    }
+}
+
 /// The conditional table-style formatting a table applies (`w:tblLook`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -316,7 +332,7 @@ pub struct Table {
     /// The `w:gridCol` widths of `w:tblGrid`, in column order; `None` when
     /// the table has no grid column. A column without `w:w` is `None`.
     pub grid: Option<Vec<Option<Twips>>>,
-    invalid: Invalid,
+    pub(super) invalid: Invalid,
 }
 
 impl Table {
@@ -393,7 +409,7 @@ pub struct Row {
     pub justification: Option<TableJustification>,
     /// `w:hidden`: hide the row's end mark.
     pub hidden: Option<bool>,
-    invalid: Invalid,
+    pub(super) invalid: Invalid,
 }
 
 impl Row {

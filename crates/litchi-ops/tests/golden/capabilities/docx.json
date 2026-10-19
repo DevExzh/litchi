@@ -258,6 +258,72 @@
           "add": false,
           "set": true,
           "get": true
+        },
+        "extended.template": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.manager": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.company": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.application": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.applicationVersion": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.pages": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.words": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.characters": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.lines": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.paragraphs": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.totalTime": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
         }
       }
     },
@@ -565,13 +631,13 @@
         },
         "listStyle": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "start": {
           "type": "int",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -1445,7 +1511,7 @@
       ],
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -1478,7 +1544,7 @@
         "style": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rowBandSize": {
@@ -1633,6 +1699,48 @@
           "add": true,
           "set": false,
           "get": false
+        },
+        "border.all": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.top": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.bottom": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.left": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.right": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.horizontal": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.vertical": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -1652,7 +1760,7 @@
       ],
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -1672,7 +1780,7 @@
         "height": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height.rule": {
@@ -1689,19 +1797,19 @@
         "header": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "cantSplit": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "hidden": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rowAlign": {
@@ -1751,6 +1859,18 @@
           "type": "int",
           "add": true,
           "set": false,
+          "get": false
+        },
+        "height.exact": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "height.atLeast": {
+          "type": "string",
+          "add": false,
+          "set": true,
           "get": false
         }
       },

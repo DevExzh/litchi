@@ -124,7 +124,7 @@ pub use value::{
 pub(crate) use edit::paragraph_rank_for_tests;
 pub(crate) use edit::{
     SpliceError, admit_paragraph, admit_run, paragraph_properties_element, run_properties_element,
-    same_paragraph, same_run, splice_paragraph, splice_run,
+    same_paragraph, same_run, splice_paragraph, splice_row, splice_run, splice_table,
 };
 pub(crate) use paragraph::parse as parse_paragraph;
 pub(crate) use run::parse as parse_run;

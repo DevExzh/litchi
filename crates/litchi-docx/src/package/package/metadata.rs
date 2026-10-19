@@ -1,5 +1,8 @@
 //! Package entry points of the core-properties transaction family.
 
+use litchi_ooxml_common::custom::{Host, Props as CustomProps};
+use litchi_ooxml_common::properties::{self as families, app};
+
 use super::super::model::{Package, Props};
 use crate::metadata::{Edit, Error, Patch, Result, admit};
 
@@ -62,30 +65,87 @@ impl Package {
         if self.metadata() != patch.base() {
             return Err(Error::PatchConflict);
         }
-        self.publish_metadata(patch.target())
+        self.publish_metadata(patch.target(), patch.parts())
             .map(|(package, _)| package)
     }
 
-    /// Publish `target` as the core properties of a new package. Returns
-    /// whether it differs from this package's value.
-    pub(crate) fn publish_metadata(&self, target: Option<&Props>) -> Result<(Self, bool)> {
-        if self.metadata() == target {
+    /// The application properties (`docProps/app.xml`), when present.
+    ///
+    /// ```
+    /// use litchi_docx::Package;
+    ///
+    /// let package = Package::new()?;
+    /// assert!(package.app_props()?.is_some());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Properties`] for an invalid part or graph.
+    pub fn app_props(&self) -> Result<Option<app::Props>> {
+        app::read(&self.opc).map_err(|error| Error::Properties(error.into()))
+    }
+
+    /// The exact part patch that stages `app` and `custom` (each `None`:
+    /// untouched) over this package's application and custom properties
+    /// (record 0342).
+    pub(crate) fn property_parts_patch(
+        &self,
+        app: Option<Option<app::Props>>,
+        custom: Option<CustomProps>,
+    ) -> Result<families::Patch> {
+        // A dirty cached value would make the part bytes stale.
+        self.ensure_opc_current("edit_metadata")?;
+        let snapshot = families::Snapshot::read(&self.opc, Host::Word)?;
+        let mut edit = snapshot.edit();
+        if let Some(app) = app {
+            edit.set_app_props(app);
+        }
+        if let Some(custom) = custom {
+            edit.set_custom_props(custom);
+        }
+        Ok(edit.commit()?.into_parts().1)
+    }
+
+    /// Publish `target` as the core properties of a new package, and `parts`
+    /// over its application and custom properties. Returns whether the
+    /// package changed.
+    pub(crate) fn publish_metadata(
+        &self,
+        target: Option<&Props>,
+        parts: &families::Patch,
+    ) -> Result<(Self, bool)> {
+        let core = self.metadata() != target;
+        if !core && parts.is_noop() {
             return Ok((self.clone(), false));
         }
-        if let Some(props) = target {
+        if core && let Some(props) = target {
             admit(props)?;
         }
         if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
         let mut package = self.clone();
-        package.edit_semantic_opc("edit_metadata", |opc| {
-            match target {
-                Some(props) => litchi_ooxml_common::properties::write(opc, props)?,
-                None => litchi_ooxml_common::properties::clear(opc)?,
-            };
+        let mut failure = None;
+        let published = package.edit_semantic_opc("edit_metadata", |opc| {
+            if core {
+                match target {
+                    Some(props) => litchi_ooxml_common::properties::write(opc, props)?,
+                    None => litchi_ooxml_common::properties::clear(opc)?,
+                };
+            }
+            if let Err(error) = parts.apply(opc) {
+                failure = Some(error);
+                return Err(crate::Error::InvalidFormat(
+                    "document-property parts refused the patch".to_owned(),
+                ));
+            }
             Ok(())
-        })?;
+        });
+        if let Some(error) = failure {
+            return Err(Error::Properties(error));
+        }
+        published?;
         Ok((package, true))
     }
 }

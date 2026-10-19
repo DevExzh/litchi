@@ -68,26 +68,26 @@ docx	table	get	supported		ok 8 instances, first `officecli/examples/word/revisio
 docx	table	find	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]
 docx	table	query	supported		ok matches in officecli/examples/word/revisions.docx
 docx	table	view	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]
-docx	table	set	n/a	set not offered for this element	-
+docx	table	set	supported		ok `seed + add table` /body/tbl[1] {"style":"Litchi"}
 docx	table	add	supported		ok /body/tbl[1] on `seed` under /body {"rows":"2","cols":"2"}
 docx	table	remove	supported		ok `seed + add table` /body/tbl[1]
 docx	table	move	format-verb		ok `seed + add table` /body/tbl[1] /body/tbl[2]
 docx	table	swap	format-verb		refused unsupported_capability
-docx	table	edit	n/a	edit not offered for this element	-
-docx	table	batch	n/a	batch not offered for this element	-
+docx	table	edit	supported		ok tx.set
+docx	table	batch	supported		ok set item
 docx	table	create	supported		ok format
 docx	table	save	supported		ok format
 docx	row	get	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]
 docx	row	find	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]
 docx	row	query	supported		ok matches in officecli/examples/word/revisions.docx
 docx	row	view	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]
-docx	row	set	n/a	set not offered for this element	-
+docx	row	set	supported		ok `seed + add table` /body/tbl[1]/tr[1] {"height":"7"}
 docx	row	add	supported		ok /body/tbl[1]/tr[3] on `seed + add table` under /body/tbl[1] {}
 docx	row	remove	supported		ok `seed + add table` /body/tbl[1]/tr[1]
 docx	row	move	format-verb		ok `seed + add table` /body/tbl[1]/tr[1] /body/tbl[1]/tr[2]
 docx	row	swap	format-verb		refused unsupported_capability
-docx	row	edit	n/a	edit not offered for this element	-
-docx	row	batch	n/a	batch not offered for this element	-
+docx	row	edit	supported		ok tx.set
+docx	row	batch	supported		ok set item
 docx	row	create	supported		ok format
 docx	row	save	supported		ok format
 docx	cell	get	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]/tc[1]
@@ -978,13 +978,13 @@ pptx	table	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[
 pptx	table	find	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
 pptx	table	query	supported		ok matches in ooxml/pptx/shapes.pptx
 pptx	table	view	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]
-pptx	table	set	n/a	set not offered for this element	-
+pptx	table	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1] {"name":"Litchi"}
 pptx	table	add	supported		ok /slide[1]/table[1] on `create() + add slide` under /slide[1] {}
 pptx	table	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[1]/table[1]
 pptx	table	move	format-verb		refused unsupported_type
 pptx	table	swap	format-verb		refused unsupported_type
-pptx	table	edit	n/a	edit not offered for this element	-
-pptx	table	batch	n/a	batch not offered for this element	-
+pptx	table	edit	supported		ok tx.set
+pptx	table	batch	supported		ok set item
 pptx	table	create	supported		ok format
 pptx	table	save	supported		ok format
 pptx	tr	get	supported		ok 8 instances, first `ooxml/pptx/shapes.pptx` /slide[1]/table[1]/tr[1]

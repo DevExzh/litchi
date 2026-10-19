@@ -1,5 +1,5 @@
 //! The `/metadata` set path of the OOXML formats (XLSX, PPTX, XLSB), record
-//! 0253, and DOCX's core properties (record 0338).
+//! 0253, and DOCX (records 0338 and 0342).
 //!
 //! `set("/metadata", props)` stages document properties through each
 //! format's leaf `metadata` transaction. OfficeCLI's spelling, a set on the
@@ -125,10 +125,20 @@ const fn ascii_lower_cmp(left: &str, right: &str) -> std::cmp::Ordering {
 
 impl Field {
     /// Whether the core-properties part stores the field.
+    #[cfg_attr(not(feature = "docx"), allow(dead_code, reason = "DOCX only"))]
     const fn is_core(self) -> bool {
         !matches!(
             self,
             Self::Application | Self::Company | Self::ContentType | Self::Manager | Self::Template
+        )
+    }
+
+    /// Whether the application-properties part stores the field.
+    #[cfg_attr(not(feature = "docx"), allow(dead_code, reason = "DOCX only"))]
+    const fn is_app(self) -> bool {
+        matches!(
+            self,
+            Self::Application | Self::Company | Self::Manager | Self::Template
         )
     }
 }
@@ -261,6 +271,60 @@ impl Assignments {
         }
     }
 
+    /// Apply the core-property assignments to `metadata`; the application
+    /// fields are left to [`Self::apply_app`] (DOCX, record 0342).
+    #[cfg(feature = "docx")]
+    pub(crate) fn apply_core(&self, metadata: &mut Metadata) {
+        let core = Self {
+            fields: self
+                .fields
+                .iter()
+                .filter(|(field, _)| field.is_core())
+                .cloned()
+                .collect(),
+            custom: Vec::new(),
+        };
+        core.apply(metadata);
+    }
+
+    /// Whether any application property (`company`, `manager`, `template`,
+    /// `application`, or their `extended.*` spellings) is assigned.
+    #[cfg(feature = "docx")]
+    pub(crate) fn has_app(&self) -> bool {
+        self.fields.iter().any(|(field, _)| field.is_app())
+    }
+
+    /// The key of an assigned field no OOXML part stores (`contentType`).
+    #[cfg(feature = "docx")]
+    pub(crate) fn unstored(&self) -> Option<&'static str> {
+        self.fields
+            .iter()
+            .any(|(field, _)| *field == Field::ContentType)
+            .then_some("contentType")
+    }
+
+    /// `base` with the application-property assignments applied: every
+    /// element the assignments do not name keeps its value (DOCX, record
+    /// 0342).
+    #[cfg(feature = "docx")]
+    pub(crate) fn apply_app(&self, base: Option<properties::app::Props>) -> properties::app::Props {
+        let mut props = base.unwrap_or_default();
+        for (field, value) in &self.fields {
+            let Assigned::Text(text) = value else {
+                continue;
+            };
+            let slot = match field {
+                Field::Application => &mut props.application,
+                Field::Company => &mut props.company,
+                Field::Manager => &mut props.manager,
+                Field::Template => &mut props.template,
+                _ => continue,
+            };
+            slot.clone_from(text);
+        }
+        props
+    }
+
     /// Whether any custom property is assigned.
     pub(crate) fn has_custom(&self) -> bool {
         !self.custom.is_empty()
@@ -302,27 +366,6 @@ impl Assignments {
 /// `unsupported_property` for an unknown key (with a suggestion), and
 /// `invalid_value` for a value of the wrong kind.
 pub(crate) fn admit(props: &Props<'_>, format: FileFormat) -> Result<Assignments> {
-    admit_with(props, format, Scope::Package)
-}
-
-/// The fields a format's metadata writer stores.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Scope {
-    /// Core, application and custom properties (PPTX, XLSX, XLSB).
-    Package,
-    /// The core properties only: DOCX's leaf metadata transaction wraps the
-    /// core-properties part (records 0251, 0253 F3).
-    #[cfg_attr(not(feature = "docx"), allow(dead_code, reason = "DOCX only"))]
-    Core,
-}
-
-/// [`admit`] for the fields `scope` stores: a key of another part is
-/// refused with `unsupported_property` naming it.
-pub(crate) fn admit_with(
-    props: &Props<'_>,
-    format: FileFormat,
-    scope: Scope,
-) -> Result<Assignments> {
     if props.is_empty() {
         return Err(Error::new(
             Code::InvalidArgument,
@@ -334,9 +377,6 @@ pub(crate) fn admit_with(
     for (key, value) in props.iter() {
         let name = key.as_str();
         if let Some(custom) = strip_custom(name) {
-            if scope == Scope::Core {
-                return Err(outside_core(name, format));
-            }
             if assignments
                 .custom
                 .iter()
@@ -358,9 +398,6 @@ pub(crate) fn admit_with(
             .with_format(format)
             .with_suggestion("use a root-metadata key such as `title`, or `custom.<name>`"));
         };
-        if scope == Scope::Core && !field.is_core() {
-            return Err(outside_core(name, format));
-        }
         if assignments.fields.iter().any(|(seen, _)| *seen == field) {
             return Err(repeated(name, format));
         }
@@ -408,16 +445,6 @@ fn custom_value(
         PropValue::Text(text) => custom::Value::Text(text.to_string()),
         _ => return Err(wrong_kind(key, format)),
     }))
-}
-
-fn outside_core(key: &str, format: FileFormat) -> Error {
-    Error::new(
-        Code::UnsupportedProperty,
-        "only core document properties are written for this format",
-    )
-    .with_property(key.to_owned())
-    .with_format(format)
-    .with_suggestion("core keys: title, author, subject, keywords, description, category, lastModifiedBy, revisionNumber, created, modified, contentStatus, language, version, lastPrinted")
 }
 
 fn repeated(key: &str, format: FileFormat) -> Error {

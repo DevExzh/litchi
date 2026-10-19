@@ -1,5 +1,5 @@
 //! OfficeCLI's root-level metadata writes (`set / title=...`) route to the
-//! `/metadata` writer for DOCX, XLSX and PPTX (record 0338).
+//! `/metadata` writer for DOCX, XLSX and PPTX (records 0338 and 0342).
 #![cfg(all(feature = "docx", feature = "xlsx", feature = "pptx"))]
 
 use litchi_core::{FileFormat, Metadata};
@@ -97,15 +97,14 @@ fn the_root_refuses_other_keys_by_name() {
             .unwrap_err();
         assert_eq!(error.code(), Code::InvalidArgument, "{format:?}");
     }
-    // DOCX stores the core properties only (record 0253 F3).
+    // No OOXML part stores `contentType`.
     let docx = create(FileFormat::Docx).expect("create");
-    for key in ["extended.company", "company", "custom.Owner", "contentType"] {
-        let error = docx.set("/", props! { key => "x" }).unwrap_err();
-        assert_eq!(error.code(), Code::UnsupportedProperty, "{key}");
-        assert_eq!(error.property(), Some(key));
-    }
-    // XLSX and PPTX write application properties on the root too.
-    for format in [FileFormat::Xlsx, FileFormat::Pptx] {
+    let error = docx.set("/", props! { "contentType" => "x" }).unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedProperty);
+    assert_eq!(error.property(), Some("contentType"));
+    // Every OOXML format writes application properties on the root too
+    // (DOCX: record 0342).
+    for format in [FileFormat::Docx, FileFormat::Xlsx, FileFormat::Pptx] {
         let file = create(format)
             .unwrap()
             .set(
@@ -113,8 +112,21 @@ fn the_root_refuses_other_keys_by_name() {
                 props! { "extended.company" => "Acme Corp", "extended.manager" => "Dana" },
             )
             .unwrap_or_else(|error| panic!("{format:?}: {error}"));
-        assert_eq!(metadata(&file).company.as_deref(), Some("Acme Corp"));
-        assert_eq!(metadata(&file).manager.as_deref(), Some("Dana"));
+        if format == FileFormat::Docx {
+            // DOCX `metadata()` is the core properties; the root reads
+            // the application ones.
+            assert_eq!(
+                root_value(&file, "extended.company").as_deref(),
+                Some("Acme Corp")
+            );
+            assert_eq!(
+                root_value(&file, "extended.manager").as_deref(),
+                Some("Dana")
+            );
+        } else {
+            assert_eq!(metadata(&file).company.as_deref(), Some("Acme Corp"));
+            assert_eq!(metadata(&file).manager.as_deref(), Some("Dana"));
+        }
     }
 }
 
@@ -195,4 +207,75 @@ fn the_root_claims_set_for_its_document_property_keys() {
             assert!(!property.set(), "{format:?}");
         }
     }
+}
+
+/// OfficeCLI's `word/document-formatting.sh:28` (record 0342): DOCX
+/// application properties and custom properties on the root, read back as
+/// `extended.*`; the core properties and the main document are untouched,
+/// and a transaction step replays and inverts them.
+#[test]
+fn docx_root_writes_application_and_custom_properties() {
+    let file = create(FileFormat::Docx).expect("create");
+    let file = file
+        .set("/", props! { "title" => "Q3 Field Report" })
+        .expect("core");
+    let before = file.to_bytes().expect("bytes");
+    let after = file
+        .set(
+            "/",
+            props! {
+                "extended.company" => "Acme Corp",
+                "extended.manager" => "Dana Lead",
+                "extended.template" => "Normal.dotm",
+            },
+        )
+        .expect("extended");
+    assert_eq!(
+        root_value(&after, "extended.company").as_deref(),
+        Some("Acme Corp")
+    );
+    assert_eq!(
+        root_value(&after, "extended.manager").as_deref(),
+        Some("Dana Lead")
+    );
+    assert_eq!(
+        root_value(&after, "extended.template").as_deref(),
+        Some("Normal.dotm")
+    );
+    assert_eq!(metadata(&after).title.as_deref(), Some("Q3 Field Report"));
+    let reopened = litchi_ops::open_bytes(after.to_bytes().expect("bytes")).expect("reopen");
+    assert_eq!(
+        root_value(&reopened, "extended.company").as_deref(),
+        Some("Acme Corp")
+    );
+    // An equal value publishes nothing.
+    let same = after
+        .set("/", props! { "extended.company" => "Acme Corp" })
+        .expect("same");
+    assert_eq!(
+        same.to_bytes().expect("bytes"),
+        after.to_bytes().expect("bytes")
+    );
+    // Custom properties, in a transaction that replays and inverts.
+    let commit = file
+        .edit(|edit| {
+            edit.set(
+                "/",
+                props! { "custom.Reviewed" => true, "company" => "Acme" },
+            )?;
+            Ok(())
+        })
+        .expect("custom");
+    assert!(!commit.patch.is_noop());
+    assert_eq!(
+        root_value(&commit.file, "extended.company").as_deref(),
+        Some("Acme")
+    );
+    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    assert_eq!(restored.to_bytes().expect("bytes"), before);
+    let replayed = commit.patch.apply(&file).expect("replay");
+    assert_eq!(
+        root_value(&replayed, "extended.company").as_deref(),
+        Some("Acme")
+    );
 }

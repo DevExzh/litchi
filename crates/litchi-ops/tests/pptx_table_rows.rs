@@ -255,3 +255,55 @@ fn tables_are_added_from_data_or_a_grid() {
         );
     }
 }
+
+/// `ppt/tables/tables-nested.sh:86` (record 0342): a table-level set of the
+/// frame's name and the six style switches; equal values are a no-op, and
+/// add-only keys are refused without a change.
+#[test]
+fn table_name_and_style_switches_are_set() {
+    let bytes = fixture();
+    for eager in [false, true] {
+        let file = open(&bytes, eager);
+        let set = file
+            .set(
+                TABLE,
+                props! {
+                    "name" => "QuarterlySales",
+                    "firstRow" => true,
+                    "lastRow" => true,
+                    "firstCol" => true,
+                    "lastCol" => false,
+                    "bandedRows" => true,
+                    "bandedCols" => false,
+                },
+            )
+            .unwrap();
+        for read in [reopen(&set, false), reopen(&set, true)] {
+            assert_eq!(
+                prop(&read, TABLE, "name").as_deref(),
+                Some("QuarterlySales")
+            );
+            assert_eq!(prop(&read, TABLE, "firstRow").as_deref(), Some("true"));
+            assert_eq!(prop(&read, TABLE, "lastRow").as_deref(), Some("true"));
+            assert_eq!(prop(&read, TABLE, "firstCol").as_deref(), Some("true"));
+            assert_eq!(prop(&read, TABLE, "lastCol"), None);
+            assert_eq!(prop(&read, TABLE, "bandedRows").as_deref(), Some("true"));
+            assert_eq!(prop(&read, TABLE, "bandedCols"), None);
+        }
+        let off = set.set(TABLE, props! { "bandedRows" => false }).unwrap();
+        assert_eq!(prop(&off, TABLE, "bandedRows").as_deref(), Some("false"));
+        let same = set
+            .set(
+                TABLE,
+                props! { "lastRow" => true, "name" => "QuarterlySales" },
+            )
+            .unwrap();
+        assert_eq!(same.to_bytes().unwrap(), set.to_bytes().unwrap());
+        let before = set.to_bytes().unwrap();
+        assert_eq!(
+            code(set.set(TABLE, props! { "rows" => 4 })),
+            Code::UnsupportedProperty
+        );
+        assert_eq!(set.to_bytes().unwrap(), before);
+    }
+}

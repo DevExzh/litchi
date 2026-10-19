@@ -12,6 +12,10 @@
 //! inserts a table (OfficeCLI's defaults: three by three, `data` rows split
 //! by `;` and cells by `,`, padded to the widest row).
 //!
+//! `set(/slide[N]/table[M], {name, firstRow, lastRow, firstCol, lastCol,
+//! bandedRows, bandedCols})` renames the frame and changes the table's
+//! style switches (record 0342).
+//!
 //! Source owners are promoted to an eager package, as column writes are.
 
 use std::sync::Arc;
@@ -20,7 +24,9 @@ use litchi_core::Position;
 use litchi_core::selector::Path;
 
 use super::node::{Item, TableItem, TreeItem};
-use super::spec::{Kind, ROW_WRITE_TABLE, RowSetter, TABLE_WRITE_TABLE, TableSetter};
+use super::spec::{
+    Kind, ROW_WRITE_TABLE, RowSetter, TABLE_SWITCHES, TABLE_WRITE_TABLE, TableKey, TableSetter,
+};
 use super::structure::{bound, error};
 use super::write::{Commit, Proof, validate_text};
 use super::{Editable, Nav, Pptx};
@@ -84,6 +90,11 @@ impl Pptx {
             },
             Change::Remove { row } => native.remove_table_row(slide, shape, Position::new(row))?,
         }
+        self.commit_native(source, native)
+    }
+
+    /// Publish a native table edit over `source`.
+    fn commit_native(&self, source: Editable, native: litchi_pptx::opened::Edit) -> Result<Commit> {
         let (target, patch) = native.commit()?.into_parts();
         let target = Arc::new(target);
         let after = if patch.is_noop() {
@@ -98,6 +109,94 @@ impl Pptx {
             proof: Proof::Eager(patch),
             operations: 1,
         })
+    }
+
+    /// A table-level `set` (record 0342): the frame's `name` and the
+    /// table's style switches. `None` for other targets.
+    pub(super) fn try_set_table(
+        &self,
+        target: &TargetArg<'_>,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
+        let Some(path) = target.path() else {
+            return Ok(None);
+        };
+        if !path
+            .path()
+            .steps()
+            .last()
+            .is_some_and(|step| step.name().eq_ignore_ascii_case("table"))
+        {
+            return Ok(None);
+        }
+        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        let table = match node.item() {
+            Item::Tree(tree) if tree.kind == Kind::Table => tree.clone(),
+            _ => return Ok(None),
+        };
+        drop(node);
+        bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+        let mut name = None;
+        let mut switches = [None::<bool>; TABLE_SWITCHES.len()];
+        let mut seen = 0_u32;
+        for (key, value) in props.iter() {
+            let (index, entry) = TABLE_WRITE_TABLE
+                .resolve(key.as_str())
+                .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+            let bit = 1_u32 << index;
+            if seen & bit != 0 {
+                return Err(error(
+                    Code::InvalidArgument,
+                    "a table property was assigned more than once",
+                )
+                .with_property(entry.spec.name));
+            }
+            seen |= bit;
+            entry.prepare(Operation::Set, value, |setter, value| {
+                match (setter, value) {
+                    (TableSetter::Name, Some(Scalar::Text(value))) => {
+                        validate_text(value).map_err(|e| e.with_property("name"))?;
+                        name = Some(value.to_owned());
+                    },
+                    (TableSetter::Switch(switch), Some(Scalar::Bool(on))) => {
+                        switches[usize::from(switch)] = Some(on);
+                    },
+                    _ => {},
+                }
+                Ok(())
+            })?;
+        }
+        if name.is_none() && switches.iter().all(Option::is_none) {
+            return Err(error(Code::MissingProperty, "nothing to set"));
+        }
+        let slide = slide_table(&table)?;
+        let shape = table.handle.position().get();
+        let source = self.editable_owner()?;
+        let base = super::smartart::eager(&source)?;
+        let mut native = base.edit()?;
+        if let Some(name) = &name {
+            native.set_shape_name(slide, shape, name)?;
+        }
+        if switches.iter().any(Option::is_some) {
+            native.set_table_properties(slide, shape, |properties| {
+                for (key, on) in TABLE_SWITCHES.iter().zip(switches) {
+                    let Some(on) = on else {
+                        continue;
+                    };
+                    let slot = match key {
+                        TableKey::FirstRow => &mut properties.first_row,
+                        TableKey::LastRow => &mut properties.last_row,
+                        TableKey::FirstCol => &mut properties.first_col,
+                        TableKey::LastCol => &mut properties.last_col,
+                        TableKey::BandedRows => &mut properties.band_row,
+                        _ => &mut properties.band_col,
+                    };
+                    *slot = on;
+                }
+            })?;
+        }
+        self.commit_native(source, native).map(Some)
     }
 
     /// `add(/slide[N]/table[M], tr, {height, cols, c1…c20})`.
