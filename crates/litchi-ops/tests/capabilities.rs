@@ -297,7 +297,10 @@ fn ordinary_reports_hide_native_selection_fields() {
             {
                 // Record 0345: OfficeCLI's comment schema.
                 let name = property.name();
-                assert_eq!(property.get(), matches!(name, "anchoredTo" | "done" | "parentId"));
+                assert_eq!(
+                    property.get(),
+                    matches!(name, "anchoredTo" | "done" | "parentId")
+                );
                 assert_eq!(property.set(), name == "done", "comment {name}");
                 assert_eq!(property.add(), name != "anchoredTo", "comment {name}");
             } else if element.name() == "picture" && property.name() != "relId" {
