@@ -99,7 +99,24 @@ impl<'f, F: Flavor> Navigate<'f> for Nav<'f, F> {
             .filter(|child| tree.item(*child).kind() == kind.ordinal());
         let found = match step.select {
             Select::None => of_kind.next(),
-            Select::Ordinal(position) => of_kind.nth(position.get()),
+            Select::Ordinal(position) => {
+                // Children of one kind are usually contiguous: try the slot
+                // `position` past the first of them before counting (record
+                // 0340; the iWork navigator does the same).
+                let children = tree.item(parent.index()).children();
+                let candidate = children
+                    .iter()
+                    .position(|child| tree.item(*child).kind() == kind.ordinal())
+                    .and_then(|first| children.get(first + position.get()))
+                    .copied()
+                    .filter(|child| {
+                        let item = tree.item(*child);
+                        item.kind() == kind.ordinal()
+                            && usize::try_from(item.ordinal())
+                                .is_ok_and(|held| held == position.get())
+                    });
+                candidate.or_else(|| of_kind.nth(position.get()))
+            },
             Select::Last => of_kind.last(),
             Select::Name { name, case } => of_kind.find(|child| {
                 tree.item(*child)

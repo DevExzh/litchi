@@ -11,7 +11,7 @@
 //! run first, so every item still sees the effects of the items before it.
 
 use litchi_core::FileFormat;
-use litchi_core::selector::Path;
+use litchi_core::selector::{Path, Step};
 
 use super::super::write::{Chain, Commit, finish, refusal};
 use super::super::{At, Iwork, Nav, Node, Owner};
@@ -60,6 +60,29 @@ fn evolving_slide(path: &str) -> Option<usize> {
     number.checked_sub(1)
 }
 
+/// Whether `held` and `path` are equal, compared from the last step: a
+/// batch's distinct targets differ there, so a miss in the run's memo costs
+/// one step comparison per entry instead of a whole path (record 0340).
+fn same_path(held: &Path<'_>, path: &Path<'_>) -> bool {
+    held.is_absolute() == path.is_absolute()
+        && held.steps().len() == path.steps().len()
+        && held.last().map(Step::index) == path.last().map(Step::index)
+        && held.steps().iter().rev().eq(path.steps().iter().rev())
+}
+
+/// A parent the run resolved, and the paragraph step it resolved under it.
+#[derive(Debug)]
+struct Parent {
+    /// The parent's path.
+    path: Path<'static>,
+    at: At,
+    /// The name of a positional `name[N]` step that resolved, under this
+    /// parent, to the paragraph the parent's N-th paragraph child is
+    /// (record 0340): later steps of that name and form take that child
+    /// directly.
+    paragraphs: Option<String>,
+}
+
 /// Consecutive coalesced writes of one transaction.
 #[derive(Debug)]
 pub(crate) struct Run {
@@ -68,6 +91,10 @@ pub(crate) struct Run {
     /// Paths the run resolved against its base, with the item and its type
     /// (record 0314): a batch often sets the same few elements again.
     resolved: Vec<(Path<'static>, At, &'static str)>,
+    /// Parents of the paths the run resolved (all but the last step), with
+    /// their item (record 0340): a batch over one text's paragraphs resolves
+    /// only each path's last step.
+    parents: Vec<Parent>,
     /// New slides: source, destination among the evolving slides, item.
     slides: Vec<(SlideSource, usize, usize)>,
     /// The evolving slide list: each slide's base position, `None` for a
@@ -86,6 +113,7 @@ impl Run {
             base: base.clone(),
             pending: Pending::default(),
             resolved: Vec::new(),
+            parents: Vec::new(),
             slides: Vec::new(),
             order: (0..slides).map(Some).collect(),
             limits: *limits,
@@ -126,15 +154,12 @@ impl Run {
         let held = self
             .resolved
             .iter()
-            .find(|(held, _, _)| held == path.path())
+            .find(|(held, _, _)| same_path(held, path.path()))
             .map(|(_, at, kind)| (*at, *kind));
         let (at, kind) = match held {
             Some(found) => found,
             None => {
-                self.base.checked_tree().ok()?;
-                let node =
-                    crate::path::resolve::get(&Nav::<Keynote>::new(&self.base), path).ok()?;
-                let found = (node.at(), node.item().type_name());
+                let found = self.resolve(path)?;
                 if self.resolved.len() < RESOLVED {
                     self.resolved
                         .push((path.path().clone().into_owned(), found.0, found.1));
@@ -144,6 +169,94 @@ impl Run {
         };
         (!props.is_empty() && props.iter().all(|(key, _)| coalescible(kind, key.as_str())))
             .then_some(at)
+    }
+
+    /// Resolve `path` against the run's base: from a memoized parent when
+    /// the path's steps but the last name one, else from the root (keeping
+    /// the parent for later paths).
+    fn resolve(&mut self, path: &PathArg<'_>) -> Option<(At, &'static str)> {
+        /// Parents the memo keeps.
+        const PARENTS: usize = 4;
+        let nav = Nav::<Keynote>::new(&self.base);
+        let steps = path.path().steps();
+        let split = (path.path().is_absolute() && steps.len() >= 2)
+            .then(|| steps.split_last())
+            .flatten();
+        let held = split.and_then(|(_, prefix)| {
+            self.parents
+                .iter()
+                .position(|parent| parent.path.steps().iter().rev().eq(prefix.iter().rev()))
+        });
+        if let (Some((last, _)), Some(held)) = (split, held) {
+            let parent = &self.parents[held];
+            if parent.paragraphs.as_deref() == Some(last.name())
+                && let Some(position) = last.index()
+                && let Some(at) = self.paragraph(parent.at, position.get())
+            {
+                return Some((at, "paragraph"));
+            }
+            let start = Node::new(&self.base, parent.at);
+            let kind = crate::query::inspect::Inspect::kind(&nav, &start);
+            let step = PathArg::from(Path::relative([last.clone()]));
+            if let Ok(node) = crate::path::resolve::get_from(&nav, start, kind, &step) {
+                let found = (node.at(), node.item().type_name());
+                self.learn(held, last, found);
+                return Some(found);
+            }
+        }
+        self.base.checked_tree().ok()?;
+        let node = crate::path::resolve::get(&nav, path).ok()?;
+        let found = (node.at(), node.item().type_name());
+        if let Some((last, prefix)) = split
+            && held.is_none()
+            && self.parents.len() < PARENTS
+        {
+            let parent = PathArg::from(Path::from_steps(prefix.iter().cloned()));
+            if let Ok(at) = crate::path::resolve::get(&nav, &parent).map(|node| node.at()) {
+                self.parents.push(Parent {
+                    path: Path::from_steps(prefix.iter().cloned()).into_owned(),
+                    at,
+                    paragraphs: None,
+                });
+                self.learn(self.parents.len() - 1, last, found);
+            }
+        }
+        Some(found)
+    }
+
+    /// The `position`-th (zero-based) paragraph child of `parent`, when the
+    /// paragraphs are contiguous from the first of them.
+    fn paragraph(&self, parent: At, position: usize) -> Option<At> {
+        let ordinal = crate::path::navigate::ElementKind::ordinal(super::Kind::Paragraph);
+        let kids = self.base.kids(parent);
+        let first = (0..kids.len()).find(|slot| {
+            kids.get(*slot)
+                .is_some_and(|child| self.base.kind_at(child) == ordinal)
+        })?;
+        kids.get(first + position).filter(|child| {
+            self.base.kind_at(*child) == ordinal
+                && usize::try_from(self.base.ordinal_at(*child)).is_ok_and(|held| held == position)
+        })
+    }
+
+    /// Remember that `last` resolved to `found` under parent `held`: a
+    /// positional step that named the paragraph [`Self::paragraph`] finds.
+    fn learn(&mut self, held: usize, last: &Step<'_>, found: (At, &'static str)) {
+        let Some(parent) = self.parents.get(held) else {
+            return;
+        };
+        if parent.paragraphs.is_some() || found.1 != "paragraph" {
+            return;
+        }
+        let Some(position) = last.index() else {
+            return;
+        };
+        if self.paragraph(parent.at, position.get()) == Some(found.0) {
+            let name = last.name().to_owned();
+            if let Some(parent) = self.parents.get_mut(held) {
+                parent.paragraphs = Some(name);
+            }
+        }
     }
 
     /// Whether a set of `props` on tree item `node` must wait for the run to
