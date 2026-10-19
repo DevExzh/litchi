@@ -801,8 +801,8 @@ impl DurablePatch {
 
     /// Serialize this semantic patch as canonical deterministic JSON.
     pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
-        let bytes = serde_json::to_vec(&patch_value(&self.patch))
-            .map_err(|error| bad(format!("durable layout patch write failed: {error}")))?;
+        // Sorted members whatever `serde_json` features are unified (0349).
+        let bytes = litchi_core::canonical_json::to_vec(&patch_value(&self.patch));
         if bytes.len() > MAX_DURABLE_BYTES {
             return Err(bad("durable layout patch exceeds its byte limit"));
         }

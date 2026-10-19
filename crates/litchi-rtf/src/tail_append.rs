@@ -3793,8 +3793,8 @@ impl DurableTailAppendPatch {
         object.insert("offset".to_string(), number(self.root_close)?);
         object.insert("selector".to_string(), Value::String("body".to_string()));
         object.insert("version".to_string(), Value::from(1_u64));
-        let bytes = serde_json::to_vec(&Value::Object(object))
-            .map_err(|_error| Error::DurablePatch("JSON serialization failed"))?;
+        // Sorted members whatever `serde_json` features are unified (0349).
+        let bytes = litchi_core::canonical_json::to_vec(&Value::Object(object));
         if bytes.len() != encoded_len {
             return Err(Error::DurablePatch(
                 "deterministic JSON size preflight disagrees with serializer",
@@ -3821,8 +3821,7 @@ impl DurableTailAppendPatch {
         }
         let value: Value = serde_json::from_slice(bytes)
             .map_err(|_error| Error::DurablePatch("JSON is malformed"))?;
-        let canonical = serde_json::to_vec(&value)
-            .map_err(|_error| Error::DurablePatch("JSON cannot be canonicalized"))?;
+        let canonical = litchi_core::canonical_json::to_vec(&value);
         if canonical != bytes {
             return Err(Error::DurablePatch("JSON is not canonical"));
         }
