@@ -987,15 +987,10 @@ impl Capabilities {
                     Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
                     Verb::Add if !writes.addable.is_empty() => Support::Supported,
                     Verb::Remove if !writes.removable.is_empty() => Support::Supported,
-                    Verb::Move if !writes.movable.is_empty() => Support::Supported,
                     // Pages exchanges paragraphs (record 0299); Keynote slides,
-                    // paragraphs and drawables (record 0298).
-                    Verb::Swap
-                        if matches!(self.format, Some(FileFormat::Pages | FileFormat::Keynote))
-                            && !writes.movable.is_empty() =>
-                    {
-                        Support::Supported
-                    },
+                    // paragraphs and drawables (record 0298); Numbers sheets
+                    // and tables (record 0347).
+                    Verb::Move | Verb::Swap if !writes.movable.is_empty() => Support::Supported,
                     _ => IWORK_STRUCTURE.support(),
                 };
             }

@@ -1646,6 +1646,44 @@ class Commit:
         """What ``edit``'s callable returned; None otherwise."""
         ...
 
+    @property
+    def patch(self) -> Optional[Patch]:
+        """The change's reversible Patch; None for ``File.add_part`` and
+        ``File.raw_set``, which are not transaction steps."""
+        ...
+
+class Patch:
+    """The reversible record of one change: ``Commit.patch``.
+
+    ``apply(file)`` replays the change on the File it started from and
+    returns the changed File; ``inverse()`` is the Patch that undoes it. A
+    Patch applied to any other File raises a LitchiError with code
+    ``invalid_input``. A Patch lives only in this process.
+
+    Example:
+        >>> commit = doc.edit(lambda tx: tx.set("/body/p[1]", {"bold": True}))
+        >>> undone = commit.patch.inverse().apply(commit.file)
+        >>> assert undone.to_bytes() == doc.to_bytes()
+    """
+
+    def is_noop(self) -> bool:
+        """Whether the change kept the document as it was."""
+        ...
+
+    def inverse(self) -> Patch:
+        """The Patch that undoes this one."""
+        ...
+
+    def apply(self, file: File) -> File:
+        """Replay the change on ``file`` (the File it started from); return
+        the changed File. ``file`` is unchanged.
+
+        Raises:
+            LitchiError: ``invalid_input`` if ``file`` is another File, or a
+                protection or source failure
+        """
+        ...
+
 class Edit:
     """A transaction: operations that apply together or not at all.
 
@@ -1773,6 +1811,7 @@ __all__ = [
     "schema",
     "File",
     "Commit",
+    "Patch",
     "Edit",
 ]
 

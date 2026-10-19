@@ -77,6 +77,10 @@ pub enum RtfError {
     InvalidControlWord(String),
     /// Malformed document
     MalformedDocument(String),
+    /// The document's `\ansicpg` names a code page with no exact codec,
+    /// such as the Mac Japanese (10001) and Mac Cyrillic (10007) pages.
+    /// The document is well formed; its text cannot be decoded exactly.
+    UnsupportedCodePage(u32),
     /// A source-limit value was invalid at profile construction.
     InvalidLimit {
         /// Stable physical ingress dimension.
@@ -123,6 +127,9 @@ impl fmt::Display for RtfError {
             RtfError::UnexpectedEof => write!(f, "Unexpected end of input"),
             RtfError::InvalidControlWord(msg) => write!(f, "Invalid control word: {msg}"),
             RtfError::MalformedDocument(msg) => write!(f, "Malformed RTF document: {msg}"),
+            RtfError::UnsupportedCodePage(page) => {
+                write!(f, "unsupported RTF ANSI code page {page}")
+            },
             RtfError::InvalidLimit {
                 kind,
                 value,

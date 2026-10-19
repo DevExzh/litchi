@@ -30,6 +30,12 @@
 //!   `col_remove` (the same row or column), and `cell_font` (leaf
 //!   `edit_table_cell_text_style` + bold on A3; unified `set` of
 //!   `font.bold`), on the grid fixture.
+//! - record 0347: `sheet_swap` (three sheets: leaf `move_sheet` 0 → 2, then
+//!   1 → 0; unified `swap` of sheets 1 and 3), `table_swap` (three tables of
+//!   one sheet: two `edit_table_order` moves; unified `swap`) and
+//!   `table_swap_sheets` (one table in each of two sheets: two
+//!   `edit_table_relocation`s and two `edit_table_order` moves; unified
+//!   `swap`), on packages grown from the grid.
 //! - record 0318: `row_insert_formulas` (the `row_insert` pair on a
 //!   created workbook whose table holds formulas, so the leaf shifts their
 //!   coordinates; inserted before physical row 3) and `comment_set` (leaf
@@ -174,6 +180,18 @@ mod enabled {
             leaf_median_ns,
             unified_median_ns,
         })
+    }
+
+    /// `package` with a small table named `name` appended to `sheet`.
+    fn package_with_table(package: &Package, sheet: usize, name: &str) -> Package {
+        package
+            .edit_table_lifecycle(sheet)
+            .expect("edit")
+            .add(name, 4, 3)
+            .expect("add")
+            .commit()
+            .expect("commit")
+            .into_package()
     }
 
     fn table() -> (SheetSelector<'static>, TableSelector<'static>) {
@@ -612,6 +630,109 @@ mod enabled {
             Some(same),
             || time(|| leaf_table_move(&tables)),
             || time(|| unified_table_move(&tables_file)),
+        ));
+
+        // Record 0347: swaps, each the leaf's two moves (four steps across
+        // sheets) against one unified `swap`.
+        let leaf_add_sheet = |package: &Package, name: &str| {
+            package
+                .edit_sheet_lifecycle()
+                .add(name)
+                .expect("add")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let leaf_sheet_order = |package: &Package, from: usize, to: usize| {
+            package
+                .edit_sheet_order()
+                .move_sheet(SheetSelector::index(from), to)
+                .expect("move")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let leaf_table_order = |package: &Package, sheet: usize, from: usize, to: usize| {
+            package
+                .edit_table_order(sheet)
+                .expect("edit")
+                .move_table(from, to)
+                .expect("move")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let three_sheets = leaf_add_sheet(&two, "Third");
+        let three_sheets_file =
+            litchi_ops::open_bytes(leaf_bytes(&three_sheets)).expect("open three sheets");
+        let leaf_sheet_swap =
+            |package: &Package| leaf_sheet_order(&leaf_sheet_order(package, 0, 2), 1, 0);
+        let unified_sheet_swap =
+            |file: &File| file.swap("/sheet[1]", "/sheet[3]").expect("swap sheets");
+        let same = leaf_bytes(&leaf_sheet_swap(&three_sheets))
+            == unified_sheet_swap(&three_sheets_file)
+                .to_bytes()
+                .expect("bytes");
+        scenarios.extend(abba(
+            "sheet_swap",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_sheet_swap(&three_sheets)),
+            || time(|| unified_sheet_swap(&three_sheets_file)),
+        ));
+        let three_tables = package_with_table(&tables, 0, "Third");
+        let three_tables_file =
+            litchi_ops::open_bytes(leaf_bytes(&three_tables)).expect("open three tables");
+        let leaf_table_swap =
+            |package: &Package| leaf_table_order(&leaf_table_order(package, 0, 0, 2), 0, 1, 0);
+        let unified_table_swap = |file: &File| {
+            file.swap("/sheet[1]/table[1]", "/sheet[1]/table[3]")
+                .expect("swap tables")
+        };
+        let same = leaf_bytes(&leaf_table_swap(&three_tables))
+            == unified_table_swap(&three_tables_file)
+                .to_bytes()
+                .expect("bytes");
+        scenarios.extend(abba(
+            "table_swap",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_table_swap(&three_tables)),
+            || time(|| unified_table_swap(&three_tables_file)),
+        ));
+        let split = package_with_table(&two, 1, "Other");
+        let split_file = litchi_ops::open_bytes(leaf_bytes(&split)).expect("open split");
+        let leaf_relocate = |package: &Package, sheet: usize, to: usize| {
+            package
+                .edit_table_relocation(
+                    SheetSelector::index(sheet),
+                    TableSelector::index(0),
+                    SheetSelector::index(to),
+                )
+                .expect("edit")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let leaf_cross_swap = |package: &Package| {
+            let relocated = leaf_relocate(&leaf_relocate(package, 0, 1), 1, 0);
+            leaf_table_order(&leaf_table_order(&relocated, 0, 0, 0), 1, 0, 0)
+        };
+        let unified_cross_swap = |file: &File| {
+            file.swap("/sheet[1]/table[1]", "/sheet[2]/table[1]")
+                .expect("swap across sheets")
+        };
+        let same = leaf_bytes(&leaf_cross_swap(&split))
+            == unified_cross_swap(&split_file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "table_swap_sheets",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_cross_swap(&split)),
+            || time(|| unified_cross_swap(&split_file)),
         ));
 
         // Record 0309: rows and columns, and cell character properties.

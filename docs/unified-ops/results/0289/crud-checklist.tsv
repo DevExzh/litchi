@@ -5896,7 +5896,7 @@ numbers	workbook	set	n/a	set not offered for this element	-
 numbers	workbook	add	n/a	add not offered for this element	-
 numbers	workbook	remove	n/a	remove not offered for this element	-
 numbers	workbook	move	format-verb		unreached
-numbers	workbook	swap	gap	IWORK_API_REQUESTS.md	unreached
+numbers	workbook	swap	format-verb		unreached
 numbers	workbook	edit	n/a	edit not offered for this element	-
 numbers	workbook	batch	n/a	batch not offered for this element	-
 numbers	workbook	create	supported		ok format
@@ -5909,7 +5909,7 @@ numbers	sheet	set	supported		ok `create() + add sheet` /sheet[1] {"name":"Litchi
 numbers	sheet	add	supported		ok /sheet[2] on `create()` under / {}
 numbers	sheet	remove	supported		ok `create() + add sheet` /sheet[1]
 numbers	sheet	move	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
-numbers	sheet	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	sheet	swap	format-verb		ok `create() + add sheet` /sheet[1] /sheet[2]
 numbers	sheet	edit	supported		ok tx.set
 numbers	sheet	batch	supported		ok set item
 numbers	sheet	create	supported		ok format
@@ -5922,7 +5922,7 @@ numbers	table	set	supported		ok `create() + add sheet` /sheet[1]/table[1] {"name
 numbers	table	add	supported		ok /sheet[1]/table[2] on `create() + add sheet` under /sheet[1] {}
 numbers	table	remove	supported		ok `create() + add sheet` /sheet[1]/table[1]
 numbers	table	move	format-verb		ok `create() + add sheet + add table` /sheet[1]/table[1] /sheet[1]/table[2]
-numbers	table	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	table	swap	format-verb		ok `create() + add sheet + add table` /sheet[1]/table[1] /sheet[1]/table[2]
 numbers	table	edit	supported		ok tx.set
 numbers	table	batch	supported		ok set item
 numbers	table	create	supported		ok format
@@ -5935,7 +5935,7 @@ numbers	cell	set	supported		ok `iwork/numbers/basic.numbers` /sheet[1]/table[1]/
 numbers	cell	add	n/a	add not offered for this element	-
 numbers	cell	remove	supported		ok `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
 numbers	cell	move	format-verb		refused unsupported_capability
-numbers	cell	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	cell	swap	format-verb		refused unsupported_capability
 numbers	cell	edit	supported		ok tx.set
 numbers	cell	batch	supported		ok set item
 numbers	cell	create	supported		ok format
@@ -5948,7 +5948,7 @@ numbers	mergeCell	set	n/a	set not offered for this element	-
 numbers	mergeCell	add	supported		ok /sheet[1]/table[1]/mergeCell[1] on `create()` under /sheet[1]/table[1] {"ref":"B2:C3"}
 numbers	mergeCell	remove	supported		ok `create() + add mergeCell` /sheet[1]/table[1]/mergeCell[1]
 numbers	mergeCell	move	format-verb		unreached
-numbers	mergeCell	swap	gap	IWORK_API_REQUESTS.md	unreached
+numbers	mergeCell	swap	format-verb		unreached
 numbers	mergeCell	edit	n/a	edit not offered for this element	-
 numbers	mergeCell	batch	n/a	batch not offered for this element	-
 numbers	mergeCell	create	supported		ok format
@@ -5961,7 +5961,7 @@ numbers	row	set	n/a	set not offered for this element	-
 numbers	row	add	supported		ok /sheet[1]/table[1]/row[11] on `create() + add sheet` under /sheet[1]/table[1] {}
 numbers	row	remove	supported		ok `create() + add sheet` /sheet[1]/table[1]/row[1]
 numbers	row	move	format-verb		refused unsupported_capability
-numbers	row	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	row	swap	format-verb		refused unsupported_capability
 numbers	row	edit	n/a	edit not offered for this element	-
 numbers	row	batch	n/a	batch not offered for this element	-
 numbers	row	create	supported		ok format
@@ -5974,7 +5974,7 @@ numbers	col	set	n/a	set not offered for this element	-
 numbers	col	add	supported		ok /sheet[1]/table[1]/col[6] on `create() + add sheet` under /sheet[1]/table[1] {}
 numbers	col	remove	supported		ok `create() + add sheet` /sheet[1]/table[1]/col[1]
 numbers	col	move	format-verb		refused unsupported_capability
-numbers	col	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	col	swap	format-verb		refused unsupported_capability
 numbers	col	edit	n/a	edit not offered for this element	-
 numbers	col	batch	n/a	batch not offered for this element	-
 numbers	col	create	supported		ok format

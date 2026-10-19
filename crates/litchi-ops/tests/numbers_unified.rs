@@ -876,3 +876,222 @@ fn cell_fonts_are_written() {
         .expect_err("empty cell");
     assert_eq!(error.code(), Code::UnsupportedCapability);
 }
+
+/// Three sheets; the first holds the tables `Table 1`, `B` and `C`, the
+/// second none, the third `Z` (record 0347).
+fn three_sheets() -> File {
+    let mut file = create(FileFormat::Numbers).expect("create");
+    for _ in 0..2 {
+        file = file
+            .add("/", NewNode::new("sheet").at(Placement::End))
+            .expect("add sheet")
+            .into_file();
+    }
+    for (sheet, name) in [("/sheet[1]", "B"), ("/sheet[1]", "C"), ("/sheet[3]", "Z")] {
+        file = file
+            .add(sheet, NewNode::new("table").prop("name", name))
+            .expect("add table")
+            .into_file();
+    }
+    file
+}
+
+fn names(file: &File, paths: &[&str]) -> Vec<Option<String>> {
+    let file = reopen(file);
+    paths.iter().map(|path| prop(&file, path, "name")).collect()
+}
+
+/// Sheets and tables swap atomically, each swap equals its two moves
+/// applied one at a time, and the patch inverts to the exact source bytes
+/// (record 0347).
+#[test]
+fn swaps_sheets_and_tables() {
+    let file = three_sheets();
+    let source = file.to_bytes().unwrap();
+    let sheets = ["/sheet[1]", "/sheet[2]", "/sheet[3]"];
+
+    // Sheets: the first takes the third's place, then the third the first's.
+    let swapped = file
+        .edit(|tx| tx.swap("/sheet[1]", "/sheet[3]"))
+        .expect("swap sheets");
+    assert_eq!(
+        names(&swapped.file, &sheets),
+        [
+            Some("Sheet 3".into()),
+            Some("Sheet 2".into()),
+            Some("Sheet 1".into())
+        ]
+    );
+    let moved = file
+        .move_to("/sheet[1]", Placement::End)
+        .and_then(|file| file.move_to("/sheet[2]", Placement::Start))
+        .expect("two moves");
+    assert_eq!(swapped.file.to_bytes().unwrap(), moved.to_bytes().unwrap());
+    let reversed = file
+        .swap("/sheet[3]", "/sheet[1]")
+        .expect("reversed operands");
+    assert_eq!(reversed.to_bytes().unwrap(), moved.to_bytes().unwrap());
+    let restored = swapped
+        .patch
+        .inverse()
+        .apply(&swapped.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), source);
+    // An element swapped with itself is an exact no-op.
+    let same = file
+        .edit(|tx| tx.swap("/sheet[2]", "/Sheet 2"))
+        .expect("self swap");
+    assert!(!same.diagnostics.changed());
+    assert_eq!(same.file.to_bytes().unwrap(), source);
+
+    // Tables of one sheet.
+    let tables = [
+        "/sheet[1]/table[1]",
+        "/sheet[1]/table[2]",
+        "/sheet[1]/table[3]",
+    ];
+    let swapped = file
+        .edit(|tx| tx.swap("/sheet[1]/table[1]", "/sheet[1]/table[3]"))
+        .expect("swap tables");
+    assert_eq!(
+        names(&swapped.file, &tables),
+        [Some("C".into()), Some("B".into()), Some("Table 1".into())]
+    );
+    let moved = file
+        .move_to("/sheet[1]/table[1]", Placement::End)
+        .and_then(|file| file.move_to("/sheet[1]/table[2]", Placement::Start))
+        .expect("two moves");
+    assert_eq!(swapped.file.to_bytes().unwrap(), moved.to_bytes().unwrap());
+    let restored = swapped
+        .patch
+        .inverse()
+        .apply(&swapped.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), source);
+
+    // Tables of two sheets: each takes the other's place.
+    let swapped = file
+        .edit(|tx| tx.swap("/sheet[1]/table[2]", "/sheet[3]/table[1]"))
+        .expect("swap across sheets");
+    assert_eq!(
+        names(
+            &swapped.file,
+            &[
+                "/sheet[1]/table[1]",
+                "/sheet[1]/table[2]",
+                "/sheet[1]/table[3]",
+                "/sheet[3]/table[1]"
+            ]
+        ),
+        [
+            Some("Table 1".into()),
+            Some("Z".into()),
+            Some("C".into()),
+            Some("B".into())
+        ]
+    );
+    let moved = file
+        .move_to(
+            "/sheet[1]/table[2]",
+            Placement::inside("/sheet[3]").expect("placement"),
+        )
+        .and_then(|file| file.move_to("/sheet[3]/table[1]", Placement::inside("/sheet[1]")?))
+        .and_then(|file| {
+            file.move_to(
+                "/sheet[1]/table[3]",
+                Placement::Position(litchi_core::Position::new(1)),
+            )
+        })
+        .and_then(|file| file.move_to("/sheet[3]/table[1]", Placement::Start))
+        .expect("relocations and moves");
+    assert_eq!(swapped.file.to_bytes().unwrap(), moved.to_bytes().unwrap());
+    let restored = swapped
+        .patch
+        .inverse()
+        .apply(&swapped.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), source);
+    // Two tables of one name in two sheets.
+    let renamed = file
+        .set("/sheet[3]/table[1]", props! { "name" => "Table 1" })
+        .expect("rename");
+    // A move into a sheet that holds the name is refused, typed.
+    let error = renamed
+        .move_to(
+            "/sheet[1]/table[1]",
+            Placement::inside("/sheet[3]").expect("placement"),
+        )
+        .expect_err("duplicate name");
+    assert_eq!(error.code(), Code::InvalidValue);
+    let swapped = renamed
+        .edit(|tx| tx.swap("/sheet[1]/table[1]", "/sheet[3]/table[1]"))
+        .expect("same-named tables");
+    let reopened = reopen(&swapped.file);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]", "tableCount").as_deref(),
+        Some("3")
+    );
+    for path in ["/sheet[1]/table[1]", "/sheet[3]/table[1]"] {
+        assert_eq!(prop(&reopened, path, "name").as_deref(), Some("Table 1"));
+    }
+    // The other's tables moved with it: `B` and `C` stay in sheet 1, and
+    // the swapped tables carry their cells.
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[2]", "name").as_deref(),
+        Some("B")
+    );
+    let restored = swapped
+        .patch
+        .inverse()
+        .apply(&swapped.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), renamed.to_bytes().unwrap());
+    // A third table of the name in the destination sheet is refused.
+    let error = renamed
+        .set("/sheet[1]/table[2]", props! { "name" => "Z" })
+        .and_then(|file| file.swap("/sheet[1]/table[2]", "/sheet[3]/table[1]"))
+        .map(|_| ())
+        .expect_err("third name");
+    assert_eq!(error.code(), Code::InvalidValue);
+}
+
+/// What a Numbers swap refuses, typed and without touching the snapshot.
+#[test]
+fn swap_refusals_are_typed() {
+    let file = three_sheets()
+        .set("/sheet[1]/table[1]/A1", props! { "value" => 1_i64 })
+        .and_then(|file| file.set("/sheet[1]/table[1]/A2", props! { "value" => 2_i64 }))
+        .expect("values");
+    let source = file.to_bytes().unwrap();
+    for (left, right, code) in [
+        ("/sheet[1]", "/sheet[1]/table[1]", Code::InvalidArgument),
+        (
+            "/sheet[1]/table[1]/row[1]",
+            "/sheet[1]/table[1]/row[2]",
+            Code::UnsupportedCapability,
+        ),
+        (
+            "/sheet[1]/table[1]/col[1]",
+            "/sheet[1]/table[1]/col[2]",
+            Code::UnsupportedCapability,
+        ),
+        (
+            "/sheet[1]/table[1]/A1",
+            "/sheet[1]/table[1]/A2",
+            Code::UnsupportedCapability,
+        ),
+        ("/sheet[1]", "/sheet[9]", Code::PathNotFound),
+    ] {
+        let error = file.swap(left, right).expect_err(left);
+        assert_eq!(error.code(), code, "{left} {right}: {error}");
+    }
+    // An atomic batch whose second item fails publishes neither.
+    let error = file
+        .edit(|tx| {
+            tx.swap("/sheet[1]", "/sheet[2]")?;
+            tx.swap("/sheet[1]", "/sheet[9]")
+        })
+        .expect_err("second swap");
+    assert_eq!(error.code(), Code::PathNotFound);
+    assert_eq!(file.to_bytes().unwrap(), source);
+}

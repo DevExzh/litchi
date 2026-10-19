@@ -73,9 +73,14 @@ fn parses_the_real_world_rtf_compatibility_corpus() {
         let path = corpus.join(fixture);
         let bytes = std::fs::read(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        // Refused typed as an unsupported code page, not as malformed
+        // (record 0347).
         assert!(
-            RtfDocument::from_bytes(&bytes).is_err(),
-            "accepted unsupported code page in {}",
+            matches!(
+                RtfDocument::from_bytes(&bytes),
+                Err(litchi_rtf::Error::UnsupportedCodePage(10001 | 10007))
+            ),
+            "{} is not refused as an unsupported code page",
             path.display()
         );
     }

@@ -153,6 +153,20 @@ impl Package {
     }
 }
 
+/// A replacement image's size, content type and extension.
+fn check_image(image: &[u8], content_type: &str, extension: &str) -> Result<()> {
+    LimitKind::ImageBytes.check(image.len())?;
+    if !content_type.starts_with("image/")
+        || extension.is_empty()
+        || !extension.bytes().all(|b| b.is_ascii_alphanumeric())
+    {
+        return Err(invalid(
+            "a picture needs an image content type and extension",
+        ));
+    }
+    Ok(())
+}
+
 fn worksheet_uri(package: &Package, sheet: usize) -> Result<PackURI> {
     let worksheet = package
         .workbook_ref()
@@ -345,22 +359,81 @@ impl Edit<'_> {
         content_type: &str,
         extension: &str,
     ) -> Result<bool> {
-        LimitKind::ImageBytes.check(image.len())?;
-        if !content_type.starts_with("image/")
-            || extension.is_empty()
-            || !extension.bytes().all(|b| b.is_ascii_alphanumeric())
-        {
-            return Err(invalid(
-                "a picture needs an image content type and extension",
-            ));
-        }
-        let drawing = self.existing_drawing(sheet)?;
+        check_image(&image, content_type, extension)?;
         let elements = self.elements(sheet)?;
         let picture = elements
             .iter()
             .filter(|element| element.kind == ElementKind::Picture)
             .nth(index)
             .ok_or_else(|| invalid("the worksheet has no such picture"))?;
+        self.replace_element_image(sheet, index, picture, image, content_type, extension)
+    }
+
+    /// [`Self::replace_image`] for a picture its caller has already read:
+    /// `picture` is the element at `index` among the worksheet's pictures,
+    /// as [`Package::drawing_elements`] or [`Self::elements`] returns it, so
+    /// the drawing is not read a second time to find its image (unified-ops
+    /// record 0347).
+    ///
+    /// The picture's image relationship is still resolved in the staged
+    /// drawing: a `picture` whose image part the element at `index` does not
+    /// name is refused, and nothing changes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::replace_image`]; also an error when `picture` is not a
+    /// picture with an embedded image.
+    ///
+    /// ```
+    /// use litchi_xlsx::Package;
+    /// use litchi_xlsx::drawing::edit::{Marker, PictureSpec, Placement};
+    ///
+    /// # fn main() -> Result<(), litchi_xlsx::Error> {
+    /// let picture = |row, image: &[u8]| PictureSpec {
+    ///     placement: Placement::TwoCell { from: Marker::cell(row, 0), to: Marker::cell(row + 1, 2) },
+    ///     name: format!("Picture {row}"),
+    ///     description: None,
+    ///     title: None,
+    ///     image: image.to_vec(),
+    ///     content_type: "image/png".into(),
+    ///     extension: "png".into(),
+    ///     rotation: None,
+    ///     flip_h: false,
+    ///     flip_v: false,
+    /// };
+    /// let blank = Package::new()?;
+    /// let mut edit = blank.edit_drawings()?;
+    /// edit.add_picture(0, &picture(0, b"first"))?;
+    /// edit.add_picture(0, &picture(4, b"other"))?;
+    /// let package = edit.commit()?.into_package();
+    /// let elements = package.drawing_elements(0)?;
+    ///
+    /// let mut edit = package.edit_drawings()?;
+    /// assert!(edit.replace_element_image(0, 1, &elements[1], b"second".to_vec(), "image/jpeg", "jpeg")?);
+    /// let after = edit.commit()?.into_package();
+    /// let image = after.drawing_elements(0)?[1].image.clone().expect("image");
+    /// assert_eq!((image.content_type.as_str(), image.size), ("image/jpeg", 6));
+    ///
+    /// // An element that is not the picture at the index is refused.
+    /// let mut edit = package.edit_drawings()?;
+    /// assert!(edit.replace_element_image(0, 1, &elements[0], b"second".to_vec(), "image/jpeg", "jpeg").is_err());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn replace_element_image(
+        &mut self,
+        sheet: usize,
+        index: usize,
+        picture: &Element,
+        image: Vec<u8>,
+        content_type: &str,
+        extension: &str,
+    ) -> Result<bool> {
+        check_image(&image, content_type, extension)?;
+        if picture.kind != ElementKind::Picture {
+            return Err(invalid("the element is not a picture"));
+        }
+        let drawing = self.existing_drawing(sheet)?;
         let old = picture
             .image
             .as_ref()

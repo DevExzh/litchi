@@ -119,6 +119,10 @@ pub enum Error {
     /// A changed edit targeted an effectively locked table.
     #[error("the selected Numbers table is locked at {path:?}")]
     TableLocked { path: Path },
+    /// The destination sheet already holds a table of the relocated
+    /// table's name; table names are unique within a sheet.
+    #[error("the destination Numbers sheet already has a table of that name at {path:?}")]
+    DuplicateTableName { path: Path },
     /// The exact physical source cannot be rewritten safely.
     #[error("this Numbers source does not support exact table relocation")]
     UnsupportedSource,
@@ -431,6 +435,13 @@ impl Package {
     /// The table selector is local to `source_sheet`, and the destination is
     /// appended after the destination sheet's existing semantic tables. A
     /// same-sheet request is an exact no-op after strict source resolution.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::SheetNotFound`] or [`Error::TableNotFound`] for a
+    /// selector that does not resolve, and [`Error::DuplicateTableName`]
+    /// when the destination sheet already holds a table of the relocated
+    /// table's name.
     pub fn edit_table_relocation<'source_sheet, 'table, 'destination_sheet>(
         &self,
         source_sheet: impl Into<SheetSelector<'source_sheet>>,
@@ -465,6 +476,18 @@ impl Package {
             table: source_table_position,
             destination_sheet: destination_sheet_position,
         };
+        if destination_sheet_position != source_sheet_position {
+            let name = source_sheet_semantic
+                .tables()
+                .nth(source_table_position)
+                .map(|table| table.name());
+            if destination_sheet_semantic
+                .tables()
+                .any(|table| Some(table.name()) == name)
+            {
+                return Err(Error::DuplicateTableName { path });
+            }
+        }
         let table_target =
             resolve_table_target(self, source_sheet_position, source_table_position, path)?;
         let source_target = resolve_sheet_target(self, source_sheet_position, path)?;

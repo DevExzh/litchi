@@ -35,9 +35,10 @@ use crate::errors::Failure;
 use crate::file::{File, view_options};
 use crate::{nodes, props, pyde};
 
-/// Registers `Commit` and `Edit`.
+/// Registers `Commit`, `Patch` and `Edit`.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Commit>()?;
+    m.add_class::<Patch>()?;
     m.add_class::<Edit>()?;
     Ok(())
 }
@@ -267,10 +268,11 @@ pub(crate) fn results<'py>(
 /// change that wrote what was already there). ``operations`` counts the
 /// successful operations. ``results`` lists one dict per batch item (None
 /// for ``edit``), and ``value`` is what ``edit``'s callable returned (None
-/// otherwise).
+/// otherwise). ``patch`` is the change's reversible Patch.
 #[pyclass(frozen, module = "litchi_py")]
 pub struct Commit {
     file: Py<File>,
+    patch: Option<Py<Patch>>,
     changed: bool,
     operations: usize,
     results: Option<Py<PyList>>,
@@ -278,9 +280,12 @@ pub struct Commit {
 }
 
 impl Commit {
+    /// A Commit; `patch` is None for the raw-layer verbs, which are not
+    /// transaction steps.
     pub(crate) fn new(
         py: Python<'_>,
         file: litchi::File,
+        patch: Option<Patch>,
         changed: bool,
         operations: usize,
         results: Option<Bound<'_, PyList>>,
@@ -288,6 +293,7 @@ impl Commit {
     ) -> PyResult<Self> {
         Ok(Self {
             file: Py::new(py, File::new(file))?,
+            patch: patch.map(|patch| Py::new(py, patch)).transpose()?,
             changed,
             operations,
             results: results.map(Bound::unbind),
@@ -328,11 +334,104 @@ impl Commit {
         self.value.clone_ref(py)
     }
 
+    /// The change's reversible Patch; None for ``File.add_part`` and
+    /// ``File.raw_set``, which are not transaction steps.
+    #[getter]
+    fn patch(&self, py: Python<'_>) -> Option<Py<Patch>> {
+        self.patch.as_ref().map(|patch| patch.clone_ref(py))
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "<Commit: changed={}, operations={}>",
             if self.changed { "True" } else { "False" },
             self.operations
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Patch
+// ---------------------------------------------------------------------------
+
+/// The reversible record of one change: ``Commit.patch``.
+///
+/// ``apply(file)`` replays the change on the File it started from (or the
+/// same File object again) and returns the changed File. ``inverse()`` is
+/// the Patch that undoes it: applied to the changed File it gives the
+/// original back. A Patch applied to any other File raises a LitchiError
+/// with code ``invalid_input`` and nothing changes. A Patch lives only in
+/// this process; it is not a file format.
+///
+/// Example:
+///     >>> commit = doc.edit(lambda tx: tx.set("/body/p[1]", {"bold": True}))
+///     >>> undone = commit.patch.inverse().apply(commit.file)
+///     >>> assert undone.to_bytes() == doc.to_bytes()
+#[pyclass(frozen, module = "litchi_py")]
+pub struct Patch {
+    /// The Rust patches, in application order. An ``Edit`` runs one Rust
+    /// transaction per staged run, and each run's patch starts from the
+    /// previous one's result.
+    steps: Vec<litchi::transaction::Patch>,
+}
+
+impl Patch {
+    /// The Patch of one Rust transaction.
+    pub(crate) fn one(patch: litchi::transaction::Patch) -> Self {
+        Self { steps: vec![patch] }
+    }
+}
+
+#[pymethods]
+impl Patch {
+    /// Whether the change kept the document as it was.
+    fn is_noop(&self) -> bool {
+        self.steps.iter().all(litchi::transaction::Patch::is_noop)
+    }
+
+    /// The Patch that undoes this one.
+    fn inverse(&self) -> Self {
+        Self {
+            steps: self
+                .steps
+                .iter()
+                .rev()
+                .map(litchi::transaction::Patch::inverse)
+                .collect(),
+        }
+    }
+
+    /// Replay the change on ``file``; return the changed File.
+    ///
+    /// The GIL is released while the patch applies.
+    ///
+    /// Args:
+    ///     file: The File the change started from
+    ///
+    /// Returns:
+    ///     The changed File; ``file`` is unchanged
+    ///
+    /// Raises:
+    ///     LitchiError: ``invalid_input`` if ``file`` is another File, or a
+    ///         protection or source failure
+    fn apply(&self, py: Python<'_>, file: PyRef<'_, File>) -> PyResult<File> {
+        let mut current = file.handle()?;
+        let steps = &self.steps;
+        let result = py.detach(|| {
+            for step in steps {
+                current = step
+                    .apply(&current)
+                    .map_err(|error| Failure::read(&error))?;
+            }
+            Ok::<_, Failure>(current)
+        })?;
+        Ok(File::new(result))
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "<Patch: noop={}>",
+            if self.is_noop() { "True" } else { "False" }
         )
     }
 }
@@ -380,6 +479,8 @@ struct State {
     first: usize,
     /// Whether a run changed the document.
     changed: bool,
+    /// The patch of every run so far, in order.
+    patches: Vec<litchi::transaction::Patch>,
     /// Whether a Rust transaction ran yet: the first run happens even with
     /// nothing staged, so the file's admission (locked, signed) is checked
     /// as Rust's `File::edit` checks it.
@@ -449,6 +550,7 @@ impl State {
         match result {
             Ok(commit) => {
                 self.current = commit.file;
+                self.patches.push(commit.patch);
                 self.changed |= commit.diagnostics.changed();
                 self.first += count;
                 Ok(commit.value)
@@ -503,6 +605,7 @@ impl Edit {
                 staged: Vec::new(),
                 first: 0,
                 changed: false,
+                patches: Vec::new(),
                 ran: false,
                 phase: Phase::Open,
             }),
@@ -536,12 +639,18 @@ impl Edit {
         if let Some(commit) = self.committed(py) {
             return Ok(commit);
         }
-        let (file, changed, operations) = self.with(py, |state| {
+        let (file, patch, changed, operations) = self.with(py, |state| {
             state.run(None)?;
             state.phase = Phase::Committing;
-            Ok((state.current.clone(), state.changed, state.first))
+            let patch = Patch {
+                steps: std::mem::take(&mut state.patches),
+            };
+            Ok((state.current.clone(), patch, state.changed, state.first))
         })?;
-        let commit = Py::new(py, Commit::new(py, file, changed, operations, None, value)?)?;
+        let commit = Py::new(
+            py,
+            Commit::new(py, file, Some(patch), changed, operations, None, value)?,
+        )?;
         // Holding the GIL while locking is safe: no thread holds the lock
         // while it waits for the GIL (`with` locks with the GIL released).
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);

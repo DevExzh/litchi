@@ -2838,8 +2838,25 @@ values are assigned by the leaf and never addressed.
 | `litchi_docx::document::NewComment::{with_parent, with_done, with_start_after, with_range}`, `CommentChange::with_done` | replies and resolution through `commentsExtended` (`w15:paraIdParent`, `w15:done`, keyed by the `w14:paraId` of the comment's last paragraph, [MS-DOCX] `CT_CommentEx`; an existing `commentsIds` part gains the new mappings); `with_start_after(Position)` is OfficeCLI's 1-based `runStart` minus one; `with_range(false)` writes a point comment | ✅ 0345 |
 | `litchi_docx::comment::Comment::paragraph_id`, `Document::comments_extended`, `source_backed::Package::comments_extended` | the last paragraph's `w14:paraId` (the `commentsExtended` key); the parsed `commentsExtended` entries (`modern_comments::Extended`) on both owners | ✅ 0345 |
 | DOCX `cell` add under a row (`text`, `width`; aliases `tc`) and `text` written by add and set | OfficeCLI's `table-cell` schema | ✅ 0345 |
-| DOCX `column` element (`/body/tbl[N]/col[C]`, alias `col`): `width` read, set and added, `text` added; add and remove | OfficeCLI's virtual `table-column`; not a listed table child, so table views stay the rows | ✅ 0345 |
+| DOCX `column` element (`/body/tbl[N]/col[M]`, alias `col`): `width` read, set and added, `text` added; add and remove | OfficeCLI's virtual `table-column`; not a listed table child, so table views stay the rows | ✅ 0345 |
 | DOCX hyperlink `tooltip` add and set | OfficeCLI's `hyperlink.tooltip` (add only there) | ✅ 0345 |
 | DOCX comment `anchoredTo` (read), `done` (alias `resolved`; read, add, set), `parentId` (read, add), `runStart`, `range` (add) | OfficeCLI's `comment` schema; the record 0335 property gaps are deleted | ✅ 0345 |
 
 See [0345](unified-ops/0345-docx-p0-final.md).
+
+## Numbers swap, Python patches (record 0347)
+
+No new transaction family. Numbers `swap` composes the existing sheet-order,
+table-order, table-relocation and names transactions. The Python bindings
+gain the ADR 0034 §3 patch vocabulary over `litchi_ops::transaction::Patch`.
+
+| Name | Status |
+|---|---|
+| Python `Commit.patch` (None for `File.add_part` and `File.raw_set`) | adopted (0347) |
+| Python `Patch.{apply, inverse, is_noop}` | adopted (0347): the Rust `transaction::Patch` names; one Python `Patch` spans every Rust run of an `Edit` |
+| `litchi_numbers::table::relocation::Error::DuplicateTableName` | adopted (0347): a relocation into a sheet that already has a table of that name, refused before any rewrite |
+| Numbers `swap` of `sheet`s and `table`s | adopted (0347): two moves applied one at a time (four leaf steps across sheets) |
+| `litchi_xlsx::drawing::edit::Edit::replace_element_image` | adopted (0347): `replace_image` for a picture element the caller already read; `replace_image` delegates to it |
+| `litchi_rtf::Error::UnsupportedCodePage` | adopted (0347): an `\ansicpg` with no exact codec (10001, 10007); `unsupported_capability` in the unified layer |
+
+See [0347](unified-ops/0347-numbers-swap-python-patch-xlsx-picture.md).
