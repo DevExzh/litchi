@@ -25,8 +25,8 @@ row has no disposition.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `1ae668c3924a0812b44575d32e9889f3a88496f3960963f6c31105c46f5f104e` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `4a262dfa18b94819f42dcbafff0fc7f9a644bad34e0cb48a5e4d25b23e01f578` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `69c108ce3e3e12d623c7cd960d1b14b10b109c8897b3c7a149077f1c0d9c83cc` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `1041d03e10d8da52c3e6655b2d4f52f171bde00a94cc63539e3ec4d3aea1f99a` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `a8794b7a359f3e62b36fdfca6c40f915341dd41d290414906c254b25da1e517e` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `8bca53917a3663c9a1ef54ab3900b3c15cd60ecaff906c886c5fd6a4410e560d` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `9be3d35e7a6a55cd66b74d818d30f476efbba4778a3a10de1a74850bf1a457a0` |
@@ -86,7 +86,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | unlisted | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 33 | 11 | 0 | 0 | 0 | 0 | 2 | 7 |
+| docx | 34 | 10 | 0 | 0 | 0 | 0 | 2 | 7 |
 | doc | 29 | 15 | 0 | 0 | 0 | 0 | 2 | 1 |
 | rtf | 29 | 15 | 0 | 0 | 0 | 0 | 2 | 1 |
 | xlsx | 34 | 5 | 0 | 0 | 0 | 0 | 2 | 1 |
@@ -112,7 +112,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | unlisted | litchi-only |
 |---|---|---|---|---|---|---|---|---|---|
-| docx | 307 | 4 | 82 | 0 | 224 | 2 | 0 | 342 | 271 |
+| docx | 311 | 2 | 80 | 0 | 225 | 2 | 0 | 341 | 271 |
 | doc | 157 | 0 | 228 | 0 | 168 | 1 | 0 | 407 | 59 |
 | rtf | 109 | 0 | 228 | 0 | 172 | 1 | 0 | 451 | 36 |
 | xlsx | 340 | 12 | 84 | 0 | 114 | 1 | 0 | 140 | 564 |
@@ -138,7 +138,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 279 | 35 | 482 | 0 | 248 | 188 |
+| docx | 287 | 35 | 474 | 0 | 248 | 188 |
 | doc | 10 | 29 | 757 | 0 | 27 | 197 |
 | rtf | 15 | 35 | 746 | 0 | 23 | 178 |
 | xlsx | 268 | 26 | 250 | 0 | 528 | 183 |
@@ -179,7 +179,7 @@ Element gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 1 | 5 | 2 | 0 | 5 | 0 |
+| docx | 0 | 5 | 2 | 0 | 5 | 0 |
 | doc | 0 | 11 | 1 | 0 | 5 | 0 |
 | rtf | 0 | 11 | 1 | 0 | 5 | 0 |
 | xlsx | 0 | 2 | 4 | 0 | 1 | 0 |
@@ -205,7 +205,7 @@ Property gap rows:
 
 | Format | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| docx | 43 | 548 | 35 | 0 | 19 | 0 |
+| docx | 34 | 548 | 35 | 0 | 19 | 0 |
 | doc | 0 | 882 | 35 | 0 | 19 | 0 |
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
 | xlsx | 0 | 285 | 79 | 0 | 1 | 0 |
@@ -231,7 +231,7 @@ All gap rows by tier:
 
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
-| P0 | 26 | 0 | 0 | 0 | 4 | 0 |
+| P0 | 16 | 0 | 0 | 0 | 4 | 0 |
 | P1 | 426 | 6023 | 0 | 0 | 55 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
@@ -257,8 +257,7 @@ properties share its entry unless an entry names the property):
 | raw-layer | out-of-scope | 0336 | 11 | `delta:*:raw` | the raw XML layer is the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336: OOXML parts, packaged ODF reads), not an element of the node tree |
 | markdown | out-of-scope |  | 4 | `delta:*:markdown` | an add-time import format, not an element of the document |
 | native-selection | out-of-scope |  | 12 | `delta:*:paragraph.paraId`, `delta:*:sdt.id`, `delta:*:cell.numFmtId` | ADR 0034: native selection metadata is admitted only through explicit raw paths |
-| docx-p0-residue | planned | WP4 | 5 | `delta:docx:column`, `delta:docx:cell.text`, `delta:docx:hyperlink.*` | DOCX P0/v1 residue: table columns, cell text and hyperlink keys (chart series and axes, comment set and picture set/remove closed in record 0335; list styles, table style and borders and row writes in record 0342) |
-| docx-picture-comment-follow-ups | planned | 0335 | 39 | `delta:docx:comment.*`, `delta:docx:chart-series.*`, `delta:docx:chart-axis.*` | record 0335 follow-ups: comment replies and resolution (commentsExtended) and anchor controls; series formatting and axis formatting keys beyond name/values/color and title/min/max |
+| docx-picture-comment-follow-ups | planned | 0335 | 34 | `delta:docx:chart-series.*`, `delta:docx:chart-axis.*` | record 0335 follow-ups: series formatting and axis formatting keys beyond name/values/color and title/min/max (comment replies, resolution and anchors closed in record 0345) |
 | docx-picture-breadth | deferred-P1 | 0335 | 22 | `delta:docx:picture.*` | P1 property breadth (record 0339): floating pictures (anchor, wrap, positions) need a typed wp:anchor model in the leaf (record 0335 follow-up F1); crop, decorative, click links and part facts follow it. The P0 picture keys (src, size, position, alt) are supported |
 | pptx-p0-residue | planned | 0333 | 16 | `delta:pptx:comment.*`, `delta:pptx:modernComment.*`, `delta:pptx:notes.text`, `delta:pptx:placeholder.text`, `delta:pptx:slide.layout`, `delta:pptx:slide.title`, `delta:pptx:slide.text` | PPTX P0 residue left by record 0333 (follow-ups F1-F3): comment direction and modern-comment writes, placeholder and slide text, slide layout and title writes |
 | pptx-picture-table-breadth | deferred-P1 | 0333 | 20 | `delta:pptx:picture.*`, `delta:pptx:table.style` | P1 property breadth after record 0333: picture crop (the leaf does not model a:srcRect), rotation, flips and effects; table style (record 0333 follow-up F4) |
@@ -312,7 +311,7 @@ properties share its entry unless an entry names the property):
 | styles | styles | supported |  |  |  |
 | tab | tab | supported |  |  |  |
 | cell | cell | supported |  |  |  |
-| column |  | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
+| column | column | supported |  |  |  |
 | row | row | supported |  |  |  |
 | table | table | supported |  |  |  |
 | textbox | textbox | supported |  |  |  |
@@ -326,7 +325,7 @@ properties share its entry unless an entry names the property):
 |  | smartart | litchi-only |  |  |  |
 |  | node | litchi-only |  |  |  |
 
-Properties: 1232 rows, 645 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
+Properties: 1232 rows, 636 of them gaps, in [`docx.md`](officecli-capability-delta/docx.md).
 
 ### Contextual operation gaps
 
@@ -350,7 +349,6 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `move` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `swap` | `paragraph/run` | `managed-transaction` | paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
 | `swap` | `paragraph/run` | `nested-or-unproven-selection` | only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors | L-DOCX-W3 |
-| `add` | `cell` | `cell-insertion` | a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated | M2 (DOCX table grid editing) |
 | `set` | `table/row` | `table-properties` | table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated | M2 (DOCX table properties) |
 | `swap` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `create` | `document` | `strict-conformance` | the DOCX creator emits Transitional packages and refuses a Strict conformance request rather than silently downgrading it | CreateOptions::conformance(Conformance::Transitional) |

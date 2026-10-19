@@ -39,8 +39,8 @@ Every delta, named gap and element/property group carries a disposition (`tools/
 | ppt/templates | 452 | 33 | 0 | 152 | 46 | 119 | 102 | 0 | 11 | 24/24 |
 | ppt/textboxes | 132 | 92 | 10 | 40 | 0 | 0 | 0 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 516 | 127 | 6 | 0 | 0 | 0 | 0 | 18 | 18/18 |
-| word | 1133 | 690 | 3 | 195 | 172 | 36 | 40 | 0 | 24 | 32/32 |
-| **total** | **6431** | **4426** | **344** | **1292** | **361** | **201** | **151** | **0** | **177** | **200/200** |
+| word | 1133 | 690 | 3 | 196 | 171 | 36 | 40 | 0 | 24 | 32/32 |
+| **total** | **6431** | **4426** | **344** | **1293** | **360** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -48,10 +48,10 @@ The format is the extension of the document each call names.
 
 | Format | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| docx | 949 | 540 | 0 | 191 | 142 | 36 | 40 | 0 | 22 | 30/30 |
+| docx | 949 | 540 | 0 | 192 | 141 | 36 | 40 | 0 | 22 | 30/30 |
 | pptx | 2959 | 1689 | 344 | 823 | 190 | 146 | 111 | 0 | 99 | 114/114 |
 | xlsx | 2523 | 2197 | 0 | 278 | 29 | 19 | 0 | 0 | 56 | 56/56 |
-| **total** | **6431** | **4426** | **344** | **1292** | **361** | **201** | **151** | **0** | **177** | **200/200** |
+| **total** | **6431** | **4426** | **344** | **1293** | **360** | **201** | **151** | **0** | **177** | **200/200** |
 
 ## v1-scope subset (design §14)
 
@@ -167,7 +167,8 @@ None.
 | set | document | `warned` | `pageWidth` | 2 | not in the registry; OfficeCLI documents it | `word/document-formatting.sh:32`, `word/sections.sh:137` | P1 | deferred-P1 0332 (docx-breadth) via delta `document.pageWidth` |
 | set | revision | `unsupported_capability` | - | 2 | registry gap R4x | `word/revisions.sh:398`, `word/revisions.sh:431` | P2 | deferred-P2 0332 (docx-breadth) via delta `revision` |
 | set | run | `warned` | `revision.id` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:145`, `word/revisions.sh:150` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
-| add | cell | `unsupported_element` | - | 1 | registry: no add on cell | `word/revisions.sh:196` | P0 | planned WP4 (docx-structure-writes) |
+| add | cell | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:196` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
+| add | cell | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:196` | P2 | deferred-P2 0332 (corpus-docx-breadth) |
 | add | chart | `warned` | `areafill` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:119` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.areafill` |
 | add | chart | `warned` | `chartFill` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:215` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.chartFill` |
 | add | chart | `warned` | `dispUnits` | 1 | not in the registry; OfficeCLI documents it | `word/charts.sh:215` | P1 | deferred-P1 0332 (docx-breadth) via delta `chart.dispUnits` |
@@ -852,7 +853,7 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1292 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 1293 |
 | F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
 | F3 | calls that failed after skipping unsupported properties (named gap F3b; the error carries the skipped properties, record 0271) | 72 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
@@ -954,9 +955,9 @@ None.
 | `word/numbering.sh` | 70 | 39 | 0 | 0 | 3 | 28 | 0 | 0 | 1 | 2/2 |
 | `word/paragraph-formatting.sh` | 78 | 57 | 0 | 21 | 0 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/pictures.sh` | 31 | 25 | 0 | 6 | 0 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/revisions.sh` | 73 | 36 | 0 | 17 | 14 | 6 | 0 | 0 | 2 | 2/2 |
+| `word/revisions.sh` | 73 | 36 | 0 | 18 | 13 | 6 | 0 | 0 | 2 | 2/2 |
 | `word/run-formatting.sh` | 80 | 57 | 0 | 23 | 0 | 0 | 0 | 0 | 0 | 2/2 |
 | `word/sections.sh` | 33 | 29 | 0 | 1 | 3 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 220 | 3 | 107 | 30 | 0 | 0 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 17 | 0 | 0 | 11 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **4426** | **344** | **1292** | **361** | **201** | **151** | **0** | **177** | **200/200** |
+| **total** | **6431** | **4426** | **344** | **1293** | **360** | **201** | **151** | **0** | **177** | **200/200** |

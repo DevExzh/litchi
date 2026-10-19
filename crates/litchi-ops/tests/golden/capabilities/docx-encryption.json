@@ -1368,8 +1368,8 @@
         },
         "tooltip": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "tgtFrame": {
@@ -1890,7 +1890,7 @@
         "tc"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -1922,7 +1922,7 @@
       "properties": {
         "width": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -2028,7 +2028,7 @@
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         }
@@ -2752,6 +2752,36 @@
           "add": true,
           "set": true,
           "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "done": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "parentId": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "runStart": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "range": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -6945,6 +6975,40 @@
           "type"
         ]
       }
+    },
+    {
+      "format": "docx",
+      "element": "column",
+      "parent": "table",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/col[C]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      }
     }
   ],
   "gaps": [
@@ -7013,13 +7077,6 @@
     },
     {
       "subject": "element",
-      "element": "col",
-      "code": "unsupported_capability",
-      "followUp": "WP4 (record 0335 F8)",
-      "reason": "table columns are not nodes yet: the grid widths are read on the table and the widths of cells on each cell"
-    },
-    {
-      "subject": "element",
       "element": "fieldChar",
       "code": "unsupported_capability",
       "followUp": "none: out of scope (record 0332)",
@@ -7038,22 +7095,6 @@
       "code": "unsupported_path",
       "followUp": "none: out of scope (record 0332, design §10)",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
-    },
-    {
-      "subject": "property",
-      "element": "comment",
-      "key": "parentId",
-      "code": "unsupported_capability",
-      "followUp": "0335-F2",
-      "reason": "comment replies (the commentsExtended parent link) are not read or authored; an add or set naming parentId is refused"
-    },
-    {
-      "subject": "property",
-      "element": "comment",
-      "key": "done",
-      "code": "unsupported_capability",
-      "followUp": "0335-F2",
-      "reason": "comment resolution (commentsExtended w15:done) is not read or authored; an add or set naming done is refused"
     },
     {
       "subject": "property",
@@ -7222,15 +7263,6 @@
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W3",
       "reason": "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors"
-    },
-    {
-      "subject": "operation",
-      "verb": "add",
-      "element": "cell",
-      "context": "cell-insertion",
-      "code": "unsupported_capability",
-      "followUp": "M2 (DOCX table grid editing)",
-      "reason": "a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated"
     },
     {
       "subject": "operation",

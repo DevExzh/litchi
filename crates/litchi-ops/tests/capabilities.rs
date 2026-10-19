@@ -154,7 +154,9 @@ fn ordinary_reports_hide_native_selection_fields() {
         // removed.
         let (set, add, remove) = match element.name() {
             "paragraph" | "run" | "hyperlink" => (true, true, true),
-            "cell" => (true, false, true),
+            // Record 0345: cells are added too, and grid columns are
+            // set, added and removed.
+            "cell" | "column" => (true, true, true),
             // Record 0251c: comments are added and removed; record 0335:
             // set too.
             // Record 0342: table borders and row height and flags are set.
@@ -275,6 +277,29 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert!(property.get(), "hyperlink {}", property.name());
                 assert!(property.add(), "hyperlink {}", property.name());
                 assert_eq!(property.set(), property.name() == "url");
+            } else if element.name() == "hyperlink" && property.name() == "tooltip" {
+                // Record 0345: the screen tip is added and set.
+                assert!(property.get() && property.set() && property.add());
+            } else if element.name() == "cell" && property.name() == "width" {
+                // Record 0345: a new cell's width.
+                assert!(property.get() && !property.set() && property.add());
+            } else if element.name() == "column" {
+                // Record 0345: the grid column's width is read, set and
+                // added; its text seeds the new cells.
+                assert_eq!(property.get(), property.name() == "width");
+                assert_eq!(property.set(), property.name() == "width");
+                assert!(property.add(), "column {}", property.name());
+            } else if element.name() == "comment"
+                && matches!(
+                    property.name(),
+                    "anchoredTo" | "done" | "parentId" | "runStart" | "range"
+                )
+            {
+                // Record 0345: OfficeCLI's comment schema.
+                let name = property.name();
+                assert_eq!(property.get(), matches!(name, "anchoredTo" | "done" | "parentId"));
+                assert_eq!(property.set(), name == "done", "comment {name}");
+                assert_eq!(property.add(), name != "anchoredTo", "comment {name}");
             } else if element.name() == "picture" && property.name() != "relId" {
                 // Record 0251d: the extent, name and alternative text seed a
                 // new picture; `src` is write-only. Record 0335: each is
@@ -377,7 +402,8 @@ fn ordinary_reports_hide_native_selection_fields() {
                     property.name()
                 );
             } else if property.name() == "text" {
-                // `text` of a hyperlink or cell is write-only.
+                // `text` of a hyperlink or cell is write-only; a cell's is
+                // also added (record 0345).
                 assert!(!property.get(), "{} text", element.name());
                 assert!(property.set(), "{} text", element.name());
             } else if matches!(element.name(), "table" | "row")
@@ -441,7 +467,8 @@ fn docx_write_context_gaps_are_explicit() {
         .collect();
     assert_eq!(
         operation_gaps.len(),
-        27 + if cfg!(feature = "encryption") { 8 } else { 0 }
+        // Record 0345 closed the cell-insertion gap.
+        26 + if cfg!(feature = "encryption") { 8 } else { 0 }
     );
 
     let subjects: Vec<_> = operation_gaps.iter().map(|gap| gap.subject()).collect();
