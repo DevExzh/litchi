@@ -124,6 +124,8 @@ pub(crate) const SETTABLE: &[&str] = &[
     "comment",
     // Table row height (record 0333).
     "tr",
+    // Table name and style switches (record 0342).
+    "table",
     // Document properties on the root, through the metadata writer (record
     // 0338).
     "presentation",

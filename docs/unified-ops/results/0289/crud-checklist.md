@@ -29,9 +29,9 @@ Evidence: `crud-adr0008.tsv`.
 
 | format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused | atomic failure | patch inverse | composition |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| docx | 44 | 346 | 346 | 0 | 0 | 78 | 72 | 8 | 44 | ok | ok | ok |
+| docx | 44 | 352 | 352 | 0 | 0 | 78 | 66 | 8 | 44 | ok | ok | ok |
 | xlsx | 26 | 206 | 206 | 0 | 0 | 65 | 25 | 2 | 20 | ok | ok | ok |
-| pptx | 37 | 296 | 296 | 0 | 0 | 65 | 56 | 2 | 42 | ok | ok | ok |
+| pptx | 37 | 299 | 299 | 0 | 0 | 65 | 53 | 2 | 42 | ok | ok | ok |
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 | ok | ok | ok |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 | ok | ok | ok |
 | xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 | ok | ok | ok |
@@ -66,8 +66,8 @@ Evidence: `crud-adr0008.tsv`.
 | paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | run | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | hyperlink | ok | ok | ok | ok | ok | ok | ok | ok | refused | ok | ok | ok | ok |
-| table | ok | ok | ok | ok | n/a | ok | ok | ok | refused | n/a | n/a | ok | ok |
-| row | ok | ok | ok | ok | n/a | ok | ok | ok | refused | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | ok | ok | ok | ok | refused | ok | ok | ok | ok |
+| row | ok | ok | ok | ok | ok | ok | ok | ok | refused | ok | ok | ok | ok |
 | cell | ok | ok | ok | ok | ok | n/a | ok | ok | refused | ok | ok | ok | ok |
 | sdt | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | equation | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
@@ -149,7 +149,7 @@ Evidence: `crud-adr0008.tsv`.
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 - ADR 0008 atomic failure: ok, `create() + add slide` batch [set /slide[1] {"name":"Litchi"}, set /slide[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
 - ADR 0008 patch inverse: ok, `create() + add slide` set /slide[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 30414 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
-- ADR 0008 composition: ok, `ooxml/pptx/shapes.pptx + add picture` set /slide[1]/table[1]/tr[1] {"height":"12pt"} and set /slide[1]/table[1]/tr[2] {"height":"12pt"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
+- ADR 0008 composition: ok, `ooxml/pptx/shapes.pptx + add picture` set /slide[1]/table[1] {"name":"Litchi"} and set /slide[4]/table[1] {"name":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -158,7 +158,7 @@ Evidence: `crud-adr0008.tsv`.
 | shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | placeholder | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| table | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | tr | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |

@@ -31,9 +31,9 @@ Source: the coordinator's definition-of-done audit (2026-10-17, §7), the
 | 18 | PPT `raw::Reader` and 173 `*_with_limits` entry points | Kept; not folded into `OpenOptions` | 0343 D5 |
 | 19 | Flat ODF owners' limits (`FlatDrawing`/`FlatPresentation` fixed ceilings; crate `Limits`, not `OpenOptions`) and ODC chart `Limits` | Fixed ceilings and crate `Limits` stay | 0343 D6 |
 | 20 | `Metadata.keywords` type | `Option<String>` stays, because the type fixes the JSON/CLI/Python metadata shape; the OOXML codec keeps keywords losslessly | 0343 D7 |
-| 21 | DOCX app/custom properties through the shared OOXML engine | Kept on the DOCX-specific metadata family | 0343 D8 |
+| 21 | DOCX app/custom properties through the shared OOXML engine | Withdrawn: implemented by record 0342 (`metadata::Edit::{set_app_props, set_custom_props}`, `Package::app_props()`) | 0343 D8, 0342 |
 | 22 | Content-redaction audit of OOXML/legacy error strings | The rule stands; violations are fixed as found | 0343 D9 |
-| 23 | iWork `CellPosition`/`CellRange` → `At`/`Area` | Deferred to the next iWork wave, after record 0340 merges | 0343 D10 |
+| 23 | iWork `CellPosition`/`CellRange` → `At`/`Area` | Deferred to the next iWork wave (unblocked: record 0340 has merged) | 0343 D10 |
 | 24 | `litchi-iwa` `*DocumentBuilder` prefixes | Kept; rename or delete the unpublished host crate is the owner's call | 0343 D11 |
 
 The questions most likely to change behaviour if overridden are 2, 3, 4,

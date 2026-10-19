@@ -3602,12 +3602,26 @@ fn changed(steps: &[Step]) -> Result<bool> {
     }
 }
 
-/// Whether two DOCX endpoints carry different core properties (record 0338).
+/// Whether two DOCX endpoints carry different core properties (record
+/// 0338), or different application or custom properties (record 0342).
 #[cfg(feature = "docx")]
 fn docx_metadata_changed(before: &File, after: &File) -> Result<bool> {
     match (before, after) {
         (File::Docx(before), File::Docx(after)) => {
-            Ok(!before.same_snapshot(after) && before.metadata()? != after.metadata()?)
+            if before.same_snapshot(after) {
+                return Ok(false);
+            }
+            if before.metadata()? != after.metadata()? {
+                return Ok(true);
+            }
+            Ok(
+                match (before.property_part_bytes()?, after.property_part_bytes()?) {
+                    (Some(before), Some(after)) => before != after,
+                    // Unreadable parts prove no property change (a metadata
+                    // write always publishes a readable eager owner).
+                    _ => false,
+                },
+            )
         },
         #[allow(unreachable_patterns)]
         _ => Ok(false),

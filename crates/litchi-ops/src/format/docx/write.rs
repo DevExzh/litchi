@@ -18,7 +18,10 @@ use super::element;
 use super::few::Few;
 use super::node::{Node, WriteSelection};
 use super::setters::Setter;
-use super::spec::{CELL_REGISTRY, HYPERLINK_REGISTRY, Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
+use super::spec::{
+    CELL_REGISTRY, HYPERLINK_REGISTRY, Kind, PARAGRAPH_REGISTRY, ROW_REGISTRY, RUN_REGISTRY,
+    TABLE_REGISTRY,
+};
 use crate::error::{Code, Error, Result};
 use crate::props::{IntoProps, Key, PropValue, Props};
 use crate::registry::{Entry, Operation, Table};
@@ -116,6 +119,10 @@ enum TargetKind {
     Run,
     Hyperlink,
     Cell,
+    /// A table's borders (record 0342).
+    Table,
+    /// A row's height and flags (record 0342).
+    Row,
 }
 
 /// Where a set lands: a direct-body paragraph or run on the body-position
@@ -340,6 +347,14 @@ impl Docx {
         let mut editor = WorkEdit::from(editor)?;
         let Some(request) = request else {
             if editor.bulk_paragraph_text(&targets, &assignments)? {
+                return O::publish(editor, self);
+            }
+            // A table's or row's assignments are spliced in one property
+            // edit per target (record 0342).
+            if matches!(targets[0].kind, TargetKind::Table | TargetKind::Row) {
+                for target in &targets {
+                    editor.format_structure(target, &assignments)?;
+                }
                 return O::publish(editor, self);
             }
             for target in &targets {
@@ -703,6 +718,49 @@ impl WorkEdit {
         result.map_err(|error| property_error(error, &assignment.key))
     }
 
+    /// Apply every admitted assignment of a table or row target in one
+    /// property edit (record 0342).
+    fn format_structure(&mut self, target: &Target, assignments: &[Assignment<'_>]) -> Result<()> {
+        let Selection::Element(path) = &target.selection else {
+            return Err(Error::new(
+                Code::InternalError,
+                "a DOCX table or row target has an element path",
+            ));
+        };
+        let mut failure = None;
+        let mut stage =
+            |apply: &mut dyn FnMut(Setter, Option<crate::value::Scalar<'_>>) -> Result<()>| {
+                for assignment in assignments {
+                    if failure.is_some() {
+                        break;
+                    }
+                    if let Err(error) = assignment.entry.prepare(
+                        Operation::Set,
+                        &assignment.value,
+                        |setter, value| apply(setter, value),
+                    ) {
+                        failure = Some(property_error(error, &assignment.key));
+                    }
+                }
+            };
+        let result = match target.kind {
+            TargetKind::Table => both!(self, |edit| edit
+                .format_table_at(path, |table| {
+                    stage(&mut |setter, value| setter.apply_table(table, value));
+                })
+                .map(|_| ())
+                .map_err(Error::from)),
+            _ => both!(self, |edit| edit
+                .format_row_at(path, |row| {
+                    stage(&mut |setter, value| setter.apply_row(row, value));
+                })
+                .map(|_| ())
+                .map_err(Error::from)),
+        };
+        // A refused value wins over what the staged change then did.
+        failure.map_or(result, Err)
+    }
+
     /// Apply one admitted assignment to an element reached by its leaf path.
     /// Join a paragraph to a list, or remove its numbering, in one
     /// formatting operation (record 0251e). An explicit `level` wins over
@@ -793,6 +851,22 @@ impl WorkEdit {
                     TargetKind::Run => both!(self, |edit| edit
                         .format_run_at(path, |run| {
                             if let Err(error) = setter.apply_run(run, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map(|_| ())
+                        .map_err(Error::from))?,
+                    TargetKind::Table => both!(self, |edit| edit
+                        .format_table_at(path, |table| {
+                            if let Err(error) = setter.apply_table(table, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map(|_| ())
+                        .map_err(Error::from))?,
+                    TargetKind::Row => both!(self, |edit| edit
+                        .format_row_at(path, |row| {
+                            if let Err(error) = setter.apply_row(row, value) {
                                 failure = Some(error);
                             }
                         })
@@ -1086,6 +1160,18 @@ impl WorkEdit {
             .map_err(Error::from))
     }
 
+    /// Change the direct properties of the table at `path` (record 0342).
+    pub(super) fn format_table_at(
+        &mut self,
+        path: &litchi_docx::document::ElementPath,
+        change: impl FnOnce(&mut litchi_docx::properties::Table),
+    ) -> Result<()> {
+        both!(self, |edit| edit
+            .format_table_at(path, change)
+            .map(|_| ())
+            .map_err(Error::from))
+    }
+
     pub(super) fn insert_row_at(
         &mut self,
         table: &litchi_docx::document::ElementPath,
@@ -1201,10 +1287,12 @@ fn admit_targets(nodes: &[Node<'_>]) -> Result<Few<Target>> {
             Kind::Run => TargetKind::Run,
             Kind::Hyperlink => TargetKind::Hyperlink,
             Kind::Cell => TargetKind::Cell,
+            Kind::Table => TargetKind::Table,
+            Kind::Row => TargetKind::Row,
             _ => {
                 return Err(Error::new(
                     Code::UnsupportedElement,
-                    "the DOCX write target must be a paragraph, run, hyperlink or cell",
+                    "the DOCX write target must be a paragraph, run, hyperlink, cell, table or row",
                 )
                 .with_format(FileFormat::Docx));
             },
@@ -1221,7 +1309,7 @@ fn admit_targets(nodes: &[Node<'_>]) -> Result<Few<Target>> {
                     Err(error) => return Err(error),
                 }
             },
-            TargetKind::Hyperlink | TargetKind::Cell => {
+            TargetKind::Hyperlink | TargetKind::Cell | TargetKind::Table | TargetKind::Row => {
                 Selection::Element(element::element_path(node)?)
             },
         };
@@ -1274,7 +1362,7 @@ fn apply_story(
                         })
                         .map_err(Error::from)?;
                 },
-                TargetKind::Hyperlink | TargetKind::Cell => {
+                TargetKind::Hyperlink | TargetKind::Cell | TargetKind::Table | TargetKind::Row => {
                     return Err(Error::new(
                         Code::UnsupportedProperty,
                         "the DOCX element accepts only its text property",
@@ -1291,6 +1379,8 @@ fn admit_assignments<'a>(kind: TargetKind, props: &'a Props<'_>) -> Result<Few<A
         TargetKind::Run => admit_table(&RUN_REGISTRY, kind, props),
         TargetKind::Hyperlink => admit_table(&HYPERLINK_REGISTRY, kind, props),
         TargetKind::Cell => admit_table(&CELL_REGISTRY, kind, props),
+        TargetKind::Table => admit_table(&TABLE_REGISTRY, kind, props),
+        TargetKind::Row => admit_table(&ROW_REGISTRY, kind, props),
     }
 }
 
@@ -1322,6 +1412,14 @@ fn admit_table<'a, const N: usize, const A: usize>(
                             let mut probe = litchi_docx::properties::Run::default();
                             setter.apply_run(&mut probe, value)?;
                         },
+                        TargetKind::Table => {
+                            let mut probe = litchi_docx::properties::Table::default();
+                            setter.apply_table(&mut probe, value)?;
+                        },
+                        TargetKind::Row => {
+                            let mut probe = litchi_docx::properties::Row::default();
+                            setter.apply_row(&mut probe, value)?;
+                        },
                         // Their registries hold only `text` as writable.
                         TargetKind::Hyperlink | TargetKind::Cell => {},
                     }
@@ -1342,20 +1440,16 @@ fn admit_table<'a, const N: usize, const A: usize>(
 /// others, which stay in `assignments`. The list is changed only when it
 /// holds one of them (a moved list is a copy of its inline element).
 fn list_request(assignments: &mut Few<Assignment<'_>>) -> Result<Option<super::lists::Request>> {
-    let is_list = |assignment: &Assignment<'_>| {
-        matches!(
-            assignment.entry.access,
-            crate::registry::Access::Set(Setter::ParagraphListStyle | Setter::ParagraphListStart)
-        )
-    };
+    let is_list =
+        |assignment: &Assignment<'_>| super::lists::list_setter(assignment.entry.access).is_some();
     if !assignments.iter().any(is_list) {
         return Ok(None);
     }
     let mut request = None::<super::lists::Request>;
     let mut rest = Few::with_capacity(assignments.len());
     for assignment in std::mem::take(assignments) {
-        match assignment.entry.access {
-            crate::registry::Access::Set(Setter::ParagraphListStyle) => {
+        match super::lists::list_setter(assignment.entry.access) {
+            Some(Setter::ParagraphListStyle) => {
                 let style = assignment
                     .entry
                     .prepare(Operation::Set, &assignment.value, |_, value| {
@@ -1369,22 +1463,11 @@ fn list_request(assignments: &mut Few<Assignment<'_>>) -> Result<Option<super::l
                     })
                     .style = Some(style);
             },
-            crate::registry::Access::Set(Setter::ParagraphListStart) => {
+            Some(Setter::ParagraphListStart) => {
                 let start = assignment
                     .entry
-                    .prepare(Operation::Set, &assignment.value, |_, value| match value {
-                        Some(crate::value::Scalar::Int(start)) => {
-                            u32::try_from(start).map_err(|_| {
-                                Error::new(
-                                    Code::InvalidValue,
-                                    "a list start is a non-negative integer",
-                                )
-                            })
-                        },
-                        _ => Err(Error::new(
-                            Code::InvalidValue,
-                            "a list start is a non-negative integer",
-                        )),
+                    .prepare(Operation::Set, &assignment.value, |_, value| {
+                        super::lists::start(value)
                     })
                     .map_err(|error| property_error(error, &assignment.key))?;
                 request

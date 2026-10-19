@@ -322,3 +322,67 @@ fn element_paths_round_trip_their_durable_spelling() {
     assert_eq!(ElementPath::parse(""), Some(ElementPath::body()));
     assert_eq!(ElementPath::parse("x:1"), None);
 }
+
+/// Record 0342: table borders and row properties, spliced in schema order,
+/// exact both ways; other properties are refused, and an unchanged value
+/// is a no-op.
+#[test]
+fn table_borders_and_row_properties_are_exact_and_reversible() {
+    use crate::properties::{
+        Border, BorderStyle, EighthPoints, Height, HeightRule, HexColor, Twips,
+    };
+    let base = snapshot(
+        r#"<w:tbl><w:tblPr><w:tblStyle w:val="Grid"/><w:tblLook w:val="04A0"/></w:tblPr><w:tblGrid><w:gridCol w:w="100"/></w:tblGrid><w:tr><w:tblPrEx><w:tblW w:w="0" w:type="auto"/></w:tblPrEx><w:tc><w:p/></w:tc></w:tr><w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:p/></w:tc></w:tr></w:tbl>"#,
+    );
+    let table = ElementPath::new([ElementStep::Table(Position::new(0))]);
+    let mut edit = base.edit();
+    edit.format_table_at(&table, |table| {
+        let mut border = Border::new(BorderStyle::from_xml("double").unwrap());
+        border.size = Some(EighthPoints(8));
+        border.color = Some(HexColor::Rgb([0x1F, 0x38, 0x64]));
+        let borders = table.borders.get_or_insert_default();
+        borders.top = Some(border);
+        borders.inside_vertical = Some(border);
+    })
+    .unwrap();
+    edit.format_row_at(&table.child(ElementStep::Row(Position::new(0))), |row| {
+        row.header = Some(true);
+        row.height = Some(Height::new(Twips(400), Some(HeightRule::Exact)));
+    })
+    .unwrap();
+    edit.format_row_at(&table.child(ElementStep::Row(Position::new(1))), |row| {
+        row.header = Some(true);
+    })
+    .unwrap();
+    let commit = commit_and_check(&base, edit);
+    let xml = xml(&commit);
+    assert!(xml.contains(r#"<w:tblStyle w:val="Grid"/><w:tblBorders><w:top w:val="double" w:color="1F3864" w:sz="8"/><w:insideV w:val="double" w:color="1F3864" w:sz="8"/></w:tblBorders><w:tblLook w:val="04A0"/>"#), "{xml}");
+    // A new `w:trPr` follows the row's `w:tblPrEx`.
+    assert!(xml.contains(r#"</w:tblPrEx><w:trPr><w:trHeight w:val="400" w:hRule="exact"/><w:tblHeader/></w:trPr>"#), "{xml}");
+    assert!(
+        xml.contains(r#"<w:trPr><w:cantSplit/><w:tblHeader/></w:trPr>"#),
+        "{xml}"
+    );
+
+    let mut edit = commit.snapshot().edit();
+    edit.format_table_at(&table, |table| table.layout = None)
+        .map(|_| ())
+        .expect("an unchanged layout is a no-op");
+    edit.format_table_at(&table, |table| table.caption = Some("caption".to_owned()))
+        .map(|_| ())
+        .expect_err("only the style and borders are written");
+    edit.format_row_at(&table.child(ElementStep::Row(Position::new(1))), |row| {
+        row.header = Some(true);
+    })
+    .unwrap();
+    assert!(edit.commit().unwrap().patch().is_noop());
+
+    let mut edit = commit.snapshot().edit();
+    edit.format_table_at(&table, |table| table.style = Some("Other".to_owned()))
+        .unwrap();
+    let styled = commit_and_check(commit.snapshot(), edit);
+    assert!(
+        String::from_utf8_lossy(styled.snapshot().xml_bytes())
+            .contains(r#"<w:tblPr><w:tblStyle w:val="Other"/><w:tblBorders>"#)
+    );
+}

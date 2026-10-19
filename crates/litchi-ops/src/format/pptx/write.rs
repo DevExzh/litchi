@@ -233,6 +233,10 @@ impl Pptx {
         if let Some(commit) = self.try_set_row(&target, &props, limits)? {
             return Ok(commit);
         }
+        // Table-level sets (record 0342).
+        if let Some(commit) = self.try_set_table(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_hyperlink(&target, &props, limits)? {
             return Ok(commit);
         }

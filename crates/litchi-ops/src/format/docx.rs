@@ -547,6 +547,53 @@ impl Docx {
         self.read_metadata().map(Some)
     }
 
+    /// The application properties (`docProps/app.xml`) the root node reads
+    /// as `extended.*` (record 0342). `None` for an absent or invalid part
+    /// (a metadata edit reads the part strictly and reports it), and for a
+    /// source owner with edited topology, whose physical archive no longer
+    /// answers for it.
+    pub(super) fn app_props(&self) -> Result<Option<litchi_ooxml_common::properties::app::Props>> {
+        match &self.0.owner {
+            DocxOwner::Eager(package) => Ok(package.app_props().ok().flatten()),
+            DocxOwner::Source(package) => {
+                let Ok(physical) = package.source_backed_package() else {
+                    return Ok(None);
+                };
+                let props = litchi_ooxml_common::properties::app::read_source_backed(physical)
+                    .ok()
+                    .flatten();
+                // A changed source wins over the read.
+                self.0.owner.finish(Ok(props))
+            },
+        }
+    }
+
+    /// The application- and custom-properties part bytes, which the
+    /// transaction change test compares (record 0342). `None` when they
+    /// cannot be read: a source owner with edited topology, or an invalid
+    /// property graph.
+    pub(crate) fn property_part_bytes(&self) -> Result<Option<[Option<Vec<u8>>; 2]>> {
+        use litchi_ooxml_common::custom::Host;
+        use litchi_ooxml_common::properties::{Family, Snapshot};
+        let snapshot = match &self.0.owner {
+            DocxOwner::Eager(package) => Snapshot::read(package.opc_package(), Host::Word),
+            DocxOwner::Source(package) => {
+                let Ok(physical) = package.source_backed_package() else {
+                    return Ok(None);
+                };
+                let snapshot = Snapshot::read_source_backed(physical, Host::Word);
+                self.0.owner.finish(Ok(()))?;
+                snapshot
+            },
+        };
+        let Ok(snapshot) = snapshot else {
+            return Ok(None);
+        };
+        Ok(Some([Family::App, Family::Custom].map(|family| {
+            snapshot.part_bytes(family).map(<[u8]>::to_vec)
+        })))
+    }
+
     fn read_metadata(&self) -> Result<Metadata> {
         if let Some(metadata) = self.0.metadata.get() {
             return self.0.owner.finish(Ok(Metadata::clone(metadata)));

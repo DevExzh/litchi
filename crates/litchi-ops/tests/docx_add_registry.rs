@@ -128,6 +128,9 @@ fn sample_props(kind: &str, key: &'static str) -> Props<'static> {
             "numId" => Props::new().with(key, "9"),
             "numLevel" => Props::new().with(key, "1"),
             "outlineLvl" => Props::new().with(key, 1),
+            // Record 0342: a new paragraph joins a new list.
+            "listStyle" => Props::new().with(key, "bullet"),
+            "start" => Props::new().with(key, 3),
             _ if INITIAL_RUN_KEYS.contains(&key) => sample_run_props(key),
             _ => panic!("unhandled advertised DOCX paragraph add property {key}"),
         };

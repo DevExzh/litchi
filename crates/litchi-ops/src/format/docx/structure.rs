@@ -96,10 +96,10 @@ impl Docx {
         let kind = new_kind(node.kind())?;
         let (planned, anchor) = match (kind, parent.element_kind()) {
             (NewKind::Paragraph, Kind::Body) => {
-                let paragraph = new_paragraph(node.props())?;
+                let (paragraph, list) = new_paragraph_with_list(node.props())?;
                 let anchor = body_anchor(self, placement.as_ref(), false)?;
                 (
-                    PlannedNode::Paragraph(Box::new(paragraph)),
+                    PlannedNode::Paragraph(Box::new(paragraph), list),
                     PlannedAnchor::Body(anchor),
                 )
             },
@@ -162,14 +162,31 @@ impl Docx {
             (NewKind::Mark(mark), _) => return self.add_mark(editor, &parent, mark, &node),
         };
         self.owner().check_source()?;
+        // A new list definition is a new part (record 0342), which only the
+        // owning package publishes.
+        let editor = match &planned {
+            PlannedNode::Paragraph(_, Some(_)) => self.eager_editor(editor)?,
+            _ => editor,
+        };
         let mut edit = WorkEdit::from(editor)?;
         let path = match (planned, anchor) {
-            (PlannedNode::Paragraph(paragraph), PlannedAnchor::Body(anchor)) => {
+            (PlannedNode::Paragraph(paragraph, list), PlannedAnchor::Body(anchor)) => {
                 let position = if command_text {
                     insert_command_paragraphs(&mut edit, anchor, &paragraph)?
                 } else {
                     edit.insert_paragraph(anchor, &paragraph)?
                 };
+                if let Some(list) = list {
+                    let WorkEdit::Eager(eager) = &mut edit else {
+                        return Err(internal("a DOCX list edit needs the owning package editor"));
+                    };
+                    super::lists::number_added(
+                        eager,
+                        &litchi_docx::document::ElementPath::body(),
+                        position,
+                        list,
+                    )?;
+                }
                 paragraph_path(position)
             },
             (PlannedNode::Run(run), PlannedAnchor::Run { paragraph, at }) => {
@@ -360,7 +377,7 @@ pub(super) enum NewKind {
 }
 
 enum PlannedNode {
-    Paragraph(Box<NewParagraph>),
+    Paragraph(Box<NewParagraph>, Option<super::lists::Request>),
     Run(Box<NewRun>),
 }
 
@@ -467,14 +484,60 @@ fn insert_command_paragraphs(
     first.ok_or_else(|| internal("paragraph splitting produced no paragraph"))
 }
 
+/// A new paragraph that takes no list: `listStyle` and `start` are refused
+/// (headers, footers and notes, as on `set`).
 pub(super) fn new_paragraph(props: &Props<'_>) -> Result<NewParagraph> {
+    let (paragraph, list) = new_paragraph_with_list(props)?;
+    if list.is_some() {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            "list styles are not written in headers, footers and notes",
+        )
+        .with_property("listStyle")
+        .with_format(FileFormat::Docx));
+    }
+    Ok(paragraph)
+}
+
+/// A new paragraph and the list its `listStyle` and `start` ask for (record
+/// 0342), which [`super::lists::number_added`] applies once it is inserted.
+pub(super) fn new_paragraph_with_list(
+    props: &Props<'_>,
+) -> Result<(NewParagraph, Option<super::lists::Request>)> {
     let mut paragraph = NewParagraph::new();
     let mut run = NewRun::new("");
     let mut has_run = false;
+    let mut list = None::<super::lists::Request>;
     for (key, value) in props.iter() {
         if let Some((_, entry)) = PARAGRAPH_REGISTRY.lookup(key.as_str()) {
-            let result = match entry.access {
-                Access::Add(_) => prepare_run_entry(entry, value, &mut run, &mut has_run),
+            let result = match (entry.access, super::lists::list_setter(entry.access)) {
+                (_, Some(setter)) => {
+                    let request = list.get_or_insert(super::lists::Request {
+                        style: None,
+                        start: None,
+                    });
+                    entry.prepare(Operation::Add, value, |_, value| {
+                        if setter == Setter::ParagraphListStyle {
+                            let text = match value {
+                                Some(
+                                    crate::value::Scalar::Text(text)
+                                    | crate::value::Scalar::Token(text),
+                                ) => text,
+                                _ => {
+                                    return Err(Error::new(
+                                        Code::InvalidValue,
+                                        "a list style is text",
+                                    ));
+                                },
+                            };
+                            request.style = Some(super::lists::style(text));
+                        } else {
+                            request.start = Some(super::lists::start(value)?);
+                        }
+                        Ok(())
+                    })
+                },
+                (Access::Add(_), None) => prepare_run_entry(entry, value, &mut run, &mut has_run),
                 _ => prepare_paragraph_entry(entry, value, &mut paragraph, &mut run, &mut has_run),
             };
             result.map_err(|error| property_error(error, key))?;
@@ -489,7 +552,7 @@ pub(super) fn new_paragraph(props: &Props<'_>) -> Result<NewParagraph> {
     if has_run {
         paragraph.push_run(run);
     }
-    Ok(paragraph)
+    Ok((paragraph, list))
 }
 
 pub(super) fn new_run(props: &Props<'_>) -> Result<NewRun> {

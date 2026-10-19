@@ -27,6 +27,8 @@ pub(crate) struct Item {
     /// The name a bare `[NAME]` step matches.
     label: Option<String>,
     children: Vec<u32>,
+    /// The zero-based position among its parent's children of its kind.
+    ordinal: u32,
     /// The canonical positional path.
     path: Box<[PathStep<'static>]>,
     /// The leaf positions of the element (page and shape, frame, table and
@@ -65,6 +67,11 @@ impl Item {
 
     pub(crate) fn children(&self) -> &[u32] {
         &self.children
+    }
+
+    /// The zero-based position among its parent's children of its kind.
+    pub(crate) const fn ordinal(&self) -> u32 {
+        self.ordinal
     }
 
     pub(crate) fn path(&self) -> &[PathStep<'static>] {
@@ -106,6 +113,7 @@ impl Tree {
                 text: None,
                 label: None,
                 children: Vec::new(),
+                ordinal: 0,
                 path: Box::new([]),
                 #[cfg(any(feature = "odg", feature = "odc", feature = "odi", feature = "odb"))]
                 leaf: [0, 0],
@@ -131,6 +139,9 @@ impl Tree {
 /// Builds a [`Tree`] in document order.
 pub(crate) struct TreeBuilder<K: 'static> {
     items: Vec<Item>,
+    /// Children pushed so far per (parent, kind ordinal) (record 0340: a
+    /// push counts in constant time).
+    counts: std::collections::HashMap<(u32, u8), usize>,
     elements: &'static [ElementSpec<K>],
     singletons: &'static [K],
 }
@@ -153,6 +164,7 @@ impl<K: ElementKind> TreeBuilder<K> {
             text: None,
             label: None,
             children: Vec::new(),
+            ordinal: 0,
             path: Box::new([]),
             #[cfg(any(feature = "odg", feature = "odc", feature = "odi", feature = "odb"))]
             leaf: [0, 0],
@@ -161,6 +173,7 @@ impl<K: ElementKind> TreeBuilder<K> {
         };
         Self {
             items: vec![item],
+            counts: std::collections::HashMap::new(),
             elements,
             singletons,
         }
@@ -177,11 +190,9 @@ impl<K: ElementKind> TreeBuilder<K> {
     /// Append an item of `kind` under `parent`.
     pub(crate) fn push(&mut self, parent: u32, kind: K) -> Draft<'_, K> {
         let spec = &self.elements[usize::from(kind.ordinal())];
-        let ordinal = self.items[parent as usize]
-            .children
-            .iter()
-            .filter(|child| self.items[**child as usize].kind == kind.ordinal())
-            .count();
+        let count = self.counts.entry((parent, kind.ordinal())).or_insert(0);
+        let ordinal = *count;
+        *count = count.saturating_add(1);
         let step = if self.singletons.contains(&kind) {
             PathStep::new(kind.name())
         } else {
@@ -199,6 +210,7 @@ impl<K: ElementKind> TreeBuilder<K> {
             text: None,
             label: None,
             children: Vec::new(),
+            ordinal: u32::try_from(ordinal).unwrap_or(u32::MAX),
             path: path.into_boxed_slice(),
             #[cfg(any(feature = "odg", feature = "odc", feature = "odi", feature = "odb"))]
             leaf: [0, 0],

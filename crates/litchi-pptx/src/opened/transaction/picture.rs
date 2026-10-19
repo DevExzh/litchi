@@ -24,7 +24,7 @@ use crate::{Error, Result};
 const MAX_DESCRIPTION_BYTES: usize = 64 * 1024;
 
 /// The start-tag span of the first element named `local` in `fragment`.
-fn first_start_tag(fragment: &[u8], local: &[u8]) -> Result<Option<Range<usize>>> {
+pub(super) fn first_start_tag(fragment: &[u8], local: &[u8]) -> Result<Option<Range<usize>>> {
     let mut reader = Reader::from_reader(fragment);
     loop {
         let before = usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
@@ -46,7 +46,10 @@ fn first_start_tag(fragment: &[u8], local: &[u8]) -> Result<Option<Range<usize>>
 
 /// The first attribute whose local name is `local` (any prefix) of a raw
 /// start tag: its value span, its qualified name and its whole span.
-fn attribute_value(tag: &[u8], local: &[u8]) -> Option<(Range<usize>, Vec<u8>, Range<usize>)> {
+pub(super) fn attribute_value(
+    tag: &[u8],
+    local: &[u8],
+) -> Option<(Range<usize>, Vec<u8>, Range<usize>)> {
     let mut at = 1;
     while at < tag.len() && !tag[at].is_ascii_whitespace() && tag[at] != b'>' && tag[at] != b'/' {
         at += 1;

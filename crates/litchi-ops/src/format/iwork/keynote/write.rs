@@ -139,8 +139,8 @@ impl Add {
 /// error attribution; 0 outside batches).
 #[derive(Debug, Default)]
 pub(super) struct Pending {
-    /// Texts to publish, whole: text → (new text, item).
-    texts: BTreeMap<Text, (String, usize)>,
+    /// Texts to publish: text → (new text, item).
+    texts: BTreeMap<Text, (Staged, usize)>,
     /// Frames to publish: (slide, drawable) → (frame, item).
     frames: BTreeMap<(usize, usize), (Geometry, usize)>,
     /// Drawables to remove: (slide, drawable) → item.
@@ -160,15 +160,119 @@ pub(super) struct Pending {
     groups: BTreeMap<Text, TextGroup>,
 }
 
+/// A staged text.
+#[derive(Debug)]
+enum Staged {
+    /// A whole new text.
+    Text(String),
+    /// The base of the text's [`TextGroup`] with the paragraphs its sets
+    /// replaced (record 0340): a paragraph set costs its own paragraph, and
+    /// the text is joined once, when the run publishes.
+    Paragraphs,
+}
+
 /// The sets one text received in a run: its text before them, the region
 /// they touched, and the largest region the leaf admitted for one combined
 /// splice (record 0314).
 #[derive(Debug)]
 struct TextGroup {
     base: String,
+    /// The byte offset of each paragraph of `base`, then `base.len() + 1`.
+    starts: Vec<usize>,
+    /// The UTF-16 offset of each paragraph of `base`, then its UTF-16
+    /// length + 1.
+    units: Vec<usize>,
+    /// The paragraphs set while the text is [`Staged::Paragraphs`]; `None`
+    /// keeps the base's paragraph.
+    lines: Vec<Option<String>>,
+    /// How many of `lines` differ from the base's paragraph.
+    differs: usize,
     touched: Touched,
-    changed: bool,
     admitted: Option<Touched>,
+}
+
+impl TextGroup {
+    fn new(base: String) -> Self {
+        let mut starts = vec![0];
+        let mut units = vec![0];
+        let mut unit = 0_usize;
+        for (at, byte) in base.char_indices() {
+            if byte == '\n' {
+                starts.push(at + 1);
+                units.push(unit + 1);
+            }
+            unit += byte.len_utf16();
+        }
+        starts.push(base.len() + 1);
+        units.push(unit + 1);
+        let count = starts.len() - 1;
+        Self {
+            base,
+            starts,
+            units,
+            lines: std::iter::repeat_with(|| None).take(count).collect(),
+            differs: 0,
+            touched: Touched::Lines(0, 0),
+            admitted: None,
+        }
+    }
+
+    /// The number of paragraphs of the base.
+    fn count(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Paragraph `line` of the base.
+    fn base_line(&self, line: usize) -> Option<&str> {
+        let (start, end) = (*self.starts.get(line)?, *self.starts.get(line + 1)?);
+        self.base.get(start..end - 1)
+    }
+
+    /// Paragraph `line` of the staged text.
+    fn line(&self, line: usize) -> Option<&str> {
+        match self.lines.get(line)? {
+            Some(set) => Some(set),
+            None => self.base_line(line),
+        }
+    }
+
+    /// Replace paragraph `line` of the staged text.
+    fn set_line(&mut self, line: usize, value: String) {
+        let Some(base) = self.base_line(line) else {
+            return;
+        };
+        let now = value != base;
+        let before = self.lines[line].as_deref().is_some_and(|held| held != base);
+        self.differs = self.differs + usize::from(now) - usize::from(before);
+        self.lines[line] = now.then_some(value);
+    }
+
+    /// The staged text, joined.
+    fn text(&self) -> String {
+        if self.differs == 0 {
+            return self.base.clone();
+        }
+        let mut text = String::with_capacity(self.base.len());
+        for line in 0..self.count() {
+            if line > 0 {
+                text.push('\n');
+            }
+            text.push_str(self.line(line).unwrap_or_default());
+        }
+        text
+    }
+
+    /// The UTF-16 region of the base that `touched` covers, both ends
+    /// inclusive.
+    fn hull(&self, touched: Touched) -> Option<std::ops::Range<usize>> {
+        let (first, last) = match touched {
+            Touched::Whole => (0, self.count().checked_sub(1)?),
+            Touched::Lines(first, last) => (first, last),
+        };
+        let start = *self.units.get(first)?;
+        let end = self.units.get(last + 1)? - 1;
+        (start <= end).then_some(start..end)
+    }
 }
 
 /// The region of a text its sets touched.
@@ -200,27 +304,6 @@ impl Touched {
     }
 }
 
-/// The UTF-16 region of `base` that `touched` covers, both ends inclusive.
-fn hull(base: &str, touched: Touched) -> Option<std::ops::Range<usize>> {
-    let (first, last) = match touched {
-        Touched::Whole => return Some(0..base.encode_utf16().count()),
-        Touched::Lines(first, last) => (first, last),
-    };
-    let mut unit = 0_usize;
-    let mut start = None;
-    for (line, paragraph) in base.split('\n').enumerate() {
-        if line == first {
-            start = Some(unit);
-        }
-        let end = unit + paragraph.encode_utf16().count();
-        if line == last {
-            return start.map(|start| start..end);
-        }
-        unit = end + 1;
-    }
-    None
-}
-
 /// Whether the leaf admits one combined splice over `hull` of `text`.
 fn leaf_admits(package: &Package, text: Text, hull: std::ops::Range<usize>) -> bool {
     let slide = SlideSelector::index(text.slide);
@@ -245,6 +328,80 @@ fn leaf_admits(package: &Package, text: Text, hull: std::ops::Range<usize>) -> b
             .text_admits_combined_splice(slide, DrawableSelector::index(text.drawable), hull)
             .unwrap_or(false),
         _ => false,
+    }
+}
+
+/// The widest region of `text` holding `union` that the leaf admits for one
+/// combined splice: the whole text, else `union` widened paragraph by
+/// paragraph as far as the leaf admits; `None` when it refuses `union`.
+///
+/// The leaf's answer holds for every region within an admitted one, so one
+/// search per text group replaces a leaf call per set (record 0340).
+fn widest_admitted(
+    package: &Package,
+    text: Text,
+    group: &TextGroup,
+    union: Touched,
+) -> Option<Touched> {
+    let admits = |touched| {
+        group
+            .hull(touched)
+            .is_some_and(|hull| leaf_admits(package, text, hull))
+    };
+    if admits(Touched::Whole) {
+        return Some(Touched::Whole);
+    }
+    let Touched::Lines(first, last) = union else {
+        return None;
+    };
+    if !admits(union) {
+        return None;
+    }
+    // The first paragraph the widened region can start at.
+    let (mut low, mut high) = (0, first);
+    while low < high {
+        let middle = low + (high - low) / 2;
+        if admits(Touched::Lines(middle, last)) {
+            high = middle;
+        } else {
+            low = middle + 1;
+        }
+    }
+    let start = low;
+    // The last paragraph it can end at.
+    let (mut low, mut high) = (last, group.count().saturating_sub(1).max(last));
+    while low < high {
+        let middle = high - (high - low) / 2;
+        if admits(Touched::Lines(first, middle)) {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
+    }
+    let widest = Touched::Lines(start, low);
+    Some(if widest == union || admits(widest) {
+        widest
+    } else {
+        union
+    })
+}
+
+/// Whether a set writing `written` over `touched` brings `current`, a whole
+/// text staged after `base`, back to `base`: one at a time the sets publish
+/// twice, joined they would publish nothing.
+fn cancels_text(base: &str, current: &str, touched: Touched, written: &str) -> bool {
+    match touched {
+        Touched::Whole => written == base && current != base,
+        Touched::Lines(line, _) => {
+            base.split('\n').nth(line) == Some(written)
+                && current.split('\n').nth(line) != Some(written)
+                && current
+                    .split('\n')
+                    .zip(base.split('\n'))
+                    .enumerate()
+                    .all(|(at, (held, base))| at == line || held == base)
+                && current.split('\n').count() == base.split('\n').count()
+        },
     }
 }
 
@@ -459,10 +616,18 @@ impl Pending {
             .filter(move |add| add.slide() == slide)
     }
 
+    /// The staged text of `text`, joined; `None` when it is not staged.
+    fn staged(&self, text: Text) -> Option<String> {
+        match self.texts.get(&text)? {
+            (Staged::Text(value), _) => Some(value.clone()),
+            (Staged::Paragraphs, _) => self.groups.get(&text).map(TextGroup::text),
+        }
+    }
+
     /// The current text of `text`: staged, or the tree's.
     fn current(&self, file: &Iwork, text: Text) -> Result<String> {
-        if let Some((value, _)) = self.texts.get(&text) {
-            return Ok(value.clone());
+        if let Some(value) = self.staged(text) {
+            return Ok(value);
         }
         text.item(file)
             .map(|item| item.text().unwrap_or_default().to_owned())
@@ -471,27 +636,64 @@ impl Pending {
 
     /// Stage a whole text.
     pub(super) fn stage_text(&mut self, text: Text, value: String, index: usize) {
-        self.texts.insert(text, (value, index));
+        self.texts.insert(text, (Staged::Text(value), index));
     }
 
-    /// Record that a set touches `touched` of `text`; `value` is the text
-    /// (or paragraph text) it writes.
-    fn touch(&mut self, file: &Iwork, text: Text, touched: Touched, value: &str) -> Result<()> {
-        let current = self.current(file, text)?;
-        let group = match self.groups.entry(text) {
-            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
-            std::collections::btree_map::Entry::Vacant(entry) => entry.insert(TextGroup {
-                base: current.clone(),
-                touched,
-                changed: false,
-                admitted: None,
-            }),
-        };
-        group.touched = group.touched.union(touched);
-        group.changed |= match touched {
-            Touched::Whole => current != value,
-            Touched::Lines(line, _) => current.split('\n').nth(line) != Some(value),
-        };
+    /// Record that a set touches `touched` of `text`, opening the text's
+    /// group at its current text.
+    fn touch(&mut self, file: &Iwork, text: Text, touched: Touched) -> Result<()> {
+        if !self.groups.contains_key(&text) {
+            let base = self.current(file, text)?;
+            let mut group = TextGroup::new(base);
+            group.touched = touched;
+            self.groups.insert(text, group);
+            return Ok(());
+        }
+        if let Some(group) = self.groups.get_mut(&text) {
+            group.touched = group.touched.union(touched);
+        }
+        Ok(())
+    }
+
+    /// Stage paragraph `line` of `text` as `value`.
+    fn stage_paragraph(
+        &mut self,
+        file: &Iwork,
+        text: Text,
+        line: usize,
+        value: String,
+        index: usize,
+    ) -> Result<()> {
+        let missing = || refusal(Code::PathNotFound, "the paragraph is no longer in its text");
+        self.touch(file, text, Touched::Lines(line, line))?;
+        let group = self
+            .groups
+            .get_mut(&text)
+            .ok_or_else(|| refusal(Code::InternalError, "the text's group is missing"))?;
+        match self.texts.get_mut(&text) {
+            // A whole text staged before: replace its paragraph.
+            Some((Staged::Text(current), at)) => {
+                let mut lines = current.split('\n').collect::<Vec<_>>();
+                let slot = lines.get_mut(line).ok_or_else(missing)?;
+                *slot = &value;
+                *current = lines.join("\n");
+                *at = index;
+            },
+            Some((Staged::Paragraphs, at)) => {
+                if line >= group.count() {
+                    return Err(missing());
+                }
+                group.set_line(line, value);
+                *at = index;
+            },
+            None => {
+                if line >= group.count() {
+                    return Err(missing());
+                }
+                group.set_line(line, value);
+                self.texts.insert(text, (Staged::Paragraphs, index));
+            },
+        }
         Ok(())
     }
 
@@ -583,7 +785,7 @@ impl Pending {
             if self.styles.keys().any(|style| style.0 == text.slide) {
                 return false;
             }
-            let (Some(group), Some((current, _))) = (self.groups.get(&text), self.texts.get(&text))
+            let (Some(group), Some((staged, _))) = (self.groups.get(&text), self.texts.get(&text))
             else {
                 continue;
             };
@@ -597,25 +799,33 @@ impl Pending {
             let Ok(written) = written else {
                 continue;
             };
-            if current.is_empty() && !group.base.is_empty() {
-                return false;
-            }
-            // The sets cancel out when this one brings the text back to its
-            // base: it writes the base's own text (or paragraph), and the
-            // rest of the text is the base's already.
-            let cancels = match touched {
-                Touched::Whole => written == group.base && *current != group.base,
-                Touched::Lines(line, _) => {
-                    group.base.split('\n').nth(line) == Some(written.as_str())
-                        && current.split('\n').nth(line) != Some(written.as_str())
-                        && current
-                            .split('\n')
-                            .zip(group.base.split('\n'))
-                            .enumerate()
-                            .all(|(at, (held, base))| at == line || held == base)
-                        && current.split('\n').count() == group.base.split('\n').count()
+            let (emptied, cancels) = match staged {
+                Staged::Text(current) => (
+                    current.is_empty(),
+                    cancels_text(&group.base, current, touched, &written),
+                ),
+                Staged::Paragraphs => {
+                    let emptied = group.count() == 1 && group.line(0) == Some("");
+                    // The sets cancel out when this one brings the text back
+                    // to its base: it writes the base's own text (or
+                    // paragraph), and the rest of the text is the base's
+                    // already.
+                    let cancels = match touched {
+                        Touched::Whole => written == group.base && group.differs > 0,
+                        Touched::Lines(line, _) => {
+                            let base = group.base_line(line);
+                            let held = group.line(line);
+                            base == Some(written.as_str())
+                                && held != Some(written.as_str())
+                                && group.differs == usize::from(held != base)
+                        },
+                    };
+                    (emptied, cancels)
                 },
             };
+            if emptied && !group.base.is_empty() {
+                return false;
+            }
             if cancels {
                 return false;
             }
@@ -626,17 +836,14 @@ impl Pending {
             {
                 continue;
             }
-            let Some(region) = hull(&group.base, union) else {
-                return false;
-            };
             let Some(package) = file.keynote() else {
                 return false;
             };
-            if !leaf_admits(package, text, region) {
+            let Some(admitted) = widest_admitted(package, text, group, union) else {
                 return false;
-            }
+            };
             if let Some(group) = self.groups.get_mut(&text) {
-                group.admitted = Some(union);
+                group.admitted = Some(admitted);
             }
         }
         true
@@ -821,22 +1028,14 @@ impl Pending {
                 let text = Text::of(node)
                     .ok_or_else(|| refusal(Code::InternalError, "the text is missing"))?;
                 let value = super::super::write::text(value, "text")?.unwrap_or_default();
-                self.touch(file, text, Touched::Whole, &value)?;
+                self.touch(file, text, Touched::Whole)?;
                 self.stage_text(text, value, index);
             },
             ("paragraph", "text") => {
                 let text = Text::of(node)
                     .ok_or_else(|| refusal(Code::InternalError, "the text is missing"))?;
                 let value = paragraph_text(value)?;
-                let current = self.current(file, text)?;
-                self.touch(file, text, Touched::Lines(line, line), &value)?;
-                let mut lines = current.split('\n').collect::<Vec<_>>();
-                let slot = lines.get_mut(line).ok_or_else(|| {
-                    refusal(Code::PathNotFound, "the paragraph is no longer in its text")
-                })?;
-                *slot = &value;
-                let joined = lines.join("\n");
-                self.stage_text(text, joined, index);
+                self.stage_paragraph(file, text, line, value, index)?;
             },
             ("placeholder" | "shape" | "picture", "x" | "y" | "width" | "height" | "rotation") => {
                 if drawable == NONE {
@@ -904,11 +1103,24 @@ impl Pending {
         chain: &mut Chain<Package>,
     ) -> std::result::Result<Published, (Error, Option<usize>)> {
         let mut published = Published::default();
-        let drawable_texts = self
-            .texts
+        // Join the texts staged as paragraphs, once.
+        let groups = &self.groups;
+        let texts = std::mem::take(&mut self.texts)
+            .into_iter()
+            .map(|(text, (staged, index))| {
+                let value = match staged {
+                    Staged::Text(value) => value,
+                    Staged::Paragraphs => {
+                        groups.get(&text).map(TextGroup::text).unwrap_or_default()
+                    },
+                };
+                (text, (value, index))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let drawable_texts = texts
             .iter()
             .filter(|(text, _)| text.container == DRAWABLE)
-            .map(|(text, (value, index))| (*text, value.clone(), *index))
+            .map(|(text, (value, index))| (*text, value.as_str(), *index))
             .collect::<Vec<_>>();
         if !drawable_texts.is_empty()
             || !self.frames.is_empty()
@@ -1014,7 +1226,7 @@ impl Pending {
             let (package, patch) = commit.into_parts();
             push(chain, package, Patch::Drawables(patch));
         }
-        for (text, (value, index)) in std::mem::take(&mut self.texts) {
+        for (text, (value, index)) in texts {
             let at = |error| (error, Some(index));
             match text.container {
                 TITLE | BODY => {
@@ -2039,4 +2251,60 @@ pub(crate) fn swap(
         1,
         limits,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TextGroup, Touched, cancels_text};
+
+    /// A paragraph group reads, replaces and joins paragraphs like splitting
+    /// and joining the whole text, and its hulls are the base's UTF-16
+    /// paragraph regions (record 0340).
+    #[test]
+    fn paragraph_groups_match_split_and_join() {
+        let base = "one\n\u{e9}\u{1f600}x\n\nlast";
+        let mut group = TextGroup::new(base.to_owned());
+        assert_eq!(group.count(), 4);
+        let lines: Vec<_> = base.split('\n').collect();
+        for (at, line) in lines.iter().enumerate() {
+            assert_eq!(group.base_line(at), Some(*line));
+        }
+        assert_eq!(group.base_line(4), None);
+        assert_eq!(
+            group.hull(Touched::Whole),
+            Some(0..base.encode_utf16().count())
+        );
+        assert_eq!(group.hull(Touched::Lines(0, 0)), Some(0..3));
+        // "é😀x" is 4 UTF-16 units starting at 4.
+        assert_eq!(group.hull(Touched::Lines(1, 1)), Some(4..8));
+        assert_eq!(group.hull(Touched::Lines(2, 2)), Some(9..9));
+        assert_eq!(group.hull(Touched::Lines(1, 3)), Some(4..14));
+        assert_eq!(group.hull(Touched::Lines(3, 4)), None);
+
+        group.set_line(2, "new".to_owned());
+        group.set_line(0, "one".to_owned());
+        assert_eq!(group.differs, 1);
+        assert_eq!(group.text(), "one\n\u{e9}\u{1f600}x\nnew\nlast");
+        group.set_line(2, String::new());
+        assert_eq!(group.differs, 0);
+        assert_eq!(group.text(), base);
+        group.set_line(3, String::new());
+        group.set_line(3, "again".to_owned());
+        assert_eq!(group.differs, 1);
+        assert_eq!(group.line(3), Some("again"));
+
+        let empty = TextGroup::new(String::new());
+        assert_eq!(empty.count(), 1);
+        assert_eq!(empty.base_line(0), Some(""));
+        assert_eq!(empty.hull(Touched::Whole), Some(0..0));
+    }
+
+    #[test]
+    fn whole_texts_cancel_back_to_their_base() {
+        assert!(cancels_text("a\nb", "a\nc", Touched::Lines(1, 1), "b"));
+        assert!(!cancels_text("a\nb", "x\nc", Touched::Lines(1, 1), "b"));
+        assert!(!cancels_text("a\nb", "a\nb\nc", Touched::Lines(1, 1), "b"));
+        assert!(cancels_text("a", "b", Touched::Whole, "a"));
+        assert!(!cancels_text("a", "a", Touched::Whole, "a"));
+    }
 }

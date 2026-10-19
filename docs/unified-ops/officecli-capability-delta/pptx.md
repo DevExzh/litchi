@@ -808,12 +808,12 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | table | `colWidths` | string | asg |  | gap | gap | P1 | deferred-P1 0332 (pptx-breadth) | L-PPTX-R8 |
 | table | `headerFill` | color | a-- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | table | `bodyFill` | color | a-- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| table | `firstRow` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| table | `lastRow` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| table | `firstCol` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| table | `lastCol` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| table | `bandedRows` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| table | `bandedCols` | bool | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| table | `firstRow` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| table | `lastRow` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| table | `firstCol` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| table | `lastCol` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| table | `bandedRows` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| table | `bandedCols` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | table | `border.all` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | table | `border.bottom` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | table | `border.horizontal` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
@@ -821,7 +821,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | table | `border.right` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | table | `border.top` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | table | `border.vertical` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| table | `name` | string | asg | a-g | supported | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| table | `name` | string | asg | asg | supported | supported |  |  |  |
 | table | `cols` | int | a-g | a-g | supported | supported |  |  |  |
 | table | `data` | string | a-- | a-- | write-only | supported |  |  |  |
 | table | `rows` | int | a-g | a-g | supported | supported |  |  |  |

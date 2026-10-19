@@ -1132,6 +1132,107 @@ impl Edit {
         self.replace_element(path, &before, &Arc::new(after))
     }
 
+    /// Change the direct properties (`w:tblPr`) of the table at `path`
+    /// (record 0342). The style and the borders are written: only the
+    /// properties whose typed value changes are rewritten, and every other
+    /// byte of the table is kept. An unchanged value is an exact no-op.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    /// use litchi_docx::properties::{Border, BorderStyle, EighthPoints};
+    ///
+    /// let snapshot = Snapshot::from_xml(
+    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+    /// )?;
+    /// let path = ElementPath::new([ElementStep::Table(Position::new(0))]);
+    /// let mut edit = snapshot.edit();
+    /// edit.format_table_at(&path, |table| {
+    ///     let mut border = Border::new(BorderStyle::from_xml("double").unwrap());
+    ///     border.size = Some(EighthPoints(8));
+    ///     table.borders.get_or_insert_default().top = Some(border);
+    /// })?;
+    /// let commit = edit.commit()?;
+    /// let xml = std::str::from_utf8(commit.snapshot().xml_bytes())?;
+    /// assert!(xml.contains(r#"<w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="double" w:sz="8"/></w:tblBorders>"#));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::UnmodelledProperty`] for a change of any other
+    /// table property, [`Refusal::BlockNotFound`] for a path that names no
+    /// table, and the splice refusals of [`Self::format_paragraph`].
+    pub fn format_table_at(
+        &mut self,
+        path: &ElementPath,
+        change: impl FnOnce(&mut properties::Table),
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("format_table")?;
+        let (located, inherited) = self.element_with_scope(path, b"tbl")?;
+        let before = self.element_bytes(located)?;
+        let current = properties::parse_table(&before, &inherited)?;
+        let mut target = current.clone();
+        change(&mut target);
+        let Some(after) = properties::splice_table(&before, &current, &target, &inherited)
+            .map_err(spliced(Position::new(0)))?
+        else {
+            return Ok(self);
+        };
+        self.replace_element(path, &before, &Arc::new(after))
+    }
+
+    /// Change the direct properties (`w:trPr`) of the table row at `path`
+    /// (record 0342): its height and its `cantSplit`, `tblHeader` and
+    /// `hidden` flags, with the rules of [`Self::format_table_at`].
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    /// use litchi_docx::properties::{Height, HeightRule, Twips};
+    ///
+    /// let snapshot = Snapshot::from_xml(
+    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+    /// )?;
+    /// let path = ElementPath::new([
+    ///     ElementStep::Table(Position::new(0)),
+    ///     ElementStep::Row(Position::new(0)),
+    /// ]);
+    /// let mut edit = snapshot.edit();
+    /// edit.format_row_at(&path, |row| {
+    ///     row.header = Some(true);
+    ///     row.height = Some(Height::new(Twips(400), Some(HeightRule::Exact)));
+    /// })?;
+    /// let commit = edit.commit()?;
+    /// let xml = std::str::from_utf8(commit.snapshot().xml_bytes())?;
+    /// assert!(xml.contains(r#"<w:tr><w:trPr><w:trHeight w:val="400" w:hRule="exact"/><w:tblHeader/></w:trPr>"#));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::UnmodelledProperty`] for a change of any other
+    /// row property, [`Refusal::BlockNotFound`] for a path that names no
+    /// row, and the splice refusals of [`Self::format_paragraph`].
+    pub fn format_row_at(
+        &mut self,
+        path: &ElementPath,
+        change: impl FnOnce(&mut properties::Row),
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("format_row")?;
+        let (located, inherited) = self.element_with_scope(path, b"tr")?;
+        let before = self.element_bytes(located)?;
+        let current = properties::parse_row(&before, &inherited)?;
+        let mut target = current.clone();
+        change(&mut target);
+        let Some(after) = properties::splice_row(&before, &current, &target, &inherited)
+            .map_err(spliced(Position::new(0)))?
+        else {
+            return Ok(self);
+        };
+        self.replace_element(path, &before, &Arc::new(after))
+    }
+
     /// Change the direct properties of the run at `path` (a run of a
     /// paragraph, a hyperlink or an inline content control), with the rules
     /// of [`Self::format_run`].

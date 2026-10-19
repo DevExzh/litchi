@@ -261,6 +261,39 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
+    /// Change the direct properties of the table at `path` (record 0342).
+    ///
+    /// See [`super::snapshot::Edit::format_table_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, property or resource refusal without
+    /// changing the staged document.
+    pub fn format_table_at(
+        &mut self,
+        path: &super::ElementPath,
+        change: impl FnOnce(&mut crate::properties::Table),
+    ) -> Result<&mut Self> {
+        self.inner.format_table_at(path, change)?;
+        Ok(self)
+    }
+
+    /// Change the direct properties of the table row at `path` (record
+    /// 0342).
+    ///
+    /// See [`super::snapshot::Edit::format_row_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, property or resource refusal without
+    /// changing the staged document.
+    pub fn format_row_at(
+        &mut self,
+        path: &super::ElementPath,
+        change: impl FnOnce(&mut crate::properties::Row),
+    ) -> Result<&mut Self> {
+        self.inner.format_row_at(path, change)?;
+        Ok(self)
+    }
+
     /// Change the direct properties of the run at `path`.
     ///
     /// See [`super::snapshot::Edit::format_run_at`].

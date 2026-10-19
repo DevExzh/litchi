@@ -2,7 +2,8 @@
 
 - Status: implemented on `uo2/glossary-closure`, cut from
   `feat/unified-ops-api` at `ed832736c3`; trunk merged at `d03195dfea`
-  (record 0341) before the final gates.
+  (record 0341) and again after records 0340 and 0342 merged, before the
+  final gates.
 - Date: 2026-10-18.
 - Input: the definition-of-done audit of 2026-10-17, WP14: the pending 🔴
   cells of `docs/API_GLOSSARY.md`, the records index of `PROGRESS.md`
@@ -77,8 +78,8 @@ compilation and the rustdoc scan above.
 
 ## 4. Deferrals (option b)
 
-Each is added to the owner memo (0331) as items 14–24; the adopted default
-is in effect until the owner overrides it.
+Each is added to the owner memo (0331) as items 14–24 (item 21, D8, is
+withdrawn); the adopted default is in effect until the owner overrides it.
 
 - **D1 — Direct package mutators (row *Immutable owner snapshot*).**
   `litchi_docx::Package` exposes 85 public `&mut self` methods (VBA, fonts,
@@ -87,8 +88,7 @@ is in effect until the owner overrides it.
   `put_*`/`remove_*`, `apply_*_patch`, outputs) and XLSB keeps
   `Package::into_workbook` with the mutating `Workbook` verbs (0261 F1).
   Moving each into an `Edit` family (or making the outputs `&self`) is a
-  per-verb redesign of the two crates other agents are changing now (0342),
-  not a rename. Default: kept; no new public `&mut self` mutator may be
+  per-verb redesign of the two crates, not a rename. Default: kept; no new public `&mut self` mutator may be
   added on a `Package`.
 - **D2 — Scoped OOXML commit triad (rows *New snapshot accessor*,
   *Diagnostics*, *Split commit*, *Patch application*, *No-op*).** About 200
@@ -129,22 +129,21 @@ is in effect until the owner overrides it.
   string today). Default: `Option<String>` stays, the OOXML codec keeps
   keyword mixed content losslessly.
 - **D8 — DOCX app/custom properties through the shared engine (row
-  *Metadata mutation*).** The DOCX `metadata` family is its own model
-  (`Patch::{base, target}` over `Metadata`), not the shared
-  `litchi_ooxml_common::properties` engine that gives PPTX/XLSX/XLSB
-  `metadata::Edit::set_custom_props` and `Package::app_props()`. Re-basing
-  it changes `metadata::Patch`'s public shape and replaces
-  `Package::custom_props_mut` (D1). Default: kept.
+  *Metadata mutation*).** Withdrawn: record 0342, merged while this record
+  was in flight, added `metadata::Edit::{app_props, set_app_props,
+  custom_props, set_custom_props}` over the shared engine's part patch and
+  `Package::app_props()`, so the cell is ✅ (0342). The direct mutator
+  `Package::custom_props_mut` stays under D1.
 - **D9 — Content redaction call-site audit (OOXML/legacy).** An audit of
   error and `Debug` strings across four OOXML and three legacy crates, not
   a rename. Default: the rule stands; violations are fixed as found.
 - **D10 — iWork grid coordinates (row *Grid coordinates*).**
   `CellPosition`/`CellRange` → `At`/`Area` touches about 1,300 occurrences
   in 161 files of the iWork crates, `litchi-ops` and the facade, including
-  `format/iwork/keynote`, which record 0340 is editing now; `litchi-ops`
+  `format/iwork/keynote`, which record 0340 was editing while this record ran; `litchi-ops`
   already has a private `format::iwork::tree::At`, and several ops files
-  import the XLSX `At`/`Area`. Default: deferred to the next iWork wave,
-  after 0340 merges.
+  import the XLSX `At`/`Area`. Default: deferred to the next iWork wave
+  (0340 has since merged, so it is unblocked).
 - **D11 — `litchi-iwa` builder prefixes (row *Option-bearing fresh
   authoring*).** `PagesDocumentBuilder`, `KeynoteDocumentBuilder` and
   `NumbersDocumentBuilder` (about 940 occurrences in 183 files) live in the
@@ -157,8 +156,7 @@ is in effect until the owner overrides it.
 
 - `PROGRESS.md` records index: rows 0249–0343 added (one per record file,
   0251a–0251f included), each with its title and the merge that landed it,
-  taken from the record's first lines and its trunk merge subject. 0340 and
-  0342 are not on trunk yet; their rows belong to their merges.
+  taken from the record's first lines and its trunk merge subject.
 - Facade crate docs (`crates/litchi/src/lib.rs`, *Unified operations*):
   "Batches and the other formats' unified write handlers are still in
   progress" replaced by the current state (every format reads and writes
