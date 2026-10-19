@@ -2,10 +2,13 @@
 //! recognize encryption and signatures from clear streams, and adopt the
 //! legacy owner each format keeps.
 //!
-//! The host-stream precedence is the facade's: `WordDocument`, then
-//! `PowerPoint Document` or `Current User`, then `Workbook` or `Book`. A
-//! compound file with none of them but with `EncryptionInfo` and
-//! `EncryptedPackage` is an encrypted OOXML package.
+//! A compound file with `EncryptionInfo` and `EncryptedPackage` is an
+//! encrypted OOXML package ([MS-OFFCRYPTO] 2.3.4), even when it also holds a
+//! legacy host stream: Word 2007 writes a stub `WordDocument` stream next
+//! to the encrypted package (record 0341). Otherwise the host-stream
+//! precedence is the facade's: `WordDocument`, then `PowerPoint Document`
+//! or `Current User`, then `Workbook` or `Book`. Binary DOC, PPT and XLS
+//! encryption never uses an `EncryptedPackage` stream.
 
 use std::io::Cursor;
 #[cfg(any(unix, windows))]
@@ -60,14 +63,14 @@ impl Cfb for &SharedOleFile {
 }
 
 fn host(cfb: &impl Cfb) -> Host {
-    if cfb.has(&["WordDocument"]) {
+    if cfb.has(&["EncryptionInfo"]) && cfb.has(&["EncryptedPackage"]) {
+        Host::EncryptedOoxml
+    } else if cfb.has(&["WordDocument"]) {
         Host::Doc
     } else if cfb.has(&["PowerPoint Document"]) || cfb.has(&["Current User"]) {
         Host::Ppt
     } else if cfb.has(&["Workbook"]) || cfb.has(&["Book"]) {
         Host::Xls
-    } else if cfb.has(&["EncryptionInfo"]) && cfb.has(&["EncryptedPackage"]) {
-        Host::EncryptedOoxml
     } else {
         Host::Unknown
     }

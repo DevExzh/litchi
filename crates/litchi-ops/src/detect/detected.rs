@@ -339,6 +339,11 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
         if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor) {
+            // An encrypted OOXML package, even beside a stub `WordDocument`
+            // stream (record 0341).
+            if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
+                return None;
+            }
             #[cfg(feature = "doc")]
             if ole_file.exists(&["WordDocument"]) {
                 return Some(DetectedFormat::Doc(ole_file));
@@ -470,6 +475,11 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
         if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor) {
+            // An encrypted OOXML package, even beside a stub `WordDocument`
+            // stream (record 0341).
+            if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
+                return None;
+            }
             // Use existing OLE2 detection logic by checking streams
             #[cfg(feature = "doc")]
             if ole_file.exists(&["WordDocument"]) {

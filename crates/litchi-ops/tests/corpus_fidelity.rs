@@ -35,6 +35,12 @@
 //! exact too. The whole corpus runs in about 20 s in a debug build, so no
 //! subset is needed.
 //!
+//! Every Office-extension file that does not open is listed in
+//! [`NOT_OPENED`] with its expected typed code and class (invalid, fuzzed,
+//! legacy version, opens leniently, or reader gap; record 0341): a new
+//! refusal, a changed code or a listed file that opens fails the test, and
+//! the lenient class is opened with its leniency here.
+//!
 //! The generated report is golden-tested:
 //! `docs/unified-ops/results/0289/fidelity.{md,tsv}`; rewrite it with
 //! `LITCHI_BLESS=1` after showing that a change is intended. A save that is
@@ -827,6 +833,262 @@ const OFFICE: &[&str] = &[
     "odm", "odf", "pages", "key", "numbers",
 ];
 
+/// Why an Office-extension file of the corpus does not open (record 0341).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Refusal {
+    /// The input breaks its specification and the strict reader refuses it.
+    Invalid,
+    /// A fuzzer-made or garbage file.
+    Fuzzed,
+    /// An older format version Litchi does not read (Word 6.0 and 95).
+    Legacy,
+    /// Invalid input the reader opens under an opt-in leniency, checked here.
+    Lenient,
+    /// Valid input the reader does not support yet (a follow-up).
+    Gap,
+}
+
+impl Refusal {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Invalid => "invalid input",
+            Self::Fuzzed => "fuzzed input",
+            Self::Legacy => "legacy version",
+            Self::Lenient => "invalid; opens leniently",
+            Self::Gap => "reader gap",
+        }
+    }
+}
+
+/// Every Office-extension file of the corpus that does not open: the file,
+/// its expected typed code, the class and why (record 0341). A file that
+/// fails differently, a new file that does not open, and a listed file
+/// that now opens all fail the test.
+const NOT_OPENED: &[(&str, &str, Refusal, &str)] = &[
+    (
+        "libreoffice-core/chart2/qa/extras/data/fods/stacked-column-chart.fods",
+        "corrupt_file",
+        Refusal::Gap,
+        "a chart object inlined as a nested office:document in draw:object (valid flat ODF); the flat ODS validator takes its office:body for a second body",
+    ),
+    (
+        "libreoffice-core/sc/qa/unit/data/functions/mathematical/fods/aggregate.fods",
+        "corrupt_file",
+        Refusal::Invalid,
+        "Sheet2 declares 1,048,578 logical rows, two past the 1,048,576-row grid",
+    ),
+    (
+        "libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf",
+        "corrupt_file",
+        Refusal::Fuzzed,
+        "LibreOffice's must-fail fuzz case: a bitmap header without a DIB or bitmap picture",
+    ),
+    (
+        "libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf",
+        "corrupt_file",
+        Refusal::Fuzzed,
+        "LibreOffice's must-fail fuzz case: a control parameter below i32",
+    ),
+    (
+        "libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-1.rtf",
+        "corrupt_file",
+        Refusal::Fuzzed,
+        "a fuzz case LibreOffice must survive: a control parameter past i32",
+    ),
+    (
+        "libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-3.rtf",
+        "corrupt_file",
+        Refusal::Fuzzed,
+        "a fuzz case LibreOffice must survive: a control parameter below i32",
+    ),
+    (
+        "libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc",
+        "unsupported_format",
+        Refusal::Fuzzed,
+        "LibreOffice's must-fail case: a compound file with a corrupt DIFAT (first index out of range)",
+    ),
+    (
+        "libreoffice-core/sw/qa/extras/rtfexport/data/all_gaps_word.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a \\brdrw border width past the RTF 1.9.1 maximum of 75",
+    ),
+    (
+        "libreoffice-core/sw/qa/extras/rtfexport/data/fdo77996.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a bare \\rtf root without the required version parameter",
+    ),
+    (
+        "libreoffice-core/sw/qa/extras/rtfexport/data/tdf108505_fieldCharFormat2.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a \\datafield with an odd number of hexadecimal digits",
+    ),
+    (
+        "libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a revision root outside the revision-save table",
+    ),
+    (
+        "libreoffice-core/sw/qa/extras/rtfimport/data/fdo53556.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "shape properties after \\shptxt instead of as direct \\shpinst children",
+    ),
+    (
+        "libreoffice-core/sw/qa/extras/rtfimport/data/tdf117403.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a bare \\rtf root without the required version parameter",
+    ),
+    (
+        "libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "an unstarred \\shprslt destination in a shape group",
+    ),
+    (
+        "libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a negative page-border width (RTF admits 0..=75 twips)",
+    ),
+    (
+        "odf/corpus/writer-minimal-nasty.odt",
+        "corrupt_file",
+        Refusal::Invalid,
+        "content.xml references the undeclared entity &nasty;",
+    ),
+    (
+        "odf/drawing/dashed-line.fodg",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a style fixture with an empty office:body (ODF requires office:drawing)",
+    ),
+    (
+        "odf/drawing/hatch-angles.fodg",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a style fixture with an empty office:body (ODF requires office:drawing)",
+    ),
+    (
+        "odf/drawing/multicolor-gradient.fodp",
+        "corrupt_file",
+        Refusal::Invalid,
+        "a style fixture with an empty office:body (ODF requires office:presentation)",
+    ),
+    (
+        "ole/doc/cfb-v3-uninitialized-size-high-word.doc",
+        "unsupported_format",
+        Refusal::Legacy,
+        "a Word 95 document (nFib 0x0068)",
+    ),
+    (
+        "ole/doc/duplicate-style-names.doc",
+        "corrupt_file",
+        Refusal::Lenient,
+        "duplicate style names ([MS-DOC] 2.9 requires unique names); opens with Leniency::TolerateStylesheetDefects",
+    ),
+    (
+        "ole/doc/footnote.doc",
+        "corrupt_file",
+        Refusal::Lenient,
+        "duplicate style names; opens with Leniency::TolerateStylesheetDefects",
+    ),
+    (
+        "ole/doc/lists-margins.doc",
+        "corrupt_file",
+        Refusal::Lenient,
+        "duplicate style names; opens with Leniency::TolerateStylesheetDefects",
+    ),
+    (
+        "ole/doc/picture.doc",
+        "corrupt_file",
+        Refusal::Lenient,
+        "duplicate style names; opens with Leniency::TolerateStylesheetDefects",
+    ),
+    (
+        "ole/doc/pictures_escher.doc",
+        "corrupt_file",
+        Refusal::Lenient,
+        "duplicate style names; opens with Leniency::TolerateStylesheetDefects",
+    ),
+    (
+        "ole/doc/word6-no-table-stream.doc",
+        "unsupported_format",
+        Refusal::Legacy,
+        "a Word 6.0 document (nFib 0x0065)",
+    ),
+    (
+        "poi/test-data/hpsf/TestBug52117.doc",
+        "unsupported_format",
+        Refusal::Legacy,
+        "a Word 6.0 document (nFib 0x0065)",
+    ),
+    (
+        "poi/test-data/hpsf/TestMickey.doc",
+        "unsupported_format",
+        Refusal::Legacy,
+        "a Word 95 document (nFib 0x0068)",
+    ),
+    (
+        "poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",
+        "corrupt_file",
+        Refusal::Invalid,
+        "Apache POI's OPC-conformance negative case: two core-properties relationships",
+    ),
+    (
+        "poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx",
+        "corrupt_file",
+        Refusal::Invalid,
+        "Apache POI's OPC-conformance negative case: a part name derived from another part's name",
+    ),
+    (
+        "poi/test-data/spreadsheet/1900DateWindowing.xls",
+        "unsupported_format",
+        Refusal::Invalid,
+        "a compound file whose FAT sectors are not marked FATSECT ([MS-CFB] requires it)",
+    ),
+    (
+        "poi/test-data/spreadsheet/1904DateWindowing.xls",
+        "unsupported_format",
+        Refusal::Invalid,
+        "a compound file whose FAT sectors are not marked FATSECT ([MS-CFB] requires it)",
+    ),
+    (
+        "poi/test-data/spreadsheet/57456.xls",
+        "corrupt_file",
+        Refusal::Invalid,
+        "an SST declaring 1,761 unique strings and 0 total",
+    ),
+    (
+        "poi/test-data/spreadsheet/SharedFormulaTest.xls",
+        "corrupt_file",
+        Refusal::Invalid,
+        "an XFCRC record declaring 72 XF records where 62 are present",
+    ),
+    (
+        "rtf/binary-garbage-nested-groups.rtf",
+        "unsupported_format",
+        Refusal::Fuzzed,
+        "binary garbage after an opening brace",
+    ),
+    (
+        "rtf/test10001Encoding.rtf",
+        "corrupt_file",
+        Refusal::Gap,
+        "\\ansicpg10001 (Mac Japanese) is not a supported code page; the refusal should be typed unsupported, not corrupt",
+    ),
+    (
+        "rtf/test10007Encoding.rtf",
+        "corrupt_file",
+        Refusal::Gap,
+        "\\ansicpg10007 (Mac Cyrillic) is not a supported code page; the refusal should be typed unsupported, not corrupt",
+    ),
+];
+
 #[test]
 #[allow(
     clippy::too_many_lines,
@@ -837,6 +1099,7 @@ fn open_empty_edit_save_is_byte_identical() {
     let started = std::time::Instant::now();
     let mut outcomes: Vec<(String, Outcome)> = Vec::new();
     let mut not_opened: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
+    let mut not_opened_files: Vec<(String, String)> = Vec::new();
     for (relative, _) in corpus() {
         match run(&relative, dir.path()) {
             Ok(outcome) => outcomes.push((relative, outcome)),
@@ -848,6 +1111,7 @@ fn open_empty_edit_save_is_byte_identical() {
                     .to_ascii_lowercase();
                 if OFFICE.contains(&extension.as_str()) {
                     let code = error.split(':').next().unwrap_or("").to_owned();
+                    not_opened_files.push((relative.clone(), error.clone()));
                     *not_opened
                         .entry(extension)
                         .or_default()
@@ -963,6 +1227,47 @@ fn open_empty_edit_save_is_byte_identical() {
             .collect();
         let _ = writeln!(markdown, "| {extension} | {} |", codes.join(", "));
     }
+    // Record 0341: each file that does not open, classified.
+    markdown.push_str(
+        "\n### Each file, classified (record 0341)\n\n\
+         | file | code | class | why |\n|---|---|---|---|\n",
+    );
+    let mut triage = Vec::new();
+    for (file, error) in &not_opened_files {
+        let code = error.split(':').next().unwrap_or("");
+        match NOT_OPENED.iter().find(|(listed, ..)| listed == file) {
+            Some((_, expected, class, why)) => {
+                if code != *expected {
+                    triage.push(format!(
+                        "{file}: refused {code}, expected {expected}: {error}"
+                    ));
+                }
+                if *class == Refusal::Lenient {
+                    let options = litchi_ops::OpenOptions::new().doc(
+                        litchi_ops::DocOptions::new()
+                            .leniency(litchi_doc::Leniency::TolerateStylesheetDefects),
+                    );
+                    if let Err(error) =
+                        guarded(|| litchi_ops::open_with(test_data().join(file), &options))
+                    {
+                        triage.push(format!("{file}: does not open leniently: {error}"));
+                    }
+                }
+                let _ = writeln!(
+                    markdown,
+                    "| `{file}` | `{code}` | {} | {} |",
+                    class.name(),
+                    why.replace('|', "\\|")
+                );
+            },
+            None => triage.push(format!("{file}: not classified: {error}")),
+        }
+    }
+    for (listed, ..) in NOT_OPENED {
+        if !not_opened_files.iter().any(|(file, _)| file == listed) {
+            triage.push(format!("{listed}: listed as not opening, but it opens"));
+        }
+    }
     markdown.push_str("\n## Every no-op that is not exact, and every revert that is not exact\n\n");
     let mut tsv = String::from(
         "file\tformat\tnoop\tdetail\trevert\trevert_detail\tstructure\tstructure_detail\n",
@@ -1041,6 +1346,12 @@ fn open_empty_edit_save_is_byte_identical() {
         std::fs::write(out.join("fidelity.md"), &markdown).unwrap();
         std::fs::write(out.join("fidelity.tsv"), &tsv).unwrap();
     }
+    assert!(
+        triage.is_empty(),
+        "files that do not open, against NOT_OPENED ({}):\n{}",
+        triage.len(),
+        triage.join("\n")
+    );
     assert!(
         unexpected.is_empty(),
         "fidelity failures ({}):\n{}",

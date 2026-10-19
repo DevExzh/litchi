@@ -272,6 +272,36 @@ mod locked {
         }
     }
 
+    /// Word 2007 writes a stub `WordDocument` stream next to the encrypted
+    /// package (LibreOffice's `Encrypted_MSO2007_abc.docx`); the container
+    /// is still an encrypted OOXML package, not a DOC (record 0341).
+    #[test]
+    fn an_encrypted_ooxml_package_with_a_stub_word_stream_is_locked() {
+        let mut info = vec![3, 0, 2, 0];
+        info.extend_from_slice(&[0x40, 0, 0, 0]);
+        let bytes = super::cfb::with_streams(&[
+            ("EncryptionInfo", &info),
+            (
+                "EncryptedPackage",
+                &[8, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+            ),
+            ("WordDocument", &[0; 64]),
+        ]);
+        let handle = locked(crate::open_bytes(bytes.clone()).unwrap());
+        assert_eq!(handle.encryption(), EncryptionKind::Standard);
+        assert_eq!(handle.format(), None);
+        #[cfg(any(unix, windows))]
+        {
+            let temporary = super::super::temporary_with(&bytes, ".docx");
+            let handle = locked(crate::open(temporary.path()).unwrap());
+            assert_eq!(handle.format(), Some(FileFormat::Docx));
+            assert_eq!(handle.encryption(), EncryptionKind::Standard);
+            // Detection agrees with the opener: not a DOC.
+            assert_eq!(crate::detect::detect_file_format(temporary.path()), None);
+        }
+        assert!(crate::detect::detect_format_smart(bytes).is_none());
+    }
+
     /// The facade's suffix preflight still refuses any other compound file
     /// under an OOXML name (`ooxml_suffix_preflight_precedes_native_ole_routing`).
     #[cfg(all(
@@ -399,6 +429,22 @@ mod unlock {
                 );
             }
         }
+    }
+
+    /// LibreOffice's Word 2007 fixture (a stub `WordDocument` stream beside
+    /// the encrypted package) opens locked and unlocks with its password
+    /// (record 0341).
+    #[cfg(feature = "docx")]
+    #[test]
+    fn a_word_2007_encrypted_docx_unlocks() {
+        let path =
+            test_data("libreoffice-core/sw/qa/extras/ooxmlexport/data/Encrypted_MSO2007_abc.docx");
+        let handle = locked(crate::open(&path).unwrap());
+        assert_eq!(handle.format(), Some(FileFormat::Docx));
+        assert_eq!(handle.encryption(), EncryptionKind::Standard);
+        let unlocked = handle.unlock(password("abc")).unwrap();
+        assert_eq!(unlocked.format(), Some(FileFormat::Docx));
+        assert!(!unlocked.text().unwrap().trim().is_empty());
     }
 
     /// Encrypt a plain OOXML fixture, open it locked, and unlock it back to

@@ -25,7 +25,8 @@
     feature = "odp",
     feature = "odg",
     feature = "oth",
-    feature = "odm"
+    feature = "odm",
+    feature = "keynote"
 ))]
 
 use std::io::Cursor;
@@ -490,11 +491,318 @@ fn rtf_parts() -> Vec<u8> {
     .to_vec()
 }
 
+/// Record 0341: a PPT movie frame. No corpus PPT plays a movie and the PPT
+/// writer has no media frames, so Apache POI's `sound.ppt` (Apache-2.0,
+/// `test-data/poi/test-data/slideshow/sound.ppt`) is rewritten in place: its
+/// one `ExWAVAudioEmbeddedContainer` (40 bytes: an `ExMediaAtom` for id 1
+/// and an `ExWAVAudioEmbeddedAtom`) becomes an `ExAviMovieContainer` of the
+/// same size (an `ExVideoContainer` holding the same `ExMediaAtom` and an
+/// empty path atom). Every record offset, the persist directory and the
+/// compound-file layout stay as they are, so the sound frame on the first
+/// slide now plays a movie: the PPT `video` cells.
+fn ppt_video() -> Vec<u8> {
+    const MEDIA: [u8; 16] = [
+        0x00, 0x00, 0x04, 0x10, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30,
+        0x01,
+    ];
+    let mut wav = vec![0x0F, 0x00, 0x0F, 0x10, 0x20, 0x00, 0x00, 0x00];
+    wav.extend_from_slice(&MEDIA);
+    wav.extend_from_slice(&[
+        0x11, 0x00, 0x13, 0x10, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x8A, 0x03, 0x00,
+        0x00,
+    ]);
+    let mut movie = vec![
+        0x0F, 0x00, 0x06, 0x10, 0x20, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x05, 0x10, 0x18, 0x00, 0x00,
+        0x00,
+    ];
+    movie.extend_from_slice(&MEDIA);
+    movie.extend_from_slice(&[0x00, 0x00, 0xBA, 0x0F, 0x00, 0x00, 0x00, 0x00]);
+    assert_eq!(wav.len(), movie.len());
+    let mut bytes = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/poi/test-data/slideshow/sound.ppt"),
+    )
+    .unwrap();
+    let found: Vec<usize> = bytes
+        .windows(wav.len())
+        .enumerate()
+        .filter(|(_, window)| *window == wav.as_slice())
+        .map(|(offset, _)| offset)
+        .collect();
+    assert_eq!(found.len(), 1, "sound.ppt holds one embedded WAV container");
+    bytes[found[0]..found[0] + movie.len()].copy_from_slice(&movie);
+    bytes
+}
+
+/// One protobuf field: its number, wire type and value bytes (for a
+/// length-delimited field, the payload without its length).
+struct Field<'a> {
+    number: u32,
+    wire: u8,
+    value: &'a [u8],
+}
+
+fn varint(bytes: &[u8], at: &mut usize) -> u64 {
+    let mut value = 0u64;
+    for shift in (0..64).step_by(7) {
+        let byte = bytes[*at];
+        *at += 1;
+        value |= u64::from(byte & 0x7F) << shift;
+        if byte & 0x80 == 0 {
+            break;
+        }
+    }
+    value
+}
+
+fn put_varint(out: &mut Vec<u8>, mut value: u64) {
+    loop {
+        let byte = (value & 0x7F) as u8;
+        value >>= 7;
+        if value == 0 {
+            out.push(byte);
+            return;
+        }
+        out.push(byte | 0x80);
+    }
+}
+
+fn fields(bytes: &[u8]) -> Vec<Field<'_>> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while at < bytes.len() {
+        let tag = varint(bytes, &mut at);
+        let wire = (tag & 7) as u8;
+        let start = at;
+        let end = match wire {
+            0 => {
+                varint(bytes, &mut at);
+                at
+            },
+            1 => at + 8,
+            2 => {
+                let length = varint(bytes, &mut at) as usize;
+                at += length;
+                at
+            },
+            5 => at + 4,
+            _ => panic!("unexpected protobuf wire type {wire}"),
+        };
+        let value = if wire == 2 {
+            let mut inner = start;
+            varint(bytes, &mut inner);
+            &bytes[inner..end]
+        } else {
+            &bytes[start..end]
+        };
+        out.push(Field {
+            number: (tag >> 3) as u32,
+            wire,
+            value,
+        });
+        at = end;
+    }
+    out
+}
+
+fn encode(fields: &[(u32, u8, Vec<u8>)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for (number, wire, value) in fields {
+        put_varint(&mut out, (u64::from(*number) << 3) | u64::from(*wire));
+        if *wire == 2 {
+            put_varint(&mut out, value.len() as u64);
+        }
+        out.extend_from_slice(value);
+    }
+    out
+}
+
+/// The singular message field `number` of `message`.
+fn field(message: &[u8], number: u32) -> Option<Vec<u8>> {
+    fields(message)
+        .into_iter()
+        .find(|field| field.number == number && field.wire == 2)
+        .map(|field| field.value.to_vec())
+}
+
+/// `message` with the message reached through `path` replaced by `edit`
+/// of it.
+fn rewrite(message: &[u8], path: &[u32], edit: &dyn Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
+    let Some((first, rest)) = path.split_first() else {
+        return edit(message);
+    };
+    let rebuilt: Vec<(u32, u8, Vec<u8>)> = fields(message)
+        .into_iter()
+        .map(|field| {
+            let value = if field.number == *first && field.wire == 2 {
+                rewrite(field.value, rest, edit)
+            } else {
+                field.value.to_vec()
+            };
+            (field.number, field.wire, value)
+        })
+        .collect();
+    encode(&rebuilt)
+}
+
+/// The object identifiers of every `TSP.Reference` (a message holding only
+/// field 1, a varint) nested in `message`.
+fn nested_references(message: &[u8], out: &mut Vec<u64>) {
+    let parsed = std::panic::catch_unwind(|| {
+        fields(message)
+            .into_iter()
+            .map(|field| (field.number, field.wire, field.value.to_vec()))
+            .collect::<Vec<_>>()
+    });
+    let Ok(parsed) = parsed else { return };
+    if let [(1, 0, value)] = parsed.as_slice() {
+        let mut at = 0;
+        out.push(varint(value, &mut at));
+        return;
+    }
+    for (_, wire, value) in parsed {
+        if wire == 2 {
+            nested_references(&value, out);
+        }
+    }
+}
+
+/// Record 0341: a Keynote slide holding a line and a group. The Keynote
+/// writer creates text boxes, preset shapes and images but no lines or
+/// groups, and no corpus deck holds either, so `iwork/keynote/basic.key`
+/// gets two rectangles and an image through the leaf's drawable edit, and
+/// the slide archive is then rewritten at the wire level: the first
+/// rectangle's Bézier path keeps only its move-to and first line-to (a
+/// two-point path, what the host writes for a straight line), and the
+/// image becomes a `TSD.GroupArchive` holding the image's drawable (its
+/// geometry) and no children. Every object keeps its identifier and the
+/// package metadata is untouched; the group's message lists only the
+/// references its payload still holds.
+fn keynote_shapes() -> Vec<u8> {
+    use litchi_iwa_archive::iwa::{Archive, SnappyStream};
+    use litchi_iwa_archive::{Limits, package::Catalog};
+    use litchi_keynote::SlideSelector;
+    use litchi_keynote::slide::drawable::{Geometry, Preset};
+
+    const LINE_WIDTH: f32 = 321.0;
+    let source = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key"),
+    )
+    .unwrap();
+    let package = litchi_keynote::Package::from_bytes(&source).unwrap();
+    let mut edit = package.edit_slide_drawables();
+    let slide = SlideSelector::index(0);
+    edit.add_shape(
+        slide,
+        Preset::Rectangle,
+        Geometry::new(80.0, 300.0, LINE_WIDTH, 2.0),
+        "",
+    )
+    .unwrap()
+    .add_shape(
+        slide,
+        Preset::Rectangle,
+        Geometry::new(80.0, 400.0, 200.0, 100.0),
+        "Box",
+    )
+    .unwrap()
+    .add_image(
+        slide,
+        PNG,
+        "litchi.png",
+        Geometry::new(400.0, 400.0, 64.0, 32.0),
+    )
+    .unwrap();
+    let mut written = Vec::new();
+    edit.commit()
+        .unwrap()
+        .into_package()
+        .write_to(&mut written)
+        .unwrap();
+
+    let width = LINE_WIDTH.to_le_bytes();
+    let catalog = Catalog::from_bytes(&written).unwrap();
+    let mut replaced: Vec<(String, Vec<u8>)> = Vec::new();
+    let (mut lines, mut groups) = (0, 0);
+    for entry in catalog.iter() {
+        if !(entry.name().starts_with("Index/Slide") && entry.name().ends_with(".iwa")) {
+            continue;
+        }
+        let stream = SnappyStream::decompress(entry.data()).unwrap().into_bytes();
+        let mut archive = Archive::parse(&stream).unwrap();
+        let mut changed = false;
+        for object in &mut archive.objects {
+            let Some(index) = object
+                .messages
+                .iter()
+                .position(|message| matches!(message.type_, 2_011 | 3_005))
+            else {
+                continue;
+            };
+            let message = &mut object.messages[index];
+            if message.type_ == 2_011 {
+                // ShapeInfo → ShapeArchive (1) → PathSource (3) → Bézier
+                // source (5) → Path (3); the rectangle of width LINE_WIDTH.
+                let Some(path) = field(&message.data, 1)
+                    .and_then(|shape| field(&shape, 3))
+                    .and_then(|source| field(&source, 5))
+                    .and_then(|bezier| field(&bezier, 3))
+                else {
+                    continue;
+                };
+                if !path.windows(4).any(|window| window == width) {
+                    continue;
+                }
+                message.data = rewrite(&message.data, &[1, 3, 5, 3], &|path| {
+                    let kept: Vec<(u32, u8, Vec<u8>)> = fields(path)
+                        .into_iter()
+                        .filter(|field| field.number == 1)
+                        .take(2)
+                        .map(|field| (field.number, field.wire, field.value.to_vec()))
+                        .collect();
+                    encode(&kept)
+                });
+                lines += 1;
+            } else {
+                let drawable = field(&message.data, 1).unwrap();
+                message.type_ = 3_008;
+                message.data = encode(&[(1, 2, drawable.clone())]);
+                let mut kept = Vec::new();
+                nested_references(&drawable, &mut kept);
+                let info = &mut object.archive_info.message_infos[index];
+                info.object_references.retain(|id| kept.contains(id));
+                info.data_references.clear();
+                info.field_infos.clear();
+                groups += 1;
+            }
+            changed = true;
+        }
+        if changed {
+            let bytes = SnappyStream::compress(&archive.to_bytes().unwrap()).unwrap();
+            replaced.push((entry.name().to_owned(), bytes));
+        }
+    }
+    assert_eq!((lines, groups), (1, 1), "one line and one group");
+    let entries: Vec<(&str, &[u8])> = catalog
+        .iter()
+        .map(|entry| {
+            let data = replaced
+                .iter()
+                .find(|(name, _)| name == entry.name())
+                .map_or(entry.data(), |(_, bytes)| bytes.as_slice());
+            (entry.name(), data)
+        })
+        .collect();
+    litchi_iwa_archive::package::to_bytes(entries, Limits::default()).unwrap()
+}
+
 /// Every generated fixture: file name and bytes.
 fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
     vec![
         ("modern-comments.pptx", presentation::bytes()),
         ("connectors.ppt", ppt_connectors()),
+        ("video.ppt", ppt_video()),
+        ("shapes.key", keynote_shapes()),
         ("marks.doc", doc_marks()),
         ("elements.ppt", ppt_elements()),
         ("table.xlsb", xlsb_table()),

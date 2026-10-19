@@ -11,7 +11,9 @@ equal them, and rewrites them with
 They are synthetic, not producer files: they show that each element's
 adapter code works, not that every third-party variant of the element does.
 They are part of this repository and carry its license (see the workspace
-`Cargo.toml`); nothing upstream is copied.
+`Cargo.toml`). Only `video.ppt` derives from an upstream file (Apache POI,
+Apache-2.0, notice in `test-data/poi/NOTICE`); every other file copies nothing
+upstream.
 
 | File | Bytes | SHA-256 | Generator | Reaches |
 |---|---|---|---|---|
@@ -29,5 +31,7 @@ They are part of this repository and carry its license (see the workspace
 | `parts.odm` | 3,223 | `ae577d28afe0b74b0befb67f0076b14b9662b5974120555e51ca0dd08f2d7cdd` | as `parts.odt`, `text-master` mimetype | the same ODM kinds |
 | `parts.odp` | 3,196 | `7cb7864322129dec6fb58ec7ed712544264c01260e7e54ce8bcb0b435714278c` | `PackageWriter` (record 0328), content, styles, formula and chart XML written in the test: a text link with a title, two line breaks, click listeners (a URL, the next page), a `draw:a` link, a table with three declared columns, a video and an audio plugin with inert payloads, a formula subdocument and an inline formula, a chart subdocument with two axes and two series, and a second slide | ODP `hyperlink`, `linebreak`, `col`, `video`, `audio`, `equation`, `series`, `axis` |
 | `parts.rtf` | 1,028 | `ce02b25cade06b8b67d67008ed848cb61e92bcdaed45a247294a7d300b851738` | hand-written RTF bytes (record 0328) in the test: a document section and a continuous landscape two-column section, the bookmarks `Intro` and `Second`, `PAGE`, `NUMPAGES` and `TOC` fields, a paragraph with a left and a right dot-leader tab stop, a rectangle shape and a text-box shape | RTF `section`, `bookmark`, `field`, `toc`, `tab`, `shape`, `textbox` |
+| `video.ppt` | 43,520 | `f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a` | record 0341: Apache POI's `test-data/slideshow/sound.ppt` (Apache-2.0; copied as `test-data/poi/test-data/slideshow/sound.ppt`, SHA-256 `d6425bec…c0b1`) rewritten in place: its one 40-byte `ExWAVAudioEmbeddedContainer` becomes an `ExAviMovieContainer` of the same size holding the same `ExMediaAtom` (id 1) and an empty path atom, so no offset moves | PPT `video` |
+| `shapes.key` | 456,779 | `72f0ff952c4f9838db8eac3ffd75d93cb8a7e66dfa778bb9b69bb44dddd016cb` | record 0341: `test-data/iwork/keynote/basic.key` plus two rectangles and an image from `litchi_keynote`'s drawable edit, then a wire-level rewrite of the slide archive: the first rectangle's Bézier path keeps its move-to and first line-to (a straight line), and the image becomes a `TSD.GroupArchive` holding only its drawable (no children) | Keynote `connector`, `group` |
 
 The embedded PNG is the 4×2 image the checklist's picture recipes use.
