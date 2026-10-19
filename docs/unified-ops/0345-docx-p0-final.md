@@ -1,7 +1,8 @@
 # 0345 — DOCX P0 residue, final: add cell, the table `col` element, cell text, hyperlink tooltip, comment replies, resolution and anchors
 
 - Status: implemented on `uo2/docx-p0b`, cut from `feat/unified-ops-api` at
-  `926cbde41e`; trunk merged at `104ef2ffcd` (record 0344).
+  `926cbde41e`; trunk merged at `2bdfd00598` (record 0344) and `dfaffd5e48`
+  (record 0347).
 - Date: 2026-10-19
 - Input: the second definition-of-done audit
   (`.coord/r9/dod-audit-2026-10-19.md` §2, §3, §12.1 item 1, package A):
