@@ -1311,7 +1311,7 @@ mod oracle {
             "let root = root_references_with_limits(components, package.state.source.limits())",
             r"let payload = unique_message_payload(\n            &reference.messages,\n            FOOTNOTE_REFERENCE_MESSAGE_TYPE,",
             r"let marker_payload = unique_message_payload(\n            &marker.messages,\n            TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
-            r"let body =\n        find_object(components, body_identifier.get())",
+            "let body = find_object(components, body_identifier.get())",
             ".object_mut(native_footnote.reference_identifier.get())",
             ".object_mut(native_footnote.storage_identifier.get())",
             "let marker_identifier = footnote_marker_identifier(",
