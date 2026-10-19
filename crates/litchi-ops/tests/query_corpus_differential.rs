@@ -22,7 +22,10 @@
 //! `placeholder` selector started matching the shapes with a placeholder
 //! binding. The flat ODT and flat ODG digests were added by record 0292,
 //! printed by the build that first opened `.fodt` and `.fodg`, before any
-//! flat write landed. Each digest covers, file by file, every match's kind,
+//! flat write landed. Record 0341 re-blessed the flat ODP digests (two
+//! LibreOffice files that write `&apos;` and `&lt;` now open) and the
+//! Keynote digests (the generated `unified-ops/0294/shapes.key`, which
+//! holds a line and a group). Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is

@@ -40,6 +40,19 @@ get cell's evidence) and must fail with a ``LitchiError``.
 A second test checks that the Python capability report claims exactly the
 cells the TSV calls ``supported``.
 
+A third test replays the per-format ADR 0008 rows of record 0341
+(``crud-adr0008.tsv``: atomic failure, patch inverse, composition). The
+atomic-failure row runs the same two-item batch on a file opened from a
+copy of the fixture and requires the refusal to carry the recorded code
+with ``item == 1``, the File, its file on disk and two refused save
+destinations unchanged. The composition row makes both edits on two
+threads from one File and requires both orders to hold both values and to
+give the same bytes (or, where the Rust row says the bytes differ, the same
+text and node views). The bindings expose no patch object (``Commit`` has
+no ``patch``), so the patch-inverse row is checked only as far as Python
+reaches: the forward edit changes the bytes and leaves its source File
+byte-identical; the inverse and its conflicts are Rust-only.
+
 Rerun: ``crates/pyo3-litchi/tests/run_tests.sh --no-build -k crud_mirror``;
 set ``LITCHI_MIRROR_VERBOSE=1`` to print the replayed cells per verb.
 """
@@ -57,6 +70,7 @@ import unittest
 from _support import L, REPO_ROOT, TEST_DATA
 
 TSV = REPO_ROOT / "docs" / "unified-ops" / "results" / "0289" / "crud-checklist.tsv"
+ADR_TSV = REPO_ROOT / "docs" / "unified-ops" / "results" / "0289" / "crud-adr0008.tsv"
 
 #: ``PNG`` of crud_matrix.rs; the TSV abbreviates it to ``<PNG>``.
 PNG = (
@@ -465,6 +479,145 @@ class CrudMirrorTest(unittest.TestCase):
                         f"Python report says {'supported' if supported else 'not supported'}")
         if failures:
             self.fail(f"{len(failures)} claim mismatches:\n" + "\n".join(failures))
+
+
+def load_adr_rows():
+    with open(ADR_TSV, encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+    header = lines[0].split("\t")
+    return [dict(zip(header, line.split("\t"))) for line in lines[1:] if line]
+
+
+class Adr0008MirrorTest(unittest.TestCase):
+    """The ADR 0008 rows of ``crud-adr0008.tsv`` replay through litchi_py."""
+
+    def test_replay_adr_rows(self):
+        cl = checklist()
+        rows = load_adr_rows()
+        failures: list = []
+        counts: collections.Counter = collections.Counter()
+        self.assertEqual(
+            sorted({row["format"] for row in rows}), sorted(cl.formats),
+            "every checklist format has its ADR 0008 rows")
+        for row in rows:
+            fmt, kind = row["format"], row["row"]
+            if row["status"] != "ok":
+                # n/a rows carry their typed reason in the Rust report.
+                if row["status"] != "n/a":
+                    failures.append(f"{fmt} {kind}: status {row['status']}")
+                continue
+            replay = {
+                "atomic failure": self._atomic,
+                "patch inverse": self._inverse,
+                "composition": self._compose,
+            }[kind]
+            _, error = guarded(lambda replay=replay, row=row: replay(cl, row))
+            if error is not None:
+                failures.append(f"{fmt} {kind}: {describe(error)}")
+            else:
+                counts[kind] += 1
+        if os.environ.get("LITCHI_MIRROR_VERBOSE"):
+            print(f"\nADR 0008 mirror: {dict(counts)}", file=sys.stderr)
+        if failures:
+            self.fail(f"{len(failures)} ADR 0008 mismatches:\n" + "\n".join(failures))
+
+    @staticmethod
+    def _atomic(cl, row):
+        fmt = row["format"]
+        extension = EXTENSIONS.get(fmt, fmt)
+        file = cl.fixture(fmt, row["fixture"])
+        props = props_of(row["props"])
+        before = file.to_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            source = os.path.join(directory, f"source.{extension}")
+            with open(source, "wb") as handle:
+                handle.write(before)
+            origin = L.open(source)
+            try:
+                items = [
+                    {"command": "set", "path": row["path"], "props": props},
+                    {"command": "set", "path": row["path2"], "props": props},
+                ]
+                try:
+                    origin.batch(items, mode="atomic")
+                except L.LitchiError as error:
+                    if error.code != row["code"] or error.item != 1:
+                        raise AssertionError(
+                            f"refused {error.code} at item {error.item}, Rust recorded "
+                            f"{row['code']} at item 1") from error
+                else:
+                    raise AssertionError("the batch with a failing item 1 succeeded")
+                if origin.to_bytes() != before:
+                    raise AssertionError("the File changed after the refused batch")
+                with open(source, "rb") as handle:
+                    if handle.read() != before:
+                        raise AssertionError("the File's source file changed")
+                other = "xlsx" if extension == "docx" else "docx"
+                sentinel = b"litchi sentinel"
+                wrong = os.path.join(directory, f"destination.{other}")
+                blocker = os.path.join(directory, "blocker")
+                for path in (wrong, blocker):
+                    with open(path, "wb") as handle:
+                        handle.write(sentinel)
+                for path in (wrong, os.path.join(blocker, f"saved.{extension}")):
+                    try:
+                        origin.save_as(path)
+                    except L.LitchiError:
+                        pass
+                    else:
+                        raise AssertionError(f"save_as {path} succeeded")
+                for path in (wrong, blocker):
+                    with open(path, "rb") as handle:
+                        if handle.read() != sentinel:
+                            raise AssertionError(f"{path} changed")
+                expected = sorted(["blocker", f"destination.{other}", f"source.{extension}"])
+                if sorted(os.listdir(directory)) != expected:
+                    raise AssertionError(f"refused saves left {sorted(os.listdir(directory))}")
+            finally:
+                origin.close()
+
+    @staticmethod
+    def _inverse(cl, row):
+        file = cl.fixture(row["format"], row["fixture"])
+        before = file.to_bytes()
+        props = props_of(row["props"])
+        commit = file.edit(lambda tx: tx.set(row["path"], props))
+        if not commit.changed or commit.file.to_bytes() == before:
+            raise AssertionError("the edit changed nothing")
+        if file.to_bytes() != before:
+            raise AssertionError("the edit changed its source File")
+        republish(commit.file)
+
+    @staticmethod
+    def _compose(cl, row):
+        import concurrent.futures
+
+        file = cl.fixture(row["format"], row["fixture"])
+        a, b = (row["path"], props_of(row["props"])), (row["path2"], props_of(row["props2"]))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            first, second = pool.map(lambda edit: file.set(edit[0], edit[1]), [a, b])
+        ab, ba = first.set(*b), second.set(*a)
+
+        def value(target, edit):
+            view = target.get(edit[0], 0)
+            key = next(iter(edit[1]))
+            return view.get("format", {}).get(key), view.get("text")
+
+        want = (value(first, a), value(second, b))
+        for order, composed in (("a then b", ab), ("b then a", ba)):
+            reopened = republish(composed)
+            got = (value(reopened, a), value(reopened, b))
+            if got != want:
+                raise AssertionError(f"{order} dropped an edit: {got} != {want}")
+        if first.set(*b).to_bytes() != ab.to_bytes():
+            raise AssertionError("a then b is not repeatable")
+        if "the same bytes" in row["note"]:
+            if ab.to_bytes() != ba.to_bytes():
+                raise AssertionError("the two orders give different bytes")
+        else:
+            left, right = republish(ab), republish(ba)
+            if left.text() != right.text() or left.get("/", 64) != right.get("/", 64):
+                raise AssertionError("the two orders give different documents")
 
 
 if __name__ == "__main__":

@@ -2469,10 +2469,10 @@ ppt	placeholder	edit	supported		ok tx.set
 ppt	placeholder	batch	supported		ok set item
 ppt	placeholder	create	supported		ok format
 ppt	placeholder	save	supported		ok format
-ppt	picture	get	supported		ok 7 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
-ppt	picture	find	supported		ok 7 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	get	supported		ok 8 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	find	supported		ok 8 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	query	supported		ok matches in ole/ppt/ppt_with_png.ppt
-ppt	picture	view	supported		ok 7 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
+ppt	picture	view	supported		ok 8 instances, first `ole/ppt/ppt_with_png.ppt` /slide[1]/picture[1]
 ppt	picture	set	n/a	set not offered for this element	-
 ppt	picture	add	n/a	add not offered for this element	-
 ppt	picture	remove	n/a	remove not offered for this element	-
@@ -2651,13 +2651,13 @@ ppt	comment	edit	supported		ok tx.set
 ppt	comment	batch	supported		ok set item
 ppt	comment	create	supported		ok format
 ppt	comment	save	supported		ok format
-ppt	video	get	supported		unreached
-ppt	video	find	supported		unreached
-ppt	video	query	supported		unreached
-ppt	video	view	supported		unreached
-ppt	video	set	n/a	set not offered for this element	unreached
+ppt	video	get	supported		ok 1 instances, first `unified-ops/0294/video.ppt` /slide[1]/video[1]
+ppt	video	find	supported		ok 1 instances, first `unified-ops/0294/video.ppt` /slide[1]/video[1]
+ppt	video	query	supported		ok matches in unified-ops/0294/video.ppt
+ppt	video	view	supported		ok 1 instances, first `unified-ops/0294/video.ppt` /slide[1]/video[1]
+ppt	video	set	n/a	set not offered for this element	-
 ppt	video	add	n/a	add not offered for this element	-
-ppt	video	remove	n/a	remove not offered for this element	unreached
+ppt	video	remove	n/a	remove not offered for this element	-
 ppt	video	move	format-verb		unreached
 ppt	video	swap	format-verb		unreached
 ppt	video	edit	n/a	edit not offered for this element	-
@@ -2677,10 +2677,10 @@ ppt	audio	edit	n/a	edit not offered for this element	-
 ppt	audio	batch	n/a	batch not offered for this element	-
 ppt	audio	create	supported		ok format
 ppt	audio	save	supported		ok format
-ppt	media	get	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
-ppt	media	find	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
+ppt	media	get	supported		ok 2 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
+ppt	media	find	supported		ok 2 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
 ppt	media	query	supported		ok matches in poi/test-data/slideshow/sound.ppt
-ppt	media	view	supported		ok 1 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
+ppt	media	view	supported		ok 2 instances, first `poi/test-data/slideshow/sound.ppt` /slide[1]/media[1]
 ppt	media	set	n/a	set not offered for this element	-
 ppt	media	add	n/a	add not offered for this element	-
 ppt	media	remove	n/a	remove not offered for this element	-
@@ -5771,13 +5771,13 @@ keynote	picture	edit	supported		ok tx.set
 keynote	picture	batch	supported		ok set item
 keynote	picture	create	supported		ok format
 keynote	picture	save	supported		ok format
-keynote	connector	get	supported		unreached
-keynote	connector	find	supported		unreached
-keynote	connector	query	supported		unreached
-keynote	connector	view	supported		unreached
-keynote	connector	set	n/a	set not offered for this element	unreached
+keynote	connector	get	supported		ok 1 instances, first `unified-ops/0294/shapes.key` /slide[1]/connector[1]
+keynote	connector	find	supported		ok 1 instances, first `unified-ops/0294/shapes.key` /slide[1]/connector[1]
+keynote	connector	query	supported		ok matches in unified-ops/0294/shapes.key
+keynote	connector	view	supported		ok 1 instances, first `unified-ops/0294/shapes.key` /slide[1]/connector[1]
+keynote	connector	set	n/a	set not offered for this element	-
 keynote	connector	add	n/a	add not offered for this element	-
-keynote	connector	remove	supported		unreached
+keynote	connector	remove	supported		ok `unified-ops/0294/shapes.key` /slide[1]/connector[1]
 keynote	connector	move	format-verb		unreached
 keynote	connector	swap	format-verb		unreached
 keynote	connector	edit	n/a	edit not offered for this element	-
@@ -5862,13 +5862,13 @@ keynote	chart	edit	n/a	edit not offered for this element	-
 keynote	chart	batch	n/a	batch not offered for this element	-
 keynote	chart	create	supported		ok format
 keynote	chart	save	supported		ok format
-keynote	group	get	supported		unreached
-keynote	group	find	supported		unreached
-keynote	group	query	supported		unreached
-keynote	group	view	supported		unreached
-keynote	group	set	n/a	set not offered for this element	unreached
+keynote	group	get	supported		ok 1 instances, first `unified-ops/0294/shapes.key` /slide[1]/group[1]
+keynote	group	find	supported		ok 1 instances, first `unified-ops/0294/shapes.key` /slide[1]/group[1]
+keynote	group	query	supported		ok matches in unified-ops/0294/shapes.key
+keynote	group	view	supported		ok 1 instances, first `unified-ops/0294/shapes.key` /slide[1]/group[1]
+keynote	group	set	n/a	set not offered for this element	-
 keynote	group	add	n/a	add not offered for this element	-
-keynote	group	remove	n/a	remove not offered for this element	unreached
+keynote	group	remove	n/a	remove not offered for this element	-
 keynote	group	move	format-verb		unreached
 keynote	group	swap	format-verb		unreached
 keynote	group	edit	n/a	edit not offered for this element	-

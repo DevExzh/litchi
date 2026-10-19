@@ -22,6 +22,18 @@
 //! claimed-supported cell that fails is a bug: [`KNOWN_FAILURES`] lists the
 //! ones still open, each with its cause (records 0290, 0298 and 0303 closed
 //! every one record 0289 found), and the test fails on any other.
+//!
+//! Record 0341 adds the ADR 0008 rows, one of each per format, built from
+//! the format's successful changing `set` cells: **atomic failure** (a
+//! batch whose item 1 fails is refused naming item 1 and leaves the
+//! snapshot, its file and refused save destinations byte-identical),
+//! **patch inverse** (the commit's patch replays onto its source, its
+//! inverse restores the exact source bytes, and the patch is refused on
+//! another artifact) and **composition** (two sets made on two threads from
+//! one snapshot compose in either order to one result holding both values,
+//! and each edit's patch is refused on the other's result). They are
+//! golden-tested as `crud-adr0008.tsv`; [`ADR_NOT_APPLICABLE`] lists the
+//! rows a format cannot support, with the typed reason (none today).
 
 #![cfg(all(
     feature = "doc",
@@ -216,6 +228,8 @@ const SPECS: &[Spec] = &[
             "poi/test-data/slideshow/headers_footers_2007.ppt",
             "poi/test-data/slideshow/testPPT_oleWorkbook.ppt",
             "poi/test-data/slideshow/sound.ppt",
+            // Record 0341: POI's sound frame rewritten to play a movie.
+            "unified-ops/0294/video.ppt",
         ],
     },
     Spec {
@@ -386,6 +400,8 @@ const SPECS: &[Spec] = &[
             "iwork/keynote/image-adjustments-native.key",
             "iwork/keynote/media-lifecycle-audio-remove-native.key",
             "iwork/keynote/media-lifecycle-remove-native.key",
+            // Record 0341: a line and a group (generated).
+            "unified-ops/0294/shapes.key",
         ],
     },
     Spec {
@@ -1815,6 +1831,8 @@ struct Report {
     order: Vec<String>,
     cells: BTreeMap<(String, &'static str), Cell>,
     notes: Vec<String>,
+    /// The ADR 0008 rows, in [`ADR_ROWS`] order (record 0341).
+    adr: Vec<AdrObserved>,
 }
 
 #[allow(
@@ -1870,12 +1888,16 @@ fn run_format(spec: &Spec) -> Report {
         order: Vec::new(),
         cells: BTreeMap::new(),
         notes: Vec::new(),
+        adr: Vec::new(),
     };
-    for element in &elements {
+    let mut candidates: Vec<Candidate> = Vec::new();
+    let mut found_by_element: Vec<Vec<Instance>> = Vec::new();
+    for (element_index, element) in elements.iter().enumerate() {
         let name = element.name().to_owned();
         report.order.push(name.clone());
         let read = instances(element, &fixtures, &walked, false);
         let found = instances(element, &fixtures, &walked, true);
+        found_by_element.push(found.clone());
         let claim = |verb: &str| element_claim(&caps, element, verb);
         let mut cells: Vec<(&'static str, Observed)> = Vec::new();
 
@@ -2000,6 +2022,17 @@ fn run_format(spec: &Spec) -> Report {
             }
         };
         cells.push(("set", observed));
+        if let Some((fixture, path, key, value)) = &replay
+            && !unchanged
+        {
+            candidates.push(Candidate {
+                element: element_index,
+                fixture: *fixture,
+                path: path.clone(),
+                key: key.clone(),
+                value: value.clone(),
+            });
+        }
         let (edit, batch) = match &replay {
             None => (Observed::Skipped, Observed::Skipped),
             Some((fixture, path, key, value)) => {
@@ -2163,6 +2196,32 @@ fn run_format(spec: &Spec) -> Report {
             (false, Err(error)) => format!("{} gap ({})", mode.name(), code_of(&error)),
         });
     }
+    report.adr = adr_rows(spec, &fixtures, &candidates, &mut |a: &Candidate| {
+        let mut errors = Errors::default();
+        let mut more = Vec::new();
+        for instance in found_by_element[a.element].iter().take(10) {
+            if instance.fixture != a.fixture || instance.path == a.path {
+                continue;
+            }
+            let file = &fixtures[instance.fixture].file;
+            if let Some((key, value, false)) = try_set(
+                &elements[a.element],
+                file,
+                &instance.path,
+                true,
+                &mut errors,
+            ) {
+                more.push(Candidate {
+                    element: a.element,
+                    fixture: instance.fixture,
+                    path: instance.path.clone(),
+                    key,
+                    value,
+                });
+            }
+        }
+        more
+    });
     report.notes.push(format!(
         "fixtures: {}",
         fixtures
@@ -2177,6 +2236,483 @@ fn run_format(spec: &Spec) -> Report {
         views.join(", ")
     ));
     report
+}
+
+/// The ADR 0008 rows of the checklist (record 0341), in column order.
+const ADR_ROWS: [&str; 3] = ["atomic failure", "patch inverse", "composition"];
+
+/// ADR 0008 rows a format cannot support, with the reason:
+/// `(format, row, reason)`. A listed row that fails with a typed error is
+/// reported `n/a`; one that passes fails the test (remove it).
+const ADR_NOT_APPLICABLE: &[(&str, &str, &str)] = &[];
+
+/// One successful, changing `set` of the checklist: the fixture, the path
+/// and the property it wrote.
+#[derive(Clone)]
+struct Candidate {
+    element: usize,
+    fixture: usize,
+    path: String,
+    key: String,
+    value: String,
+}
+
+impl Candidate {
+    fn props(&self) -> Props<'_> {
+        Props::new().with(self.key.as_str(), self.value.as_str())
+    }
+
+    fn json(&self) -> String {
+        props_json(&[(self.key.clone(), self.value.clone())])
+    }
+}
+
+/// What one ADR 0008 row observed: its evidence fields for the TSV (the
+/// Python mirror replays them: fixture, path, props, second path, second
+/// props, typed code) and its note, or why it failed.
+enum AdrObserved {
+    Ok { fields: Vec<String>, note: String },
+    Failed(String),
+}
+
+/// Runs `f`, keeping a typed error whole; a panic becomes `Err(Err(_))`.
+fn attempt<T>(
+    f: impl FnOnce() -> litchi_ops::Result<T>,
+) -> Result<T, Result<litchi_ops::Error, String>> {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(error)) => Err(Ok(error)),
+        Err(_) => Err(Err("panic".to_owned())),
+    }
+}
+
+fn describe(error: &Result<litchi_ops::Error, String>) -> String {
+    match error {
+        Ok(error) => format!("{}: {}", error.code().as_str(), error.message()),
+        Err(panic) => panic.clone(),
+    }
+}
+
+/// A typed refusal (not `internal_error`, not a panic), as its code.
+fn typed(error: Result<litchi_ops::Error, String>) -> Result<&'static str, String> {
+    match error {
+        Ok(error) if error.code() != Code::InternalError => Ok(error.code().as_str()),
+        error => Err(describe(&error)),
+    }
+}
+
+/// A path that parses like `path` but names nothing: its last index is
+/// 9999, or a missing child when it has no index.
+fn missing_path(path: &str) -> String {
+    match path.rfind('[') {
+        Some(open)
+            if path.ends_with(']') && path[open + 1..path.len() - 1].parse::<u32>().is_ok() =>
+        {
+            format!("{}[9999]", &path[..open])
+        },
+        _ => format!("{}/missing[9999]", path.trim_end_matches('/')),
+    }
+}
+
+/// The input bytes a fixture was opened from, when it is a pinned file.
+fn input_bytes(label: &str) -> Option<Vec<u8>> {
+    if label.contains(" + add ") || label == "seed" || label == "create()" {
+        return None;
+    }
+    std::fs::read(test_data().join(label)).ok()
+}
+
+/// Atomic failure: a batch whose item 1 names nothing, after a valid set
+/// at item 0, is refused naming item 1, and leaves the snapshot, its file
+/// on disk and two refused save destinations byte-identical.
+fn adr_atomic(spec: &Spec, fixtures: &[Fixture], candidate: &Candidate) -> AdrObserved {
+    let fixture = &fixtures[candidate.fixture];
+    let run = || -> Result<(String, &'static str), String> {
+        let before = guarded(|| fixture.file.to_bytes())?;
+        let dir = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let source = dir.path().join(format!("source.{}", spec.extension));
+        std::fs::write(&source, &before).map_err(|error| error.to_string())?;
+        let origin = guarded(|| open(&source))?;
+        let props = candidate.props();
+        let missing = missing_path(&candidate.path);
+        let mut first = BatchItem::new("set");
+        first.path = Some(candidate.path.as_str().into());
+        first.props = Some(props.clone());
+        let mut second = BatchItem::new("set");
+        second.path = Some(missing.as_str().into());
+        second.props = Some(props.clone());
+        // The first item alone changes the document, so the refusal below
+        // rolls a real change back.
+        let alone = guarded(|| origin.batch([first.clone()], BatchMode::Atomic))?;
+        if guarded(|| alone.file.to_bytes())? == before {
+            return Err("item 0 alone does not change the document".to_owned());
+        }
+        let code = match attempt(|| origin.batch([first, second], BatchMode::Atomic)) {
+            Ok(_) => {
+                return Err(format!(
+                    "the batch with a missing {missing} at item 1 succeeded"
+                ));
+            },
+            Err(Ok(error)) if error.code() != Code::InternalError => {
+                if error.item() != Some(1) {
+                    return Err(format!(
+                        "the refusal names item {:?}, not 1: {}",
+                        error.item(),
+                        error.message()
+                    ));
+                }
+                error.code().as_str()
+            },
+            Err(error) => return Err(format!("untyped refusal: {}", describe(&error))),
+        };
+        if guarded(|| origin.to_bytes())? != before {
+            return Err("the snapshot changed after the refused batch".to_owned());
+        }
+        if std::fs::read(&source).map_err(|error| error.to_string())? != before {
+            return Err("the snapshot's file changed after the refused batch".to_owned());
+        }
+        // A destination of another format and one under a regular file:
+        // both saves are refused and neither existing file changes.
+        let other = if spec.extension == "docx" {
+            "xlsx"
+        } else {
+            "docx"
+        };
+        let sentinel = b"litchi sentinel".to_vec();
+        let wrong = dir.path().join(format!("destination.{other}"));
+        let blocker = dir.path().join("blocker");
+        for path in [&wrong, &blocker] {
+            std::fs::write(path, &sentinel).map_err(|error| error.to_string())?;
+        }
+        let under = blocker.join(format!("saved.{}", spec.extension));
+        for (what, path) in [("another format", &wrong), ("a path under a file", &under)] {
+            if let Err(error) = typed(match attempt(|| origin.save_as(path)) {
+                Ok(_) => return Err(format!("save_as to {what} succeeded")),
+                Err(error) => error,
+            }) {
+                return Err(format!("save_as to {what}: {error}"));
+            }
+        }
+        for path in [&wrong, &blocker] {
+            if std::fs::read(path).map_err(|error| error.to_string())? != sentinel {
+                return Err(format!("{} changed", path.display()));
+            }
+        }
+        let mut names: Vec<String> = std::fs::read_dir(dir.path())
+            .map_err(|error| error.to_string())?
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        let expected = {
+            let mut expected = vec![
+                "blocker".to_owned(),
+                format!("destination.{other}"),
+                format!("source.{}", spec.extension),
+            ];
+            expected.sort();
+            expected
+        };
+        if names != expected {
+            return Err(format!("the refused saves left files behind: {names:?}"));
+        }
+        Ok((missing, code))
+    };
+    match run() {
+        Ok((missing, code)) => AdrObserved::Ok {
+            note: format!(
+                "`{}` batch [set {} {}, set {missing}] refused `{code}` naming item 1; snapshot, its file and two refused save destinations unchanged",
+                fixture.label,
+                candidate.path,
+                candidate.json()
+            ),
+            fields: vec![
+                fixture.label.clone(),
+                candidate.path.clone(),
+                candidate.json(),
+                missing,
+                String::new(),
+                code.to_owned(),
+            ],
+        },
+        Err(error) => {
+            AdrObserved::Failed(format!("`{}` {}: {error}", fixture.label, candidate.path))
+        },
+    }
+}
+
+/// Patch inverse: an edit's patch replays onto its source, its inverse
+/// restores the exact source bytes, and a separately opened copy of the
+/// source refuses it (typed).
+fn adr_inverse(fixtures: &[Fixture], candidate: &Candidate) -> Result<AdrObserved, String> {
+    let fixture = &fixtures[candidate.fixture];
+    let before = guarded(|| fixture.file.to_bytes())?;
+    let props = candidate.props();
+    let commit = guarded(|| {
+        fixture
+            .file
+            .edit(|tx| tx.set(candidate.path.as_str(), &props))
+    })?;
+    if !commit.diagnostics.changed() {
+        // Not a change: the caller tries the next candidate.
+        return Err("the edit changed nothing".to_owned());
+    }
+    let run = || -> Result<(usize, &'static str, bool, &'static str), String> {
+        let after = guarded(|| commit.file.to_bytes())?;
+        if after == before {
+            return Err("the edit's bytes equal the source".to_owned());
+        }
+        let forward = guarded(|| commit.patch.apply(&fixture.file))?;
+        if guarded(|| forward.to_bytes())? != after {
+            return Err("the patch replayed onto its source differs from the commit".to_owned());
+        }
+        let inverse = commit.patch.inverse();
+        let restored = guarded(|| inverse.apply(&commit.file))?;
+        if guarded(|| restored.to_bytes())? != before {
+            return Err("the inverse patch does not restore the exact source bytes".to_owned());
+        }
+        // Another artifact: the edited result is not the patch's source.
+        let code = match attempt(|| commit.patch.apply(&commit.file)) {
+            Ok(_) => return Err("the patch applied to its own result".to_owned()),
+            Err(error) => typed(error).map_err(|error| format!("stale apply: {error}"))?,
+        };
+        // A separately opened, byte-identical copy: owner-bound patches
+        // refuse it, content-checked ones accept it (reported, not required).
+        let foreign = guarded(|| open_bytes(before.clone()))?;
+        let copy = match attempt(|| commit.patch.apply(&foreign)) {
+            Ok(applied) if guarded(|| applied.to_bytes())? == after => "accepts (content-checked)",
+            Ok(_) => return Err("a byte-identical copy took the patch to other bytes".to_owned()),
+            Err(error) => {
+                typed(error).map_err(|error| format!("copy apply: {error}"))?;
+                "refuses (owner-bound)"
+            },
+        };
+        let input = input_bytes(&fixture.label).is_some_and(|input| input == before);
+        Ok((before.len(), code, input, copy))
+    };
+    Ok(match run() {
+        Ok((bytes, code, input, copy)) => AdrObserved::Ok {
+            note: format!(
+                "`{}` set {} {}: the patch replays onto its source, the inverse restores the exact {bytes} source bytes{}, the patch on its own result refuses `{code}`; a byte-identical reopened copy {copy}",
+                fixture.label,
+                candidate.path,
+                candidate.json(),
+                if input {
+                    " (the input file's bytes)"
+                } else {
+                    ""
+                }
+            ),
+            fields: vec![
+                fixture.label.clone(),
+                candidate.path.clone(),
+                candidate.json(),
+                String::new(),
+                String::new(),
+                code.to_owned(),
+            ],
+        },
+        Err(error) => {
+            AdrObserved::Failed(format!("`{}` {}: {error}", fixture.label, candidate.path))
+        },
+    })
+}
+
+/// Composition: two edits prepared on two threads from one snapshot each
+/// compose with the other in either order to the same bytes holding both
+/// values, and either edit's patch refuses (typed) the other's result.
+fn adr_compose(fixtures: &[Fixture], a: &Candidate, b: &Candidate) -> Result<AdrObserved, String> {
+    let fixture = &fixtures[a.fixture];
+    let file = &fixture.file;
+    let (props_a, props_b) = (a.props(), b.props());
+    let (first, second) = std::thread::scope(|scope| {
+        let first = scope.spawn(|| guarded(|| file.edit(|tx| tx.set(a.path.as_str(), &props_a))));
+        let second = scope.spawn(|| guarded(|| file.edit(|tx| tx.set(b.path.as_str(), &props_b))));
+        (
+            first.join().unwrap_or_else(|_| Err("panic".to_owned())),
+            second.join().unwrap_or_else(|_| Err("panic".to_owned())),
+        )
+    });
+    let (first, second) = (first?, second?);
+    if !first.diagnostics.changed() || !second.diagnostics.changed() {
+        return Err("an edit changed nothing".to_owned());
+    }
+    let run = || -> Result<(&'static str, &'static str, &'static str), String> {
+        let ab = guarded(|| first.file.set(b.path.as_str(), &props_b))?;
+        let ba = guarded(|| second.file.set(a.path.as_str(), &props_a))?;
+        let value = |file: &File, candidate: &Candidate| {
+            current(file, &candidate.path, &candidate.key).or_else(|| {
+                let node = file.get(candidate.path.as_str()).ok()?;
+                let text = node.view().text().ok()??.into_owned();
+                Some(format!("text {text}"))
+            })
+        };
+        let (want_a, want_b) = (value(&first.file, a), value(&second.file, b));
+        for (order, composed) in [("a then b", &ab), ("b then a", &ba)] {
+            let reopened = republish(composed)?;
+            if value(&reopened, a) != want_a || value(&reopened, b) != want_b {
+                return Err(format!(
+                    "{order} dropped an edit: {:?} {:?}, expected {want_a:?} {want_b:?}",
+                    value(&reopened, a),
+                    value(&reopened, b)
+                ));
+            }
+        }
+        // Each order is repeatable; the two orders give the same bytes or,
+        // where the format numbers new strings, links or records in
+        // insertion order, the same document (text, node tree, both
+        // values).
+        let ab_bytes = guarded(|| ab.to_bytes())?;
+        let again = guarded(|| first.file.set(b.path.as_str(), &props_b))?;
+        if guarded(|| again.to_bytes())? != ab_bytes {
+            return Err("a then b is not repeatable".to_owned());
+        }
+        let same = if ab_bytes == guarded(|| ba.to_bytes())? {
+            "the same bytes"
+        } else {
+            let logical = |file: &File| -> Result<(String, Vec<(&'static str, String)>), String> {
+                let reopened = republish(file)?;
+                Ok((guarded(|| reopened.text())?, walk_one(&reopened, 3000)))
+            };
+            if logical(&ab)? != logical(&ba)? {
+                return Err("the two orders give different documents".to_owned());
+            }
+            "the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written)"
+        };
+        let stale_a = match attempt(|| second.patch.apply(&first.file)) {
+            Ok(_) => return Err("b's patch applied to a's result".to_owned()),
+            Err(error) => typed(error).map_err(|error| format!("b's patch on a: {error}"))?,
+        };
+        let stale_b = match attempt(|| first.patch.apply(&second.file)) {
+            Ok(_) => return Err("a's patch applied to b's result".to_owned()),
+            Err(error) => typed(error).map_err(|error| format!("a's patch on b: {error}"))?,
+        };
+        Ok((same, stale_a, stale_b))
+    };
+    Ok(match run() {
+        Ok((same, stale_a, stale_b)) => AdrObserved::Ok {
+            note: format!(
+                "`{}` set {} {} and set {} {} on two threads: both orders hold both values and give {same}; each patch on the other's result refuses `{stale_a}`/`{stale_b}`",
+                fixture.label,
+                a.path,
+                a.json(),
+                b.path,
+                b.json()
+            ),
+            fields: vec![
+                fixture.label.clone(),
+                a.path.clone(),
+                a.json(),
+                b.path.clone(),
+                b.json(),
+                format!("{stale_a}/{stale_b}"),
+            ],
+        },
+        Err(error) => AdrObserved::Failed(format!(
+            "`{}` {} and {}: {error}",
+            fixture.label, a.path, b.path
+        )),
+    })
+}
+
+/// `b` with a value other than `a`'s generated text, so two names never
+/// collide (two sheets or pages renamed alike conflict by design).
+fn distinct(a: &Candidate, mut b: Candidate) -> Candidate {
+    if b.value == a.value && b.value == "Litchi" {
+        b.value = "Lychee".to_owned();
+    }
+    b
+}
+
+/// Whether two paths address independent nodes (neither holds the other)
+/// or, on one node, different properties.
+fn independent(a: &Candidate, b: &Candidate) -> bool {
+    if a.fixture != b.fixture {
+        return false;
+    }
+    if a.path == b.path {
+        return a.key != b.key;
+    }
+    let nested = |outer: &str, inner: &str| {
+        inner.starts_with(outer) && (outer.ends_with('/') || inner[outer.len()..].starts_with('/'))
+    };
+    !nested(&a.path, &b.path) && !nested(&b.path, &a.path)
+}
+
+/// The three ADR 0008 rows of one format, from its changing sets (and, for
+/// composition, a second set found on another instance when the checklist
+/// holds no independent pair).
+fn adr_rows(
+    spec: &Spec,
+    fixtures: &[Fixture],
+    candidates: &[Candidate],
+    extra: &mut dyn FnMut(&Candidate) -> Vec<Candidate>,
+) -> Vec<AdrObserved> {
+    // Node sets before document-root sets, so item 1 of the atomic batch
+    // names a missing sibling of a real node.
+    let mut ordered: Vec<Candidate> = candidates.to_vec();
+    ordered.sort_by_key(|candidate| candidate.path == "/");
+    let candidates = ordered.as_slice();
+    let none = |what: &str| AdrObserved::Failed(format!("no changing set {what}"));
+    let atomic = candidates.first().map_or_else(
+        || none("to batch"),
+        |candidate| adr_atomic(spec, fixtures, candidate),
+    );
+    let mut inverse = None;
+    let mut skipped = Errors::default();
+    for candidate in candidates.iter().take(12) {
+        match adr_inverse(fixtures, candidate) {
+            Ok(observed) => {
+                inverse = Some(observed);
+                break;
+            },
+            Err(error) => skipped.push(error),
+        }
+    }
+    let inverse = inverse.unwrap_or_else(|| {
+        AdrObserved::Failed(format!(
+            "no candidate edit: {}",
+            skipped.joined("no changing set")
+        ))
+    });
+    let mut compose = None;
+    let mut skipped = Errors::default();
+    // Two instances of one element kind first (two paragraphs, two cells,
+    // two slides), then two element kinds, then two properties of one node.
+    let mut pairs: Vec<(Candidate, Candidate)> = Vec::new();
+    for a in candidates.iter().take(8) {
+        for b in extra(a).into_iter().take(2) {
+            if independent(a, &b) {
+                pairs.push((a.clone(), distinct(a, b)));
+            }
+        }
+    }
+    let mut across = Vec::new();
+    for (index, a) in candidates.iter().enumerate() {
+        for b in &candidates[index + 1..] {
+            if independent(a, b) {
+                across.push((a.clone(), distinct(a, b.clone())));
+            }
+        }
+    }
+    across.sort_by_key(|(a, b)| a.path == b.path);
+    pairs.extend(across);
+    for (a, b) in pairs.iter().take(12) {
+        match adr_compose(fixtures, a, b) {
+            Ok(observed) => {
+                compose = Some(observed);
+                break;
+            },
+            Err(error) => skipped.push(error),
+        }
+    }
+    let compose = compose.unwrap_or_else(|| {
+        AdrObserved::Failed(format!(
+            "no independent pair: {}",
+            skipped.joined("no two independent changing sets")
+        ))
+    });
+    vec![atomic, inverse, compose]
 }
 
 fn short(claim: &Claim, observed: &Observed) -> &'static str {
@@ -2234,12 +2770,29 @@ fn crud_checklist_per_format() {
          `ok` the first sibling pair moved and swapped, `refused` a typed\n\
          refusal for that element kind (not a failure), `no pair` no two siblings.\n\
          Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/\n\
-         `add`/`remove`/`edit`/`batch` claims plus `create`/`save` per row.\n\n",
+         `add`/`remove`/`edit`/`batch` claims plus `create`/`save` per row.\n\n\
+         ADR 0008 rows (record 0341), one per format: `atomic failure` a\n\
+         batch whose item 1 names nothing, after a valid set, is refused naming\n\
+         item 1 and leaves the snapshot, its file on disk and two refused save\n\
+         destinations byte-identical; `patch inverse` an edit's patch replays\n\
+         onto its source, its inverse restores the exact source bytes and the\n\
+         patch on its own result is refused (typed), and whether a\n\
+         byte-identical reopened copy takes it is reported; `composition` two\n\
+         sets made on two threads from one snapshot compose in either order\n\
+         (each repeatable) to the same bytes, or to the same document where a\n\
+         format writes new strings, links or records in edit order, holding\n\
+         both values, and each edit's patch on the other's result is refused\n\
+         (typed). `n/a` a typed reason the format cannot support the row.\n\
+         Evidence: `crud-adr0008.tsv`.\n\n",
     );
     let mut summary = String::from(
-        "| format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused |\n\
-         |---|---|---|---|---|---|---|---|---|---|\n",
+        "| format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused | atomic failure | patch inverse | composition |\n\
+         |---|---|---|---|---|---|---|---|---|---|---|---|---|\n",
     );
+    let mut adr_tsv =
+        String::from("format\trow\tstatus\tfixture\tpath\tprops\tpath2\tprops2\tcode\tnote\n");
+    let mut adr_failures: Vec<String> = Vec::new();
+    let mut adr_listed: Vec<(&str, &str)> = Vec::new();
     let mut tsv = String::from("format\telement\tverb\tclaim\tfollow_up\tobserved\n");
     let mut failures: Vec<(&str, String, &str, String)> = Vec::new();
     let mut unreached = Vec::new();
@@ -2250,6 +2803,42 @@ fn crud_checklist_per_format() {
         let _ = writeln!(body, "## {}\n", spec.name);
         for note in &report.notes {
             let _ = writeln!(body, "- {note}");
+        }
+        let mut adr_short = Vec::new();
+        for (row, observed) in ADR_ROWS.iter().zip(&report.adr) {
+            let not_applicable = ADR_NOT_APPLICABLE
+                .iter()
+                .find(|(format, listed, _)| *format == spec.name && listed == row);
+            let (status, fields, note) = match (observed, not_applicable) {
+                (AdrObserved::Ok { fields, note }, None) => ("ok", fields.clone(), note.clone()),
+                (AdrObserved::Ok { .. }, Some(_)) => {
+                    adr_failures.push(format!("{} {row}: listed n/a but passes", spec.name));
+                    ("ok", Vec::new(), "listed n/a but passes".to_owned())
+                },
+                (AdrObserved::Failed(error), Some((_, _, reason))) => {
+                    adr_listed.push((spec.name, row));
+                    ("n/a", Vec::new(), format!("{reason} ({})", clean(error)))
+                },
+                (AdrObserved::Failed(error), None) => {
+                    adr_failures.push(format!("{} {row}: {error}", spec.name));
+                    ("FAIL", Vec::new(), clean(error))
+                },
+            };
+            adr_short.push(status);
+            let _ = writeln!(body, "- ADR 0008 {row}: {status}, {note}");
+            let mut fields = fields;
+            fields.resize(6, String::new());
+            let _ = writeln!(
+                adr_tsv,
+                "{}\t{row}\t{status}\t{}\t{}",
+                spec.name,
+                fields
+                    .iter()
+                    .map(|field| field.replace(['\t', '\n'], " "))
+                    .collect::<Vec<_>>()
+                    .join("\t"),
+                note.replace(['\t', '\n'], " ")
+            );
         }
         let _ = writeln!(body, "\n| element | {} |", VERBS.join(" | "));
         let _ = writeln!(body, "|---|{}", "---|".repeat(VERBS.len()));
@@ -2316,7 +2905,7 @@ fn crud_checklist_per_format() {
         body.push('\n');
         let _ = writeln!(
             summary,
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
             spec.name,
             report.order.len(),
             counts[0],
@@ -2326,7 +2915,8 @@ fn crud_checklist_per_format() {
             counts[4],
             counts[5],
             counts[6],
-            counts[7]
+            counts[7],
+            adr_short.join(" | ")
         );
     }
     markdown.push_str(&summary);
@@ -2337,6 +2927,7 @@ fn crud_checklist_per_format() {
         std::fs::create_dir_all(&out).unwrap();
         std::fs::write(out.join("crud-checklist.md"), &markdown).unwrap();
         std::fs::write(out.join("crud-checklist.tsv"), &tsv).unwrap();
+        std::fs::write(out.join("crud-adr0008.tsv"), &adr_tsv).unwrap();
     }
     let unexpected: Vec<String> = failures
         .iter()
@@ -2371,12 +2962,32 @@ fn crud_checklist_per_format() {
         fixed.is_empty(),
         "known failures now pass; remove them: {fixed:?}"
     );
+    assert!(
+        adr_failures.is_empty(),
+        "ADR 0008 rows failed ({}):\n{}",
+        adr_failures.len(),
+        adr_failures.join("\n")
+    );
+    let stale: Vec<_> = ADR_NOT_APPLICABLE
+        .iter()
+        .filter(|(format, row, _)| !adr_listed.contains(&(*format, *row)))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "ADR 0008 n/a rows not observed: {stale:?}"
+    );
     if std::env::var_os("LITCHI_BLESS").is_none() {
         let golden = std::fs::read_to_string(out.join("crud-checklist.tsv"))
             .expect("crud-checklist.tsv; bless with LITCHI_BLESS=1");
         assert!(
             golden == tsv,
             "the CRUD checklist changed; review and bless with LITCHI_BLESS=1"
+        );
+        let golden = std::fs::read_to_string(out.join("crud-adr0008.tsv"))
+            .expect("crud-adr0008.tsv; bless with LITCHI_BLESS=1");
+        assert!(
+            golden == adr_tsv,
+            "the ADR 0008 rows changed; review and bless with LITCHI_BLESS=1"
         );
         let golden = std::fs::read_to_string(out.join("crud-checklist.md")).unwrap();
         assert!(

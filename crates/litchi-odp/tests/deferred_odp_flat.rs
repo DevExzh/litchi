@@ -184,3 +184,29 @@ fn flat_changed_publication_never_materializes_an_oversized_output() {
         Err(Error::InvalidFormat(message)) if message.contains("output limit")
     ));
 }
+
+/// Record 0341: XML's predefined entities and character references need no
+/// document type, so a flat presentation holding them opens (LibreOffice's
+/// `theme.fodp` and `alternativeText.fodp` write `&apos;`, `&lt;` and
+/// `&gt;`); an undeclared custom entity is still refused.
+#[test]
+fn flat_predefined_entities_and_character_references_open() {
+    let page = r#"<draw:page draw:name="one"><draw:frame><draw:text-box><text:p>Tom&apos;s &lt;a&gt; &amp; &quot;b&quot; &#169; &#x41;</text:p></draw:text-box></draw:frame></draw:page>"#;
+    let document = NOTES.replace(
+        r#"<draw:page draw:name="one"><draw:frame presentation:class="object"><draw:text-box><text:p>First slide</text:p></draw:text-box></draw:frame></draw:page>"#,
+        page,
+    );
+    assert_ne!(document, NOTES);
+    let flat = FlatPresentation::from_bytes(document.as_bytes().to_vec()).unwrap();
+    assert_eq!(flat.slide_count(), 2);
+    assert_eq!(flat.as_bytes(), document.as_bytes());
+    assert_eq!(flat.slides()[0].text().unwrap(), "Tom's <a> & \"b\" © A");
+
+    let control = NOTES.replace("First slide", "First &#1; slide");
+    assert!(FlatPresentation::from_bytes(control.into_bytes()).is_err());
+    let custom = NOTES.replace("First slide", "First &nasty; slide");
+    assert!(matches!(
+        FlatPresentation::from_bytes(custom.into_bytes()),
+        Err(Error::InvalidFormat(message)) if message.contains("custom entities")
+    ));
+}
