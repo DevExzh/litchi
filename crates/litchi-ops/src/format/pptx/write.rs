@@ -486,8 +486,6 @@ struct Target {
     bounds: Option<(i64, i64, i64, i64)>,
 }
 
-/// Slide-grouped body edits: rich formatting for every target, and the text
-/// of targets whose body has no run slot.
 /// The text of a new notes page (record 0346): its `text`, empty when the
 /// call assigns none.
 pub(in crate::format::pptx) fn notes_add_text(
@@ -500,6 +498,8 @@ pub(in crate::format::pptx) fn notes_add_text(
     notes::admitted_text(props, "text", limits)
 }
 
+/// Slide-grouped body edits: rich formatting for every target, and the text
+/// of targets whose body has no run slot.
 fn body_edits<'t>(
     targets: &[Target],
     text: Option<&'t str>,

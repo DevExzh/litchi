@@ -716,3 +716,251 @@ fn notes_are_added() {
         assert_eq!(text(&replaced, "/slide[1]/notes"), "New notes");
     }
 }
+
+// Record 0346 (record 0333 F3): cell, notes and paragraph-text batches
+// coalesce into one native commit.
+
+type Plan = Vec<(String, litchi_ops::Props<'static>)>;
+
+/// The batch's result file, per-item changes and commit count.
+fn batch(file: &File, items: &Plan) -> (File, Vec<bool>, usize) {
+    let commit = file
+        .batch(
+            items
+                .iter()
+                .map(|(path, props)| {
+                    let mut item = litchi_ops::BatchItem::new("set");
+                    item.path = Some(path.clone().into());
+                    item.props = Some(props.clone());
+                    item
+                })
+                .collect::<Vec<_>>(),
+            litchi_ops::BatchMode::Atomic,
+        )
+        .unwrap();
+    let changes = commit
+        .results
+        .iter()
+        .map(|result| match result {
+            litchi_ops::ItemResult::Applied(applied) => applied.changed,
+            other => panic!("unexpected result {other:?}"),
+        })
+        .collect();
+    (commit.file, changes, commit.diagnostics.commits())
+}
+
+/// The same items applied one `set` at a time.
+fn sequential(file: &File, items: &Plan) -> Vec<u8> {
+    let mut current = file.clone();
+    for (path, props) in items {
+        current = current.set(path.as_str(), props.clone()).unwrap();
+    }
+    current.to_bytes().unwrap()
+}
+
+/// A one-slide deck holding a `size`×`size` table.
+fn table_deck(size: usize) -> Vec<u8> {
+    let data = (0..size)
+        .map(|row| {
+            (0..size)
+                .map(|column| format!("r{row}c{column}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        })
+        .collect::<Vec<_>>()
+        .join(";");
+    let [_, eager] = files(&layouts_deck());
+    let deck = eager
+        .add("/", NewNode::new("slide").prop("layout", "Blank"))
+        .unwrap()
+        .file;
+    deck.add(
+        "/slide[1]",
+        NewNode::new("table")
+            .prop("rows", i64::try_from(size).unwrap())
+            .prop("cols", i64::try_from(size).unwrap())
+            .prop("data", data),
+    )
+    .unwrap()
+    .file
+    .to_bytes()
+    .unwrap()
+}
+
+fn cell(row: usize, column: usize) -> String {
+    format!("/slide[1]/table[1]/tr[{row}]/tc[{column}]")
+}
+
+#[test]
+fn cell_batches_are_one_commit() {
+    let bytes = table_deck(10);
+    for file in files(&bytes) {
+        let mut items: Plan = Vec::new();
+        for row in 1..=10 {
+            for column in 1..=10 {
+                items.push((
+                    cell(row, column),
+                    litchi_ops::Props::new()
+                        .with("fill", "FFEECC")
+                        .with("bold", true),
+                ));
+            }
+        }
+        let (after, changes, commits) = batch(&file, &items);
+        assert_eq!(commits, 1);
+        assert!(changes.iter().all(|changed| *changed));
+        assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+        assert_eq!(
+            value(&after, &cell(10, 10), "fill").as_deref(),
+            Some("#FFEECC")
+        );
+        let (_, changes, _) = batch(&after, &items);
+        assert!(changes.iter().all(|changed| !*changed));
+
+        // Cell paragraphs and runs, and cell text.
+        let items: Plan = (1..=10)
+            .flat_map(|row| {
+                [
+                    (
+                        format!("{}/paragraph[1]", cell(row, 1)),
+                        litchi_ops::Props::new().with("align", "center"),
+                    ),
+                    (
+                        format!("{}/paragraph[1]/run[1]", cell(row, 2)),
+                        litchi_ops::Props::new().with("italic", true),
+                    ),
+                    (
+                        cell(row, 3),
+                        litchi_ops::Props::new().with("text", format!("new {row}")),
+                    ),
+                ]
+            })
+            .collect();
+        let (after, changes, commits) = batch(&file, &items);
+        assert_eq!(commits, 1);
+        assert!(changes.iter().all(|changed| *changed));
+        assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+        assert_eq!(text(&after, &cell(4, 3)), "new 4");
+    }
+}
+
+#[test]
+fn overlapping_cell_plans_keep_sequential_semantics() {
+    let bytes = table_deck(3);
+    for file in files(&bytes) {
+        let items: Plan = vec![
+            (
+                format!("{}/paragraph[1]/run[1]", cell(1, 1)),
+                litchi_ops::Props::new().with("bold", true),
+            ),
+            // The same cell: closes the run first.
+            (
+                cell(1, 1),
+                litchi_ops::Props::new()
+                    .with("bold", true)
+                    .with("valign", "center"),
+            ),
+            (
+                format!("{}/paragraph[1]", cell(2, 2)),
+                litchi_ops::Props::new().with("text", "two\nlines"),
+            ),
+            (
+                format!("{}/paragraph[1]/run[1]", cell(2, 2)),
+                litchi_ops::Props::new().with("italic", true),
+            ),
+        ];
+        let (after, changes, commits) = batch(&file, &items);
+        assert_eq!(changes, [true, true, true, true]);
+        assert!(commits < items.len());
+        assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+    }
+}
+
+#[test]
+fn paragraph_text_batches_are_one_commit() {
+    let bytes = presentation::bytes();
+    for file in files(&bytes) {
+        let items: Plan = vec![
+            (
+                "/slide[1]/shape[1]/paragraph[1]".into(),
+                litchi_ops::Props::new().with("text", "Retitled"),
+            ),
+            (
+                "/slide[1]/shape[2]/paragraph[1]".into(),
+                litchi_ops::Props::new()
+                    .with("text", "Body\nline")
+                    .with("bold", true),
+            ),
+        ];
+        let (after, changes, commits) = batch(&file, &items);
+        assert_eq!(commits, 1);
+        assert_eq!(changes, [true, true]);
+        assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+        let (_, changes, _) = batch(&after, &items);
+        assert_eq!(changes, [false, false]);
+    }
+}
+
+#[test]
+fn notes_batches_are_one_commit_on_eager_owners() {
+    let bytes = presentation::bytes();
+    for (eager, file) in files(&bytes).into_iter().enumerate() {
+        let mut file = file
+            .add("/slide[1]", NewNode::new("notes").prop("text", "one"))
+            .unwrap()
+            .file;
+        for text in ["two", "three"] {
+            file = file
+                .add(
+                    "/slide[1]/notes",
+                    NewNode::new("paragraph").prop("text", text),
+                )
+                .unwrap()
+                .file;
+        }
+        // A paragraph and its own run overlap, so each kind is one run.
+        let items: Plan = (1..=3)
+            .map(|paragraph| {
+                (
+                    format!("/slide[1]/notes/paragraph[{paragraph}]"),
+                    litchi_ops::Props::new().with("align", "right"),
+                )
+            })
+            .chain((1..=3).map(|paragraph| {
+                (
+                    format!("/slide[1]/notes/paragraph[{paragraph}]/run[1]"),
+                    litchi_ops::Props::new().with("bold", true),
+                )
+            }))
+            .collect();
+        let (after, changes, commits) = batch(&file, &items);
+        assert!(changes.iter().all(|changed| *changed));
+        assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+        // The notes add promoted the source owner to an eager package: both
+        // owners coalesce.
+        assert_eq!(commits, 2, "{eager}");
+        assert_eq!(
+            value(&after, "/slide[1]/notes/paragraph[3]/run[1]", "bold").as_deref(),
+            Some("true")
+        );
+    }
+}
+
+#[test]
+fn source_owned_notes_keep_the_ordinary_writer() {
+    let bytes = presentation::bytes();
+    let [source, _] = files(&bytes);
+    let items: Plan = vec![
+        (
+            "/slide[1]/notes/paragraph[1]".into(),
+            litchi_ops::Props::new().with("align", "center"),
+        ),
+        (
+            "/slide[1]/notes/paragraph[1]/run[1]".into(),
+            litchi_ops::Props::new().with("italic", true),
+        ),
+    ];
+    let (after, changes, _) = batch(&source, &items);
+    assert_eq!(changes, [true, true]);
+    assert_eq!(after.to_bytes().unwrap(), sequential(&source, &items));
+}

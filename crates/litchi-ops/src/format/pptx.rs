@@ -943,6 +943,14 @@ impl Pptx {
         Ok(owner)
     }
 
+    /// Whether [`Self::editable_owner`] hands out the eager package (record
+    /// 0346): coalesced notes formatting needs the eager editor.
+    fn edits_eagerly(&self) -> bool {
+        self.0.revision.is_none()
+            && (matches!(self.0.owner, PptxOwner::Eager(_))
+                || self.0.signature() == Signature::RemovalAuthorized)
+    }
+
     /// Acquire the retained owner for an immediately following native edit.
     /// The caller must construct that edit even for an empty/no-op request:
     /// it performs encryption and strict graph admission exactly once.

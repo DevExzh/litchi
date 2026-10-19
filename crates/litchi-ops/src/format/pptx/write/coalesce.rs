@@ -12,6 +12,13 @@
 //! A plan overlapping an earlier plan of the run (the same shape's text,
 //! the same paragraph or run) closes the run first, so each plan's change
 //! is judged against the text it formats.
+//!
+//! Record 0346 (record 0333 F3) adds paragraph `text`, table cells (their
+//! text, formatting, fill, anchor and insets), the paragraphs and runs of
+//! cell bodies, and the paragraphs and runs of the speaker notes. Notes
+//! pages are separate parts the source-backed slide edit does not stage, so
+//! notes plans join a run on eager owners only; a source owner's notes
+//! writes keep the ordinary writer, which promotes it.
 
 use super::text::{self, TextValues};
 use super::{Commit, Editable, Pptx, Target, admit_shape_props, allocation, error};
@@ -37,6 +44,9 @@ pub(crate) struct Plan {
     format: Option<Box<Format>>,
     changed: bool,
     staged_bytes: usize,
+    /// Whether the target is a text body of the slide's notes page (record
+    /// 0346), which a separate native call edits.
+    notes: bool,
 }
 
 /// A formatting plan's native target and admitted assignments.
@@ -55,9 +65,25 @@ enum Scope {
     Paragraph(usize),
     /// One run child, by paragraph and child index.
     Run(usize, usize),
+    /// One table cell, by row and column (record 0346).
+    Cell(usize, usize),
+    /// One paragraph of a table cell's body.
+    CellParagraph(usize, usize, usize),
+    /// One run child of a table cell's paragraph.
+    CellRun(usize, usize, usize, usize),
 }
 
 impl Scope {
+    /// The table cell a scope lies in, if any.
+    const fn cell(self) -> Option<(usize, usize)> {
+        match self {
+            Self::Cell(row, column)
+            | Self::CellParagraph(row, column, _)
+            | Self::CellRun(row, column, ..) => Some((row, column)),
+            Self::Shape | Self::Paragraph(_) | Self::Run(..) => None,
+        }
+    }
+
     /// Whether two plans of one shape touch the same text.
     fn overlaps(self, other: Self) -> bool {
         match (self, other) {
@@ -66,13 +92,25 @@ impl Scope {
             | (Self::Paragraph(left), Self::Run(right, _))
             | (Self::Run(left, _), Self::Paragraph(right)) => left == right,
             (Self::Run(left, a), Self::Run(right, b)) => left == right && a == b,
+            (left, right) => match (left.cell(), right.cell()) {
+                (Some(a), Some(b)) if a == b => match (left, right) {
+                    (Self::Cell(..), _) | (_, Self::Cell(..)) => true,
+                    (Self::CellParagraph(.., p), Self::CellParagraph(.., q))
+                    | (Self::CellParagraph(.., p), Self::CellRun(.., q, _))
+                    | (Self::CellRun(.., p, _), Self::CellParagraph(.., q)) => p == q,
+                    (Self::CellRun(.., p, a), Self::CellRun(.., q, b)) => p == q && a == b,
+                    _ => true,
+                },
+                // A cell scope and a shape-body scope name different bodies.
+                _ => false,
+            },
         }
     }
 }
 
 impl Plan {
-    fn key(&self) -> (usize, usize) {
-        (self.target.slide, self.target.position)
+    fn key(&self) -> (usize, usize, bool) {
+        (self.target.slide, self.target.position, self.notes)
     }
 
     fn scope(&self) -> Scope {
@@ -126,7 +164,7 @@ pub(crate) struct Run {
     edit: NativeEdit,
     items: Vec<Item>,
     /// The scopes each shape's plans touch.
-    seen: HashMap<(usize, usize), Vec<Scope>>,
+    seen: HashMap<(usize, usize, bool), Vec<Scope>>,
     staged_bytes: usize,
     target_count: usize,
     max_staged_bytes: usize,
@@ -297,7 +335,7 @@ fn shape_plan(
         return Ok(None);
     };
     let Some((slide, kind, ordinal, text)) = direct_path(path.path()) else {
-        return Ok(None);
+        return story_plan(file, path, props, limits);
     };
     if let Some(text) = text {
         return text_plan(file, slide, kind, ordinal, text, props, limits, scene_cache);
@@ -427,6 +465,7 @@ fn shape_plan(
         format: None,
         changed,
         staged_bytes,
+        notes: false,
     }))
 }
 
@@ -466,12 +505,14 @@ fn text_plan(
     if !values.coalescible() {
         return Ok(None);
     }
-    match (step, values.text()) {
-        // Paragraph text rebuilds the paragraph's runs; a line break in run
-        // text is refused by the ordinary writer.
-        (TextStep::Paragraph(_), Some(_)) => return Ok(None),
-        (TextStep::Run(..), Some(text)) if text.contains(['\n', '\r']) => return Ok(None),
-        _ => {},
+    // A line break in run text is refused by the ordinary writer.
+    // Paragraph text rebuilds the paragraph's runs (record 0346).
+    if matches!(step, TextStep::Run(..))
+        && values
+            .text()
+            .is_some_and(|text| text.contains(['\n', '\r']))
+    {
+        return Ok(None);
     }
     let scope = match step {
         TextStep::Paragraph(paragraph) => Scope::Paragraph(paragraph),
@@ -553,7 +594,7 @@ fn format_plan(
                     paragraph: Position::new(index),
                 },
                 Scope::Paragraph(index),
-                values.paragraph_changed(paragraph),
+                paragraph_changed(&values, paragraph),
             )
         },
         Scope::Run(paragraph_index, ordinal) => {
@@ -579,6 +620,8 @@ fn format_plan(
                 values.run_changed(run),
             )
         },
+        // Cell scopes are planned by `story_plan`.
+        Scope::Cell(..) | Scope::CellParagraph(..) | Scope::CellRun(..) => return Ok(None),
     };
     Ok(Some(Plan {
         target: Target {
@@ -595,6 +638,222 @@ fn format_plan(
         })),
         changed,
         staged_bytes,
+        notes: false,
+    }))
+}
+
+/// Whether `values` change a paragraph, its text included (record 0346).
+fn paragraph_changed(
+    values: &TextValues,
+    paragraph: &litchi_drawingml::text::body::Paragraph,
+) -> bool {
+    values.paragraph_changed(paragraph)
+        || values.text().is_some_and(|text| text != paragraph.text())
+}
+
+/// What a cell or notes path names (record 0346).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StoryLeaf {
+    Cell,
+    Paragraph,
+    Run,
+}
+
+/// The leaf of an absolute, all-ordinal table-cell path
+/// (`/slide[N]/table[M]/tr[R]/tc[C]`, optionally `/paragraph[K]` and
+/// `/run[J]`) or notes path (`/slide[N]/notes/paragraph[K]`, optionally
+/// `/run[J]`), and whether it is a notes path.
+fn story_path(path: &Path<'_>) -> Option<(StoryLeaf, bool)> {
+    if !path.is_absolute() {
+        return None;
+    }
+    let indexed =
+        |step: &litchi_core::selector::Step<'_>, names: &[&str]| index_of(step, names).is_some();
+    let steps = path.steps();
+    let [slide, rest @ ..] = steps else {
+        return None;
+    };
+    if !indexed(slide, &["slide"]) {
+        return None;
+    }
+    let (notes, text) = match rest {
+        [notes, text @ ..]
+            if notes.name().eq_ignore_ascii_case("notes") && notes.predicates().is_empty() =>
+        {
+            (true, text)
+        },
+        [table, row, cell, text @ ..]
+            if indexed(table, &["table"]) && indexed(row, &["tr"]) && indexed(cell, &["tc"]) =>
+        {
+            (false, text)
+        },
+        _ => return None,
+    };
+    let leaf = match text {
+        [] if !notes => StoryLeaf::Cell,
+        [paragraph] if indexed(paragraph, &["paragraph", "p", "para"]) => StoryLeaf::Paragraph,
+        [paragraph, run]
+            if indexed(paragraph, &["paragraph", "p", "para"]) && indexed(run, &["run", "r"]) =>
+        {
+            StoryLeaf::Run
+        },
+        _ => return None,
+    };
+    Some((leaf, notes))
+}
+
+/// A formatting plan of a table cell, a cell paragraph or run, or a notes
+/// paragraph or run (record 0346), resolved through the ordinary path
+/// navigator against the run's base. Anything the plan cannot judge falls
+/// back to the ordinary writer.
+fn story_plan(
+    file: &Pptx,
+    path: &crate::path::PathArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<Plan>> {
+    use crate::format::pptx::node::Item;
+    use crate::format::pptx::spec::CELL_WRITE_TABLE;
+    let Some((leaf, notes)) = story_path(path.path()) else {
+        return Ok(None);
+    };
+    if notes && !file.edits_eagerly() {
+        return Ok(None);
+    }
+    let table = match leaf {
+        StoryLeaf::Cell => text::admit_for(&CELL_WRITE_TABLE, props, Operation::Set, limits),
+        StoryLeaf::Paragraph => {
+            text::admit_for(&PARAGRAPH_WRITE_TABLE, props, Operation::Set, limits)
+        },
+        StoryLeaf::Run => text::admit_for(&RUN_WRITE_TABLE, props, Operation::Set, limits),
+    };
+    let Ok(values) = table else {
+        return Ok(None);
+    };
+    let admitted = match leaf {
+        StoryLeaf::Cell => values.cell_coalescible(),
+        StoryLeaf::Paragraph => values.coalescible(),
+        StoryLeaf::Run => {
+            values.coalescible()
+                && !values
+                    .text()
+                    .is_some_and(|text| text.contains(['\n', '\r']))
+        },
+    };
+    if !admitted {
+        return Ok(None);
+    }
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    let staged_bytes = values.charge();
+    bound(
+        LimitKind::StagedBytes,
+        staged_bytes,
+        limits.max_staged_bytes(),
+    )?;
+    let Ok(node) = crate::path::resolve::get(&crate::format::pptx::Nav::new(file), path) else {
+        return Ok(None);
+    };
+    let (container, shape, target, scope, changed) = match (leaf, node.item()) {
+        (StoryLeaf::Cell, Item::Cell(cell)) => {
+            let properties = crate::format::pptx::text::cell_properties(cell)?;
+            let body = crate::format::pptx::text::cell_body(cell)?;
+            let (row, column) = (cell.row as usize, cell.column as usize);
+            let shape = cell.table.handle.position();
+            (
+                cell.table.container,
+                shape,
+                TextTarget::Cell {
+                    shape,
+                    row: Position::new(row),
+                    column: Position::new(column),
+                },
+                Scope::Cell(row, column),
+                values.cell_changed(&properties, body.as_ref()),
+            )
+        },
+        (StoryLeaf::Paragraph, Item::Paragraph(text)) => {
+            let Some(paragraph) = text.body.paragraphs.get(text.paragraph as usize) else {
+                return Ok(None);
+            };
+            let shape = text.shape.handle.position();
+            let index = text.paragraph as usize;
+            let changed = paragraph_changed(&values, paragraph);
+            let (target, scope) = match text.cell.get() {
+                Some((row, column)) => (
+                    TextTarget::CellParagraph {
+                        shape,
+                        row: Position::new(row as usize),
+                        column: Position::new(column as usize),
+                        paragraph: Position::new(index),
+                    },
+                    Scope::CellParagraph(row as usize, column as usize, index),
+                ),
+                None => (
+                    TextTarget::Paragraph {
+                        shape,
+                        paragraph: Position::new(index),
+                    },
+                    Scope::Paragraph(index),
+                ),
+            };
+            (text.shape.container, shape, target, scope, changed)
+        },
+        (StoryLeaf::Run, Item::Run(text)) => {
+            let Some(run) = text
+                .body
+                .paragraphs
+                .get(text.paragraph as usize)
+                .and_then(|paragraph| paragraph.runs.get(text.run as usize))
+            else {
+                return Ok(None);
+            };
+            let shape = text.shape.handle.position();
+            let (paragraph, index) = (text.paragraph as usize, text.run as usize);
+            let changed = values.run_changed(run);
+            let (target, scope) = match text.cell.get() {
+                Some((row, column)) => (
+                    TextTarget::CellRun {
+                        shape,
+                        row: Position::new(row as usize),
+                        column: Position::new(column as usize),
+                        paragraph: Position::new(paragraph),
+                        run: Position::new(index),
+                    },
+                    Scope::CellRun(row as usize, column as usize, paragraph, index),
+                ),
+                None => (
+                    TextTarget::Run {
+                        shape,
+                        paragraph: Position::new(paragraph),
+                        run: Position::new(index),
+                    },
+                    Scope::Run(paragraph, index),
+                ),
+            };
+            (text.shape.container, shape, target, scope, changed)
+        },
+        _ => return Ok(None),
+    };
+    let slide = match (notes, container.slide(), container.notes()) {
+        (false, Some(slide), _) | (true, None, Some(slide)) => slide as usize,
+        _ => return Ok(None),
+    };
+    Ok(Some(Plan {
+        target: Target {
+            slot: true,
+            slide,
+            position: shape.get(),
+            bounds: None,
+        },
+        text: None,
+        format: Some(Box::new(Format {
+            target,
+            scope,
+            values,
+        })),
+        changed,
+        staged_bytes,
+        notes,
     }))
 }
 
@@ -730,7 +989,13 @@ fn stage_all(edit: &mut NativeEdit, items: &[Item]) -> Result<usize> {
     for run in items.chunk_by(|left, right| {
         left.plan.target.slide == right.plan.target.slide
             && left.plan.format.is_some() == right.plan.format.is_some()
+            && left.plan.notes == right.plan.notes
     }) {
+        if run[0].plan.notes {
+            operations =
+                operations.saturating_add(stage_notes(edit, run[0].plan.target.slide, run)?);
+            continue;
+        }
         let kind = if run[0].plan.format.is_some() {
             BatchKind::Format
         } else if run.iter().any(|item| item.plan.target.bounds.is_some()) {
@@ -868,7 +1133,56 @@ fn stage_batch(
     }
 }
 
+/// One notes page's formatting plans, through the eager editor's notes
+/// text verb in 256-edit chunks (record 0346).
+fn stage_notes(edit: &mut NativeEdit, slide: usize, items: &[Item]) -> Result<usize> {
+    let NativeEdit::Eager(edit) = edit else {
+        return Err(Error::new(
+            Code::InternalError,
+            "PPTX notes formatting joined a source-backed run",
+        )
+        .with_format(FileFormat::Pptx));
+    };
+    let mut edits = Vec::new();
+    edits.try_reserve_exact(items.len()).map_err(allocation)?;
+    for item in items {
+        let format = item
+            .plan
+            .format
+            .as_ref()
+            .ok_or_else(|| Error::new(Code::InternalError, "PPTX notes batch lost a plan"))?;
+        edits.push(TextEdit::new(format.target, format.values.properties()));
+    }
+    let mut operations = 0_usize;
+    for chunk in edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS) {
+        operations = operations.saturating_add(
+            edit.set_notes_text_properties(slide, chunk)
+                .map_err(native_error)?,
+        );
+    }
+    Ok(operations)
+}
+
 fn stage_one(edit: &mut NativeEdit, plan: &Plan) -> Result<()> {
+    if plan.notes {
+        let Some(format) = &plan.format else {
+            return Err(Error::new(
+                Code::InternalError,
+                "PPTX notes plan lost its format",
+            ));
+        };
+        let NativeEdit::Eager(edit) = edit else {
+            return Err(Error::new(
+                Code::InternalError,
+                "PPTX notes formatting joined a source-backed run",
+            ));
+        };
+        let edits = [TextEdit::new(format.target, format.values.properties())];
+        return edit
+            .set_notes_text_properties(plan.target.slide, &edits)
+            .map(|_| ())
+            .map_err(native_error);
+    }
     if let Some(format) = &plan.format {
         let edits = [TextEdit::new(format.target, format.values.properties())];
         return match edit {
