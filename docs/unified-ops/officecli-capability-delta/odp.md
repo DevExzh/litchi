@@ -5,22 +5,22 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 
 | Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Tier | Disposition | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|
-| animation | `effect` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `class` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `path` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `d` | string | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `trigger` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `duration` | number | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `delay` | number | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `direction` | string | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `repeat` | string | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `restart` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `autoReverse` | bool | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `presetId` | number | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `easein` | number | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `easeout` | number | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `motionPath` | string | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
-| animation | `chartBuild` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
+| animation | `effect` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `class` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `path` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `d` | string | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `trigger` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `duration` | number | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `delay` | number | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `direction` | string | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `repeat` | string | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `restart` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `autoReverse` | bool | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `presetId` | number | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `easein` | number | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `easeout` | number | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `motionPath` | string | --g |  | element gap | — | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
+| animation | `chartBuild` | enum | asg |  | element gap | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
 | chart-axis | `dispUnits` | enum | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | chart-axis | `majorUnit` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | chart-axis | `minorUnit` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
@@ -561,7 +561,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | shape | `align` | string | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | shape | `bold` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
 | shape | `color` | color | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
-| shape | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP graphic styles |
+| shape | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP graphic styles → 0328 |
 | shape | `font` | string | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
 | shape | `italic` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
 | shape | `line` | string | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
@@ -701,7 +701,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | textbox | `bold` | bool | as- | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
 | textbox | `italic` | bool | as- | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
 | textbox | `color` | color | as- | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
-| textbox | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP graphic styles |
+| textbox | `fill` | color | asg |  | gap | gap | P1 | deferred-P1 0328 (odp-family) | M6 ODP graphic styles → 0328 |
 | textbox | `align` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0328 (odp-family) |  |
 | textbox | `width` | length | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |
 | textbox | `height` | length | asg | -sg | supported | partial | P1 | deferred-P1 0328 (odp-family) |  |

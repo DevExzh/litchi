@@ -467,6 +467,68 @@ class DispositionFile(unittest.TestCase):
         self.assertEqual(wide.tier("xls", "cell"), "P0")
 
 
+class MilestoneFollowUps(unittest.TestCase):
+    """Record 0344 (audit WP13): every milestone-only follow-up of the
+    registry and capability goldens maps to a current id."""
+
+    def load(self, follow_ups: list[dict]) -> delta.Dispositions:
+        return delta.Dispositions({"tiers": [], "dispositions": [], "followUps": follow_ups}, "test")
+
+    def test_a_format_entry_beats_a_general_one_then_the_longer_pattern(self) -> None:
+        loaded = self.load([
+            {"id": "all", "followUps": ["M2 *"], "ref": "0332", "note": "n"},
+            {"id": "xlsx", "followUps": ["M2 *"], "formats": ["xlsx"], "ref": "0338", "note": "n"},
+            {"id": "exact", "followUps": ["M2 XLSX input policy"], "formats": ["xlsx"], "ref": "WP16", "note": "n"},
+        ])
+        self.assertEqual(loaded.follow_up_entry("docx", "M2 tables")["id"], "all")
+        self.assertEqual(loaded.follow_up_entry("xlsx", "M2 tables")["id"], "xlsx")
+        self.assertEqual(loaded.follow_up_entry("xlsx", "M2 XLSX input policy")["id"], "exact")
+        self.assertIsNone(loaded.follow_up_entry("xlsx", "M1-extended"))
+        self.assertEqual(loaded.current("xlsx", "M2 XLSX input policy"), "M2 XLSX input policy → WP16")
+        # Text that already names a record, and unmapped text, are shown as they are.
+        self.assertEqual(loaded.current("xlsx", "record 0327 follow-up"), "record 0327 follow-up")
+        self.assertEqual(loaded.current("xlsx", "M1-extended"), "M1-extended")
+        self.assertFalse(delta.milestone_only(loaded.current("docx", "M2 tables")))
+
+    def test_entries_are_validated(self) -> None:
+        for bad in ({"id": "a", "followUps": ["M2 *"], "ref": "M3", "note": "n"},
+                    {"id": "a", "followUps": ["M2 *"], "ref": "", "note": "n"},
+                    {"id": "a", "followUps": [], "ref": "0332", "note": "n"},
+                    {"id": "a", "followUps": ["M2 *"], "ref": "0332"}):
+            with self.assertRaises(SystemExit):
+                self.load([bad])
+        with self.assertRaises(SystemExit):
+            self.load([{"id": "a", "followUps": ["x"], "ref": "0332", "note": "n"}] * 2)
+        self.load([{"id": "a", "followUps": ["M2 *"], "ref": "0327/0316", "note": "n"}])
+
+    def test_unmapped_and_stale_entries_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / delta.GOLDEN_DIR / "xlsx.json", {"gaps": [{"followUp": "M2 (validate)"}]})
+            write(root / delta.CAPABILITY_DIR / "xlsx-encryption.json",
+                  {"elements": [{"gap": {"followUp": "M1-extended (R4x)"}},
+                                {"gap": {"followUp": "record 0338 follow-up"}}]})
+            found = delta.golden_follow_ups(root)
+            self.assertEqual(sorted((fmt, text) for fmt, text, _ in found),
+                             [("xlsx", "M1-extended (R4x)"), ("xlsx", "M2 (validate)"),
+                              ("xlsx", "record 0338 follow-up")])
+            loaded = self.load([
+                {"id": "validate", "followUps": ["M2 (validate)"], "ref": "0336", "note": "n"},
+                {"id": "unused", "followUps": ["M6 *"], "ref": "0328", "note": "n"},
+            ])
+            problems = delta.milestone_problems(found, loaded)
+            self.assertEqual(len(problems), 2, problems)
+            self.assertIn("xlsx: milestone-only follow-up `M1-extended (R4x)`", problems[0])
+            self.assertIn("crates/litchi-ops/tests/golden/capabilities/xlsx-encryption.json", problems[0])
+            self.assertEqual(problems[1], "stale follow-up map `unused`: it maps no golden follow-up")
+
+    def test_the_committed_goldens_have_no_unmapped_milestone(self) -> None:
+        loaded = delta.Dispositions.load(delta.REPO / delta.DISPOSITIONS)
+        found = delta.golden_follow_ups(delta.REPO)
+        self.assertTrue(any(origin.startswith(delta.CAPABILITY_DIR.as_posix()) for _, _, origin in found))
+        self.assertEqual(delta.milestone_problems(found, loaded), [])
+
+
 class ApplyingDispositions(unittest.TestCase):
     def setUp(self) -> None:
         oc = lambda name, props: delta.OcElement(name, name, [], [], {}, props)
@@ -562,7 +624,10 @@ class ApplyingDispositions(unittest.TestCase):
                 entry("stale", ["delta:xlsx:nothing", "delta:docx:*"], "deferred", ref="0332"),
             ], tiers=[{"tier": "P0", "keys": ["xlsx:*"], "basis": "b"}, {"tier": "P1", "keys": ["xlsx:unused"], "basis": "b"}])
             _, _, problems = delta.classified(root, root, loaded)
-            self.assertEqual(problems, [
+            # Record 0344: the fixture's milestone-only follow-up has no current id.
+            self.assertEqual(problems[0], "xlsx: milestone-only follow-up `M2 (comments)` (1 in "
+                             "crates/litchi-ops/tests/golden/registry/xlsx.json) has no current id in `followUps`")
+            self.assertEqual(problems[1:], [
                 "stale disposition key `delta:xlsx:nothing`: it classifies no row",
                 "stale disposition key `delta:docx:*`: it classifies no row",
                 "stale tier key `xlsx:unused`: it classifies no row",
