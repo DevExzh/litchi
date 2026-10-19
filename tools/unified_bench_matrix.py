@@ -48,9 +48,11 @@ is on this tree; the range ends at the highest record on the tree, and the
 Markdown lists every record of it, absent ones as "not on this tree", so
 the tool can be rerun unchanged after later merges.
 
-Outputs: docs/unified-ops/results/0289/bench-matrix.tsv, bench-matrix.md and
-one page per format under bench-matrix/ (record 0344: each file stays below
-the repository's 1 MiB evidence limit, which `--check` enforces).
+Outputs: docs/unified-ops/results/0289/bench-matrix.md and, per format under
+bench-matrix/, the row page <format>.md (record 0344) and the row table
+<format>.tsv (record 0348; one bench-matrix.tsv grew towards the limit):
+each file stays below the repository's 1 MiB evidence limit, which `--check`
+enforces.
 `--check` regenerates in memory and exits non-zero when the committed
 outputs differ, when a miss lacks an explanation, when an open miss names
 neither a follow-up nor an explained residual (record 0337), or when a
@@ -75,7 +77,9 @@ UO = ROOT / "docs" / "unified-ops"
 RES = UO / "results"
 OUT_DIR = RES / "0289"
 CURATED = OUT_DIR / "bench-matrix-curated.json"
-OUT_TSV = OUT_DIR / "bench-matrix.tsv"
+# Record 0348: the single row table this tool wrote before the per-format
+# tables; `--check` reports it while it is still on the tree.
+OLD_TSV = OUT_DIR / "bench-matrix.tsv"
 OUT_MD = OUT_DIR / "bench-matrix.md"
 # Record 0344: the per-format row tables, one page each, so that every
 # generated file stays below the repository's 1 MiB evidence limit.
@@ -2715,11 +2719,14 @@ def sort_rows(rows):
                                        r["stage_rank"], r["stage"]))
 
 
-def to_tsv(rows):
+def to_tsv(rows, f=None):
+    """The row table, of format `f` only when given (record 0348)."""
     buf = io.StringIO()
     w = csv.writer(buf, delimiter="\t", lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
     w.writerow(TSV_COLUMNS)
     for r in rows:
+        if f is not None and r["format"] != f:
+            continue
         w.writerow([r["format"], r["operation"], r["scenario"], r["size"], r["comparison"],
                     r["stage"], fmt_num(r["leaf"]), fmt_num(r["unified"]), r["unit"],
                     fmt_ratio(r), fmt_range(r), r["budget"], r["status"], r["record"],
@@ -2849,10 +2856,12 @@ def to_md(rows, conflicts, agreements, cur):
         a("")
     a("## Rows by format")
     a("")
-    a("Each format's rows are on their own page (record 0344), under `bench-matrix/`:")
+    a("Each format's rows are on their own page (record 0344) and in their own "
+      "tab-separated table (record 0348), under `bench-matrix/`:")
     a("")
     for f in fmts:
-        a(f"- [{f}](bench-matrix/{f}.md) ({sum(r['format'] == f for r in rows)} rows)")
+        a(f"- [{f}](bench-matrix/{f}.md), [TSV](bench-matrix/{f}.tsv) "
+          f"({sum(r['format'] == f for r in rows)} rows)")
     return "\n".join(L).rstrip() + "\n"
 
 
@@ -2882,9 +2891,10 @@ def format_page(f, rows):
 
 def outputs(rows, conflicts, agreements, cur):
     """Every generated file and its text."""
-    files = {OUT_TSV: to_tsv(rows), OUT_MD: to_md(rows, conflicts, agreements, cur)}
+    files = {OUT_MD: to_md(rows, conflicts, agreements, cur)}
     for f in sorted({r["format"] for r in rows}):
         files[OUT_FORMAT_DIR / f"{f}.md"] = format_page(f, rows)
+        files[OUT_FORMAT_DIR / f"{f}.tsv"] = to_tsv(rows, f)
     return files
 
 
@@ -2950,7 +2960,8 @@ def build():
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter,
-                                 epilog="Outputs: " + rel(OUT_TSV) + ", " + rel(OUT_MD) +
+                                 epilog="Outputs: " + rel(OUT_MD) + " and " +
+                                 rel(OUT_FORMAT_DIR) + "/<format>.{md,tsv}" +
                                  " (paths relative to docs/unified-ops/results/).")
     ap.add_argument("--check", action="store_true",
                     help="regenerate in memory; exit 1 if the committed outputs differ, "
@@ -2973,7 +2984,10 @@ def main(argv=None):
             what = "explanation" if not r["explanation"].strip() else "follow-up or residual"
             print(f"miss without {what}: {r['record']} {r['series']} {r['stage']}", file=sys.stderr)
         rc = 1
-    stale_pages = sorted(set(OUT_FORMAT_DIR.glob("*.md")) - set(files)) if OUT_FORMAT_DIR.is_dir() else []
+    stale_pages = sorted((set(OUT_FORMAT_DIR.glob("*.md")) | set(OUT_FORMAT_DIR.glob("*.tsv")))
+                         - set(files)) if OUT_FORMAT_DIR.is_dir() else []
+    if OLD_TSV.is_file():
+        stale_pages.append(OLD_TSV)
     if args.check:
         for path, text in files.items():
             if not path.is_file() or path.read_text(encoding="utf-8") != text:
