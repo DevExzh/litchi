@@ -92,6 +92,7 @@ pub(crate) fn import_commit(
     Commit::new(
         py,
         commit.file,
+        Some(crate::write::Patch::one(commit.patch)),
         commit.diagnostics.changed(),
         commit.diagnostics.operations(),
         None,

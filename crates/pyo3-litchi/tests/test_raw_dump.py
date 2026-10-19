@@ -59,6 +59,8 @@ class RawTests(unittest.TestCase):
             "/document", "//w:body", "prepend", "<w:p><w:r><w:t>Raw</w:t></w:r></w:p>"
         )
         self.assertEqual(commit.value, {"matched": 1})
+        # Raw edits are not transaction steps: no patch (record 0347).
+        self.assertIsNone(commit.patch)
         self.assertEqual(commit.file.text().strip(), "Raw")
         self.assertEqual(file.to_bytes(), before)
         with self.assertRaises(L.PathError) as raised:
@@ -67,6 +69,7 @@ class RawTests(unittest.TestCase):
 
         added = file.add_part("/document", "header")
         self.assertEqual(added.value["part"], "/word/header1.xml")
+        self.assertIsNone(added.patch)
         self.assertTrue(added.value["relationshipId"].startswith("rId"))
         self.assertIn(b"<w:hdr", added.file.raw("/header[1]"))
         custom = file.add_part(
