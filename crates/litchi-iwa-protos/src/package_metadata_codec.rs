@@ -2274,7 +2274,7 @@ mod tests {
             &[(901, UuidBits::new(90, 91))],
             &[],
         );
-        let source = metadata(1_000, &[current], &[versioned.clone()]);
+        let source = metadata(1_000, &[current], std::slice::from_ref(&versioned));
         let additions = [ObjectUuidAddition::new(
             selector,
             1_001,

@@ -413,7 +413,8 @@ impl ParagraphStreamPatch {
                 maximum: ABSOLUTE_MAX_PATCH_BYTES as u64,
             })?;
         let mut writer = JsonWriter::new(maximum);
-        serde_json::to_writer(&mut writer, &self.to_value(reference))
+        // Sorted members whatever `serde_json` features are unified (0349).
+        litchi_core::canonical_json::to_writer(&mut writer, &self.to_value(reference))
             .map_err(|error| PatchError::Encoding(error.to_string()))?;
         Ok(writer.finish())
     }
@@ -784,7 +785,7 @@ impl ExactInverseAuthorization {
             maximum: ABSOLUTE_MAX_PATCH_BYTES as u64,
         })?;
         let mut writer = JsonWriter::new(maximum);
-        serde_json::to_writer(
+        litchi_core::canonical_json::to_writer(
             &mut writer,
             &object([
                 ("current", artifact_value(self.current)),
@@ -1415,7 +1416,7 @@ fn parse_limits(value: &Value) -> Result<PatchLimits> {
 
 fn canonical_bytes(value: &Value) -> Result<Vec<u8>> {
     let mut writer = JsonWriter::new(ABSOLUTE_MAX_PATCH_BYTES);
-    serde_json::to_writer(&mut writer, value)
+    litchi_core::canonical_json::to_writer(&mut writer, value)
         .map_err(|error| PatchError::Encoding(error.to_string()))?;
     Ok(writer.finish())
 }
