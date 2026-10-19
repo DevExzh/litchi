@@ -41,11 +41,11 @@ impl FlatPresentation {
     ///
     /// # Errors
     /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > MAX_XML_BYTES {
             return invalid("flat ODP exceeds the 64 MiB input limit");
         }
-        let xml = String::from_utf8(bytes.clone())
+        let xml = String::from_utf8(bytes.to_vec())
             .map_err(|error| Error::InvalidFormat(format!("flat ODP is not UTF-8: {error}")))?;
         let page_ranges = scan_flat(&xml)?;
         let (slides, tolerance) = Parser::parse_slides_with_report(&xml, Some(&xml))?;
@@ -143,11 +143,11 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse owned source bytes as a flat editing snapshot.
+    /// Parse source bytes as a flat editing snapshot.
     ///
     /// # Errors
     /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(FlatPresentation::from_bytes(bytes)?.snapshot())
     }
 
@@ -279,7 +279,7 @@ impl Transaction {
         }
         push_bounded(&mut output, &xml[cursor..])?;
         validate_compact_xml(&output)?;
-        let presentation = FlatPresentation::from_bytes(output.into_bytes())?;
+        let presentation = FlatPresentation::from_bytes(output.as_bytes())?;
         if presentation.slides() != self.draft {
             return invalid("flat ODP commit readback differs from the staged slide model");
         }

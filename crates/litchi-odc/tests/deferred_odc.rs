@@ -17,7 +17,7 @@ const ODC: &str = concat!(
 );
 
 fn exercise(bytes: Vec<u8>) -> Option<litchi_core::Error> {
-    match FlatChart::from_bytes(bytes) {
+    match FlatChart::from_bytes(&bytes) {
         Ok(flat) => {
             if let Some(plot) = flat.plot_area() {
                 for axis in plot.axes() {
@@ -45,7 +45,7 @@ fn assert_invalid(case: &str, bytes: Vec<u8>) {
 
 #[test]
 fn flat_chart_reads_tree_preserves_bytes_and_rejects_wrong_family() {
-    let flat = FlatChart::from_bytes(ODC.as_bytes().to_vec()).unwrap();
+    let flat = FlatChart::from_bytes(ODC.as_bytes()).unwrap();
     assert_eq!(flat.as_bytes(), ODC.as_bytes());
     assert!(flat.chart().all_text().contains("Revenue"));
     assert!(flat.find_axis("primary-x").is_some());
@@ -70,7 +70,7 @@ fn flat_chart_preserves_a_chart_class_alias_losslessly() {
             "xmlns:chart=",
             "xmlns:c=\"urn:oasis:names:tc:opendocument:xmlns:chart:1.0\" xmlns:chart=",
         );
-    let flat = FlatChart::from_bytes(input.clone().into_bytes()).unwrap();
+    let flat = FlatChart::from_bytes(&input.clone().into_bytes()).unwrap();
     let class = flat.chart().chart_class().unwrap();
     assert_eq!(class.kind(), ChartClassKind::Bar);
     assert_eq!(class.lexical(), "c:bar");
@@ -82,7 +82,7 @@ fn flat_chart_preserves_a_chart_class_alias_losslessly() {
 
 #[test]
 fn flat_axis_transaction_is_lossless_source_checked_and_reversible() {
-    let source = FlatChart::from_bytes(ODC.as_bytes().to_vec()).unwrap();
+    let source = FlatChart::from_bytes(ODC.as_bytes()).unwrap();
     let no_op = source.edit().commit().unwrap();
     assert_eq!(no_op.snapshot().as_bytes(), source.as_bytes());
     assert!(no_op.patch().changes().is_empty());
@@ -100,7 +100,7 @@ fn flat_axis_transaction_is_lossless_source_checked_and_reversible() {
     assert!(commit.patch().is_applicable_to(&source));
 
     let unrelated =
-        FlatChart::from_bytes(ODC.replace("keep-me", "also-kept").into_bytes()).unwrap();
+        FlatChart::from_bytes(&ODC.replace("keep-me", "also-kept").into_bytes()).unwrap();
     assert!(!commit.patch().is_applicable_to(&unrelated));
     assert!(commit.patch().apply(&unrelated).is_err());
 
@@ -145,7 +145,7 @@ fn malformed_and_misplaced_chart_inputs_return_typed_errors() {
     let foreign = content(
         r#"<office:chart><chart:chart chart:class="chart:bar"><chart:plot-area/><ext:thing xmlns:ext="urn:example" ext:attr="1"/></chart:chart></office:chart>"#,
     );
-    assert!(FlatChart::from_bytes(foreign).is_ok());
+    assert!(FlatChart::from_bytes(&foreign).is_ok());
     let mut invalid_utf8 = ODC.as_bytes().to_vec();
     invalid_utf8.insert(invalid_utf8.len() / 2, 0x80);
     assert_invalid("invalid UTF-8", invalid_utf8);

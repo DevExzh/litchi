@@ -26,7 +26,7 @@ const HARDENING_SEED: &str = concat!(
 
 #[test]
 fn flat_pages_and_noop_bytes_stay_exact() {
-    let drawing = FlatDrawing::from_bytes(SHAPE_FODG.as_bytes().to_vec()).unwrap();
+    let drawing = FlatDrawing::from_bytes(SHAPE_FODG.as_bytes()).unwrap();
     assert_eq!(drawing.pages().len(), 1);
     assert_eq!(drawing.as_bytes(), SHAPE_FODG.as_bytes());
     assert_eq!(drawing.clone().into_bytes(), SHAPE_FODG.as_bytes());
@@ -34,7 +34,7 @@ fn flat_pages_and_noop_bytes_stay_exact() {
 
 #[test]
 fn flat_shape_text_edit_is_lossless_and_transactional() {
-    let source = FlatDrawing::from_bytes(SHAPE_FODG.as_bytes().to_vec()).unwrap();
+    let source = FlatDrawing::from_bytes(SHAPE_FODG.as_bytes()).unwrap();
     assert_eq!(source.pages()[0].shapes()[0].text(), "Old label");
     let mut edit = source.edit();
     edit.set_shape_text(0, 0, "New <label>").unwrap();
@@ -52,7 +52,7 @@ fn flat_shape_text_edit_is_lossless_and_transactional() {
     assert_eq!(reapplied.as_bytes(), commit.snapshot().as_bytes());
 
     let different = FlatDrawing::from_bytes(
-        SHAPE_FODG
+        &SHAPE_FODG
             .replace("Old label", "Different label")
             .into_bytes(),
     )
@@ -90,7 +90,7 @@ fn flat_wrong_family_and_malformed_or_misplaced_structures_are_typed_errors() {
     ];
     for case in cases {
         assert!(matches!(
-            FlatDrawing::from_bytes(case.into_bytes()),
+            FlatDrawing::from_bytes(case.as_bytes()),
             Err(Error::InvalidFormat(_))
         ));
     }
@@ -100,18 +100,18 @@ fn flat_wrong_family_and_malformed_or_misplaced_structures_are_typed_errors() {
 fn flat_truncation_and_mutation_sweeps_never_panic() {
     let bytes = HARDENING_SEED.as_bytes();
     for end in 0..bytes.len() {
-        drop(FlatDrawing::from_bytes(bytes[..end].to_vec()));
+        drop(FlatDrawing::from_bytes(&bytes[..end].to_vec()));
     }
     for position in 0..bytes.len() {
         let mut mutated = bytes.to_vec();
         mutated[position] ^= 1;
-        drop(FlatDrawing::from_bytes(mutated));
+        drop(FlatDrawing::from_bytes(&mutated));
     }
-    assert!(FlatDrawing::from_bytes(bytes.to_vec()).is_ok());
+    assert!(FlatDrawing::from_bytes(bytes).is_ok());
     let mut invalid_utf8 = bytes.to_vec();
     invalid_utf8.insert(bytes.len() / 2, 0xfe);
     assert!(matches!(
-        FlatDrawing::from_bytes(invalid_utf8),
+        FlatDrawing::from_bytes(&invalid_utf8),
         Err(Error::InvalidFormat(_))
     ));
 }

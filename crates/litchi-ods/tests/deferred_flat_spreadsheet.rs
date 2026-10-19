@@ -8,7 +8,7 @@ const PACKAGED: &[u8] = include_bytes!("../../../test-data/odf/corpus/calc-formu
 
 #[test]
 fn reads_real_flat_calc_sheets_cells_metadata_and_source_exactly() {
-    let flat = FlatSpreadsheet::from_bytes(FLAT_SAMPLE.as_bytes().to_vec())
+    let flat = FlatSpreadsheet::from_bytes(FLAT_SAMPLE.as_bytes())
         .expect("test fixture or operation should succeed");
     assert_eq!(flat.sheets().len(), 2);
     assert_eq!(
@@ -71,7 +71,7 @@ fn repeated_cells_are_logically_addressable_without_expansion() {
         r#"<table:table-cell office:value-type="string"><text:p>end</text:p></table:table-cell>"#,
         r#"</table:table-row></table:table></office:spreadsheet></office:body></office:document>"#,
     );
-    let flat = FlatSpreadsheet::from_bytes(xml.as_bytes().to_vec())
+    let flat = FlatSpreadsheet::from_bytes(xml.as_bytes())
         .expect("test fixture or operation should succeed");
     let sheet = flat
         .sheet("R")
@@ -99,15 +99,15 @@ fn repeated_cells_are_logically_addressable_without_expansion() {
 #[test]
 fn wrappers_reject_wrong_family_package_and_garbage() {
     let presentation = br#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/vnd.oasis.opendocument.presentation"><office:body><office:presentation/></office:body></office:document>"#;
-    assert!(FlatSpreadsheet::from_bytes(presentation.to_vec()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(PACKAGED.to_vec()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(Vec::new()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(b"not XML".to_vec()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(presentation).is_err());
+    assert!(FlatSpreadsheet::from_bytes(PACKAGED).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&[]).is_err());
+    assert!(FlatSpreadsheet::from_bytes(b"not XML").is_err());
 }
 
 #[test]
 fn real_flat_cell_edit_preserves_linked_shape_and_reopens() {
-    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes().to_vec())
+    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut edit = original
         .transaction()
@@ -145,7 +145,7 @@ fn real_flat_cell_edit_preserves_linked_shape_and_reopens() {
 
 #[test]
 fn odfpy_dde_edit_preserves_inert_source_without_inventing_metadata() {
-    let original = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
+    let original = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut edit = original
         .transaction()
@@ -187,7 +187,7 @@ fn odfpy_dde_edit_preserves_inert_source_without_inventing_metadata() {
 
 #[test]
 fn no_op_is_byte_exact_and_unmodeled_changed_rows_are_refused() {
-    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes().to_vec())
+    let original = FlatSpreadsheet::from_bytes(FLAT_IMAGE.as_bytes())
         .expect("test fixture or operation should succeed");
     let commit = original
         .transaction()
@@ -201,7 +201,7 @@ fn no_op_is_byte_exact_and_unmodeled_changed_rows_are_refused() {
         "<text:p>test</text:p>",
         "<text:p>test</text:p><office:annotation><text:p>keep</text:p></office:annotation>",
     );
-    let source = FlatSpreadsheet::from_bytes(annotated.as_bytes().to_vec())
+    let source = FlatSpreadsheet::from_bytes(annotated.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut edit = source
         .transaction()
@@ -222,7 +222,7 @@ fn duplicate_names_require_an_unambiguous_selector() {
         r#"<table:table table:name="Same"><table:table-row/></table:table>"#,
         r#"</office:spreadsheet></office:body></office:document>"#,
     );
-    let snapshot = FlatSpreadsheet::from_bytes(xml.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(xml.as_bytes())
         .expect("test fixture or operation should succeed");
     assert!(snapshot.sheet("Same").is_err());
     assert_eq!(
@@ -280,7 +280,7 @@ fn duplicate_names_require_an_unambiguous_selector() {
 
 #[test]
 fn patch_is_exact_source_checked_reversible_and_stale_safe() {
-    let source = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
+    let source = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut transaction = source
         .transaction()
@@ -330,7 +330,7 @@ fn input_output_and_patch_limits_enforce_exact_n_and_n_plus_one() {
         .is_err()
     );
 
-    let source = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
+    let source = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes())
         .expect("test fixture or operation should succeed");
     let stage = |limits| {
         let mut transaction = source
@@ -369,14 +369,14 @@ fn input_output_and_patch_limits_enforce_exact_n_and_n_plus_one() {
 
 #[test]
 fn trailing_content_is_rejected_and_formatted_source_is_read_only() {
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}trailing").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}trailing").into_bytes()).is_err());
     assert!(
-        FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}<![CDATA[trailing]]>").into_bytes())
+        FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}<![CDATA[trailing]]>").into_bytes())
             .is_err()
     );
 
     let formatted = FLAT_DDE.replacen("><", ">\n<", 1);
-    let snapshot = FlatSpreadsheet::from_bytes(formatted.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(formatted.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut transaction = snapshot
         .transaction()
@@ -399,7 +399,7 @@ fn changed_publication_uses_quote_aware_shared_compactness_rules() {
         format!(" {FLAT_DDE}"),
     ];
     for source in formatted {
-        let snapshot = FlatSpreadsheet::from_bytes(source.as_bytes().to_vec())
+        let snapshot = FlatSpreadsheet::from_bytes(source.as_bytes())
             .expect("test fixture or operation should succeed");
         let mut transaction = snapshot
             .transaction()
@@ -415,7 +415,7 @@ fn changed_publication_uses_quote_aware_shared_compactness_rules() {
     }
 
     let quoted = FLAT_DDE.replacen("<office:document ", "<office:document quoted=\"> <\" ", 1);
-    let snapshot = FlatSpreadsheet::from_bytes(quoted.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(quoted.as_bytes())
         .expect("test fixture or operation should succeed");
     let mut transaction = snapshot
         .transaction()
@@ -435,7 +435,7 @@ fn changed_publication_uses_quote_aware_shared_compactness_rules() {
 
 #[test]
 fn transaction_shares_source_and_reports_absent_selectors() {
-    let snapshot = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes().to_vec())
+    let snapshot = FlatSpreadsheet::from_bytes(FLAT_DDE.as_bytes())
         .expect("test fixture or operation should succeed");
     let first = snapshot.to_bytes();
     let second = snapshot.to_bytes();
@@ -468,11 +468,11 @@ fn transaction_shares_source_and_reports_absent_selectors() {
 
 #[test]
 fn content_events_outside_the_document_root_are_rejected() {
-    assert!(FlatSpreadsheet::from_bytes(format!("text{FLAT_DDE}").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("<![CDATA[]]>{FLAT_DDE}").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}<![CDATA[]]>").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}text").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!(" \n{FLAT_DDE}").into_bytes()).is_ok());
+    assert!(FlatSpreadsheet::from_bytes(&format!("text{FLAT_DDE}").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("<![CDATA[]]>{FLAT_DDE}").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}<![CDATA[]]>").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}text").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(&format!(" \n{FLAT_DDE}").into_bytes()).is_ok());
 }
 
 /// XML 1.0 `Misc` (whitespace, comments, processing instructions) may
@@ -482,7 +482,7 @@ fn content_events_outside_the_document_root_are_rejected() {
 fn xml_misc_after_the_document_root_is_admitted() {
     for tail in [" ", "\n", "<!--outside-->", "<?pi data?>\n"] {
         assert!(
-            FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}{tail}").into_bytes()).is_ok(),
+            FlatSpreadsheet::from_bytes(&format!("{FLAT_DDE}{tail}").into_bytes()).is_ok(),
             "{tail:?}"
         );
     }

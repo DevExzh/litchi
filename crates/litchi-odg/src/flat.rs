@@ -37,13 +37,13 @@ struct State {
 pub struct FlatDrawing(Arc<State>);
 
 impl FlatDrawing {
-    /// Opens a flat ODG document from owned bytes.
+    /// Opens a flat ODG document; the bytes are copied.
     ///
     /// # Errors
     ///
     /// Returns an error when the bytes are not a bounded, structurally valid FODG document.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        parse(bytes).map(|state| Self(Arc::new(state)))
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        parse(bytes.to_vec()).map(|state| Self(Arc::new(state)))
     }
 
     /// Returns the parsed drawing pages.
@@ -238,7 +238,7 @@ impl FlatDrawingEdit {
             bytes.splice(span.clone(), replacement.bytes());
             previous_start = span.start;
         }
-        let snapshot = FlatDrawing::from_bytes(bytes)?;
+        let snapshot = FlatDrawing::from_bytes(&bytes)?;
         for change in &changes {
             let actual = snapshot.pages()[change.page].shapes()[change.shape].text();
             if actual != change.after {

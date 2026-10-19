@@ -76,8 +76,8 @@ impl FlatChart {
     ///
     /// Returns an error when the input is not a bounded, structurally valid
     /// flat ODC document.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, crate::Limits::default())
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes.to_vec(), crate::Limits::default())
     }
 
     /// Opens flat ODC XML under caller-selected limits retained by edits.

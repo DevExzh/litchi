@@ -6,7 +6,7 @@ const FLAT_TEXT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:documen
 
 #[test]
 fn flat_text_paragraph_edit_commits_and_round_trips() {
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let mut edit = source.edit();
     edit.update_paragraph(0, "Rewritten & Intro")
         .unwrap()
@@ -25,7 +25,7 @@ fn flat_text_paragraph_edit_commits_and_round_trips() {
     assert!(commit.document().xml().contains("style:name=\"keep-me\""));
     assert!(!commit.document().xml().contains('\n'));
 
-    let reopened = Document::from_bytes(commit.document().to_bytes()).unwrap();
+    let reopened = Document::from_bytes(&commit.document().to_bytes()).unwrap();
     let paragraphs: Vec<_> = reopened
         .elements()
         .unwrap()
@@ -50,7 +50,7 @@ fn flat_text_paragraph_edit_commits_and_round_trips() {
 
 #[test]
 fn flat_text_mutation_preserves_settings_bytes() {
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let mut edit = source.edit();
     edit.update_paragraph(1, "Unrelated edit").unwrap().unwrap();
     let commit = edit.commit().unwrap();
@@ -59,7 +59,7 @@ fn flat_text_mutation_preserves_settings_bytes() {
 
 #[test]
 fn flat_text_missing_selector_returns_none_without_mutating_source() {
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let mut edit = source.edit();
     assert!(
         edit.update_paragraph(99, "Out of bounds")
@@ -75,7 +75,7 @@ fn flat_text_missing_selector_returns_none_without_mutating_source() {
 
 #[test]
 fn flat_text_structured_paragraph_edit_is_refused_losslessly() {
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let mut edit = source.edit();
     assert!(edit.update_paragraph(2, "Would discard markup").is_err());
     assert_eq!(source.as_bytes(), FLAT_TEXT.as_bytes());
@@ -83,7 +83,7 @@ fn flat_text_structured_paragraph_edit_is_refused_losslessly() {
 
 #[test]
 fn flat_text_empty_commit_is_an_exact_no_op() {
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let commit = source.edit().commit().unwrap();
     assert_eq!(commit.document().as_bytes(), source.as_bytes());
     assert_eq!(
@@ -95,7 +95,7 @@ fn flat_text_empty_commit_is_an_exact_no_op() {
 #[test]
 fn formatted_flat_text_no_op_is_exact_but_changed_commit_refuses() {
     let formatted = FLAT_TEXT.replacen("<office:styles>", "\n<office:styles>", 1);
-    let source = Document::from_bytes(formatted.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(formatted.as_bytes()).unwrap();
     let no_op = source.edit().commit().unwrap();
     assert_eq!(no_op.document().as_bytes(), formatted.as_bytes());
 
@@ -223,7 +223,7 @@ fn flat_text_limits_accept_exact_caps_and_reject_cap_plus_one() {
 fn concurrent_flat_text_saves_publish_only_complete_documents() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("shared.fodt");
-    let first = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let first = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let mut second_edit = first.edit();
     second_edit
         .update_paragraph(0, "Second writer")
@@ -270,7 +270,7 @@ fn failed_flat_text_save_preserves_foreign_temp_and_leaves_no_owned_temp() {
     std::fs::create_dir(&path).unwrap();
     let foreign = directory.path().join(".blocked.fodt.litchi.tmp");
     std::fs::write(&foreign, b"foreign").unwrap();
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     assert!(source.save(&path).is_err());
     assert_eq!(std::fs::read(&foreign).unwrap(), b"foreign");
     assert_eq!(
@@ -292,7 +292,7 @@ fn flat_text_save_refuses_destination_symlinks() {
     std::fs::write(&victim, b"victim").unwrap();
     let destination = directory.path().join("link.fodt");
     symlink(&victim, &destination).unwrap();
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     assert!(source.save(destination).is_err());
     assert_eq!(std::fs::read(victim).unwrap(), b"victim");
 }
@@ -300,7 +300,7 @@ fn flat_text_save_refuses_destination_symlinks() {
 #[test]
 fn flat_text_selector_ignores_paragraphs_nested_in_sections() {
     let xml = r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:text><t:section t:name="nested"><t:p>Nested paragraph</t:p></t:section><t:p>Top paragraph</t:p></o:text></o:body></o:document>"#;
-    let source = Document::from_bytes(xml.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(xml.as_bytes()).unwrap();
     let mut edit = source.edit();
     edit.update_paragraph(0, "Updated top").unwrap().unwrap();
     let committed = edit.commit().unwrap().into_document();
@@ -308,7 +308,7 @@ fn flat_text_selector_ignores_paragraphs_nested_in_sections() {
     assert!(committed.xml().contains("<t:p>Updated top</t:p>"));
 
     let nested_only = r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:text><t:section t:name="nested"><t:p>Nested paragraph</t:p></t:section></o:text></o:body></o:document>"#;
-    let source = Document::from_bytes(nested_only.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(nested_only.as_bytes()).unwrap();
     let mut edit = source.edit();
     assert!(edit.update_paragraph(0, "Must refuse").unwrap().is_none());
     assert_eq!(source.as_bytes(), nested_only.as_bytes());
@@ -322,7 +322,7 @@ fn flat_text_save_supports_a_bare_relative_destination() {
         .tempfile_in(".")
         .unwrap();
     let bare = std::path::PathBuf::from(reservation.path().file_name().unwrap());
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     source.save(&bare).unwrap();
     assert_eq!(std::fs::read(&bare).unwrap(), source.as_bytes());
     drop(reservation);
@@ -335,7 +335,7 @@ fn flat_text_save_supports_non_utf8_destinations() {
     use std::os::unix::ffi::OsStringExt;
 
     let directory = tempfile::tempdir().unwrap();
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let non_utf8 = directory
         .path()
         .join(OsString::from_vec(b"flat-\xff.fodt".to_vec()));
@@ -350,7 +350,7 @@ fn flat_text_save_supports_near_name_max_destinations() {
     use std::os::unix::ffi::OsStringExt;
 
     let directory = tempfile::tempdir().unwrap();
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let mut long_name = vec![b'n'; 245];
     long_name.extend_from_slice(b".fodt");
     let near_name_max = directory.path().join(OsString::from_vec(long_name));
@@ -363,7 +363,7 @@ fn flat_text_save_supports_near_name_max_destinations() {
 fn flat_text_save_publishes_windows_destination_atomically() {
     let directory = tempfile::tempdir().unwrap();
     let destination = directory.path().join("published.fodt");
-    let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     source.save(&destination).unwrap();
     assert_eq!(std::fs::read(destination).unwrap(), source.as_bytes());
 }
