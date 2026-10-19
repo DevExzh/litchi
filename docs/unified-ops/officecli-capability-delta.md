@@ -184,7 +184,7 @@ Element gap rows:
 | rtf | 0 | 11 | 1 | 0 | 5 | 0 |
 | xlsx | 0 | 2 | 4 | 0 | 1 | 0 |
 | xlsb | 0 | 3 | 4 | 0 | 1 | 0 |
-| xls | 7 | 0 | 4 | 0 | 1 | 0 |
+| xls | 0 | 7 | 4 | 0 | 1 | 0 |
 | pptx | 0 | 0 | 3 | 0 | 2 | 0 |
 | ppt | 0 | 6 | 3 | 0 | 2 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -196,7 +196,7 @@ Element gap rows:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 0 | 2 | 3 | 0 | 2 | 0 |
-| ods | 7 | 0 | 4 | 0 | 1 | 0 |
+| ods | 0 | 7 | 4 | 0 | 1 | 0 |
 | odt | 0 | 9 | 1 | 0 | 5 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -210,7 +210,7 @@ Property gap rows:
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
 | xlsx | 0 | 285 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
-| xls | 189 | 219 | 79 | 0 | 1 | 0 |
+| xls | 0 | 408 | 79 | 0 | 1 | 0 |
 | pptx | 16 | 430 | 57 | 0 | 12 | 0 |
 | ppt | 0 | 609 | 58 | 0 | 12 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -222,7 +222,7 @@ Property gap rows:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 0 | 603 | 58 | 0 | 12 | 0 |
-| ods | 189 | 247 | 79 | 0 | 1 | 0 |
+| ods | 0 | 436 | 79 | 0 | 1 | 0 |
 | odt | 0 | 880 | 35 | 0 | 19 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -232,7 +232,7 @@ All gap rows by tier:
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
 | P0 | 16 | 0 | 0 | 0 | 4 | 0 |
-| P1 | 426 | 6023 | 0 | 0 | 55 | 0 |
+| P1 | 34 | 6415 | 0 | 0 | 55 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -246,8 +246,8 @@ properties share its entry unless an entry names the property):
 | odp-family | deferred | 0328 | 666 | `delta:odp:*` | ODP is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
 | ppt-family | deferred | 0323 | 676 | `delta:ppt:*` | PPT is outside the v1 boundary; record 0323 lists its element follow-ups |
 | xlsb-family | deferred | 0322 | 477 | `delta:xlsb:*` | XLSB is outside the v1 boundary; record 0322 lists its worksheet-feature follow-ups |
-| xls-parity | planned | WP10 | 196 | `delta:xls:*` | XLS element parity: the gap element families and their properties (audit WP10, record 0327) |
-| ods-parity | planned | WP11 | 196 | `delta:ods:*` | ODS element parity: the gap element families and their properties (audit WP11, record 0327) |
+| xls-parity | deferred | 0327/0316 | 196 | `delta:xls:*` | XLS element parity (audit WP10): the gap element families and their properties (chart, chart series and axes, run, table, detected table), deferred to P1 because XLS is outside the v1 boundary (record 0344; owner memo 0331 item 25); follow-ups: record 0327 §4 (typed refusals of the XLS feature nodes), record 0316 (XLS structural follow-ups) and record 0339 F5 (detected tables) |
+| ods-parity | deferred | 0327 | 196 | `delta:ods:*` | ODS element parity (audit WP11): the gap element families and their properties (chart, chart series and axes, run, table, detected table), deferred to P1 because ODS is outside the v1 boundary (record 0344; owner memo 0331 item 25); follow-ups: record 0327 §4 (typed refusals of the ODS feature nodes) and record 0339 F5 (detected tables) |
 | spreadsheet-p2-families | deferred | 0327 | 166 | `delta:xls:pivottable`, `delta:xls:slicer`, `delta:xls:sparkline`, `delta:xls:ole`, `delta:ods:pivottable`, `delta:ods:slicer`, `delta:ods:sparkline`, `delta:ods:ole` | §13 P2 families (pivot tables, slicers, sparklines, OLE) stay out of the XLS and ODS parity work packages |
 | xls-breadth | deferred | 0327 | 219 | `delta:xls:*.*` | XLS property breadth of supported elements; XLS is outside the v1 boundary |
 | ods-breadth | deferred | 0327 | 247 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
@@ -264,6 +264,33 @@ properties share its entry unless an entry names the property):
 | mermaid-diagram | out-of-scope |  | 83 | `delta:*:diagram`, `delta:*:diagram.*` | OfficeCLI's `diagram` renders Mermaid text into native shapes or a picture: a layout and rendering engine, which design §10 leaves out of scope (Litchi's typed SmartArt is the `smartart` element) |
 | complex-field-parts | out-of-scope |  | 16 | `delta:*:fieldChar`, `delta:*:instrText` | Litchi models a complex field as one `field` node (field refresh, record 0279); its `fldChar`/`instrText` runs are raw markup (design §12) |
 | numbering-native-ids | out-of-scope |  | 20 | `delta:*:abstractNum.id`, `delta:*:abstractNum.abstractNumId`, `delta:*:num.id`, `delta:*:num.numId`, `delta:*:level.ilvl` | a numbering identifier is a native identity, addressed only by raw paths (ADR 0034, record 0319) |
+
+## Milestone follow-ups
+
+780 follow-ups in the registry and capability goldens (95 distinct texts) name only a milestone or a step of one (`M2 (validate)`, `M1-extended (R4x)`). `tools/officecli_dispositions.json` (`followUps`) maps each to the record or work package that owns it now; the tables above show the id after the text (`M2 (validate) → 0336`). `--check` fails on a milestone-only follow-up without a current id and on a map entry that maps none (audit WP13, record 0344).
+
+| Map entry | Follow-ups | Formats | Golden follow-ups | Current id | Now |
+|---|---|---|---:|---|---|
+| validate-views | `M2 (validate)` | doc, docx, keynote, numbers, odb, odc, odf, odg, odi, odm, odp, ods, odt, oth, pages, ppt, pptx, rtf, xls, xlsb, xlsx | 138 | 0336 | `validate` landed in record 0336 (structural checks); the issues and forms views it would feed are still refused and their text predates it (record 0336 F4: schema validation) |
+| docx-batch-integration | `M2 (batch command and transfer families)` | docx | 24 | 0336 | batch items for reads and the raw, dump and validate commands: record 0336 F2 (the batch channel and transaction steps) |
+| docx-table-properties | `M2 (DOCX table properties)` | docx | 4 | 0342 | record 0342 implemented the table `style`/border and row property sets; this operation-gap entry predates it, and the DOCX lane reconciles its wording |
+| docx-mixed-fanout | `M2 (homogeneous mutation fanout)` | docx | 4 | 0332 | a paragraph/run union target is refused before staging: P1 breadth under record 0332 |
+| docx-unlocated-objects | `R4x` | docx | 36 | 0332 | legacy form fields, embedded objects and the other DOCX objects without a located reader: P1/P2 breadth under record 0332 (`docx-breadth`) |
+| ooxml-encrypted-edits | `M2 (DOCX encryption-profile-preserving native edits)`, `M2 (XLSX encryption-profile-preserving native edits)` | docx, xlsx | 20 | 0332 | native edits keep an encrypted package's profile only through `SaveOptions::reencrypt`: P1 breadth under record 0332 |
+| xlsx-projection | `M1-extended (R4x)`, `M1 XLSX *` | xlsx | 98 | 0332 | XLSX content the leaf reads but the node does not project (pivot tables, slicers, sparklines, merged ranges, OLE, sheet views and print settings, hyperlink targets, rich text, gradient and border colour detail): P1/P2 breadth under record 0332 (`xlsx-breadth`); record 0320 owns the worksheet features |
+| xlsx-write-breadth | `M2 XLSX *`, `use Flavor::Document; M2 XLSX template creation` | xlsx | 60 | 0332 | XLSX write breadth beyond the P0 surface record 0338 (WP16) closed: templates, merge guards, OfficeCLI input conventions, border vocabulary, the style-resource lifecycle, non-worksheet tabs, structural batches; P1 under record 0332 |
+| computed-values | `M4 follow-up: project computed values in cell views` | xlsb, xlsx | 6 | 0266 | `File::evaluate` and `File::recalculate` compute formula results (record 0266); projecting them into cell views is open |
+| xlsb-family | `M1-extended (R4x)`, `M1-extended (R4d)`, `M2 XLSB *`, `use Flavor::Document; M2 XLSB template creation` | xlsb | 144 | 0322 | XLSB is outside the v1 boundary; record 0322 owns its projection, worksheet-feature and structural follow-ups (`xlsb-family`) |
+| xls-projection | `M1-extended (R6b)` | xls | 44 | 0327 | XLS element projection (tables, charts, series, axes, runs, merged ranges, pivots, OLE, array formulas): deferred-P1 (owner memo 0331 item 25, record 0344); record 0327 §4 owns the feature-node follow-ups |
+| xls-write-breadth | `M2 XLS *`, `M4 XLS *`, `use Flavor::Document; M2 XLS template creation` | xls | 22 | 0316 | XLS structural and setter breadth (dependency closures, 3-D ranges, defined names, outline and visibility setters, templates): record 0316's XLS structural follow-ups; XLS is outside the v1 boundary |
+| ppt-family | `M1-extended`, `M2 PPT *`, `use Flavor::Document; M2 PPT template creation` | ppt | 20 | 0323 | PPT is outside the v1 boundary; record 0323 owns its element and write follow-ups (`ppt-family`) |
+| pptx-projection | `M1-extended` | pptx | 23 | 0332 | PPTX content not projected as nodes or keys (zoom and 3D frames, the timing tree, notes slides and masters, backgrounds, transitions, OfficeCLI's list vocabulary): P1 breadth under record 0332 (`pptx-breadth`); record 0321 owns the element follow-ups |
+| pptx-slide-notes | `M1-Δ1` | pptx | 2 | 0333 | a slide's notes are addressed as `/slide[N]/notes`; notes text writes are the planned PPTX P0 residue (record 0333 F1) |
+| pptx-write-breadth | `M2 PPTX *` | pptx | 28 | 0332 | PPTX structural write breadth (non-append placement, group/master/layout shapes, dependency-aware removal, the final slide, templates, signature removal on managed sources): P1 under record 0332; record 0333 (WP3) owns the P0 residue |
+| doc-family | `M2 DOC *` | doc | 10 | 0324 | DOC is outside the v1 boundary; record 0324 owns its element and structural follow-ups (`doc-family`) |
+| odt-family | `M6 ODT *` | odm, odt, oth | 54 | 0328 | ODT (and OTH/ODM, which hold the ODT handle) is outside the v1 boundary; record 0328 owns the ODT/ODP/RTF wave |
+| odp-family | `M6 ODP *` | odp | 25 | 0328 | ODP is outside the v1 boundary; record 0328 owns the ODT/ODP/RTF wave |
+| rtf-family | `M6 RTF *` | rtf | 18 | 0328 | RTF is outside the v1 boundary; record 0328 owns the ODT/ODP/RTF wave |
 
 ## docx
 
@@ -287,7 +314,7 @@ properties share its entry unless an entry names the property):
 | fieldChar |  | gap | P0 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
 | footer | footer | supported |  |  |  |
 | footnote | footnote | supported |  |  |  |
-| formfield | formfield | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
+| formfield | formfield | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
 | header | header | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
 | instrText |  | gap | P0 | out-of-scope (complex-field-parts) | none: out of scope (record 0332) |
@@ -295,18 +322,18 @@ properties share its entry unless an entry names the property):
 | markdown |  | out of scope | P2 | out-of-scope (markdown) | an add-time import format, not an element of the document |
 | num | num | supported |  |  |  |
 | numbering | numbering | supported |  |  |  |
-| ole | ole | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
+| ole | ole | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
 | pagebreak | break | supported |  |  |  |
 | paragraph | paragraph | supported |  |  |  |
 | permStart |  | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | picture | picture | supported |  |  |  |
 | ptab |  | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
-| revision | revision | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x |
+| revision | revision | gap | P2 | deferred-P2 0332 (docx-breadth) | R4x → 0332 |
 | run | run | supported |  |  |  |
 | sdt | sdt | supported |  |  |  |
 | section | section | supported |  |  |  |
-| shape | shape | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x |
+| shape | shape | gap | P1 | deferred-P1 0332 (docx-breadth) | R4x → 0332 |
 | style | style | supported |  |  |  |
 | styles | styles | supported |  |  |  |
 | tab | tab | supported |  |  |  |
@@ -335,7 +362,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `set` | `paragraph` | `wrapped-or-unproven-selection` | paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position (record 0307) | L-DOCX-W3 |
 | `set` | `run` | `wrapped-or-unproven-selection` | direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal | L-DOCX-W2 |
-| `set` | `paragraph/run` | `mixed-paragraph-run-fanout` | one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf | M2 (homogeneous mutation fanout) |
+| `set` | `paragraph/run` | `mixed-paragraph-run-fanout` | one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf | M2 (homogeneous mutation fanout) → 0332 |
 | `set` | `paragraph/run` | `managed-transaction` | the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available | L-DOCX-W5 |
 | `set` | `paragraph/run` | `complex-leaf-content` | fields and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits; markup-compatibility alternate content in a run is one opaque object, so a text set over one whose branches hold text (a text box) is refused | L-DOCX-W2 / record 0011 / record 0307 (text-box stories) |
 | `add` | `paragraph/run` | `managed-transaction` | structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
@@ -349,23 +376,23 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `move` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `swap` | `paragraph/run` | `managed-transaction` | paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
 | `swap` | `paragraph/run` | `nested-or-unproven-selection` | only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors | L-DOCX-W3 |
-| `set` | `table/row` | `table-properties` | table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated | M2 (DOCX table properties) |
+| `set` | `table/row` | `table-properties` | table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated | M2 (DOCX table properties) → 0342 |
 | `swap` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `create` | `document` | `strict-conformance` | the DOCX creator emits Transitional packages and refuses a Strict conformance request rather than silently downgrading it | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `document` | `noncore-initial-metadata` | initial metadata outside the DOCX core-properties part is not representable by the creator and is refused rather than dropped | CreateOptions::metadata (DOCX core properties) |
-| `batch` | `document` | `text-paragraph-and-soft-breaks` | full text-output parity remains incomplete; paragraph addition splits normalized LF into paragraphs with VT inline breaks; run setters update the first literal text node and mark the owning same-paragraph cached field dirty; run addition and paragraph setters normalize controls to inline breaks | M2 (batch command and transfer families) |
-| `batch` | `document` | `read-and-extended-commands` | get, query, view, raw, raw-set, add-part, validate and import are not integrated into batch item results | M2 (batch command and transfer families) |
-| `batch` | `document` | `non-v2-dump-metadata` | dumpVersion other than explicit v2 is refused for the whole batch; absent metadata uses current semantics | M2 (batch command and transfer families) |
-| `batch` | `document` | `add-from` | copying an add source requires typed transfer families not yet integrated into the command channel | M2 (batch command and transfer families) |
-| `batch` | `document` | `move-properties` | move-time property assignments are not integrated and are never silently dropped | M2 (batch command and transfer families) |
-| `batch` | `document` | `move-parent-and-relative-anchor` | move to a parent combined with before or after is not represented by the current placement model | M2 (batch command and transfer families) |
-| `set` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) |
-| `add` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) |
-| `remove` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) |
-| `move` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) |
-| `swap` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) |
-| `edit` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) |
-| `batch` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) |
+| `batch` | `document` | `text-paragraph-and-soft-breaks` | full text-output parity remains incomplete; paragraph addition splits normalized LF into paragraphs with VT inline breaks; run setters update the first literal text node and mark the owning same-paragraph cached field dirty; run addition and paragraph setters normalize controls to inline breaks | M2 (batch command and transfer families) → 0336 |
+| `batch` | `document` | `read-and-extended-commands` | get, query, view, raw, raw-set, add-part, validate and import are not integrated into batch item results | M2 (batch command and transfer families) → 0336 |
+| `batch` | `document` | `non-v2-dump-metadata` | dumpVersion other than explicit v2 is refused for the whole batch; absent metadata uses current semantics | M2 (batch command and transfer families) → 0336 |
+| `batch` | `document` | `add-from` | copying an add source requires typed transfer families not yet integrated into the command channel | M2 (batch command and transfer families) → 0336 |
+| `batch` | `document` | `move-properties` | move-time property assignments are not integrated and are never silently dropped | M2 (batch command and transfer families) → 0336 |
+| `batch` | `document` | `move-parent-and-relative-anchor` | move to a parent combined with before or after is not represented by the current placement model | M2 (batch command and transfer families) → 0336 |
+| `set` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) → 0332 |
+| `add` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) → 0332 |
+| `remove` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) → 0332 |
+| `move` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) → 0332 |
+| `swap` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) → 0332 |
+| `edit` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) → 0332 |
+| `batch` | `document` | `unlocked-encrypted-owner` | the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (DOCX encryption-profile-preserving native edits) → 0332 |
 | `save` | `document` | `encrypted-without-reencrypt` | an encrypted DOCX cannot be published as plain bytes because that would silently downgrade its protection profile | SaveOptions::reencrypt |
 
 ## doc
@@ -434,11 +461,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `create` | `document` | `strict-conformance` | legacy DOC has one canonical binary writer and does not accept an OOXML Strict conformance request | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `document` | `unrepresentable-initial-metadata` | initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped, as is metadata combined with CryptoAPI encryption | CreateOptions::metadata (OLE property sets, record 0254) |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() | File::metadata(); /metadata node reads with the shared metadata vocabulary |
-| `add` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not add elements | M2 DOC structural body editing |
-| `remove` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not remove elements | M2 DOC structural body editing |
-| `move` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not move elements | M2 DOC structural body editing |
-| `swap` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not reorder elements | M2 DOC structural body editing |
-| `batch` | `body` | `non-text-command` | DOC atomic batches currently admit paragraph text sets only; structural and read commands remain refused | M2 DOC structural batch commands |
+| `add` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not add elements | M2 DOC structural body editing → 0324 |
+| `remove` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not remove elements | M2 DOC structural body editing → 0324 |
+| `move` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not move elements | M2 DOC structural body editing → 0324 |
+| `swap` | `body` | `structural-edit` | the DOC write adapter currently replaces existing ordinary paragraph text and does not reorder elements | M2 DOC structural body editing → 0324 |
+| `batch` | `body` | `non-text-command` | DOC atomic batches currently admit paragraph text sets only; structural and read commands remain refused | M2 DOC structural batch commands → 0324 |
 
 ## rtf
 
@@ -505,18 +532,18 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `create` | `document` | `template` | RTF template creation is not supported | use Flavor::Document |
 | `create` | `document` | `strict-conformance` | RTF does not support OOXML Strict conformance | use Conformance::Transitional |
 | `create` | `document` | `initial-metadata` | initial RTF metadata authoring is not integrated | RTF typed metadata creation |
-| `set` | `run` | `native-source-closure` | changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported; opaque body syntax is preserved when outside changed source spans with projectable UTF-8 anchors | M6 RTF rich run preservation |
-| `set` | `paragraph` | `native-source-closure` | paragraph text, alignment and layout updates require the native editor to prove the source formatting and destination closure | M6 RTF rich paragraph preservation |
-| `remove` | `paragraph` | `native-source-closure` | paragraph removal requires the native editor to prove an ordinary literal body and retain every unselected source boundary | M6 RTF rich paragraph preservation |
-| `add` | `paragraph` | `native-source-closure` | paragraph insertion requires the native editor to prove the ordinary literal body and preserve every unselected source boundary | M6 RTF rich paragraph preservation |
-| `swap` | `body` | `native-source-closure` | paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries | M6 RTF rich paragraph preservation |
-| `remove` | `run` | `native-source-closure` | run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits | M6 RTF rich run preservation |
-| `move` | `run` | `native-run-edit` | run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls | M6 RTF atomic native run edits |
-| `swap` | `run` | `native-run-edit` | run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls | M6 RTF atomic native run edits |
+| `set` | `run` | `native-source-closure` | changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported; opaque body syntax is preserved when outside changed source spans with projectable UTF-8 anchors | M6 RTF rich run preservation → 0328 |
+| `set` | `paragraph` | `native-source-closure` | paragraph text, alignment and layout updates require the native editor to prove the source formatting and destination closure | M6 RTF rich paragraph preservation → 0328 |
+| `remove` | `paragraph` | `native-source-closure` | paragraph removal requires the native editor to prove an ordinary literal body and retain every unselected source boundary | M6 RTF rich paragraph preservation → 0328 |
+| `add` | `paragraph` | `native-source-closure` | paragraph insertion requires the native editor to prove the ordinary literal body and preserve every unselected source boundary | M6 RTF rich paragraph preservation → 0328 |
+| `swap` | `body` | `native-source-closure` | paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries | M6 RTF rich paragraph preservation → 0328 |
+| `remove` | `run` | `native-source-closure` | run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits | M6 RTF rich run preservation → 0328 |
+| `move` | `run` | `native-run-edit` | run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls | M6 RTF atomic native run edits → 0328 |
+| `swap` | `run` | `native-run-edit` | run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls | M6 RTF atomic native run edits → 0328 |
 | `set` | `paragraph` | `style-application` | paragraph `style`, `numId` and `numLevel` are read-only: applying a style or list requires emitting the referenced definition's properties with the handle | record 0275 follow-up: native RTF style application |
 | `set` | `run` | `style-application` | run `rStyle` is read-only: applying a character style requires emitting its formatting with the `\cs` handle | record 0275 follow-up: native RTF style application |
 | `get` | `paragraph` | `table-cell-paragraphs` | table cells expose their flat text story; per-paragraph cell nodes (`tc/p`) are not projected | record 0275 follow-up: native RTF table structure editor |
-| `get` | `run` | `header-footer-runs` | header/footer paragraphs expose text only; their character runs are not projected | M6 RTF rich run preservation |
+| `get` | `run` | `header-footer-runs` | header/footer paragraphs expose text only; their character runs are not projected | M6 RTF rich run preservation → 0328 |
 | `set` | `cell` | `native-source-closure` | cell text is spliced into the retained source; cells whose text range contains paragraph resets, destinations or unbalanced groups, nested-table cells, compressed or non-ASCII transports are refused, and cell properties other than `text` are read-only | record 0275 follow-up: native RTF table structure editor |
 | `add` | `table` | `native-table-structure` | the native RTF editor cannot insert tables | record 0275 follow-up: native RTF table structure editor |
 | `remove` | `table` | `native-table-structure` | the native RTF editor cannot remove tables | record 0275 follow-up: native RTF table structure editor |
@@ -567,10 +594,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | hyperlink | hyperlink | supported |  |  |  |
 | iconset | conditionalFormatting | supported |  |  |  |
 | namedrange | namedrange | supported |  |  |  |
-| ole | ole | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
+| ole | ole | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | pagebreak | colbreak | supported |  |  |  |
 | picture | picture | supported |  |  |  |
-| pivottable | pivottable | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
+| pivottable | pivottable | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | range | range | supported |  |  |  |
 | raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
@@ -578,15 +605,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | run | supported |  |  |  |
 | shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
-| slicer | slicer | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
+| slicer | slicer | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | sort |  | out of scope | P1 | deferred-P1 0332 (xlsx-breadth) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
-| sparkline | sparkline | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) |
+| sparkline | sparkline | gap | P2 | deferred-P2 0332 (xlsx-breadth) | M1-extended (R4x) → 0332 |
 | table | table | supported |  |  |  |
 | topn | conditionalFormatting | supported |  |  |  |
 | uniquevalues | conditionalFormatting | supported |  |  |  |
 | validation | dataValidation | supported |  |  |  |
 | workbook | workbook | supported |  |  |  |
-|  | mergeCell | litchi-only |  |  | M1-extended (R4x) |
+|  | mergeCell | litchi-only |  |  | M1-extended (R4x) → 0332 |
 
 Properties: 1255 rows, 365 of them gaps, in [`xlsx.md`](officecli-capability-delta/xlsx.md).
 
@@ -596,30 +623,30 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `get` | `cell` | `gradient-fill-projection` | ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format | M1 XLSX lossless scalar gradient property projection |
-| `create` | `workbook` | `template` | the XLSX creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSX template creation |
+| `get` | `cell` | `gradient-fill-projection` | ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format | M1 XLSX lossless scalar gradient property projection → 0332 |
+| `create` | `workbook` | `template` | the XLSX creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSX template creation → 0332 |
 | `create` | `workbook` | `strict-conformance` | the XLSX creator emits Transitional packages and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `workbook` | `unrepresentable-initial-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | CreateOptions::metadata (OOXML document properties, record 0253) |
 | `save` | `workbook` | `execution-context-budgeting` | OpenOptions::execution checks open-boundary cancellation only; unified opens do not yet retain a managed owner for publication budgeting | managed OOXML open and publication (record 0008 A1) |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node | File::metadata(); /metadata node reads with the shared metadata vocabulary |
-| `set` | `range` | `merge-native-preservation-guards` | native merge edits refuse follower content, overlapping geometry, table intersections, group formulas and unmodeled or compatibility-owned payloads instead of discarding them | M2 XLSX dependency-aware and compatibility-aware merge edits |
-| `set` | `column` | `unit-qualified-width-input` | column width accepts native character-unit numbers; OfficeCLI unit-qualified width conversion remains pending | M2 XLSX OfficeCLI column width input conversion |
-| `set` | `workbook` | `row-column-table-targets` | row and column layout properties support scoped selectors; whole-row/column cell payloads, styles, table-driven keys and table writes remain pending | M2 XLSX row/column payload and table write admission |
-| `batch` | `workbook` | `structural-and-coalesced-commands` | worksheet lifecycle commands and distinct direct cell payload coalescing are integrated; other structural targets, broader coalescing and read commands remain pending | M2 XLSX structure and native transaction coalescing |
-| `set` | `cell` | `officecli-input-conventions` | cell values preserve typed scalar input; formulas use native formula text without a leading equals sign; OfficeCLI string inference and extended clear modes remain pending | M2 XLSX OfficeCLI input policy |
-| `set` | `cell` | `number-format-input-repair` | numberformat accepts checked native codes and OfficeCLI keyword aliases; malformed quotes are rejected under strict defaults rather than repaired by dropping trailing characters | M2 XLSX explicit number-format compatibility input policy |
-| `set` | `cell` | `fill-replacement-opaque-content` | typed solid, pattern and gradient fills support whole-fill replacement; a changed replacement refuses opaque content inside the replaced pattern or gradient child, while exact no-ops retain it | M2 XLSX lossless replacement of extended fill children |
-| `set` | `cell` | `border-color-without-line` | border colors require a resulting visible line; strict input admission rejects colors OfficeCLI silently discards on an unstyled side; clearing a line retains existing source color markup | M2 XLSX explicit invisible-border color authoring policy |
-| `set` | `cell` | `border-opaque-content` | granular border edits preserve unrelated markup; removing a side or color refuses opaque content that would be discarded | M2 XLSX lossless replacement of extended border content |
-| `get` | `cell` | `border-color-projection` | ordinary border color readback follows OfficeCLI RGB projection; native theme, indexed, automatic colors and tints remain available through Node::cell_format | M1 XLSX complete scalar border color projection |
-| `set` | `cell` | `border-native-only-edges` | the native border editor supports Strict start/end edges, interior edges and outline; the unified OfficeCLI vocabulary currently exposes physical left/right, top/bottom and diagonal edges only | M2 XLSX logical and interior border property vocabulary |
-| `set` | `cell` | `style-resource-compaction` | cell formatting edits reuse matching resources and retain existing stylesheet records; reverting formatting across separate commits can retain unused generated records | M2 XLSX generated style resource lifecycle |
-| `set` | `cell` | `font-authoring-profile` | supported cell formatting edits preserve proven Ignorable markup and require existing direct font and cell-format tables; alternate content, unproven directives, escaped namespace bindings and inherited formatting remain unsupported | M2 XLSX stylesheet creation, markup compatibility and inherited formatting |
-| `remove` | `sheet` | `non-worksheet-tabs` | worksheet removal uses native dependency guards; removal of chart, dialog and macro tabs remains pending | M2 XLSX non-worksheet tab removal |
-| `add` | `sheet` | `officecli-sheet-input-conventions` | sheet creation supports name, hidden and explicit placement, defaulting name to Sheet plus catalog count plus one; ifExists, placeholder claiming and additional sheet properties remain pending | M2 XLSX sheet creation property and replay conventions |
-| `set` | `workbook` | `unlocked-encrypted-owner` | the XLSX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (XLSX encryption-profile-preserving native edits) |
-| `edit` | `workbook` | `unlocked-encrypted-owner` | the XLSX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (XLSX encryption-profile-preserving native edits) |
-| `batch` | `workbook` | `unlocked-encrypted-owner` | the XLSX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (XLSX encryption-profile-preserving native edits) |
+| `set` | `range` | `merge-native-preservation-guards` | native merge edits refuse follower content, overlapping geometry, table intersections, group formulas and unmodeled or compatibility-owned payloads instead of discarding them | M2 XLSX dependency-aware and compatibility-aware merge edits → 0332 |
+| `set` | `column` | `unit-qualified-width-input` | column width accepts native character-unit numbers; OfficeCLI unit-qualified width conversion remains pending | M2 XLSX OfficeCLI column width input conversion → 0332 |
+| `set` | `workbook` | `row-column-table-targets` | row and column layout properties support scoped selectors; whole-row/column cell payloads, styles, table-driven keys and table writes remain pending | M2 XLSX row/column payload and table write admission → 0332 |
+| `batch` | `workbook` | `structural-and-coalesced-commands` | worksheet lifecycle commands and distinct direct cell payload coalescing are integrated; other structural targets, broader coalescing and read commands remain pending | M2 XLSX structure and native transaction coalescing → 0332 |
+| `set` | `cell` | `officecli-input-conventions` | cell values preserve typed scalar input; formulas use native formula text without a leading equals sign; OfficeCLI string inference and extended clear modes remain pending | M2 XLSX OfficeCLI input policy → 0332 |
+| `set` | `cell` | `number-format-input-repair` | numberformat accepts checked native codes and OfficeCLI keyword aliases; malformed quotes are rejected under strict defaults rather than repaired by dropping trailing characters | M2 XLSX explicit number-format compatibility input policy → 0332 |
+| `set` | `cell` | `fill-replacement-opaque-content` | typed solid, pattern and gradient fills support whole-fill replacement; a changed replacement refuses opaque content inside the replaced pattern or gradient child, while exact no-ops retain it | M2 XLSX lossless replacement of extended fill children → 0332 |
+| `set` | `cell` | `border-color-without-line` | border colors require a resulting visible line; strict input admission rejects colors OfficeCLI silently discards on an unstyled side; clearing a line retains existing source color markup | M2 XLSX explicit invisible-border color authoring policy → 0332 |
+| `set` | `cell` | `border-opaque-content` | granular border edits preserve unrelated markup; removing a side or color refuses opaque content that would be discarded | M2 XLSX lossless replacement of extended border content → 0332 |
+| `get` | `cell` | `border-color-projection` | ordinary border color readback follows OfficeCLI RGB projection; native theme, indexed, automatic colors and tints remain available through Node::cell_format | M1 XLSX complete scalar border color projection → 0332 |
+| `set` | `cell` | `border-native-only-edges` | the native border editor supports Strict start/end edges, interior edges and outline; the unified OfficeCLI vocabulary currently exposes physical left/right, top/bottom and diagonal edges only | M2 XLSX logical and interior border property vocabulary → 0332 |
+| `set` | `cell` | `style-resource-compaction` | cell formatting edits reuse matching resources and retain existing stylesheet records; reverting formatting across separate commits can retain unused generated records | M2 XLSX generated style resource lifecycle → 0332 |
+| `set` | `cell` | `font-authoring-profile` | supported cell formatting edits preserve proven Ignorable markup and require existing direct font and cell-format tables; alternate content, unproven directives, escaped namespace bindings and inherited formatting remain unsupported | M2 XLSX stylesheet creation, markup compatibility and inherited formatting → 0332 |
+| `remove` | `sheet` | `non-worksheet-tabs` | worksheet removal uses native dependency guards; removal of chart, dialog and macro tabs remains pending | M2 XLSX non-worksheet tab removal → 0332 |
+| `add` | `sheet` | `officecli-sheet-input-conventions` | sheet creation supports name, hidden and explicit placement, defaulting name to Sheet plus catalog count plus one; ifExists, placeholder claiming and additional sheet properties remain pending | M2 XLSX sheet creation property and replay conventions → 0332 |
+| `set` | `workbook` | `unlocked-encrypted-owner` | the XLSX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (XLSX encryption-profile-preserving native edits) → 0332 |
+| `edit` | `workbook` | `unlocked-encrypted-owner` | the XLSX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (XLSX encryption-profile-preserving native edits) → 0332 |
+| `batch` | `workbook` | `unlocked-encrypted-owner` | the XLSX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile | M2 (XLSX encryption-profile-preserving native edits) → 0332 |
 | `save` | `workbook` | `encrypted-without-reencrypt` | an encrypted XLSX requires explicit re-encryption for publication; ordinary output never silently emits plaintext | SaveOptions::reencrypt |
 
 ## xlsb
@@ -650,26 +677,26 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | hyperlink | hyperlink | supported |  |  |  |
 | iconset | conditionalFormatting | supported |  |  |  |
 | namedrange | namedrange | supported |  |  |  |
-| ole | ole | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
+| ole | ole | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | pagebreak | colbreak | supported |  |  |  |
 | picture | picture | supported |  |  |  |
-| pivottable | pivottable | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
+| pivottable | pivottable | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | range | range | supported |  |  |  |
 | raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
-| run | run | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| run | run | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
-| slicer | slicer | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
+| slicer | slicer | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | sort |  | out of scope | P1 | deferred-P1 0322 (xlsb-family) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
-| sparkline | sparkline | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
+| sparkline | sparkline | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | table | table | supported |  |  |  |
 | topn | conditionalFormatting | supported |  |  |  |
 | uniquevalues | conditionalFormatting | supported |  |  |  |
 | validation | dataValidation | supported |  |  |  |
 | workbook | workbook | supported |  |  |  |
-|  | mergeCell | litchi-only |  |  | M1-extended (R4x) |
+|  | mergeCell | litchi-only |  |  | M1-extended (R4x) → 0322 |
 
 Properties: 1121 rows, 471 of them gaps, in [`xlsb.md`](officecli-capability-delta/xlsb.md).
 
@@ -680,34 +707,34 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `remove` | `namedrange` | `earlier-name` | only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references | XLSB defined-name index renumbering (record 0330) |
-| `create` | `workbook` | `template` | the XLSB creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSB template creation |
+| `create` | `workbook` | `template` | the XLSB creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSB template creation → 0322 |
 | `create` | `workbook` | `strict-conformance` | the XLSB creator emits Transitional packages and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `workbook` | `unrepresentable-initial-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | CreateOptions::metadata (OOXML document properties, record 0253) |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node | File::metadata(); /metadata node reads with the shared metadata vocabulary |
-| `add` | `workbook` | `non-sheet-elements` | XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners | M2 XLSB structural add handlers for non-sheet elements |
-| `add` | `sheet` | `order-opaque-dependencies` | sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet insertion |
-| `add` | `sheet` | `vba-dependency` | sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet insertion |
-| `add` | `sheet` | `calculation-chain-dependency` | sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet insertion |
-| `add` | `sheet` | `noncontiguous-3d-dependency` | sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range | M2 XLSB 3-D dependency-aware sheet insertion |
-| `remove` | `workbook` | `non-sheet-elements` | XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners | M2 XLSB non-cell removal handlers |
-| `remove` | `sheet` | `order-opaque-dependencies` | sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata | M2 XLSB dependency-aware complete-catalog sheet removal |
-| `remove` | `sheet` | `removed-scoped-names` | sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available | M2 XLSB dependency-aware scoped-name removal |
-| `remove` | `sheet` | `textual-references` | sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links | M2 XLSB dependency-aware textual-reference removal |
-| `remove` | `cell` | `formula-groups` | array, shared and data-table formula-group members require native group lifecycle support before removal | M2 XLSB dependency-aware formula-group removal |
-| `remove` | `cell` | `calculation-chain` | stored formulas cannot be removed while an opaque calculation chain is present | M2 XLSB calculation-chain-aware formula removal |
-| `remove` | `cell` | `unmodeled-cell-records` | semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled | M2 XLSB additional native cell-record families |
+| `add` | `workbook` | `non-sheet-elements` | XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners | M2 XLSB structural add handlers for non-sheet elements → 0322 |
+| `add` | `sheet` | `order-opaque-dependencies` | sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet insertion → 0322 |
+| `add` | `sheet` | `vba-dependency` | sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet insertion → 0322 |
+| `add` | `sheet` | `calculation-chain-dependency` | sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet insertion → 0322 |
+| `add` | `sheet` | `noncontiguous-3d-dependency` | sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range | M2 XLSB 3-D dependency-aware sheet insertion → 0322 |
+| `remove` | `workbook` | `non-sheet-elements` | XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners | M2 XLSB non-cell removal handlers → 0322 |
+| `remove` | `sheet` | `order-opaque-dependencies` | sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata | M2 XLSB dependency-aware complete-catalog sheet removal → 0322 |
+| `remove` | `sheet` | `removed-scoped-names` | sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available | M2 XLSB dependency-aware scoped-name removal → 0322 |
+| `remove` | `sheet` | `textual-references` | sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links | M2 XLSB dependency-aware textual-reference removal → 0322 |
+| `remove` | `cell` | `formula-groups` | array, shared and data-table formula-group members require native group lifecycle support before removal | M2 XLSB dependency-aware formula-group removal → 0322 |
+| `remove` | `cell` | `calculation-chain` | stored formulas cannot be removed while an opaque calculation chain is present | M2 XLSB calculation-chain-aware formula removal → 0322 |
+| `remove` | `cell` | `unmodeled-cell-records` | semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled | M2 XLSB additional native cell-record families → 0322 |
 | `set` | `sheet` | `unbound-tab-visibility` | an unbound XLSB tab has no sheet payload and must remain veryHidden | bind a physical sheet before revealing an unbound tab |
-| `set` | `sheet` | `unmodeled-tab-views` | visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs | M2 XLSB multi-window and additional tab-kind view mutation |
-| `set` | `sheet` | `sheet-name-markup-compatibility` | sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch | M2 XLSB markup-compatibility-aware sheet-name dependency rewrites |
-| `set` | `sheet` | `sheet-name-unmodeled-reference` | sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale | M2 XLSB additional sheet-name reference carriers |
-| `move` | `sheet` | `order-opaque-dependencies` | sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet ordering |
-| `swap` | `sheet` | `order-opaque-dependencies` | sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet ordering |
-| `move` | `sheet` | `vba-dependency` | sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet ordering |
-| `swap` | `sheet` | `vba-dependency` | sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet ordering |
-| `move` | `sheet` | `calculation-chain-dependency` | sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet ordering |
-| `swap` | `sheet` | `calculation-chain-dependency` | sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet ordering |
-| `move` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering |
-| `swap` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering |
+| `set` | `sheet` | `unmodeled-tab-views` | visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs | M2 XLSB multi-window and additional tab-kind view mutation → 0322 |
+| `set` | `sheet` | `sheet-name-markup-compatibility` | sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch | M2 XLSB markup-compatibility-aware sheet-name dependency rewrites → 0322 |
+| `set` | `sheet` | `sheet-name-unmodeled-reference` | sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale | M2 XLSB additional sheet-name reference carriers → 0322 |
+| `move` | `sheet` | `order-opaque-dependencies` | sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet ordering → 0322 |
+| `swap` | `sheet` | `order-opaque-dependencies` | sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet ordering → 0322 |
+| `move` | `sheet` | `vba-dependency` | sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet ordering → 0322 |
+| `swap` | `sheet` | `vba-dependency` | sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet ordering → 0322 |
+| `move` | `sheet` | `calculation-chain-dependency` | sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet ordering → 0322 |
+| `swap` | `sheet` | `calculation-chain-dependency` | sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet ordering → 0322 |
+| `move` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering → 0322 |
+| `swap` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering → 0322 |
 
 ## xls
 
@@ -720,9 +747,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | cell | supported |  |  |  |
 | cellis | conditionalFormatting | supported |  |  |  |
 | cfextended | conditionalFormatting | supported |  |  |  |
-| chart-axis | axis | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | series | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | chart | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| chart-axis | axis | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | series | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | chart | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
 | colbreak | colbreak | supported |  |  |  |
 | colorscale | conditionalFormatting | supported |  |  |  |
 | column | column | supported |  |  |  |
@@ -731,32 +758,32 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | gap | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable |  | gap | P1 | deferred-P1 0327/0316 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
 | iconset | conditionalFormatting | supported |  |  |  |
 | namedrange | namedrange | supported |  |  |  |
-| ole | ole | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
+| ole | ole | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
 | pagebreak | colbreak | supported |  |  |  |
 | picture | picture | supported |  |  |  |
-| pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
+| pivottable | pivottable | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
 | range | range | supported |  |  |  |
 | raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
-| run | run | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| run | run | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
 | shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
-| slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sort |  | out of scope | P1 | planned WP10 (xls-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
-| sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| table | table | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sort |  | out of scope | P1 | deferred-P1 0327/0316 (xls-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
+| sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| table | table | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
 | topn | conditionalFormatting | supported |  |  |  |
 | uniquevalues | conditionalFormatting | supported |  |  |  |
 | validation | dataValidation | supported |  |  |  |
 | workbook | workbook | supported |  |  |  |
-|  | mergeCell | litchi-only |  |  | M1-extended (R6b) |
+|  | mergeCell | litchi-only |  |  | M1-extended (R6b) → 0327 |
 
 Properties: 1091 rows, 488 of them gaps, in [`xls.md`](officecli-capability-delta/xls.md).
 
@@ -766,23 +793,23 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `query` | `row` | `header-column-predicates` | legacy XLS does not yet bind row predicate names to header columns | M1-extended (R6b) |
-| `get` | `cell` | `non-worksheet-tab` | chart and macro tabs retain catalog positions but do not expose ordinary worksheet cells | M1-extended (R6b) |
-| `view` | `workbook` | `non-worksheet-content` | text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected | M1-extended (R6b) |
-| `create` | `workbook` | `template` | the XLS creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLS template creation |
+| `query` | `row` | `header-column-predicates` | legacy XLS does not yet bind row predicate names to header columns | M1-extended (R6b) → 0327 |
+| `get` | `cell` | `non-worksheet-tab` | chart and macro tabs retain catalog positions but do not expose ordinary worksheet cells | M1-extended (R6b) → 0327 |
+| `view` | `workbook` | `non-worksheet-content` | text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected | M1-extended (R6b) → 0327 |
+| `create` | `workbook` | `template` | the XLS creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLS template creation → 0316 |
 | `create` | `workbook` | `strict-conformance` | the XLS creator emits binary BIFF8 workbooks and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `workbook` | `unrepresentable-initial-metadata` | initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped | CreateOptions::metadata (OLE property sets, record 0254) |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() | File::metadata(); /metadata node reads with the shared metadata vocabulary |
-| `remove` | `cell` | `native-dependency-closure` | formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata | M2 XLS dependency-complete cell removal |
-| `set` | `cell` | `non-scalar-properties` | alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula | M2 XLS font, number-format and protection setters |
-| `set` | `cell` | `existing-formula-cells` | an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set | M4 XLS dependency-aware formula replacement |
-| `set` | `cell` | `native-dependency-closure` | admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented | M2 XLS dependency-complete scalar replacement |
-| `set` | `sheet` | `tab-state` | the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible | M2 XLS worksheet visibility setters |
-| `remove` | `sheet` | `native-dependency-closure` | one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks | M2 XLS dependency-closing tab removal |
-| `move` | `sheet` | `native-dependency-closure` | tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move | M2 XLS 3-D range rewriting |
-| `set` | `row` | `outline-and-defaults` | row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only | M2 XLS outline and default-layout setters |
-| `set` | `namedrange` | `native-editor` | defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have | M2 XLS defined-name editor |
-| `add` | `row` | `native-dependency-closure` | row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns | M2 XLS formula and name rewriting for axis shifts |
+| `remove` | `cell` | `native-dependency-closure` | formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata | M2 XLS dependency-complete cell removal → 0316 |
+| `set` | `cell` | `non-scalar-properties` | alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula | M2 XLS font, number-format and protection setters → 0316 |
+| `set` | `cell` | `existing-formula-cells` | an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set | M4 XLS dependency-aware formula replacement → 0316 |
+| `set` | `cell` | `native-dependency-closure` | admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented | M2 XLS dependency-complete scalar replacement → 0316 |
+| `set` | `sheet` | `tab-state` | the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible | M2 XLS worksheet visibility setters → 0316 |
+| `remove` | `sheet` | `native-dependency-closure` | one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks | M2 XLS dependency-closing tab removal → 0316 |
+| `move` | `sheet` | `native-dependency-closure` | tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move | M2 XLS 3-D range rewriting → 0316 |
+| `set` | `row` | `outline-and-defaults` | row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only | M2 XLS outline and default-layout setters → 0316 |
+| `set` | `namedrange` | `native-editor` | defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have | M2 XLS defined-name editor → 0316 |
+| `add` | `row` | `native-dependency-closure` | row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns | M2 XLS formula and name rewriting for axis shifts → 0316 |
 
 ## pptx
 
@@ -790,7 +817,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Tier | Disposition | Follow-up |
 |---|---|---|---|---|---|
-| animation | animation | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
+| animation | animation | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended → 0332 |
 | chart-axis | axis | supported |  |  |  |
 | chart-series | series | supported |  |  |  |
 | chart | chart | supported |  |  |  |
@@ -802,7 +829,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | hyperlink | hyperlink | supported |  |  |  |
 | linebreak | linebreak | supported |  |  |  |
 | media | media | supported |  |  |  |
-| model3d | model3d | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
+| model3d | model3d | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended → 0332 |
 | modernComment | modernComment | supported |  |  |  |
 | notes | notes | supported |  |  |  |
 | ole | ole | supported |  |  |  |
@@ -823,13 +850,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | textbox | shape | supported |  |  |  |
 | theme | theme | supported |  |  |  |
 | transition | slide | supported |  |  |  |
-| zoom | zoom | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
+| zoom | zoom | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended → 0332 |
 |  | smartart | litchi-only |  |  |  |
 |  | video | litchi-only |  |  |  |
 |  | audio | litchi-only |  |  |  |
 |  | reply | litchi-only |  |  |  |
-|  | noteSlide | litchi-only |  |  | M1-extended |
-|  | notesMaster | litchi-only |  |  | M1-extended |
+|  | noteSlide | litchi-only |  |  | M1-extended → 0332 |
+|  | notesMaster | litchi-only |  |  | M1-extended → 0332 |
 |  | node | litchi-only |  |  |  |
 
 Properties: 907 rows, 515 of them gaps, in [`pptx.md`](officecli-capability-delta/pptx.md).
@@ -841,20 +868,20 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node | File::metadata(); /metadata node reads with the shared metadata vocabulary |
-| `create` | `presentation` | `template` | native PPTX template creation is not integrated | M2 PPTX creation options |
-| `create` | `presentation` | `strict` | native PPTX Strict creation is not integrated | M2 PPTX creation options |
-| `create` | `presentation` | `unrepresentable-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | M2 PPTX creation options |
-| `add` | `shape` | `non-append-placement` | PPTX shape creation currently supports append placement only | M2 PPTX non-append shape placement |
-| `add` | `shape` | `non-slide-parent` | text-box creation requires a top-level slide parent; group, master and layout insertion remain pending | M2 PPTX group/master/layout shape creation |
-| `move` | `slide` | `positional-owner` | source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering |
-| `swap` | `slide` | `positional-owner` | source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering |
-| `remove` | `slide` | `dependency-topology` | native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused | M2 PPTX dependency-aware slide removal |
-| `remove` | `slide` | `final-slide` | native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation | M2 PPTX final-slide removal policy |
-| `remove` | `slide` | `canonical-target` | source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling | M2 PPTX equivalent relationship-target spellings |
-| `remove` | `shape` | `dependency-topology` | shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure | M2 PPTX dependency-aware shape removal |
-| `remove` | `shape` | `non-top-level` | native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology | M2 PPTX grouped/master/layout shape removal |
-| `set` | `shape` | `native-shape-text-preservation` | text replacement requires an existing slide shape text body and native edit admission; master/layout shapes, text-body creation and rich-text formatting remain pending | M2 PPTX structural and rich-text editing |
-| `set` | `presentation` | `managed-signature-removal` | explicit signature removal requires native eager materialization, which managed sources refuse | M2 PPTX managed source-preserving signature removal |
+| `create` | `presentation` | `template` | native PPTX template creation is not integrated | M2 PPTX creation options → 0332 |
+| `create` | `presentation` | `strict` | native PPTX Strict creation is not integrated | M2 PPTX creation options → 0332 |
+| `create` | `presentation` | `unrepresentable-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | M2 PPTX creation options → 0332 |
+| `add` | `shape` | `non-append-placement` | PPTX shape creation currently supports append placement only | M2 PPTX non-append shape placement → 0332 |
+| `add` | `shape` | `non-slide-parent` | text-box creation requires a top-level slide parent; group, master and layout insertion remain pending | M2 PPTX group/master/layout shape creation → 0332 |
+| `move` | `slide` | `positional-owner` | source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering → 0332 |
+| `swap` | `slide` | `positional-owner` | source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering → 0332 |
+| `remove` | `slide` | `dependency-topology` | native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused | M2 PPTX dependency-aware slide removal → 0332 |
+| `remove` | `slide` | `final-slide` | native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation | M2 PPTX final-slide removal policy → 0332 |
+| `remove` | `slide` | `canonical-target` | source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling | M2 PPTX equivalent relationship-target spellings → 0332 |
+| `remove` | `shape` | `dependency-topology` | shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure | M2 PPTX dependency-aware shape removal → 0332 |
+| `remove` | `shape` | `non-top-level` | native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology | M2 PPTX grouped/master/layout shape removal → 0332 |
+| `set` | `shape` | `native-shape-text-preservation` | text replacement requires an existing slide shape text body and native edit admission; master/layout shapes, text-body creation and rich-text formatting remain pending | M2 PPTX structural and rich-text editing → 0332 |
+| `set` | `presentation` | `managed-signature-removal` | explicit signature removal requires native eager materialization, which managed sources refuse | M2 PPTX managed source-preserving signature removal → 0332 |
 
 ## ppt
 
@@ -900,8 +927,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | video | litchi-only |  |  |  |
 |  | audio | litchi-only |  |  |  |
 |  | reply | litchi-only |  |  | wontfix: PPTX-only (record 0323) |
-|  | noteSlide | litchi-only |  |  | M1-extended |
-|  | notesMaster | litchi-only |  |  | M1-extended |
+|  | noteSlide | litchi-only |  |  | M1-extended → 0323 |
+|  | notesMaster | litchi-only |  |  | M1-extended → 0323 |
 
 Properties: 718 rows, 679 of them gaps, in [`ppt.md`](officecli-capability-delta/ppt.md).
 
@@ -911,7 +938,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `create` | `presentation` | `template` | the PPT creator currently authors ordinary presentations and refuses template requests | use Flavor::Document; M2 PPT template creation |
+| `create` | `presentation` | `template` | the PPT creator currently authors ordinary presentations and refuses template requests | use Flavor::Document; M2 PPT template creation → 0323 |
 | `create` | `presentation` | `strict-conformance` | legacy PPT has one canonical binary writer and refuses an OOXML Strict conformance request | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `presentation` | `unrepresentable-initial-metadata` | initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped | CreateOptions::metadata (OLE property sets, record 0254) |
 | `add` | `ole` | `object-storage` | embedding an OLE object needs a new ExOleObjStg storage, an ExOleEmbedContainer and a picture frame with its preview; OLE frames are read (progId, linked, frame) only | 0323-F8 PPT OLE object writes |
@@ -929,10 +956,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `remove` | `col` | `table-layout` | removing a column would re-lay out the table group's later cells and border lines, which the leaf does not model | 0323-F1 PPT table re-layout |
 | `set` | `tc` | `native-cell-text` | cell text follows the shape-text closure rules (a changed length refuses over several formatting runs or position-dependent records); tables inside groups and merged-away cells are refused | 0323-F2 PPT nested tables and rich cell text |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() | File::metadata(); /metadata node reads with the shared metadata vocabulary |
-| `remove` | `slide` | `native-slide-dependencies` | slide removal requires native closure admission; unsupported dependent records refuse atomically | M2 PPT dependency-preserving slide removal |
-| `set` | `slide` | `native-visibility-record` | slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated | M2 PPT visibility atom insertion |
-| `set` | `shape` | `native-shape-preservation` | top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported | M2 PPT nested-shape and rich-text edits |
-| `batch` | `presentation` | `native-write-coalescing` | distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open | M2 PPT broader native edit runs and performance qualification |
+| `remove` | `slide` | `native-slide-dependencies` | slide removal requires native closure admission; unsupported dependent records refuse atomically | M2 PPT dependency-preserving slide removal → 0323 |
+| `set` | `slide` | `native-visibility-record` | slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated | M2 PPT visibility atom insertion → 0323 |
+| `set` | `shape` | `native-shape-preservation` | top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported | M2 PPT nested-shape and rich-text edits → 0323 |
+| `batch` | `presentation` | `native-write-coalescing` | distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open | M2 PPT broader native edit runs and performance qualification → 0323 |
 
 ## keynote
 
@@ -1154,15 +1181,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits |
-| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits |
-| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits |
-| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits |
-| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits |
-| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits |
-| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions |
-| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
-| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
+| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits → 0328 |
+| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits → 0328 |
+| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits → 0328 |
+| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits → 0328 |
+| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits → 0328 |
+| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits → 0328 |
+| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions → 0328 |
+| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal → 0328 |
+| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values → 0328 |
 | `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
 | `add` | `document` | `flat-odf-input` | a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused | 0292 flat ODF package members |
 | `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |
@@ -1173,7 +1200,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Tier | Disposition | Follow-up |
 |---|---|---|---|---|---|
-| animation | animation | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes |
+| animation | animation | gap | P2 | deferred-P2 0328 (odp-family) | M6 ODP animation nodes → 0328 |
 | chart-axis | axis | supported |  |  |  |
 | chart-series | series | supported |  |  |  |
 | chart | chart | supported |  |  |  |
@@ -1209,8 +1236,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | zoom |  | gap | P2 | deferred-P2 0328 (odp-family) | none: a PresentationML-only concept |
 |  | video | litchi-only |  |  |  |
 |  | audio | litchi-only |  |  |  |
-|  | notesMaster | litchi-only |  |  | M6 ODP notes master |
-|  | noteSlide | litchi-only |  |  | M6 ODP notes pages |
+|  | notesMaster | litchi-only |  |  | M6 ODP notes master → 0328 |
+|  | noteSlide | litchi-only |  |  | M6 ODP notes pages → 0328 |
 
 Properties: 757 rows, 673 of them gaps, in [`odp.md`](officecli-capability-delta/odp.md).
 
@@ -1220,14 +1247,14 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `run` | `field-run` | page-number, date and other field runs are computed by the producer and refuse text | M6 ODP field editing |
+| `set` | `run` | `field-run` | page-number, date and other field runs are computed by the producer and refuse text | M6 ODP field editing → 0328 |
 | `set` | `shape` | `character-format` | bold, italic, underline, size, colour and font are set on paragraphs, runs (links and fields included), and on a shape, table cell or notes story as a whole (each paragraph and every run that overrides the value); reads resolve the node's style chain through the common styles of styles.xml but not a shape's graphic or presentation style, and text sets write plain paragraphs in the first paragraph's style | 0316 ODP inherited shape formatting |
-| `set` | `shape` | `non-paragraph-story` | a whole-story text set refuses a text box that holds drawing objects or other non-paragraph children; set paragraphs or runs instead | M6 ODP rich text boxes |
-| `add` | `shape` | `positioned-insert` | new text boxes are appended at the end of the slide's objects; move them afterwards | M6 ODP z-order insertion |
-| `add` | `shape` | `picture-table-chart` | only text boxes are added; pictures, tables, charts and media need package resources the scene splice does not author | M6 ODP media and table creation |
-| `move` | `paragraph` | `story-reorder` | paragraphs, runs, rows and cells are not moved or swapped; slides and top-level slide objects are | M6 ODP paragraph ordering |
-| `remove` | `slide` | `referenced-page` | a slide (or a renamed slide) whose name links, custom shows or other markup reference is refused rather than leaving a dangling reference | M6 ODP reference rewriting |
-| `remove` | `shape` | `referenced-object` | an object whose draw:id or xml:id animations or other markup reference is refused; notes-page objects are not removed | M6 ODP reference rewriting |
+| `set` | `shape` | `non-paragraph-story` | a whole-story text set refuses a text box that holds drawing objects or other non-paragraph children; set paragraphs or runs instead | M6 ODP rich text boxes → 0328 |
+| `add` | `shape` | `positioned-insert` | new text boxes are appended at the end of the slide's objects; move them afterwards | M6 ODP z-order insertion → 0328 |
+| `add` | `shape` | `picture-table-chart` | only text boxes are added; pictures, tables, charts and media need package resources the scene splice does not author | M6 ODP media and table creation → 0328 |
+| `move` | `paragraph` | `story-reorder` | paragraphs, runs, rows and cells are not moved or swapped; slides and top-level slide objects are | M6 ODP paragraph ordering → 0328 |
+| `remove` | `slide` | `referenced-page` | a slide (or a renamed slide) whose name links, custom shows or other markup reference is refused rather than leaving a dangling reference | M6 ODP reference rewriting → 0328 |
+| `remove` | `shape` | `referenced-object` | an object whose draw:id or xml:id animations or other markup reference is refused; notes-page objects are not removed | M6 ODP reference rewriting → 0328 |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the root node's properties | File::metadata(); /metadata node reads with the shared metadata vocabulary |
 | `set` | `presentation` | `extended-metadata` | /metadata writes title, subject, description, author, lastModifiedBy, language and keywords through the ODF metadata family; dates, statistics and custom.<name> are refused | 0288 ODF user-defined and statistics metadata |
 
@@ -1242,9 +1269,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | cell | supported |  |  |  |
 | cellis | conditionalFormatting | supported |  |  |  |
 | cfextended | conditionalFormatting | supported |  |  |  |
-| chart-axis | axis | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| chart-series | series | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| chart | chart | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| chart-axis | axis | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
+| chart-series | series | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
+| chart | chart | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
 | colbreak | colbreak | supported |  |  |  |
 | colorscale | conditionalFormatting | supported |  |  |  |
 | column | column | supported |  |  |  |
@@ -1253,7 +1280,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | gap | P1 | planned WP11 (ods-parity) | WP11 (record 0339 F5): header-row table detection in queries |
+| detectedtable |  | gap | P1 | deferred-P1 0327 (ods-parity) | WP11 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -1267,13 +1294,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
-| run | run | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| run | run | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
 | shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
 | slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
-| sort |  | out of scope | P1 | planned WP11 (ods-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
+| sort |  | out of scope | P1 | deferred-P1 0327 (ods-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
 | sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
-| table | table | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| table | table | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
 | topn | conditionalFormatting | supported |  |  |  |
 | uniquevalues | conditionalFormatting | supported |  |  |  |
 | validation | dataValidation | supported |  |  |  |
@@ -1369,15 +1396,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits |
-| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits |
-| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits |
-| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits |
-| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits |
-| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits |
-| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions |
-| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
-| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
+| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits → 0328 |
+| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits → 0328 |
+| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits → 0328 |
+| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits → 0328 |
+| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits → 0328 |
+| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits → 0328 |
+| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions → 0328 |
+| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal → 0328 |
+| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values → 0328 |
 | `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
 | `add` | `document` | `flat-odf-input` | a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused | 0292 flat ODF package members |
 | `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |
@@ -1429,15 +1456,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits |
-| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits |
-| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits |
-| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits |
-| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits |
-| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits |
-| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions |
-| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
-| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
+| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits → 0328 |
+| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits → 0328 |
+| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits → 0328 |
+| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits → 0328 |
+| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits → 0328 |
+| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits → 0328 |
+| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions → 0328 |
+| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal → 0328 |
+| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values → 0328 |
 | `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
 | `add` | `document` | `flat-odf-input` | a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused | 0292 flat ODF package members |
 | `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |

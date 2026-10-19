@@ -80,10 +80,10 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `runs` | string | a-- |  | write-only | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | cell | `clear` | bool | as- | -s- | write-only | partial | P1 | deferred-P1 0327 (xls-breadth) |  |
 | cell | `shift` | string | a-- |  | write-only | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
-| cell | `arrayformula` | string | as- |  | gap | gap | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) |
+| cell | `arrayformula` | string | as- |  | gap | gap | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) → 0327 |
 | cell | `cachedValue` | string | --g | --g | supported | — |  |  |  |
 | cell | `computedValue` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
-| cell | `evaluated` | bool | --g |  | gap | — | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) |
+| cell | `evaluated` | bool | --g |  | gap | — | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) → 0327 |
 | cell | `alignment.indent` | number | asg | -sg | supported | partial | P1 | deferred-P1 0327 (xls-breadth) |  |
 | cell | `alignment.shrinkToFit` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0327 (xls-breadth) |  |
 | cell | `alignment.textRotation` | number | asg |  | unlisted | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
@@ -98,7 +98,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `border.left` | string | asg | -sg | supported | partial | P1 | deferred-P1 0327 (xls-breadth) |  |
 | cell | `border.right` | string | asg | -sg | supported | partial | P1 | deferred-P1 0327 (xls-breadth) |  |
 | cell | `border.color` | color | as- |  | write-only | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
-| cell | `arrayref` | string | --g |  | gap | — | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) |
+| cell | `arrayref` | string | --g |  | gap | — | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) → 0327 |
 | cell | `mergeAnchor` | bool | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
 | cell | `empty` | bool | --g | --g | supported | — |  |  |  |
 | cell | `richtext` | bool | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
@@ -190,167 +190,167 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cfextended | `axisColor` | color |  | --- | litchi-only | — |  |  |  |
 | cfextended | `axisPosition` | string |  | --- | litchi-only | — |  |  |  |
 | cfextended | `direction` | string |  | --- | litchi-only | — |  |  |  |
-| chart-axis | `role` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `dispUnits` | enum | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `majorUnit` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `minorUnit` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `axisFont` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `axisMax` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `axisMin` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `axisNumFmt` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `axisOrientation` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `axisTitle` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `format` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `labelOffset` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `labelRotation` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `logBase` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `majorGridlines` | bool | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `max` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `min` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `minorGridlines` | bool | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `tickLabelSkip` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `title` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-axis | `visible` | bool | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `valuesRef` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `trendline.dispEq` | bool | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `trendline.dispRSqr` | bool | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `alpha` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `outlineColor` | color | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `categories` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `categoriesRef` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `color` | color | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `dataLabels.numFmt` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `dataLabels.separator` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `errBars` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `invertIfNeg` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `lineDash` | enum | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `lineWidth` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `marker` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `markerSize` | number | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `markerColor` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `name` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `nameRef` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `scatterStyle` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `secondaryAxis` | bool | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `smooth` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `values` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `bubbleSize` | string | a-g |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | `bubbleSizeRef` | string | a-g |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `dataRange` | string | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `radarStyle` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `roundedCorners` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `valAxisVisible` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `view3d.perspective` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `view3d.rotateX` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `view3d.rotateY` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `anchor` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `dispunits` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `x` | length | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `y` | length | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `seriesCount` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `areafill` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `autotitledeleted` | bool | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axisfont` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axisline` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axismax` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axismin` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axisnumfmt` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axisorientation` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axisposition` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axistitle` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `axisvisible` | bool | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `bubbleScale` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `catAxisVisible` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `catTitle` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `cataxisline` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `categories` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `chartFill` | color | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `chartType` | enum | a-g |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `chartareafill` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `chartborder` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `colorrule` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `colors` | string | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `combosplit` | number | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `combotypes` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `crossBetween` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `crosses` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `crossesAt` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `data` | string | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `dataLabels` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `dataTable` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `decreaseColor` | color | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `droplines` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `errbars` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `explosion` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `firstSliceAngle` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `gapdepth` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `gapwidth` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `gradient` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `gradients` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `gridlines` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `height` | length | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `hilowlines` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `holeSize` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `increaseColor` | color | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `invertifneg` | bool | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labelPos` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labelfont` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labelFont.size` | number | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labelFont.color` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labelFont.bold` | bool | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labelFont.name` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labeloffset` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `labelrotation` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `leaderlines` | bool | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `legend` | enum | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `legend.overlay` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `legendFont` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `linedash` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `linewidth` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `logbase` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `majorTickMark` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `majorunit` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `marker` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `markersize` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `markercolor` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `minorGridlines` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `minorTickMark` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `minorunit` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `overlap` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `plotFill` | color | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `plotborder` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `plotvisonly` | bool | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `preset` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `referenceline` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `scatterstyle` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `secondaryaxis` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `series{N}` | string | -s- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `seriesoutline` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `seriesshadow` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `serlines` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `shape` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `showMarker` | string | -sg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `shownegbubbles` | bool | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `sizerepresents` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `smooth` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `style` | number | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `tickLabelPos` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `ticklabelskip` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `title` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `title.bold` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `title.color` | color | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `title.font` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `title.overlay` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `title.size` | font-size | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `totalColor` | color | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `transparency` | number | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `trendline` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `updownbars` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `valaxisline` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `varyColors` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `view3d` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | `width` | length | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| chart-axis | `role` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `dispUnits` | enum | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `majorUnit` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `minorUnit` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `axisFont` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `axisMax` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `axisMin` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `axisNumFmt` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `axisOrientation` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `axisTitle` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `format` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `labelOffset` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `labelRotation` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `logBase` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `majorGridlines` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `max` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `min` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `minorGridlines` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `tickLabelSkip` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `title` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-axis | `visible` | bool | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `valuesRef` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `trendline.dispEq` | bool | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `trendline.dispRSqr` | bool | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `alpha` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `outlineColor` | color | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `categories` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `categoriesRef` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `color` | color | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `dataLabels.numFmt` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `dataLabels.separator` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `errBars` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `invertIfNeg` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `lineDash` | enum | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `lineWidth` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `marker` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `markerSize` | number | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `markerColor` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `name` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `nameRef` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `scatterStyle` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `secondaryAxis` | bool | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `smooth` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `values` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `bubbleSize` | string | a-g |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart-series | `bubbleSizeRef` | string | a-g |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `dataRange` | string | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `radarStyle` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `roundedCorners` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `valAxisVisible` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `view3d.perspective` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `view3d.rotateX` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `view3d.rotateY` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `anchor` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `dispunits` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `x` | length | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `y` | length | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `seriesCount` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `areafill` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `autotitledeleted` | bool | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axisfont` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axisline` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axismax` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axismin` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axisnumfmt` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axisorientation` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axisposition` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axistitle` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `axisvisible` | bool | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `bubbleScale` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `catAxisVisible` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `catTitle` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `cataxisline` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `categories` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `chartFill` | color | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `chartType` | enum | a-g |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `chartareafill` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `chartborder` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `colorrule` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `colors` | string | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `combosplit` | number | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `combotypes` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `crossBetween` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `crosses` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `crossesAt` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `data` | string | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `dataLabels` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `dataTable` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `decreaseColor` | color | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `droplines` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `errbars` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `explosion` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `firstSliceAngle` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `gapdepth` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `gapwidth` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `gradient` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `gradients` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `gridlines` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `height` | length | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `hilowlines` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `holeSize` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `increaseColor` | color | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `invertifneg` | bool | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labelPos` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labelfont` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labelFont.size` | number | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labelFont.color` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labelFont.bold` | bool | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labelFont.name` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labeloffset` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `labelrotation` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `leaderlines` | bool | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `legend` | enum | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `legend.overlay` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `legendFont` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `linedash` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `linewidth` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `logbase` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `majorTickMark` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `majorunit` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `marker` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `markersize` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `markercolor` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `minorGridlines` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `minorTickMark` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `minorunit` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `overlap` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `plotFill` | color | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `plotborder` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `plotvisonly` | bool | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `preset` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `referenceline` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `scatterstyle` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `secondaryaxis` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `series{N}` | string | -s- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `seriesoutline` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `seriesshadow` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `serlines` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `shape` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `showMarker` | string | -sg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `shownegbubbles` | bool | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `sizerepresents` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `smooth` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `style` | number | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `tickLabelPos` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `ticklabelskip` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `title` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `title.bold` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `title.color` | color | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `title.font` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `title.overlay` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `title.size` | font-size | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `totalColor` | color | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `transparency` | number | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `trendline` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `updownbars` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `valaxisline` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `varyColors` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `view3d` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| chart | `width` | length | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
 | colbreak | `col` | string | as- | asg | supported | supported |  |  |  |
 | colbreak | `manual` | bool | -s- | asg | supported | supported |  |  |  |
 | colbreak | `min` | int | -s- | asg | supported | supported |  |  |  |
@@ -572,11 +572,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | dateoccurring | `axisColor` | color |  | --- | litchi-only | — |  |  |  |
 | dateoccurring | `axisPosition` | string |  | --- | litchi-only | — |  |  |  |
 | dateoccurring | `direction` | string |  | --- | litchi-only | — |  |  |  |
-| detectedtable | `source` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
-| detectedtable | `stable` | bool | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
-| detectedtable | `ref` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
-| detectedtable | `columns` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
-| detectedtable | `dataRange` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `source` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `stable` | bool | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `ref` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `columns` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable | `dataRange` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | `ref` | string | a-g | asg | supported | supported |  |  |  |
 | duplicatevalues | `fill` | color | a-- | asg | supported | supported |  |  |  |
 | duplicatevalues | `font.color` | color | a-- | asg | supported | supported |  |  |  |
@@ -710,16 +710,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | namedrange | `scope` | string | asg | --g | supported | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | namedrange | `comment` | string | asg | --g | supported | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | namedrange | `volatile` | bool | asg | --g | supported | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
-| ole | `anchor` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `shapeId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `contentType` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
+| ole | `anchor` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `shapeId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `contentType` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
 | pagebreak | `row` | int | a-- |  | write-only | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | pagebreak | `col` | string | a-- | asg | supported | supported |  |  |  |
 | pagebreak | `manual` | bool |  | asg | litchi-only | litchi-only |  |  |  |
@@ -763,45 +763,45 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `fileSize` | number | --g | --g | supported | — |  |  |  |
 | picture | `relId` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
 | picture | `src` | string | as- | a-- | write-only | partial | P1 | deferred-P1 0327 (xls-breadth) |  |
-| pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `style` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `rows` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `cols` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `filters` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `values` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `location` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
+| pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `style` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `rows` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `cols` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `filters` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `values` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `location` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
 | range | `merge` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | range | `font.bold` | bool | -s- |  | write-only | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | range | `fill` | color | -s- |  | write-only | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
@@ -820,14 +820,14 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | rowbreak | `manual` | bool | -s- | asg | supported | supported |  |  |  |
 | rowbreak | `min` | int | -s- | asg | supported | supported |  |  |  |
 | rowbreak | `max` | int | -s- | asg | supported | supported |  |  |  |
-| run | `subscript` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| run | `superscript` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| run | `bold` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| run | `color` | color | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| run | `font` | string | as- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| run | `italic` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| run | `size` | font-size | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| run | `text` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| run | `subscript` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| run | `superscript` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| run | `bold` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| run | `color` | color | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| run | `font` | string | as- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| run | `italic` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| run | `size` | font-size | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| run | `text` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
 | shape | `hyperlink` | string | a-g | --g | supported | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | shape | `reflection` | string | asg | --- | write-only | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | shape | `anchor` | string | a-- | a-- | write-only | supported |  |  |  |
@@ -893,51 +893,51 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sheet | `sort` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | sheet | `rowBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
 | sheet | `colBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
-| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `field` | string | a-g |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `caption` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `itemCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| slicer | `cache` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `type` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `location` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `color` | color | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| table | `ref` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `displayName` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `headerRow` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `totalRow` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `autoExpand` | bool | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `showFirstColumn` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `showLastColumn` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `showRowStripes` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `showColumnStripes` | bool | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `columns` | string | a-g |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `totalsRowFunction` | string | a-- |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `totalFunction` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `totalLabel` | string | --g |  | element gap | — | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `name` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| table | `style` | string | asg |  | element gap | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `field` | string | a-g |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `caption` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `itemCount` | number | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| slicer | `cache` | string | --g |  | element gap | — | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `type` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `location` | string | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `color` | color | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) → 0327 |
+| table | `ref` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `displayName` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `headerRow` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `totalRow` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `autoExpand` | bool | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `showFirstColumn` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `showLastColumn` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `showRowStripes` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `showColumnStripes` | bool | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `columns` | string | a-g |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `totalsRowFunction` | string | a-- |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `totalFunction` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `totalLabel` | string | --g |  | element gap | — | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `name` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
+| table | `style` | string | asg |  | element gap | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) → 0327 |
 | topn | `ref` | string | a-g | asg | supported | supported |  |  |  |
 | topn | `rank` | number | a-g | asg | supported | supported |  |  |  |
 | topn | `percent` | bool | a-g | asg | supported | supported |  |  |  |
@@ -1052,7 +1052,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | workbook | `description` | string | -sg | --g | supported | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | workbook | `keywords` | string | -sg | --g | supported | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
 | workbook | `revisionNumber` | string | -sg | --g | supported | gap | P1 | deferred-P1 0327 (xls-breadth) |  |
-| workbook | `activeTab` | number | --g |  | gap | — | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) |
+| workbook | `activeTab` | number | --g |  | gap | — | P1 | deferred-P1 0327 (xls-breadth) | M1-extended (R6b) → 0327 |
 | workbook | `firstSheet` | number | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
 | workbook | `calc.fullCalcOnLoad` | bool | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
 | workbook | `calc.refMode` | string | --g |  | unlisted | — | P1 | deferred-P1 0327 (xls-breadth) |  |
