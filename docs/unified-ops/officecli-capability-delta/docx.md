@@ -269,11 +269,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |  |  |
 | chart | `series20.color` | string |  | as- | litchi-only | litchi-only |  |  |  |
 | comment | `id` | number | --g | --g | supported | — |  |  |  |
-| comment | `anchoredTo` | string | --g |  | unlisted | — | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| comment | `runStart` | int | a-- |  | write-only | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| comment | `range` | bool | a-- |  | write-only | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| comment | `parentId` | number | a-g |  | gap | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) | 0335-F2 |
-| comment | `done` | bool | asg |  | gap | gap | P0 | planned 0335 (docx-picture-comment-follow-ups) | 0335-F2 |
+| comment | `anchoredTo` | string | --g | --g | supported | — |  |  |  |
+| comment | `runStart` | int | a-- | a-- | write-only | supported |  |  |  |
+| comment | `range` | bool | a-- | a-- | write-only | supported |  |  |  |
+| comment | `parentId` | number | a-g | a-g | supported | supported |  |  |  |
+| comment | `done` | bool | asg | asg | supported | supported |  |  |  |
 | comment | `date` | string | asg | asg | supported | supported |  |  |  |
 | comment | `initials` | string | asg | asg | supported | supported |  |  |  |
 | comment | `author` | string | asg | asg | supported | supported |  |  |  |
@@ -464,7 +464,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | header | `underline` | enum |  | asg | litchi-only | litchi-only |  |  |  |
 | hyperlink | `url` | string | asg | asg | supported | supported |  |  |  |
 | hyperlink | `anchor` | string | a-g | a-g | supported | supported |  |  |  |
-| hyperlink | `tooltip` | string | a-g | --g | supported | gap | P0 | planned WP4 (docx-p0-residue) |  |
+| hyperlink | `tooltip` | string | a-g | asg | supported | supported |  |  |  |
 | hyperlink | `text` | string | asg | as- | write-only | supported |  |  |  |
 | hyperlink | `rStyle` | string | a-g | a-g | supported | supported |  |  |  |
 | hyperlink | `color` | color | a-g | a-g | supported | supported |  |  |  |
@@ -1111,7 +1111,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | tab | `pos` | length | asg | asg | supported | supported |  |  |  |
 | tab | `val` | enum | asg | asg | supported | supported |  |  |  |
 | tab | `leader` | enum | asg | asg | supported | supported |  |  |  |
-| cell | `width` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
+| cell | `width` | string | asg | a-g | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `skipGridSync` | bool | -s- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `font` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `size` | font-size | -sg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
@@ -1145,9 +1145,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `border.tl2br` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `border.top` | string | -s- |  | write-only | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | cell | `border.tr2bl` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
-| cell | `text` | string | asg | -s- | write-only | partial | P0 | planned WP4 (docx-p0-residue) |  |
-| column | `width` | length | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
-| column | `text` | string | a-- |  | element gap | gap | P0 | planned WP4 (docx-p0-residue) | WP4 (record 0335 F8) |
+| cell | `text` | string | asg | as- | write-only | supported |  |  |  |
+| column | `width` | length | a-- | asg | supported | supported |  |  |  |
+| column | `text` | string | a-- | a-- | write-only | supported |  |  |  |
 | row | `height.exact` | length | as- | -s- | write-only | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `header` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |
 | row | `cantSplit` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0332 (docx-breadth) |  |

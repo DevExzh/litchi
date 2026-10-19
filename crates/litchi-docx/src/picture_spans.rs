@@ -323,6 +323,36 @@ pub(crate) fn with_attribute(tag: &[u8], key: &str, value: &str) -> Option<Vec<u
     Some(format!("{head} {key}=\"{escaped}\"{}", &text[close..]).into_bytes())
 }
 
+/// The start tag (or empty element) `tag` without attribute `key` (its
+/// exact qualified name), unchanged when absent; `None` for a tag this
+/// cannot rewrite (record 0345).
+pub(crate) fn without_attribute(tag: &[u8], key: &str) -> Option<Vec<u8>> {
+    let text = std::str::from_utf8(tag).ok()?;
+    if !text.starts_with('<') {
+        return None;
+    }
+    let Some((range, _)) = find_attribute(text, key) else {
+        return Some(tag.to_vec());
+    };
+    let bytes = text.as_bytes();
+    // Back from the opening quote over `=` and whitespace to the name.
+    let mut name_end = range.start.checked_sub(1)?;
+    while name_end > 0 && matches!(bytes[name_end - 1], b'=' | b' ' | b'\t' | b'\r' | b'\n') {
+        name_end -= 1;
+    }
+    let mut start = name_end.checked_sub(key.len())?;
+    if &text[start..name_end] != key {
+        return None;
+    }
+    while start > 0 && bytes[start - 1].is_ascii_whitespace() {
+        start -= 1;
+    }
+    let mut out = String::with_capacity(text.len());
+    out.push_str(&text[..start]);
+    out.push_str(&text[range.end + 1..]);
+    Some(out.into_bytes())
+}
+
 fn escape(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());
     for character in value.chars() {

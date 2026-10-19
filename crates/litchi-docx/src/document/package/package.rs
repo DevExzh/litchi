@@ -434,6 +434,35 @@ impl Document {
         }
     }
 
+    /// The entries of the `commentsExtended` part (record 0345): each
+    /// comment paragraph's reply parent and resolved state, keyed by the
+    /// paragraph's `w14:paraId`; empty when the document has no such part.
+    ///
+    /// ```
+    /// let package = litchi_docx::Builder::new()?.build()?;
+    /// assert!(package.document()?.comments_extended()?.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the part is missing or malformed.
+    pub fn comments_extended(&self) -> Result<Vec<crate::modern_comments::Extended>> {
+        let main_part = self.opc.main_document_part()?;
+        match main_part
+            .rels()
+            .part_with_reltype(crate::modern_comments::COMMENTS_EXTENDED_RELATIONSHIP)
+        {
+            Ok(rel) => {
+                let target = rel.target_partname()?;
+                let part = self.opc.get_part(&target)?;
+                crate::modern_comments::parse_comments_extended(part.blob())
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))
+            },
+            Err(_) => Ok(Vec::new()),
+        }
+    }
+
     /// Get the number of comments in the document.
     ///
     /// # Examples

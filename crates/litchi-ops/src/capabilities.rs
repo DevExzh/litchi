@@ -2889,6 +2889,8 @@ impl Element {
                             | "smartart"
                             | "node"
                             | "document"
+                            // Table grid columns (record 0345).
+                            | "col"
                     )
                     && readable)
                     || (self.adapter == Adapter::Docx
@@ -3049,6 +3051,9 @@ impl Element {
                         | "bookmark"
                         | "field"
                         | "toc"
+                        // Cells and grid columns (record 0345).
+                        | "tc"
+                        | "col"
                 ) || DOCX_PART_WRITES.contains(&self.data().canonical))
                 && readable);
         #[cfg(feature = "xlsb")]
@@ -3117,8 +3122,8 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let remove = structural;
-        // DOCX cells and content controls are removable but not yet
-        // addable (record 0251a).
+        // DOCX content controls are removable but not yet addable (record
+        // 0251a); cells and grid columns are both (record 0345).
         #[cfg(feature = "docx")]
         let remove = remove
             || (self.adapter == Adapter::Docx
@@ -3126,6 +3131,7 @@ impl Element {
                 && (matches!(
                     self.data().canonical,
                     "tc" | "sdt"
+                        | "col"
                         | "chart"
                         | "picture"
                         | "smartart"

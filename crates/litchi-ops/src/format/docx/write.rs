@@ -285,6 +285,11 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
+        // Table grid columns (record 0345).
+        let editor = match self.try_set_column(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
         // Styles, numbering, headers, footers and notes (record 0319).
         let editor = match self.try_set_parts(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),
@@ -823,6 +828,16 @@ impl WorkEdit {
                             .map_err(Error::from))
                     };
                 }
+                if setter == Setter::HyperlinkTooltip {
+                    let tooltip = match value {
+                        None => None,
+                        value => Some(text_value(value)?),
+                    };
+                    return both!(self, |edit| edit
+                        .set_hyperlink_tooltip_at(path, tooltip.as_deref())
+                        .map(|_| ())
+                        .map_err(Error::from));
+                }
                 if setter == Setter::HyperlinkUrl {
                     let url = text_value(value)?;
                     let Self::Eager(edit) = self else {
@@ -1180,6 +1195,56 @@ impl WorkEdit {
     ) -> Result<Position> {
         both!(self, |edit| edit
             .insert_row_at(table, at, cells, &[])
+            .map_err(Error::from))
+    }
+
+    /// Insert a grid column into the table at `table` (record 0345).
+    pub(super) fn insert_column_at(
+        &mut self,
+        table: &litchi_docx::document::ElementPath,
+        at: Option<Position>,
+        width: Option<u32>,
+        text: &str,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_column_at(table, at, width, text)
+            .map_err(Error::from))
+    }
+
+    /// Set a grid column's width (record 0345).
+    pub(super) fn set_column_width_at(
+        &mut self,
+        table: &litchi_docx::document::ElementPath,
+        column: Position,
+        width: u32,
+    ) -> Result<()> {
+        both!(self, |edit| edit
+            .set_column_width_at(table, column, width)
+            .map(|_| ())
+            .map_err(Error::from))
+    }
+
+    /// Remove a grid column and its cells (record 0345).
+    pub(super) fn remove_column_at(
+        &mut self,
+        table: &litchi_docx::document::ElementPath,
+        column: Position,
+    ) -> Result<()> {
+        both!(self, |edit| edit
+            .remove_column_at(table, column)
+            .map(|_| ())
+            .map_err(Error::from))
+    }
+
+    /// Insert a cell into the row at `row` (record 0345).
+    pub(super) fn insert_cell_at(
+        &mut self,
+        row: &litchi_docx::document::ElementPath,
+        at: Option<Position>,
+        cell: &litchi_docx::document::NewCell,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_cell_at(row, at, cell)
             .map_err(Error::from))
     }
 

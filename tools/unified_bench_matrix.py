@@ -2467,6 +2467,25 @@ def p0342():
     })
 
 
+@needs("0345")
+def p0345():
+    """Record 0345 §6: docx_p0_final_bench, three runs. The resolution,
+    leaf-read and view legs are attributions, not unified/leaf pairs."""
+    attribution = (None, "none (record 0345 §6: attribution leg)", "none")
+    return native_lines("0345", "p0_final", RES / "0345" / "docx-p0-final-bench.txt", {
+        "add cell": ("add", SINGLE, "unified/native"),
+        "add column": ("add", SINGLE, "unified/native"),
+        "add comment reply": ("add", SINGLE, "unified/native"),
+        "add plain comment": ("add", SINGLE, "unified/native"),
+        "resolve /body/tbl[1] vs /body/tbl[1]/col[1]": (
+            "resolve", attribution, "column path/table path resolution"),
+        "leaf document() vs document().comments()": (
+            "read", attribution, "comments read/document handle (leaf)"),
+        "view format: /body/p[2] vs /comments/comment[1]": (
+            "view", attribution, "comment view/paragraph view"),
+    })
+
+
 @needs("0347")
 def p0347():
     """Record 0347 §6: numbers_unified_bench swaps (two runs, with the
@@ -2488,7 +2507,8 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
-           p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0347]
+           p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345,
+           p0347]
 
 
 # ---------------------------------------------------------------- merge

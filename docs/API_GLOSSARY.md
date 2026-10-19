@@ -2820,6 +2820,30 @@ No new transaction family: the DOCX verbs live on the primary
 | `litchi_docx::metadata::{Edit::app_props, Edit::set_app_props, Edit::custom_props, Edit::set_custom_props, Patch::parts, Error::Properties}` and `Package::app_props` | adopted (0342): the xlsx spellings of the same staging |
 | `litchi_pptx::opened::Edit::set_table_properties` | adopted (0342): the `a:tblPr` style switches through a closure over `table::Properties`; the style id is refused |
 
+
+## DOCX P0 final: cells, grid columns, hyperlink tips, comment threads (record 0345)
+
+No new transaction family: the grid and tooltip verbs live on the primary
+`document::Edit` (both owners) and its `snapshot::Edit`, beside
+`insert_row_at` and `set_hyperlink_target_at`; the comment verbs stay on the
+eager package-bound `Edit` beside `add_comment_at`/`set_comment`. Native
+comment identifiers remain the selectors these verbs take; `w14:paraId`
+values are assigned by the leaf and never addressed.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_docx::document::NewCell` (`new`, `with_text`, `with_width`, `text`, `width`), `Edit::insert_cell_at` | OfficeCLI's `AddCell`: one paragraph of text, `w:tcW`; the grid gains average-width columns and the other rows padding cells when the row outgrows it | ✅ 0345 |
+| `litchi_docx::document::Edit::{insert_column_at, remove_column_at, set_column_width_at}` | a grid column by its position: `w:gridCol` and each row's cell at that slot, one table replacement; merged slots and the last column refused | ✅ 0345 |
+| `litchi_docx::document::Edit::set_hyperlink_tooltip_at` | `w:tooltip` on the hyperlink start tag; `None` removes it | ✅ 0345 |
+| `litchi_docx::document::NewComment::{with_parent, with_done, with_start_after, with_range}`, `CommentChange::with_done` | replies and resolution through `commentsExtended` (`w15:paraIdParent`, `w15:done`, keyed by the `w14:paraId` of the comment's last paragraph, [MS-DOCX] `CT_CommentEx`; an existing `commentsIds` part gains the new mappings); `with_start_after(Position)` is OfficeCLI's 1-based `runStart` minus one; `with_range(false)` writes a point comment | ✅ 0345 |
+| `litchi_docx::comment::Comment::paragraph_id`, `Document::comments_extended`, `source_backed::Package::comments_extended` | the last paragraph's `w14:paraId` (the `commentsExtended` key); the parsed `commentsExtended` entries (`modern_comments::Extended`) on both owners | ✅ 0345 |
+| DOCX `cell` add under a row (`text`, `width`; aliases `tc`) and `text` written by add and set | OfficeCLI's `table-cell` schema | ✅ 0345 |
+| DOCX `column` element (`/body/tbl[N]/col[M]`, alias `col`): `width` read, set and added, `text` added; add and remove | OfficeCLI's virtual `table-column`; not a listed table child, so table views stay the rows | ✅ 0345 |
+| DOCX hyperlink `tooltip` add and set | OfficeCLI's `hyperlink.tooltip` (add only there) | ✅ 0345 |
+| DOCX comment `anchoredTo` (read), `done` (alias `resolved`; read, add, set), `parentId` (read, add), `runStart`, `range` (add) | OfficeCLI's `comment` schema; the record 0335 property gaps are deleted | ✅ 0345 |
+
+See [0345](unified-ops/0345-docx-p0-final.md).
+
 ## Numbers swap, Python patches (record 0347)
 
 No new transaction family. Numbers `swap` composes the existing sheet-order,

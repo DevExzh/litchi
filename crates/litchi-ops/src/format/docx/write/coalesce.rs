@@ -61,6 +61,7 @@ impl Docx {
                         | Kind::Comment
                         | Kind::SmartArt
                         | Kind::Node
+                        | Kind::Column
                 ) || super::super::parts::is_part_kind(node.element_kind())
                     || super::super::marks::is_mark_kind(node.element_kind())
             }) {

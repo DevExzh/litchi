@@ -39,6 +39,9 @@ use super::{
 };
 use crate::properties;
 
+mod grid;
+pub use grid::NewCell;
+
 /// One step of an [`ElementPath`]: the position of a direct
 /// WordprocessingML child, counted among the container's direct children with
 /// the same element name.
@@ -1773,14 +1776,87 @@ impl Edit {
         self.replace_element(hyperlink, &before, &Arc::new(after))
     }
 
+    /// Set the screen tip (`w:tooltip`) of the hyperlink at `hyperlink` to
+    /// `tooltip`, or remove it for `None` (record 0345). The start tag keeps
+    /// every other attribute as written; an unchanged tip is an exact no-op.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    ///
+    /// let snapshot = Snapshot::from_xml(
+    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:hyperlink w:anchor="Intro"><w:r><w:t>Intro</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#,
+    /// )?;
+    /// let mut edit = snapshot.edit();
+    /// let link = ElementPath::new([
+    ///     ElementStep::Paragraph(Position::new(0)),
+    ///     ElementStep::Hyperlink(Position::new(0)),
+    /// ]);
+    /// edit.set_hyperlink_tooltip_at(&link, Some("Jump to the introduction"))?;
+    /// let commit = edit.commit()?;
+    /// assert!(String::from_utf8_lossy(commit.snapshot().xml_bytes())
+    ///     .contains(r#"w:tooltip="Jump to the introduction""#));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::BlockNotFound`] for a missing hyperlink,
+    /// [`Refusal::InvalidPropertyValue`] for a tip holding a control
+    /// character XML cannot carry, or a resource-limit error.
+    pub fn set_hyperlink_tooltip_at(
+        &mut self,
+        hyperlink: &ElementPath,
+        tooltip: Option<&str>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("set_hyperlink_tooltip_at")?;
+        if tooltip.is_some_and(|tip| {
+            tip.chars()
+                .any(|c| c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
+        }) {
+            return Err(refusal(Refusal::InvalidPropertyValue));
+        }
+        let (located, _) = self.element_with_scope(hyperlink, b"hyperlink")?;
+        let before = self.element_bytes(located)?;
+        let (tag_end, _) = super::root_tag(&before)?;
+        let tag = &before[..tag_end];
+        let key = crate::picture_spans::attribute_named(tag, "tooltip").unwrap_or_else(|| {
+            let name = String::from_utf8_lossy(super::tag_name(tag).unwrap_or(b"w:hyperlink"));
+            match name.split_once(':') {
+                Some((prefix, _)) => format!("{prefix}:tooltip"),
+                None => "tooltip".to_owned(),
+            }
+        });
+        let rewritten = match tooltip {
+            Some(tip) => crate::picture_spans::with_attribute(tag, &key, tip),
+            None => crate::picture_spans::without_attribute(tag, &key),
+        }
+        .ok_or_else(|| invalid("invalid hyperlink start tag"))?;
+        if rewritten.as_slice() == tag {
+            return Ok(self);
+        }
+        let mut after = buffer(staging_add(before.len(), rewritten.len())?)?;
+        after.extend_from_slice(&rewritten);
+        after.extend_from_slice(&before[tag_end..]);
+        self.replace_element(hyperlink, &before, &Arc::new(after))
+    }
+
     /// Anchor comment `id` in the paragraph at `paragraph`: a range around
     /// its direct runs `range` (inclusive), or around all its content for
     /// `None`, followed by the comment's reference run.
+    ///
+    /// Record 0345, after OfficeCLI's `AddComment`: for a whole-paragraph
+    /// anchor, `start_after` starts the range after that direct run (a run
+    /// the paragraph lacks keeps the paragraph start); `reference_only`
+    /// writes the reference run alone, with no range markers, at the end
+    /// of the range (after `start_after` for a whole paragraph).
     pub(crate) fn anchor_comment_at(
         &mut self,
         paragraph: &ElementPath,
         range: Option<(Position, Position)>,
         id: u32,
+        start_after: Option<Position>,
+        reference_only: bool,
     ) -> Result<&mut Self> {
         self.ensure_unmanaged("add_comment_at")?;
         let (located, inherited) = self.element_with_scope(paragraph, b"p")?;
@@ -1809,14 +1885,24 @@ impl Edit {
                     .ok_or_else(|| refusal(Refusal::RunNotFound))?;
                 (start, end + 1)
             },
-            None => (
-                layout
-                    .children
-                    .iter()
-                    .position(|child| child.2.as_deref() != Some(b"pPr"))
-                    .unwrap_or(layout.children.len()),
-                layout.children.len(),
-            ),
+            None => {
+                let after = start_after
+                    .and_then(|run| layout.index_of(b"r", run))
+                    .map(|child| child + 1);
+                let start = after.unwrap_or_else(|| {
+                    layout
+                        .children
+                        .iter()
+                        .position(|child| child.2.as_deref() != Some(b"pPr"))
+                        .unwrap_or(layout.children.len())
+                });
+                // A reference-only comment sits where the range would
+                // start when a run names the place, else at the end.
+                match (reference_only, after) {
+                    (true, Some(after)) => (after, after),
+                    _ => (start, layout.children.len()),
+                }
+            },
         };
         let start = layout
             .insertion_offset(start_child)
@@ -1864,8 +1950,11 @@ impl Edit {
         attribute(&mut reference, &prefix, "id", &id.to_string());
         reference.extend_from_slice(b"/>");
         close(&mut reference, &prefix, "r");
-        let start_marker = marker("commentRangeStart");
-        let end_marker = marker("commentRangeEnd");
+        let (start_marker, end_marker) = if reference_only {
+            (Vec::new(), Vec::new())
+        } else {
+            (marker("commentRangeStart"), marker("commentRangeEnd"))
+        };
         let mut after = buffer(staging_add(
             base.len(),
             start_marker.len() + end_marker.len() + reference.len(),
@@ -1968,6 +2057,12 @@ impl Edit {
 
     /// The largest comment identifier the main document's range markers and
     /// references use.
+    /// Every `paraId` value of the projected main document, for choosing
+    /// a fresh paragraph identifier (record 0345).
+    pub(crate) fn paragraph_ids(&self) -> Vec<u32> {
+        crate::part_scan::paragraph_ids(self.projected.xml_bytes())
+    }
+
     pub(crate) fn max_comment_marker_id(&self) -> Result<Option<u32>> {
         let mut maximum = None;
         scan_comment_markers(self.projected.xml_bytes(), |_, id, _| {

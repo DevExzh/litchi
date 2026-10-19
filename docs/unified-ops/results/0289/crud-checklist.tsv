@@ -95,7 +95,7 @@ docx	cell	find	supported		ok 8 instances, first `officecli/examples/word/revisio
 docx	cell	query	supported		ok matches in officecli/examples/word/revisions.docx
 docx	cell	view	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/tr[1]/tc[1]
 docx	cell	set	supported		ok `seed + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
-docx	cell	add	n/a	add not offered for this element	-
+docx	cell	add	supported		ok /body/tbl[1]/tr[1]/tc[3] on `seed + add table` under /body/tbl[1]/tr[1] {}
 docx	cell	remove	supported		ok `seed + add table` /body/tbl[1]/tr[1]/tc[1]
 docx	cell	move	format-verb		ok `seed + add table` /body/tbl[1]/tr[1]/tc[1] /body/tbl[1]/tr[1]/tc[2]
 docx	cell	swap	format-verb		refused unsupported_capability
@@ -571,6 +571,19 @@ docx	node	edit	supported		ok tx.set
 docx	node	batch	supported		ok set item
 docx	node	create	supported		ok format
 docx	node	save	supported		ok format
+docx	column	get	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/col[1]
+docx	column	find	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/col[1]
+docx	column	query	n/a	query not offered for this element	-
+docx	column	view	supported		ok 8 instances, first `officecli/examples/word/revisions.docx` /body/tbl[1]/col[1]
+docx	column	set	supported		ok `seed + add table` /body/tbl[1]/col[1] {"width":"7"}
+docx	column	add	supported		ok /body/tbl[1]/col[3] on `seed + add table` under /body/tbl[1] {}
+docx	column	remove	supported		ok `seed + add table` /body/tbl[1]/col[1]
+docx	column	move	format-verb		unreached
+docx	column	swap	format-verb		unreached
+docx	column	edit	supported		ok tx.set
+docx	column	batch	supported		ok set item
+docx	column	create	supported		ok format
+docx	column	save	supported		ok format
 xlsx	workbook	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
 xlsx	workbook	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
 xlsx	workbook	query	n/a	query not offered for this element	-

@@ -1018,6 +1018,20 @@ impl Package {
         crate::comment::Comment::extract_from_payload(&payload)
     }
 
+    /// The entries of the `commentsExtended` part, as the eager
+    /// `Document::comments_extended` reads them (record 0345).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the part is malformed.
+    pub fn comments_extended(&self) -> Result<Vec<crate::modern_comments::Extended>> {
+        match self.related_xml("/commentsExtended")? {
+            Some(xml) => crate::modern_comments::parse_comments_extended(&xml)
+                .map_err(|error| Error::InvalidFormat(error.to_string())),
+            None => Ok(Vec::new()),
+        }
+    }
+
     /// Whether the main document relates a comments part; retained edits
     /// are included (record 0319).
     ///
