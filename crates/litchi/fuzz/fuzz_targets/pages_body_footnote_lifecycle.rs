@@ -25,7 +25,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    if let Ok(package) = Package::from_bytes_with_options(&source, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    if let Ok(package) = Package::from_bytes_with_options(&source, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         exercise_package(&package, &source);
     }
 
@@ -99,7 +99,7 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        let package = Package::from_bytes_with_options(NATIVE_PAGES, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits()))
+        let package = Package::from_bytes_with_options(NATIVE_PAGES, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()))
             .unwrap_or_else(|error| panic!("native Pages lifecycle seed must open: {error}"));
         package
             .validate()
@@ -363,7 +363,7 @@ fn exercise_authored_rejections(package: &Package, source_before: &[u8]) {
 }
 
 fn exercise_redacted_malformed_ingress() {
-    match Package::from_bytes_with_options(PRIVATE_MALFORMED_INPUT, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(PRIVATE_MALFORMED_INPUT, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         Err(error) => {
             let display = error.to_string();
             let debug = format!("{error:?}");
@@ -380,7 +380,7 @@ fn exercise_redacted_malformed_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_options(bytes, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(bytes, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("oversized Pages input must be rejected"),
     }

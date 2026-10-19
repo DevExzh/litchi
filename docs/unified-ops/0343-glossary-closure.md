@@ -172,15 +172,30 @@ withdrawn); the adopted default is in effect until the owner overrides it.
 
 ## 6. Verification
 
-See the final report of this record's branch for commands and exit codes:
-`cargo fmt --all --check`; clippy of the changed crates, `litchi-ops`,
-`litchi` and `litchi-py` (all features, `-D warnings`) and of `litchi-ops`
-with no features and each touched format feature; the changed crates'
-tests, `cargo test -p litchi-ops --all-features` (in chunks) and
-`cargo test -p litchi --all-features`; `RUSTDOCFLAGS=-Dwarnings cargo doc`;
-`tools/check_api_glossary.py` over every profile; the boundary,
-non-iWork, feature-matrix, corpus and capability-delta tools and their unit
-tests; `crates/pyo3-litchi/tests/run_tests.sh`; and the perf-baseline check.
+After the last trunk merge (`6994d038de`, records 0340–0342):
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| clippy `-D warnings`, all targets, all features: opc, docx, xlsb, odt, odg, odc, odp, ppt, pptx, xlsx, ooxml-common, ops, litchi, litchi-py; `litchi-ods --lib` | 0 |
+| clippy `litchi-ops --no-default-features` alone and with `docx`, `pptx`, `xlsx`, `xlsb`, `ppt`, `doc`, `rtf`, `odt`, `ods`, `odp`, `odg`, `odc`, `keynote`, `numbers` | 0 each |
+| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` | 0: 40 profiles, 2,329 banned names, 253 families |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features` (changed crates, ops, litchi) | 0 |
+| tests, all features: docx 2,455; xlsb 1,295; odt 1,128; odg 162; odc 59; odp 444; ods 1,774 (every target but the purged-fixture `ods_formula_conditional_native`); ooxml-common 513; xlsx 2,467; pptx 1,842; ppt 1,499; opc | all pass |
+| `cargo test -p litchi-ops --all-features` in chunks (lib 948, doc 215, 162 test targets in 7 chunks) and `cargo test -p litchi --all-features` (235) | all pass |
+| capability/registry goldens, all features and all-but-`encryption` | pass unchanged (no re-bless needed) |
+| fuzz (`CARGO_TARGET_DIR=target/fuzz`): `litchi-core`, `litchi-ops`, `litchi-ops --features apply` checks; both `smoke_batch_payload` release runs; `crates/litchi/fuzz` check | 0 each |
+| `tools/perf-baseline`: `cargo check --locked --all-targets` | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 (293 tests) |
+| `tools/check_feature_matrix.py` | 0 (31 ok) |
+| tool unit tests, capability-delta/corpus/bench-matrix `--check`, crate boundaries, non-iWork gate | 0 |
+
+`crates/litchi/fuzz` (the facade's iWork targets) did not compile before
+this record: three targets named `litchi_pages::OpenOptions`, which that
+workspace does not depend on (now `litchi::pages::OpenOptions`), one used a
+removed `cell::comment::reply` path (now `cell::comment::transaction`), and
+one had an ambiguous `as_ref()`. None of the three was caused by this
+record's renames; they are fixed here.
 
 ## 7. Performance
 
