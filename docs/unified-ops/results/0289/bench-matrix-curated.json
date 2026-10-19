@@ -17,7 +17,8 @@
   "[0306] Parsers added for 0303 (pptx_gaps_bench: unified/native in the after build, after/before on the plain paths the base accepts), 0304 (text_set_bench: each after run against the median of the before runs, and ODT unified/leaf) and 0306 (iwork_directory_bench). 0305 is listed as 'not on this tree' until it merges.",
   "[0310] Record 0310 re-measured every open miss's harness on trunk 0f3d8158cb (results/0310/trunk/) and the routes it changes in B A A B order (results/0310/abba/, after legs parsed). Its §2 groups the open misses by root cause (G1–G12); every open miss cites that grouping. Rows it cannot re-measure (before/after builds of 0263 and 0290) carry its note in their explanation.",
   "[0310] Parsers added for 0305 (after legs of its keynote, numbers, docx, rtf — with its route G, the fan-out passing &Query — pages and docx_large harnesses) and 0309 (its element-write scenarios, against its stated 5 % or 20 µs bar). Records with no paired measurement: 0308 ('performance_claim: none; §7 shows the touched paths'). Record 0310 also added the 0311 (docx_large_bench with its committed-handle legs, the office_gaps_bench DOC scenarios) and 0312 (its keynote, pages and numbers runs) parsers after merging them.",
-  "[0326] Parser added for 0326 (after legs of its B A A B run: PPTX query routes, record 0314's iWork batch legs including the _parsed and _owned routes, the RTF single-target routes, and the element reads it re-measures). Curated rows added for the read misses of records 0319, 0320, 0321 and 0322 that 0326 re-measures, so they are superseded there; the read misses of records 0323 and 0324 are not curated (0326 does not re-measure them)."
+  "[0326] Parser added for 0326 (after legs of its B A A B run: PPTX query routes, record 0314's iWork batch legs including the _parsed and _owned routes, the RTF single-target routes, and the element reads it re-measures). Curated rows added for the read misses of records 0319, 0320, 0321 and 0322 that 0326 re-measures, so they are superseded there; the read misses of records 0323 and 0324 are not curated (0326 does not re-measure them).",
+  "[0344] Records 0307, 0308, 0314, 0316-0318, 0323-0325, 0327-0330, 0333, 0335, 0336, 0338 and 0342 are collected (second definition-of-done audit §5); record 0327's two rows are curated (its evidence stayed in the coordinator scratch directory). `--check` fails when a record's results directory (or a `results/<record>-*` file) holds evidence but the record contributes no rows, unless `evidence_without_rows` gives the reason."
  ],
  "rows": [
   {
@@ -2205,6 +2206,48 @@
    "series": "batch_closure:xls:file:cell_remove:1000:fixture1000",
    "cite": "0209-xls-publication-work.md, Paired measurements table: 'Filesystem | remove | 1,000 | 3.988 | 3.081 | 7.321 | 6.449 | 2.0929×' (ms)",
    "explanation": "Record 0209: at 1,000 filesystem removals the batch fell from 7.32 to 6.45 ms but the native edit fell more, so the ratio rose to 2.093×; left as a facade-overhead follow-up."
+  },
+  {
+   "stage": "",
+   "stage_rank": 1,
+   "comparison": "unified/leaf",
+   "unit": "M instructions (callgrind, loop cost)",
+   "size": "one sheet, every feature kind, 10 reads",
+   "record": "0327",
+   "format": "xls",
+   "operation": "query",
+   "scenario": "list every feature kind of one sheet (six queries + every node's properties vs Package::sheet_features)",
+   "ratio": 1.5,
+   "leaf": 2.85,
+   "unified": 4.27,
+   "budget_value": 1.25,
+   "budget": "1.25 (record 0327 §5 bar)",
+   "budget_kind": "read",
+   "series": "sheet_features:xls",
+   "cite": "0327-xls-ods-worksheet-features.md §5 table: '| XLS | 4,774,622 | 7,623,216 / 7,623,178 | 9,040,242 / 9,040,283 | 2.85 M | 4.27 M | **1.50×** |'",
+   "explanation": "Record 0327 §5: the leaf mode reads all kinds in one call (`Package::sheet_features`); the unified mode reopens a handle, runs six queries and projects every node's properties, so it is not a like-for-like fast path. Follow-up F-0344-SHEET-FEATURES (record 0344; XLS lane, WP10): pair the unified queries with the leaf's per-kind reads on one open handle, then cache the sheet's parsed feature records across the per-kind queries of one snapshot.",
+   "disposition": "follow-up"
+  },
+  {
+   "stage": "",
+   "stage_rank": 1,
+   "comparison": "unified/leaf",
+   "unit": "M instructions (callgrind, loop cost)",
+   "size": "one sheet, every feature kind, 10 reads",
+   "record": "0327",
+   "format": "ods",
+   "operation": "query",
+   "scenario": "list every feature kind of one sheet (six queries + every node's properties vs sheet_features::read)",
+   "ratio": 2.1,
+   "leaf": 54.3,
+   "unified": 113.9,
+   "budget_value": 1.25,
+   "budget": "1.25 (record 0327 §5 bar)",
+   "budget_kind": "read",
+   "series": "sheet_features:ods",
+   "cite": "0327-xls-ods-worksheet-features.md §5 table: '| ODS | 387,676,743 | 442,043,032 / 442,009,161 | 501,402,303 / 501,699,975 | 54.3 M | 113.9 M | **2.10×** |'",
+   "explanation": "Record 0327 §5: not a like-for-like fast path (a reopened handle, six queries and every node's projection against one leaf call); most of the ODS gap is the handle's open (content index) and the per-kind query walks. Follow-up F-0344-SHEET-FEATURES (record 0344; ODS lane, WP11): measure on one open handle against the leaf's per-kind reads, then share the content index and the per-sheet feature read across the six queries; record 0327's own follow-up (thread one parsed `Archive` through a verb's helpers) covers the write side.",
+   "disposition": "follow-up"
   }
  ],
  "annotations": [
@@ -2626,6 +2669,107 @@
    "series": "batch_closure:keynote:.*",
    "disposition": "follow-up",
    "explanation": "Record 0337 §3.3: the Keynote paragraph-set run is quadratic in the text's length: per item Pending::joins and Pending::touch split the base and the staged text (split('\\n').nth, the cancel check zips every line), hull re-scans the base, leaf_admits opens a slide-text edit, and Pending::stage_set splits and re-joins the whole staged text; callgrind of 3 batches of 1,000: 94 % in coalesce_set, 57 % in CharSearcher. 100 / 1,000 / 10,000 sets on a 10,000-line body: 3.1 / 22 / 390×. Follow-up F-0337-KEYNOTE (format/iwork/keynote, the iWork adapter owner): keep a staged text group as lines with UTF-16 prefix offsets and a count of lines that differ from the base, so a paragraph set costs its own line."
+  },
+  {
+   "record": "0307",
+   "series": "docx_large:(set|add):auto",
+   "explanation": "Record 0307 §6 (docx_mc_bench, the same 1,000-paragraph middle edit on the default owner): 2.48 (set) and 2.10 (add), unchanged by record 0307 and pre-dating the source-overlay fixes of records 0305 and 0311 (its base e7fe30fb24 is earlier than both merges).",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0308",
+   "series": "office_gaps:odp_scene_parse_200",
+   "explanation": "Record 0308 §7: the first build indexed every automatic style in the scan (+38 %); styles are now indexed on demand. The remaining wall-time difference (+3.4 % and +6.6 % in the r2 runs, +6.6 % after the third build) has no instruction-count counterpart: callgrind over the whole scenario counts 3.615 G -> 3.610 G (-0.14 %). Reported, not claimed as noise. Follow-up F-0344-ODP-SCENE (record 0344; ODP lane, record 0328 owner): re-measure `Scene::parse` on current trunk against 6c8d517eff (ABBA plus callgrind); record 0316's after/before of the same scene reads 0.983.",
+   "disposition": "follow-up",
+   "stage": "after3 (scan check limited to depth ≤ 2)"
+  },
+  {
+   "record": "0323",
+   "series": "ppt_elements:ppt_(comment|run)_get_v1:.*",
+   "explanation": "Record 0323 §5: microsecond-scale reads; the unified leg adds path parsing, the resolution walk and the node's step array, and the run read builds the paragraph's pieces (the native leg reads the first character run only). The added cost is 0.6 µs and 1.5 µs, flat in deck size. Follow-up 0323-F12: cache a slide's comments and a shape's runs per node handle, and pair the run leg with the same piece construction.",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0324",
+   "series": "doc_parts:(style_get_format|paragraph_list_format|hyperlink_get_format|section_get_format)",
+   "explanation": "Record 0324 §6: the unified point reads cost a fixed 0.3-0.6 µs: the path is parsed and resolved, a node is built and every key of the element's table is projected (a style has 47 keys, a section 23), where the leaf legs return one typed struct (section_get_format's leaf leg copies one struct, 1 ns). Follow-up 7 of record 0324: a projection that formats only the requested keys, or a typed fast path for get(path).format().get(key).",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0324",
+   "series": "doc_view:(p2_format|p28_format|p1_r1_format|query_p_formats)",
+   "explanation": "Record 0324 §6: a paragraph's format carries seven more keys (style, styleId, styleName, numFmt, listStyle, start, numLevel) and a run's one (rStyle); a styled or listed paragraph answers them (new output, +6-9 %), a plain one pays the iteration over them (+5-7 %, about 60 ns), and the query over all paragraphs follows (+7-8 %). Follow-up 7 of record 0324 (a projection that formats only the requested keys) removes the plain paragraphs' share.",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0325",
+   "series": "ooxml_followups:note_(font|text)_set",
+   "explanation": "Record 0325 §6: resolving /Sheet1/comment[19] parses the comments part once more than the leaf leg, which names the cell; the plain-text set of record 0320 has the same cost, so record 0325 did not introduce it. Follow-up 4 of record 0325: a per-handle cache of a sheet's notes, so comment[N] resolves without a second parse.",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0325",
+   "series": "ooxml_followups:rich_comment_get",
+   "explanation": "Record 0325 §6: +10-12 % (+8 µs); the node clones the note's runs. This is record 0320's comment_get (1.10) with rich text added. Follow-up 4 of record 0325 (a per-handle note cache) and lending the runs to the node instead of cloning them (record 0344 F-0344-XLSX-NOTE-RUNS).",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0328",
+   "series": "odf_rtf_parts:.*_get_format",
+   "explanation": "Record 0328 §6: the unified point reads cost a fixed 0.2-0.7 µs: the path is parsed and resolved, a node is built and every key of the element's table is projected (a section has 19 keys, a link 2 after its click scan); the leaf legs read one typed value (rtf_section_get_format's leaf borrows one struct in about 1 ns). Record 0324's section_get_format has the same shape. Follow-up 7 of record 0328.",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0328",
+   "series": "odf_rtf_view:(odt|odp|rtf)_(root|body|p1|slide|shape|paragraph)_children|odf_rtf_view:rtf_query_p_formats",
+   "explanation": "Record 0328 §6: node views of the root, body, paragraphs and slides are 3-19 % slower (10-60 ns): each listing checks for part kinds and iterates longer child tables (+1-11 % instructions), and callgrind attributes the rest to one more struct move per listed child; inlining the constructors made it worse. Queries and writes over the same documents are unchanged or faster. Follow-up 8 of record 0328 (child-listing overhead).",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0329",
+   "series": "iwork:keynote:table_cell",
+   "explanation": "Record 0329 §7: every existing scenario is within 0.02 of base; the Keynote after processes are 2-5 % slower on both legs of every scenario, open included, which record 0329 does not touch, and callgrind instruction counts per call are unchanged (run_style +0.06 %, open +0.01 %), so this is code layout and host noise, not added work (an explained residual; the next Keynote measurement re-reads it).",
+   "disposition": "residual"
+  },
+  {
+   "record": "0335",
+   "series": "docx_p0_residue:(open_control|smartart_node_text_cold|chart_series_color_cold)",
+   "explanation": "Record 0335 §6: the first write on a fresh handle pays one-time handle costs the leaf leg does not: the eager unified open itself (open_control, +190 µs on this fixture, a pre-existing cost outside the record), the body block index the path resolver builds, and the SmartArt inventory or chart projection the resolver reads to pick a node; warm writes are within budget. Follow-up F6 of record 0335: a resolver that reads one graphic's anchor or one chart's series indexes without the full inventory or projection; the open overhead is a separate open-route follow-up.",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0338",
+   "series": "json_number:(seeds|cells-10k-long)",
+   "explanation": "Record 0338 §3 (F1): serde_json is built with float_roundtrip so every JSON number decodes correctly rounded and the batch wire form is a fixed point; long decimals cost about 30 ns more per number, the price of a correctly rounded parse. The seeds payload (numbers as strings) is the same parser build (the record reads it as host noise). A correctness change adopted by design: an explained residual (record 0344 memo item on the residual misses).",
+   "disposition": "residual"
+  },
+  {
+   "record": "0338",
+   "series": "p0_residue:xlsx:set_run_bold",
+   "explanation": "Record 0338 §6: the run set is 0.55 µs over a 1.9 µs leaf edit, the fixed per-call cost: path parsing, sheet resolution, the cell view and property admission; the unified leg reuses the runs its path resolution read. Follow-up F-0344-XLSX-RUN (record 0344; XLSX lane): a lone run-path target staged without the general cell plan (as F-0337-RTF-SINGLE for RTF), with the sheet step cached per handle (as F-0337-XLSB-NOTE).",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0338",
+   "series": "p0_residue:xlsx:set_picture_src_both_decode_the_data_uri",
+   "explanation": "Record 0338 §6: path resolution reads the worksheet's drawing elements to find picture[1], and replace_image reads them again (+4.3 µs). Follow-up 0338-P1: a leaf replace_image that takes the resolved element.",
+   "disposition": "follow-up"
+  },
+  {
+   "record": "0342",
+   "series": "v1_closure:docx:set_row_header_height_exact",
+   "explanation": "Record 0342 §6: row path resolution builds the table's rows (4.4 µs, against 0.3 µs for /body/tbl[1], the bench's attribution leg), and the element path proof then walks them. Follow-up 0342-P1.",
+   "disposition": "follow-up"
+  }
+ ],
+ "evidence_without_rows": [
+  {
+   "record": "0272",
+   "reason": "route-identity check only (record 0272: 'no timing claim'); its JSON holds no paired timing"
+  },
+  {
+   "record": "0339",
+   "reason": "a property-visibility probe of the corpus harness (record 0339 §1, `newly-visible-skipped-properties`), not a measurement; record 0339 claims no performance"
   }
  ]
 }

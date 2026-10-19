@@ -39,7 +39,12 @@ long, so each format's sits in its own page under
 ``docs/unified-ops/officecli-capability-delta/``. ``--check`` also fails on
 an untriaged (``missing``) row, a gap without a disposition, a P0 row that is
 deferred or wontfix, a milestone-only follow-up without a current id, and a
-disposition or tier key that matches nothing.
+disposition or tier key that matches nothing. Record 0344 (audit WP13)
+extends the milestone rule to every ``followUp`` of the registry and
+capability goldens (``crates/litchi-ops/tests/golden/capabilities``): each
+one that names only a milestone must match a ``followUps`` entry of the
+dispositions file, which gives its current record or work-package id (the
+tables show it after the text), and every entry must match one.
 
 The output is deterministic: no timestamps, sorted where OfficeCLI's order is
 not meaningful, so rerunning on the same inputs reproduces it byte for byte.
@@ -67,6 +72,9 @@ OUTPUT = Path("docs/unified-ops/officecli-capability-delta.md")
 # Per-format property tables, next to the main table.
 PROPERTY_DIR = Path("docs/unified-ops/officecli-capability-delta")
 DISPOSITIONS = Path("tools/officecli_dispositions.json")
+# The capability goldens (`File::capabilities()` per format); record 0344
+# reads their follow-ups for the milestone rule.
+CAPABILITY_DIR = Path("crates/litchi-ops/tests/golden/capabilities")
 # Generated files stay below the repository's 1 MiB evidence limit.
 SIZE_LIMIT = 1 << 20
 # Table order: each OfficeCLI format, then the formats compared against its
@@ -387,6 +395,23 @@ class Dispositions:
             if entry.get("tier") not in TIER_VALUES or not entry.get("basis"):
                 raise SystemExit(f"{origin}: corpus script entry {entry.get('keys')} needs a tier and a basis")
         self.by_id = {entry["id"]: entry for entry in data.get("dispositions", [])}
+        self.follow_ups = []
+        follow_ids: set[str] = set()
+        for entry in data.get("followUps", []):
+            label = entry.get("id", "")
+            if not label or label in follow_ids:
+                raise SystemExit(f"{origin}: follow-up map id `{label}` is empty or repeated")
+            follow_ids.add(label)
+            ref = entry.get("ref", "")
+            if not REF.fullmatch(ref.split("/", 1)[0]) or milestone_only(ref):
+                raise SystemExit(f"{origin}: follow-up map `{label}` needs a work-package or record id, not `{ref}`")
+            if not entry.get("followUps") or not entry.get("note"):
+                raise SystemExit(f"{origin}: follow-up map `{label}` needs `followUps` and a `note`")
+            self.follow_ups.append(entry)
+        self.follow_up_uses: dict[str, int] = {}
+        # (format, follow-up) of every milestone-only golden follow-up, set
+        # by `classified`.
+        self.milestone_follow_ups: list[tuple[str, str]] = []
 
     @classmethod
     def load(cls, path: Path) -> "Dispositions":
@@ -438,6 +463,33 @@ class Dispositions:
         if value == "deferred" and tier in ("P1", "P2"):
             value = f"deferred-{tier}"
         return Resolution(value, tier, entry.get("ref", ""), entry["id"], entry.get("reason", ""))
+
+    def follow_up_entry(self, fmt: str, text: str, mark: bool = True) -> dict | None:
+        """The follow-up map entry (record 0344, audit WP13) that gives a
+        milestone-only follow-up of ``fmt`` its current id: an entry that
+        names the format beats one that does not, then the pattern with
+        the most literal characters, then the earlier entry."""
+        best, rank = None, None
+        for order, entry in enumerate(self.follow_ups):
+            fmts = entry.get("formats")
+            if fmts and fmt not in fmts:
+                continue
+            for pattern in entry["followUps"]:
+                if fnmatchcase(text, pattern):
+                    key = (bool(fmts), _literal(pattern), -order)
+                    if rank is None or key > rank:
+                        best, rank = entry, key
+        if best is not None and mark:
+            self.follow_up_uses[best["id"]] = self.follow_up_uses.get(best["id"], 0) + 1
+        return best
+
+    def current(self, fmt: str, text: str) -> str:
+        """A follow-up as the tables show it: a milestone-only one gains its
+        current id (`M2 (validate) → 0336`)."""
+        if not text or not milestone_only(text):
+            return text
+        entry = self.follow_up_entry(fmt, text, mark=False)
+        return f"{text} → {entry['ref']}" if entry else text
 
     def script_tier(self, script: str) -> str | None:
         hit = self.scripts.best(script)
@@ -1236,6 +1288,40 @@ def render_disposition_summary(deltas: list[FormatDelta], dispositions: Disposit
             f"| {entry_id} | {entry['disposition']} | {entry.get('ref', '')} | {uses.get(entry_id, 0)} | "
             f"{shown} | {entry.get('reason', '')} |"
         )
+    lines += follow_up_lines(dispositions)
+    return lines
+
+
+def follow_up_lines(dispositions: Dispositions) -> list[str]:
+    """The milestone follow-up map (record 0344, audit WP13)."""
+    counts: dict[str, int] = {}
+    formats_of: dict[str, set[str]] = {}
+    for fmt, text in dispositions.milestone_follow_ups:
+        entry = dispositions.follow_up_entry(fmt, text, mark=False)
+        if entry is not None:
+            counts[entry["id"]] = counts.get(entry["id"], 0) + 1
+            formats_of.setdefault(entry["id"], set()).add(fmt)
+    total = len(dispositions.milestone_follow_ups)
+    distinct = len(set(text for _, text in dispositions.milestone_follow_ups))
+    lines = [
+        "",
+        "## Milestone follow-ups",
+        "",
+        f"{total} follow-ups in the registry and capability goldens ({distinct} distinct texts) "
+        "name only a milestone or a step of one (`M2 (validate)`, `M1-extended (R4x)`). "
+        f"`{DISPOSITIONS.as_posix()}` (`followUps`) maps each to the record or work package that owns it "
+        "now; the tables above show the id after the text (`M2 (validate) → 0336`). `--check` fails on "
+        "a milestone-only follow-up without a current id and on a map entry that maps none "
+        "(audit WP13, record 0344).",
+        "",
+        "| Map entry | Follow-ups | Formats | Golden follow-ups | Current id | Now |",
+        "|---|---|---|---:|---|---|",
+    ]
+    for entry in dispositions.follow_ups:
+        shown = ", ".join(f"`{pattern}`" for pattern in entry["followUps"])
+        fmts = ", ".join(sorted(formats_of.get(entry["id"], set())))
+        lines.append(f"| {entry['id']} | {shown} | {fmts} | {counts.get(entry['id'], 0)} | "
+                     f"{entry['ref']} | {entry['note']} |")
     return lines
 
 
@@ -1290,12 +1376,63 @@ def compute_deltas(officecli: Path, repo: Path) -> tuple[list[FormatDelta], list
     return deltas, goldens
 
 
+def golden_follow_ups(repo: Path) -> list[tuple[str, str, str]]:
+    """Every ``followUp`` of the registry and capability goldens, as
+    (format, follow-up, golden path); an ``-encryption`` snapshot counts for
+    its format."""
+    found = []
+    for directory in (GOLDEN_DIR, CAPABILITY_DIR):
+        for path in sorted((repo / directory).glob("*.json")):
+            fmt = path.stem.removesuffix(OPTIONAL_SUFFIX)
+            stack = [json.loads(path.read_text(encoding="utf-8"))]
+            while stack:
+                node = stack.pop()
+                if isinstance(node, dict):
+                    text = node.get("followUp")
+                    if isinstance(text, str) and text:
+                        found.append((fmt, text, (directory / path.name).as_posix()))
+                    stack.extend(node.values())
+                elif isinstance(node, list):
+                    stack.extend(node)
+    return found
+
+
+def milestone_problems(follow_ups: list[tuple[str, str, str]], dispositions: Dispositions) -> list[str]:
+    """Record 0344 (audit WP13): every follow-up of the registry and
+    capability goldens that names only a milestone maps to a current id in
+    the dispositions file's ``followUps``, and every map entry is used."""
+    problems = []
+    unmapped: dict[tuple[str, str], list[str]] = {}
+    for fmt, text, origin in follow_ups:
+        if milestone_only(text) and dispositions.follow_up_entry(fmt, text) is None:
+            unmapped.setdefault((fmt, text), []).append(origin)
+    for (fmt, text), origins in sorted(unmapped.items()):
+        problems.append(f"{fmt}: milestone-only follow-up `{text}` ({len(origins)} in "
+                        f"{', '.join(sorted(set(origins)))}) has no current id in `followUps`")
+    for entry in dispositions.follow_ups:
+        if not dispositions.follow_up_uses.get(entry["id"]):
+            problems.append(f"stale follow-up map `{entry['id']}`: it maps no golden follow-up")
+    return problems
+
+
+def map_follow_ups(delta: FormatDelta, dispositions: Dispositions) -> None:
+    """Show each milestone-only follow-up of a delta with its current id."""
+    fmt = delta.name
+    delta.elements = [(*row[:3], dispositions.current(fmt, row[3])) for row in delta.elements]
+    delta.properties = [(*row[:5], dispositions.current(fmt, row[5]), *row[6:]) for row in delta.properties]
+    delta.operation_gaps = [(*row[:4], dispositions.current(fmt, row[4])) for row in delta.operation_gaps]
+
+
 def classified(officecli: Path, repo: Path, dispositions: Dispositions) -> tuple[list[FormatDelta], list[tuple[str, str]], list[str]]:
     """Every format's delta with its dispositions applied, the golden
     hashes, and the problems (including stale keys)."""
     deltas, goldens = compute_deltas(officecli, repo)
     problems: list[str] = []
+    follow_ups = golden_follow_ups(repo)
+    dispositions.milestone_follow_ups = [(fmt, text) for fmt, text, _ in follow_ups if milestone_only(text)]
+    problems += milestone_problems(follow_ups, dispositions)
     for delta in deltas:
+        map_follow_ups(delta, dispositions)
         problems += apply_dispositions(delta, dispositions)
     problems += [f"stale disposition key `{key}`: it classifies no row"
                  for key in dispositions.entries.unused(prefix="delta:")]
