@@ -648,18 +648,27 @@ impl<'a> Common<'a> {
         Ok(Some(text_reader::read_with_options(xml, scope, limits)?))
     }
 
-    /// The paragraphs and text runs of [`Self::text_body`], from one pass
-    /// over the body when it can, without decoding its properties and text
-    /// (record 0348); `None` without a body.
+    /// The paragraphs and text runs of [`Self::text_body`] (record 0348);
+    /// `None` without a body.
     ///
-    /// The pass reads structure only: a value the text-body reader would
-    /// refuse is not refused here.
+    /// # Errors
+    ///
+    /// As [`Self::text_body`].
+    pub fn text_index(self) -> Result<Option<BodyTextIndex>> {
+        self.text_body()?
+            .map(|body| crate::table::CellTextIndex::from_body(&body).map(BodyTextIndex))
+            .transpose()
+    }
+
+    /// [`Self::text_index`] of a body [`Self::text_body`] has read (record
+    /// 0348): from one pass over the body when it can, without decoding it
+    /// again, so values the reader would refuse are not checked here.
     ///
     /// # Errors
     ///
     /// As [`Self::text_body`] (for competing bodies, and for a body the pass
     /// leaves to the reader).
-    pub fn text_index(self) -> Result<Option<BodyTextIndex>> {
+    pub fn read_text_index(self) -> Result<Option<BodyTextIndex>> {
         if self.record.text_body_invalid {
             return Err(Error::Invalid(
                 "shape contains duplicate direct text bodies".into(),
@@ -674,12 +683,10 @@ impl<'a> Common<'a> {
             .xml
             .get(range)
             .ok_or_else(|| Error::Invalid("shape text body span became invalid".into()))?;
-        if let Some(index) = crate::table::shape::scan_body_text_index(xml, scope)? {
+        if let Some(index) = crate::table::shape::scan_read_body_text_index(xml, scope)? {
             return Ok(Some(BodyTextIndex(index)));
         }
-        self.text_body()?
-            .map(|body| crate::table::CellTextIndex::from_body(&body).map(BodyTextIndex))
-            .transpose()
+        self.text_index()
     }
 
     /// Resolve the namespaces inherited by a direct child body.

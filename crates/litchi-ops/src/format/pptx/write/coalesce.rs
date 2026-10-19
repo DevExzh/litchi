@@ -269,7 +269,13 @@ impl Run {
     pub(crate) fn new(base: &Pptx, limits: &SemanticLimits) -> Result<Self> {
         base.check_source()?;
         let source = base.editable_owner()?;
-        let edit = new_native_edit(&source)?;
+        let edit = match &source {
+            Editable::Eager(package) => match base.take_spare_edit(package) {
+                Some(edit) => NativeEdit::Eager(edit),
+                None => new_native_edit(&source)?,
+            },
+            Editable::Source(_) => new_native_edit(&source)?,
+        };
         base.check_source()?;
         Ok(Self {
             base: base.clone(),
@@ -1098,30 +1104,27 @@ fn cache_scene(scene: Scene) -> Result<CachedScene> {
 
 /// Read slide `slide`'s notes body placeholder (record 0346).
 fn read_notes(file: &Pptx, slide: usize) -> Result<NotesBody> {
-    // An eager owner's notes page is read from the graph snapshot the
-    // native notes editor stages on (record 0348).
-    let scene = match file.eager_notes_scene(slide)? {
-        Some(scene) => scene,
-        None => file.slide_notes_scene(slide)?,
+    // As the navigator resolves `/slide[N]/notes/paragraph[K]`: the notes
+    // page must have notes text, and its first body placeholder holds the
+    // paragraphs (record 0348).
+    let Some((true, scene)) = file.slide_notes_view(slide)? else {
+        return Ok(None);
     };
-    Ok(match scene {
-        None => None,
-        Some(scene) => {
-            let found = scene.roots().find(|handle| {
-                handle
-                    .view()
-                    .common()
-                    .placeholder()
-                    .is_some_and(|placeholder| placeholder.kind() == Some("body"))
-            });
-            match found {
-                Some(handle) => match handle.view().common().text_index() {
-                    Ok(Some(index)) => Some((handle.position().get(), Arc::new(index))),
-                    _ => None,
-                },
-                None => None,
-            }
+    let found = scene.roots().find(|handle| {
+        handle
+            .view()
+            .common()
+            .placeholder()
+            .is_some_and(|placeholder| placeholder.kind() == Some("body"))
+    });
+    Ok(match found {
+        // `Slide::notes` has read the body (its text): its structure is
+        // indexed without reading it again (record 0348).
+        Some(handle) => match handle.view().common().read_text_index() {
+            Ok(Some(index)) => Some((handle.position().get(), Arc::new(index))),
+            _ => None,
         },
+        None => None,
     })
 }
 

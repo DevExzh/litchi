@@ -941,6 +941,7 @@ fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
                         bodies += 1;
                         let expected = crate::table::CellTextIndex::from_body(&body)?;
                         let index = common.text_index()?.expect("a body");
+                        assert_eq!(common.read_text_index()?.as_ref(), Some(&index));
                         assert_eq!(index.paragraph_count(), body.paragraphs.len());
                         for (paragraph, item) in body.paragraphs.iter().enumerate() {
                             let runs = item.runs.iter().filter(|run| run.is_text()).count();
@@ -957,15 +958,12 @@ fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
                     let Ok(table) = handle.table() else {
                         continue;
                     };
-                    let Ok(contents) = table.cell_contents() else {
-                        continue;
-                    };
                     tables += 1;
                     scanned += usize::from(table.scan_cell_text_index()?.is_some());
                     assert_eq!(handle.cell_text_index()?, table.cell_text_index()?);
                     assert_eq!(
                         table.cell_text_index()?,
-                        crate::table::CellTextIndex::from_contents(&contents)?,
+                        crate::table::CellTextIndex::from_cells(table)?,
                         "{} {position}",
                         path.display()
                     );

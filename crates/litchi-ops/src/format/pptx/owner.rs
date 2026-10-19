@@ -436,41 +436,34 @@ impl Pptx {
         })
     }
 
-    /// [`Self::slide_notes_scene`] of an eager owner, read from the notes
-    /// graph snapshot the native notes editor stages on (record 0348); the
-    /// outer `None` when this does not apply (a source owner, a revision, or
-    /// a notes page holding markup compatibility), so the caller reads the
-    /// notes page as [`Self::slide_notes_scene`] does.
-    pub(super) fn eager_notes_scene(&self, position: usize) -> Result<Option<Option<Scene>>> {
-        if self.0.revision.is_some() {
-            return Ok(None);
-        }
-        let PptxOwner::Eager(package) = &self.0.owner else {
-            return Ok(None);
+    /// The notes page of the selected slide as the navigator sees it
+    /// (record 0348): its shape scene, and whether it has notes text, which
+    /// [`Self::slide_notes`] requires before `/slide[N]/notes` resolves —
+    /// read once.
+    pub(super) fn slide_notes_view(&self, position: usize) -> Result<Option<(bool, Scene)>> {
+        let view = |notes: Option<related::Notes>| {
+            notes.map(|notes| (notes.text().is_some(), notes.scene().clone()))
         };
-        self.finish(|| {
-            let Some(target) = self
-                .eager_catalog(package)?
-                .get(position)
-                .map(|slide| slide.target.clone())
-            else {
-                return Ok(Some(None));
-            };
-            let Some(graph) = package.notes_snapshot()? else {
-                return Ok(Some(None));
-            };
-            let Some(note) = graph
-                .slides()
-                .iter()
-                .find(|note| note.owner() == target.as_str())
-            else {
-                return Ok(Some(None));
-            };
-            let xml = note.xml();
-            if memchr::memmem::find(xml, b"AlternateContent").is_some() {
-                return Ok(None);
-            }
-            Ok(Some(Some(Scene::read(xml.to_vec())?)))
+        self.finish(|| match &self.0.owner {
+            PptxOwner::Source(presentation) => {
+                self.check_owner()?;
+                if self.0.revision.is_some() {
+                    let Some(slide) = self.revised_slide(position)? else {
+                        return Ok(None);
+                    };
+                    return Ok(view(slide.notes()?));
+                }
+                let Some(slide) = presentation.slide(position) else {
+                    return Ok(None);
+                };
+                Ok(view(slide.notes()?))
+            },
+            PptxOwner::Eager(package) => {
+                let Some(slide) = super::eager_slide(self, package, position)? else {
+                    return Ok(None);
+                };
+                Ok(view(slide.notes()?))
+            },
         })
     }
 

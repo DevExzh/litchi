@@ -142,6 +142,7 @@ impl Pptx {
             admitted: OnceLock::new(),
             cells: std::sync::Mutex::new(None),
             notes: std::sync::Mutex::new(None),
+            spare: std::sync::Mutex::new(None),
         }))
         .with_origin(self.origin())
     }
