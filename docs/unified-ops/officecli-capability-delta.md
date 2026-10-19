@@ -25,8 +25,8 @@ row has no disposition.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `69c108ce3e3e12d623c7cd960d1b14b10b109c8897b3c7a149077f1c0d9c83cc` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `1041d03e10d8da52c3e6655b2d4f52f171bde00a94cc63539e3ec4d3aea1f99a` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `46e6d325a787279ca00a54d8b48056001f33a76ff09888aea3a0354ad4c37020` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `d70d91b416cd5c25d0c05ab0142f7ecd246f95f3ed05432855a83a2c27452082` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `a8794b7a359f3e62b36fdfca6c40f915341dd41d290414906c254b25da1e517e` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `8bca53917a3663c9a1ef54ab3900b3c15cd60ecaff906c886c5fd6a4410e560d` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `9be3d35e7a6a55cd66b74d818d30f476efbba4778a3a10de1a74850bf1a457a0` |

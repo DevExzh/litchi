@@ -1667,7 +1667,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["col", "column"],
                 &[K::Table],
                 &[],
-                &["/body/tbl[N]/col[C]"],
+                &["/body/tbl[N]/col[M]"],
                 COLUMN_PROPS,
             ),
         ],

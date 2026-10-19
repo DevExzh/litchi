@@ -526,7 +526,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
         },
         // Record 0335: a picture and a comment added to the first body
         // paragraph, each set once, and both removed again, through the
-        // leaf picture and comment edits.
+        // leaf picture and comment edits; record 0345 resolves the comment.
         Some(FileFormat::Docx) => {
             if count("/body", "paragraph") == 0 {
                 return ("none", String::new());
@@ -547,9 +547,13 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                             .prop("author", "Litchi")
                             .prop("text", "Structural probe"),
                     )?;
+                    // Record 0345: resolving the comment writes its
+                    // `commentsExtended` entry, which the removal strips.
                     commented.file.set(
                         commented.path.to_string().as_str(),
-                        Props::new().with("text", "Structural probe, set"),
+                        Props::new()
+                            .with("text", "Structural probe, set")
+                            .with("done", true),
                     )
                 }),
                 Box::new(|file: &File| {

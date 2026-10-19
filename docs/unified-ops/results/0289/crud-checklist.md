@@ -29,7 +29,7 @@ Evidence: `crud-adr0008.tsv`.
 
 | format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused | atomic failure | patch inverse | composition |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| docx | 44 | 352 | 352 | 0 | 0 | 78 | 66 | 8 | 44 | ok | ok | ok |
+| docx | 45 | 363 | 363 | 0 | 0 | 78 | 66 | 8 | 44 | ok | ok | ok |
 | xlsx | 26 | 206 | 206 | 0 | 0 | 65 | 25 | 2 | 20 | ok | ok | ok |
 | pptx | 37 | 299 | 299 | 0 | 0 | 65 | 53 | 2 | 42 | ok | ok | ok |
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 | ok | ok | ok |
@@ -53,7 +53,7 @@ Evidence: `crud-adr0008.tsv`.
 
 ## docx
 
-- fixtures: `create()`, `seed`, `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`, `ooxml/docx/Hyperlink.docx`, `officecli/examples/word/revisions.docx`, `ooxml/docx/table-indent.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`, `ooxml/docx/comment.docx`, `libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`, `ooxml/docx/footnotes.docx`, `ooxml/docx/endnotes.docx`, `ooxml/docx/headerFooter.docx`, `ooxml/docx/ComplexNumberedLists.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx`, `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx`, `seed + add paragraph`, `seed + add paragraph + add run`, `seed + add hyperlink`, `seed + add table`, `seed + add table + add row`, `seed + add paragraph + add header`, `seed + add paragraph + add footer`, `seed + add footnote`, `seed + add endnote`, `seed + add comment`, `seed + add paragraph + add style`, `seed + add paragraph + add abstractNum`, `seed + add paragraph + add num`, `ooxml/docx/ComplexNumberedLists.docx + add level`, `seed + add bookmark`, `seed + add field`, `seed + add picture`, `seed + add chart`, `seed + add toc`, `seed + add paragraph + add break`, `seed + add paragraph + add tab`, `seed + add smartart`, `seed + add smartart + add node`
+- fixtures: `create()`, `seed`, `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`, `ooxml/docx/Hyperlink.docx`, `officecli/examples/word/revisions.docx`, `ooxml/docx/table-indent.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx`, `ooxml/docx/comment.docx`, `libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx`, `ooxml/docx/footnotes.docx`, `ooxml/docx/endnotes.docx`, `ooxml/docx/headerFooter.docx`, `ooxml/docx/ComplexNumberedLists.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx`, `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx`, `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx`, `seed + add paragraph`, `seed + add paragraph + add run`, `seed + add hyperlink`, `seed + add table`, `seed + add table + add row`, `seed + add table + add cell`, `seed + add paragraph + add header`, `seed + add paragraph + add footer`, `seed + add footnote`, `seed + add endnote`, `seed + add comment`, `seed + add paragraph + add style`, `seed + add paragraph + add abstractNum`, `seed + add paragraph + add num`, `ooxml/docx/ComplexNumberedLists.docx + add level`, `seed + add bookmark`, `seed + add field`, `seed + add picture`, `seed + add chart`, `seed + add toc`, `seed + add paragraph + add break`, `seed + add paragraph + add tab`, `seed + add smartart`, `seed + add smartart + add node`, `seed + add table + add column`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 - ADR 0008 atomic failure: ok, `seed + add paragraph` batch [set /body/p[1] {"style":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
 - ADR 0008 patch inverse: ok, `seed + add paragraph` set /body/p[1] {"style":"Litchi"}: the patch replays onto its source, the inverse restores the exact 8623 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
@@ -68,7 +68,7 @@ Evidence: `crud-adr0008.tsv`.
 | hyperlink | ok | ok | ok | ok | ok | ok | ok | ok | refused | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | ok | ok | ok | ok | refused | ok | ok | ok | ok |
 | row | ok | ok | ok | ok | ok | ok | ok | ok | refused | ok | ok | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | ok | ok | refused | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | ok | ok | ok | refused | ok | ok | ok | ok |
 | sdt | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | equation | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | section | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
@@ -105,6 +105,7 @@ Evidence: `crud-adr0008.tsv`.
 | series | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | axis | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | node | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| column | ok | ok | n/a | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 
 ## xlsx
 
