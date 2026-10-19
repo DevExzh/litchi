@@ -4,7 +4,7 @@
 //! recorded, as the second half of its evidence gap 5, that the programme has
 //! **no selector for "the ordinary OOXML save"**: every timed publication in
 //! this harness goes through a source-backed preservation route
-//! (`publish_multi_commit_to_stream`, `write_to_stream`, `PackageWriter`) or an
+//! (`publish_multi_commit_to_stream`, `write_to`, `PackageWriter`) or an
 //! in-memory `to_bytes`. The documented entry points a caller actually reaches
 //! for — [`litchi_docx::Package::save`], [`litchi_xlsx::Workbook::save`] and
 //! [`litchi_pptx::Package::save`], "Path A" of change
@@ -195,7 +195,7 @@ impl Format {
 
     const fn sink_entry_point(self) -> &'static str {
         match self {
-            Self::Docx => "litchi_docx::Package::to_stream",
+            Self::Docx => "litchi_docx::Package::write_to",
             Self::Xlsx => "litchi_xlsx::Workbook::write_to",
             // PPTX has no sequential-sink entry point; the counting phase
             // times `to_bytes` and accepts the produced buffer into the sink.

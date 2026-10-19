@@ -52,7 +52,7 @@ fn raw_pretty_producer_package_is_ingested_exactly_then_compacted_on_change() {
         .replace("<office:text>", "<office:text>\n    ")
         .replace("</office:text>", "\n  </office:text>");
     let original = raw_package(&pretty);
-    let source = Package::from_bytes(&original.clone()).unwrap();
+    let source = Package::from_bytes(&original).unwrap();
     assert_eq!(source.as_bytes(), original);
 
     let mut edit = source.edit();

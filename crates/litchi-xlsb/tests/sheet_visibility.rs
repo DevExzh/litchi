@@ -597,7 +597,7 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
         .expect("workbook part")
         .set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("serialize OPC");
+    package.write_to(&mut output).expect("serialize OPC");
     output
 }
 
@@ -631,7 +631,7 @@ fn with_unknown_workbook_record(bytes: &[u8]) -> Vec<u8> {
         .expect("workbook part")
         .set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("serialize OPC");
+    package.write_to(&mut output).expect("serialize OPC");
     output
 }
 
@@ -767,7 +767,7 @@ fn with_opaque_sheet_records(bytes: &[u8], positions: &[usize]) -> Vec<u8> {
             .set_blob(rewritten);
     }
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("serialize OPC");
+    package.write_to(&mut output).expect("serialize OPC");
     output
 }
 
@@ -859,7 +859,7 @@ fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type:
         .set_content_type(content_type.to_owned())
         .expect("content type");
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("serialize OPC");
+    package.write_to(&mut output).expect("serialize OPC");
     output
 }
 
@@ -909,7 +909,7 @@ fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> 
         .expect("workbook part")
         .set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("serialize OPC");
+    package.write_to(&mut output).expect("serialize OPC");
     output
 }
 
@@ -945,7 +945,7 @@ fn with_duplicate_chart_view(bytes: &[u8]) -> Vec<u8> {
         .expect("chart part")
         .set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("serialize OPC");
+    package.write_to(&mut output).expect("serialize OPC");
     output
 }
 
@@ -980,7 +980,7 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
         .expect("chart part")
         .set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("serialize OPC");
+    package.write_to(&mut output).expect("serialize OPC");
     output
 }
 

@@ -96,7 +96,7 @@ fn assert_round_trips(bytes: &[u8]) {
     let package = OpcPackage::from_bytes(bytes).expect("open");
     let mut saved = Vec::new();
     package
-        .to_stream(std::io::Cursor::new(&mut saved))
+        .write_to(std::io::Cursor::new(&mut saved))
         .expect("save");
     let reopened = OpcPackage::from_bytes(&saved).expect("reopen");
     assert_eq!(reopened.tolerance_report(), package.tolerance_report());
@@ -596,7 +596,7 @@ fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() 
     add(&mut edited, "application/octet-stream");
     let mut saved = Vec::new();
     edited
-        .to_stream(std::io::Cursor::new(&mut saved))
+        .write_to(std::io::Cursor::new(&mut saved))
         .expect("a source content type admitted verbatim is carried forward");
     let reopened = OpcPackage::from_bytes(&saved).unwrap();
     assert_eq!(reopened.tolerance_report(), edited.tolerance_report());
@@ -612,7 +612,7 @@ fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() 
     add(&mut authored, "application/octet-stream; x=1");
     assert!(
         authored
-            .to_stream(std::io::Cursor::new(&mut Vec::new()))
+            .write_to(std::io::Cursor::new(&mut Vec::new()))
             .is_err()
     );
 }
@@ -708,7 +708,7 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
         .expect("a source Id admitted verbatim is carried forward");
     let mut saved = Vec::new();
     edited
-        .to_stream(std::io::Cursor::new(&mut saved))
+        .write_to(std::io::Cursor::new(&mut saved))
         .expect("save");
     let reopened = OpcPackage::from_bytes(&saved).unwrap();
     assert_eq!(reopened.tolerance_report(), edited.tolerance_report());

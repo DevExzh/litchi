@@ -493,7 +493,7 @@ fn transaction_errors_are_classified_and_typed() {
             },
             Code::LimitExceeded,
         ),
-        (TransactionError::StaleSource, Code::IoError),
+        (TransactionError::PatchConflict, Code::IoError),
         (
             TransactionError::SemanticPrecondition,
             Code::InvalidArgument,

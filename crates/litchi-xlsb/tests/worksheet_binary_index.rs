@@ -115,7 +115,7 @@ fn rewrite_index(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Vec<u8>)
         .expect("index part")
         .set_blob(changed);
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("rewrite package");
+    package.write_to(&mut output).expect("rewrite package");
     output
 }
 
@@ -141,7 +141,7 @@ fn remove_index_relationship(package_bytes: &[u8]) -> Vec<u8> {
         .remove(&relationship_id)
         .expect("remove binary-index relationship");
     let mut output = Vec::new();
-    package.to_stream(&mut output).expect("rewrite package");
+    package.write_to(&mut output).expect("rewrite package");
     output
 }
 

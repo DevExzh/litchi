@@ -29,7 +29,7 @@ pub use model::{
 };
 pub use patch::{Commit, Patch};
 pub use snapshot::{SemanticLimits, Snapshot};
-pub use transaction::Transaction;
+pub use transaction::Edit;
 pub use validation::{validate_binding_map_ids, validate_catalog};
 
 pub use host_api::{

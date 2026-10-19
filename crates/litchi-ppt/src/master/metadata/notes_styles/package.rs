@@ -38,7 +38,7 @@ pub(super) fn from_xml(xml: &[u8]) -> Result<Styles> {
     );
 
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).map_err(|error| {
+    package.write_to(&mut output).map_err(|error| {
         Error::InvalidFormat(format!(
             "notes-master text styles package write failed: {error}"
         ))

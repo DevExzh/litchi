@@ -100,8 +100,8 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with(bytes, Limits::default())
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with(bytes.to_vec(), Limits::default())
     }
 
     ///

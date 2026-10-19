@@ -14,7 +14,7 @@ const EXACT_MACRO_METADATA: &str = r#"<o:document xmlns:o="urn:oasis:names:tc:op
 
 #[test]
 fn flat_text_document_exposes_paragraphs_headings_and_tables() {
-    let document = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let document = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let text = document.text().unwrap();
     assert!(text.contains("Lorem Ipsum"));
     assert!(text.contains("Cras eu leo sed justo"));
@@ -48,7 +48,7 @@ fn flat_text_document_exposes_paragraphs_headings_and_tables() {
 
 #[test]
 fn flat_text_document_exposes_metadata_and_exact_bytes() {
-    let document = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
+    let document = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let metadata = document.metadata().unwrap();
     assert_eq!(metadata.title.as_deref(), Some("Flat & Exact"));
     assert_eq!(metadata.application.as_deref(), Some("LibreOffice/24.2"));
@@ -58,14 +58,14 @@ fn flat_text_document_exposes_metadata_and_exact_bytes() {
 
 #[test]
 fn flat_text_document_rejects_garbage_empty_and_packaged_input() {
-    assert!(Document::from_bytes(b"not xml at all".to_vec()).is_err());
-    assert!(Document::from_bytes(Vec::new()).is_err());
-    assert!(Document::from_bytes(b"PK\x03\x04mimetype".to_vec()).is_err());
+    assert!(Document::from_bytes(b"not xml at all").is_err());
+    assert!(Document::from_bytes(&[]).is_err());
+    assert!(Document::from_bytes(b"PK\x03\x04mimetype").is_err());
 }
 
 #[test]
 fn compact_real_fodt_opens_reads_and_saves_byte_exactly() {
-    let document = Document::from_bytes(REAL_FLAT_TEXT.to_vec()).unwrap();
+    let document = Document::from_bytes(REAL_FLAT_TEXT).unwrap();
     assert_eq!(document.text().unwrap(), "Body");
     assert_eq!(document.as_bytes(), REAL_FLAT_TEXT);
     let directory = tempfile::tempdir().unwrap();
@@ -85,7 +85,7 @@ fn compact_real_fodt_fixtures_expose_layout_objects_and_declarations() {
         litchi_odf_common::compact_xml::validate(bytes).unwrap();
     }
 
-    let layout = Document::from_bytes(REAL_DEFAULT_PAGE_LAYOUT.to_vec())
+    let layout = Document::from_bytes(REAL_DEFAULT_PAGE_LAYOUT)
         .unwrap()
         .default_page_layout()
         .unwrap()
@@ -93,7 +93,7 @@ fn compact_real_fodt_fixtures_expose_layout_objects_and_declarations() {
     assert!(layout.name.is_empty());
     assert!(layout.properties.is_some());
 
-    let objects = Document::from_bytes(REAL_LINKED_OBJECT.to_vec())
+    let objects = Document::from_bytes(REAL_LINKED_OBJECT)
         .unwrap()
         .embedded_objects()
         .unwrap();
@@ -104,7 +104,7 @@ fn compact_real_fodt_fixtures_expose_layout_objects_and_declarations() {
             if href == "http://192.0.2.1:12345/probe"
     ));
 
-    let declarations = Document::from_bytes(REAL_USER_FIELD.to_vec())
+    let declarations = Document::from_bytes(REAL_USER_FIELD)
         .unwrap()
         .variable_declarations()
         .unwrap();
@@ -118,7 +118,7 @@ fn compact_real_fodt_fixtures_expose_layout_objects_and_declarations() {
 #[test]
 fn compact_exact_fodt_exposes_inert_macro_metadata() {
     litchi_odf_common::compact_xml::validate(EXACT_MACRO_METADATA.as_bytes()).unwrap();
-    let scripts = Document::from_bytes(EXACT_MACRO_METADATA.as_bytes().to_vec())
+    let scripts = Document::from_bytes(EXACT_MACRO_METADATA.as_bytes())
         .unwrap()
         .document_scripts()
         .unwrap()

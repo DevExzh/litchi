@@ -730,7 +730,7 @@ fn eager_replacement_preserves_a_utf8_bom_and_still_refuses_a_doctype_before_out
         .unwrap()
         .set_blob(b"\xef\xbb\xbf<!DOCTYPE document><document/>".to_vec());
     let mut output = Vec::new();
-    assert!(PackageWriter::write_to_stream(&mut output, &package).is_err());
+    assert!(PackageWriter::write_to(&mut output, &package).is_err());
     assert!(output.is_empty());
 }
 

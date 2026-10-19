@@ -637,7 +637,7 @@ impl Package {
                 operation: "write_to",
                 source,
             })?;
-        litchi_opc::PackageWriter::write_to_stream(writer, &self.opc)?;
+        litchi_opc::PackageWriter::write_to(writer, &self.opc)?;
         Ok(())
     }
 

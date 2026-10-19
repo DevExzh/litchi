@@ -649,7 +649,7 @@ fn sequential_ingress_retains_input_charges_with_source_artifacts_and_clones() {
     drop((package, clone));
     assert_eq!(budget.used(Resource::Memory), input_memory);
     let mut output = Vec::new();
-    artifact.write_to_stream(&mut output).unwrap();
+    artifact.write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
     drop(artifact);
     assert_eq!(budget.used(Resource::Memory), 0);

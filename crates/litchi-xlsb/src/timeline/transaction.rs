@@ -78,9 +78,9 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the bounded semantic fingerprint cannot be allocated or encoded.
-    pub fn edit(self) -> Result<Transaction> {
+    pub fn edit(self) -> Result<Edit> {
         let before_fingerprint = fingerprint(&self.content)?;
-        Ok(Transaction {
+        Ok(Edit {
             scope: self.scope,
             before_source: self.source,
             before_package: self.package,
@@ -113,7 +113,7 @@ impl Eq for Snapshot {}
 
 /// A detached, failure-atomic timeline edit.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     scope: Scope,
     before_source: Arc<Source>,
     before_package: Arc<OpcPackage>,
@@ -122,7 +122,7 @@ pub struct Transaction {
     content: Content,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow staged content.
     #[must_use]
     pub const fn content(&self) -> &Content {

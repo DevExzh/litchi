@@ -325,6 +325,11 @@
           "name": "rewrite_text_nodes",
           "scope": "litchi_docx::document",
           "replacement": "use Edit::substitute_formatted (record 0285)"
+        },
+        {
+          "name": "StaleSource",
+          "scope": "litchi_docx",
+          "replacement": "Error::PatchConflict: a patch's base does not match (ADR 0034 §6; record 0343)"
         }
       ],
       "families": [
@@ -597,6 +602,11 @@
           "name": "rewrite_text_nodes",
           "scope": "litchi_docx::document",
           "replacement": "use Edit::substitute_formatted (record 0285)"
+        },
+        {
+          "name": "StaleSource",
+          "scope": "litchi_docx",
+          "replacement": "Error::PatchConflict: a patch's base does not match (ADR 0034 §6; record 0343)"
         }
       ],
       "families": [
@@ -724,6 +734,26 @@
           "name": "XmlEvents",
           "scope": "litchi_opc::SourceLimitKind",
           "replacement": "use Events"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_accounting",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_expected_artifact",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
         }
       ],
       "families": []
@@ -851,6 +881,26 @@
           "name": "XmlEvents",
           "scope": "litchi_opc::SourceLimitKind",
           "replacement": "use Events"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_accounting",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
+        },
+        {
+          "name": "write_to_stream_with_expected_artifact",
+          "scope": "litchi_opc",
+          "replacement": "use write_to(impl Write) (ADR 0034 §4, record 0343)"
         }
       ],
       "families": []
@@ -3695,6 +3745,21 @@
           "scope": "litchi_xlsb::volatile_dependencies",
           "replacement": "use volatile_dependencies::SemanticLimits (one name per dimension set)",
           "recursive": false
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xlsb",
+          "replacement": "module-local Edit (ADR 0034 §3; record 0343)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xlsb",
+          "replacement": "drop the Edit (ADR 0034 §3; record 0343)"
+        },
+        {
+          "name": "CustomDataTransaction",
+          "scope": "litchi_xlsb",
+          "replacement": "use custom_data::Edit (record 0343)"
         }
       ],
       "families": [
@@ -4131,6 +4196,21 @@
           "scope": "litchi_xlsb::volatile_dependencies",
           "replacement": "use volatile_dependencies::SemanticLimits (one name per dimension set)",
           "recursive": false
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xlsb",
+          "replacement": "module-local Edit (ADR 0034 §3; record 0343)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xlsb",
+          "replacement": "drop the Edit (ADR 0034 §3; record 0343)"
+        },
+        {
+          "name": "CustomDataTransaction",
+          "scope": "litchi_xlsb",
+          "replacement": "use custom_data::Edit (record 0343)"
         }
       ],
       "families": [

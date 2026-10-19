@@ -149,7 +149,7 @@ pub(crate) fn exact_source(package: &litchi_opc::SourceBackedPackage) -> Result<
         artifact.len(),
         "the exact OPC source of an unsigned copy",
     )?;
-    artifact.write_to_stream(&mut bytes)?;
+    artifact.write_to(&mut bytes)?;
     Ok(bytes)
 }
 

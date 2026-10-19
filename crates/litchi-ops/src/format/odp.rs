@@ -126,7 +126,7 @@ impl Odp {
 
     /// Adopts a flat (single XML) presentation for reads.
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        let flat = litchi_odp::FlatPresentation::from_bytes(bytes).map_err(core_error)?;
+        let flat = litchi_odp::FlatPresentation::from_bytes(&bytes).map_err(core_error)?;
         Ok(Self::from_owner(
             OdpOwner::Flat(flat),
             None,
@@ -243,7 +243,7 @@ impl Odp {
             let bytes = parts
                 .merge_package(flat.as_bytes(), package.as_bytes())
                 .map_err(core_error)?;
-            let flat = litchi_odp::FlatPresentation::from_bytes(bytes).map_err(core_error)?;
+            let flat = litchi_odp::FlatPresentation::from_bytes(&bytes).map_err(core_error)?;
             let next = Self::from_owner(
                 OdpOwner::Flat(flat),
                 self.0.origin.clone(),

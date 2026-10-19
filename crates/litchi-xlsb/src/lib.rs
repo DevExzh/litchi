@@ -170,8 +170,7 @@ pub use custom_data::{
     Commit as CustomDataCommit, CustomData, CustomDataView, ExtensionList,
     Limits as CustomDataLimits, Part as CustomDataPart, Patch as CustomDataPatch, Properties,
     RemovalDisposition, Snapshot as CustomDataSnapshot, Storage, StorageId, StorageSelector,
-    StorageSelectorInput, Transaction as CustomDataTransaction, parse_properties,
-    validate_workbook_root, write_properties,
+    StorageSelectorInput, parse_properties, validate_workbook_root, write_properties,
 };
 
 pub use package::scenarios;

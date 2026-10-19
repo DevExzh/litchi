@@ -37,13 +37,19 @@ struct State {
 pub struct FlatDrawing(Arc<State>);
 
 impl FlatDrawing {
-    /// Opens a flat ODG document from owned bytes.
+    /// Opens a flat ODG document; the bytes are copied.
     ///
     /// # Errors
     ///
     /// Returns an error when the bytes are not a bounded, structurally valid FODG document.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        parse(bytes).map(|state| Self(Arc::new(state)))
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        // Validate the borrowed input before copying it, so a refused input
+        // never costs an input-sized allocation.
+        let pages = parse(bytes)?;
+        Ok(Self(Arc::new(State {
+            bytes: bytes.to_vec(),
+            pages,
+        })))
     }
 
     /// Returns the parsed drawing pages.
@@ -238,7 +244,8 @@ impl FlatDrawingEdit {
             bytes.splice(span.clone(), replacement.bytes());
             previous_start = span.start;
         }
-        let snapshot = FlatDrawing::from_bytes(bytes)?;
+        let pages = parse(&bytes)?;
+        let snapshot = FlatDrawing(Arc::new(State { bytes, pages }));
         for change in &changes {
             let actual = snapshot.pages()[change.page].shapes()[change.shape].text();
             if actual != change.after {
@@ -366,7 +373,7 @@ impl TextChange {
     }
 }
 
-fn parse(bytes: Vec<u8>) -> Result<State> {
+fn parse(bytes: &[u8]) -> Result<Vec<FlatPage>> {
     if bytes.len() > MAX_BYTES {
         return Err(invalid("flat ODG exceeds the input size limit"));
     }
@@ -375,9 +382,9 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
     // can otherwise own an oversized root namespace declaration; malformed
     // UTF-8 therefore receives this typed source error instead of a generic
     // non-flat classification.
-    let xml = std::str::from_utf8(&bytes).map_err(|_error| invalid("flat ODG is not UTF-8"))?;
+    let xml = std::str::from_utf8(bytes).map_err(|_error| invalid("flat ODG is not UTF-8"))?;
     validate_raw_events(xml)?;
-    if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odg) {
+    if litchi_odf_common::detect::flat(bytes) != Some(FileFormat::Odg) {
         return Err(invalid("input is not a flat ODG document"));
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
@@ -533,7 +540,7 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
     if depth != 0 || !root_seen || !body_seen || !drawing_seen || page_open.is_some() {
         return Err(invalid("flat ODG has an incomplete drawing structure"));
     }
-    Ok(State { bytes, pages })
+    Ok(pages)
 }
 
 fn validate_borrowed_event(event: &Event<'_>) -> Result<()> {

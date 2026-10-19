@@ -586,7 +586,7 @@ pub(crate) fn substitute_part<F: FnMut(&mut properties::Run)>(
         return Err(refused(0, Refusal::StoryReference));
     }
     if current != story.xml.as_slice() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let plan = write::plan(story, replacements, &mut format)?;
     if plan.changes.is_empty() {
@@ -882,7 +882,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::StaleSource`] for a story of other bytes, a refusal
+    /// Returns [`Error::PatchConflict`] for a story of other bytes, a refusal
     /// for an invalid, overlapping or non-text range, a field that is not
     /// replaceable or text a `w:t` cannot hold, and a limit error for too
     /// many changed blocks or too much replacement text. The edit is
@@ -928,7 +928,7 @@ impl Edit {
         }
         self.ensure_unmanaged("substitute")?;
         if !is_current(&self.projected, story) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let plan = write::plan(story, replacements, &mut format)?;
         if plan.changes.is_empty() {

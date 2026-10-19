@@ -17,7 +17,7 @@ use crate::package::error::{Error, Result};
 
 /// A bounded draft detached from an immutable Data Model snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     definition: Option<Definition>,
     payload: Option<Arc<Vec<u8>>>,
@@ -37,7 +37,7 @@ enum PayloadEditKind {
     IdentityRename,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(before: Snapshot) -> Self {
         let definition = before.definition().cloned();
         let payload = before.part().map(|part| Arc::clone(&part.bytes));

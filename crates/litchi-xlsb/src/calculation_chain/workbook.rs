@@ -1,6 +1,6 @@
 //! Workbook and package facades for the XLSB Calculation Chain owner.
 
-use super::{Commit, Patch, SemanticLimits, Snapshot, Transaction};
+use super::{Commit, Edit, Patch, SemanticLimits, Snapshot};
 use crate::package::error::Result;
 
 impl crate::Workbook {
@@ -27,15 +27,12 @@ impl crate::Workbook {
     /// The only supported mutation is removal of the optional performance
     /// cache. Payload replacement and typed cell edits are intentionally
     /// unavailable until the binary grammar is authoritative.
-    pub fn edit_calculation_chain(&self) -> Result<Transaction> {
+    pub fn edit_calculation_chain(&self) -> Result<Edit> {
         Ok(self.calculation_chain()?.edit())
     }
 
     /// Start a Calculation Chain transaction with explicit finite limits.
-    pub fn edit_calculation_chain_with_limits(
-        &self,
-        limits: SemanticLimits,
-    ) -> Result<Transaction> {
+    pub fn edit_calculation_chain_with_limits(&self, limits: SemanticLimits) -> Result<Edit> {
         Ok(self.calculation_chain_with_limits(limits)?.edit())
     }
 
@@ -82,15 +79,12 @@ impl crate::Package {
     }
 
     /// Start a detached source-bound Calculation Chain transaction.
-    pub fn edit_calculation_chain(&self) -> Result<Transaction> {
+    pub fn edit_calculation_chain(&self) -> Result<Edit> {
         Ok(self.calculation_chain()?.edit())
     }
 
     /// Start a Calculation Chain transaction with explicit finite limits.
-    pub fn edit_calculation_chain_with_limits(
-        &self,
-        limits: SemanticLimits,
-    ) -> Result<Transaction> {
+    pub fn edit_calculation_chain_with_limits(&self, limits: SemanticLimits) -> Result<Edit> {
         Ok(self.calculation_chain_with_limits(limits)?.edit())
     }
 

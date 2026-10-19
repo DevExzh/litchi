@@ -32,9 +32,7 @@ pub use model::{
     RevisionLog, ShortDateTime, User, UserNames,
 };
 pub use package::{load, store};
-pub use transaction::{
-    Commit, Patch, Snapshot, SourcePart, SourceRelationship, Transaction, apply, read,
-};
+pub use transaction::{Commit, Edit, Patch, Snapshot, SourcePart, SourceRelationship, apply, read};
 pub use validation::{validate_catalog, validate_headers, validate_log, validate_users};
 
 #[cfg(test)]

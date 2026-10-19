@@ -1113,7 +1113,7 @@ impl OpcPackage {
     /// SHA-256 of the exact owned source archive, while the exact-source
     /// authorization is intact.
     ///
-    /// For such a package [`Self::to_stream`] writes exactly the retained
+    /// For such a package [`Self::write_to`] writes exactly the retained
     /// archive and nothing else, so this is the digest of the bytes the
     /// package publishes. It is computed on first request, at most once per
     /// owned ingress, and shared by every clone of that ingress, because the
@@ -1138,7 +1138,7 @@ impl OpcPackage {
     }
 
     /// Length of the exact owned source archive, while the exact-source
-    /// authorization is intact: the number of bytes [`Self::to_stream`]
+    /// authorization is intact: the number of bytes [`Self::write_to`]
     /// writes for such a package.
     ///
     /// Returns `None` exactly when [`Self::exact_source_sha256`] does. It reads
@@ -2804,15 +2804,15 @@ impl OpcPackage {
     /// let mut pkg = OpcPackage::new();
     /// // ... add parts to package ...
     /// let file = File::create("output.docx")?;
-    /// pkg.to_stream(file)?;
+    /// pkg.write_to(file)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
     /// # Errors
     /// Returns an error if the package cannot be serialized or written to the
     /// stream; the stream may be left incomplete.
-    pub fn to_stream<W: Write>(&self, writer: W) -> Result<()> {
-        crate::pkgwriter::PackageWriter::write_to_stream(writer, self)
+    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
+        crate::pkgwriter::PackageWriter::write_to(writer, self)
     }
 
     pub(crate) fn strip_signature_graph(&mut self) {
@@ -4453,7 +4453,7 @@ mod tests {
             assert_eq!(package.exact_source_sha256(), Some(expected));
             assert_eq!(package.exact_source_len(), Some(bytes.len()));
             let mut streamed = Vec::new();
-            package.to_stream(&mut streamed).unwrap();
+            package.write_to(&mut streamed).unwrap();
             assert_eq!(sha256_of(&streamed), expected);
             assert_eq!(streamed, bytes);
         }

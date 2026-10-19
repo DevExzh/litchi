@@ -282,7 +282,7 @@ pub enum Error {
     },
     /// A patch was applied to a source with different selected-part bytes.
     #[error("source-backed story text patch source is stale")]
-    StaleSource,
+    PatchConflict,
     /// A patch was applied to a package lineage other than its source.
     #[error("source-backed story text patch belongs to a different source lineage")]
     ForeignSource,
@@ -1136,12 +1136,12 @@ impl Patch {
             return Err(Error::ForeignSource);
         }
         if source.source_version != self.before.source_version {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         if source.part_fingerprint != self.before.part_fingerprint
             || source.raw_bytes() != self.before.raw_bytes()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_noop() {
             source.clone()
@@ -1235,7 +1235,7 @@ impl Package {
                 writer: &mut output,
                 execution: execution.as_ref(),
             };
-            original_artifact.write_to_stream(&mut cancellation_writer)?;
+            original_artifact.write_to(&mut cancellation_writer)?;
             check_execution_context(execution.as_ref())?;
         } else {
             self.physical_package()?
@@ -1290,7 +1290,7 @@ impl Package {
         };
         publication
             .original_artifact
-            .write_to_stream(&mut cancellation_writer)?;
+            .write_to(&mut cancellation_writer)?;
         check_execution_context(execution.as_ref())?;
         Ok(publication.original_snapshot.clone())
     }
@@ -5010,12 +5010,12 @@ impl GlossaryBatchPatch {
             return Err(Error::ForeignSource);
         }
         if source.source_version != self.before.source_version {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         if source.part_fingerprint != self.before.part_fingerprint
             || source.raw_bytes() != self.before.raw_bytes()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_noop() {
             source.clone()
@@ -5118,7 +5118,7 @@ impl Package {
                 writer: &mut output,
                 execution: execution.as_ref(),
             };
-            original_artifact.write_to_stream(&mut cancellation_writer)?;
+            original_artifact.write_to(&mut cancellation_writer)?;
             check_execution_context(execution.as_ref())?;
         } else {
             self.physical_package()?
@@ -5173,7 +5173,7 @@ impl Package {
         };
         publication
             .original_artifact
-            .write_to_stream(&mut cancellation_writer)?;
+            .write_to(&mut cancellation_writer)?;
         check_execution_context(execution.as_ref())?;
         Ok(publication.original_snapshot.clone())
     }

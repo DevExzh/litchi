@@ -2104,7 +2104,7 @@ impl super::Package {
                 "SVG lifecycle inverse publication source is stale or foreign".into(),
             ));
         }
-        publication.original_artifact().write_to_stream(writer)?;
+        publication.original_artifact().write_to(writer)?;
         Ok(publication.original_snapshot().clone())
     }
 
@@ -2132,7 +2132,7 @@ impl super::Package {
                 "SVG lifecycle batch inverse publication source is stale or foreign".into(),
             ));
         }
-        publication.original_artifact().write_to_stream(writer)?;
+        publication.original_artifact().write_to(writer)?;
         Ok(publication.original_snapshot().clone())
     }
 

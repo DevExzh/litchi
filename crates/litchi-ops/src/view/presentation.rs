@@ -146,7 +146,8 @@ impl<'a> PresentationView<'a> {
     /// # Errors
     ///
     /// As [`Self::slides`], for the selected slide.
-    pub fn slide(&self, position: usize) -> Result<Option<Slide>> {
+    pub fn slide(&self, position: impl Into<litchi_core::Position>) -> Result<Option<Slide>> {
+        let position = position.into().get();
         match self.0 {
             #[cfg(feature = "pptx")]
             Inner::Pptx(pptx) => Ok(pptx.slide(position)?.map(pptx_slide)),

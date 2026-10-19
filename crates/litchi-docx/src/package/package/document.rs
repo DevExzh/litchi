@@ -255,7 +255,7 @@ impl Package {
         history: &mut crate::document::History,
     ) -> std::result::Result<Vec<crate::document::Snapshot>, crate::document::Error> {
         if history.current().xml_bytes() != commit.patch().source().xml_bytes() {
-            return Err(crate::document::Error::StaleSource);
+            return Err(crate::document::Error::PatchConflict);
         }
         if commit.patch().is_noop() {
             self.publish_patch(commit.patch())?;
@@ -332,7 +332,7 @@ impl Package {
                     .and_then(serde_json::Value::as_str)
                     != Some(dependency_digest.as_str())
                 {
-                    return Err(crate::document::Error::StaleSource);
+                    return Err(crate::document::Error::PatchConflict);
                 }
             }
         }
@@ -379,7 +379,7 @@ impl Package {
     ) -> std::result::Result<bool, crate::document::Error> {
         let current = self.document_snapshot()?;
         if current.xml_bytes() != history.current().xml_bytes() {
-            return Err(crate::document::Error::StaleSource);
+            return Err(crate::document::Error::PatchConflict);
         }
         let moved = if redo { history.redo() } else { history.undo() };
         if !moved {
@@ -399,7 +399,7 @@ impl Package {
                     let _restored = history.redo();
                 }
                 let _pending = history.take_graph_transition();
-                return Err(crate::document::Error::StaleSource);
+                return Err(crate::document::Error::PatchConflict);
             }
         }
         let replacement = history.current().xml_bytes().to_vec();
@@ -467,7 +467,7 @@ impl Package {
                 } if dependency_digest.as_ref() != expected.as_str()
             )
         }) {
-            return Err(crate::document::Error::StaleSource);
+            return Err(crate::document::Error::PatchConflict);
         }
         Ok(())
     }

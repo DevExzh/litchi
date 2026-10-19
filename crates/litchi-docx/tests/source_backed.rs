@@ -529,7 +529,7 @@ fn stale_commit_and_changed_source_fail_before_output() {
     let stale_package = source_backed::Package::from_read_at(stale_read_at).unwrap();
     assert!(matches!(
         stale_package.publish_document_commit_to_stream(&mut output, &commit),
-        Err(TransactionError::StaleSource)
+        Err(TransactionError::PatchConflict)
     ));
     assert!(output.is_empty());
 }

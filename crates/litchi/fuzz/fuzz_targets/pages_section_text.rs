@@ -25,7 +25,7 @@ const PRIVATE_REPLACEMENT: &str = "__litchi_private_pages_section_text_replaceme
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
-    match Package::from_bytes_with_options(data, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(data, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         Ok(package) => match package.validate() {
             Ok(()) => exercise_package(&package, data),
             Err(error) => observe_error(error),
@@ -62,7 +62,7 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        let package = Package::from_bytes_with_options(NATIVE_PAGES, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits()))
+        let package = Package::from_bytes_with_options(NATIVE_PAGES, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()))
             .unwrap_or_else(|error| panic!("native Pages section-text seed must open: {error}"));
         package.validate().unwrap_or_else(|error| {
             panic!("native Pages section-text seed must validate: {error}")
@@ -320,7 +320,7 @@ fn exercise_redacted_malformed_ingress() {
     ];
     for input in malformed {
         let before = input.to_vec();
-        match Package::from_bytes_with_options(input, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+        match Package::from_bytes_with_options(input, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
             Err(error) => {
                 if input == PRIVATE_MALFORMED_INPUT {
                     observe_redacted(error, PRIVATE_MALFORMED_INPUT);
@@ -337,7 +337,7 @@ fn exercise_redacted_malformed_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_options(bytes, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(bytes, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("an oversized Pages input must be rejected"),
     }
@@ -413,7 +413,7 @@ fn exercise_resource_limits() {
             defaults.max_iwa_stream_bytes(),
         )
         .unwrap_or_else(|error| unreachable!("valid exact-source profile: {error}"));
-        let package = match Package::from_bytes_with_options(NATIVE_PAGES, litchi_pages::OpenOptions::new().__archive_limits(exact_source_limits)) {
+        let package = match Package::from_bytes_with_options(NATIVE_PAGES, litchi::pages::OpenOptions::new().__archive_limits(exact_source_limits)) {
             Ok(package) => package,
             Err(error) => {
                 observe_error(error);
@@ -432,7 +432,7 @@ fn exercise_resource_limits() {
 
 fn observe_limited_ingress(limits: Limits) {
     let before = NATIVE_PAGES.to_vec();
-    match Package::from_bytes_with_options(&before, litchi_pages::OpenOptions::new().__archive_limits(limits)) {
+    match Package::from_bytes_with_options(&before, litchi::pages::OpenOptions::new().__archive_limits(limits)) {
         Ok(package) => {
             // A profile may reject only a later semantic layer; keep that
             // successful branch observable without retaining the package.

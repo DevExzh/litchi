@@ -27,7 +27,7 @@ pub use model::{
 pub use package::{CONTENT_TYPE, DEFAULT_PART_NAME, RELATIONSHIP_TYPE};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::Transaction;
+pub use transaction::Edit;
 
 /// Alias matching other XLSB feature owners.
 pub use crate::package::error::{Error, Result};

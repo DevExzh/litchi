@@ -1491,7 +1491,7 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
 
 fn serialized_opc(package: &OpcPackage) -> Vec<u8> {
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes
 }
 

@@ -20,7 +20,7 @@ fn real_master_document_xml_and_auxiliary_entries_remain_exact_and_opaque() {
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
-    let master = Package::from_bytes(&bytes.clone()).unwrap();
+    let master = Package::from_bytes(&bytes).unwrap();
     assert_eq!(master.as_bytes(), bytes.as_slice());
     assert_eq!(master.document().content_xml(), CONTENT);
     assert!(master.document().content_xml().contains("Chapters/a.odt"));

@@ -37,6 +37,7 @@ otherwise.
 | `litchi-xlsx` | SpreadsheetML (`.xlsx`, related OOXML packages) | [MS-XLSX], [MS-OE376], [MS-OI29500], [MS-OWEXML], [MS-ODRAWXML], [MS-OFFCRYPTO], [MS-OVBA] | [SpreadsheetML feature matrix](../crates/litchi-xlsx/docs/FEATURE_MATRIX.md) |
 | `litchi-ppt` | PowerPoint binary (`.ppt`) | [MS-PPT], [MS-CFB], [MS-OLEPS], [MS-ODRAW], [MS-OGRAPH], [MS-OSHARED] | [PowerPoint binary feature matrix](../crates/litchi-ppt/docs/FEATURE_MATRIX.md) |
 | `litchi-pptx` | PresentationML (`.pptx`, related OOXML packages) | [MS-PPTX], [MS-OE376], [MS-OI29500], [MS-ODRAWXML], [MS-OFFCRYPTO], [MS-OVBA] | [PresentationML feature matrix](../crates/litchi-pptx/docs/FEATURE_MATRIX.md) |
+| `litchi-rtf` | Rich Text Format (`.rtf`) | RTF 1.9.1, [MS-OXRTFCP] | [Rich Text Format feature matrix](../crates/litchi-rtf/docs/FEATURE_MATRIX.md) |
 | `litchi-pages` | Apple Pages (`.pages`) | Apple IWA package plus Pages, text, table, and shared schema projections | [Pages feature matrix](../crates/litchi-pages/docs/FEATURE_MATRIX.md) |
 | `litchi-keynote` | Apple Keynote (`.key`) | Apple IWA package plus Keynote, presentation, text, table, chart, and shared schema projections | [Keynote feature matrix](../crates/litchi-keynote/docs/FEATURE_MATRIX.md) |
 | `litchi-numbers` | Apple Numbers (`.numbers`) | Apple IWA package plus Numbers, table, formula, chart, and shared schema projections | [Numbers feature matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md) |
@@ -290,9 +291,24 @@ iWork parsing is split by concrete application format: `litchi-pages` owns
 Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`
 owns Numbers (`.numbers`). Their shared IWA archive, protocol, and package
 layers do not constitute a fourth user-facing format. At the `litchi` facade,
-the `pages`, `keynote`, and `numbers` feature leaves enable those parsers
-independently. `iwork` is both their aggregate dependency gate and a bounded,
-format-neutral read-only facade; it is not a fourth native format or writer.
+the `pages`, `keynote`, and `numbers` feature leaves enable those formats
+independently, and `iwork` is only their aggregate feature. `litchi::open` opens
+all three as `File::Pages`, `File::Keynote`, and `File::Numbers`, which read
+and write through the unified API like every other format; the former
+format-neutral `litchi::iwork::Document` reader was removed (record 0306).
+
+## Unified API
+
+Every format listed above, plus RTF, reads and writes through the unified
+`litchi::File` (`litchi-ops`): paths, queries and views; immutable `set`, `add`,
+`remove`, `move_to` and `swap`; transactions with exact inverse patches;
+batches; `save`, `save_as`, `to_bytes` and `write_to`; and `litchi::create`.
+The detailed matrices describe each format crate's own typed API, which the
+unified operations dispatch to. Element and property coverage through `File`
+is reported per handle by `File::capabilities()`; an unsupported request is a
+typed `unsupported_capability` refusal. The per-format element coverage
+against OfficeCLI is tracked in
+[`officecli-capability-delta.md`](unified-ops/officecli-capability-delta.md).
 
 ## Cross-format capability index
 
@@ -301,7 +317,7 @@ give the authoritative status and limitations for each concrete format.
 
 | Capability family | Overall scope | Primary owners |
 |--------------------|---------------|----------------|
-| Format detection and unified facades | Office, ODF, RTF, iWork, and tabular APIs where exposed; facade authoring is not implied | `litchi`, `litchi-core`, detailed format crates |
+| Format detection and the unified API | Content detection and `litchi::File` reads and writes for every Office, ODF, RTF, and iWork format; per-handle coverage is reported by `File::capabilities()` | `litchi`, `litchi-ops`, `litchi-core`, detailed format crates |
 | OOXML OPC package editing | Parts, relationships, content types, strict/transitional XML, and graph validation. Ingestion has configurable `SourceLimits`; default ceilings protect package input, ZIP members/names/metadata/compressed and uncompressed sizes, materialized parts, `[Content_Types].xml`, and relationship XML, attributes, targets, events, depth, and graph traversal. These are safety policy rather than spec maxima, grounded in ECMA-376 Part 2 §7.3.6/§10 and [MS-OI29500] §2.1.1749-1752. | `litchi-opc`, `litchi-ooxml-common`, DOCX/XLSX/XLSB/PPTX matrices |
 | OLE/CFB package editing | Streams, storages, property sets, inert OLEDS links, directory catalogs, custom XML stores, VBA signature metadata, and package-preserving editors | `litchi-cfb`, `litchi-ole-common`, DOC/XLS/PPT matrices; `object::{directory,link}`, `custom_xml`, and `vba_signature` provide bounded source-checked transactions with reversible patches and opaque-tail preservation |
 | ODF package and flat XML editing | ZIP package, manifest, metadata, styles, settings, resources, and bounded flat-document handling | `litchi-odf-common`, concrete ODF family crates, and ODF matrices |

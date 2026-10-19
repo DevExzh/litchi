@@ -179,7 +179,7 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
         .set_blob(rewritten);
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize chart fixture without views");
     output
 }

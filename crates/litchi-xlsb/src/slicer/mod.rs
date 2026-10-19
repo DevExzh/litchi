@@ -19,4 +19,4 @@ pub use model::{
     Cache, CrossFilter, Item, Native, Olap, PivotTable, SortOrder, Source, Table, View, Views,
 };
 pub use package::{CachePart, ViewPart};
-pub use transaction::{Commit, Content, Patch, Snapshot, Transaction};
+pub use transaction::{Commit, Content, Edit, Patch, Snapshot};

@@ -231,7 +231,7 @@ fn dependency_free_chart_fixture() -> Vec<u8> {
     }
     let mut output = Cursor::new(Vec::new());
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize dependency-free chart package");
     output.into_inner()
 }

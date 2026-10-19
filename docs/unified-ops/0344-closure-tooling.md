@@ -257,4 +257,26 @@ without renumbering.
 
 ## 8. Gates
 
-Filled in after the trunk merge (§8 table below).
+Tree: this branch with trunk `926cbde41e` (record 0343) merged. The only
+conflict was the owner memo; both sections are kept, items 14–24 and then
+25–29. After the merge every report was regenerated. The bench matrix
+lists 0343, and the delta and corpus outputs did not change. Build
+environment per the rules, with every exit status checked.
+
+| Command | Exit |
+|---|---:|
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_unified_bench_matrix` (1,276 tests) | 0 |
+| `python3 tools/officecli_capability_delta.py --check` (and the regeneration with `--officecli /home/zhuhe/code/litchi/3rdparty/OfficeCLI`: same output) | 0 |
+| `python3 tools/officecli_corpus.py --check` | 0 |
+| `python3 tools/unified_bench_matrix.py --check` | 0 |
+| `python3 tools/check_feature_matrix.py` (31 commands) | 0 |
+| `python3 tools/check_crate_boundaries.py` | 0 |
+| `python3 tools/non_iwork_gate.py verify` | 0 |
+| `cargo fmt --all --check` | 0 |
+
+No Rust source, golden or public name changed. The branch's diff against
+trunk touches `tools/`, `docs/unified-ops/` and the generated reports
+only. Clippy, the cargo test suites, rustdoc, the glossary gate,
+`run_tests.sh`, the perf-baseline check and the golden re-bless therefore
+have nothing of this record's to verify, and were not run. No glossary
+row changes.

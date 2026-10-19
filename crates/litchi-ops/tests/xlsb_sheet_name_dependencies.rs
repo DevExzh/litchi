@@ -107,7 +107,7 @@ fn rewrite_app_xml(bytes: &[u8], replacement: &str) -> Vec<u8> {
         .set_blob(source.into_bytes());
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize rewritten XLSB package");
     output
 }
@@ -141,7 +141,7 @@ fn mce_reference_fixture() -> Vec<u8> {
         .set_blob(source.into_bytes());
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize MCE XLSB package");
     output
 }

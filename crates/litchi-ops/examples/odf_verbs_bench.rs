@@ -291,7 +291,7 @@ mod bench {
     fn fodt(rows: &mut Vec<serde_json::Value>) {
         let bytes = fixture("odf/odt/libreoffice-page-columns-compact.fodt");
         let mut leaf = || {
-            let flat = litchi_odt::flat::Document::from_bytes(bytes.clone()).expect("flat");
+            let flat = litchi_odt::flat::Document::from_bytes(&bytes).expect("flat");
             let package = flat.to_package().expect("projection");
             black_box(package.document().expect("document"));
             black_box(flat);
@@ -302,7 +302,7 @@ mod bench {
         let times = paired(20, &mut [&mut leaf, &mut unified]);
         row(rows, "fodt", "open", &times);
 
-        let flat = litchi_odt::flat::Document::from_bytes(bytes.clone()).expect("flat");
+        let flat = litchi_odt::flat::Document::from_bytes(&bytes).expect("flat");
         let package = flat.to_package().expect("projection");
         let document = package.document().expect("document");
         let body = document.body().expect("body");

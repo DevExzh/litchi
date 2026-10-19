@@ -82,9 +82,7 @@ fn nan_workbook() -> Vec<u8> {
         .expect("worksheet part")
         .set_blob(output);
     let mut bytes = Cursor::new(Vec::new());
-    package
-        .to_stream(&mut bytes)
-        .expect("serialize NaN fixture");
+    package.write_to(&mut bytes).expect("serialize NaN fixture");
     bytes.into_inner()
 }
 

@@ -652,7 +652,7 @@ fn run_owned_iteration(
     }
     {
         let destination_opc = destination.opc()?;
-        destination_opc.to_stream(&mut sink)?;
+        destination_opc.write_to(&mut sink)?;
     }
     validate_sink(&sink, &corpus.expected_output)?;
     let published_checkpoint = capture_checkpoint()?;

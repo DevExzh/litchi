@@ -233,7 +233,7 @@ fn package_and_content_repairs_are_reported_together() {
 #[test]
 fn flat_spreadsheets_degrade_and_record_the_same_way() {
     let conforming = include_str!("fixtures/odfdo-test-flat-lo-compact.fods").to_string();
-    let clean = FlatSnapshot::from_bytes(conforming.clone().into_bytes()).unwrap();
+    let clean = FlatSnapshot::from_bytes(&conforming.clone().into_bytes()).unwrap();
     assert!(clean.tolerance_report().is_clean());
 
     let malformed = replace_nth(
@@ -242,7 +242,7 @@ fn flat_spreadsheets_degrade_and_record_the_same_way() {
         r#"office:value-type="float" office:value="one-two-three""#,
         0,
     );
-    let flat = FlatSnapshot::from_bytes(malformed.into_bytes()).unwrap();
+    let flat = FlatSnapshot::from_bytes(malformed.as_bytes()).unwrap();
     let defects = recorded(flat.tolerance_report());
     assert_eq!(defects.len(), 1);
     assert_eq!(

@@ -283,10 +283,7 @@ fn an_exact_no_op_from_any_clone_is_the_source() {
             .unwrap();
         assert_eq!(prepared, bytes, "{name}");
         let mut artifact = Vec::new();
-        clone
-            .source_artifact()
-            .write_to_stream(&mut artifact)
-            .unwrap();
+        clone.source_artifact().write_to(&mut artifact).unwrap();
         assert_eq!(artifact, bytes, "{name}");
         drop(clone);
         assert_eq!(publish_noop(original), bytes, "{name}");

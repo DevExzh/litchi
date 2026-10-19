@@ -50,7 +50,7 @@ fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)
     }
     package.get_part_mut(&uri).unwrap().set_blob(blob);
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 

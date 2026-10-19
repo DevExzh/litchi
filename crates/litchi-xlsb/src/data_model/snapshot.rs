@@ -154,8 +154,8 @@ impl Snapshot {
 
     /// Begin a detached, source-bound Data Model transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Exact finite limits used to inspect and edit this snapshot.

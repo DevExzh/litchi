@@ -1228,7 +1228,7 @@ impl Classify for litchi_docx::document::Error {
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             // The patch target no longer holds the bytes the edit captured:
             // the source changed underneath the handle.
-            Self::StaleSource => Class::of(Code::IoError),
+            Self::PatchConflict => Class::of(Code::IoError),
             Self::SemanticPrecondition => Class::of(Code::InvalidArgument),
             Self::Durable(_) | Self::Composition(_) | Self::InvalidDurable(_) => {
                 Class::of(Code::InvalidInput)

@@ -26,7 +26,7 @@ const SINGLE_CELLS_REL: &str =
 
 /// A validated draft whose commit remains bound to the exact source graph.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     catalog: Option<XmlMapInfo>,
     conformance: XmlMapConformance,
@@ -34,7 +34,7 @@ pub struct Transaction {
     single_cell_bindings: Vec<Option<Vec<SingleCellBinding>>>,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(before: Snapshot) -> Self {
         Self {
             catalog: before.map_info().cloned(),
@@ -1123,7 +1123,7 @@ mod transaction_tests {
             XPath::new("/r").expect("XPath"),
         )
         .expect("binding");
-        let mut transaction = Transaction {
+        let mut transaction = Edit {
             before,
             catalog: Some(fixture_catalog()),
             conformance: XmlMapConformance::Transitional,

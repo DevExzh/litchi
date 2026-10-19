@@ -104,8 +104,8 @@ impl Snapshot {
 
     /// Start a detached, failure-atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             base: self.clone(),
             link: self.link.clone(),
         }
@@ -122,12 +122,12 @@ impl Eq for Snapshot {}
 
 /// A detached transaction over typed link metadata and inert caches.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     base: Snapshot,
     link: Link,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the currently staged link.
     #[must_use]
     pub const fn link(&self) -> &Link {

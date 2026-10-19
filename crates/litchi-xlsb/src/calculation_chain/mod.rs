@@ -24,7 +24,7 @@ pub use model::{
 pub use package::{CONTENT_TYPE, RELATIONSHIP_TYPE};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::Transaction;
+pub use transaction::Edit;
 
 /// Alias matching the concise limits naming used by other XLSB feature owners.
 pub use crate::package::error::{Error, Result};

@@ -4360,7 +4360,7 @@ impl SourceArtifact {
     /// write and commits only the accepted count. A refusal before any bytes
     /// are accepted returns the typed output resource-limit error; a sink or
     /// policy failure after accepted bytes returns [`OpcError::IncompleteOutput`].
-    pub fn write_to_stream<W: Write>(&self, writer: W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
         write_exact_snapshot(&self.snapshot, writer, self.snapshot.context.as_ref())
     }
 
@@ -4371,7 +4371,7 @@ impl SourceArtifact {
     /// prefix before a source, cancellation, policy, or sink error. The raw
     /// unchanged counter equals the actual accepted source bytes for this
     /// exact-copy operation; it is never inferred from the source length.
-    pub fn write_to_stream_with_accounting<W: Write>(
+    pub fn write_to_with_accounting<W: Write>(
         &self,
         writer: W,
         accounting: &mut OpcOperationAccounting,
@@ -8211,7 +8211,7 @@ impl SourceBackedPackage {
     /// operation does not read part payloads or expose member identifiers. For
     /// managed packages it also reports cumulative direct-publication
     /// `OutputBytes` usage/limit and budget refusal counts; this includes
-    /// [`SourceArtifact::write_to_stream`] and bounded overlay sinks, while
+    /// [`SourceArtifact::write_to`] and bounded overlay sinks, while
     /// unmanaged compatibility publication remains uncharged. Clones share the
     /// cache, so the counters cover reads and publications through every clone.
     #[must_use]
@@ -8698,7 +8698,7 @@ impl SourceBackedPackage {
                 "source archive preservation allocation exceeds its requested bound",
             ));
         }
-        self.source_artifact().write_to_stream(&mut bytes)?;
+        self.source_artifact().write_to(&mut bytes)?;
         if bytes.len() != length {
             return Err(OpcError::ZipError(format!(
                 "source-backed OPC archive declared {length} bytes but copied {}",
@@ -19934,7 +19934,7 @@ mod tests {
 
         let mut output = Vec::new();
         assert!(matches!(
-            artifact.write_to_stream(&mut output),
+            artifact.write_to(&mut output),
             Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
         ));
         assert!(output.is_empty());
@@ -19953,7 +19953,7 @@ mod tests {
         };
 
         assert!(matches!(
-            artifact.write_to_stream(&mut sink),
+            artifact.write_to(&mut sink),
             Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
         ));
         assert_eq!(sink.calls, 1);
@@ -23188,7 +23188,7 @@ mod tests {
             )
             .unwrap();
         let mut output = Vec::new();
-        changed.to_stream(&mut output).unwrap();
+        changed.write_to(&mut output).unwrap();
         let reopened = OpcPackage::from_bytes(&output).unwrap();
         assert_eq!(reopened.get_part(&document).unwrap().blob(), b"<changed/>");
     }
@@ -23210,7 +23210,7 @@ mod tests {
 
         // An untouched package still publishes its exact source.
         let mut output = Vec::new();
-        owned.to_stream(&mut output).unwrap();
+        owned.write_to(&mut output).unwrap();
         assert_eq!(output, bytes);
     }
 
@@ -23533,9 +23533,9 @@ mod tests {
         let eager = OpcPackage::from_bytes(&source_bytes).unwrap();
 
         let mut materialized_bytes = Vec::new();
-        materialized.to_stream(&mut materialized_bytes).unwrap();
+        materialized.write_to(&mut materialized_bytes).unwrap();
         let mut eager_bytes = Vec::new();
-        eager.to_stream(&mut eager_bytes).unwrap();
+        eager.write_to(&mut eager_bytes).unwrap();
         let materialized_reader =
             crate::phys_pkg::OwnedPhysPkgReader::from_bytes(materialized_bytes).unwrap();
         let eager_reader = crate::phys_pkg::OwnedPhysPkgReader::from_bytes(eager_bytes).unwrap();
@@ -23563,7 +23563,7 @@ mod tests {
 
         let mut output = Vec::new();
         assert!(matches!(
-            materialized.to_stream(&mut output),
+            materialized.write_to(&mut output),
             Err(OpcError::SignedSourceRequiresExplicitPolicy)
         ));
         assert!(output.is_empty());
@@ -24407,7 +24407,7 @@ mod tests {
                 .unwrap();
         let artifact = package.source_artifact();
         let mut output = Vec::new();
-        artifact.write_to_stream(&mut output).unwrap();
+        artifact.write_to(&mut output).unwrap();
 
         assert_eq!(output, source_bytes);
         let diagnostics = package.cache_diagnostics();
@@ -24936,7 +24936,7 @@ mod tests {
         .unwrap();
         let artifact = package.source_artifact();
         let mut output = Vec::new();
-        artifact.write_to_stream(&mut output).unwrap();
+        artifact.write_to(&mut output).unwrap();
 
         assert_eq!(output, source_bytes);
         assert_eq!(
@@ -24968,7 +24968,7 @@ mod tests {
         .unwrap();
         let artifact = package.source_artifact();
         let mut output = Vec::new();
-        let error = artifact.write_to_stream(&mut output).unwrap_err();
+        let error = artifact.write_to(&mut output).unwrap_err();
 
         assert!(matches!(
             error,
@@ -25005,10 +25005,10 @@ mod tests {
             let error = if with_accounting {
                 let mut accounting = OpcOperationAccounting::default();
                 artifact
-                    .write_to_stream_with_accounting(&mut output, &mut accounting)
+                    .write_to_with_accounting(&mut output, &mut accounting)
                     .unwrap_err()
             } else {
-                artifact.write_to_stream(&mut output).unwrap_err()
+                artifact.write_to(&mut output).unwrap_err()
             };
 
             assert!(matches!(
@@ -25035,7 +25035,7 @@ mod tests {
         .unwrap();
         let artifact = package.source_artifact();
         let mut output = Vec::new();
-        let error = artifact.write_to_stream(&mut output).unwrap_err();
+        let error = artifact.write_to(&mut output).unwrap_err();
 
         match error {
             OpcError::IncompleteOutput { written, source } => {
@@ -25101,7 +25101,7 @@ mod tests {
         .unwrap();
         let artifact = package.source_artifact();
         let mut output = Vec::new();
-        artifact.write_to_stream(&mut output).unwrap();
+        artifact.write_to(&mut output).unwrap();
 
         assert_eq!(output, source_bytes);
         assert_eq!(root.used(Resource::OutputBytes), output_bytes);
@@ -25122,9 +25122,9 @@ mod tests {
         .unwrap();
         let artifact = package.source_artifact();
         let mut first = Vec::new();
-        artifact.write_to_stream(&mut first).unwrap();
+        artifact.write_to(&mut first).unwrap();
         let mut retry = Vec::new();
-        let error = artifact.write_to_stream(&mut retry).unwrap_err();
+        let error = artifact.write_to(&mut retry).unwrap_err();
 
         assert!(matches!(
             error,
@@ -25149,7 +25149,7 @@ mod tests {
         .unwrap();
         let artifact = package.source_artifact();
         let mut sink = FlushFailingSink { bytes: Vec::new() };
-        let error = artifact.write_to_stream(&mut sink).unwrap_err();
+        let error = artifact.write_to(&mut sink).unwrap_err();
 
         match error {
             OpcError::IncompleteOutput { written, source } => {
@@ -25301,7 +25301,7 @@ mod tests {
             maximum_write: 7,
             interrupted: false,
         };
-        artifact.write_to_stream(&mut sink).unwrap();
+        artifact.write_to(&mut sink).unwrap();
 
         assert_eq!(sink.bytes, source_bytes);
         assert_eq!(
@@ -25337,7 +25337,7 @@ mod tests {
         };
 
         assert!(matches!(
-            artifact.write_to_stream(&mut sink),
+            artifact.write_to(&mut sink),
             Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
         ));
         assert_eq!(sink.calls, 1);
@@ -26160,10 +26160,10 @@ mod callback_scoped_verified_reader_tests {
         assert_eq!(original.fingerprint().unwrap(), original_sha256);
 
         let mut copied = Vec::new();
-        original.write_to_stream(&mut copied).unwrap();
+        original.write_to(&mut copied).unwrap();
         assert_eq!(copied, source);
         assert!(matches!(
-            original.write_to_stream(RejectingSink),
+            original.write_to(RejectingSink),
             Err(OpcError::IoError(_))
         ));
 
