@@ -1,8 +1,13 @@
 //! Legacy slide comments through the native eager edit (record 0252).
 //!
-//! `set(/slide[N]/comment[K], {text, x, y})` replaces one comment's text or
-//! location; `add(/slide[N], comment, {text, author, initials, date, x, y})`
-//! appends one, creating the named author when absent;
+//! `set(/slide[N]/comment[K], {text, author, initials, date, x, y})`
+//! replaces one comment's text, location or date, or re-attributes it
+//! (record 0346: the author is renamed when the comment is their only one,
+//! otherwise the comment moves to an author of that name and initials, so
+//! other comments keep their attribution); `add(/slide[N], comment, {text,
+//! author, initials, date, x, y, direction})` appends one, creating the
+//! named author when absent (`direction=rtl` leads the text with a
+//! right-to-left mark, as OfficeCLI does);
 //! `remove(/slide[N]/comment[K])` deletes one (record 0333), as do
 //! `remove(/slide[N]/moderncomment[K])` (with its replies) and
 //! `remove(/slide[N]/moderncomment[K]/reply[R])` for threaded comments.
@@ -25,6 +30,9 @@ use litchi_core::Position;
 use litchi_core::selector::{Path, Predicate, Step};
 use std::sync::Arc;
 
+/// U+200F, prefixed to right-to-left comment text (record 0346).
+const RIGHT_TO_LEFT_MARK: char = '\u{200F}';
+
 #[derive(Default)]
 struct Values {
     text: Option<String>,
@@ -33,6 +41,8 @@ struct Values {
     date: Option<String>,
     x: Option<i64>,
     y: Option<i64>,
+    /// `direction=rtl` on `add` (record 0346).
+    rtl: bool,
 }
 
 fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Result<Values> {
@@ -54,6 +64,9 @@ fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Re
         assigned |= bit;
         entry.prepare(operation, value, |setter, scalar| {
             match (setter, scalar) {
+                (CommentSetter::Direction, Some(Scalar::Token(token))) => {
+                    values.rtl = token == "rtl";
+                },
                 (CommentSetter::X | CommentSetter::Y, Some(Scalar::Length(length))) => {
                     if matches!(setter, CommentSetter::X) {
                         values.x = Some(length.emu());
@@ -74,7 +87,9 @@ fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Re
                         CommentSetter::Author => values.author = owned,
                         CommentSetter::Initials => values.initials = owned,
                         CommentSetter::Date => values.date = owned,
-                        CommentSetter::X | CommentSetter::Y => unreachable!("length setters"),
+                        CommentSetter::X | CommentSetter::Y | CommentSetter::Direction => {
+                            unreachable!("length and token setters")
+                        },
                     }
                 },
                 _ => unreachable!("comment property coercion"),
@@ -136,12 +151,26 @@ impl Pptx {
         let source = self.editable_owner()?;
         let base = Self::eager_base(&source)?;
         let mut edit = base.edit()?;
-        let changed = edit.set_comment_at(
+        let mut changed = edit.set_comment_at(
             slide as usize,
             Position::new(position as usize),
             values.text.as_deref(),
             location,
         )?;
+        // Each setter addresses the comment by its slide position, which
+        // re-attribution keeps (record 0346).
+        if let Some(date) = values.date.as_deref() {
+            changed |=
+                edit.set_comment_date_at(slide as usize, Position::new(position as usize), date)?;
+        }
+        if values.author.is_some() || values.initials.is_some() {
+            changed |= edit.set_comment_author_at(
+                slide as usize,
+                Position::new(position as usize),
+                values.author.as_deref(),
+                values.initials.as_deref(),
+            )?;
+        }
         let (target, patch) = edit.commit()?.into_parts();
         let target = Arc::new(target);
         let after = if changed {
@@ -190,6 +219,13 @@ impl Pptx {
                 .collect()
         });
         let slide = slide.position as usize;
+        // OfficeCLI's convention for right-to-left comment text: `p:cm` has
+        // no direction attribute, so a right-to-left mark leads the text
+        // (once; an empty text stays empty).
+        let mut text = values.text.unwrap_or_default();
+        if values.rtl && !text.is_empty() && !text.starts_with(RIGHT_TO_LEFT_MARK) {
+            text.insert(0, RIGHT_TO_LEFT_MARK);
+        }
         let source = self.editable_owner()?;
         let base = Self::eager_base(&source)?;
         let mut edit = base.edit()?;
@@ -197,7 +233,7 @@ impl Pptx {
             slide,
             &author,
             &initials,
-            values.text.as_deref().unwrap_or(""),
+            &text,
             (values.x.unwrap_or(0), values.y.unwrap_or(0)),
             values.date.as_deref(),
         )?;

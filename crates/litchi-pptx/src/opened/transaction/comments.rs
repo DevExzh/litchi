@@ -162,6 +162,104 @@ impl Edit {
         Ok(true)
     }
 
+    /// Replace the `xsd:dateTime` stamp of the comment at `position` in the
+    /// slide's comment list (record 0346). Returns whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IndexOutOfBounds`] for a missing comment and the
+    /// errors of the comment codec. A failure leaves the edit unchanged.
+    pub fn set_comment_date_at<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        position: Position,
+        date_time: &str,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let conformance = self.comment_conformance(&selected.part_name)?;
+        let current = self.legacy_comment(&selected.part_name, position)?;
+        if current.date_time.as_deref() == Some(date_time) {
+            return Ok(false);
+        }
+        let mut replacement = current.clone();
+        replacement.date_time = Some(date_time.to_owned());
+        let before = self.working.clone();
+        if let Err(error) = crate::comments::update_presentation_comment(
+            &mut self.working,
+            selected.part_name.as_str(),
+            current.author_id,
+            current.index,
+            replacement,
+            conformance,
+        ) {
+            self.working = before;
+            return Err(error);
+        }
+        Ok(true)
+    }
+
+    /// Re-attribute the comment at `position` in the slide's comment list to
+    /// the author `name` with `initials` (record 0346); `None` keeps the
+    /// current author's value. The author is renamed in place when no other
+    /// comment of the presentation is theirs; otherwise the comment moves to
+    /// the author of that name and initials (created when absent) and takes
+    /// that author's next index, so the other comments keep their
+    /// attribution. Returns whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IndexOutOfBounds`] for a missing comment, an error
+    /// for exhausted author identifiers or indexes or a signed package, and
+    /// the errors of the comment codec. A failure leaves the edit unchanged.
+    pub fn set_comment_author_at<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        position: Position,
+        name: Option<&str>,
+        initials: Option<&str>,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let conformance = self.comment_conformance(&selected.part_name)?;
+        let current = self.legacy_comment(&selected.part_name, position)?;
+        let before = self.working.clone();
+        match crate::comments::reattribute_presentation_comment(
+            &mut self.working,
+            selected.part_name.as_str(),
+            current.author_id,
+            current.index,
+            name,
+            initials,
+            conformance,
+        ) {
+            Ok(changed) => Ok(changed),
+            Err(error) => {
+                self.working = before;
+                Err(error)
+            },
+        }
+    }
+
+    /// The legacy comment at `position` of a slide part.
+    fn legacy_comment(&self, slide: &litchi_opc::PackURI, position: Position) -> Result<Comment> {
+        let graph = crate::comments::load_presentation_comments_strict(&self.working)?;
+        let comments = graph
+            .as_ref()
+            .and_then(|graph| {
+                graph
+                    .slides
+                    .iter()
+                    .find(|list| list.slide_part_name == slide.as_str())
+            })
+            .map_or(&[][..], |list| list.comments.as_slice());
+        comments
+            .get(position.get())
+            .cloned()
+            .ok_or(Error::IndexOutOfBounds {
+                index: position.get(),
+                len: comments.len(),
+            })
+    }
+
     /// Remove the comment at `position` in the slide's legacy comment list
     /// (record 0333). The slide's comments part and its relationship go
     /// when the last comment does; the comment authors are kept, since

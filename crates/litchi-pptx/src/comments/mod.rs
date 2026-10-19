@@ -22,6 +22,7 @@ pub use collaboration::{
     put_threading, remove_presence, remove_threading,
 };
 pub use model::{Author, Comment, Comments, Conformance, List};
+pub(crate) use package::reattribute_presentation_comment;
 pub use package::{
     add_presentation_comment, add_presentation_comment_author, find_presentation_comment,
     find_presentation_comment_author, load_presentation_comments,

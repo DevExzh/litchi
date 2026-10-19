@@ -828,7 +828,11 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
         ),
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
-        "comment" => matches!(property, "text" | "x" | "y"),
+        // Author, initials and date since record 0346.
+        "comment" => matches!(
+            property,
+            "text" | "x" | "y" | "author" | "initials" | "date"
+        ),
         // Table rows (record 0333).
         "tr" => property == "height",
         _ => false,
@@ -886,6 +890,8 @@ fn pptx_write_only(element: &str, property: &str) -> bool {
         "picture" => property == "src",
         "tr" => property != "height" && pptx_row_add(property),
         "table" => property == "data",
+        // A comment's reading direction, on add (record 0346).
+        "comment" => property == "direction",
         _ => false,
     }
 }
@@ -972,7 +978,7 @@ fn pptx_reports_selection_and_structural_writes() {
             let comment_add = element.name() == "comment"
                 && matches!(
                     property.name(),
-                    "text" | "author" | "initials" | "date" | "x" | "y"
+                    "text" | "author" | "initials" | "date" | "x" | "y" | "direction"
                 );
             assert_eq!(
                 property.add(),

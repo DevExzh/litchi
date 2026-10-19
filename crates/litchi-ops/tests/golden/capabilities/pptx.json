@@ -3439,13 +3439,13 @@
         "author": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "initials": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "index": {
@@ -3457,7 +3457,7 @@
         "date": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "x": {
@@ -3471,6 +3471,16 @@
           "add": true,
           "set": true,
           "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

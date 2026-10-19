@@ -2138,21 +2138,27 @@ pub(super) enum CommentSetter {
     Date,
     X,
     Y,
+    /// The reading direction of the text (`add` only, record 0346):
+    /// `rtl` prefixes a right-to-left mark, as OfficeCLI does, since
+    /// `p:cm` has no direction attribute.
+    Direction,
 }
-const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMMENT_PROPS.len()] {
+const COMMENT_WRITE_COUNT: usize = COMMENT_PROPS.len() + 1;
+const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMMENT_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
-    let mut entries = [Entry::read(COMMENT_PROPS[0]); COMMENT_PROPS.len()];
+    let mut entries = [Entry::read(COMMENT_PROPS[0]); COMMENT_WRITE_COUNT];
     let mut index = 0;
     while index < COMMENT_PROPS.len() {
         let spec = COMMENT_PROPS[index];
+        // Author, initials and date are settable since record 0346.
         let access = if index == CommentKey::Text as usize {
             Some(Access::SetAndAdd(CommentSetter::Text))
         } else if index == CommentKey::Author as usize {
-            Some(Access::Add(CommentSetter::Author))
+            Some(Access::SetAndAdd(CommentSetter::Author))
         } else if index == CommentKey::Initials as usize {
-            Some(Access::Add(CommentSetter::Initials))
+            Some(Access::SetAndAdd(CommentSetter::Initials))
         } else if index == CommentKey::Date as usize {
-            Some(Access::Add(CommentSetter::Date))
+            Some(Access::SetAndAdd(CommentSetter::Date))
         } else if index == CommentKey::X as usize {
             Some(Access::SetAndAdd(CommentSetter::X))
         } else if index == CommentKey::Y as usize {
@@ -2175,13 +2181,25 @@ const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMM
         };
         index += 1;
     }
+    entries[COMMENT_PROPS.len()] = Entry {
+        spec: write_only("direction", ValueType::Token(&DIRECTION)),
+        access: Access::Add(CommentSetter::Direction),
+        constraint: Constraint::None,
+        clear: false,
+    };
     entries
 }
 pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
     CommentSetter,
-    { COMMENT_PROPS.len() },
-    0,
-> = crate::registry::Table::new(comment_write_entries(), []);
+    COMMENT_WRITE_COUNT,
+    1,
+> = crate::registry::Table::new(
+    comment_write_entries(),
+    [crate::registry::Alias {
+        name: "dir",
+        entry: COMMENT_PROPS.len(),
+    }],
+);
 pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
 
 /// Picture insertion assignments (`add` only).

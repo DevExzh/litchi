@@ -2820,3 +2820,17 @@ No new transaction family: the DOCX verbs live on the primary
 | `litchi_docx::metadata::{Edit::app_props, Edit::set_app_props, Edit::custom_props, Edit::set_custom_props, Patch::parts, Error::Properties}` and `Package::app_props` | adopted (0342): the xlsx spellings of the same staging |
 | `litchi_pptx::opened::Edit::set_table_properties` | adopted (0342): the `a:tblPr` style switches through a closure over `table::Properties`; the style id is refused |
 
+
+## PPTX P0 closure: comments, modern comments, notes, placeholders, slides (record 0346)
+
+No new transaction family: every verb lives on the primary `opened::Edit`,
+beside the record 0252 and 0333 positional comment verbs. Comment and
+reply identities stay native (the modern-comment `id` is read through the
+raw query surface only).
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::opened::Edit::{set_comment_date_at, set_comment_author_at}` | adopted (0346), positional siblings of `set_comment_at`; re-attribution renames an author only when the comment is their only one, otherwise moves the comment to an author of that name and initials at the author's next index |
+| `litchi_ops` PPTX `comment` `author`/`initials`/`date` set, `direction` (alias `dir`) on add | adopted (0346) |
+
+See [0346](unified-ops/0346-pptx-p0-final.md).

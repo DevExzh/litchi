@@ -734,6 +734,115 @@ pub fn reorder_presentation_comments(
     commit_legacy_slide_comments(package, slide, comments, conformance)
 }
 
+/// Re-attribute one legacy comment (record 0346): the comment keyed by
+/// `(author_id, index)` on `slide_part_name` takes the author `name` and
+/// `initials` (each `None` keeps the current author's value).
+///
+/// The comment author is a record the comments share, so a rename that
+/// touched every comment of that author would rewrite attribution the
+/// caller did not name. When no other comment of the presentation refers
+/// to the author, the author is renamed in place; otherwise the comment is
+/// routed to the author of that exact name and initials (a new one, with
+/// the next free identifier, when the presentation has none) and takes
+/// that author's next index. Returns whether anything changed.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006); an exact no-op keeps the signature.
+///
+/// # Errors
+///
+/// Returns an error for a missing comment or author, exhausted author
+/// identifiers or indexes, and the errors of the comment codec.
+pub(crate) fn reattribute_presentation_comment(
+    package: &mut OpcPackage,
+    slide_part_name: &str,
+    author_id: u32,
+    index: u32,
+    name: Option<&str>,
+    initials: Option<&str>,
+    conformance: Conformance,
+) -> Result<bool> {
+    let mut graph = load_presentation_comments_strict(package)?
+        .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
+    let current = graph
+        .authors
+        .iter()
+        .find(|author| author.id == author_id)
+        .cloned()
+        .ok_or_else(|| invalid(format!("comment author {author_id} was not found")))?;
+    let name = name.unwrap_or(&current.name);
+    let initials = initials.unwrap_or(&current.initials);
+    if name == current.name && initials == current.initials {
+        return Ok(false);
+    }
+    let slide_offset = graph
+        .slides
+        .iter()
+        .position(|slide| slide.slide_part_name == slide_part_name)
+        .ok_or_else(|| invalid("slide has no legacy comments"))?;
+    let comment_offset = graph.slides[slide_offset]
+        .comments
+        .iter()
+        .position(|item| item.author_id == author_id && item.index == index)
+        .ok_or_else(|| invalid("comment was not found"))?;
+    let shared = graph.slides.iter().enumerate().any(|(slide, list)| {
+        list.comments.iter().enumerate().any(|(offset, item)| {
+            item.author_id == author_id && (slide, offset) != (slide_offset, comment_offset)
+        })
+    });
+    if !shared {
+        let author = graph
+            .authors
+            .iter_mut()
+            .find(|author| author.id == author_id)
+            .ok_or_else(|| invalid(format!("comment author {author_id} was not found")))?;
+        name.clone_into(&mut author.name);
+        initials.clone_into(&mut author.initials);
+        commit_legacy_authors(package, &graph, conformance)?;
+        return Ok(true);
+    }
+    let target = match graph
+        .authors
+        .iter()
+        .position(|author| author.name == name && author.initials == initials)
+    {
+        Some(offset) => offset,
+        None => {
+            let id = graph
+                .authors
+                .iter()
+                .map(|author| author.id)
+                .max()
+                .map_or(Some(0), |maximum| maximum.checked_add(1))
+                .ok_or_else(|| invalid("comment author identifiers are exhausted"))?;
+            graph.authors.push(Author::new(id, name, initials));
+            graph.authors.len() - 1
+        },
+    };
+    let author = &mut graph.authors[target];
+    let next = author
+        .last_index
+        .checked_add(1)
+        .ok_or_else(|| invalid("comment indexes are exhausted"))?;
+    author.last_index = next;
+    let new_author = author.id;
+    let slide = graph.slides[slide_offset].clone();
+    let mut comments = slide.comments.clone();
+    comments[comment_offset].author_id = new_author;
+    comments[comment_offset].index = next;
+    graph.slides[slide_offset].comments.clone_from(&comments);
+    validate_package_value(&graph)?;
+    let before = package.clone();
+    let result = commit_legacy_authors(package, &graph, conformance)
+        .and_then(|()| commit_legacy_slide_comments(package, &slide, comments, conformance));
+    if let Err(error) = result {
+        *package = before;
+        return Err(error);
+    }
+    Ok(true)
+}
+
 fn commit_legacy_authors(
     package: &mut OpcPackage,
     graph: &Comments,

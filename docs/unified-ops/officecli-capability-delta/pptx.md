@@ -274,10 +274,10 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | comment | `index` | int | --g | --g | supported | — |  |  |  |
 | comment | `x` | length | asg | asg | supported | supported |  |  |  |
 | comment | `y` | length | asg | asg | supported | supported |  |  |  |
-| comment | `direction` | string | a-- |  | write-only | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| comment | `date` | string | asg | a-g | supported | partial | P0 | planned 0333 (pptx-p0-residue) |  |
-| comment | `initials` | string | asg | a-g | supported | partial | P0 | planned 0333 (pptx-p0-residue) |  |
-| comment | `author` | string | asg | a-g | supported | partial | P0 | planned 0333 (pptx-p0-residue) |  |
+| comment | `direction` | string | a-- | a-- | write-only | supported |  |  |  |
+| comment | `date` | string | asg | asg | supported | supported |  |  |  |
+| comment | `initials` | string | asg | asg | supported | supported |  |  |  |
+| comment | `author` | string | asg | asg | supported | supported |  |  |  |
 | comment | `text` | string | asg | asg | supported | supported |  |  |  |
 | connector | `shape` | enum | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | connector | `from` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
