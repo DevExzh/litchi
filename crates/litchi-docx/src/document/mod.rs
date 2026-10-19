@@ -91,8 +91,8 @@ pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics,
     ElementAnchor, ElementPath, ElementStep, Error, GraphChange, History, HistoryLimits,
-    HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewParagraph,
-    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
+    HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewCell,
+    NewParagraph, NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
     ParagraphTransfer, Patch, PreparedEdit, Refusal, Result, RevisionAction, RevisionKind,
     RevisionSelector, RunAnchor, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
     ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,

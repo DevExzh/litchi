@@ -24,6 +24,12 @@ pub(crate) enum Setter {
     HyperlinkText,
     /// A table cell's text, replacing its content with one paragraph.
     CellText,
+    /// A new cell's preferred width, `w:tcW` (record 0345).
+    CellWidth,
+    /// A grid column's width in twips (record 0345).
+    ColumnWidth,
+    /// A new column's cell text (record 0345).
+    ColumnText,
     /// A hyperlink's external target (record 0251b).
     HyperlinkUrl,
     /// A new hyperlink's bookmark target.
@@ -822,7 +828,7 @@ fn rounded_units(value: Length, unit: i64) -> Result<i64> {
         .ok_or_else(|| invalid("the length is outside the DOCX integer range"))
 }
 
-fn twips(value: Length) -> Result<direct::Twips> {
+pub(super) fn twips(value: Length) -> Result<direct::Twips> {
     Ok(direct::Twips(rounded_units(value, 635)?))
 }
 

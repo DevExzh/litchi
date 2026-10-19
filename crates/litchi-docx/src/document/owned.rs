@@ -482,6 +482,76 @@ impl<P: Clone> Edit<P> {
         self.inner.insert_row_at(table, at, cells, texts)
     }
 
+    /// Insert a cell into the row at `row`, keeping the table grid in step
+    /// (record 0345).
+    ///
+    /// See [`super::snapshot::Edit::insert_cell_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, text or resource refusal without changing the
+    /// staged document.
+    pub fn insert_cell_at(
+        &mut self,
+        row: &super::ElementPath,
+        at: Option<Position>,
+        cell: &super::NewCell,
+    ) -> Result<Position> {
+        self.inner.insert_cell_at(row, at, cell)
+    }
+
+    /// Insert a grid column, with a cell in every row, into the table at
+    /// `table` (record 0345).
+    ///
+    /// See [`super::snapshot::Edit::insert_column_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, merge, text or resource refusal without
+    /// changing the staged document.
+    pub fn insert_column_at(
+        &mut self,
+        table: &super::ElementPath,
+        at: Option<Position>,
+        width: Option<u32>,
+        text: &str,
+    ) -> Result<Position> {
+        self.inner.insert_column_at(table, at, width, text)
+    }
+
+    /// Remove a grid column and its cells from the table at `table`
+    /// (record 0345).
+    ///
+    /// See [`super::snapshot::Edit::remove_column_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, merge, dependency or resource refusal
+    /// without changing the staged document.
+    pub fn remove_column_at(
+        &mut self,
+        table: &super::ElementPath,
+        column: Position,
+    ) -> Result<&mut Self> {
+        self.inner.remove_column_at(table, column)?;
+        Ok(self)
+    }
+
+    /// Set the width of a grid column of the table at `table` (record
+    /// 0345).
+    ///
+    /// See [`super::snapshot::Edit::set_column_width_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, value or resource refusal without changing
+    /// the staged document.
+    pub fn set_column_width_at(
+        &mut self,
+        table: &super::ElementPath,
+        column: Position,
+        width: u32,
+    ) -> Result<&mut Self> {
+        self.inner.set_column_width_at(table, column, width)?;
+        Ok(self)
+    }
+
     /// Remove the element at `path`.
     ///
     /// See [`super::snapshot::Edit::remove_element_at`].

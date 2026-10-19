@@ -101,6 +101,9 @@ pub(super) enum Value {
     /// A tab stop, break, bookmark, field, table of contents, watermark or
     /// text box (record 0319).
     Mark(Arc<super::marks::MarkValue>),
+    /// A grid column: its table's container entry and its position in the
+    /// grid (record 0345).
+    Column(Block, u32),
 }
 
 /// One direct child of a block container: the container's index and the

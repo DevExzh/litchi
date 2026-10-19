@@ -90,6 +90,22 @@ impl Docx {
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Row, raw)))))
             },
+            // A single cell, after OfficeCLI's `AddCell` (record 0345).
+            (NewKind::Cell, Kind::Row) => {
+                let row = element_path(parent)?;
+                let Value::Row(value) = &parent.value else {
+                    return Err(refusal("the cell parent holds no row"));
+                };
+                let cells = value.cell_count().map_err(Error::from)?;
+                let at = sibling_position(self, parent, Kind::Cell, cells, placement)?;
+                let cell = new_cell(node.props())?;
+                self.owner().check_source()?;
+                let mut edit = WorkEdit::from(editor)?;
+                let position = edit.insert_cell_at(&row, at.map(Position::new), &cell)?;
+                let commit = edit.commit(self)?;
+                Ok((commit, path_with(parent, Some((Kind::Cell, position)))))
+            },
+            (NewKind::Column, Kind::Table) => self.add_column(editor, parent, node),
             (NewKind::Hyperlink, Kind::Paragraph) => {
                 let owner = element_path(parent)?;
                 let Value::Paragraph { paragraph, .. } = &parent.value else {
@@ -266,6 +282,10 @@ impl Docx {
                 .all(|node| matches!(node.element_kind(), Kind::SmartArt | Kind::Node))
         {
             return self.remove_smartarts(editor, nodes);
+        }
+        // Table grid columns (record 0345).
+        if !nodes.is_empty() && nodes.iter().all(|node| node.element_kind() == Kind::Column) {
+            return self.remove_columns(editor, nodes);
         }
         // Styles, numbering, headers, footers and notes (record 0319).
         if !nodes.is_empty()
@@ -1007,6 +1027,93 @@ impl Docx {
         }
         edit.commit(self).map(Ok)
     }
+}
+
+/// A new cell from its add properties (record 0345): `text`, one
+/// paragraph, and `width` (twips, `N%`, `auto`, `nil`, or a length).
+fn new_cell(props: &Props<'_>) -> Result<litchi_docx::document::NewCell> {
+    use super::setters::Setter;
+    let mut cell = litchi_docx::document::NewCell::new();
+    for (key, value) in props.iter() {
+        let (_, entry) = super::spec::CELL_REGISTRY
+            .resolve(key.as_str())
+            .map_err(|error| error.with_property(key.as_str().to_owned()))?;
+        entry
+            .prepare(Operation::Add, value, |setter, value| {
+                let text = match value {
+                    Some(crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text)) => {
+                        text.to_owned()
+                    },
+                    Some(scalar) => scalar.to_string(),
+                    None => String::new(),
+                };
+                let current = std::mem::take(&mut cell);
+                cell = match setter {
+                    Setter::CellText => current.with_text(text),
+                    Setter::CellWidth => current.with_width(cell_width(&text)?),
+                    _ => {
+                        return Err(Error::new(
+                            Code::UnsupportedProperty,
+                            "the property does not seed a DOCX cell",
+                        ));
+                    },
+                };
+                Ok(())
+            })
+            .map_err(|error| {
+                error
+                    .with_property(key.as_str().to_owned())
+                    .with_format(FileFormat::Docx)
+            })?;
+    }
+    Ok(cell)
+}
+
+/// A cell width as OfficeCLI's `AddCell` reads it: `N%` (fiftieths of a
+/// percent in the file), `nil`, `auto`, twips with an optional `dxa`
+/// suffix, or a length such as `2cm`.
+pub(super) fn cell_width(text: &str) -> Result<litchi_docx::properties::Width> {
+    use litchi_docx::properties::{Twips, Width};
+    let text = text.trim();
+    if text.eq_ignore_ascii_case("nil") {
+        return Ok(Width::Nil);
+    }
+    if text.eq_ignore_ascii_case("auto") {
+        return Ok(Width::Auto);
+    }
+    let invalid = || {
+        Error::new(
+            Code::InvalidValue,
+            "a cell width is twips, N%, auto, nil or a length such as 2cm",
+        )
+    };
+    if let Some(percent) = text.strip_suffix('%') {
+        let percent: f64 = percent.trim().parse().map_err(|_| invalid())?;
+        if !percent.is_finite() || percent < 0.0 {
+            return Err(invalid());
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        return Ok(Width::Percent((percent * 50.0).round() as i64));
+    }
+    Ok(Width::Twips(Twips(i64::from(
+        twips_length(text).ok_or_else(invalid)?,
+    ))))
+}
+
+/// Twips from a bare number (with an optional `dxa` suffix) or a length.
+pub(super) fn twips_length(text: &str) -> Option<u32> {
+    let bare = text
+        .strip_suffix("dxa")
+        .or_else(|| text.strip_suffix("DXA"))
+        .unwrap_or(text)
+        .trim();
+    if let Ok(twips) = bare.parse::<u32>() {
+        return Some(twips);
+    }
+    let length =
+        crate::value::Length::parse_in(text, crate::value::LengthContext::WordSpacing).ok()?;
+    let twips = super::setters::twips(length).ok()?;
+    u32::try_from(twips.0).ok()
 }
 
 /// A new row's cell count from its add properties.

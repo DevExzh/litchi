@@ -129,6 +129,9 @@ pub enum Kind {
     Axis,
     /// A content node of a SmartArt graphic (record 0335).
     Node,
+    /// A grid column of a table, `col[N]` (record 0345): a `w:gridCol` of
+    /// `w:tblGrid` and the cells at its slot.
+    Column,
 }
 
 impl Kind {
@@ -273,6 +276,7 @@ names! {
     Series => "series",
     Axis => "axis",
     Node => "node",
+    Column => "col",
 }
 
 // ---------------------------------------------------------------------------
@@ -585,20 +589,6 @@ const fn write_only(
     }
 }
 
-/// A write-only property that `set` writes and `add` does not seed: a cell's
-/// text, since a single cell is never added (rows bring their cells; record
-/// 0330).
-const fn set_only_text(setter: Setter) -> crate::registry::Entry<Setter> {
-    let mut spec = PropSpec::new("text", ValueType::Text);
-    spec.access.get = false;
-    crate::registry::Entry {
-        spec,
-        access: crate::registry::Access::Set(setter),
-        constraint: Constraint::None,
-        clear: true,
-    }
-}
-
 // `GetRootNode`: the core document properties.
 crate::registry::registry! {
     pub(crate) DOCUMENT_PROPS, DOCUMENT_REGISTRY: () {
@@ -863,11 +853,23 @@ crate::registry::registry! {
     }
 }
 
+// A table grid column (record 0345), after OfficeCLI's virtual `column`
+// element: `width` (twips) and `text` seed a new column; Litchi also reads
+// and sets the width (the `w:gridCol`).
+crate::registry::registry! {
+    pub(crate) COLUMN_PROPS, COLUMN_REGISTRY: Setter {
+    read_set_add("width", ValueType::Text, Setter::ColumnWidth, Constraint::NotEmpty),
+    add_only("text", ValueType::Text, Setter::ColumnText, Constraint::None),
+    }
+}
+
 // `ReadCellProps`, in its order. `width` is a string (`"2880dxa"`,
 // `"50%"`, `"auto"`, `"nil"`) there.
 crate::registry::registry! {
     pub(crate) CELL_PROPS, CELL_REGISTRY: Setter {
-    crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
+    // Record 0345: `width` and `text` seed a new cell (OfficeCLI's
+    // `AddCell` honours only these two at add time).
+    read_add("width", ValueType::Text, Setter::CellWidth, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("valign", ValueType::Token(&VALIGN))),
     crate::registry::Entry::read(PropSpec::new("vmerge", ValueType::Token(&MERGE))),
     crate::registry::Entry::read(PropSpec::new("hmerge", ValueType::Token(&MERGE))),
@@ -880,7 +882,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("nowrap", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("hideMark", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("tcFitText", ValueType::Bool)),
-    set_only_text(Setter::CellText),
+    write_only("text", ValueType::Text, Setter::CellText),
     }
 }
 
@@ -1589,6 +1591,17 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/smartart[N]/node[K]", "/smartart[N]/node[K]/node[J]"],
                 super::smartart::NODE_PROPS,
             ),
+            // Not a listed table child: table views and child counts stay
+            // the rows (record 0345).
+            element(
+                K::Column,
+                "column",
+                &["col", "column"],
+                &[K::Table],
+                &[],
+                &["/body/tbl[N]/col[C]"],
+                COLUMN_PROPS,
+            ),
         ],
         gaps: &[
             // OfficeCLI elements this adapter does not list as kinds
@@ -1607,11 +1620,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "ptab",
                 "0339-F2 (deferred-P1)",
                 "positional tabs (w:ptab) are kept in their runs but not projected as nodes",
-            ),
-            unlisted_gap(
-                "col",
-                "WP4 (record 0335 F8)",
-                "table columns are not nodes yet: the grid widths are read on the table and the widths of cells on each cell",
             ),
             unlisted_gap(
                 "fieldChar",
@@ -1833,16 +1841,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
                 reason: "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors",
-            },
-            GapSpec {
-                subject: Subject::Operation {
-                    verb: "add",
-                    element: "cell",
-                    context: "cell-insertion",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "M2 (DOCX table grid editing)",
-                reason: "a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated",
             },
             GapSpec {
                 subject: Subject::Operation {

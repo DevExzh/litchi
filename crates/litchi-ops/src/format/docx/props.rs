@@ -56,7 +56,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         Value::Part(value) => super::parts::text(node.docx, *value)?.map(Cow::Owned),
         Value::Mark(mark) => super::marks::text(mark).map(Cow::Owned),
         Value::DiagramNode(node) => super::smartart::node_text(node).map(Cow::Owned),
-        Value::Picture(_) | Value::Chart(_) | Value::ChartChild(..) => None,
+        Value::Picture(_) | Value::Chart(_) | Value::ChartChild(..) | Value::Column(..) => None,
         Value::Document
         | Value::Body(_)
         | Value::Table(_)
@@ -167,7 +167,8 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         | Value::Section(_)
         | Value::Comment(_)
         | Value::Picture(_)
-        | Value::ChartChild(..) => 0,
+        | Value::ChartChild(..)
+        | Value::Column(..) => 0,
     };
     Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
 }
@@ -258,6 +259,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         Value::DiagramNode(value) => Props::DiagramNode(Arc::clone(value)),
         Value::Part(value) => Props::Part(super::parts::props(node.docx, *value)?),
         Value::Mark(mark) => Props::Mark(Arc::clone(mark)),
+        Value::Column(block, column) => Props::Column(super::column::width(block, *column)?),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
     };
     let invalid = match &props {
@@ -388,6 +390,8 @@ pub(crate) enum Props<'a> {
     /// A tab stop, break, bookmark, field, table of contents, watermark or
     /// text box (record 0319).
     Mark(Arc<super::marks::MarkValue>),
+    /// A table grid column's width in twips (record 0345).
+    Column(Option<u32>),
 }
 
 impl<'a> Props<'a> {
@@ -424,6 +428,7 @@ impl<'a> Props<'a> {
             Self::DiagramNode(node) => super::smartart::node_value(node, index),
             Self::Part(part) => part.get(index),
             Self::Mark(mark) => super::marks::value(mark, index),
+            Self::Column(width) => super::column::column_value(*width, index),
         }
     }
 }
@@ -449,6 +454,7 @@ impl std::fmt::Debug for Props<'_> {
             Self::DiagramNode(_) => "Props::DiagramNode",
             Self::Part(_) => "Props::Part",
             Self::Mark(_) => "Props::Mark",
+            Self::Column(_) => "Props::Column",
         })
     }
 }

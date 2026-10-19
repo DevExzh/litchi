@@ -78,6 +78,7 @@ use crate::options::{OpenOptions, SourceMode};
 pub mod __unified;
 mod chart;
 mod children;
+mod column;
 pub(crate) mod create;
 mod element;
 mod few;

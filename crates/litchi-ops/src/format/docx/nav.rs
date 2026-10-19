@@ -462,6 +462,10 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
+            // Grid columns (record 0345).
+            (Value::Table(block), Kind::Column) => {
+                super::column::pick_column(self.docx, parent, block, &step.select)
+            },
             (Value::Row(row), Kind::Cell) => {
                 if let Select::Ordinal(position) = step.select {
                     return Ok(row.cell(position.get())?.map_or(Lookup::Missing, |cell| {

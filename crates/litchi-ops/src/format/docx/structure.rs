@@ -146,6 +146,8 @@ impl Docx {
                 NewKind::Paragraph
                 | NewKind::Table
                 | NewKind::Row
+                | NewKind::Cell
+                | NewKind::Column
                 | NewKind::Hyperlink
                 | NewKind::Comment
                 | NewKind::Picture
@@ -365,6 +367,10 @@ pub(super) enum NewKind {
     Run,
     Table,
     Row,
+    /// A table cell (record 0345).
+    Cell,
+    /// A table grid column (record 0345).
+    Column,
     Hyperlink,
     Comment,
     Picture,
@@ -406,6 +412,10 @@ fn new_kind(name: &str) -> Result<NewKind> {
         Ok(NewKind::Table)
     } else if name.eq_ignore_ascii_case("tr") || name.eq_ignore_ascii_case("row") {
         Ok(NewKind::Row)
+    } else if name.eq_ignore_ascii_case("tc") || name.eq_ignore_ascii_case("cell") {
+        Ok(NewKind::Cell)
+    } else if name.eq_ignore_ascii_case("col") || name.eq_ignore_ascii_case("column") {
+        Ok(NewKind::Column)
     } else if name.eq_ignore_ascii_case("hyperlink") || name.eq_ignore_ascii_case("link") {
         Ok(NewKind::Hyperlink)
     } else if name.eq_ignore_ascii_case("comment") {
