@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import io
 import tempfile
 import unittest
@@ -80,6 +81,22 @@ class Committed(unittest.TestCase):
         with redirect_stderr(err):
             rc = matrix.main(["--check"])
         self.assertEqual(rc, 0, err.getvalue())
+
+    def test_row_tables_are_per_format(self):
+        """Record 0348: one TSV per format, each holding that format's rows
+        under the shared header; no single row table."""
+        rows, conflicts, agreements, cur, _ = matrix.build()
+        files = matrix.outputs(rows, conflicts, agreements, cur)
+        tables = {p.stem: t for p, t in files.items() if p.suffix == ".tsv"}
+        self.assertNotIn(matrix.OLD_TSV, files)
+        self.assertEqual(set(tables), {r["format"] for r in rows})
+        count = 0
+        for f, text in tables.items():
+            table = list(csv.reader(io.StringIO(text), delimiter="\t"))
+            self.assertEqual(table[0], matrix.TSV_COLUMNS, f)
+            self.assertTrue(all(line[0] == f for line in table[1:]), f)
+            count += len(table) - 1
+        self.assertEqual(count, len(rows))
 
     def test_audit_records_contribute_rows(self):
         rows, _, _, _, _ = matrix.build()

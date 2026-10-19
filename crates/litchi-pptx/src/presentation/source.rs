@@ -3281,9 +3281,32 @@ impl SourceBackedSlideEdit {
         &mut self,
         chunks: &[&[crate::opened::TextEdit<'_>]],
     ) -> Result<usize> {
+        self.text_property_chunks(chunks, None)
+    }
+
+    /// [`Self::set_text_property_chunks`], returning each edit's change in
+    /// order (record 0348); see
+    /// [`crate::opened::Edit::set_text_property_chunks_per_edit`].
+    pub fn set_text_property_chunks_per_edit(
+        &mut self,
+        chunks: &[&[crate::opened::TextEdit<'_>]],
+    ) -> Result<Vec<bool>> {
+        let mut changes = Vec::new();
+        self.text_property_chunks(chunks, Some(&mut changes))?;
+        Ok(changes)
+    }
+
+    pub(crate) fn text_property_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::TextEdit<'_>]],
+        mut changes: Option<&mut Vec<bool>>,
+    ) -> Result<usize> {
         self.check_execution()?;
         self.refuse_enclosed("set_text_properties")?;
         if chunks.iter().all(|chunk| chunk.is_empty()) {
+            if let Some(changes) = changes.as_deref_mut() {
+                changes.clear();
+            }
             return Ok(0);
         }
         if self.operation_used {
@@ -3297,6 +3320,7 @@ impl SourceBackedSlideEdit {
             chunks,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
+            changes,
         )?;
         self.check_execution()?;
         if let Some(xml) = xml {

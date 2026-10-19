@@ -436,6 +436,37 @@ impl Pptx {
         })
     }
 
+    /// The notes page of the selected slide as the navigator sees it
+    /// (record 0348): its shape scene, and whether it has notes text, which
+    /// [`Self::slide_notes`] requires before `/slide[N]/notes` resolves —
+    /// read once.
+    pub(super) fn slide_notes_view(&self, position: usize) -> Result<Option<(bool, Scene)>> {
+        let view = |notes: Option<related::Notes>| {
+            notes.map(|notes| (notes.text().is_some(), notes.scene().clone()))
+        };
+        self.finish(|| match &self.0.owner {
+            PptxOwner::Source(presentation) => {
+                self.check_owner()?;
+                if self.0.revision.is_some() {
+                    let Some(slide) = self.revised_slide(position)? else {
+                        return Ok(None);
+                    };
+                    return Ok(view(slide.notes()?));
+                }
+                let Some(slide) = presentation.slide(position) else {
+                    return Ok(None);
+                };
+                Ok(view(slide.notes()?))
+            },
+            PptxOwner::Eager(package) => {
+                let Some(slide) = super::eager_slide(self, package, position)? else {
+                    return Ok(None);
+                };
+                Ok(view(slide.notes()?))
+            },
+        })
+    }
+
     /// The shape scene of the selected slide's notes page, when it has one
     /// (record 0285: find reads its shapes' text bodies).
     pub(super) fn slide_notes_scene(&self, position: usize) -> Result<Option<Scene>> {

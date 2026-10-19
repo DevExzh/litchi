@@ -292,6 +292,15 @@ struct PptxState {
     /// scene position and cells (record 0346), so a batch's first plan and
     /// its run read the table once.
     cells: Mutex<Option<(usize, usize, Arc<write::coalesce::Cells>)>>,
+    /// The notes body the last coalesced notes batch read on this handle:
+    /// its slide and the body placeholder's notes-scene position and body,
+    /// `None` when the slide has none (record 0348), so a batch's first plan
+    /// and its run read the notes page once.
+    notes: Mutex<Option<(usize, write::coalesce::NotesBody)>>,
+    /// The native edit the eager package's admission built, with that
+    /// package, until a coalesced run on this handle takes it (record 0348):
+    /// an edit is a function of the immutable package only.
+    spare: Mutex<Option<(Arc<pptx::Package>, pptx::opened::Edit)>>,
 }
 
 struct EagerSlide {
@@ -455,6 +464,8 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
             cells: Mutex::new(None),
+            notes: Mutex::new(None),
+            spare: Mutex::new(None),
         }))
         .with_origin(self.origin())
     }
@@ -499,6 +510,8 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
             cells: Mutex::new(None),
+            notes: Mutex::new(None),
+            spare: Mutex::new(None),
         }))
     }
 
@@ -543,6 +556,8 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
             cells: Mutex::new(None),
+            notes: Mutex::new(None),
+            spare: Mutex::new(None),
         }))
         .with_signature(self.signature())
         .with_origin(self.origin());
@@ -944,7 +959,15 @@ impl Pptx {
             && self.signature() != Signature::RemovalAuthorized
         {
             // Admission-only callers still require the native strict checks.
-            drop(package.edit()?);
+            // The admitted edit is kept for the handle's first coalesced run
+            // (record 0348), which would otherwise build the same edit again.
+            let edit = package.edit()?;
+            *self
+                .0
+                .spare
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                Some((Arc::clone(package), edit));
             let _ = self.0.admitted.set(());
         }
         Ok(owner)
@@ -973,6 +996,42 @@ impl Pptx {
             .as_ref()
             .map(|cells| (slide, frame, Arc::clone(cells)));
         Ok(cells)
+    }
+
+    /// The admission's native edit of `package`, when this handle kept one
+    /// (record 0348).
+    fn take_spare_edit(&self, package: &Arc<pptx::Package>) -> Option<pptx::opened::Edit> {
+        let mut spare = self
+            .0
+            .spare
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        match spare.take() {
+            Some((owner, edit)) if Arc::ptr_eq(&owner, package) => Some(edit),
+            _ => None,
+        }
+    }
+
+    /// The notes body of slide `slide` for coalesced notes plans, read once
+    /// per handle (record 0348).
+    fn notes_body(
+        &self,
+        slide: usize,
+        read: impl FnOnce() -> Result<write::coalesce::NotesBody>,
+    ) -> Result<write::coalesce::NotesBody> {
+        let mut cached = self
+            .0
+            .notes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((at_slide, body)) = cached.as_ref()
+            && *at_slide == slide
+        {
+            return Ok(body.clone());
+        }
+        let body = read()?;
+        *cached = Some((slide, body.clone()));
+        Ok(body)
     }
 
     /// Whether [`Self::editable_owner`] hands out the eager package (record

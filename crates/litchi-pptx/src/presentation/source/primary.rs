@@ -1698,6 +1698,23 @@ impl Edit {
         )
     }
 
+    /// [`Self::set_text_property_chunks`], returning each edit's change in
+    /// order (record 0348); see
+    /// [`crate::opened::Edit::set_text_property_chunks_per_edit`].
+    pub fn set_text_property_chunks_per_edit(
+        &mut self,
+        slide: impl Into<Position>,
+        chunks: &[&[crate::opened::TextEdit<'_>]],
+    ) -> Result<Vec<bool>> {
+        let mut changes = Vec::new();
+        self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| edit.text_property_chunks(chunks, Some(&mut changes)),
+        )?;
+        Ok(changes)
+    }
+
     /// Set (`Some`) or clear (`None`) one effective slide's direct
     /// transition, with the semantics of
     /// [`super::SourceBackedSlideEdit::set_transition`] and

@@ -395,6 +395,14 @@ impl File {
                     Err(error) => results.push(ItemResult::Failed(error)),
                 }
             }
+            // A coalesced run reports some items' changes at its commit
+            // (record 0348).
+            edit.flush_pending()?;
+            for (index, changed) in edit.take_reported() {
+                if let Some(ItemResult::Applied(applied)) = results.get_mut(index) {
+                    applied.changed = changed;
+                }
+            }
             Ok(results)
         })?;
         Ok(BatchCommit {

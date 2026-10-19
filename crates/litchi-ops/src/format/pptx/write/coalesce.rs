@@ -44,6 +44,10 @@ pub(crate) struct Plan {
     /// 0333); `None` for a text or geometry plan.
     format: Option<Box<Format>>,
     changed: bool,
+    /// Whether the leaf reports the plan's change when the run stages it
+    /// (record 0348): a table-cell plan, whose target is not read before
+    /// staging; `changed` is then unknown until the commit.
+    reported: bool,
     staged_bytes: usize,
     /// Whether the target is a text body of the slide's notes page (record
     /// 0346), which a separate native call edits.
@@ -195,22 +199,24 @@ struct CachedScene {
     /// The scene positions of the slide's root tables, in `table[M]` order
     /// (record 0346).
     tables: Box<[usize]>,
-    /// Each table read so far, by scene position: its cells' properties
-    /// and bodies, read once per run (record 0346).
+    /// Each table indexed so far, by scene position: its cells'
+    /// paragraphs and text runs, indexed once per run (records 0346, 0348).
     cells: HashMap<usize, Arc<Cells>>,
     /// The notes page's body placeholder: its notes-scene position and
     /// body; `Some(None)` when the slide has none (record 0346).
-    notes: Option<Option<(usize, Arc<litchi_drawingml::text::body::Body>)>>,
+    notes: Option<NotesBody>,
 }
 
-/// One table's cells, by row and position in the row.
+/// A notes page's body placeholder: its notes-scene position and the
+/// paragraphs and text runs of its body; `None` when the slide has none
+/// (records 0346, 0348).
+pub(crate) type NotesBody = Option<(usize, Arc<litchi_pptx::shape::BodyTextIndex>)>;
+
+/// One table's cells, by row and position in the row: the paragraphs and
+/// text runs plans address (record 0348). Their properties and text are not
+/// read: the leaf reports each cell plan's change when the run stages it.
 pub(crate) struct Cells {
-    rows: Vec<
-        Vec<(
-            litchi_pptx::table::CellProperties,
-            Option<litchi_drawingml::text::body::Body>,
-        )>,
-    >,
+    index: litchi_pptx::table::CellTextIndex,
 }
 
 #[allow(
@@ -263,7 +269,13 @@ impl Run {
     pub(crate) fn new(base: &Pptx, limits: &SemanticLimits) -> Result<Self> {
         base.check_source()?;
         let source = base.editable_owner()?;
-        let edit = new_native_edit(&source)?;
+        let edit = match &source {
+            Editable::Eager(package) => match base.take_spare_edit(package) {
+                Some(edit) => NativeEdit::Eager(edit),
+                None => new_native_edit(&source)?,
+            },
+            Editable::Source(_) => new_native_edit(&source)?,
+        };
         base.check_source()?;
         Ok(Self {
             base: base.clone(),
@@ -363,7 +375,11 @@ impl Run {
     /// chunk retains the leaf's 256-replacement capacity, while disjoint chunks
     /// share one slide publication. A refusal drops the entire edit and is
     /// located by wire-order replay.
-    pub(crate) fn commit(self) -> Result<(Pptx, Commit)> {
+    ///
+    /// The third value holds, for each plan whose change the leaf reports
+    /// (record 0348), its wire index and change; [`Self::stage`] returned
+    /// `false` for it.
+    pub(crate) fn commit(self) -> Result<(Pptx, Commit, Vec<(usize, bool)>)> {
         let Self {
             base,
             source,
@@ -373,8 +389,10 @@ impl Run {
         } = self;
         base.check_source()?;
         let result = (|| {
-            let operations = stage_all(&mut edit, &items)?;
-            commit_native(&base, source, edit, operations)
+            let mut changes = Vec::new();
+            let operations = stage_all(&mut edit, &items, &mut changes)?;
+            let (after, commit) = commit_native(&base, source, edit, operations)?;
+            Ok((after, commit, changes))
         })();
         let freshness = base.check_source();
         match freshness.and(result) {
@@ -525,6 +543,7 @@ fn shape_plan(
         text: values.text,
         format: None,
         changed,
+        reported: false,
         staged_bytes,
         notes: false,
     }))
@@ -698,6 +717,7 @@ fn format_plan(
             values,
         })),
         changed,
+        reported: false,
         staged_bytes,
         notes: false,
     }))
@@ -842,64 +862,29 @@ fn story_plan(
             "PPTX shape scene cache was lost during admission",
         ));
     };
-    // The paragraph and listed run a text step names, and the run's child
-    // index, in `body`.
-    let locate = |body: &litchi_drawingml::text::body::Body| -> Option<(usize, Option<usize>)> {
-        let paragraph = story.paragraph?;
-        let item = body.paragraphs.get(paragraph)?;
-        match story.run {
-            None => Some((paragraph, None)),
-            Some(ordinal) => item
-                .runs
-                .iter()
-                .enumerate()
-                .filter(|(_, run)| super::super::text::listed_run(run) == Some(Kind::Run))
-                .nth(ordinal)
-                .map(|(index, _)| (paragraph, Some(index))),
-        }
-    };
-    let judge =
-        |body: &litchi_drawingml::text::body::Body, paragraph: usize, run: Option<usize>| {
-            let item = &body.paragraphs[paragraph];
-            match run {
-                None => paragraph_changed(&values, item),
-                Some(run) => values.run_changed(&item.runs[run]),
-            }
-        };
     let (shape, target, scope, changed) = match story.cell {
         None => {
             if cached.notes.is_none() {
-                let body = match file.slide_notes_scene(story.slide)? {
-                    None => None,
-                    Some(scene) => {
-                        let found = scene.roots().find(|handle| {
-                            handle
-                                .view()
-                                .common()
-                                .placeholder()
-                                .is_some_and(|placeholder| placeholder.kind() == Some("body"))
-                        });
-                        match found {
-                            Some(handle) => match handle.view().text_body() {
-                                Ok(Some(body)) => {
-                                    Some((handle.position().get(), Arc::new(body.clone())))
-                                },
-                                _ => None,
-                            },
-                            None => None,
-                        }
-                    },
-                };
+                let body = file.notes_body(story.slide, || read_notes(file, story.slide))?;
                 cached.notes = Some(body);
             }
-            let Some(Some((position, body))) = &cached.notes else {
+            let Some(Some((position, index))) = &cached.notes else {
                 return Ok(None);
             };
-            let Some((paragraph, run)) = locate(body) else {
+            // The paragraph and listed run the text step names, and the
+            // run's child index; the leaf reports the change (record 0348).
+            let Some(paragraph) = story.paragraph.filter(|p| *p < index.paragraph_count()) else {
                 return Ok(None);
+            };
+            let run = match story.run {
+                None => None,
+                Some(ordinal) => match index.text_run(paragraph, ordinal) {
+                    Some(run) => Some(run),
+                    None => return Ok(None),
+                },
             };
             let shape = Position::new(*position);
-            let changed = judge(body, paragraph, run);
+            let changed = false;
             let (target, scope) = match run {
                 None => (
                     TextTarget::Paragraph {
@@ -936,14 +921,17 @@ fn story_plan(
                     cells
                 },
             };
-            let Some((properties, body)) = cells.rows.get(row).and_then(|row| row.get(column))
-            else {
+            let index = &cells.index;
+            if !index.has_cell(row, column) {
                 return Ok(None);
-            };
+            }
             let shape = Position::new(frame);
             let (row_at, column_at) = (Position::new(row), Position::new(column));
-            match story.paragraph {
-                None => (
+            // The leaf reports the change when the run stages the plan
+            // (record 0348).
+            let unknown = false;
+            match (story.paragraph, story.run) {
+                (None, _) => (
                     shape,
                     TextTarget::Cell {
                         shape,
@@ -951,16 +939,15 @@ fn story_plan(
                         column: column_at,
                     },
                     Scope::Cell(row, column),
-                    values.cell_changed(properties, body.as_ref()),
+                    unknown,
                 ),
-                Some(_) => {
-                    let Some(body) = body else {
+                (Some(paragraph), run) => {
+                    if index
+                        .paragraph_count(row, column)
+                        .is_none_or(|count| paragraph >= count)
+                    {
                         return Ok(None);
-                    };
-                    let Some((paragraph, run)) = locate(body) else {
-                        return Ok(None);
-                    };
-                    let changed = judge(body, paragraph, run);
+                    }
                     match run {
                         None => (
                             shape,
@@ -971,20 +958,25 @@ fn story_plan(
                                 paragraph: Position::new(paragraph),
                             },
                             Scope::CellParagraph(row, column, paragraph),
-                            changed,
+                            unknown,
                         ),
-                        Some(run) => (
-                            shape,
-                            TextTarget::CellRun {
+                        Some(ordinal) => {
+                            let Some(run) = index.text_run(row, column, paragraph, ordinal) else {
+                                return Ok(None);
+                            };
+                            (
                                 shape,
-                                row: row_at,
-                                column: column_at,
-                                paragraph: Position::new(paragraph),
-                                run: Position::new(run),
-                            },
-                            Scope::CellRun(row, column, paragraph, run),
-                            changed,
-                        ),
+                                TextTarget::CellRun {
+                                    shape,
+                                    row: row_at,
+                                    column: column_at,
+                                    paragraph: Position::new(paragraph),
+                                    run: Position::new(run),
+                                },
+                                Scope::CellRun(row, column, paragraph, run),
+                                unknown,
+                            )
+                        },
                     }
                 },
             }
@@ -1004,6 +996,7 @@ fn story_plan(
             values,
         })),
         changed,
+        reported: true,
         staged_bytes,
         notes,
     }))
@@ -1109,6 +1102,32 @@ fn cache_scene(scene: Scene) -> Result<CachedScene> {
     })
 }
 
+/// Read slide `slide`'s notes body placeholder (record 0346).
+fn read_notes(file: &Pptx, slide: usize) -> Result<NotesBody> {
+    // As the navigator resolves `/slide[N]/notes/paragraph[K]`: the notes
+    // page must have notes text, and its first body placeholder holds the
+    // paragraphs (record 0348).
+    let Some((true, scene)) = file.slide_notes_view(slide)? else {
+        return Ok(None);
+    };
+    let found = scene.roots().find(|handle| {
+        handle
+            .view()
+            .common()
+            .placeholder()
+            .is_some_and(|placeholder| placeholder.kind() == Some("body"))
+    });
+    Ok(match found {
+        // `Slide::notes` has read the body (its text): its structure is
+        // indexed without reading it again (record 0348).
+        Some(handle) => match handle.view().common().read_text_index() {
+            Ok(Some(index)) => Some((handle.position().get(), Arc::new(index))),
+            _ => None,
+        },
+        None => None,
+    })
+}
+
 /// Read every cell of the table at scene position `position` once.
 fn read_cells(cached: &CachedScene, position: usize) -> Result<Option<Arc<Cells>>> {
     let Some(handle) = cached
@@ -1118,8 +1137,8 @@ fn read_cells(cached: &CachedScene, position: usize) -> Result<Option<Arc<Cells>
     else {
         return Ok(None);
     };
-    let out = handle.table()?.cell_contents()?;
-    Ok(Some(Arc::new(Cells { rows: out })))
+    let index = handle.cell_text_index()?;
+    Ok(Some(Arc::new(Cells { index })))
 }
 
 fn direct_handle(cached: &CachedScene, kind: DirectKind, ordinal: usize) -> Result<Option<Handle>> {
@@ -1159,7 +1178,11 @@ fn native_error(error: litchi_pptx::Error) -> Error {
     Error::from(error).with_format(FileFormat::Pptx)
 }
 
-fn stage_all(edit: &mut NativeEdit, items: &[Item]) -> Result<usize> {
+fn stage_all(
+    edit: &mut NativeEdit,
+    items: &[Item],
+    changes: &mut Vec<(usize, bool)>,
+) -> Result<usize> {
     let mut operations = 0_usize;
     for run in items.chunk_by(|left, right| {
         left.plan.target.slide == right.plan.target.slide
@@ -1167,8 +1190,12 @@ fn stage_all(edit: &mut NativeEdit, items: &[Item]) -> Result<usize> {
             && left.plan.notes == right.plan.notes
     }) {
         if run[0].plan.notes {
-            operations =
-                operations.saturating_add(stage_notes(edit, run[0].plan.target.slide, run)?);
+            operations = operations.saturating_add(stage_notes(
+                edit,
+                run[0].plan.target.slide,
+                run,
+                changes,
+            )?);
             continue;
         }
         let kind = if run[0].plan.format.is_some() {
@@ -1178,8 +1205,13 @@ fn stage_all(edit: &mut NativeEdit, items: &[Item]) -> Result<usize> {
         } else {
             BatchKind::Text
         };
-        operations =
-            operations.saturating_add(stage_batch(edit, run[0].plan.target.slide, kind, run)?);
+        operations = operations.saturating_add(stage_batch(
+            edit,
+            run[0].plan.target.slide,
+            kind,
+            run,
+            changes,
+        )?);
     }
     Ok(operations)
 }
@@ -1217,6 +1249,7 @@ fn stage_batch(
     slide: usize,
     kind: BatchKind,
     items: &[Item],
+    changes: &mut Vec<(usize, bool)>,
 ) -> Result<usize> {
     if kind == BatchKind::Format {
         let mut edits = Vec::new();
@@ -1239,14 +1272,43 @@ fn stage_batch(
             )
             .map_err(allocation)?;
         chunks.extend(edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS));
-        return match edit {
+        if !items.iter().any(|item| item.plan.reported) {
+            return match edit {
+                NativeEdit::Source(edit) => edit
+                    .set_text_property_chunks(Position::new(slide), &chunks)
+                    .map_err(native_error),
+                NativeEdit::Eager(edit) => edit
+                    .set_text_property_chunks(slide, &chunks)
+                    .map_err(native_error),
+            };
+        }
+        // The leaf reports each edit's change (record 0348).
+        let flags = match edit {
             NativeEdit::Source(edit) => edit
-                .set_text_property_chunks(Position::new(slide), &chunks)
-                .map_err(native_error),
+                .set_text_property_chunks_per_edit(Position::new(slide), &chunks)
+                .map_err(native_error)?,
             NativeEdit::Eager(edit) => edit
-                .set_text_property_chunks(slide, &chunks)
-                .map_err(native_error),
+                .set_text_property_chunks_per_edit(slide, &chunks)
+                .map_err(native_error)?,
         };
+        if flags.len() != items.len() {
+            return Err(Error::new(
+                Code::InternalError,
+                "PPTX format batch lost an edit's change",
+            )
+            .with_format(FileFormat::Pptx));
+        }
+        changes
+            .try_reserve(items.iter().filter(|item| item.plan.reported).count())
+            .map_err(allocation)?;
+        changes.extend(
+            items
+                .iter()
+                .zip(&flags)
+                .filter(|(item, _)| item.plan.reported)
+                .map(|(item, changed)| (item.index, *changed)),
+        );
+        return Ok(flags.iter().filter(|changed| **changed).count());
     }
     let ranges = chunk_ranges(items)?;
     match kind {
@@ -1309,8 +1371,14 @@ fn stage_batch(
 }
 
 /// One notes page's formatting plans, through the eager editor's notes
-/// text verb in 256-edit chunks (record 0346).
-fn stage_notes(edit: &mut NativeEdit, slide: usize, items: &[Item]) -> Result<usize> {
+/// text verb in 256-edit chunks (record 0346), staged in one pass over the
+/// notes part (record 0348).
+fn stage_notes(
+    edit: &mut NativeEdit,
+    slide: usize,
+    items: &[Item],
+    changes: &mut Vec<(usize, bool)>,
+) -> Result<usize> {
     let NativeEdit::Eager(edit) = edit else {
         return Err(Error::new(
             Code::InternalError,
@@ -1328,14 +1396,35 @@ fn stage_notes(edit: &mut NativeEdit, slide: usize, items: &[Item]) -> Result<us
             .ok_or_else(|| Error::new(Code::InternalError, "PPTX notes batch lost a plan"))?;
         edits.push(TextEdit::new(format.target, format.values.properties()));
     }
-    let mut operations = 0_usize;
-    for chunk in edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS) {
-        operations = operations.saturating_add(
-            edit.set_notes_text_properties(slide, chunk)
-                .map_err(native_error)?,
-        );
+    let mut chunks = Vec::new();
+    chunks
+        .try_reserve_exact(
+            edits
+                .len()
+                .div_ceil(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS),
+        )
+        .map_err(allocation)?;
+    chunks.extend(edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS));
+    // The leaf reports each edit's change (record 0348).
+    let flags = edit
+        .set_notes_text_property_chunks_per_edit(slide, &chunks)
+        .map_err(native_error)?;
+    if flags.len() != items.len() {
+        return Err(Error::new(
+            Code::InternalError,
+            "PPTX notes batch lost an edit's change",
+        )
+        .with_format(FileFormat::Pptx));
     }
-    Ok(operations)
+    changes.try_reserve(items.len()).map_err(allocation)?;
+    changes.extend(
+        items
+            .iter()
+            .zip(&flags)
+            .filter(|(item, _)| item.plan.reported)
+            .map(|(item, changed)| (item.index, *changed)),
+    );
+    Ok(flags.iter().filter(|changed| **changed).count())
 }
 
 fn stage_one(edit: &mut NativeEdit, plan: &Plan) -> Result<()> {

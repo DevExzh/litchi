@@ -328,6 +328,38 @@ impl<'a> Table<'a> {
         Ok(counts)
     }
 
+    /// The paragraphs and text runs of every cell (record 0348): what a
+    /// batch planner needs to resolve cell, cell-paragraph and cell-run
+    /// addresses, without reading the cells' properties and text. The
+    /// index equals the one [`Self::cell_contents`] gives, from one pass
+    /// over the table; a table holding markup this pass does not vouch for
+    /// (markup compatibility, a nested table, a second text body in a cell,
+    /// a fragment without its owner) is indexed from [`Self::cell_contents`]
+    /// instead, with its errors.
+    ///
+    /// The pass reads structure only: an attribute value the text-body
+    /// reader would refuse is not refused here.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure, or the errors of
+    /// [`Self::cell_contents`] when the table is indexed from it.
+    pub fn cell_text_index(self) -> Result<CellTextIndex> {
+        if let Some(index) = self.scan_cell_text_index()? {
+            return Ok(index);
+        }
+        CellTextIndex::from_cells(self)
+    }
+
+    /// The one-pass [`Self::cell_text_index`], or `None` when the table
+    /// holds markup it does not vouch for.
+    pub(crate) fn scan_cell_text_index(self) -> Result<Option<CellTextIndex>> {
+        let Some(context) = self.context else {
+            return Ok(None);
+        };
+        scan_cell_text_fragment(self.xml()?, context)
+    }
+
     /// Get one cell by zero-based row and column position.
     ///
     /// # Errors
@@ -368,6 +400,751 @@ impl<'a> Table<'a> {
     /// Returns an error if the operation fails.
     pub fn properties(self) -> Result<Option<Properties>> {
         parse_properties(self.xml()?, self.context)
+    }
+}
+
+/// The namespace of an element, as the cell text index tells them apart.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Namespaced {
+    DrawingMl,
+    MarkupCompatibility,
+    Other,
+}
+
+impl Namespaced {
+    fn of(namespace: &ResolveResult<'_>) -> Self {
+        match namespace {
+            ResolveResult::Bound(Namespace(value))
+                if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE =>
+            {
+                Self::DrawingMl
+            },
+            ResolveResult::Bound(Namespace(value))
+                if *value == litchi_ooxml_common::mce::NAMESPACE.as_bytes() =>
+            {
+                Self::MarkupCompatibility
+            },
+            _ => Self::Other,
+        }
+    }
+}
+
+/// What a cell text scan does after an event.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Step {
+    Next,
+    /// The table holds markup the scan does not vouch for.
+    Unvouched,
+}
+
+/// The open elements of a cell text scan, as the index sees them.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mark {
+    /// An element of a frame around the table.
+    Outside,
+    Table,
+    Row,
+    Cell,
+    Body,
+    Paragraph,
+    Other,
+}
+
+/// The state of one pass building a [`CellTextIndex`] (record 0348). It
+/// takes the rows, cells, bodies, paragraphs and runs as
+/// [`Table::cell_contents`] reads them, and gives up on markup that reader
+/// treats otherwise.
+#[derive(Default)]
+struct CellTextScan {
+    index: CellTextIndex,
+    stack: Vec<Mark>,
+    /// Whether the current cell has a `txBody` child already (the reader
+    /// takes the first; a second is left to it).
+    bodied: bool,
+    /// The current paragraph's run children so far.
+    children: usize,
+    nodes: usize,
+    /// Whether the fragment's table has started.
+    tabled: bool,
+    /// The byte span of each cell's text body in the fragment, by cell
+    /// (record 0348): bodies are validated after the pass.
+    bodies: Vec<(usize, std::ops::Range<usize>)>,
+    /// Where the current cell's text body starts.
+    body_start: usize,
+    /// Whether the fragment is one text body the caller has read, scanned
+    /// as one cell, whose body is not validated again.
+    read: bool,
+}
+
+impl CellTextScan {
+    /// A scan of one text body element, taken as the one cell of one row;
+    /// its body is not validated (see [`scan_read_body_text_index`]).
+    fn body() -> Result<Self> {
+        let mut scan = Self {
+            stack: vec![Mark::Table, Mark::Row, Mark::Cell],
+            tabled: true,
+            read: true,
+            ..Self::default()
+        };
+        scan.index.open_row()?;
+        scan.index.open_cell()?;
+        Ok(scan)
+    }
+
+    fn start(
+        &mut self,
+        namespace: Namespaced,
+        local: &[u8],
+        empty: bool,
+        open: usize,
+    ) -> Result<Step> {
+        self.nodes += 1;
+        if self.nodes > MAX_NODES || namespace == Namespaced::MarkupCompatibility {
+            return Ok(Step::Unvouched);
+        }
+        let dml = namespace == Namespaced::DrawingMl;
+        let index = &mut self.index;
+        let mark = match (self.stack.last().copied(), dml, local) {
+            // The fragment's one table; a frame's other elements are outside.
+            (None | Some(Mark::Outside), true, b"tbl") => {
+                if self.tabled {
+                    return Ok(Step::Unvouched);
+                }
+                self.tabled = true;
+                Mark::Table
+            },
+            (Some(_), true, b"tbl") => return Ok(Step::Unvouched),
+            (None | Some(Mark::Outside), ..) => Mark::Outside,
+            (Some(Mark::Table), true, b"tr") => {
+                index.open_row()?;
+                Mark::Row
+            },
+            (Some(Mark::Row), true, b"tc") => {
+                index.open_cell()?;
+                self.bodied = false;
+                Mark::Cell
+            },
+            (_, true, b"tr" | b"tc") => return Ok(Step::Unvouched),
+            (Some(Mark::Cell), _, b"txBody") => {
+                if self.bodied {
+                    return Ok(Step::Unvouched);
+                }
+                self.bodied = true;
+                if empty {
+                    Mark::Other
+                } else {
+                    index.open_body();
+                    self.body_start = open;
+                    Mark::Body
+                }
+            },
+            (Some(Mark::Body), true, b"p") => {
+                index.open_paragraph()?;
+                self.children = 0;
+                Mark::Paragraph
+            },
+            (Some(Mark::Paragraph), true, b"r" | b"br" | b"fld") => {
+                if local == b"r" {
+                    index.push_text_run(self.children)?;
+                }
+                self.children += 1;
+                Mark::Other
+            },
+            _ => Mark::Other,
+        };
+        if empty {
+            return Ok(match mark {
+                Mark::Paragraph => {
+                    index.close_paragraph();
+                    Step::Next
+                },
+                Mark::Cell => {
+                    index.close_cell();
+                    Step::Next
+                },
+                Mark::Row => {
+                    index.close_row();
+                    Step::Next
+                },
+                Mark::Table => Step::Unvouched,
+                Mark::Body | Mark::Other | Mark::Outside => Step::Next,
+            });
+        }
+        if self.stack.len() >= MAX_DEPTH {
+            return Ok(Step::Unvouched);
+        }
+        self.stack.try_reserve(1).map_err(index_allocation)?;
+        self.stack.push(mark);
+        Ok(Step::Next)
+    }
+
+    fn end(&mut self, close: usize) -> Result<Step> {
+        match self.stack.pop() {
+            None => return Ok(Step::Unvouched),
+            Some(Mark::Paragraph) => self.index.close_paragraph(),
+            Some(Mark::Body) => {
+                self.index.close_cell();
+                self.bodies.try_reserve(1).map_err(index_allocation)?;
+                let cell = self.index.cells.len().saturating_sub(1);
+                self.bodies.push((cell, self.body_start..close));
+            },
+            Some(Mark::Cell) => self.index.close_cell(),
+            Some(Mark::Row) => self.index.close_row(),
+            Some(_) => {},
+        }
+        Ok(Step::Next)
+    }
+
+    fn finish(mut self) -> Option<CellTextIndex> {
+        if self.read {
+            // The body's own element closed; the cell it fills ends here.
+            if self.stack != [Mark::Table, Mark::Row, Mark::Cell]
+                || !matches!(self.index.cells.last(), Some(Some(_)))
+            {
+                return None;
+            }
+            self.stack.clear();
+            self.index.close_cell();
+            self.index.close_row();
+        }
+        (self.tabled
+            && self.stack.is_empty()
+            && self.index.rows.len() <= MAX_ROWS
+            && self.index.cells.len() <= MAX_CELLS)
+            .then_some(self.index)
+    }
+}
+
+/// [`Table::cell_text_index`] of the one `DrawingML` table of the graphic
+/// frame at `offset` of `owner`, from one pass over the frame (record
+/// 0348); `None` when the frame holds markup the pass does not vouch for
+/// (or no table, or more than one), which the caller then reads through
+/// [`Table::from_graphic_frame_with_context`].
+pub(crate) fn scan_frame_cell_text_index(
+    frame: &[u8],
+    owner: &[u8],
+    offset: usize,
+) -> Result<Option<CellTextIndex>> {
+    scan_cell_text_fragment(frame, NamespaceContext { owner, offset })
+}
+
+/// The cell text index of the one `DrawingML` table in `xml` (the table
+/// itself or a frame holding it), whose root inherits `context`'s scope.
+fn scan_cell_text_fragment(
+    xml: &[u8],
+    context: NamespaceContext<'_>,
+) -> Result<Option<CellTextIndex>> {
+    if xml.len() > MAX_XML_BYTES || memchr::memmem::find(xml, b"AlternateContent").is_some() {
+        return Ok(None);
+    }
+    scan_text_fragment(xml, context.resolver()?, CellTextScan::default())
+}
+
+/// The paragraphs and text runs of the text body element `xml` (a shape's
+/// `p:txBody`), whose root inherits `scope`, as the one cell of one row,
+/// from one pass (record 0348); `None` when the body holds markup the pass
+/// does not vouch for. The body is not validated: the caller has read it
+/// with the text-body reader.
+pub(crate) fn scan_read_body_text_index(
+    xml: &[u8],
+    scope: NamespaceResolver,
+) -> Result<Option<CellTextIndex>> {
+    if xml.len() > MAX_XML_BYTES || memchr::memmem::find(xml, b"AlternateContent").is_some() {
+        return Ok(None);
+    }
+    scan_text_fragment(xml, scope, CellTextScan::body()?)
+}
+
+/// One pass of `scan` over `xml`, whose root inherits `scope`.
+fn scan_text_fragment(
+    xml: &[u8],
+    mut scope: NamespaceResolver,
+    mut scan: CellTextScan,
+) -> Result<Option<CellTextIndex>> {
+    // Declarations on the root start tag only: one namespace scope for every
+    // descendant, so each prefix is resolved once and the tags are found
+    // without a namespace reader (the fragment is a span of a part the
+    // scene reader has read whole).
+    if let Some(root_end) = root_tag_end(xml)
+        && memchr::memmem::find(&xml[root_end..], b"xmlns").is_none()
+    {
+        let mut reader = quick_xml::Reader::from_reader(&xml[..root_end]);
+        let Ok(Event::Start(root)) = reader.read_event() else {
+            return Ok(None);
+        };
+        if scope.push(&root).is_err() {
+            return Ok(None);
+        }
+        let mut prefixes: Vec<(Vec<u8>, Namespaced)> = Vec::new();
+        let classify = |name: &[u8]| -> Result<Namespaced> {
+            let prefix = name
+                .iter()
+                .position(|byte| *byte == b':')
+                .map_or(&b""[..], |colon| &name[..colon]);
+            if let Some((_, namespaced)) = prefixes
+                .iter()
+                .find(|(known, _)| known.as_slice() == prefix)
+            {
+                return Ok(*namespaced);
+            }
+            let namespaced = Namespaced::of(&scope.resolve_element(QName(name)).0);
+            prefixes.try_reserve(1).map_err(index_allocation)?;
+            prefixes.push((prefix.to_vec(), namespaced));
+            Ok(namespaced)
+        };
+        if scan_tags(xml, &mut scan, classify)? == Step::Unvouched {
+            return Ok(None);
+        }
+        let bodies = if scan.read {
+            Vec::new()
+        } else {
+            std::mem::take(&mut scan.bodies)
+        };
+        let Some(mut index) = scan.finish() else {
+            return Ok(None);
+        };
+        // A body the text-body reader refuses is indexed as no body, as
+        // `Cell::text_body` sees it fail (record 0348): its paragraph and
+        // run addresses then take the item-by-item path and its refusal.
+        // The reader's verdict depends on the body's markup, not on the
+        // plain text of its runs, so bodies alike but for that text are
+        // read once.
+        let mut verdicts: std::collections::HashMap<Vec<u8>, bool> =
+            std::collections::HashMap::new();
+        let mut key = Vec::new();
+        let mut dropped = false;
+        for (cell, range) in bodies {
+            let body = &xml[range];
+            let readable = if body_key(body, &mut key) {
+                match verdicts.get(key.as_slice()) {
+                    Some(readable) => *readable,
+                    None => {
+                        let readable = body_readable(body, &scope);
+                        verdicts.try_reserve(1).map_err(index_allocation)?;
+                        verdicts.insert(key.clone(), readable);
+                        readable
+                    },
+                }
+            } else {
+                body_readable(body, &scope)
+            };
+            if !readable {
+                index.cells[cell] = None;
+                dropped = true;
+            }
+        }
+        return if dropped {
+            index.compact().map(Some)
+        } else {
+            Ok(Some(index))
+        };
+    }
+    // Declarations below the root: the cells are read one by one.
+    Ok(None)
+}
+
+/// The end of the root start tag of `xml`, when the fragment begins with a
+/// start tag (not an empty element).
+fn root_tag_end(xml: &[u8]) -> Option<usize> {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    match reader.read_event() {
+        Ok(Event::Start(_)) => usize::try_from(reader.buffer_position()).ok(),
+        _ => None,
+    }
+}
+
+/// Feed the elements of a well-formed fragment without namespace
+/// declarations to `scan`: start and empty tags with their namespace (by
+/// `classify`, from the qualified name) and local name, end tags checked
+/// against their start. Comments and character data sections are skipped;
+/// a processing instruction, a declaration or a malformed tag is
+/// [`Step::Unvouched`].
+fn scan_tags(
+    xml: &[u8],
+    scan: &mut CellTextScan,
+    mut classify: impl FnMut(&[u8]) -> Result<Namespaced>,
+) -> Result<Step> {
+    // The qualified names of the open elements.
+    let mut names: Vec<std::ops::Range<usize>> = Vec::new();
+    let mut at = 0;
+    while let Some(found) = memchr::memchr(b'<', &xml[at..]) {
+        let open = at + found;
+        let rest = &xml[open + 1..];
+        match rest.first() {
+            Some(b'/') => {
+                let Some(close) = memchr::memchr(b'>', rest) else {
+                    return Ok(Step::Unvouched);
+                };
+                let name = rest[1..close].trim_ascii_end();
+                match names.pop() {
+                    Some(range) if xml[range.clone()] == *name => {},
+                    _ => return Ok(Step::Unvouched),
+                }
+                if scan.end(open + 1 + close + 1)? == Step::Unvouched {
+                    return Ok(Step::Unvouched);
+                }
+                at = open + 1 + close + 1;
+            },
+            Some(b'!') => {
+                let (start, terminator): (usize, &[u8]) = if rest.starts_with(b"!--") {
+                    (open + 4, b"-->")
+                } else if rest.starts_with(b"![CDATA[") {
+                    (open + 9, b"]]>")
+                } else {
+                    return Ok(Step::Unvouched);
+                };
+                let Some(end) = memchr::memmem::find(&xml[start..], terminator) else {
+                    return Ok(Step::Unvouched);
+                };
+                at = start + end + terminator.len();
+            },
+            Some(byte) if !matches!(byte, b'?' | b' ' | b'\t' | b'\r' | b'\n' | b'>') => {
+                let Some(length) = rest
+                    .iter()
+                    .position(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+                else {
+                    return Ok(Step::Unvouched);
+                };
+                let name = open + 1..open + 1 + length;
+                // The tag's `>`, past quoted attribute values.
+                let mut cursor = name.end;
+                let close = loop {
+                    let Some(found) = memchr::memchr3(b'>', b'"', b'\'', &xml[cursor..]) else {
+                        return Ok(Step::Unvouched);
+                    };
+                    let position = cursor + found;
+                    let quote = xml[position];
+                    if quote == b'>' {
+                        break position;
+                    }
+                    let Some(end) = memchr::memchr(quote, &xml[position + 1..]) else {
+                        return Ok(Step::Unvouched);
+                    };
+                    cursor = position + 1 + end + 1;
+                };
+                let empty = xml[close - 1] == b'/';
+                let qualified = &xml[name.clone()];
+                let local = qualified
+                    .iter()
+                    .position(|byte| *byte == b':')
+                    .map_or(qualified, |colon| &qualified[colon + 1..]);
+                if scan.start(classify(qualified)?, local, empty, open)? == Step::Unvouched {
+                    return Ok(Step::Unvouched);
+                }
+                if !empty {
+                    names.try_reserve(1).map_err(index_allocation)?;
+                    names.push(name);
+                }
+                at = close + 1;
+            },
+            _ => return Ok(Step::Unvouched),
+        }
+    }
+    Ok(if names.is_empty() {
+        Step::Next
+    } else {
+        Step::Unvouched
+    })
+}
+
+/// Whether the shared text-body reader accepts the body element `body` in
+/// `scope`, as [`Cell::text_body`] reads it (record 0348).
+fn body_readable(body: &[u8], scope: &NamespaceResolver) -> bool {
+    litchi_drawingml::text::body::reader::read_with_options(
+        body,
+        scope.clone(),
+        litchi_drawingml::text::body::reader::Limits::DEFAULT,
+    )
+    .is_ok()
+}
+
+/// The text-body reader's view of `body` with the plain character data
+/// of its elements reduced to its class, into `key` (record 0348): markup
+/// and attribute values are kept byte for byte; a run of character data
+/// without references, control characters or more than 1 KiB, valid
+/// UTF-8, becomes one byte telling whitespace from text. `false` when the
+/// body is not keyed so (comments, character data sections, a large body):
+/// it is then read on its own.
+fn body_key(body: &[u8], key: &mut Vec<u8>) -> bool {
+    const LARGEST: usize = 64 * 1024;
+    key.clear();
+    if body.len() > LARGEST || memchr::memmem::find(body, b"<!").is_some() {
+        return false;
+    }
+    let mut at = 0;
+    while at < body.len() {
+        let next = memchr::memchr(b'<', &body[at..]).map_or(body.len(), |found| at + found);
+        let text = &body[at..next];
+        if !text.is_empty() {
+            let plain = text.len() <= 1024
+                && !text.contains(&b'&')
+                && text
+                    .iter()
+                    .all(|byte| *byte >= 0x20 || matches!(byte, b'\t' | b'\n' | b'\r'))
+                && std::str::from_utf8(text).is_ok();
+            if plain {
+                let blank = text
+                    .iter()
+                    .all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'));
+                key.push(if blank { 0x01 } else { 0x02 });
+            } else {
+                key.push(0x03);
+                key.extend_from_slice(text);
+                key.push(0x03);
+            }
+        }
+        if next == body.len() {
+            break;
+        }
+        // The tag, past quoted attribute values.
+        let mut cursor = next + 1;
+        let close = loop {
+            let Some(found) = memchr::memchr3(b'>', b'"', b'\'', &body[cursor..]) else {
+                return false;
+            };
+            let position = cursor + found;
+            let quote = body[position];
+            if quote == b'>' {
+                break position;
+            }
+            let Some(end) = memchr::memchr(quote, &body[position + 1..]) else {
+                return false;
+            };
+            cursor = position + 1 + end + 1;
+        };
+        key.extend_from_slice(&body[next..=close]);
+        at = close + 1;
+    }
+    true
+}
+
+fn index_allocation(source: std::collections::TryReserveError) -> Error {
+    Error::Allocation {
+        resource: "table cell text index",
+        source,
+    }
+}
+
+/// The paragraphs and text runs of a table's cells, by row and position in
+/// the row (record 0348); see [`Table::cell_text_index`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CellTextIndex {
+    /// Each row's cells, as a range of `cells`.
+    rows: Vec<std::ops::Range<usize>>,
+    /// Each cell's paragraphs, as a range of `paragraphs`; `None` for a
+    /// cell without a text body.
+    cells: Vec<Option<std::ops::Range<usize>>>,
+    /// Each paragraph's text runs, as a range of `runs`.
+    paragraphs: Vec<std::ops::Range<usize>>,
+    /// The positions of text runs (`a:r`) among their paragraph's run
+    /// children (`a:r`, `a:br`, `a:fld`), as
+    /// [`crate::opened::TextTarget::CellRun`] counts them.
+    runs: Vec<usize>,
+}
+
+impl CellTextIndex {
+    /// The number of rows.
+    #[must_use]
+    pub fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    /// The number of cells of row `row`; `None` past the last row.
+    #[must_use]
+    pub fn cell_count(&self, row: usize) -> Option<usize> {
+        self.rows.get(row).map(ExactSizeIterator::len)
+    }
+
+    /// Whether the table has a cell at `row` and `column`.
+    #[must_use]
+    pub fn has_cell(&self, row: usize, column: usize) -> bool {
+        self.cell(row, column).is_some()
+    }
+
+    /// The number of paragraphs of the cell at `row` and `column`; `None`
+    /// for a missing cell or a cell without a text body.
+    #[must_use]
+    pub fn paragraph_count(&self, row: usize, column: usize) -> Option<usize> {
+        self.cell(row, column)?.as_ref().map(ExactSizeIterator::len)
+    }
+
+    /// The position among its paragraph's run children of the
+    /// `ordinal`-th text run (zero-based) of paragraph `paragraph` of the
+    /// cell at `row` and `column`; `None` when there is no such run.
+    #[must_use]
+    pub fn text_run(
+        &self,
+        row: usize,
+        column: usize,
+        paragraph: usize,
+        ordinal: usize,
+    ) -> Option<usize> {
+        let paragraphs = self.cell(row, column)?.as_ref()?;
+        let runs = self.paragraphs.get(paragraphs.clone())?.get(paragraph)?;
+        self.runs.get(runs.clone())?.get(ordinal).copied()
+    }
+
+    fn cell(&self, row: usize, column: usize) -> Option<&Option<std::ops::Range<usize>>> {
+        let cells = self.rows.get(row)?;
+        self.cells.get(cells.clone())?.get(column)
+    }
+
+    /// The index of one text body as the one cell of one row (record
+    /// 0348).
+    pub(crate) fn from_body(body: &litchi_drawingml::text::body::Body) -> Result<Self> {
+        let mut index = Self::default();
+        index.open_row()?;
+        index.open_cell()?;
+        index.open_body();
+        for paragraph in &body.paragraphs {
+            index.open_paragraph()?;
+            for (position, run) in paragraph.runs.iter().enumerate() {
+                if run.is_text() {
+                    index.push_text_run(position)?;
+                }
+            }
+            index.close_paragraph();
+        }
+        index.close_cell();
+        index.close_row();
+        Ok(index)
+    }
+
+    /// The index of the cells read one by one: a cell whose text body
+    /// [`Cell::text_body`] refuses is indexed as one without a body (record
+    /// 0348).
+    pub(crate) fn from_cells(table: Table<'_>) -> Result<Self> {
+        let mut index = Self::default();
+        for row in table.rows()? {
+            index.open_row()?;
+            for cell in row.cells()? {
+                index.open_cell()?;
+                if let Ok(Some(body)) = cell.text_body() {
+                    index.open_body();
+                    for paragraph in &body.paragraphs {
+                        index.open_paragraph()?;
+                        for (position, run) in paragraph.runs.iter().enumerate() {
+                            if run.is_text() {
+                                index.push_text_run(position)?;
+                            }
+                        }
+                        index.close_paragraph();
+                    }
+                }
+                index.close_cell();
+            }
+            index.close_row();
+        }
+        Ok(index)
+    }
+
+    /// The index of contents [`Table::cell_contents`] read.
+    #[cfg(test)]
+    pub(crate) fn from_contents(
+        rows: &[Vec<(CellProperties, Option<litchi_drawingml::text::body::Body>)>],
+    ) -> Result<Self> {
+        let mut index = Self::default();
+        for row in rows {
+            index.open_row()?;
+            for (_, body) in row {
+                index.open_cell()?;
+                if let Some(body) = body {
+                    index.open_body();
+                    for paragraph in &body.paragraphs {
+                        index.open_paragraph()?;
+                        for (position, run) in paragraph.runs.iter().enumerate() {
+                            if run.is_text() {
+                                index.push_text_run(position)?;
+                            }
+                        }
+                        index.close_paragraph();
+                    }
+                }
+                index.close_cell();
+            }
+            index.close_row();
+        }
+        Ok(index)
+    }
+
+    /// The index without the paragraphs of dropped bodies.
+    fn compact(&self) -> Result<Self> {
+        let mut index = Self::default();
+        for cells in &self.rows {
+            index.open_row()?;
+            for cell in &self.cells[cells.clone()] {
+                index.open_cell()?;
+                if let Some(paragraphs) = cell {
+                    index.open_body();
+                    for runs in &self.paragraphs[paragraphs.clone()] {
+                        index.open_paragraph()?;
+                        for position in &self.runs[runs.clone()] {
+                            index.push_text_run(*position)?;
+                        }
+                        index.close_paragraph();
+                    }
+                }
+                index.close_cell();
+            }
+            index.close_row();
+        }
+        Ok(index)
+    }
+
+    fn grow<T>(items: &mut Vec<T>) -> Result<()> {
+        items.try_reserve(1).map_err(index_allocation)
+    }
+
+    fn open_row(&mut self) -> Result<()> {
+        Self::grow(&mut self.rows)?;
+        self.rows.push(self.cells.len()..self.cells.len());
+        Ok(())
+    }
+
+    fn close_row(&mut self) {
+        let end = self.cells.len();
+        if let Some(row) = self.rows.last_mut() {
+            row.end = end;
+        }
+    }
+
+    fn open_cell(&mut self) -> Result<()> {
+        Self::grow(&mut self.cells)?;
+        self.cells.push(None);
+        Ok(())
+    }
+
+    fn open_body(&mut self) {
+        let start = self.paragraphs.len();
+        if let Some(cell) = self.cells.last_mut() {
+            *cell = Some(start..start);
+        }
+    }
+
+    fn close_cell(&mut self) {
+        let end = self.paragraphs.len();
+        if let Some(Some(cell)) = self.cells.last_mut() {
+            cell.end = end;
+        }
+    }
+
+    fn open_paragraph(&mut self) -> Result<()> {
+        Self::grow(&mut self.paragraphs)?;
+        self.paragraphs.push(self.runs.len()..self.runs.len());
+        Ok(())
+    }
+
+    fn close_paragraph(&mut self) {
+        let end = self.runs.len();
+        if let Some(paragraph) = self.paragraphs.last_mut() {
+            paragraph.end = end;
+        }
+    }
+
+    fn push_text_run(&mut self, position: usize) -> Result<()> {
+        Self::grow(&mut self.runs)?;
+        self.runs.push(position);
+        Ok(())
     }
 }
 
@@ -1311,6 +2088,154 @@ mod tests {
         assert_eq!(
             table.rows().unwrap()[0].cells().unwrap()[0].text().unwrap(),
             "x\ty"
+        );
+    }
+
+    /// The one-pass cell text index of `owner` (a graphic frame or table
+    /// whose root declares the namespaces), next to the index of the full
+    /// cell reader.
+    fn indexes(owner: &str) -> (Option<CellTextIndex>, CellTextIndex) {
+        let table =
+            Table::from_graphic_frame_with_context(owner.as_bytes(), owner.as_bytes(), 0).unwrap();
+        let scanned = table.scan_cell_text_index().unwrap();
+        let read = CellTextIndex::from_cells(table).unwrap();
+        if let Ok(contents) = table.cell_contents() {
+            assert_eq!(CellTextIndex::from_contents(&contents).unwrap(), read);
+        }
+        assert_eq!(table.cell_text_index().unwrap(), read);
+        (scanned, read)
+    }
+
+    #[test]
+    fn cell_text_index_equals_the_cell_reader() {
+        // Record 0348: runs, breaks and fields; empty paragraphs; cells
+        // without a body or with an empty one; foreign and unmodeled
+        // children; a cell after an empty row.
+        let field = r#"<a:fld id="{5C2F1A2B-0000-4000-8000-000000000001}" type="slidenum"><a:t>1</a:t></a:fld>"#;
+        let rows = [
+            format!(
+                r#"<a:tr h="1"><a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>a</a:t></a:r><a:br/><a:r><a:rPr b="1"/><a:t>b</a:t></a:r>{field}<a:r><a:t>c</a:t></a:r><a:endParaRPr/></a:p><a:p/><a:p><a:pPr algn="ctr"/></a:p></a:txBody><a:tcPr/></a:tc><a:tc/><a:tc><a:txBody/></a:tc></a:tr>"#
+            ),
+            "<a:tr/>".to_owned(),
+            // Comments, character data sections and quoted `>` and `/`.
+            r#"<a:tr><!-- <a:tc> --><a:tc ><a:txBody><a:p><a:r><a:rPr altLang="a>b/" lang='x"y'/><a:t><![CDATA[<a:r/>]]></a:t></a:r ><a:r/></a:p></a:txBody></a:tc></a:tr>"#.to_owned(),
+            r#"<a:tr><a:tc><a:txBody><a:p><x:note/><a:r><a:t>x</a:t></a:r><a:unknown/><a:r/></a:p><x:p><a:r/></x:p></a:txBody><a:tcPr><a:solidFill><a:srgbClr val="FFEECC"/></a:solidFill></a:tcPr></a:tc><a:tc><x:txBody><a:p><a:r><a:t>y</a:t></a:r></a:p></x:txBody></a:tc></a:tr>"#.to_owned(),
+        ];
+        for namespace in [DML, "http://purl.oclc.org/ooxml/drawingml/main"] {
+            let owner = format!(
+                r#"<p:graphicFrame xmlns:p="urn:p" xmlns:a="{namespace}" xmlns:x="urn:foreign"><a:graphic><a:graphicData><a:tbl><a:tblGrid><a:gridCol w="1"/></a:tblGrid>{}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>"#,
+                rows.concat()
+            );
+            let (scanned, read) = indexes(&owner);
+            assert_eq!(scanned.as_ref(), Some(&read));
+            assert_eq!(read.row_count(), 4);
+            assert_eq!(read.cell_count(1), Some(0));
+            assert_eq!(read.text_run(2, 0, 0, 1), Some(1));
+            assert_eq!(read.paragraph_count(0, 0), Some(3));
+            assert_eq!(read.paragraph_count(0, 1), None);
+            assert_eq!(read.paragraph_count(0, 2), None);
+            assert!(read.has_cell(0, 2) && !read.has_cell(0, 3) && !read.has_cell(4, 0));
+            // `a` at 0, `b` at 2, `c` at 4 (the break and field count).
+            assert_eq!(read.text_run(0, 0, 0, 1), Some(2));
+            assert_eq!(read.text_run(0, 0, 0, 2), Some(4));
+            assert_eq!(read.text_run(0, 0, 0, 3), None);
+            assert_eq!(read.text_run(0, 0, 1, 0), None);
+            assert_eq!(read.paragraph_count(3, 0), Some(1));
+            assert_eq!(read.text_run(3, 0, 0, 1), Some(1));
+            assert_eq!(read.paragraph_count(3, 1), Some(1));
+        }
+        // A table declaring namespaces below its root: read cell by cell.
+        let owner = format!(
+            r#"<a:tbl xmlns:a="{DML}"><a:tr><a:tc><a:txBody xmlns:b="{DML}" xmlns:a="urn:other"><b:p><b:r><b:t>z</b:t></b:r><a:r/><b:r/></b:p></a:txBody></a:tc></a:tr></a:tbl>"#
+        );
+        let (scanned, read) = indexes(&owner);
+        assert_eq!(scanned, None);
+        assert_eq!(read.text_run(0, 0, 0, 1), Some(1));
+    }
+
+    #[test]
+    fn cell_text_index_drops_the_bodies_the_reader_refuses() {
+        // Record 0348: a body the text-body reader refuses is no body, as
+        // `Cell::text_body` sees it fail; bodies alike but for their text
+        // share one reading, others are read on their own.
+        let cell =
+            |content: &str| format!("<a:tc><a:txBody><a:p>{content}</a:p></a:txBody></a:tc>");
+        let cells = [
+            cell("<a:r><a:t>fine</a:t></a:r>"),
+            cell(r#"<a:pPr algn="bogus"/><a:r><a:t>a</a:t></a:r>"#),
+            cell(r#"<a:r><a:rPr sz="abc"/><a:t>b</a:t></a:r>"#),
+            cell("<a:r><a:rPr/><a:rPr/><a:t>c</a:t></a:r>"),
+            cell(r#"<a:r><a:rPr sz="1800"/><a:t>d</a:t></a:r>"#),
+            cell(r#"<a:r><a:rPr sz="1800"/><a:t>another text</a:t></a:r>"#),
+            cell(r#"<a:r><a:rPr sz="1800"/><a:t>x &amp; y</a:t></a:r>"#),
+            cell(r#"<a:r><a:rPr sz="1800"/><a:t>x &bogus; y</a:t></a:r>"#),
+            cell(r#"<a:r><a:rPr altLang="a>b" sz="1800"/><a:t>e</a:t></a:r>"#),
+            cell(r#"<a:r><a:rPr altLang="a>b" sz="18x0"/><a:t>e</a:t></a:r>"#),
+            cell("<!-- c --><a:r><a:t>f</a:t></a:r>"),
+            cell("stray text<a:r><a:t>g</a:t></a:r>"),
+            cell("<a:r><a:t>h</a:t></a:r>"),
+        ];
+        let owner = format!(
+            r#"<a:tbl xmlns:a="{DML}"><a:tr>{}</a:tr></a:tbl>"#,
+            cells.concat()
+        );
+        let table =
+            Table::from_graphic_frame_with_context(owner.as_bytes(), owner.as_bytes(), 0).unwrap();
+        let read = CellTextIndex::from_cells(table).unwrap();
+        let rows = table.rows().unwrap();
+        let expected: Vec<bool> = rows[0]
+            .cells()
+            .unwrap()
+            .into_iter()
+            .map(|cell| matches!(cell.text_body(), Ok(Some(_))))
+            .collect();
+        assert_eq!(
+            expected.iter().filter(|ok| !**ok).count(),
+            5,
+            "{expected:?}"
+        );
+        for (column, ok) in expected.iter().enumerate() {
+            assert_eq!(read.paragraph_count(0, column).is_some(), *ok, "{column}");
+        }
+        assert_eq!(table.scan_cell_text_index().unwrap().as_ref(), Some(&read));
+        assert_eq!(table.cell_text_index().unwrap(), read);
+    }
+
+    #[test]
+    fn cell_text_index_defers_markup_it_does_not_vouch_for() {
+        let cell = r#"<a:tc><a:txBody><a:p><a:r><a:t>v</a:t></a:r></a:p></a:txBody></a:tc>"#;
+        let frame = |rows: &str| {
+            format!(
+                r#"<p:graphicFrame xmlns:p="urn:p" xmlns:a="{DML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><a:graphic><a:graphicData><a:tbl>{rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>"#
+            )
+        };
+        for rows in [
+            // Markup compatibility.
+            r#"<a:tr><a:tc><a:txBody><a:p><mc:AlternateContent><mc:Fallback><a:r><a:t>x</a:t></a:r></mc:Fallback></mc:AlternateContent></a:p></a:txBody></a:tc></a:tr>"#
+                .to_owned(),
+            // A second text body.
+            r#"<a:tr><a:tc><a:txBody><a:p/></a:txBody><a:txBody><a:p/></a:txBody></a:tc></a:tr>"#
+                .to_owned(),
+            // A row outside the table's own rows.
+            format!(r#"<a:tr>{cell}<a:extLst><a:tr/></a:extLst></a:tr>"#),
+        ] {
+            let owner = frame(&rows);
+            let table =
+                Table::from_graphic_frame_with_context(owner.as_bytes(), owner.as_bytes(), 0)
+                    .unwrap();
+            assert_eq!(table.scan_cell_text_index().unwrap(), None, "{rows}");
+            assert_eq!(
+                table.cell_text_index().unwrap(),
+                CellTextIndex::from_cells(table).unwrap()
+            );
+        }
+        // A fragment without its owner's scope.
+        let owner = frame(&format!("<a:tr>{cell}</a:tr>"));
+        let table = Table::from_graphic_frame(owner.as_bytes()).unwrap();
+        assert_eq!(table.scan_cell_text_index().unwrap(), None);
+        assert_eq!(
+            table.cell_text_index().unwrap().paragraph_count(0, 0),
+            Some(1)
         );
     }
 

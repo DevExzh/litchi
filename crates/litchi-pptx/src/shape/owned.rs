@@ -368,6 +368,29 @@ impl Handle {
         crate::table::Table::from_graphic_frame_with_context(xml, owner, range.start)
     }
 
+    /// The paragraphs and text runs of the cells of the table this
+    /// graphic frame holds, as [`crate::table::Table::cell_text_index`]
+    /// gives them, from one pass over the frame when it can (record 0348).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::table`] and [`crate::table::Table::cell_text_index`].
+    pub fn cell_text_index(&self) -> crate::Result<crate::table::CellTextIndex> {
+        let owner = self.scene.data.xml.bytes();
+        let range = self.scene.data.records[self.index]
+            .span
+            .range(owner.len())?;
+        let xml = owner
+            .get(range.clone())
+            .ok_or_else(|| crate::Error::Invalid("shape XML span became invalid".into()))?;
+        if let Some(index) =
+            crate::table::shape::scan_frame_cell_text_index(xml, owner, range.start)?
+        {
+            return Ok(index);
+        }
+        self.table()?.cell_text_index()
+    }
+
     /// Clone the detached scene retained by this handle.
     ///
     /// The returned scene shares the same immutable allocation and carries no

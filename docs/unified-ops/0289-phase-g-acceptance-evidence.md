@@ -203,8 +203,9 @@ now stable from run to run (checked twice).
 
 It writes one table — format, operation, scenario/size, leaf, unified,
 ratio, budget, status, record, source and explanation — to
-[`results/0289/bench-matrix.tsv`](results/0289/bench-matrix.tsv) and
-[`.md`](results/0289/bench-matrix.md).
+`results/0289/bench-matrix.tsv` and
+[`.md`](results/0289/bench-matrix.md) (record 0348 split the TSV per format:
+`results/0289/bench-matrix/<format>.tsv`).
 
 **Budgets** come from the goal's PERFORMANCE BAR:
 - open: 1.05 or +20 µs;

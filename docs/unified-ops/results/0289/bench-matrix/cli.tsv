@@ -1,0 +1,5 @@
+format	operation	scenario	size	comparison	stage	leaf	unified	unit	ratio	ratio_range	budget	status	record	source	explanation
+cli	get	litchi get --json (docx) vs in-process open+get+JSON	drawing.docx /body/p[2]	cli process/in-process		3491.1	4113.7	µs	1.178		none (record 0256 §6: no budget applies to process start)	no-budget	0256	parsed:0256-cli/get-cost.json	
+cli	get	litchi get --json (pptx) vs in-process open+get+JSON	sample.pptx /slide[1]	cli process/in-process		287.90	1149.5	µs	3.993		none (record 0256 §6: no budget applies to process start)	no-budget	0256	parsed:0256-cli/get-cost.json	
+cli	get	litchi get --json (xls) vs in-process open+get+JSON	Simple.xls /sheet[1]	cli process/in-process		20.30	620.70	µs	30.576		none (record 0256 §6: no budget applies to process start)	no-budget	0256	parsed:0256-cli/get-cost.json	
+cli	get	litchi get --json (xlsx) vs in-process open+get+JSON	SimpleMultiCell.xlsx /Sheet1/A1	cli process/in-process		124.40	946.60	µs	7.609		none (record 0256 §6: no budget applies to process start)	no-budget	0256	parsed:0256-cli/get-cost.json	

@@ -752,3 +752,250 @@ fn batched_paragraph_and_cell_edits_equal_one_edit_at_a_time() -> Result<()> {
     assert_eq!(slide_xml(&batched)?, slide_xml(&sequential)?);
     Ok(())
 }
+
+#[test]
+fn per_edit_changes_equal_one_edit_at_a_time() -> Result<()> {
+    // Record 0348: the per-edit changes of a chunked batch are the changes
+    // its edits report applied one after the other, on both owners.
+    let package = deck()?;
+    let cell = |row: usize, column: usize| TextTarget::Cell {
+        shape: at(1),
+        row: at(row),
+        column: at(column),
+    };
+    let cell_paragraph = |row: usize, column: usize| TextTarget::CellParagraph {
+        shape: at(1),
+        row: at(row),
+        column: at(column),
+        paragraph: at(0),
+    };
+    let bold = TextProperties::default().with_bold(Some(true));
+    let fill = TextProperties::default().with_fill(Some(CellFill::Rgb(Rgb([0xFF, 0xEE, 0xCC]))));
+    let edits = [
+        TextEdit::new(cell(0, 0), bold),
+        // The same change again: no bytes change.
+        TextEdit::new(cell(0, 0), bold),
+        TextEdit::new(cell(0, 1), fill),
+        TextEdit::new(
+            cell_paragraph(1, 0),
+            TextProperties::default().with_align(Some(Alignment::Center)),
+        ),
+        TextEdit::new(
+            cell_paragraph(1, 1),
+            TextProperties::default().with_text("b2"),
+        ),
+        TextEdit::new(run(0, 0), TextProperties::default().with_italic(Some(true))),
+    ];
+    let mut expected = Vec::new();
+    let mut sequential = deck()?;
+    for edit in &edits {
+        let (after, changed) = apply(&sequential, std::slice::from_ref(edit))?;
+        expected.push(changed == 1);
+        sequential = after;
+    }
+    assert_eq!(expected, [true, false, true, true, false, true]);
+    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(2).collect();
+    let mut batched = package.edit()?;
+    assert_eq!(
+        batched.set_text_property_chunks_per_edit(0usize, &chunks)?,
+        expected
+    );
+    assert_eq!(
+        slide_xml(&batched.commit()?.into_package())?,
+        slide_xml(&sequential)?
+    );
+    let mut empty = package.edit()?;
+    assert!(
+        empty
+            .set_text_property_chunks_per_edit(0usize, &[])?
+            .is_empty()
+    );
+
+    let source = crate::source::Package::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(deck()?.to_bytes()?),
+    ))?;
+    let mut edit = source.edit()?;
+    assert_eq!(
+        edit.set_text_property_chunks_per_edit(at(0), &chunks)?,
+        expected
+    );
+    let mut counted = source.edit()?;
+    assert_eq!(counted.set_text_property_chunks(at(0), &chunks)?, 4);
+    Ok(())
+}
+
+#[test]
+fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
+    // Record 0348: one notes-part pass for every chunk.
+    let package = deck()?;
+    let mut edit = package.edit()?;
+    assert!(edit.set_notes_text(0usize, "one")?);
+    let package = edit.commit()?.into_package();
+    let notes = package.notes()?.expect("notes");
+    let note = notes.slides().first().expect("note").clone();
+    let scene = crate::shape::Scene::read(note.xml())?;
+    let body = (0..scene.len())
+        .find(|index| {
+            scene
+                .at(*index)
+                .is_ok_and(|shape| shape.text().is_some_and(|text| text.starts_with("one")))
+        })
+        .expect("the notes body");
+    let paragraph = |index: usize| TextTarget::Paragraph {
+        shape: at(body),
+        paragraph: at(index),
+    };
+    let notes_run = TextTarget::Run {
+        shape: at(body),
+        paragraph: at(0),
+        run: at(0),
+    };
+    let edits = [
+        TextEdit::new(
+            paragraph(0),
+            TextProperties::default().with_align(Some(Alignment::Right)),
+        ),
+        TextEdit::new(notes_run, TextProperties::default().with_bold(Some(true))),
+        TextEdit::new(
+            paragraph(0),
+            TextProperties::default().with_italic(Some(true)),
+        ),
+        TextEdit::new(notes_run, TextProperties::default().with_bold(Some(true))),
+        TextEdit::new(paragraph(0), TextProperties::default().with_text("one two")),
+        // Unchanged after the edit before it.
+        TextEdit::new(paragraph(0), TextProperties::default().with_text("one two")),
+    ];
+    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(2).collect();
+    let notes_xml = |package: &Package| -> Result<Vec<u8>> {
+        let notes = package.notes()?.expect("notes");
+        Ok(notes.slides().first().expect("note").xml().to_vec())
+    };
+    let mut one = package.edit()?;
+    let mut changed = 0;
+    for chunk in &chunks {
+        changed += one.set_notes_text_properties(0usize, chunk)?;
+    }
+    let expected = notes_xml(&one.commit()?.into_package())?;
+    let mut chunked = package.edit()?;
+    assert_eq!(
+        chunked.set_notes_text_property_chunks(0usize, &chunks)?,
+        changed
+    );
+    assert_eq!(notes_xml(&chunked.commit()?.into_package())?, expected);
+    // Each edit's change, as one call per edit applied in order reports it.
+    let mut sequential = package.edit()?;
+    let mut changes = Vec::new();
+    for edit in &edits {
+        changes
+            .push(sequential.set_notes_text_properties(0usize, std::slice::from_ref(edit))? == 1);
+    }
+    assert_eq!(changes.last(), Some(&false));
+    let mut reported = package.edit()?;
+    assert_eq!(
+        reported.set_notes_text_property_chunks_per_edit(0usize, &chunks)?,
+        changes
+    );
+    // A slide without notes refuses.
+    let mut edit = deck()?.edit()?;
+    assert!(
+        edit.set_notes_text_property_chunks(0usize, &chunks)
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
+    // Record 0348: every table of the tracked PPTX corpus.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+    let mut pending = vec![root];
+    let (mut tables, mut scanned, mut bodies) = (0usize, 0usize, 0usize);
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(&directory)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if path.extension().is_none_or(|extension| extension != "pptx") {
+                continue;
+            }
+            let Ok(package) = Package::from_bytes(&std::fs::read(&path)?) else {
+                continue;
+            };
+            let Ok(edit) = package.edit() else {
+                continue;
+            };
+            let opc = package.opc()?;
+            for slide in edit.slides() {
+                let xml = opc.get_part(slide.part_name())?.blob().to_vec();
+                let Ok(scene) = crate::shape::owned::Scene::read(xml) else {
+                    continue;
+                };
+                for position in 0..scene.len() {
+                    let Ok(Some(handle)) = scene.shape(position) else {
+                        continue;
+                    };
+                    let common = handle.view().common();
+                    if let Ok(Some(body)) = common.text_body() {
+                        bodies += 1;
+                        let expected = crate::table::CellTextIndex::from_body(&body)?;
+                        let index = common.text_index()?.expect("a body");
+                        assert_eq!(common.read_text_index()?.as_ref(), Some(&index));
+                        assert_eq!(index.paragraph_count(), body.paragraphs.len());
+                        for (paragraph, item) in body.paragraphs.iter().enumerate() {
+                            let runs = item.runs.iter().filter(|run| run.is_text()).count();
+                            for ordinal in 0..=runs {
+                                assert_eq!(
+                                    index.text_run(paragraph, ordinal),
+                                    expected.text_run(0, 0, paragraph, ordinal),
+                                    "{} {position}",
+                                    path.display()
+                                );
+                            }
+                        }
+                    }
+                    let Ok(table) = handle.table() else {
+                        continue;
+                    };
+                    tables += 1;
+                    scanned += usize::from(table.scan_cell_text_index()?.is_some());
+                    assert_eq!(handle.cell_text_index()?, table.cell_text_index()?);
+                    assert_eq!(
+                        table.cell_text_index()?,
+                        crate::table::CellTextIndex::from_cells(table)?,
+                        "{} {position}",
+                        path.display()
+                    );
+                }
+            }
+        }
+    }
+    assert!(
+        tables >= 5 && scanned >= 5 && bodies >= 100,
+        "{tables} {scanned} {bodies}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_litchi_table_frame_is_indexed_in_one_pass() -> Result<()> {
+    // Record 0348: a frame declaring its namespaces on its root (as
+    // `add_table` writes it) takes the one-pass frame index.
+    let xml = slide_xml(&deck()?)?;
+    let start = memchr::memmem::find(&xml, b"<p:graphicFrame").expect("a frame");
+    let end = start
+        + memchr::memmem::find(&xml[start..], b"</p:graphicFrame>").expect("its end")
+        + b"</p:graphicFrame>".len();
+    let index = crate::table::shape::scan_frame_cell_text_index(&xml[start..end], &xml, start)?
+        .expect("the one-pass index");
+    let scene = crate::shape::owned::Scene::read(xml)?;
+    let handle = scene
+        .shape(1_usize)
+        .map_err(|_| Error::Invalid("selector".into()))?
+        .expect("table frame");
+    assert_eq!(index, handle.table()?.cell_text_index()?);
+    assert_eq!(index, handle.cell_text_index()?);
+    assert_eq!(index.paragraph_count(1, 1), Some(1));
+    Ok(())
+}

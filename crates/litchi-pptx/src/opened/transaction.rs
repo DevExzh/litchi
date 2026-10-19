@@ -710,7 +710,35 @@ impl Edit {
         slide: impl Into<crate::slide::Selector<'s>>,
         chunks: &[&[super::TextEdit<'_>]],
     ) -> Result<usize> {
-        let selected_slide = self.resolve_slide(slide.into())?;
+        self.text_property_chunks(slide.into(), chunks, None)
+    }
+
+    /// [`Self::set_text_property_chunks`], returning for each edit, in
+    /// order, whether it changed bytes (record 0348): the change one
+    /// [`Self::set_text_properties`] call per edit, applied one after the
+    /// other, would report. A batch planner learns each edit's change here
+    /// instead of reading the targets before staging.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_text_property_chunks`].
+    pub fn set_text_property_chunks_per_edit<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        chunks: &[&[super::TextEdit<'_>]],
+    ) -> Result<Vec<bool>> {
+        let mut changes = Vec::new();
+        self.text_property_chunks(slide.into(), chunks, Some(&mut changes))?;
+        Ok(changes)
+    }
+
+    fn text_property_chunks(
+        &mut self,
+        slide: crate::slide::Selector<'_>,
+        chunks: &[&[super::TextEdit<'_>]],
+        changes: Option<&mut Vec<bool>>,
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide)?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
         let (xml, changed) = super::stage_text_property_chunks(
@@ -718,6 +746,7 @@ impl Edit {
             chunks,
             self.source.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
+            changes,
         )?;
         if let Some(xml) = xml {
             self.working
@@ -1159,6 +1188,77 @@ impl Edit {
             edits,
             self.source.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working.get_part_mut(&part_name)?.set_blob(xml);
+        }
+        Ok(changed)
+    }
+
+    /// Apply several already bounded batches of rich text edits to the
+    /// notes page of one slide, in order, in one notes-part read, rewrite
+    /// and read-back (record 0348), as [`Self::set_text_property_chunks`]
+    /// does for a slide. The result equals one
+    /// [`Self::set_notes_text_properties`] call per chunk, in order. The
+    /// return value is the number of edits that changed bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_notes_text_properties`], and a limit error for too
+    /// many chunks or edits. A failed batch leaves the transaction
+    /// unchanged.
+    pub fn set_notes_text_property_chunks<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        chunks: &[&[super::TextEdit<'_>]],
+    ) -> Result<usize> {
+        self.notes_text_property_chunks(slide.into(), chunks, None)
+    }
+
+    /// [`Self::set_notes_text_property_chunks`], returning each edit's
+    /// change in order (record 0348), as
+    /// [`Self::set_text_property_chunks_per_edit`] does for a slide.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_notes_text_property_chunks`].
+    pub fn set_notes_text_property_chunks_per_edit<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        chunks: &[&[super::TextEdit<'_>]],
+    ) -> Result<Vec<bool>> {
+        let mut changes = Vec::new();
+        self.notes_text_property_chunks(slide.into(), chunks, Some(&mut changes))?;
+        Ok(changes)
+    }
+
+    fn notes_text_property_chunks(
+        &mut self,
+        slide: crate::slide::Selector<'_>,
+        chunks: &[&[super::TextEdit<'_>]],
+        changes: Option<&mut Vec<bool>>,
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide)?;
+        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+        let Some(note) = source.as_ref().and_then(|source| {
+            source
+                .slides()
+                .iter()
+                .find(|note| note.owner() == selected_slide.part_name.as_str())
+        }) else {
+            return Err(Error::UnsafeEdit {
+                operation: "set_notes_text_properties",
+                reason: "the slide has no notes page",
+            });
+        };
+        let part_name = PackURI::new(note.part())
+            .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
+        let (xml, changed) = super::stage_text_property_chunks(
+            note.xml(),
+            chunks,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+            changes,
         )?;
         if let Some(xml) = xml {
             self.working.get_part_mut(&part_name)?.set_blob(xml);
