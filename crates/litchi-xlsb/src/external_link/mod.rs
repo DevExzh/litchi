@@ -101,6 +101,6 @@ pub use model::{
 };
 pub use package::{write_external_link_stream, write_external_link_stream_with_limits};
 pub use transaction::{
-    Commit, Patch, Snapshot, Transaction, apply, apply_with_limits, read, read_with_limits,
+    Commit, Edit, Patch, Snapshot, apply, apply_with_limits, read, read_with_limits,
 };
 pub use validation::validate_link;

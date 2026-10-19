@@ -154,7 +154,7 @@ fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type:
         .set_content_type(content_type.to_owned())
         .unwrap();
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -183,7 +183,7 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
         .unwrap()
         .set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -229,7 +229,7 @@ fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> 
         .unwrap()
         .set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -242,7 +242,7 @@ fn rewrite_target(
     let uri = sheet_partname(&package, position);
     f(&mut package, &uri);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -352,7 +352,7 @@ fn eager_catalog_refuses_missing_external_and_wrong_content_type_targets() {
             true,
         );
         let mut output = Vec::new();
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         output
     };
     assert!(matches!(

@@ -149,7 +149,7 @@ pub enum Error {
     Io(#[from] io::Error),
     /// Publication was attempted against a package that is no longer current.
     #[error("plain paragraph tail append source is stale")]
-    StaleSource,
+    PatchConflict,
 }
 
 /// Finite bounds for one source-backed plain-paragraph tail append.
@@ -804,7 +804,7 @@ fn publish_commit(commit: Commit<'_>, writer: impl Write) -> Result<Publication>
     let candidate = plan.candidate;
     let guarded_result = if plan.options.execution.is_none() && plan.options.cancellation.is_none()
     {
-        (plan.splice.write_to_stream(writer), None)
+        (plan.splice.write_to(writer), None)
     } else {
         let failure = Arc::new(Mutex::new(None));
         let guarded = PublicationCheckedWriter {
@@ -813,7 +813,7 @@ fn publish_commit(commit: Commit<'_>, writer: impl Write) -> Result<Publication>
             cancellation: plan.options.cancellation.clone(),
             failure: Arc::clone(&failure),
         };
-        let result = plan.splice.write_to_stream(guarded);
+        let result = plan.splice.write_to(guarded);
         let failure = failure
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())

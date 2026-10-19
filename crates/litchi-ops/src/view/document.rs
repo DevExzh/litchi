@@ -232,7 +232,11 @@ impl<'a> DocumentView<'a> {
     /// # Errors
     ///
     /// As [`Self::paragraph_count`].
-    pub fn paragraph_text(&self, index: usize) -> Result<Option<String>> {
+    pub fn paragraph_text(
+        &self,
+        index: impl Into<litchi_core::Position>,
+    ) -> Result<Option<String>> {
+        let index = index.into().get();
         match self.0 {
             #[cfg(feature = "docx")]
             Inner::Docx(docx) => match docx.owner() {
@@ -291,7 +295,8 @@ impl<'a> DocumentView<'a> {
     /// # Errors
     ///
     /// As [`Self::paragraph_count`].
-    pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
+    pub fn paragraph(&self, index: impl Into<litchi_core::Position>) -> Result<Option<Paragraph>> {
+        let index = index.into().get();
         match self.0 {
             #[cfg(feature = "docx")]
             Inner::Docx(docx) => match docx.owner() {

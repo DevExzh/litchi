@@ -1356,7 +1356,7 @@ impl Package {
                 None
             };
 
-            self.opc.to_stream(writer)?;
+            self.opc.write_to(writer)?;
             if let Some(staged_properties) = staged_properties {
                 staged_properties.commit();
             }

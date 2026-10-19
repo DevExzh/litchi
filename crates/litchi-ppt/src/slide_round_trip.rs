@@ -850,7 +850,7 @@ mod tests {
             );
         }
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         let mut output_bytes = output.into_inner();
         for (name, _content_type, _relationship_type, data) in parts {
             output_bytes = replace_zip_member_raw(&output_bytes, name, data);
@@ -904,7 +904,7 @@ mod tests {
             false,
         );
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         replace_zip_member_raw(&output.into_inner(), "/theme/theme/theme1.xml", theme_xml)
     }
 

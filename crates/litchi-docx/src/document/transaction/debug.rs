@@ -169,7 +169,7 @@ impl fmt::Debug for Error {
             Self::Composition(_) => f.debug_struct("Composition").finish_non_exhaustive(),
             Self::InvalidDurable(_) => f.debug_struct("InvalidDurable").finish_non_exhaustive(),
             Self::Transfer(reason) => f.debug_tuple("Transfer").field(reason).finish(),
-            Self::StaleSource => f.write_str("StaleSource"),
+            Self::PatchConflict => f.write_str("PatchConflict"),
             Self::SemanticPrecondition => f.write_str("SemanticPrecondition"),
         }
     }

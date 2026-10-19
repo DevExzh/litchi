@@ -54,7 +54,7 @@ impl Xlsx {
                 XlsxOwner::Source(workbook) => workbook
                     .source_backed_package()
                     .source_artifact()
-                    .write_to_stream(&mut sink)
+                    .write_to(&mut sink)
                     .map_err(Error::from),
                 XlsxOwner::Eager(workbook) => {
                     workbook.clone().write_to(&mut sink).map_err(Error::from)
@@ -87,7 +87,7 @@ fn publish_source(
         let mut counted = Counted::new(sink);
         package
             .source_artifact()
-            .write_to_stream(&mut counted)
+            .write_to(&mut counted)
             .map_err(Error::from)?;
         bytes = counted.written;
         Ok(())

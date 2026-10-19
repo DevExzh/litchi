@@ -424,7 +424,7 @@ fn source_checked_transaction_preserves_opaque_records_and_inverse() {
 
     let commit = {
         let package = workbook.opc_package_mut();
-        let mut transaction = super::transaction::Transaction::new(package).unwrap();
+        let mut transaction = super::transaction::Edit::new(package).unwrap();
         assert!(
             transaction
                 .edit(42, |connection| {
@@ -460,7 +460,7 @@ fn source_checked_transaction_rejects_stale_patch_and_supports_noop() {
         .set_connections(sample_connection("Stable"))
         .unwrap();
     let noop = {
-        let transaction = super::transaction::Transaction::new(workbook.opc_package_mut()).unwrap();
+        let transaction = super::transaction::Edit::new(workbook.opc_package_mut()).unwrap();
         transaction.commit().unwrap()
     };
     assert!(!noop.changed());

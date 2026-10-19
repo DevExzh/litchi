@@ -299,7 +299,7 @@ mod tests {
             false,
         );
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         output.into_inner()
     }
 
@@ -517,7 +517,7 @@ mod tests {
             );
         }
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         let ambiguous = record(
             RecordType::RoundTripContentMasterInfo12Atom,
             0,

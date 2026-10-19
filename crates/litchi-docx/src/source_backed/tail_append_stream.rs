@@ -2258,13 +2258,13 @@ fn publish_stream(
     } = plan;
     let splice = match expected_candidate_archive {
         Some(expected) => splice
-            .write_to_stream_with_expected_artifact(
+            .write_to_with_expected_artifact(
                 writer,
                 expected.len,
                 SourceArtifactFingerprint::from_sha256(expected.sha256),
             )
             .map_err(Error::Opc)?,
-        None => splice.write_to_stream(writer).map_err(Error::Opc)?,
+        None => splice.write_to(writer).map_err(Error::Opc)?,
     };
     Ok(ParagraphStreamPublication {
         source,

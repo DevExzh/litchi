@@ -426,7 +426,7 @@ fn flat_transaction_rejects_new_unsafe_public_link_without_staging() -> litchi_c
         )
         .replace(" office:version=\"1.4\">", ">")
         .replace("</office:document-content>", "</office:document>");
-    let flat = FlatSnapshot::from_bytes(flat_xml.into_bytes())?;
+    let flat = FlatSnapshot::from_bytes(flat_xml.as_bytes())?;
     let before = flat.as_bytes().to_vec();
     let Some(CellView::Stored(source_cell)) = flat.cell("Data", 0, 0)? else {
         return Err(litchi_core::Error::InvalidFormat(

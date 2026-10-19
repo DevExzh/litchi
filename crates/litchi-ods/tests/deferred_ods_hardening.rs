@@ -7,7 +7,7 @@ fn table(inner: &str) -> Vec<u8> {
 }
 
 fn exercise(bytes: Vec<u8>) -> Option<litchi_core::Error> {
-    match FlatSpreadsheet::from_bytes(bytes) {
+    match FlatSpreadsheet::from_bytes(&bytes) {
         Ok(flat) => {
             let _ = flat.sheets();
             let _ = flat.dde();

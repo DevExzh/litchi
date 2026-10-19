@@ -297,8 +297,8 @@ impl Snapshot {
 
     /// Start a detached, failure-atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             bindings: self.bindings.clone(),
             valid_external_sheets: self.valid_external_sheets.clone(),
@@ -328,13 +328,13 @@ impl Eq for Snapshot {}
 
 /// A detached, typed edit over one worksheet `WEBEXTENSIONS` snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     bindings: Vec<Binding>,
     valid_external_sheets: ValidExternalSheets,
 }
 
-impl Transaction {
+impl Edit {
     /// Construct an edit from a validated source snapshot.
     #[must_use]
     pub fn new(source: Snapshot) -> Self {
@@ -504,12 +504,6 @@ impl Transaction {
             Arc::from(bytes.into_boxed_slice()),
             self.valid_external_sheets.clone(),
         )
-    }
-
-    /// Discard staged edits and return the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validate and publish the staged collection as a reversible patch.

@@ -24,6 +24,18 @@ Source: the coordinator's definition-of-done audit (2026-10-17, §7), the
 | 11 | Core `Limits` | The glossary ban on the core `Limits` name stands | 0249 |
 | 12 | XLSX SmartArt tier | Deferred to P1 as a typed capability gap. Design §13 lists typed SmartArt CRUD as "also in v1" because the models exist, but `litchi-xlsx` has no diagram model, and no OfficeCLI corpus line uses XLSX SmartArt | 0339 |
 | 13 | Picture and table breadth | PPTX picture crop/effects, `table.style` and DOCX picture crop/floating/link are deferred-P1 under 0332's breadth rule (a P0 element's properties are P1 unless design §13 names them); the picture elements stay P0 and supported | 0332, 0333, 0339 |
+| 14 | Direct `&mut self` package mutators (DOCX 85, PPTX 77, XLSB `into_workbook` and mutating `Workbook` verbs) | Kept; no new public `&mut self` mutator may be added to a `Package` | 0343 D1 |
+| 15 | Scoped OOXML commit triad (`snapshot()` on ~200 scoped commits, missing `Diagnostics`, DOCX/XLSX scoped `Transaction` names) | Kept until each family is migrated to publish a `Package`; the primary transactions are canonical | 0343 D2 |
+| 16 | PPT scoped `Transaction` families and `rollback` | Kept as W4 residue | 0343 D3 |
+| 17 | DOCX/PPTX `Error::UnsafeEdit` refusal vocabulary; ODT `MutableDocument` | Kept; the replacement error taxonomy is an owner choice | 0343 D4 |
+| 18 | PPT `raw::Reader` and 173 `*_with_limits` entry points | Kept; not folded into `OpenOptions` | 0343 D5 |
+| 19 | Flat ODF owners' limits (`FlatDrawing`/`FlatPresentation` fixed ceilings; crate `Limits`, not `OpenOptions`) and ODC chart `Limits` | Fixed ceilings and crate `Limits` stay | 0343 D6 |
+| 20 | `Metadata.keywords` type | `Option<String>` stays, because the type fixes the JSON/CLI/Python metadata shape; the OOXML codec keeps keywords losslessly | 0343 D7 |
+| 21 | DOCX app/custom properties through the shared OOXML engine | Withdrawn: implemented by record 0342 (`metadata::Edit::{set_app_props, set_custom_props}`, `Package::app_props()`) | 0343 D8, 0342 |
+| 22 | Content-redaction audit of OOXML/legacy error strings | The rule stands; violations are fixed as found | 0343 D9 |
+| 23 | iWork `CellPosition`/`CellRange` → `At`/`Area` | Deferred to the next iWork wave (unblocked: record 0340 has merged) | 0343 D10 |
+| 24 | `litchi-iwa` `*DocumentBuilder` prefixes | Kept; rename or delete the unpublished host crate is the owner's call | 0343 D11 |
 
 The questions most likely to change behaviour if overridden are 2, 3, 4,
-7 (Q3, regex) and 12.
+7 (Q3, regex) and 12; of the 0343 API deferrals, 14, 15 and 20 have the
+widest public-API reach.

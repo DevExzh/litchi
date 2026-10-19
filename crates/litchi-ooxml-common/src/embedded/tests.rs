@@ -597,7 +597,7 @@ fn source_backed_package(package: &OpcPackage) -> SourceBackedPackage {
 
 fn package_bytes(package: &OpcPackage) -> Vec<u8> {
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes).expect("package serializes");
+    package.write_to(&mut bytes).expect("package serializes");
     bytes
 }
 

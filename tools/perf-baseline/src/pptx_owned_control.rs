@@ -389,7 +389,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     verify_pptx_multi_slide_edit_output(&corpus, &output)?;
 
     let mut streamed = Vec::new();
-    PackageWriter::write_to_stream(&mut streamed, package.opc()?)?;
+    PackageWriter::write_to(&mut streamed, package.opc()?)?;
     if streamed != output {
         return Err("owning PPTX OPC stream differs from Package::to_bytes output".into());
     }
@@ -403,7 +403,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         bytes: Vec::new(),
         fail_after,
     };
-    let partial_result = PackageWriter::write_to_stream(&mut partial, package.opc()?);
+    let partial_result = PackageWriter::write_to(&mut partial, package.opc()?);
     if partial_result.is_ok()
         || partial.bytes.is_empty()
         || partial.bytes.len() >= output.len()
@@ -434,7 +434,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         bytes: Vec::new(),
         fail_after: 0,
     };
-    let zero_result = PackageWriter::write_to_stream(&mut zero, package.opc()?);
+    let zero_result = PackageWriter::write_to(&mut zero, package.opc()?);
     if zero_result.is_ok() || !zero.bytes.is_empty() || package.to_bytes()? != output {
         return Err("owning PPTX zero sink failure changed output or package state".into());
     }
@@ -608,7 +608,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     let report = ControlReport {
         schema: SCHEMA,
         status: "probe_passed_pending_independent_raw_census",
-        implementation: "litchi_pptx::Package::from_vec -> edit -> PackageWriter::write_to_stream",
+        implementation: "litchi_pptx::Package::from_vec -> edit -> PackageWriter::write_to",
         timing_scope: "untimed qualification; no elapsed-time, allocation, instruction, compression, or speedup measurement",
         performance_claim: "none; this owning control only establishes preservation and refusal gates",
         corpus: corpus.manifest,

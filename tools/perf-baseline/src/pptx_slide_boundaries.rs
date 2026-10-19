@@ -445,7 +445,7 @@ fn verify_partial_zero_sinks(
         accepted: 0,
         fail_after,
     };
-    let partial_result = package.opc()?.to_stream(&mut partial);
+    let partial_result = package.opc()?.write_to(&mut partial);
     let partial_verified = partial_result.is_err()
         && partial.accepted > 0
         && partial.accepted < u64::try_from(expected_output.len())?;
@@ -453,7 +453,7 @@ fn verify_partial_zero_sinks(
         accepted: 0,
         fail_after: 0,
     };
-    let zero_result = package.opc()?.to_stream(&mut zero);
+    let zero_result = package.opc()?.write_to(&mut zero);
     let zero_verified = zero_result.is_err() && zero.accepted == 0;
     Ok((partial_verified, zero_verified))
 }
@@ -861,7 +861,7 @@ pub(super) fn run(
         let mut sink = CountingSink::bounded(maximum, MAX_WRITE);
         sink.reserve_budget()?;
         let started = Instant::now();
-        package.opc()?.to_stream(&mut sink)?;
+        package.opc()?.write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         let sink_summary = sink.summary();
         let output = sink.bytes;

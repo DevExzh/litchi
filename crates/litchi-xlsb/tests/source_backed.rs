@@ -135,7 +135,7 @@ fn two_external_link_fixture() -> (Vec<u8>, usize) {
     }
     package.add_part(Box::new(copied_external));
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     (output, external_part_bytes)
 }
 
@@ -146,7 +146,7 @@ fn rewrite_part(partname: &str, blob: Vec<u8>) -> Vec<u8> {
         .unwrap()
         .set_blob(blob);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -174,7 +174,7 @@ fn reserved_cell_flag_fixture() -> Vec<u8> {
     assert!(changed, "Simple.xlsb should contain an RK cell");
     package.get_part_mut(&uri).unwrap().set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -198,7 +198,7 @@ fn reserved_indexed_fixture() -> Vec<u8> {
     assert!(changed, "sample.xlsb should contain an RK cell");
     package.get_part_mut(&uri).unwrap().set_blob(rewritten);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -209,7 +209,7 @@ fn rewrite_workbook_blob(blob: Vec<u8>) -> Vec<u8> {
         .unwrap()
         .set_blob(blob);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -277,7 +277,7 @@ fn remove_part(partname: &str) -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
     assert!(package.remove_part(&PackURI::new(partname).unwrap()));
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -289,7 +289,7 @@ fn rewrite_content_type(partname: &str, content_type: &str) -> Vec<u8> {
         .set_content_type(content_type.to_string())
         .unwrap();
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -315,7 +315,7 @@ fn add_comments_part(content_type: &str) -> Vec<u8> {
             false,
         );
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -355,7 +355,7 @@ fn rewrite_sheet_relationship(relationship_type: &str, content_type: &str) -> Ve
         .set_content_type(content_type.to_owned())
         .unwrap();
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -371,7 +371,7 @@ fn rewrite_sheet_relationship_with_blob(
         .unwrap()
         .set_blob(blob);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -401,7 +401,7 @@ fn rewrite_sheet_target(target_partname: &str, target_ref: &str) -> Vec<u8> {
         .rels_mut()
         .add_relationship(rel_type, target_ref.to_owned(), r_id, is_external);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -426,7 +426,7 @@ fn set_date1904() -> Vec<u8> {
         .unwrap()
         .set_blob(workbook_blob);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -1805,7 +1805,7 @@ fn table_workbook_source(
     }
 
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -1822,7 +1822,7 @@ fn add_pivot_relationship(source: Vec<u8>) -> Vec<u8> {
             true,
         );
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 
@@ -2473,7 +2473,7 @@ fn source_external_link_owner_graph_is_validated_at_catalog_open() {
             external,
         );
     let mut bytes = Vec::new();
-    wrong_relationship.to_stream(&mut bytes).unwrap();
+    wrong_relationship.write_to(&mut bytes).unwrap();
     assert!(matches!(
         SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))),
         Err(PackageError::InvalidRelationship(_))
@@ -2486,7 +2486,7 @@ fn source_external_link_owner_graph_is_validated_at_catalog_open() {
         .set_content_type("application/octet-stream".to_owned())
         .unwrap();
     let mut bytes = Vec::new();
-    wrong_content.to_stream(&mut bytes).unwrap();
+    wrong_content.write_to(&mut bytes).unwrap();
     assert!(matches!(
         SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))),
         Err(PackageError::InvalidContentType { .. })
@@ -2503,7 +2503,7 @@ fn source_external_link_payload_failures_remain_deferred_and_typed() {
         .unwrap()
         .set_blob(vec![0]);
     let mut bytes = Vec::new();
-    malformed.to_stream(&mut bytes).unwrap();
+    malformed.write_to(&mut bytes).unwrap();
     let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
     assert!(matches!(
         workbook.external_links(),
@@ -2527,7 +2527,7 @@ fn source_external_link_payload_failures_remain_deferred_and_typed() {
         .remove(&relationship_id)
         .unwrap();
     let mut bytes = Vec::new();
-    missing_inner.to_stream(&mut bytes).unwrap();
+    missing_inner.write_to(&mut bytes).unwrap();
     let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
     assert!(matches!(
         workbook.external_links(),

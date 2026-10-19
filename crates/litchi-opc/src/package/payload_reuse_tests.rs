@@ -326,7 +326,7 @@ fn custom_donor_cannot_claim_an_arc_inconsistent_with_its_visible_payload() {
     assert_eq!(payload.as_slice(), BINARY_PAYLOAD);
     assert!(!Arc::ptr_eq(&payload, &offered));
     let mut output = Vec::new();
-    reused.to_stream(&mut output).expect("exact publication");
+    reused.write_to(&mut output).expect("exact publication");
     assert_eq!(output, bytes);
 }
 

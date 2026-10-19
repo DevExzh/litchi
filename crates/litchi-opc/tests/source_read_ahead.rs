@@ -661,7 +661,7 @@ fn exact_source_save_preserves_unknown_member_after_known_payload_read() {
     let mut saved = Vec::new();
     package
         .source_artifact()
-        .write_to_stream(&mut saved)
+        .write_to(&mut saved)
         .expect("exact source save must succeed");
     assert_eq!(saved, source, "exact source save must retain all ZIP bytes");
     assert_eq!(unknown_member(&saved), UNKNOWN_PAYLOAD);
@@ -726,7 +726,7 @@ fn publication_disables_read_ahead_before_output_and_keeps_future_reads_exact() 
 
     let mut saved = Vec::new();
     materialized
-        .to_stream(&mut saved)
+        .write_to(&mut saved)
         .expect("materialized package save must succeed");
     assert_eq!(unknown_member(&saved), UNKNOWN_PAYLOAD);
     let reopened = SourceBackedPackage::from_vec(saved).expect("saved package must reopen");
@@ -968,7 +968,7 @@ fn exact_splice_artifact() -> (Vec<u8>, Vec<ReadCall>) {
         .expect("exact splice control must prepare");
     let before_publication = source.calls().len();
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("exact splice control must publish");
     let calls = source
         .calls()
@@ -1008,7 +1008,7 @@ fn expected_artifact_splice_preview_releases_opt_in_reads_and_runs_exact_twice()
     let expected_len = u64::try_from(expected.len()).expect("fixture output length fits u64");
     let expected_hash = SourceArtifactFingerprint::from_sha256(digest(&expected));
     let mut output = Vec::new();
-    plan.write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+    plan.write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect("expected-artifact splice publication must succeed");
     assert_eq!(output, expected);
 
@@ -1175,7 +1175,7 @@ fn retained_source_artifact_does_not_pin_the_read_ahead_window() {
     );
     let mut saved = Vec::new();
     artifact
-        .write_to_stream(&mut saved)
+        .write_to(&mut saved)
         .expect("retained source artifact must remain usable");
     assert_eq!(saved, archive_bytes());
 }

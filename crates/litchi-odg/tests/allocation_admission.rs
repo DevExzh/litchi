@@ -211,7 +211,7 @@ fn flat_public_path_rejects_oversized_attribute_before_decode_ownership() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(input);
+    let result = FlatDrawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -240,7 +240,7 @@ fn flat_public_path_rejects_oversized_text_before_decode_ownership() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(input);
+    let result = FlatDrawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -271,7 +271,7 @@ fn flat_public_path_rejects_oversized_unknown_prefix_before_resolution() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(input);
+    let result = FlatDrawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -303,7 +303,7 @@ fn flat_public_path_rejects_oversized_namespace_declaration_before_registration(
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(input);
+    let result = FlatDrawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -343,7 +343,7 @@ fn flat_public_path_rejects_deep_nesting_before_reader_stack_growth() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(input);
+    let result = FlatDrawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {

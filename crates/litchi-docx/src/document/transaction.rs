@@ -609,7 +609,7 @@ pub enum Error {
     /// The patch target no longer has the exact source bytes captured by the
     /// edit.
     #[error("document patch source is stale")]
-    StaleSource,
+    PatchConflict,
     /// A semantic durable operation's expected value did not match source.
     #[error("document patch semantic precondition does not match")]
     SemanticPrecondition,
@@ -3264,7 +3264,7 @@ impl Edit {
                     .into());
                 }
                 if before != &base_text {
-                    return Err(Error::StaleSource);
+                    return Err(Error::PatchConflict);
                 }
             }
         }
@@ -3520,7 +3520,7 @@ impl Edit {
             })?;
             scan_admission.release_depth();
             if owner.text != *before {
-                return Err(Error::StaleSource);
+                return Err(Error::PatchConflict);
             }
             let (_, owner_fragment_bytes) = preflight_text_owner_rewrite(paragraph, &owner, after)?;
             fragment_bytes =
@@ -3985,7 +3985,7 @@ impl Edit {
                         .into());
                     }
                     if before != &base_text {
-                        return Err(Error::StaleSource);
+                        return Err(Error::PatchConflict);
                     }
                 }
             }
@@ -5509,7 +5509,7 @@ impl Edit {
     ) -> Result<&mut Self> {
         self.ensure_unmanaged("insert_paragraph_transfer")?;
         if plan.target.as_slice() != self.base.xml_bytes() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         self.insert_transferred_paragraph(
             position,
@@ -6726,11 +6726,11 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::StaleSource`] when `source` does not match
+    /// Returns [`Error::PatchConflict`] when `source` does not match
     /// the exact bytes against which this patch was produced.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if !self.is_noop() {
             self.after.clone()
@@ -14728,7 +14728,7 @@ mod tests {
         let stale = Snapshot::from_xml(document("<w:p><w:r><w:t>other</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             commit.patch().apply(&stale),
-            Err(Error::StaleSource)
+            Err(Error::PatchConflict)
         ));
     }
 
@@ -14964,7 +14964,7 @@ mod tests {
             Snapshot::from_xml(document("<w:p><w:r><w:t>different</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             noop.commit().unwrap().patch().apply(&stale),
-            Err(Error::StaleSource)
+            Err(Error::PatchConflict)
         ));
     }
 
@@ -15501,7 +15501,7 @@ mod tests {
         let stale = Snapshot::from_xml(document("<w:p><w:r><w:t>other</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             stale.apply_durable(&decoded),
-            Err(Error::StaleSource)
+            Err(Error::PatchConflict)
         ));
     }
 

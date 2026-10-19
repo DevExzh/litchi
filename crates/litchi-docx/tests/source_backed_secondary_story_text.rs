@@ -902,7 +902,7 @@ fn secondary_patches_reject_stale_and_foreign_snapshots() {
     let commit = edit.commit().unwrap();
     assert!(matches!(
         commit.patch().apply(commit.snapshot()),
-        Err(source_backed::StoryTextError::StaleSource)
+        Err(source_backed::StoryTextError::PatchConflict)
     ));
     let foreign = open(&source)
         .story_text_snapshot(StorySelector::footnote(41))

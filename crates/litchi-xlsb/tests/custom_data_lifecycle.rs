@@ -22,8 +22,8 @@ use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, XmlPart};
 use litchi_xlsb::Package;
 use litchi_xlsb::custom_data::{
-    Commit, CustomData, Limits, Patch, Properties, RemovalDisposition, Snapshot, StorageId,
-    StorageSelector, Transaction, write_properties,
+    Commit, CustomData, Edit, Limits, Patch, Properties, RemovalDisposition, Snapshot, StorageId,
+    StorageSelector, write_properties,
 };
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Encoder, Kind, kind as rt};
@@ -250,7 +250,7 @@ fn synthetic_fixture(
 
     let mut package_bytes = Vec::new();
     package
-        .to_stream(&mut package_bytes)
+        .write_to(&mut package_bytes)
         .expect("synthetic source package serializes");
     let package = Package::from_bytes(&package_bytes)
         .expect("synthetic XLSB custom-data graph reopens with source provenance");
@@ -477,7 +477,7 @@ fn public_custom_data_crud_reads_typed_properties_and_inert_bytes() {
     assert!(!snapshot.has_opaque_reference_candidates());
 
     let properties: Properties = storage.properties().clone();
-    let mut transaction: Transaction = package.edit_custom_data().expect("public edit transaction");
+    let mut transaction: Edit = package.edit_custom_data().expect("public edit transaction");
     let replacement = CustomData {
         properties,
         data: b"replacement".to_vec(),

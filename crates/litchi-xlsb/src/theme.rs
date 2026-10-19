@@ -151,8 +151,8 @@ impl Snapshot {
 
     /// Start a detached source-checked edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             staged: self.theme.as_ref().clone(),
             staged_family: self.family.clone(),
@@ -228,9 +228,9 @@ impl View {
     /// The detached transaction copies only this bounded Theme XML part;
     /// the source-backed view itself continues to retain its managed payload
     /// reservation.
-    pub fn edit(&self) -> Result<Transaction> {
+    pub fn edit(&self) -> Result<Edit> {
         let source_xml = copy_bytes(self.source.as_bytes(), "Theme transaction source")?;
-        Ok(Transaction {
+        Ok(Edit {
             before: Snapshot {
                 theme: Arc::clone(&self.theme),
                 family: self.family.clone(),
@@ -246,13 +246,13 @@ impl View {
 
 /// A detached, source-checked Theme draft.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     staged: Theme,
     staged_family: Option<Family>,
 }
 
-impl Transaction {
+impl Edit {
     /// Snapshot used for stale-source checks.
     #[must_use]
     pub fn before(&self) -> &Snapshot {

@@ -61,7 +61,7 @@ fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
     }
     package.get_part_mut(&uri).unwrap().set_blob(blob);
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 

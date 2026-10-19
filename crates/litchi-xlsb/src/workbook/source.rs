@@ -1218,11 +1218,7 @@ impl SourceBackedWorkbook {
                 .topology(&self.inner.package)
                 .map_err(publication_error)?
                 .publish_to_stream(writer)?,
-            None => self
-                .inner
-                .package
-                .source_artifact()
-                .write_to_stream(writer)?,
+            None => self.inner.package.source_artifact().write_to(writer)?,
         }
         Ok(())
     }

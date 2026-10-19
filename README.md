@@ -4,7 +4,7 @@
   <img src="media/litchi_logo.png" alt="Litchi Logo" width="200"/>
 </p>
 
-A high-performance Rust library for parsing Microsoft Office file formats (OLE2 and OOXML), OpenDocument formats (ODF), and Apple iWork files. Supports .doc, .docx, .xls, .xlsx, .ppt, .pptx, .odt, .ods, .odp, .pages, .numbers, and .key files.
+A high-performance Rust library for reading and writing Microsoft Office file formats (OLE2 and OOXML), OpenDocument formats (ODF), RTF, and Apple iWork files. Supports .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx, .rtf, .odt, .ods, .odp, .oth, .odm, .odg, .odc, .odi, .odb, .odf, .pages, .numbers, and .key files.
 
 > [!WARNING]
 > ⚠️ **Active Development**: This library is under active development. The API may change without notice. **Not recommended for production use yet.**
@@ -14,11 +14,11 @@ A high-performance Rust library for parsing Microsoft Office file formats (OLE2 
 
 ## Features
 
-- **Complete CRUD Operations** - Create, read, update, and save Office documents (.docx, .xlsx, .pptx) through the per-format modules
-- **Unified API** - `litchi::open` reads legacy, OOXML, and OpenDocument files into one `File` type, detecting the format from the content, with typed errors that carry a stable code and a suggestion; integrated formats expose immutable edits and batches, with support reported by `capabilities()`
-- **Microsoft Office** - Full support for .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx files
-- **OpenDocument** - Parse .odt, .ods, .odp files (ODF format)
-- **Apple iWork** - Independently parse .pages, .numbers, and .key files through dedicated format leaves
+- **Unified API** - `litchi::open` opens every supported format into one `File` type, detecting the format from the content. Every format reads and writes through `File`: paths, queries and views; immutable `set`, `add`, `remove`, `move_to` and `swap`; transactions with exact inverse patches; batches; `save`, `to_bytes` and `create`. Errors are typed and carry a stable code and a suggestion, and `capabilities()` reports what each handle supports
+- **Microsoft Office** - .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx and .rtf files
+- **OpenDocument** - .odt, .ods, .odp, and the .oth, .odm, .odg, .odc, .odi, .odb and .odf formula formats
+- **Apple iWork** - .pages, .numbers, and .key packages and app-authored package directories
+- **Per-format modules** - each format crate is re-exported for format-specific reading and writing
 - **Formula Conversion** - Parse MathType and Office MathML equations and convert to LaTeX
 - **Markdown Conversion** - Convert documents and presentations to Markdown format
 - **Memory Efficient** - Direct byte buffer support with zero-copy parsing where possible
@@ -34,8 +34,9 @@ opt-in feature is enabled.
 OOXML ingestion is bounded by `litchi_opc::SourceLimits`. The standard profile is
 used by ordinary open methods; applications that receive untrusted or
 multi-tenant input can derive a tighter checked profile with
-`SourceLimits::builder()` and pass it to the contextual DOCX, PPTX, XLSX, or XLSB
-`*_with_limits` entry point. The policy covers package input, ZIP members and
+`SourceLimits::builder()` and pass it through the format's `OpenOptions` to
+`open_with_options` or `from_bytes_with_options` (or through
+`litchi::OpenOptions` to `litchi::open_with`). The policy covers package input, ZIP members and
 metadata, materialized OPC parts, `[Content_Types].xml`, and relationship XML
 and graph traversal. It implements the defensive-consumer concerns in
 ECMA-376 Part 2 sections 7.3.6 and 10, together with MS-OI29500 sections
@@ -151,8 +152,7 @@ A signed OOXML or legacy binary file opens as `File::Signed`. It reads like
 any other file, and nothing is verified when it opens. So that no edit can
 strip a signature silently, editing a signed file requires removing the
 signature explicitly first: `Signed::unsign` consumes the signature and
-returns the file. (The unified edit verbs themselves are not available yet;
-see below.)
+returns the file.
 
 ```rust
 use litchi::File;
@@ -205,20 +205,30 @@ The codes that opening and reading report most often:
 | `unsupported_capability` | The format cannot do what was asked, such as Markdown output of a workbook or unlocking an encrypted XLSB package. |
 | `cancelled` | The execution context in `OpenOptions` was cancelled. |
 
-### What the unified API does not do yet
+### Editing through `File`
 
-- **Editing.** `File` reads; it does not write. The unified edit verbs
-  (`set`, `add`, `remove`, batches, `save`, `create`) and path queries are
-  planned for later releases. Until then, write documents through the
-  per-format modules shown below.
-- **Apple iWork.** `litchi::open` opens Pages, Keynote, and Numbers packages
-  and app-authored package directories as `File::Pages`, `File::Keynote`, and
-  `File::Numbers`; a directory saves back as a directory. The
-  `litchi::pages`, `litchi::keynote`, and `litchi::numbers` modules expose the
-  leaf owners.
-- **Other OpenDocument formats.** Drawings, charts, images, databases,
-  templates, masters, and formulas (`.odg`, `.odc`, `.odi`, `.odb`, `.oth`,
-  `.odm`, `.odf`) are not opened by `litchi::open` yet.
+Every format writes through `File`. The verbs take `&self` and return a new
+`File`; the input never changes. Several edits form one transaction through
+`File::edit`, whose patch inverts exactly. A snapshot saves to its origin with
+`save()`, to another path with `save_as`, or to memory with `to_bytes()`.
+
+```rust
+use litchi::{FileFormat, NewNode, props};
+
+let file = litchi::open("report.docx")?;
+let file = file.set("/body/p[1]", props! { "text" => "Revised text" })?;
+let added = file.add("/body", NewNode::new("paragraph").prop("text", "Appendix"))?;
+added.file.save_as("report-revised.docx")?;
+
+// A new file starts from `create`.
+let book = litchi::create(FileFormat::Xlsx)?;
+let book = book.set("/Sheet1/A1", props! { "value" => 42 })?;
+book.save_as("new.xlsx")?;
+```
+
+Not every element supports every verb in every format.
+`file.capabilities()` lists what the handle supports; anything else fails with
+`unsupported_capability` instead of writing part of a change.
 
 ### Creating and Writing Documents
 
@@ -228,7 +238,7 @@ function that returns `Result<(), Box<dyn std::error::Error + Send + Sync>>`.
 
 ```rust
 use litchi::docx::Builder;
-use litchi::pptx::Package as PptxPackage;
+use litchi::pptx::builder::Builder as PptxBuilder;
 use litchi::xlsx::Package as XlsxPackage;
 
 // Create Word document
@@ -247,11 +257,11 @@ edit.sheet("Sheet1")?
 edit.commit()?.into_package().save("output.xlsx")?;
 
 // Create PowerPoint presentation
-let mut pkg = PptxPackage::new()?;
-let pres = pkg.presentation_mut()?;
-let slide = pres.add_slide()?;
-slide.set_title("My Presentation");
-pkg.save("output.pptx")?;
+let mut builder = PptxBuilder::new()?;
+builder.presentation()?
+    .add_slide()?
+    .add_text_box("My Presentation", 0, 0, 914_400, 914_400);
+builder.build()?.save("output.pptx")?;
 ```
 
 ### Additional Format Support
@@ -362,24 +372,18 @@ Buffer values.
 
 ## Current Status
 
-**Fully Implemented:**
-- ✅ **Unified Reading** - `litchi::open` and `File` for .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx, .rtf, .odt, .ods, .odp, including encrypted (`Locked`) and signed (`Signed`) files
-- ✅ **CRUD Operations** - Create, read, and update .docx, .xlsx, .pptx files
-- ✅ **Reading** - Full support for .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx
-- ✅ **Writing** - Document creation and modification for OOXML formats
-- ✅ **Text & Formatting** - Paragraphs, runs, tables, cells, basic styling
-- ✅ **OpenDocument** - Read .odt, .ods, .odp files
-- ✅ **Apple iWork** - Read .pages, .numbers, .key files  
+**Implemented:**
+- ✅ **Unified reading and writing** - `litchi::open`, `litchi::create` and `File` for all 21 formats (.doc, .docx, .rtf, .odt, .oth, .odm, .ppt, .pptx, .odp, .xls, .xlsx, .xlsb, .ods, .odg, .odc, .odi, .odb, .odf, .pages, .key, .numbers), including encrypted (`Locked`) and signed (`Signed`) files
+- ✅ **Paths, queries and views** - path addressing, selector queries, outline/text/JSON views and `capabilities()`
+- ✅ **Immutable edits** - `set`, `add`, `remove`, `move_to`, `swap`, transactions with exact inverse patches, and batches
+- ✅ **Text & Formatting** - Paragraphs, runs, tables, cells, styles, numbering, comments, hyperlinks, pictures, charts
+- ✅ **Engines** - find/replace, template merge, field refresh, CSV/TSV import and formula evaluation
 - ✅ **Formula Parsing** - MathType and Office MathML to LaTeX conversion
 - ✅ **Markdown Export** - Convert documents and presentations to Markdown
 
 **In Progress:**
-- 🟡 Unified editing: `set`, `add`, `remove`, batches, and `save` on `File`, with path queries
-- 🟡 The remaining OpenDocument formats through `litchi::open`
-- 🟡 Advanced formatting (cell styles, conditional formatting)
-- 🟡 Charts and embedded objects
-- 🟡 Headers, footers, comments
-- 🟡 Document protection and security features
+- 🟡 Element and property coverage beyond the P0 set; `capabilities()` lists each handle's typed gaps
+- 🟡 Advanced formatting (conditional formatting rules, SmartArt layout) in every format
 
 See [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md) for a detailed feature comparison with Apache POI.
 

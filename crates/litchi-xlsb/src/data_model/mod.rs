@@ -27,7 +27,7 @@ pub use model::{
 pub use package::{DATA_MODEL_CONTENT_TYPE, DATA_MODEL_PART_NAME};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::Transaction;
+pub use transaction::Edit;
 
 pub(crate) use package::{
     validate_definition_connections, validate_model_for_write, validate_model_payload_and_groupings,

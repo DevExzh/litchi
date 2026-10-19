@@ -1654,7 +1654,7 @@ fn raw_transfer_rebases_owner_target_and_allocates_a_free_id() {
     assert!(!raw::put(&mut destination, &graph).unwrap());
     assert!(destination.is_signed());
     let mut bytes = Vec::new();
-    destination.to_stream(&mut bytes).unwrap();
+    destination.write_to(&mut bytes).unwrap();
     let reopened = OpcPackage::from_bytes(&bytes).unwrap();
     assert_eq!(
         raw::load(&reopened).unwrap().unwrap().owner_main_part(),

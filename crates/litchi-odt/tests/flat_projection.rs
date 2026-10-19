@@ -15,7 +15,7 @@ fn fixture() -> Vec<u8> {
 #[test]
 fn an_edit_of_the_projection_republishes_into_the_flat_bytes() {
     let source = fixture();
-    let flat = Document::from_bytes(source.clone()).unwrap();
+    let flat = Document::from_bytes(&source).unwrap();
     let package = flat.to_package().unwrap();
     let document = package.document().unwrap();
     assert!(document.text().unwrap().contains("body text"));

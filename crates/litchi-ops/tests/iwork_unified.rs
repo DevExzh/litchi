@@ -518,3 +518,32 @@ mod directories {
         );
     }
 }
+
+/// ADR 0034 §7: Keynote and Numbers metadata writes are a typed unsupported
+/// capability until their native acceptance gates pass (record 0343).
+#[cfg(all(feature = "keynote", feature = "numbers"))]
+mod iwork_metadata_write {
+    use super::*;
+
+    #[test]
+    fn keynote_and_numbers_refuse_metadata_writes_typed() {
+        for path in ["keynote/basic.key", "numbers/basic.numbers"] {
+            let file = read(path);
+            let before = file.to_bytes().expect("publish");
+            let error = file
+                .set("/", props! { "title" => "Renamed" })
+                .expect_err("metadata write must be refused");
+            assert!(
+                matches!(
+                    error.code(),
+                    Code::UnsupportedCapability
+                        | Code::UnsupportedElement
+                        | Code::UnsupportedProperty
+                ),
+                "{path}: {:?}",
+                error.code()
+            );
+            assert_eq!(file.to_bytes().expect("publish"), before, "{path}");
+        }
+    }
+}

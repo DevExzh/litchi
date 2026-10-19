@@ -1112,7 +1112,7 @@ fn raw_signature_non_part_materialization_is_owned_mutation_locked() {
         .unwrap()
         .set_blob(b"<after/>".to_vec());
     let mut output = Vec::new();
-    let error = changed.to_stream(&mut output).unwrap_err();
+    let error = changed.write_to(&mut output).unwrap_err();
     assert!(matches!(
         error,
         OpcError::SignedSourceRequiresExplicitPolicy
@@ -1707,7 +1707,7 @@ fn prepared_materialization_preserves_signature_and_non_part_policy() {
             .set_blob(b"<after/>".to_vec());
         let mut output = Vec::new();
         assert!(matches!(
-            owned.to_stream(&mut output),
+            owned.write_to(&mut output),
             Err(OpcError::SignedSourceRequiresExplicitPolicy)
         ));
         assert!(output.is_empty());

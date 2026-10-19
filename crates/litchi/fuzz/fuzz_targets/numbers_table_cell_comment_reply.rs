@@ -547,7 +547,7 @@ fn exercise_thread(
 fn verify_edit_commit(
     package: &Package,
     source_bytes: &[u8],
-    result: Result<litchi::numbers::cell::comment::reply::Commit, Error>,
+    result: Result<litchi::numbers::cell::comment::transaction::Commit, Error>,
 ) {
     match result {
         Ok(commit) => {
@@ -604,7 +604,7 @@ fn verify_edit_commit(
 fn observe_atomic_failure(
     package: &Package,
     source_bytes: &[u8],
-    result: Result<litchi::numbers::cell::comment::reply::Commit, Error>,
+    result: Result<litchi::numbers::cell::comment::transaction::Commit, Error>,
 ) {
     match result {
         Ok(commit) => verify_edit_commit(package, source_bytes, Ok(commit)),

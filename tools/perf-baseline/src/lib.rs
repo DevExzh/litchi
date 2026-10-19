@@ -17173,7 +17173,7 @@ fn restore_docx_source_edit_v1(bytes: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>
     }
     part.set_blob(xml.replace(LOCAL, "<w:sectPr>").into_bytes());
     let mut restored = Vec::new();
-    package.to_stream(&mut restored)?;
+    package.write_to(&mut restored)?;
     if sha256_hex(&restored) != ORIGINAL {
         return Err("DOCX v1 fixture restoration changed historical archive bytes".into());
     }
@@ -51578,7 +51578,7 @@ fn run_pptx_cross_copy(
         sink.reserve_budget()?;
         let destination_opc = destination.opc()?;
         let started = Instant::now();
-        destination_opc.to_stream(&mut sink)?;
+        destination_opc.write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         if sink.bytes != corpus.expected_output
             || sink.summary().accepted_bytes != u64::try_from(sink.bytes.len())?
@@ -51643,7 +51643,7 @@ fn run_pptx_cross_copy(
         return Err("PPTX cross-copy measured output digests are not stable".into());
     }
     let cross_copy = PptxCrossCopySummary {
-        implementation: "opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream",
+        implementation: "opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::write_to",
         timing_scope: "plan only; commit only; OPC sequential publication only; setup, reopen, semantic/package/closure/refusal verification excluded",
         performance_claim: "none: opt-in correctness/evidence only; no release ABBA, speedup, allocation, RSS, or physical-I/O claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
@@ -51688,7 +51688,7 @@ fn run_pptx_cross_copy(
 /// Measure the complete owned PPTX cross-copy lifecycle. The input Vec clones
 /// and bounded sink reservation happen before both brackets. `lifecycle_ns`
 /// and the allocator observation begin immediately before `Package::from_vec`
-/// ingress and end immediately after final `OpcPackage::to_stream`
+/// ingress and end immediately after final `OpcPackage::write_to`
 /// publication. Plan/commit/publication vectors are nested phase diagnostics;
 /// reopen, semantic/package/closure/refusal validation, and source immutability
 /// checks happen after the brackets. Package and sink teardown also happens
@@ -51790,7 +51790,7 @@ fn run_pptx_cross_copy_lifecycle(
         let commit_duration = commit_started.elapsed();
 
         let publication_started = Instant::now();
-        destination.opc()?.to_stream(&mut sink)?;
+        destination.opc()?.write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
@@ -51903,7 +51903,7 @@ fn run_pptx_cross_copy_lifecycle(
     reorder_sample_vector(&mut reopen_ns, &sample_order)?;
     reorder_sample_vector(&mut output_digests, &sample_order)?;
     let cross_copy = PptxCrossCopySummary {
-        implementation: "Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream",
+        implementation: "Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::write_to",
         timing_scope: "lifecycle_ns and operation_metrics cover owned source/destination ingress, opened snapshots, plan, atomic cross-copy commit, and final OPC sequential publication; corpus clones and sink reservation are outside; plan/commit/publication are nested diagnostics; reopen and all semantic/package/closure/refusal/source checks are outside",
         performance_claim: "none: opt-in correctness, lifecycle, and operation-allocation evidence only; no release ABBA, speedup, RSS, physical-I/O, or full-retention memory claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
@@ -54938,7 +54938,7 @@ fn publish_xlsx_sheet_protection_edit<W: Write>(
             &metadata,
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -55234,7 +55234,7 @@ fn publish_xlsx_auto_filter_edit<W: Write>(
             Some(&value),
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -56488,7 +56488,7 @@ fn publish_xlsx_conditional_formatting_edit<W: Write>(
             0,
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -56697,7 +56697,7 @@ fn publish_xlsx_data_validation_edit<W: Write>(
             &values,
         )?;
         opc.get_part_mut(&worksheet_uri)?.set_blob(updated);
-        PackageWriter::write_to_stream(writer, &opc)?;
+        PackageWriter::write_to(writer, &opc)?;
         Ok(materializations)
     }
 }
@@ -57763,7 +57763,7 @@ fn run_opc_noop_save(
         sink.reserve_budget()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        PackageWriter::write_to_stream(&mut sink, &package)?;
+        PackageWriter::write_to(&mut sink, &package)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         record_default_operation(
@@ -57821,8 +57821,8 @@ fn run_provider_nonseek_write(
     }
     let mut provider = ProviderAxisSummary {
         axis: "non_seek_sink",
-        implementation: "PackageWriter::write_to_stream + CountingSink",
-        timing_scope: "PackageWriter::write_to_stream into a pre-reserved non-seek sink; corpus parsing, exact-byte oracle, and sink finalization are outside elapsed_ns",
+        implementation: "PackageWriter::write_to + CountingSink",
+        timing_scope: "PackageWriter::write_to into a pre-reserved non-seek sink; corpus parsing, exact-byte oracle, and sink finalization are outside elapsed_ns",
         sample_order: sample_order.clone(),
         simulation_config: None,
         logical_counter_scope: "not_applicable: owned OPC package is already in memory",
@@ -57884,7 +57884,7 @@ fn run_opc_mutated_save(
         sink.reserve_budget()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        PackageWriter::write_to_stream(&mut sink, &package)?;
+        PackageWriter::write_to(&mut sink, &package)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         record_default_operation(

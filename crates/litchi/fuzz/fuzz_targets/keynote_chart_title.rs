@@ -183,7 +183,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
         // source-byte no-op rather than normalizing that hidden wire state.
         0 if before.is_none() => edit.clear(),
         0 => edit.set(before.as_deref().unwrap_or_default()),
-        1 => edit.set(distinct_title(before.as_deref(), data).as_ref()),
+        1 => edit.set(distinct_title(before.as_deref(), data).as_str()),
         2 => edit.clear(),
         _ => edit.set(""),
     };

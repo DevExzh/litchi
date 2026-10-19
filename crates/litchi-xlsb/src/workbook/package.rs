@@ -124,16 +124,16 @@ impl Workbook {
     }
 
     /// Start a detached source-bound Custom Data transaction.
-    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package(self.package.clone())
+    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Edit> {
+        crate::custom_data::Edit::from_package(self.package.clone())
     }
 
     /// Start a detached Custom Data transaction with an explicit finite policy.
     pub fn edit_custom_data_with_limits(
         &self,
         limits: crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package_with_limits(self.package.clone(), limits)
+    ) -> Result<crate::custom_data::Edit> {
+        crate::custom_data::Edit::from_package_with_limits(self.package.clone(), limits)
     }
 
     /// Start a detached Custom Data transaction with an owned execution context.
@@ -141,8 +141,8 @@ impl Workbook {
         &self,
         limits: crate::custom_data::Limits,
         context: ExecutionContext,
-    ) -> Result<crate::custom_data::Transaction> {
-        crate::custom_data::Transaction::from_package_with_limits_and_context(
+    ) -> Result<crate::custom_data::Edit> {
+        crate::custom_data::Edit::from_package_with_limits_and_context(
             self.package.clone(),
             limits,
             Some(context),
@@ -188,7 +188,7 @@ impl Workbook {
     }
 
     /// Start a detached edit of the workbook Theme part.
-    pub fn edit_theme(&self) -> Result<crate::theme::Transaction> {
+    pub fn edit_theme(&self) -> Result<crate::theme::Edit> {
         let snapshot = self
             .theme_with_limits(crate::theme::Limits::DEFAULT)?
             .ok_or_else(|| {
@@ -203,7 +203,7 @@ impl Workbook {
     pub fn edit_theme_with_limits(
         &self,
         limits: crate::theme::Limits,
-    ) -> Result<crate::theme::Transaction> {
+    ) -> Result<crate::theme::Edit> {
         let snapshot = self.theme_with_limits(limits)?.ok_or_else(|| {
             crate::package::error::Error::UnsupportedFeature(
                 "cannot edit an absent Theme part through a present-only snapshot".to_string(),
@@ -1026,7 +1026,7 @@ impl Workbook {
 
     /// Workbook style table loaded from `xl/styles.bin`.
     pub fn save<W: Write + Seek>(&self, writer: W) -> Result<()> {
-        self.package.to_stream(writer)?;
+        self.package.write_to(writer)?;
         Ok(())
     }
 

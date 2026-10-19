@@ -511,7 +511,7 @@ fn native_packaged_fixture_contains_the_missing_number_particles() -> Result<()>
 
 #[test]
 fn native_flat_fixture_is_read_as_flat_and_retains_extension_lexemes() -> Result<()> {
-    let flat = FlatSpreadsheet::from_bytes(YIELDDISC_FODS.to_vec())?;
+    let flat = FlatSpreadsheet::from_bytes(YIELDDISC_FODS)?;
     assert_eq!(flat.as_bytes(), YIELDDISC_FODS);
     let source = std::str::from_utf8(flat.as_bytes())
         .map_err(|error| Error::InvalidFormat(format!("yielddisc UTF-8: {error}")))?;

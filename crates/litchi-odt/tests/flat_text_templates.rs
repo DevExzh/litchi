@@ -368,7 +368,7 @@ fn generic_and_specialized_template_metadata_preserve_exact_source_bytes() {
     assert_eq!(generic.to_bytes(), bytes);
     assert_eq!(generic.into_bytes(), TEMPLATE_XML.as_bytes());
 
-    let specialized = Document::from_bytes(template_bytes()).unwrap();
+    let specialized = Document::from_bytes(&template_bytes()).unwrap();
     assert_template_metadata(&specialized);
     assert_eq!(specialized.xml(), TEMPLATE_XML);
     assert_eq!(specialized.as_bytes(), TEMPLATE_XML.as_bytes());
@@ -379,7 +379,7 @@ fn generic_and_specialized_template_metadata_preserve_exact_source_bytes() {
     let generic_normal = FlatDocument::from_bytes(normal.as_bytes().to_vec()).unwrap();
     assert_normal_metadata(&generic_normal);
     assert_eq!(generic_normal.as_bytes(), normal.as_bytes());
-    let specialized_normal = Document::from_bytes(normal.as_bytes().to_vec()).unwrap();
+    let specialized_normal = Document::from_bytes(normal.as_bytes()).unwrap();
     assert_normal_metadata(&specialized_normal);
     assert_eq!(specialized_normal.as_bytes(), normal.as_bytes());
 }
@@ -825,7 +825,7 @@ fn malformed_and_non_text_template_flat_inputs_are_refused() {
         b"PK\x03\x04mimetype".to_vec(),
     ] {
         assert!(FlatDocument::from_bytes(malformed.clone()).is_err());
-        assert!(Document::from_bytes(malformed).is_err());
+        assert!(Document::from_bytes(&malformed).is_err());
     }
 
     for mimetype in [
@@ -843,12 +843,12 @@ fn malformed_and_non_text_template_flat_inputs_are_refused() {
             FlatDocument::from_bytes(bytes.clone()).is_err(),
             "accepted {mimetype}"
         );
-        assert!(Document::from_bytes(bytes).is_err(), "accepted {mimetype}");
+        assert!(Document::from_bytes(&bytes).is_err(), "accepted {mimetype}");
     }
 
     let wrong_body = flat_xml(ODF_TEXT_TEMPLATE, "spreadsheet");
     assert!(FlatDocument::from_bytes(wrong_body.clone()).is_err());
-    assert!(Document::from_bytes(wrong_body).is_err());
+    assert!(Document::from_bytes(&wrong_body).is_err());
 }
 
 #[test]
@@ -888,7 +888,7 @@ fn flat_template_ingress_accepts_exact_cap_and_rejects_cap_plus_one() {
 
 #[test]
 fn specialized_template_edit_no_op_change_inverse_and_stale_source_are_atomic() {
-    let source = Document::from_bytes(template_bytes()).unwrap();
+    let source = Document::from_bytes(&template_bytes()).unwrap();
     let no_op = source.edit().commit().unwrap();
     assert_eq!(no_op.document().as_bytes(), source.as_bytes());
     assert_template_metadata(no_op.document());
@@ -907,7 +907,7 @@ fn specialized_template_edit_no_op_change_inverse_and_stale_source_are_atomic() 
     assert_eq!(reverted.as_bytes(), source.as_bytes());
     assert_template_metadata(&reverted);
 
-    let normal = Document::from_bytes(normal_xml().into_bytes()).unwrap();
+    let normal = Document::from_bytes(&normal_xml().into_bytes()).unwrap();
     assert!(!normal.is_template());
     assert!(commit.patch().apply(&normal).is_err());
     assert_eq!(normal.as_bytes(), normal_xml().as_bytes());
@@ -938,7 +938,7 @@ fn specialized_template_output_limit_accepts_exact_output_and_rejects_one_over()
 #[test]
 fn formatted_template_no_op_is_exact_but_changed_edit_keeps_compactness_refusal() {
     let formatted = TEMPLATE_XML.replace("<o:body>", "\n<o:body>");
-    let source = Document::from_bytes(formatted.as_bytes().to_vec()).unwrap();
+    let source = Document::from_bytes(formatted.as_bytes()).unwrap();
     let no_op = source.edit().commit().unwrap();
     assert_eq!(no_op.document().as_bytes(), formatted.as_bytes());
     assert_template_metadata(no_op.document());
@@ -961,7 +961,7 @@ fn generic_and_specialized_template_saves_are_exact_and_suffix_neutral() {
     );
     assert_template_metadata(&FlatDocument::open(&generic_path).unwrap());
 
-    let specialized = Document::from_bytes(template_bytes()).unwrap();
+    let specialized = Document::from_bytes(&template_bytes()).unwrap();
     let specialized_path = directory.path().join("template.fott");
     specialized.save(&specialized_path).unwrap();
     assert_eq!(
@@ -976,7 +976,7 @@ fn generic_and_specialized_template_saves_are_exact_and_suffix_neutral() {
     let reopened = FlatDocument::open(&normal_path).unwrap();
     assert_normal_metadata(&reopened);
 
-    let normal_specialized = Document::from_bytes(normal_xml().into_bytes()).unwrap();
+    let normal_specialized = Document::from_bytes(&normal_xml().into_bytes()).unwrap();
     let normal_specialized_path = directory.path().join("normal-specialized.fott");
     normal_specialized.save(&normal_specialized_path).unwrap();
     assert_normal_metadata(&Document::open(&normal_specialized_path).unwrap());
@@ -1005,7 +1005,7 @@ fn cancelled_generic_and_specialized_saves_preserve_destinations_and_temps() {
 
     let specialized_destination = directory.path().join("cancelled-specialized.fott");
     std::fs::write(&specialized_destination, b"specialized-old").unwrap();
-    let specialized = Document::from_bytes(template_bytes()).unwrap();
+    let specialized = Document::from_bytes(&template_bytes()).unwrap();
     let (specialized_budget, specialized_cancel, specialized_context) =
         execution_context_with_memory(u64::MAX);
     specialized_cancel.cancel();
@@ -1043,7 +1043,7 @@ fn generic_and_specialized_saves_refuse_directory_destinations_without_mutation(
     let specialized_marker = specialized_destination.join("marker");
     std::fs::write(&specialized_marker, b"preserve").unwrap();
     assert!(
-        Document::from_bytes(template_bytes())
+        Document::from_bytes(&template_bytes())
             .unwrap()
             .save(&specialized_destination)
             .is_err()
@@ -1072,5 +1072,5 @@ fn packaged_ott_template_behavior_remains_package_owned() {
     assert_eq!(package.mimetype(), ODF_TEXT_TEMPLATE);
     assert_eq!(package.to_bytes(), bytes);
     assert!(FlatDocument::from_bytes(bytes.clone()).is_err());
-    assert!(Document::from_bytes(bytes).is_err());
+    assert!(Document::from_bytes(&bytes).is_err());
 }

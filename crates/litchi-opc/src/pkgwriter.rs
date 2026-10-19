@@ -1218,7 +1218,7 @@ impl PackageWriter {
         durability: Durability,
     ) -> Result<()> {
         crate::atomic::replace_with_durability(path.as_ref(), durability, |writer| {
-            Self::write_to_stream(writer, package)
+            Self::write_to(writer, package)
         })
     }
 
@@ -1236,7 +1236,7 @@ impl PackageWriter {
     /// invalid content type or partname) or if the sink rejects a write. When
     /// the sink has already accepted bytes, the error is wrapped in
     /// [`crate::OpcError::IncompleteOutput`] with the accepted byte count.
-    pub fn write_to_stream<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
+    pub fn write_to<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
         let mut written = 0_u64;
         let result = Self::write_counted(
             Counted {
@@ -2630,7 +2630,7 @@ mod tests {
 
         let mut streamed = Vec::new();
         package
-            .to_stream(&mut streamed)
+            .write_to(&mut streamed)
             .expect("stream exact source");
         assert_eq!(streamed, source);
     }
@@ -2652,7 +2652,7 @@ mod tests {
             Err(crate::OpcError::SignedSourceRequiresExplicitPolicy)
         ));
         let mut output = Vec::new();
-        let error = PackageWriter::write_to_stream(&mut output, &package)
+        let error = PackageWriter::write_to(&mut output, &package)
             .expect_err("changed signed source must be rejected");
         assert!(matches!(
             error,
@@ -2679,7 +2679,7 @@ mod tests {
         assert!(!package.is_signed(), "generic removal emptied the graph");
 
         let mut output = Vec::new();
-        let error = PackageWriter::write_to_stream(&mut output, &package)
+        let error = PackageWriter::write_to(&mut output, &package)
             .expect_err("generic removal must not authorize signature stripping");
         assert!(matches!(
             error,
@@ -2700,7 +2700,7 @@ mod tests {
             Err(crate::OpcError::SignedSourceRequiresExplicitPolicy)
         ));
         let mut output = Vec::new();
-        let error = PackageWriter::write_to_stream(&mut output, &package)
+        let error = PackageWriter::write_to(&mut output, &package)
             .expect_err("borrowed signed source must not normalize signatures");
         assert!(matches!(
             error,
@@ -2779,7 +2779,7 @@ mod tests {
             limit: EXACT_SOURCE_CHUNK_BYTES,
         };
 
-        PackageWriter::write_to_stream(&mut sink, &package).expect("stream exact source");
+        PackageWriter::write_to(&mut sink, &package).expect("stream exact source");
 
         assert_eq!(sink.total, source.len());
         assert!(sink.writes > 1);
@@ -2795,7 +2795,7 @@ mod tests {
             limit: 128,
         };
 
-        let error = PackageWriter::write_to_stream(sink, &package)
+        let error = PackageWriter::write_to(sink, &package)
             .expect_err("bounded sink must reject exact source");
 
         assert!(matches!(
@@ -3115,8 +3115,8 @@ mod tests {
             limit: 70_000,
         };
 
-        let error = PackageWriter::write_to_stream(sink, &package)
-            .expect_err("sink must reject targeted output");
+        let error =
+            PackageWriter::write_to(sink, &package).expect_err("sink must reject targeted output");
 
         assert!(matches!(
             error,
@@ -3142,7 +3142,7 @@ mod tests {
             limit: EXACT_SOURCE_CHUNK_BYTES,
         };
 
-        PackageWriter::write_to_stream(&mut sink, &package).expect("bounded targeted stream");
+        PackageWriter::write_to(&mut sink, &package).expect("bounded targeted stream");
 
         assert!(sink.total > 256 * 1024);
         assert!(sink.writes > 1);
@@ -3767,7 +3767,7 @@ mod tests {
                 .unwrap();
             assert_eq!(published, replacement.bytes(), "preserve={preserve}");
             let mut streamed = Vec::new();
-            PackageWriter::write_to_stream(&mut streamed, &package).unwrap();
+            PackageWriter::write_to(&mut streamed, &package).unwrap();
             assert_eq!(streamed, output, "preserve={preserve}");
         }
     }
@@ -3804,7 +3804,7 @@ mod tests {
             .set_blob(b"changed".to_vec());
 
         let mut output = Vec::new();
-        let error = PackageWriter::write_to_stream(&mut output, &package)
+        let error = PackageWriter::write_to(&mut output, &package)
             .expect_err("unsupported source framing must be rejected");
         assert!(matches!(
             error,
@@ -3823,7 +3823,7 @@ mod tests {
         package.set_save_options(options);
 
         let mut output = Vec::new();
-        let error = PackageWriter::write_to_stream(&mut output, &package)
+        let error = PackageWriter::write_to(&mut output, &package)
             .expect_err("unsupported source framing must be rejected");
         assert!(matches!(
             error,
@@ -3890,7 +3890,7 @@ mod tests {
         assert_eq!(reopened.get_part(&second).unwrap().blob(), untouched_second);
 
         let mut output = Vec::new();
-        PackageWriter::write_to_stream(&mut output, &package).expect("targeted ZIP64 stream save");
+        PackageWriter::write_to(&mut output, &package).expect("targeted ZIP64 stream save");
         assert_eq!(output, PackageWriter::to_bytes(&package).unwrap());
     }
 
@@ -3904,7 +3904,7 @@ mod tests {
             .unwrap()
             .set_blob(b"ZIP64 changed before sink failure".to_vec());
 
-        let error = PackageWriter::write_to_stream(
+        let error = PackageWriter::write_to(
             FailAfter {
                 written: 0,
                 limit: 70_000,
@@ -3963,7 +3963,7 @@ mod tests {
         );
 
         let mut streamed = Vec::new();
-        PackageWriter::write_to_stream(&mut streamed, &package)
+        PackageWriter::write_to(&mut streamed, &package)
             .expect("targeted projected ZIP64 stream save");
         assert_eq!(streamed, output);
     }
@@ -4143,7 +4143,7 @@ mod tests {
                 largest: 0,
                 limit: usize::MAX,
             };
-            let Err(error) = PackageWriter::write_to_stream(&mut sink, &package) else {
+            let Err(error) = PackageWriter::write_to(&mut sink, &package) else {
                 panic!("{label} must be refused before publication");
             };
             assert!(
@@ -4184,7 +4184,7 @@ mod tests {
             limit: usize::MAX,
         };
 
-        let error = PackageWriter::write_to_stream(&mut sink, &package)
+        let error = PackageWriter::write_to(&mut sink, &package)
             .expect_err("authored XML must fail publication planning");
 
         assert!(matches!(
@@ -4319,7 +4319,7 @@ mod tests {
             limit: 64 * 1024,
         };
 
-        PackageWriter::write_to_stream(&mut sink, &package).expect("stream package");
+        PackageWriter::write_to(&mut sink, &package).expect("stream package");
 
         assert!(sink.total > 1024 * 1024);
         assert!(sink.writes > 1);
@@ -4334,7 +4334,7 @@ mod tests {
             limit: 128,
         };
 
-        let error = PackageWriter::write_to_stream(sink, &package)
+        let error = PackageWriter::write_to(sink, &package)
             .expect_err("bounded sink must reject the package");
 
         assert!(matches!(

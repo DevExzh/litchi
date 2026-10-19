@@ -688,7 +688,7 @@ impl Snapshot {
 }
 
 /// A detached transaction over an immutable package snapshot.
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     draft: Vec<Storage>,
     package: OpcPackage,
@@ -697,10 +697,10 @@ pub struct Transaction {
     connection_edits: BTreeMap<String, String>,
 }
 
-impl std::fmt::Debug for Transaction {
+impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("Transaction")
+            .debug_struct("Edit")
             .field("storages", &self.draft.len())
             .field("changed_connections", &self.connection_edits.len())
             .field("limits", &self.limits)
@@ -708,7 +708,7 @@ impl std::fmt::Debug for Transaction {
     }
 }
 
-impl Transaction {
+impl Edit {
     /// Start a detached transaction from a package clone.
     pub(crate) fn from_package(package: OpcPackage) -> Result<Self> {
         Self::from_package_with_limits_and_context(package, Limits::default(), None)

@@ -283,7 +283,7 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
     assert!(PartState::capture(package.get_part(&extension).unwrap()) == extension_state);
 
     let mut bytes = Vec::new();
-    PackageWriter::write_to_stream(&mut bytes, &package).unwrap();
+    PackageWriter::write_to(&mut bytes, &package).unwrap();
     let reopened = OpcPackage::from_vec(bytes).unwrap();
     assert_eq!(
         reopened.source_content_types().unwrap(),

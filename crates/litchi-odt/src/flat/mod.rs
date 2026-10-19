@@ -184,9 +184,9 @@ impl Document {
         })
     }
 
-    /// Validates owned flat ODT bytes with default finite limits.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+    /// Validates flat ODT bytes with default finite limits; the bytes are copied.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes.to_vec(), Limits::default())
     }
 
     /// Validates owned flat ODT bytes with caller-selected finite limits.

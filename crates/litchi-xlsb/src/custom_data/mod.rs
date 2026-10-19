@@ -17,7 +17,7 @@ pub use litchi_ooxml_common::custom_data::{
     parse_properties, validate_workbook_root, write_properties,
 };
 pub use model::{Part, Storage, StorageId, StorageSelector, StorageSelectorInput};
-pub use package::{Commit, Limits, Patch, Snapshot, Transaction};
+pub use package::{Commit, Edit, Limits, Patch, Snapshot};
 
 /// Result type for XLSB Custom Data operations.
 pub type Result<T> = crate::package::error::Result<T>;

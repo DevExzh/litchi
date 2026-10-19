@@ -608,7 +608,7 @@ fn expected_replay_artifact(deflated: bool) -> (Vec<u8>, u64, SourceArtifactFing
     let provider = ReplayProvider::new(FRAGMENT, ReplayMode::Exact);
     let plan = replay_plan(&package, provider, SourcePartSpliceLimits::default());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("reference replay publication must succeed");
     let length = output.len() as u64;
     let hash = SourceArtifactFingerprint::from_sha256(digest(&output));
@@ -685,7 +685,7 @@ fn replay_store_and_deflate_preserve_opaque_members_and_target_bytes() {
         );
         let mut output = Vec::new();
         let publication = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect("replay splice must publish");
 
         assert_eq!(target_bytes(&output), candidate(SOURCE, FRAGMENT));
@@ -737,7 +737,7 @@ fn replay_512_byte_window_handles_multi_window_source_and_payload() {
             )
             .expect("a 512-byte replay window must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("a multi-window replay must publish");
 
         assert_eq!(target_bytes(&output), expected);
@@ -773,7 +773,7 @@ fn replay_expected_artifact_accepts_exact_store_and_deflate_output() {
             SourcePartSpliceLimits::default(),
         );
         let mut output = Vec::new();
-        plan.write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        plan.write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
             .expect("the exact expected artifact must authorize publication");
         assert_eq!(output, expected);
     }
@@ -798,7 +798,7 @@ fn replay_expected_artifact_mismatch_writes_zero_bytes() {
             );
             let mut output = Vec::new();
             let error = plan
-                .write_to_stream_with_expected_artifact(&mut output, length, hash)
+                .write_to_with_expected_artifact(&mut output, length, hash)
                 .expect_err("an expected artifact mismatch must refuse publication");
             assert!(
                 matches!(error, OpcError::SourceArtifactMismatch { .. }),
@@ -823,7 +823,7 @@ fn replay_expected_artifact_preview_failure_keeps_caller_sink_empty() {
     );
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        .write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect_err("a preview reader failure must refuse publication");
     assert!(
         output.is_empty(),
@@ -858,7 +858,7 @@ fn replay_expected_artifact_charges_one_managed_output_artifact() {
         );
         let before = budget.used(Resource::OutputBytes);
         let mut output = Vec::new();
-        plan.write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        plan.write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
             .expect("the exact output ceiling must permit one artifact");
         assert_eq!(output, expected);
         assert_eq!(
@@ -880,7 +880,7 @@ fn replay_expected_artifact_change_during_measurement_writes_zero_bytes() {
     );
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        .write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect_err("a changed replay during actual measurement must be refused");
     assert!(
         matches!(
@@ -905,7 +905,7 @@ fn replay_expected_artifact_change_during_emission_is_incomplete() {
     );
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+        .write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect_err("a changed replay during emission must report incomplete output");
     assert!(
         matches!(error, OpcError::IncompleteOutput { .. }),
@@ -948,7 +948,7 @@ fn replay_expected_artifact_noop_releases_preview_memory_and_charges_once() {
         budget: budget.clone(),
         peak_memory: Arc::clone(&peak_memory),
     };
-    plan.write_to_stream_with_expected_artifact(&mut sink, expected_len, expected_hash)
+    plan.write_to_with_expected_artifact(&mut sink, expected_len, expected_hash)
         .expect("the exact no-op artifact must publish");
     assert_eq!(sink.bytes, source_archive);
     assert_eq!(
@@ -1014,7 +1014,7 @@ fn replay_opens_fresh_readers_for_candidate_measurement_and_emission() {
         "candidate verification needs one reader"
     );
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("replay publication must succeed");
     assert_eq!(
         provider.open_count(),
@@ -1155,7 +1155,7 @@ fn replay_provider_change_on_measurement_stops_before_sink_output() {
     assert_eq!(provider.open_count(), 1);
     let mut output = Vec::new();
     let error = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect_err("provider bytes changing for measurement must be refused");
     assert!(
         output.is_empty(),
@@ -1233,14 +1233,14 @@ fn concurrent_replay_publications_charge_one_window_per_live_reader() {
     thread::scope(|scope| {
         let first = scope.spawn(move || {
             let mut output = Vec::new();
-            let result = first_plan.write_to_stream(&mut output);
+            let result = first_plan.write_to(&mut output);
             (result, output)
         });
         provider.wait_until_first_publication_reader();
 
         let second = scope.spawn(move || {
             let mut output = Vec::new();
-            let result = second_plan.write_to_stream(&mut output);
+            let result = second_plan.write_to(&mut output);
             (result, output)
         });
         let (second_result, second_output) = second
@@ -1306,7 +1306,7 @@ fn replay_short_sink_reports_exact_partial_output() {
     let plan = replay_plan(&package, provider, SourcePartSpliceLimits::default());
     let mut sink = PrefixFailSink::new(19);
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("short sink must fail the replay publication");
     let written = match error {
         OpcError::IncompleteOutput { written, .. } => written,
@@ -1330,7 +1330,7 @@ fn replay_reader_error_during_publication_reports_accepted_output() {
         );
         let mut output = Vec::new();
         let error = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect_err("reader failure must refuse an incomplete publication");
         match error {
             OpcError::IncompleteOutput { written, source } => {
@@ -1433,7 +1433,7 @@ fn replay_source_change_after_sink_progress_is_incomplete() {
         mutated: false,
     };
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("source mutation during replay publication must fail");
     assert!(
         contains_source_change(&error),
@@ -1465,13 +1465,13 @@ fn prepared_replay_authenticates_late_length_and_hash_failures_in_every_pass() {
                     assert_eq!(provider.open_count(), 1);
                     let mut output = Vec::new();
                     let result = if expected_artifact {
-                        plan.write_to_stream_with_expected_artifact(
+                        plan.write_to_with_expected_artifact(
                             &mut output,
                             expected_len,
                             expected_hash,
                         )
                     } else {
-                        plan.write_to_stream(&mut output)
+                        plan.write_to(&mut output)
                     };
                     let error =
                         result.expect_err("every later replay pass must authenticate bytes");

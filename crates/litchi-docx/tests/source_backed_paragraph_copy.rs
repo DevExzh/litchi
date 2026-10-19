@@ -225,7 +225,7 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
     let stale = open(bytes(&foreign))
         .plain_paragraph_copy_snapshot()
         .unwrap();
-    assert!(matches!(durable.apply(&stale), Err(Error::StaleSource)));
+    assert!(matches!(durable.apply(&stale), Err(Error::PatchConflict)));
 
     let mut tampered = wire;
     tampered[58..62].copy_from_slice(&0u32.to_le_bytes());
@@ -252,7 +252,7 @@ fn empty_edit_is_an_exact_noop_and_stale_inverse_writes_nothing() {
     let mut inverse_output = Vec::new();
     assert!(matches!(
         foreign.publish_plain_paragraph_copy_inverse_to_stream(&mut inverse_output, &publication),
-        Err(Error::StaleSource)
+        Err(Error::PatchConflict)
     ));
     assert!(inverse_output.is_empty());
 }

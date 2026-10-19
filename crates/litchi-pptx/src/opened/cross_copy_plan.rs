@@ -1926,7 +1926,7 @@ fn build_candidate(
     }
     // A retained candidate archive is the serialization of this exact graph.
     // Both input packages were proved unchanged before this call -- semantic
-    // graph and serialized archive alike -- and `to_stream` is a deterministic
+    // graph and serialized archive alike -- and `write_to` is a deterministic
     // function of the package, so a fresh serialization reproduces the
     // retained bytes. The `debug_assert` re-derives exactly that on every
     // reuse in debug and test builds; a release build rests on the argument
@@ -2877,7 +2877,7 @@ fn is_xml_part(partname: &PackURI, content_type: &str) -> bool {
 
 /// Hash the exact serialized archive used for physical authorization.
 ///
-/// `OpcPackage::to_stream` is source-aware: an untouched package streams its
+/// `OpcPackage::write_to` is source-aware: an untouched package streams its
 /// retained source archive byte-for-byte (including ZIP ordering, compression,
 /// comments, and extra fields), while an authored or mutated package streams
 /// the complete checked OPC graph. Unknown non-Part members are refused before
@@ -2918,7 +2918,7 @@ fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<
 /// every memoized value.
 fn streamed_physical_revision(package: &OpcPackage, limits: Limits) -> Result<[u8; 32]> {
     let mut sink = ArchiveHashWriter::new(limits.max_patch_bytes());
-    let result = package.to_stream(&mut sink);
+    let result = package.write_to(&mut sink);
     if sink.exceeded {
         return Err(Error::EditLimit {
             kind: crate::opened::LimitKind::PatchBytes,
@@ -3151,7 +3151,7 @@ impl Write for BoundedVecWriter {
 /// second time.
 fn bounded_package_bytes(package: &OpcPackage, limit: usize) -> Result<(Vec<u8>, [u8; 32])> {
     let mut writer = BoundedVecWriter::new(limit);
-    let result = package.to_stream(&mut writer);
+    let result = package.write_to(&mut writer);
     if let Some(source) = writer.allocation_failure.take() {
         return Err(Error::Allocation {
             resource: "cross-slide candidate archive",

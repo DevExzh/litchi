@@ -78,7 +78,7 @@ fn with_states(bytes: &[u8], states: &[u32]) -> Vec<u8> {
         .set_blob(rewritten);
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize rewritten workbook");
     output
 }
@@ -170,7 +170,7 @@ fn with_null_relationship(bytes: &[u8], target_position: usize) -> Vec<u8> {
         .set_blob(rewritten);
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize null relationship package");
     output
 }
@@ -780,7 +780,7 @@ fn multi_window_active_relocation_is_an_explicit_capability_refusal() {
     assert!(inserted);
     package.get_part_mut(&uri).unwrap().set_blob(output);
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     for eager in [false, true] {
         let source = open_owner(&bytes, eager);
         let before = source.to_bytes().unwrap();

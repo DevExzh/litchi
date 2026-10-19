@@ -1233,7 +1233,7 @@ fn unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_out
     let mut output = Vec::new();
     let result = second_package.publish_document_commit_to_stream(&mut output, &commit);
     drop(second_package);
-    assert!(matches!(result, Err(TransactionError::StaleSource)));
+    assert!(matches!(result, Err(TransactionError::PatchConflict)));
     assert!(output.is_empty());
 }
 
@@ -2295,7 +2295,7 @@ fn managed_foreign_equal_main_xml_refuses_commit_before_output() {
     let mut output = Vec::new();
     let result = second_package.publish_document_commit_to_stream(&mut output, &commit);
     drop(second_package);
-    assert!(matches!(result, Err(TransactionError::StaleSource)));
+    assert!(matches!(result, Err(TransactionError::PatchConflict)));
     assert!(output.is_empty());
 
     drop(commit);

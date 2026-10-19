@@ -146,8 +146,8 @@ impl Snapshot {
 
     /// Start a detached, source-bound XML Maps transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Borrow the individual XML maps, or an empty slice when no catalog exists.

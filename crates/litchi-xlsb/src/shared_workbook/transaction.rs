@@ -78,8 +78,8 @@ impl Snapshot {
 
     /// Start a detached transaction against this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             base: self.clone(),
             catalog: self.catalog.clone(),
         }
@@ -96,12 +96,12 @@ impl Eq for Snapshot {}
 
 /// A detached, failure-atomic metadata transaction.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     base: Snapshot,
     catalog: Catalog,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the currently staged metadata graph.
     #[must_use]
     pub const fn catalog(&self) -> &Catalog {

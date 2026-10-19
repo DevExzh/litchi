@@ -26,7 +26,7 @@ fn flat_with_pages(page: &str, count: usize) -> String {
 
 #[test]
 fn flat_read_slides_notes_and_byte_exact_noop() {
-    let flat = FlatPresentation::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let flat = FlatPresentation::from_bytes(FLAT.as_bytes()).unwrap();
     assert_eq!(flat.slide_count(), 1);
     assert!(
         flat.slides()[0]
@@ -37,7 +37,7 @@ fn flat_read_slides_notes_and_byte_exact_noop() {
     assert_eq!(flat.as_bytes(), FLAT.as_bytes());
     assert_eq!(flat.to_bytes(), FLAT.as_bytes());
 
-    let notes = FlatPresentation::from_bytes(NOTES.as_bytes().to_vec()).unwrap();
+    let notes = FlatPresentation::from_bytes(NOTES.as_bytes()).unwrap();
     assert_eq!(notes.slide_count(), 2);
     assert_eq!(notes.slides()[0].notes().unwrap(), None);
     assert_eq!(
@@ -48,7 +48,7 @@ fn flat_read_slides_notes_and_byte_exact_noop() {
 
 #[test]
 fn flat_transaction_edits_one_slide_and_is_reversible() {
-    let flat = FlatPresentation::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let flat = FlatPresentation::from_bytes(FLAT.as_bytes()).unwrap();
     let source = flat.snapshot();
     let mut transaction = source.transaction();
     transaction
@@ -78,7 +78,7 @@ fn flat_transaction_preserves_self_closing_direct_notes() {
         r"<presentation:notes><draw:frame><draw:text-box><text:p>Remember to breathe</text:p></draw:text-box></draw:frame></presentation:notes>",
         r"<presentation:notes/>",
     );
-    let source = FlatPresentation::from_bytes(document.into_bytes())
+    let source = FlatPresentation::from_bytes(document.as_bytes())
         .unwrap()
         .snapshot();
     let mut transaction = source.transaction();
@@ -91,7 +91,7 @@ fn flat_transaction_preserves_self_closing_direct_notes() {
 #[test]
 fn flat_changed_publication_refuses_formatted_source_xml() {
     let formatted = FLAT.replace("<office:body>", "<office:body>\n");
-    let source = FlatPresentation::from_bytes(formatted.into_bytes())
+    let source = FlatPresentation::from_bytes(formatted.as_bytes())
         .unwrap()
         .snapshot();
     let mut transaction = source.transaction();
@@ -111,15 +111,15 @@ fn flat_rejects_wrong_family_packaged_garbage_and_unsafe_rewrite() {
         "application/vnd.oasis.opendocument.presentation",
         "application/vnd.oasis.opendocument.text",
     );
-    assert!(FlatPresentation::from_bytes(text.into_bytes()).is_err());
-    assert!(FlatPresentation::from_bytes(b"PK\x03\x04mimetype".to_vec()).is_err());
-    assert!(FlatPresentation::from_bytes(Vec::new()).is_err());
+    assert!(FlatPresentation::from_bytes(text.as_bytes()).is_err());
+    assert!(FlatPresentation::from_bytes(b"PK\x03\x04mimetype").is_err());
+    assert!(FlatPresentation::from_bytes(&[]).is_err());
 
     let unsupported = FLAT.replace(
         "</draw:page>",
         "<presentation:event-listeners/></draw:page>",
     );
-    let source = FlatPresentation::from_bytes(unsupported.into_bytes())
+    let source = FlatPresentation::from_bytes(unsupported.as_bytes())
         .unwrap()
         .snapshot();
     let mut transaction = source.transaction();
@@ -129,7 +129,7 @@ fn flat_rejects_wrong_family_packaged_garbage_and_unsafe_rewrite() {
     ));
 
     let self_closing_unmodeled = FLAT.replace("</draw:page>", "<draw:image/></draw:page>");
-    let source = FlatPresentation::from_bytes(self_closing_unmodeled.into_bytes())
+    let source = FlatPresentation::from_bytes(self_closing_unmodeled.as_bytes())
         .unwrap()
         .snapshot();
     let mut transaction = source.transaction();
@@ -149,7 +149,7 @@ fn flat_rejects_misparented_and_excessive_empty_or_nonempty_pages() {
             "<office:presentation></office:presentation><office:other>{page}</office:other>"
         ));
         assert!(matches!(
-            FlatPresentation::from_bytes(document.into_bytes()),
+            FlatPresentation::from_bytes(document.as_bytes()),
             Err(Error::InvalidFormat(message)) if message.contains("outside office:presentation")
         ));
     }
@@ -159,7 +159,7 @@ fn flat_rejects_misparented_and_excessive_empty_or_nonempty_pages() {
         r#"<draw:page draw:name="p"></draw:page>"#,
     ] {
         assert!(matches!(
-            FlatPresentation::from_bytes(flat_with_pages(page, 65_537).into_bytes()),
+            FlatPresentation::from_bytes(&flat_with_pages(page, 65_537).into_bytes()),
             Err(Error::InvalidFormat(message)) if message.contains("slide-count limit")
         ));
     }
@@ -173,7 +173,7 @@ fn flat_changed_publication_never_materializes_an_oversized_output() {
         document.len() - "</office:document>".len(),
         &format!("<!--{filler}-->"),
     );
-    let source = FlatPresentation::from_bytes(document.into_bytes())
+    let source = FlatPresentation::from_bytes(document.as_bytes())
         .unwrap()
         .snapshot();
     let text = "x".repeat(16 * 1024 * 1024);
@@ -197,16 +197,16 @@ fn flat_predefined_entities_and_character_references_open() {
         page,
     );
     assert_ne!(document, NOTES);
-    let flat = FlatPresentation::from_bytes(document.as_bytes().to_vec()).unwrap();
+    let flat = FlatPresentation::from_bytes(document.as_bytes()).unwrap();
     assert_eq!(flat.slide_count(), 2);
     assert_eq!(flat.as_bytes(), document.as_bytes());
     assert_eq!(flat.slides()[0].text().unwrap(), "Tom's <a> & \"b\" © A");
 
     let control = NOTES.replace("First slide", "First &#1; slide");
-    assert!(FlatPresentation::from_bytes(control.into_bytes()).is_err());
+    assert!(FlatPresentation::from_bytes(control.as_bytes()).is_err());
     let custom = NOTES.replace("First slide", "First &nasty; slide");
     assert!(matches!(
-        FlatPresentation::from_bytes(custom.into_bytes()),
+        FlatPresentation::from_bytes(custom.as_bytes()),
         Err(Error::InvalidFormat(message)) if message.contains("custom entities")
     ));
 }

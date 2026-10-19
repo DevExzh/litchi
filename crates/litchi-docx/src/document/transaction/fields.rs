@@ -1630,7 +1630,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::StaleSource`] for an index of other bytes, a refusal
+    /// Returns [`Error::PatchConflict`] for an index of other bytes, a refusal
     /// for an update the field's markup does not admit (see
     /// [`Fields::accepts_text`] and [`Fields::accepts_paragraphs`]), text a
     /// document cannot hold or overlapping updates, and a limit error. The
@@ -1638,7 +1638,7 @@ impl Edit {
     pub fn refresh_fields(&mut self, fields: &Fields, updates: &[Update]) -> Result<Outcome> {
         self.ensure_unmanaged("refresh_fields")?;
         if self.projected.xml_bytes() != fields.xml.as_slice() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let xml = fields.xml.as_slice();
         let mut outcome = Outcome::default();
@@ -2016,7 +2016,7 @@ impl Edit {
             let (Some(first), Some(last)) =
                 (index_of(first_range.start), index_of(last_range.start))
             else {
-                return Err(Error::StaleSource);
+                return Err(Error::PatchConflict);
             };
             if last < first || last - first != region.last - region.first {
                 return Err(refused(0, Refusal::BlockNotFound));

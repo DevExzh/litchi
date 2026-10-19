@@ -361,7 +361,7 @@ fn opc(file: &File, operation: &str) -> Result<(FileFormat, OpcPackage)> {
 /// Publish `package` and open the result as the new handle.
 fn reopen(package: &OpcPackage) -> Result<File> {
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes)?;
+    package.write_to(&mut bytes)?;
     crate::open_bytes(bytes)
 }
 

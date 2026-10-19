@@ -492,18 +492,18 @@ impl<'package> SourcePartSplicePlan<'package> {
 
     /// Publish the plan to a sequential sink and retain an exact inverse
     /// authorization for the resulting artifact.
-    pub fn write_to_stream<W: Write>(self, writer: W) -> Result<SourcePartSplicePublication> {
-        self.write_to_stream_inner(writer, None, true)
+    pub fn write_to<W: Write>(self, writer: W) -> Result<SourcePartSplicePublication> {
+        self.write_to_inner(writer, None, true)
     }
 
     /// Publish while recording accepted output and low-level ZIP work in an
     /// OPC-owned accounting report.
-    pub fn write_to_stream_with_accounting<W: Write>(
+    pub fn write_to_with_accounting<W: Write>(
         self,
         writer: W,
         accounting: &mut OpcOperationAccounting,
     ) -> Result<SourcePartSplicePublication> {
-        self.write_to_stream_inner(writer, Some(accounting), true)
+        self.write_to_inner(writer, Some(accounting), true)
     }
 
     /// Authenticate the complete candidate artifact in a bounded sink before
@@ -511,7 +511,7 @@ impl<'package> SourcePartSplicePlan<'package> {
     /// sequential shallow copy of this plan and does not charge external
     /// output bytes; the publishing pass retains the ordinary output-budget
     /// and partial-output semantics.
-    pub fn write_to_stream_with_expected_artifact<W: Write>(
+    pub fn write_to_with_expected_artifact<W: Write>(
         self,
         writer: W,
         expected_len: u64,
@@ -519,7 +519,7 @@ impl<'package> SourcePartSplicePlan<'package> {
     ) -> Result<SourcePartSplicePublication> {
         let (preview_len, preview_sha256) = {
             let preview = self.clone_for_preview();
-            let publication = match preview.write_to_stream_inner(io::sink(), None, false) {
+            let publication = match preview.write_to_inner(io::sink(), None, false) {
                 Ok(publication) => publication,
                 Err(OpcError::IncompleteOutput { source, .. }) => return Err(*source),
                 Err(error) => return Err(error),
@@ -542,7 +542,7 @@ impl<'package> SourcePartSplicePlan<'package> {
             });
         }
 
-        let publication = self.write_to_stream_inner(writer, None, true)?;
+        let publication = self.write_to_inner(writer, None, true)?;
         if publication.candidate_artifact_len != expected_len {
             return Err(OpcError::IncompleteOutput {
                 written: publication.candidate_artifact_len,
@@ -579,7 +579,7 @@ impl<'package> SourcePartSplicePlan<'package> {
         }
     }
 
-    fn write_to_stream_inner<W: Write>(
+    fn write_to_inner<W: Write>(
         self,
         writer: W,
         mut accounting: Option<&mut OpcOperationAccounting>,
@@ -605,8 +605,8 @@ impl<'package> SourcePartSplicePlan<'package> {
                 match accounting.as_deref_mut() {
                     Some(report) => self
                         .source_artifact
-                        .write_to_stream_with_accounting(&mut hashing, report)?,
-                    None => self.source_artifact.write_to_stream(&mut hashing)?,
+                        .write_to_with_accounting(&mut hashing, report)?,
+                    None => self.source_artifact.write_to(&mut hashing)?,
                 }
             } else {
                 write_source_artifact_without_output_budget(
