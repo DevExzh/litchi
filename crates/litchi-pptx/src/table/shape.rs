@@ -179,6 +179,62 @@ impl<'a> Table<'a> {
         Ok(self.rows()?.first().map_or(0, |row| row.cell_count()))
     }
 
+    /// Every cell's local properties and text body, by row and position in
+    /// the row, as [`Cell::properties`] and [`Cell::text_body`] read each
+    /// (record 0346). A table that declares no namespace has one namespace
+    /// scope, resolved once, so reading every cell is proportional to the
+    /// table rather than to the part per row and cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::rows`], [`Row::cells`],
+    /// [`Cell::properties`] and [`Cell::text_body`].
+    #[allow(
+        clippy::type_complexity,
+        reason = "rows of (properties, body) pairs, the shape the callers index"
+    )]
+    pub fn cell_contents(
+        self,
+    ) -> Result<Vec<Vec<(CellProperties, Option<litchi_drawingml::text::body::Body>)>>> {
+        let table = self.xml()?;
+        let Some(context) = self.context.filter(|_| !contains(table, b"xmlns")) else {
+            let mut out = Vec::new();
+            for row in self.rows()? {
+                let mut cells = Vec::new();
+                for cell in row.cells()? {
+                    cells.push((cell.properties()?, cell.text_body()?));
+                }
+                out.push(cells);
+            }
+            return Ok(out);
+        };
+        let scope = context.resolver()?;
+        let rows = scan_with_scope(table, b"tr", Some(scope.clone()), false)?;
+        if rows.len() > MAX_ROWS {
+            return Err(limit("table row count", MAX_ROWS));
+        }
+        let mut out = Vec::new();
+        for row_span in rows {
+            let row = row_span.get(table)?;
+            let spans = scan_with_scope(row, b"tc", Some(scope.clone()), false)?;
+            if spans.len() > MAX_CELLS {
+                return Err(limit("table cell count", MAX_CELLS));
+            }
+            let row_context = context.child(row_span.start)?;
+            let mut cells = Vec::new();
+            for span in spans {
+                let cell = Cell {
+                    xml: row,
+                    context: Some(row_context.child(span.start)?),
+                    span,
+                };
+                cells.push((cell.properties()?, cell.text_body_in(Some(&scope))?));
+            }
+            out.push(cells);
+        }
+        Ok(out)
+    }
+
     /// Index rows as borrowed views over the table's source XML.
     ///
     /// # Errors
@@ -441,6 +497,17 @@ impl<'a> Cell<'a> {
     /// Returns an error for malformed cell XML or a text body the reader
     /// refuses.
     pub fn text_body(self) -> Result<Option<litchi_drawingml::text::body::Body>> {
+        self.text_body_in(None)
+    }
+
+    /// [`Self::text_body`], reusing `shared`, the namespace scope every
+    /// offset of the owning table has (record 0346): a table without
+    /// namespace declarations has one scope, which
+    /// [`Table::text_bodies`] computes once.
+    fn text_body_in(
+        self,
+        shared: Option<&NamespaceResolver>,
+    ) -> Result<Option<litchi_drawingml::text::body::Body>> {
         let xml = self.xml()?;
         let mut reader = quick_xml::Reader::from_reader(xml);
         let origin = ReaderOrigin::of(xml);
@@ -488,11 +555,12 @@ impl<'a> Cell<'a> {
         let Some((start, end)) = body.filter(|(_, end)| *end > 0) else {
             return Ok(None);
         };
-        let scope = match self.context {
-            Some(context) => context.child(start)?.resolver()?,
+        let scope = match (shared, self.context) {
+            (Some(shared), _) => shared.clone(),
+            (None, Some(context)) => context.child(start)?.resolver()?,
             // A fragment cut from its part: its own prefix is DrawingML's,
             // as the cell text reader assumes.
-            None => {
+            (None, None) => {
                 let mut resolver = NamespaceResolver::default();
                 let tag = &xml[start..end];
                 let name_end = tag
@@ -718,6 +786,18 @@ fn scan_with_context(
     target: &[u8],
     context: Option<NamespaceContext<'_>>,
 ) -> Result<Vec<Span>> {
+    let scope = context.map(NamespaceContext::resolver).transpose()?;
+    scan_with_scope(xml, target, scope, context.is_none())
+}
+
+/// [`scan_with_context`] with the scope at the start of `xml` already
+/// resolved (record 0346).
+fn scan_with_scope(
+    xml: &[u8],
+    target: &[u8],
+    scope: Option<NamespaceResolver>,
+    allow_fragment_fallback: bool,
+) -> Result<Vec<Span>> {
     enum ScanEvent {
         Start { local: Vec<u8>, matched: bool },
         Empty { matched: bool },
@@ -730,10 +810,9 @@ fn scan_with_context(
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("table XML bytes", MAX_XML_BYTES));
     }
-    let allow_fragment_fallback = context.is_none();
     let mut reader = NsReader::from_reader(xml);
-    if let Some(context) = context {
-        *reader.resolver_mut() = context.resolver()?;
+    if let Some(scope) = scope {
+        *reader.resolver_mut() = scope;
     }
     let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<(usize, Vec<u8>, bool)> = Vec::new();
@@ -1234,4 +1313,11 @@ mod tests {
         let table = Table::from_xml(xml).unwrap();
         assert_eq!(table.row_count().unwrap(), 1);
     }
+}
+
+/// Whether `haystack` holds `needle`.
+fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack
+        .windows(needle.len())
+        .any(|window| window == needle)
 }

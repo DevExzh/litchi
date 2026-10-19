@@ -288,6 +288,10 @@ struct PptxState {
     /// transaction's admission check then skips a second capture of the
     /// package (record 0333).
     admitted: OnceLock<()>,
+    /// The last table a coalesced cell batch read on this handle: its slide,
+    /// scene position and cells (record 0346), so a batch's first plan and
+    /// its run read the table once.
+    cells: Mutex<Option<(usize, usize, Arc<write::coalesce::Cells>)>>,
 }
 
 struct EagerSlide {
@@ -450,6 +454,7 @@ impl Pptx {
             revision: None,
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
+            cells: Mutex::new(None),
         }))
         .with_origin(self.origin())
     }
@@ -493,6 +498,7 @@ impl Pptx {
             revision: None,
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
+            cells: Mutex::new(None),
         }))
     }
 
@@ -536,6 +542,7 @@ impl Pptx {
             revision: Some(revision),
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
+            cells: Mutex::new(None),
         }))
         .with_signature(self.signature())
         .with_origin(self.origin());
@@ -941,6 +948,31 @@ impl Pptx {
             let _ = self.0.admitted.set(());
         }
         Ok(owner)
+    }
+
+    /// The cells of the table at scene position `frame` of slide `slide`,
+    /// read once per handle (record 0346).
+    fn table_cells(
+        &self,
+        slide: usize,
+        frame: usize,
+        read: impl FnOnce() -> Result<Option<Arc<write::coalesce::Cells>>>,
+    ) -> Result<Option<Arc<write::coalesce::Cells>>> {
+        let mut cached = self
+            .0
+            .cells
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((at_slide, at_frame, cells)) = cached.as_ref()
+            && (*at_slide, *at_frame) == (slide, frame)
+        {
+            return Ok(Some(Arc::clone(cells)));
+        }
+        let cells = read()?;
+        *cached = cells
+            .as_ref()
+            .map(|cells| (slide, frame, Arc::clone(cells)));
+        Ok(cells)
     }
 
     /// Whether [`Self::editable_owner`] hands out the eager package (record

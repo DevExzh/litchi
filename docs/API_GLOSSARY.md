@@ -2837,6 +2837,7 @@ raw query surface only).
 | `litchi_ops` PPTX `modernComment` add (`text`, `author`, `initials`, `created`, `resolved`, `parent`) and set; `reply` set; reads `initials`, `resolved`, `parent`; raw `id` | adopted (0346); `created` is required on add (no clock) |
 | `litchi_pptx::opened::Edit::{add_placeholder, put_placeholder_text}` | adopted (0346): a placeholder bound to the layout slot of its type (a title adopts the layout's title-family type; other types the slot's index, else the smallest free one); `put_` fills the slide's matching placeholder or adds one, OfficeCLI's slide `title`/`text` shorthand |
 | `litchi_pptx::opened::Edit::set_slide_layout` | adopted (0346): retargets the slide's layout relationship to the layout of that exact name; shapes are kept |
+| `litchi_pptx::table::Table::cell_contents` | adopted (0346): every cell's properties and text body, by row; a table without namespace declarations resolves its scope once |
 | `litchi_ops` PPTX `placeholder` add (`phType`, alias `type`; `text`), returning the canonical `/slide[N]/shape[K]`; `notes` add (`text`); slide `title`/`text` on add and `layout` set | adopted (0346) |
 
 See [0346](unified-ops/0346-pptx-p0-final.md).
