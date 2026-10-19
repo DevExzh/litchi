@@ -1,7 +1,7 @@
 # 0340 — Keynote paragraph-set batches and ODC series batches scale linearly
 
 - Status: implemented on `uo2/keynote-batch`, cut from `feat/unified-ops-api`
-  at `2083926091` (trunk merged three times: `c31198a5af`, `4282e69000` (record 0338), `ed832736c3` (record 0336)).
+  at `2083926091` (trunk merged four times: `c31198a5af`, `4282e69000` (record 0338), `ed832736c3` (record 0336), `7ea8acee2a` (record 0341)).
 - Date: 2026-10-17
 - Input: record [0337](0337-perf-closure.md) follow-ups **F-0337-KEYNOTE**
   (the only 1k-batch budget miss: 21.9–22.4× at 1k, 387–390× at 10k,
@@ -202,6 +202,16 @@ keynote_unified --test odf_objects_unified --test iwork_unified --test
 capabilities --test registry --test charts`; `cargo test -p litchi
 --all-features`; the crate-boundary, non-iWork, tool unit-test,
 capability-delta, corpus, bench-matrix and feature-matrix checks.
+
+After the record 0341 merge (`7ea8acee2a`, merged at `eea11baa22`; detection
+and open code only, the bench matrix regenerated), each exit 0:
+`cargo fmt --all --check`; the all-features clippy; `--no-default-features`
+clippy with no feature and with `keynote`, `odc`, `pages`, `numbers`; `cargo
+test -p litchi-ops --all-features --test keynote_unified --test iwork_unified
+--test iwork_table_cells --test odf_objects_unified --test capabilities
+--test registry`; `LITCHI_BATCH_EQUIVALENCE_CASES=60 cargo test -p litchi-ops
+--features keynote,pages,numbers --test iwork_batch_equivalence`; `python3
+tools/unified_bench_matrix.py --check`.
 
 No capability, registry, public name or OfficeCLI-visible behaviour
 changed, so the goldens were not re-blessed, the delta table and the
