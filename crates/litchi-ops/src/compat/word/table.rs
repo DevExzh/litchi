@@ -95,7 +95,8 @@ impl Table {
     /// # Errors
     ///
     /// Returns the format's typed error when the rows cannot be decoded.
-    pub fn row_at(&self, index: usize) -> Result<Option<Row>> {
+    pub fn row_at(&self, index: impl Into<litchi_core::Position>) -> Result<Option<Row>> {
+        let index = index.into().get();
         match self {
             #[cfg(feature = "doc")]
             Self::Doc(table) => Ok(table
@@ -209,7 +210,8 @@ impl Row {
     /// # Errors
     ///
     /// Returns the format's typed error when the cells cannot be decoded.
-    pub fn cell_at(&self, index: usize) -> Result<Option<Cell>> {
+    pub fn cell_at(&self, index: impl Into<litchi_core::Position>) -> Result<Option<Cell>> {
+        let index = index.into().get();
         match self {
             #[cfg(feature = "doc")]
             Self::Doc(row) => Ok(row.cells()?.get(index).cloned().map(Cell::Doc)),
@@ -242,7 +244,8 @@ impl Row {
     /// # Errors
     ///
     /// Returns the format's typed error when the cells cannot be decoded.
-    pub fn grid_span_at(&self, index: usize) -> Result<Option<usize>> {
+    pub fn grid_span_at(&self, index: impl Into<litchi_core::Position>) -> Result<Option<usize>> {
+        let index = index.into().get();
         let cells = self.cells()?;
         let Some(cell) = cells.get(index) else {
             return Ok(None);
