@@ -982,7 +982,7 @@ fn comment_value<'a>(
 }
 
 /// A comment's resolved state and reply parent (the parent comment's id),
-/// from its first paragraph's `commentsExtended` entry (record 0345):
+/// from its last paragraph's `commentsExtended` entry (record 0345):
 /// unresolved and no parent without one.
 fn comment_thread(
     docx: &super::Docx,

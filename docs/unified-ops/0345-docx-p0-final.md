@@ -55,7 +55,7 @@ package-bound `Edit`.
 | `remove_column_at(table, column)` | the `w:gridCol` and each row's cell at the slot; merged or spanning cells, the last column, a row's last cell and a cell holding one end of an outside range are refused |
 | `set_column_width_at(table, column, width)` | the `w:gridCol` width and, so fixed layouts follow, the `w:tcW` of each row's cell occupying the slot alone with a twips (`dxa`) width; an unchanged width is a no-op |
 | `set_hyperlink_tooltip_at(hyperlink, Option<&str>)` | `w:tooltip` on the start tag, other attributes as written |
-| `add_comment_at` with `NewComment::{with_parent, with_done, with_start_after, with_range}` | a reply or a comment with a state gets a fresh `w14:paraId` on its paragraph (above every identifier of the main document and the comments part); the parent's first paragraph gets one if it has none; `commentsExtended` gains `w15:commentEx` entries (the thread root's when missing, then the reply's `w15:paraIdParent`/`w15:done`), created with its relationship and content type when absent; an existing `commentsIds` part maps every new identifier to the next durable id. `with_start_after(run)` starts a whole-paragraph range after that direct run; `with_range(false)` writes the reference run alone |
+| `add_comment_at` with `NewComment::{with_parent, with_done, with_start_after, with_range}` | a reply or a comment with a state gets a fresh `w14:paraId` on its (last) paragraph (above every identifier of the main document and the comments part); the parent's last paragraph gets one if it has none; `commentsExtended` gains `w15:commentEx` entries (the thread root's when missing, then the reply's `w15:paraIdParent`/`w15:done`), created with its relationship and content type when absent; an existing `commentsIds` part maps every new identifier to the next durable id. `with_start_after(run)` starts a whole-paragraph range after that direct run; `with_range(false)` writes the reference run alone |
 | `set_comment` with `CommentChange::with_done` | the comment's entry's `w15:done`, upserted lexically (other entries keep their bytes) |
 
 Reads: `Comment::paragraph_id`, `Document::comments_extended` and
@@ -107,6 +107,7 @@ the doctests.
 | 5 | a missing grid is prepended to the table | created after `w:tblPr` (schema order) |
 | 6 | a removed comment's `commentsExtended` entry is removed, the part stays | the same (record 0251c `strip_modern_entries`); the empty part and its relationship stay |
 | 7 | `add cell` with `revision.*` marks the cell inserted | the revision keys are skipped with a warning (deferred-P2, tracked changes) |
+| 8 | `commentsExtended` is keyed by the comment's *first* paragraph | by its *last* paragraph, as [MS-DOCX] `CT_CommentEx` specifies and Word writes; the same paragraph for one-paragraph comments (every comment either tool writes) |
 
 ## 5. Goldens, checklist, fidelity, corpus
 

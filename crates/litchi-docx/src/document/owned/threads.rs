@@ -3,7 +3,7 @@
 //!
 //! Word threads a reply under its parent and records a comment's resolved
 //! state in `word/commentsExtended.xml`: one `w15:commentEx` per comment,
-//! keyed by the `w14:paraId` of the comment's first paragraph, with
+//! keyed by the `w14:paraId` of the comment's last paragraph, with
 //! `w15:paraIdParent` naming the parent's paragraph and `w15:done` the
 //! state. These helpers give a comment paragraph an identifier when it has
 //! none, upsert the entries lexically (other entries keep their bytes),
@@ -189,14 +189,15 @@ fn root_tag(xml: &[u8]) -> Option<&str> {
     }
 }
 
-/// The `w14:paraId` of comment `id`'s first paragraph in the comments part
-/// `xml`, giving the paragraph a fresh one (rewriting `xml`) when it has
-/// none. `Ok(None)` for a comment without a paragraph.
+/// The `w14:paraId` of comment `id`'s last paragraph in the comments part
+/// `xml` (the paragraph Word keys `commentsExtended` by, [MS-DOCX]
+/// `CT_CommentEx`), giving the paragraph a fresh one (rewriting `xml`) when
+/// it has none. `Ok(None)` for a comment without a paragraph.
 ///
 /// # Errors
 ///
 /// Returns [`Refusal::BlockNotFound`] for an unknown comment.
-pub(super) fn first_paragraph_id(
+pub(super) fn keyed_paragraph_id(
     xml: &mut Vec<u8>,
     id: u32,
     fresh: &mut FreshIds,
@@ -218,7 +219,8 @@ pub(super) fn first_paragraph_id(
         })?;
     let Some(paragraph) = tree
         .children(comment)
-        .find(|child| tree.elements[*child].is(b"p"))
+        .filter(|child| tree.elements[*child].is(b"p"))
+        .last()
     else {
         return Ok(None);
     };
@@ -429,18 +431,22 @@ mod tests {
         let mut xml = br#"<w:comments xmlns:w="urn:w"><w:comment w:id="0" w:author="A"><w:p><w:r><w:t>x</w:t></w:r></w:p></w:comment></w:comments>"#.to_vec();
         let mut ids = fresh(&[0x10]);
         assert_eq!(
-            first_paragraph_id(&mut xml, 0, &mut ids).unwrap(),
+            keyed_paragraph_id(&mut xml, 0, &mut ids).unwrap(),
             Some(0x11)
         );
         let text = String::from_utf8(xml.clone()).unwrap();
         assert!(text.contains(r#"<w:p xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" w14:paraId="00000011">"#), "{text}");
         // Read back without assigning another.
         assert_eq!(
-            first_paragraph_id(&mut xml, 0, &mut ids).unwrap(),
+            keyed_paragraph_id(&mut xml, 0, &mut ids).unwrap(),
             Some(0x11)
         );
         assert_eq!(ids.assigned, [0x11]);
-        assert!(first_paragraph_id(&mut xml, 7, &mut ids).is_err());
+        assert!(keyed_paragraph_id(&mut xml, 7, &mut ids).is_err());
+
+        // A multi-paragraph comment is keyed by its last paragraph.
+        let mut two = br#"<w:comments xmlns:w="urn:w" xmlns:w14="urn:w14"><w:comment w:id="1" w:author="A"><w:p w14:paraId="00000001"/><w:p w14:paraId="00000002"/></w:comment></w:comments>"#.to_vec();
+        assert_eq!(keyed_paragraph_id(&mut two, 1, &mut ids).unwrap(), Some(2));
 
         let durable = br#"<w16cid:commentsIds xmlns:w16cid="urn:c"><w16cid:commentId w16cid:paraId="00000011" w16cid:durableId="00000005"/></w16cid:commentsIds>"#;
         let mapped = map_durable_ids(durable, &[0x11, 0x12]).unwrap();

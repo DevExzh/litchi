@@ -161,28 +161,42 @@ impl Comment {
         self.xml_data.as_bytes()
     }
 
-    /// The `w14:paraId` of the comment's first paragraph, which Word's
-    /// modern-comment parts (`commentsExtended`, `commentsIds`) key the
-    /// comment by (record 0345); `None` when that paragraph has none.
+    /// The `w14:paraId` of the comment's last paragraph (the last
+    /// `w:p` child of `w:comment`), by which Word's modern-comment parts
+    /// (`commentsExtended`, `commentsIds`) key the comment ([MS-DOCX]
+    /// `CT_CommentEx`; record 0345). For a one-paragraph comment, the
+    /// common case and every comment OfficeCLI writes, it is the first
+    /// paragraph's. `None` when that paragraph has none.
     #[must_use]
     pub fn paragraph_id(&self) -> Option<u32> {
         let mut reader = Reader::from_reader(self.xml_bytes());
+        let mut depth = 0usize;
+        let mut last = None;
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(element) | Event::Empty(element))
-                    if element.local_name().as_ref() == b"p" =>
-                {
-                    return element
+            let (element, empty) = match reader.read_event() {
+                Ok(Event::Start(element)) => (element, false),
+                Ok(Event::Empty(element)) => (element, true),
+                Ok(Event::End(_)) => {
+                    depth = depth.saturating_sub(1);
+                    continue;
+                },
+                Ok(Event::Eof) | Err(_) => return last.flatten(),
+                _ => continue,
+            };
+            if depth == 1 && element.local_name().as_ref() == b"p" {
+                last = Some(
+                    element
                         .unchecked_attributes()
                         .filter_map(std::result::Result::ok)
                         .find(|attribute| attribute.key.local_name().as_ref() == b"paraId")
                         .and_then(|attribute| {
                             u32::from_str_radix(std::str::from_utf8(&attribute.value).ok()?, 16)
                                 .ok()
-                        });
-                },
-                Ok(Event::Eof) | Err(_) => return None,
-                _ => {},
+                        }),
+                );
+            }
+            if !empty {
+                depth += 1;
             }
         }
     }

@@ -16,7 +16,7 @@ use quick_xml::events::Event;
 use super::super::{ElementPath, Error, Refusal, Result};
 use super::Edit;
 use super::stories::text_run;
-use super::threads::first_paragraph_id;
+use super::threads::keyed_paragraph_id;
 use crate::Package;
 use crate::part_scan::{self, qualified};
 
@@ -286,7 +286,7 @@ impl Edit<Package> {
                     reason: Refusal::BlockNotFound,
                 })?;
                 Some(
-                    first_paragraph_id(xml, parent, &mut fresh)?.ok_or(Error::Refused {
+                    keyed_paragraph_id(xml, parent, &mut fresh)?.ok_or(Error::Refused {
                         position: 0,
                         reason: Refusal::BlockNotFound,
                     })?,
@@ -543,14 +543,14 @@ impl Edit<Package> {
             cursor = end;
         }
         output.extend_from_slice(&xml[cursor..]);
-        // The resolved state (record 0345): the comment's first paragraph
+        // The resolved state (record 0345): the comment's last paragraph
         // keys its `commentsExtended` entry, given an identifier if it has
         // none.
         let mut threaded = false;
         if let Some(done) = change.done {
             let mut fresh = self.fresh_paragraph_ids(Some(&output))?;
             let paragraph =
-                first_paragraph_id(&mut output, id, &mut fresh)?.ok_or(Error::Refused {
+                keyed_paragraph_id(&mut output, id, &mut fresh)?.ok_or(Error::Refused {
                     position: 0,
                     reason: Refusal::ComplexContent,
                 })?;
