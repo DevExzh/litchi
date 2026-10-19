@@ -2,7 +2,9 @@
 
 - Status: implemented on `uo2/v1-closure`, cut from `feat/unified-ops-api`
   at `4282e69000`. Trunk was merged at `ed832736c3` (record 0336, the raw
-  layer and `dump`).
+  layer and `dump`) and again at `7ea8acee2a` (record 0341, the ADR 0008
+  checklist rows); goldens, the CRUD checklist and its ADR 0008 rows,
+  fidelity, the delta table and the corpus were re-blessed after each.
 - Date: 2026-10-17
 - Input: the v1-scope subset of the OfficeCLI corpus (record 0332;
   `officecli-corpus-deltas.md`), red with 68 open lines on the base tree:
@@ -42,7 +44,7 @@ v1-scope subset (`python3 tools/officecli_corpus.py`):
 | base `4282e69000` | 2,204 | 1,171 | 68 (57 WP5, 9 WP4, 1 0253, 1 0333) |
 | this branch before the trunk merge | 2,217 | 1,169 | **57, all WP5** |
 | trunk `ed832736c3` alone (record 0336) | 2,261 | 1,171 | 11 (the lines above) |
-| this branch after the trunk merge | 2,274 | 1,169 | **0 — green** |
+| this branch after the trunk merges (0336, 0341) | 2,274 | 1,169 | **0 — green** |
 
 Two accounted lines moved to passed besides the 11:
 `word/tables.sh:247` and `:272` (`add table border.all=…`, which skipped
