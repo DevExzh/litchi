@@ -394,6 +394,24 @@
       "reason": "rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction"
     },
     {
+      "subject": "operation",
+      "verb": "move",
+      "element": "row",
+      "context": "rows and columns",
+      "code": "unsupported_capability",
+      "followUp": "record 0347 F1 (a row and column move in `table::topology`)",
+      "reason": "the leaf topology transaction inserts and removes rows and columns but does not reorder them; reordering must carry storage, headers, UIDs, borders, merges and every formula coordinate that reads the table"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "row",
+      "context": "rows and columns",
+      "code": "unsupported_capability",
+      "followUp": "record 0347 F1 (a row and column move in `table::topology`)",
+      "reason": "a swap is two moves, and the leaf topology transaction does not reorder rows or columns; sheets and tables swap"
+    },
+    {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",

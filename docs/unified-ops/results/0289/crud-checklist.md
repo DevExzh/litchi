@@ -49,7 +49,7 @@ Evidence: `crud-adr0008.tsv`.
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 | ok | ok | ok |
 | pages | 11 | 91 | 91 | 0 | 0 | 0 | 30 | 2 | 14 | ok | ok | ok |
 | keynote | 16 | 132 | 132 | 0 | 0 | 0 | 44 | 16 | 4 | ok | ok | ok |
-| numbers | 7 | 61 | 61 | 0 | 0 | 7 | 16 | 2 | 3 | ok | ok | ok |
+| numbers | 7 | 61 | 61 | 0 | 0 | 0 | 16 | 4 | 6 | ok | ok | ok |
 
 ## docx
 
@@ -733,11 +733,11 @@ Evidence: `crud-adr0008.tsv`.
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| workbook | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | gap | n/a | n/a | ok | ok |
-| sheet | ok | ok | ok | ok | ok | ok | ok | ok | gap | ok | ok | ok | ok |
-| table | ok | ok | ok | ok | ok | ok | ok | ok | gap | ok | ok | ok | ok |
-| cell | ok | ok | ok | ok | ok | n/a | ok | refused | gap | ok | ok | ok | ok |
-| mergeCell | ok | ok | ok | ok | n/a | ok | ok | no pair | gap | n/a | n/a | ok | ok |
-| row | ok | ok | ok | ok | n/a | ok | ok | refused | gap | n/a | n/a | ok | ok |
-| col | ok | ok | ok | ok | n/a | ok | ok | refused | gap | n/a | n/a | ok | ok |
+| workbook | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| sheet | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| table | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
+| mergeCell | ok | ok | ok | ok | n/a | ok | ok | no pair | no pair | n/a | n/a | ok | ok |
+| row | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
+| col | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 

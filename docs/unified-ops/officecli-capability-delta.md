@@ -36,7 +36,7 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `e7ce908dd0d0044c14912b3baea33cfbc00ff2d08c3439de72e81a95d06525bf` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `4d17817dc9d2dfe0013cc5b0e54c36ef7fccf98a7bbc3bce3c532336e56158e8` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `104f4afa7068abc7bbe1d9e51861f007ee37cb23f5ff4fad6537de7fbcecff14` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `9c4afdf165334e207de69da99cdc335356d3ed7ec6ff012885c95f067bdf8398` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `c6a58cdfaf52bdd156c37f6e5d6b8e671ed25b5668a8a2d71016dc4b0a13de29` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
@@ -998,6 +998,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `add` | `table` | `a workbook without a table` | a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet | record 0301 follow-ups (IWORK_API_REQUESTS.md request 5) |
 | `add` | `row` | `formulas the coordinate shift refuses, merges` | rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split (record 0329); refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column | record 0329 follow-ups (IWORK_API_REQUESTS.md request 6) |
 | `set` | `row` | `height and visibility` | rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction | record 0309 follow-ups |
+| `move` | `row` | `rows and columns` | the leaf topology transaction inserts and removes rows and columns but does not reorder them; reordering must carry storage, headers, UIDs, borders, merges and every formula coordinate that reads the table | record 0347 F1 (a row and column move in `table::topology`) |
+| `swap` | `row` | `rows and columns` | a swap is two moves, and the leaf topology transaction does not reorder rows or columns; sheets and tables swap | record 0347 F1 (a row and column move in `table::topology`) |
 
 ## odb
 

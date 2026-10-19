@@ -23,6 +23,9 @@
 //! | `add`/`remove` | `sheet` | `edit_sheet_lifecycle` (+ `edit_sheet_order` for a position) |
 //! | `add`/`remove` | `table` | `edit_table_lifecycle` (+ `edit_table_order` for a position) |
 //! | `add`/`remove` | `row`/`col` of a table | `edit_table_topology` (record 0309) |
+//! | `swap` | two `sheet`s | two `edit_sheet_order` moves (record 0347) |
+//! | `swap` | two `table`s of one sheet | two `edit_table_order` moves |
+//! | `swap` | two `table`s of two sheets | two `edit_table_relocation`s, then two `edit_table_order` moves (two tables of one name pass through a temporary `edit_names` rename) |
 //!
 //! Rows and columns are addressed by position, `/sheet[N]/table[M]/row[K]`
 //! and `col[K]`; the tree does not list them (a table's `rowCount` and
@@ -158,7 +161,7 @@ static GAPS: [GapSpec; 1] = [GapSpec {
     reason: "formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles",
 }];
 
-static OPERATION_GAPS: [GapSpec; 3] = [
+static OPERATION_GAPS: [GapSpec; 5] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -188,6 +191,26 @@ static OPERATION_GAPS: [GapSpec; 3] = [
         code: Code::UnsupportedCapability,
         follow_up: "record 0309 follow-ups",
         reason: "rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "row",
+            context: "rows and columns",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "record 0347 F1 (a row and column move in `table::topology`)",
+        reason: "the leaf topology transaction inserts and removes rows and columns but does not reorder them; reordering must carry storage, headers, UIDs, borders, merges and every formula coordinate that reads the table",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "row",
+            context: "rows and columns",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "record 0347 F1 (a row and column move in `table::topology`)",
+        reason: "a swap is two moves, and the leaf topology transaction does not reorder rows or columns; sheets and tables swap",
     },
 ];
 
@@ -390,6 +413,7 @@ impl EditError {
             Self::Relocation(error) => common!(error, litchi_numbers::table::relocation::Error, {
                 E::TableNotFound => Code::PathNotFound,
                 E::TableLocked { .. } => Code::DocumentProtected,
+                E::DuplicateTableName { .. } => Code::InvalidValue,
             }),
             Self::Merges(error) => {
                 common!(error, litchi_numbers::table::merge::transaction::Error, {
@@ -2272,15 +2296,7 @@ pub(crate) fn move_to(
                     ))
                 }
             })?;
-            let error = |error| edit_error(EditError::Order(error));
-            let commit = package
-                .edit_sheet_order()
-                .move_sheet(SheetSelector::index(from), to)
-                .map_err(error)?
-                .commit()
-                .map_err(error)?;
-            let patch = commit.patch().clone();
-            push(&mut chain, commit.into_package(), Patch::Order(patch));
+            move_sheet(&mut chain, from, to)?;
         },
         "table" => {
             let crate::Placement::Into(destination_path, position) = placement else {
@@ -2303,16 +2319,7 @@ pub(crate) fn move_to(
                         ))
                     }
                 })?;
-                let error = |error| edit_error(EditError::TableOrder(error));
-                let commit = package
-                    .edit_table_order(SheetSelector::index(sheet))
-                    .map_err(error)?
-                    .move_table(TableSelector::index(table), to)
-                    .map_err(error)?
-                    .commit()
-                    .map_err(error)?;
-                let (next, patch) = commit.into_parts();
-                push(&mut chain, next, Patch::TableOrder(patch));
+                order_table(&mut chain, sheet, table, to)?;
                 bound(LimitKind::Operations, 1, limits.max_operations())?;
                 return finish(
                     file,
@@ -2341,18 +2348,7 @@ pub(crate) fn move_to(
                     "a relocated Numbers table is appended after the destination sheet's tables",
                 ));
             }
-            let error = |error| edit_error(EditError::Relocation(error));
-            let commit = package
-                .edit_table_relocation(
-                    SheetSelector::index(sheet),
-                    TableSelector::index(table),
-                    SheetSelector::index(to),
-                )
-                .map_err(error)?
-                .commit()
-                .map_err(error)?;
-            let patch = commit.patch().clone();
-            push(&mut chain, commit.into_package(), Patch::Relocation(patch));
+            relocate_table(&mut chain, sheet, table, to)?;
         },
         _ => return Err(element_refusal("move", &node)),
     }
@@ -2365,6 +2361,181 @@ pub(crate) fn move_to(
         1,
         limits,
     )
+}
+
+// ---------------------------------------------------------------------- swap
+
+/// Exchange two sheets, or two tables (of one sheet or of two sheets).
+///
+/// The exchange equals two moves applied one at a time: the first element
+/// takes the second's place, then the second takes the first's. Every step
+/// is one leaf transaction on the previous step's package, so the swap
+/// publishes all of them or none. Rows and columns are refused: the leaf's
+/// topology transaction inserts and removes them but does not reorder them.
+pub(crate) fn swap(
+    file: &Iwork,
+    package: &Package,
+    left: &PathArg<'_>,
+    right: &PathArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    if axis_target(file, left.path()).is_some() || axis_target(file, right.path()).is_some() {
+        return Err(refusal(
+            Code::UnsupportedCapability,
+            "Numbers rows and columns are inserted and removed, not reordered; the leaf topology transaction has no row or column move (follow-up: record 0347 F1)",
+        ));
+    }
+    let left = node_at::<Numbers>(file, left)?;
+    let right = node_at::<Numbers>(file, right)?;
+    let (left_kind, right_kind) = (left.item().type_name(), right.item().type_name());
+    let [left_sheet, left_table, _, _] = left.item().leaf().map(|value| value as usize);
+    let [right_sheet, right_table, _, _] = right.item().leaf().map(|value| value as usize);
+    let mut chain = Chain::new(package.clone());
+    match (left_kind, right_kind) {
+        ("sheet", "sheet") => {
+            let (first, second) = (left_sheet.min(right_sheet), left_sheet.max(right_sheet));
+            if first != second {
+                // The first sheet takes the second's place, which shifts the
+                // second back by one; that one then takes the first's place.
+                move_sheet(&mut chain, first, second)?;
+                move_sheet(&mut chain, second - 1, first)?;
+            }
+        },
+        ("table", "table") if left_sheet == right_sheet => {
+            let (first, second) = (left_table.min(right_table), left_table.max(right_table));
+            if first != second {
+                order_table(&mut chain, left_sheet, first, second)?;
+                order_table(&mut chain, left_sheet, second - 1, first)?;
+            }
+        },
+        ("table", "table") => {
+            // Two sheets: each table is relocated into the other's sheet,
+            // where the leaf appends it, and then takes the other's place.
+            // Table names are unique within a sheet, so two tables of one
+            // name (`Table 1` in both) pass through a temporary name.
+            let shared = table_name(package, left_sheet, left_table)
+                .filter(|name| table_name(package, right_sheet, right_table) == Some(*name));
+            if let Some(name) = shared {
+                let taken = [left_sheet, right_sheet]
+                    .iter()
+                    .filter_map(|sheet| package.sheets().get(*sheet))
+                    .flat_map(|sheet| sheet.tables().map(litchi_numbers::Table::name))
+                    .collect::<Vec<_>>();
+                let temporary = fresh_name(name, &taken);
+                rename_table(&mut chain, left_sheet, left_table, &temporary)?;
+            }
+            relocate_table(&mut chain, left_sheet, left_table, right_sheet)?;
+            relocate_table(&mut chain, right_sheet, right_table, left_sheet)?;
+            let left_count = table_count(&chain.package, left_sheet);
+            let right_count = table_count(&chain.package, right_sheet);
+            order_table(&mut chain, left_sheet, left_count - 1, left_table)?;
+            order_table(&mut chain, right_sheet, right_count - 1, right_table)?;
+            if let Some(name) = shared {
+                rename_table(&mut chain, right_sheet, right_table, name)?;
+            }
+        },
+        ("sheet" | "table", "sheet" | "table") => {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "a Numbers swap exchanges two sheets or two tables",
+            ));
+        },
+        ("sheet" | "table", _) => return Err(element_refusal("swap", &right)),
+        _ => return Err(element_refusal("swap", &left)),
+    }
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    finish(
+        file,
+        chain.changed,
+        Owner::Numbers(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )
+}
+
+fn table_name(package: &Package, sheet: usize, table: usize) -> Option<&str> {
+    package
+        .sheets()
+        .get(sheet)
+        .and_then(|sheet| sheet.tables().nth(table))
+        .map(litchi_numbers::Table::name)
+}
+
+/// Commit one table rename on the chain's package.
+fn rename_table(chain: &mut Chain<Package>, sheet: usize, table: usize, name: &str) -> Result<()> {
+    let error = |error| edit_error(EditError::Names(error));
+    let commit = chain
+        .package
+        .edit_names()
+        .rename_table(
+            SheetSelector::index(sheet),
+            TableSelector::index(table),
+            name,
+        )
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let patch = commit.patch().clone();
+    push(chain, commit.into_package(), Patch::Names(patch));
+    Ok(())
+}
+
+fn table_count(package: &Package, sheet: usize) -> usize {
+    package
+        .sheets()
+        .get(sheet)
+        .map_or(0, |sheet| sheet.table_count())
+}
+
+/// Commit one sheet move on the chain's package.
+fn move_sheet(chain: &mut Chain<Package>, from: usize, to: usize) -> Result<()> {
+    let error = |error| edit_error(EditError::Order(error));
+    let commit = chain
+        .package
+        .edit_sheet_order()
+        .move_sheet(SheetSelector::index(from), to)
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let patch = commit.patch().clone();
+    push(chain, commit.into_package(), Patch::Order(patch));
+    Ok(())
+}
+
+/// Commit one table move within its sheet on the chain's package.
+fn order_table(chain: &mut Chain<Package>, sheet: usize, from: usize, to: usize) -> Result<()> {
+    let error = |error| edit_error(EditError::TableOrder(error));
+    let commit = chain
+        .package
+        .edit_table_order(SheetSelector::index(sheet))
+        .map_err(error)?
+        .move_table(TableSelector::index(from), to)
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let (next, patch) = commit.into_parts();
+    push(chain, next, Patch::TableOrder(patch));
+    Ok(())
+}
+
+/// Commit one table relocation (appended to `to`'s tables) on the chain's
+/// package.
+fn relocate_table(chain: &mut Chain<Package>, sheet: usize, table: usize, to: usize) -> Result<()> {
+    let error = |error| edit_error(EditError::Relocation(error));
+    let commit = chain
+        .package
+        .edit_table_relocation(
+            SheetSelector::index(sheet),
+            TableSelector::index(table),
+            SheetSelector::index(to),
+        )
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let patch = commit.patch().clone();
+    push(chain, commit.into_package(), Patch::Relocation(patch));
+    Ok(())
 }
 
 // -------------------------------------------------------------------- create

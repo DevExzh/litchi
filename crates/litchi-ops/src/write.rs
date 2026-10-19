@@ -372,6 +372,9 @@ impl File {
     /// tabs, in retained source and eager owners.
     /// RTF supports ordinary main-story paragraph swaps through its native
     /// lifecycle editor.
+    /// Numbers swaps two sheets, or two tables of one sheet or of two
+    /// sheets, as the two moves applied one at a time; its rows and columns
+    /// are refused (record 0347).
     ///
     /// Both paths resolve against this snapshot. The returned handle owns the
     /// complete change; a failure leaves the original unchanged.

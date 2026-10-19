@@ -648,7 +648,8 @@ pub(crate) fn move_to<'p, 'q>(
     }
 }
 
-/// Exchange two elements (Pages paragraphs).
+/// Exchange two elements (Pages paragraphs; Keynote slides, paragraphs and
+/// drawables; Numbers sheets and tables, record 0347).
 pub(crate) fn swap<'p, 'q>(
     file: &Iwork,
     left: PathArg<'p>,
@@ -660,16 +661,7 @@ pub(crate) fn swap<'p, 'q>(
         Owner::Pages(package) => super::pages::swap(file, package, &left, &right, limits),
         #[cfg(feature = "keynote")]
         Owner::Keynote(package) => super::keynote::swap(file, package, &left, &right, limits),
-        #[allow(
-            unreachable_patterns,
-            reason = "the Pages and Keynote leaves exchange elements; Numbers does not yet"
-        )]
-        _ => {
-            let _ = (left, right, limits);
-            Err(refusal(
-                Code::UnsupportedCapability,
-                "swapping Numbers elements is not wired yet (follow-up: record 0297)",
-            ))
-        },
+        #[cfg(feature = "numbers")]
+        Owner::Numbers(package) => super::numbers::swap(file, package, &left, &right, limits),
     }
 }
