@@ -80,9 +80,14 @@ impl<T> fmt::Debug for Commit<T> {
 
 /// Opaque, process-local history of validated native commits.
 ///
-/// Applying a patch accepts its original input handle or a cheap clone. A
-/// separately opened file is a foreign snapshot even if its document text or
-/// bytes match. Native owners, source guards, origin and policy sidecars are
+/// Applying a patch accepts its original input handle or a cheap clone. In
+/// most formats a separately opened file is a foreign snapshot even if its
+/// document text or bytes match. The ODF text family (ODT, OTH, ODM) and the
+/// ODF object formats (ODG, ODC, ODI, ODB, ODF formula) check content
+/// instead: a separately opened file whose package bytes (or flat XML) equal
+/// the patch's source takes the patch, and the result is the patch's
+/// retained endpoint (record 0347). A file whose bytes differ is refused in
+/// every format. Native owners, source guards, origin and policy sidecars are
 /// retained; applying reuses the already-validated endpoint without a ZIP
 /// round trip. Source freshness is checked in both directions.
 ///
@@ -178,6 +183,8 @@ impl Patch {
     }
     /// Apply to the exact bound input (or a cheap clone), returning the retained
     /// validated native endpoint. The input is unchanged on success or failure.
+    /// The ODF formats also accept a separately opened, byte-identical copy
+    /// of the input (see [`Patch`]).
     ///
     /// # Errors
     /// Returns a typed [`Error::PatchConflict`] for another snapshot, protected
