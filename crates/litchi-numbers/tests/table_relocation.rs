@@ -172,6 +172,11 @@ fn sheet(
 /// table.  The selected table has a stable parent edge and the destination is
 /// non-empty so append order is observable.
 fn fixture() -> TestResult<Vec<u8>> {
+    fixture_with_destination_table(GAMMA_TABLE_NAME)
+}
+
+/// The fixture, with `gamma` naming the destination sheet's table.
+fn fixture_with_destination_table(gamma: &str) -> TestResult<Vec<u8>> {
     let mut document = object(
         DOCUMENT_ID,
         1,
@@ -220,12 +225,7 @@ fn fixture() -> TestResult<Vec<u8>> {
                     SOURCE_SHEET_ID,
                     BETA_TABLE_NAME,
                 )?,
-                table_info(
-                    GAMMA_INFO_ID,
-                    GAMMA_MODEL_ID,
-                    DESTINATION_SHEET_ID,
-                    GAMMA_TABLE_NAME,
-                )?,
+                table_info(GAMMA_INFO_ID, GAMMA_MODEL_ID, DESTINATION_SHEET_ID, gamma)?,
                 object(
                     ALPHA_MODEL_ID,
                     TABLE_MODEL_MESSAGE_TYPE,
@@ -239,7 +239,7 @@ fn fixture() -> TestResult<Vec<u8>> {
                 object(
                     GAMMA_MODEL_ID,
                     TABLE_MODEL_MESSAGE_TYPE,
-                    table_model(GAMMA_MODEL_ID, GAMMA_TABLE_NAME).encode_to_vec(),
+                    table_model(GAMMA_MODEL_ID, gamma).encode_to_vec(),
                 )?,
                 sidecars()?,
             ],
@@ -809,6 +809,40 @@ fn selectors_fail_atomically_for_missing_source_table_and_destination() -> TestR
         assert!(package.move_table(source, table, destination).is_err());
         assert_eq!(package.exact_bytes(), before);
     }
+    Ok(())
+}
+
+/// Table names are unique within a sheet: a destination sheet that holds
+/// the relocated table's name refuses the move, typed and before any
+/// rewrite (record 0347).
+#[test]
+fn a_destination_name_collision_is_refused_typed() -> TestResult {
+    let bytes = fixture_with_destination_table(BETA_TABLE_NAME)?;
+    let package = Package::from_bytes(&bytes)?;
+    let before = package.exact_bytes();
+    let error = package
+        .move_table(SOURCE_SHEET_NAME, BETA_TABLE_NAME, DESTINATION_SHEET_NAME)
+        .expect_err("a duplicate name in the destination sheet");
+    assert!(
+        matches!(
+            error,
+            Error::DuplicateTableName {
+                path: Path::Table {
+                    source_sheet: 0,
+                    table: 1,
+                    destination_sheet: 1
+                }
+            }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(package.exact_bytes(), before);
+    // The other table, whose name the destination does not hold, moves.
+    let commit = package.move_table(SOURCE_SHEET_NAME, ALPHA_TABLE_NAME, DESTINATION_SHEET_NAME)?;
+    assert_eq!(
+        table_names(commit.package(), 1),
+        vec![BETA_TABLE_NAME.to_owned(), ALPHA_TABLE_NAME.to_owned()]
+    );
     Ok(())
 }
 
