@@ -107,7 +107,7 @@ pub enum Error {
     },
     /// A patch was applied to bytes other than its exact captured source.
     #[error("plain paragraph edit patch source is stale")]
-    StaleSource,
+    PatchConflict,
     /// A deterministic durable patch envelope was malformed or non-canonical.
     #[error("invalid durable plain paragraph patch")]
     InvalidDurable,
@@ -420,7 +420,7 @@ impl Patch {
                 .source_version
                 .is_some_and(|expected| source.source_version != expected)
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         source.with_xml(checked_clone(self.after.as_slice(), "patch application")?)
     }
@@ -742,7 +742,7 @@ impl RemovalPatch {
                 .source_version
                 .is_some_and(|expected| source.source_version != expected)
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         source.with_xml(checked_clone(
             self.after.as_slice(),
@@ -1070,7 +1070,7 @@ impl Package {
         self.trim_clean_paragraph_index_for_operation();
         let current = fingerprint_artifact(&self.physical_package()?.source_artifact())?;
         if current != publication.published_fingerprint {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         publication
             .original_artifact
@@ -1140,7 +1140,7 @@ impl Package {
         self.trim_clean_paragraph_index_for_operation();
         let current = fingerprint_artifact(&self.physical_package()?.source_artifact())?;
         if current != publication.published_fingerprint {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         publication
             .original_artifact

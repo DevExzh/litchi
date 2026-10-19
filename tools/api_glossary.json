@@ -325,6 +325,11 @@
           "name": "rewrite_text_nodes",
           "scope": "litchi_docx::document",
           "replacement": "use Edit::substitute_formatted (record 0285)"
+        },
+        {
+          "name": "StaleSource",
+          "scope": "litchi_docx",
+          "replacement": "Error::PatchConflict: a patch's base does not match (ADR 0034 §6; record 0343)"
         }
       ],
       "families": [
@@ -597,6 +602,11 @@
           "name": "rewrite_text_nodes",
           "scope": "litchi_docx::document",
           "replacement": "use Edit::substitute_formatted (record 0285)"
+        },
+        {
+          "name": "StaleSource",
+          "scope": "litchi_docx",
+          "replacement": "Error::PatchConflict: a patch's base does not match (ADR 0034 §6; record 0343)"
         }
       ],
       "families": [

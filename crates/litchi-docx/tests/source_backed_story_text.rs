@@ -488,7 +488,7 @@ fn patches_reject_foreign_and_stale_snapshots_and_cancel_before_output() {
     let commit = edit.commit().unwrap();
     assert!(matches!(
         commit.patch().apply(commit.snapshot()),
-        Err(source_backed::StoryTextError::StaleSource)
+        Err(source_backed::StoryTextError::PatchConflict)
     ));
 
     let foreign = open(&source)

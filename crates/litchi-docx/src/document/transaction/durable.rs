@@ -518,7 +518,7 @@ impl Snapshot {
                 .and_then(Value::as_str)
                 .ok_or_else(|| invalid_durable("missing artifact hash precondition"))?;
             if artifact != expected_artifact {
-                return Err(TransactionError::StaleSource);
+                return Err(TransactionError::PatchConflict);
             }
         }
 

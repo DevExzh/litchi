@@ -255,7 +255,7 @@ semantic-limit migrations.
 | Recognized but wrong family | `UnexpectedFormat { detected: FileFormat }` | `NotPages` / `NotKeynote` / `NotNumbers`, string messages (`"Not an ODT file: …"`) (✅ keynote (0298): `ReadError` and `presentation::Error`; ✅ pages `PackageError::UnexpectedFormat`, unrecognized input `PackageError::NotOfficeFile`; `NotPages` banned, 0299; ✅ Numbers package and workbook `UnexpectedFormat`, 0297) |
 | Unrecognized input | `NotOfficeFile` | — |
 | Source file changed after open | `SourceChanged { expected, observed }` | — |
-| Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct; ✅ PPTX 0252, 🔴 docx) |
+| Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct; ✅ PPTX 0252, ✅ DOCX `document::Error`, the source-backed `story_text`, `paragraph_copy` and `tail_append` errors (0343); banned in the `docx` profiles) |
 | Limit exceeded | `Limit { kind, observed, maximum }` | per-crate duplicates |
 | Allocation failure | `Allocation { resource, .. }` | `CollectionAllocation` |
 | Unexpected internal failure | `Other(String)` (narrowed) | `ParseError(String)` / `InvalidFormat(String)` for expected failures |

@@ -756,7 +756,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         .to_vec();
     assert!(matches!(
         stale_receiver.apply(stale_commit.patch()),
-        Err(crate::document::Error::StaleSource)
+        Err(crate::document::Error::PatchConflict)
     ));
     assert_eq!(
         stale_receiver.document_snapshot().unwrap().xml_bytes(),
@@ -764,7 +764,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     );
     assert!(matches!(
         stale_receiver.apply_durable_document_patch(&stale_durable),
-        Err(crate::document::Error::StaleSource)
+        Err(crate::document::Error::PatchConflict)
     ));
     assert_eq!(
         stale_receiver.document_snapshot().unwrap().xml_bytes(),
@@ -1258,7 +1258,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     let republished = package.opc.main_document_part().unwrap().blob().to_vec();
     assert!(matches!(
         package.apply(commit.patch()),
-        Err(crate::document::Error::StaleSource)
+        Err(crate::document::Error::PatchConflict)
     ));
     assert_eq!(
         package.opc.main_document_part().unwrap().blob(),
@@ -1416,7 +1416,7 @@ fn immutable_apply_shares_noops_and_keeps_each_package_revision_readable() {
     );
     assert!(matches!(
         changed.apply(commit.patch()),
-        Err(crate::document::Error::StaleSource)
+        Err(crate::document::Error::PatchConflict)
     ));
     let restored = changed.apply(&commit.patch().inverse()).unwrap();
     assert_eq!(

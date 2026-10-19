@@ -149,7 +149,7 @@ pub enum Error {
     Io(#[from] io::Error),
     /// Publication was attempted against a package that is no longer current.
     #[error("plain paragraph tail append source is stale")]
-    StaleSource,
+    PatchConflict,
 }
 
 /// Finite bounds for one source-backed plain-paragraph tail append.

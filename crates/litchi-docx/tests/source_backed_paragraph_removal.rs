@@ -200,12 +200,12 @@ fn durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound() {
     let stale = open(foreign_bytes.clone())
         .plain_paragraph_removal_snapshot()
         .unwrap();
-    assert!(matches!(durable.apply(&stale), Err(Error::StaleSource)));
+    assert!(matches!(durable.apply(&stale), Err(Error::PatchConflict)));
     let mut stale_output = Vec::new();
     assert!(matches!(
         open(foreign_bytes)
             .publish_plain_paragraph_removal_patch_to_stream(&mut stale_output, &durable),
-        Err(Error::StaleSource)
+        Err(Error::PatchConflict)
     ));
     assert!(stale_output.is_empty());
 
