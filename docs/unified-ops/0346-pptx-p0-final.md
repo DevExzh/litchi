@@ -227,7 +227,31 @@ the notes part: follow-up 0346-P2, one pass over all chunks).
 
 ## 7. Gates
 
-See the branch's final report (commands and exit codes).
+On the merged tree (`d392343e02` and the record commits on top); cargo
+through the memory-capped shim, `CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`;
+every exit status checked (`.coord/pptx-p0b/gate-logs/summary.txt`).
+
+| gate | exit |
+|---|---:|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-pptx -p litchi-ops -p litchi -p litchi-py -p litchi-cli --all-targets --all-features -- -D warnings` | 0 (first run: `items_after_test_module` in `table/shape.rs`, fixed) |
+| `cargo clippy -p litchi-ops --features <all but encryption> --all-targets -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features pptx] --all-targets -- -D warnings` | 0, 0 |
+| `cargo test -p litchi-pptx --all-features` | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, 9 `--test` chunks of 20 (executables deleted per chunk) | 0 |
+| `cargo test -p litchi --all-features`; `cargo test -p litchi-cli --all-features` | 0; 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --test capabilities --test registry` (all features; all but `encryption`) | 0, 0 (no change after the merge) |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test crud_matrix --test corpus_fidelity` | 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test officecli_corpus`; `tools/officecli_corpus.py`; `--check` | 0, 0, 0 |
+| `tools/officecli_capability_delta.py --officecli …/3rdparty/OfficeCLI`; `--check` | 0, 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pptx -p litchi-ops` | 0 |
+| `tools/check_crate_boundaries.py`; `tools/non_iwork_gate.py verify` | 0; 0 |
+| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_unified_bench_matrix` | 0 |
+| `tools/unified_bench_matrix.py --check` | 0 (first run: record 0346 had evidence but no parser; `p0346` added, the cold misses annotated) |
+| `tools/check_feature_matrix.py` | 0 |
 
 ## 8. Follow-ups
 
