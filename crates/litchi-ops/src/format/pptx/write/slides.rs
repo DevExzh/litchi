@@ -32,6 +32,8 @@ impl Pptx {
     ) -> Result<Commit> {
         let mut name = None;
         let mut hidden = None;
+        // The layout retargets the slide's layout relationship (record 0346).
+        let mut layout = None;
         // `Some(None)` removes the slide's direct transition.
         let mut transition: Option<Option<litchi_pptx::transition::Transition>> = None;
         let mut properties = 0_u8;
@@ -80,8 +82,24 @@ impl Pptx {
                             _ => unreachable!("slide transition coercion"),
                         });
                     },
-                    SlideProperty::Layout => unreachable!("read-only slide layout setter"),
+                    SlideProperty::Layout => {
+                        let Some(Scalar::Text(value)) = value else {
+                            unreachable!("slide layout coercion")
+                        };
+                        bound(
+                            LimitKind::StagedBytes,
+                            value.len(),
+                            limits.max_staged_bytes(),
+                        )?;
+                        let mut owned = String::new();
+                        owned.try_reserve_exact(value.len()).map_err(allocation)?;
+                        owned.push_str(value);
+                        layout = Some(owned);
+                    },
                     SlideProperty::Notes => unreachable!("notes are routed before slide metadata"),
+                    SlideProperty::Title | SlideProperty::Text => {
+                        unreachable!("the title and text shorthand is add only")
+                    },
                 }
                 Ok(())
             })?;
@@ -92,7 +110,8 @@ impl Pptx {
             .as_ref()
             .map_or(0, String::len)
             .saturating_add(size_of::<usize>() + size_of::<Option<bool>>())
-            .saturating_add(if transition.is_some() { 64 } else { 0 });
+            .saturating_add(if transition.is_some() { 64 } else { 0 })
+            .saturating_add(layout.as_ref().map_or(0, String::len));
         let metadata = name.is_some() || hidden.is_some();
         let mut append = |node: crate::format::pptx::Node<'_>| -> Result<()> {
             let Item::Slide(slide) = node.item() else {
@@ -145,7 +164,15 @@ impl Pptx {
             ));
         }
         let source = self.editable_owner()?;
-        let (target, proof, changed) = match &source {
+        // A layout change edits the slide's relationships, which the
+        // source-backed slide edit does not stage: a source owner is promoted
+        // (record 0346).
+        let promoted = match (&source, &layout) {
+            (Editable::Source(_), Some(_)) => Some(Editable::Eager(Self::eager_base(&source)?)),
+            _ => None,
+        };
+        let owner = promoted.as_ref().unwrap_or(&source);
+        let (target, proof, changed) = match owner {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for position in &targets {
@@ -168,6 +195,9 @@ impl Pptx {
                     }
                     if let Some(value) = &transition {
                         edit.set_slide_transition(*position, value.as_ref())?;
+                    }
+                    if let Some(layout) = &layout {
+                        edit.set_slide_layout(*position, layout)?;
                     }
                 }
                 let (target, patch) = edit.commit()?.into_parts();

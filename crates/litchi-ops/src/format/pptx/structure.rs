@@ -72,7 +72,7 @@ impl Pptx {
                 "this element kind cannot be added to a PPTX presentation yet",
             )
             .with_suggestion(
-                "addable: slide, shape (textbox), picture, chart, table (and its rows and columns), smartart (and its nodes), hyperlink, media, comment, modernComment, paragraph and run; capabilities() lists the gaps",
+                "addable: slide, shape (textbox), picture, chart, table (and its rows and columns), smartart (and its nodes), hyperlink, media, comment, modernComment, placeholder, notes, paragraph and run; capabilities() lists the gaps",
             ));
         }
         if ["picture", "image", "img"]
@@ -113,6 +113,14 @@ impl Pptx {
         {
             return self.add_modern_comment(parent, node, limits);
         }
+        // Placeholders and speaker notes (record 0346).
+        if node.kind().eq_ignore_ascii_case("placeholder") || node.kind().eq_ignore_ascii_case("ph")
+        {
+            return self.add_placeholder(parent, node, limits);
+        }
+        if node.kind().eq_ignore_ascii_case("notes") {
+            return self.add_notes(parent, node, limits);
+        }
         if node.kind().eq_ignore_ascii_case("tr") || node.kind().eq_ignore_ascii_case("row") {
             return self.add_row(parent, node, limits);
         }
@@ -149,6 +157,9 @@ impl Pptx {
         let mut layout = None;
         let mut name = None;
         let mut hidden = None;
+        // OfficeCLI's title and body shorthand (record 0346).
+        let mut title = None;
+        let mut body = None;
         let mut assigned = 0_u8;
         let mut staged_bytes = 0_usize;
         for (key, value) in node.props().iter() {
@@ -166,7 +177,10 @@ impl Pptx {
             assigned |= bit;
             entry.prepare(Operation::Add, value, |property, value| {
                 match property {
-                    SlideProperty::Layout | SlideProperty::Name => {
+                    SlideProperty::Layout
+                    | SlideProperty::Name
+                    | SlideProperty::Title
+                    | SlideProperty::Text => {
                         let value = match value {
                             Some(Scalar::Text(value)) => value,
                             None => "",
@@ -178,9 +192,9 @@ impl Pptx {
                             staged_bytes,
                             limits.max_staged_bytes(),
                         )?;
-                        if matches!(property, SlideProperty::Name) {
+                        if !matches!(property, SlideProperty::Layout) {
                             super::write::validate_text(value)
-                                .map_err(|error| error.with_property("name"))?;
+                                .map_err(|error| error.with_property(entry.spec.name))?;
                         }
                         let mut owned = String::new();
                         owned
@@ -190,6 +204,8 @@ impl Pptx {
                         match property {
                             SlideProperty::Layout => layout = Some(owned),
                             SlideProperty::Name => name = Some(owned),
+                            SlideProperty::Title => title = Some(owned),
+                            SlideProperty::Text => body = Some(owned),
                             SlideProperty::Hidden
                             | SlideProperty::Notes
                             | SlideProperty::Transition => {
@@ -256,7 +272,38 @@ impl Pptx {
             },
         };
         let source = self.editable_owner()?;
+        // Placeholder text is staged by the eager editor: a source owner is
+        // promoted for a slide added with `title` or `text`, as comment and
+        // notes writes promote it (record 0346).
+        let shorthand = title.is_some() || body.is_some();
         let (target, proof, after) = match &source {
+            Editable::Source(_) | Editable::Eager(_) if shorthand => {
+                let package = Self::eager_base(&source)?;
+                let mut edit = package.edit()?;
+                let _ = edit.insert_slide(Position::new(index), &layout)?;
+                edit.set_slide_properties(index, name.as_deref(), hidden)?;
+                if let Some(title) = &title {
+                    let _ = edit.put_placeholder_text(
+                        index,
+                        litchi_pptx::PlaceholderKind::Title,
+                        None,
+                        title,
+                    )?;
+                }
+                if let Some(body) = &body {
+                    // OfficeCLI's content slot: `type="body" idx="1"`.
+                    let _ = edit.put_placeholder_text(
+                        index,
+                        litchi_pptx::PlaceholderKind::Body,
+                        Some(1),
+                        body,
+                    )?;
+                }
+                let (target, patch) = edit.commit()?.into_parts();
+                let target = Arc::new(target);
+                let after = self.adopt_eager(Arc::clone(&target));
+                (Editable::Eager(target), Proof::Eager(patch), after)
+            },
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 let _ = edit.insert_slide(Position::new(index), &layout)?;
@@ -311,6 +358,9 @@ const ADDABLE: &[&str] = &[
     "modern-comment",
     "thread",
     "threadedcomment",
+    "placeholder",
+    "ph",
+    "notes",
     "smartart",
     "node",
     "col",

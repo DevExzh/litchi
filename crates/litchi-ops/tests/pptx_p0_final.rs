@@ -485,3 +485,234 @@ fn modern_comments_and_replies_are_set() {
         assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
     }
 }
+
+/// A deck of the builder's default layouts and no slides.
+fn layouts_deck() -> Vec<u8> {
+    litchi_pptx::builder::Builder::new()
+        .unwrap()
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap()
+}
+
+fn paths(file: &File, query: &str) -> Vec<String> {
+    file.query(query)
+        .unwrap()
+        .map(|node| node.unwrap().path().to_string())
+        .collect()
+}
+
+#[test]
+fn slide_title_and_text_fill_the_layout_placeholders() {
+    let bytes = layouts_deck();
+    for file in files(&bytes) {
+        let plain = file
+            .add(
+                "/",
+                NewNode::new("slide").prop("layout", "Title and Content"),
+            )
+            .unwrap()
+            .file;
+        let added = file
+            .add(
+                "/",
+                NewNode::new("slide")
+                    .prop("layout", "Title and Content")
+                    .prop("title", "Quarterly review")
+                    .prop("text", "Revenue\nCosts"),
+            )
+            .unwrap();
+        assert_eq!(added.path.to_string(), "/slide[1]");
+        let file2 = added.file;
+        // The layout's own placeholders take the text: no shape is added.
+        assert_eq!(
+            paths(&file2, "/slide[1]/placeholder"),
+            paths(&plain, "/slide[1]/placeholder")
+        );
+        assert_eq!(text(&file2, "/slide[1]/placeholder[1]"), "Quarterly review");
+        assert_eq!(text(&file2, "/slide[1]/placeholder[2]"), "Revenue\nCosts");
+        assert_eq!(
+            value(&file2, "/slide[1]", "layout").as_deref(),
+            Some("Title and Content")
+        );
+        // The title of a title-slide layout is its centred title.
+        let title_slide = file
+            .add(
+                "/",
+                NewNode::new("slide")
+                    .prop("layout", "Title Slide")
+                    .prop("title", "Welcome"),
+            )
+            .unwrap()
+            .file;
+        assert_eq!(
+            value(&title_slide, "/slide[1]/placeholder[1]", "phType").as_deref(),
+            Some("ctrTitle")
+        );
+        assert_eq!(text(&title_slide, "/slide[1]/placeholder[1]"), "Welcome");
+    }
+}
+
+#[test]
+fn slide_title_and_text_add_placeholders_a_blank_layout_lacks() {
+    let bytes = layouts_deck();
+    for file in files(&bytes) {
+        let added = file
+            .add(
+                "/",
+                NewNode::new("slide")
+                    .prop("layout", "Blank")
+                    .prop("title", "Agenda")
+                    .prop("text", "One"),
+            )
+            .unwrap()
+            .file;
+        assert_eq!(paths(&added, "/slide[1]/placeholder").len(), 2);
+        assert_eq!(
+            value(&added, "/slide[1]/placeholder[1]", "phType").as_deref(),
+            Some("title")
+        );
+        assert_eq!(text(&added, "/slide[1]/placeholder[1]"), "Agenda");
+        assert_eq!(
+            value(&added, "/slide[1]/placeholder[2]", "phType").as_deref(),
+            Some("body")
+        );
+        assert_eq!(text(&added, "/slide[1]/placeholder[2]"), "One");
+        // Unbound placeholders get a rectangle, so they render.
+        assert!(value(&added, "/slide[1]/placeholder[1]", "width").is_some());
+        let slide = member(&added, "ppt/slides/slide1.xml").unwrap();
+        assert!(slide.contains(r#"<p:ph type="body" idx="1"/>"#), "{slide}");
+    }
+}
+
+#[test]
+fn slide_layout_is_set() {
+    let bytes = layouts_deck();
+    for file in files(&bytes) {
+        let deck = file
+            .add(
+                "/",
+                NewNode::new("slide").prop("layout", "Title and Content"),
+            )
+            .unwrap()
+            .file;
+        let changed = deck
+            .set(
+                "/slide[1]",
+                litchi_ops::Props::new().with("layout", "Title Only"),
+            )
+            .unwrap();
+        assert_eq!(
+            value(&changed, "/slide[1]", "layout").as_deref(),
+            Some("Title Only")
+        );
+        // The slide's shapes are kept, as OfficeCLI keeps them.
+        assert_eq!(
+            paths(&changed, "/slide[1]/placeholder"),
+            paths(&deck, "/slide[1]/placeholder")
+        );
+        let same = changed
+            .set(
+                "/slide[1]",
+                litchi_ops::Props::new().with("layout", "Title Only"),
+            )
+            .unwrap();
+        assert_eq!(same.to_bytes().unwrap(), changed.to_bytes().unwrap());
+        let missing = deck
+            .set(
+                "/slide[1]",
+                litchi_ops::Props::new().with("layout", "No Such Layout"),
+            )
+            .unwrap_err();
+        assert_eq!(missing.code(), Code::NotFound);
+    }
+}
+
+#[test]
+fn placeholders_are_added_with_text() {
+    let bytes = layouts_deck();
+    for file in files(&bytes) {
+        let deck = file
+            .add("/", NewNode::new("slide").prop("layout", "Blank"))
+            .unwrap()
+            .file;
+        let added = deck
+            .add(
+                "/slide[1]",
+                NewNode::new("placeholder")
+                    .prop("phType", "title")
+                    .prop("text", "Heading"),
+            )
+            .unwrap();
+        assert_eq!(added.path.to_string(), "/slide[1]/shape[1]");
+        assert_eq!(text(&added.file, "/slide[1]/placeholder[1]"), "Heading");
+        let twice = added
+            .file
+            .add(
+                "/slide[1]",
+                NewNode::new("placeholder").prop("type", "title"),
+            )
+            .unwrap_err();
+        assert_eq!(twice.code(), Code::InvalidArgument);
+        let footer = added
+            .file
+            .add(
+                "/slide[1]",
+                NewNode::new("placeholder")
+                    .prop("phType", "footer")
+                    .prop("text", "Confidential"),
+            )
+            .unwrap();
+        assert_eq!(footer.path.to_string(), "/slide[1]/shape[2]");
+        // The Blank layout's footer slot binds the new placeholder.
+        let slide = member(&footer.file, "ppt/slides/slide1.xml").unwrap();
+        assert!(slide.contains(r#"type="ftr" idx="11""#), "{slide}");
+        assert_eq!(
+            text(&footer.file, "/slide[1]/placeholder[2]"),
+            "Confidential"
+        );
+        let missing = deck
+            .add("/slide[1]", NewNode::new("placeholder").prop("text", "x"))
+            .unwrap_err();
+        assert_eq!(missing.code(), Code::MissingProperty);
+    }
+}
+
+#[test]
+fn notes_are_added() {
+    let bytes = layouts_deck();
+    for file in files(&bytes) {
+        let deck = file
+            .add("/", NewNode::new("slide").prop("layout", "Blank"))
+            .unwrap()
+            .file;
+        assert!(paths(&deck, "/slide[1]/notes").is_empty());
+        let added = deck
+            .add(
+                "/slide[1]",
+                NewNode::new("notes").prop("text", "Emphasize slide 3 data"),
+            )
+            .unwrap();
+        assert_eq!(added.path.to_string(), "/slide[1]/notes");
+        assert_eq!(
+            text(&added.file, "/slide[1]/notes"),
+            "Emphasize slide 3 data"
+        );
+        // Adding again replaces the text, as OfficeCLI does.
+        let again = added
+            .file
+            .add("/slide[1]", NewNode::new("notes").prop("text", "Second"))
+            .unwrap()
+            .file;
+        assert_eq!(text(&again, "/slide[1]/notes"), "Second");
+    }
+    let bytes = presentation::bytes();
+    for file in files(&bytes) {
+        let replaced = file
+            .add("/slide[1]", NewNode::new("notes").prop("text", "New notes"))
+            .unwrap()
+            .file;
+        assert_eq!(text(&replaced, "/slide[1]/notes"), "New notes");
+    }
+}

@@ -69,6 +69,7 @@ mod remove;
 mod rows;
 mod scenes;
 mod shape_add;
+mod slide_text;
 mod smartart;
 mod spec;
 mod steps;
@@ -157,6 +158,8 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     // Modern comment threads and replies (`parent`), speaker notes and
     // placeholders (record 0346).
     "modernComment",
+    "notes",
+    "placeholder",
     // Paragraphs and runs of shape, cell and notes bodies, tables and table
     // rows (record 0333).
     "paragraph",

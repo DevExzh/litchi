@@ -2053,17 +2053,62 @@ pub(crate) const PARAGRAPH_PROP_ALIASES: &[crate::registry::PropAlias] =
     &PARAGRAPH_WRITE_TABLE.prop_aliases();
 pub(crate) const RUN_PROP_ALIASES: &[crate::registry::PropAlias] = &RUN_WRITE_TABLE.prop_aliases();
 
+/// The placeholder's capability rows: the shape's, with `add` only for the
+/// keys a new placeholder takes, `phType` and `text` (record 0346).
 const fn placeholder_capability_props() -> [PropSpec; SHAPE_WRITE_COUNT] {
     let mut props = SHAPE_WRITE_TABLE.readable();
     let mut index = 0;
     while index < props.len() {
         let mut access = props[index].access;
-        access.add = false;
+        access.add = const_eq(props[index].name, "phType") || const_eq(props[index].name, "text");
         props[index].access = access;
         index += 1;
     }
     props
 }
+
+const fn const_eq(left: &str, right: &str) -> bool {
+    let (left, right) = (left.as_bytes(), right.as_bytes());
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < left.len() {
+        if left[index] != right[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+/// A new placeholder's keys (record 0346): its type, required, and text.
+#[derive(Clone, Copy)]
+pub(super) enum PlaceholderSetter {
+    Kind,
+    Text,
+}
+pub(super) const PLACEHOLDER_ADD_TABLE: crate::registry::Table<PlaceholderSetter, 2, 1> =
+    crate::registry::Table::new(
+        [
+            crate::registry::Entry {
+                spec: PropSpec::new("phType", ValueType::Token(&PLACEHOLDER_TYPE)),
+                access: crate::registry::Access::Add(PlaceholderSetter::Kind),
+                constraint: crate::registry::Constraint::None,
+                clear: false,
+            },
+            crate::registry::Entry {
+                spec: PropSpec::new("text", ValueType::Text),
+                access: crate::registry::Access::Add(PlaceholderSetter::Text),
+                constraint: crate::registry::Constraint::None,
+                clear: false,
+            },
+        ],
+        [crate::registry::Alias {
+            name: "type",
+            entry: 0,
+        }],
+    );
 const PLACEHOLDER_CAPABILITY_PROPS_ARRAY: [PropSpec; SHAPE_WRITE_COUNT] =
     placeholder_capability_props();
 pub(crate) const PLACEHOLDER_CAPABILITY_PROPS: &[PropSpec] = &PLACEHOLDER_CAPABILITY_PROPS_ARRAY;
@@ -2077,8 +2122,14 @@ pub(super) enum SlideProperty {
     Notes,
     /// The slide's direct transition, OfficeCLI's shorthand (record 0269).
     Transition,
+    /// OfficeCLI's `title` shorthand on add: the title placeholder's text
+    /// (record 0346).
+    Title,
+    /// OfficeCLI's `text` shorthand on add: the body placeholder's text
+    /// (record 0346).
+    Text,
 }
-const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 2;
+const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 4;
 const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
     let mut entries = [Entry::read(SLIDE_PROPS[0]); SLIDE_WRITE_COUNT];
@@ -2087,9 +2138,10 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
         entries[index] = Entry::read(SLIDE_PROPS[index]);
         index += 1;
     }
+    // Settable since record 0346: the slide's layout relationship.
     entries[0] = Entry {
         spec: SLIDE_PROPS[0],
-        access: Access::Add(SlideProperty::Layout),
+        access: Access::SetAndAdd(SlideProperty::Layout),
         constraint: Constraint::NotEmpty,
         clear: false,
     };
@@ -2121,17 +2173,31 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
         constraint: Constraint::None,
         clear: true,
     };
+    // Add only, as OfficeCLI: afterwards the placeholders hold the text.
+    entries[SLIDE_PROPS.len() + 2] = Entry {
+        spec: write_only("title", ValueType::Text),
+        access: Access::Add(SlideProperty::Title),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries[SLIDE_PROPS.len() + 3] = Entry {
+        spec: write_only("text", ValueType::Text),
+        access: Access::Add(SlideProperty::Text),
+        constraint: Constraint::None,
+        clear: false,
+    };
     entries
 }
 pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<SlideProperty, SLIDE_WRITE_COUNT, 0> =
     crate::registry::Table::new(slide_write_entries(), []);
 
-/// Speaker-notes `text` (set; null clears the text).
+/// Speaker-notes `text` (set and, since record 0346, add; null clears the
+/// text).
 const fn notes_write_entries() -> [crate::registry::Entry<()>; NOTES_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
     [Entry {
         spec: NOTES_PROPS[0],
-        access: Access::Set(()),
+        access: Access::SetAndAdd(()),
         constraint: Constraint::None,
         clear: true,
     }]

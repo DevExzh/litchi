@@ -7,6 +7,7 @@ mod media;
 mod modern_comments;
 mod notes;
 mod picture;
+mod placeholders;
 mod smartart;
 mod table;
 mod text;

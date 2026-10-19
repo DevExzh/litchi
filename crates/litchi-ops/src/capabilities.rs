@@ -3738,9 +3738,9 @@ impl Iterator for Properties {
                             match self.element.data().canonical {
                                 "slide" => Some(self.element.pptx_slide_add == Some(true)),
                                 "shape" => Some(self.element.pptx_shape_add == Some(true)),
-                                // Placeholder creation is not implemented even
-                                // though it shares the shape property registry.
-                                "placeholder" => Some(false),
+                                // Placeholder insertion follows shape insertion
+                                // (record 0346).
+                                "placeholder" => Some(self.element.pptx_shape_add == Some(true)),
                                 _ => None,
                             }
                         } else {

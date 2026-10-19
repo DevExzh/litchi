@@ -194,7 +194,13 @@ fn attributes(fragment: &[u8]) -> Result<Option<Planned>> {
 
 /// `PowerPoint`'s name for a new placeholder.
 fn name(planned: &Planned, shape_id: u32) -> String {
-    let label = match planned.kind {
+    placeholder_name(planned.kind, planned.orientation == Some("vert"), shape_id)
+}
+
+/// `PowerPoint`'s name for a new placeholder of `kind` with non-visual
+/// identifier `shape_id` (record 0346 shares it with placeholder addition).
+pub(crate) fn placeholder_name(kind: PlaceholderKind, vertical: bool, shape_id: u32) -> String {
+    let label = match kind {
         PlaceholderKind::Title | PlaceholderKind::CenteredTitle => "Title",
         PlaceholderKind::Subtitle => "Subtitle",
         PlaceholderKind::Body => "Text Placeholder",
@@ -211,16 +217,12 @@ fn name(planned: &Planned, shape_id: u32) -> String {
         PlaceholderKind::SlideNumber => "Slide Number Placeholder",
         PlaceholderKind::Header => "Header Placeholder",
     };
-    let vertical = if planned.orientation == Some("vert") {
-        "Vertical "
-    } else {
-        ""
-    };
-    format!("{vertical}{label} {}", shape_id - 1)
+    let vertical = if vertical { "Vertical " } else { "" };
+    format!("{vertical}{label} {}", shape_id.saturating_sub(1))
 }
 
 /// Whether a new placeholder of `kind` holds an empty text body.
-const fn takes_text(kind: PlaceholderKind) -> bool {
+pub(crate) const fn takes_text(kind: PlaceholderKind) -> bool {
     matches!(
         kind,
         PlaceholderKind::Title

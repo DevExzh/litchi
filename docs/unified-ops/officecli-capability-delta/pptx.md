@@ -381,7 +381,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | modernComment | `progress` | number |  | --g | litchi-only | — |  |  |  |
 | modernComment | `x` | length |  | --g | litchi-only | — |  |  |  |
 | modernComment | `y` | length |  | --g | litchi-only | — |  |  |  |
-| notes | `text` | string | asg | -sg | supported | partial | P0 | planned 0333 (pptx-p0-residue) |  |
+| notes | `text` | string | asg | asg | supported | supported |  |  |  |
 | notes | `direction` | enum | as- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | notes | `lang` | string | as- |  | write-only | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | ole | `x` | length | asg | --g | supported | gap | P2 | deferred-P2 0332 (pptx-breadth) |  |
@@ -453,9 +453,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `src` | string | as- | as- | write-only | supported |  |  |  |
 | picture | `zorder` | int |  | --g | litchi-only | — |  |  |  |
 | placeholder | `id` | number | a-g |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| placeholder | `phType` | enum | a-g | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
+| placeholder | `phType` | enum | a-g | a-g | supported | supported |  |  |  |
 | placeholder | `name` | string | asg | --g | supported | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
-| placeholder | `text` | string | asg | -s- | write-only | partial | P0 | planned 0333 (pptx-p0-residue) |  |
+| placeholder | `text` | string | asg | as- | write-only | supported |  |  |  |
 | placeholder | `phIndex` | number | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | placeholder | `effective.direction` | enum | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | placeholder | `effective.size` | length | --g |  | unlisted | — | P1 | deferred-P1 0332 (pptx-breadth) |  |
@@ -695,9 +695,9 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | shape | `indent` | length |  | --g | litchi-only | — |  |  |  |
 | shape | `marginLeft` | length |  | --g | litchi-only | — |  |  |  |
 | shape | `marginRight` | length |  | --g | litchi-only | — |  |  |  |
-| slide | `layout` | string | asg | a-g | supported | partial | P0 | planned 0333 (pptx-p0-residue) |  |
-| slide | `title` | string | a-- |  | write-only | gap | P0 | planned 0333 (pptx-p0-residue) |  |
-| slide | `text` | string | a-- |  | supported | gap | P0 | planned 0333 (pptx-p0-residue) | the node's text |
+| slide | `layout` | string | asg | asg | supported | supported |  |  |  |
+| slide | `title` | string | a-- | a-- | write-only | supported |  |  |  |
+| slide | `text` | string | a-- | a-- | write-only | supported |  |  |  |
 | slide | `background` | color | asg |  | gap | gap | P1 | deferred-P1 0332 (pptx-breadth) | M1-extended |
 | slide | `transition` | string | asg | -s- | write-only | partial | P1 | deferred-P1 0332 (pptx-breadth) |  |
 | slide | `advanceTime` | number | asg |  | unlisted | gap | P1 | deferred-P1 0332 (pptx-breadth) |  |
@@ -899,11 +899,13 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | transition | `advanceClick` | bool | -sg |  | unlisted | gap | P2 | deferred-P2 0332 (pptx-breadth) |  |
 | transition | `transitionDuration` | number | --g |  | unlisted | — | P2 | deferred-P2 0332 (pptx-breadth) |  |
 | transition | `transitionSpeed` | enum | --g |  | unlisted | — | P2 | deferred-P2 0332 (pptx-breadth) |  |
-| transition | `layout` | string |  | a-g | litchi-only | litchi-only |  |  |  |
+| transition | `layout` | string |  | asg | litchi-only | litchi-only |  |  |  |
 | transition | `layoutType` | string |  | --g | litchi-only | — |  |  |  |
 | transition | `name` | string |  | asg | litchi-only | litchi-only |  |  |  |
 | transition | `hidden` | bool |  | asg | litchi-only | litchi-only |  |  |  |
 | transition | `notes` | string |  | -s- | litchi-only | litchi-only |  |  |  |
+| transition | `title` | string |  | a-- | litchi-only | litchi-only |  |  |  |
+| transition | `text` | string |  | a-- | litchi-only | litchi-only |  |  |  |
 | zoom | `target` | int | asg |  | element gap | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
 | zoom | `x` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |
 | zoom | `y` | length | asg |  | element gap | gap | P2 | deferred-P2 0332 (pptx-breadth) | M1-extended |

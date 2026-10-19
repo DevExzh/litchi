@@ -123,7 +123,7 @@ fn validate_date_time(value: &str, property: &'static str) -> Result<()> {
 impl Pptx {
     /// The eager base for an edit of separate parts: the eager owner itself,
     /// or the source owner's current bytes promoted to an eager package.
-    fn eager_base(source: &Editable) -> Result<Arc<litchi_pptx::Package>> {
+    pub(super) fn eager_base(source: &Editable) -> Result<Arc<litchi_pptx::Package>> {
         Ok(match source {
             Editable::Eager(package) => Arc::clone(package),
             Editable::Source(package) => Arc::new(litchi_pptx::Package::from_reader(
