@@ -1269,6 +1269,13 @@ fn extract_text(xml: &[u8], context: Option<NamespaceContext<'_>>) -> Result<Str
     Ok(result.trim().to_owned())
 }
 
+/// Whether `haystack` holds `needle`.
+fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack
+        .windows(needle.len())
+        .any(|window| window == needle)
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -1313,11 +1320,4 @@ mod tests {
         let table = Table::from_xml(xml).unwrap();
         assert_eq!(table.row_count().unwrap(), 1);
     }
-}
-
-/// Whether `haystack` holds `needle`.
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle)
 }

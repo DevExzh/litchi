@@ -2486,6 +2486,30 @@ def p0345():
     })
 
 
+@needs("0346")
+def p0346():
+    """Record 0346 §6: pptx_p0_final_bench, two runs (batches against one
+    leaf edit staging the same text edits, `cold` on a fresh handle per
+    batch and `warm` on one; single operations against the leaf verb)."""
+    paths = trials((RES / "0346").glob("pptx-p0-final-bench-run*.jsonl"))
+    out = []
+    for scen, items in group_cases([load_jsonl(p) for p in paths], lambda r: r["scenario"]).items():
+        if "/" in scen:
+            family, owner, n, *handle = scen.split("/")
+            n = int(n)
+            state = f", {handle[0]} handle" if handle else ""
+            op = "batch"
+            label = f"{family.replace('_', ' ')} ({owner} owner{state}; one File::batch vs one leaf edit)"
+            size, budget = f"{n} ops", BATCH if n >= 1000 else SCALING
+        else:
+            op = "add" if "_add" in scen else "set"
+            label, size, budget = scen, "", SINGLE
+        out.append(row("0346", "pptx", op, label, size, med(i["leaf_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items), [i["ratio"] for i in items],
+                       budget, f"pptx_p0_final:{scen}", src(paths)))
+    return out
+
+
 @needs("0347")
 def p0347():
     """Record 0347 §6: numbers_unified_bench swaps (two runs, with the
@@ -2507,7 +2531,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
-           p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345,
+           p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347]
 
 
