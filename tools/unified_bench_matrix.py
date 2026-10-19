@@ -1314,6 +1314,11 @@ NUMBERS_SCEN = {
     # Record 0314's routes, first parsed by record 0326.
     "batch_1000_owned": ("batch set", "batch 1000, items copied outside the clock", BATCH),
     "batch_1000_parsed": ("batch set", "batch 1000, paths parsed outside the clock", BATCH),
+    # Record 0347's swaps: the leaf's moves (four steps across sheets).
+    "sheet_swap": ("swap (sheet)", "sheet swap (three sheets; two leaf moves)", SINGLE),
+    "table_swap": ("swap (table)", "table swap within a sheet (two leaf moves)", SINGLE),
+    "table_swap_sheets": ("swap (table)",
+                          "table swap across sheets (two relocations, two moves)", SINGLE),
 }
 
 
@@ -2462,6 +2467,20 @@ def p0342():
     })
 
 
+@needs("0347")
+def p0347():
+    """Record 0347 §6: numbers_unified_bench swaps (two runs, with the
+    sheet and table moves as controls) and the p0_residue_bench picture
+    `set src` after the 0338-P1 fix (the bench's other rows are unchanged
+    paths, recorded under 0338)."""
+    base = RES / "0347"
+    paths = trials(base.glob("numbers-swap-run*.json"))
+    out = numbers_docs("0347", [load_json(p)["scenarios"] for p in paths], paths)
+    out += [r for r in native_lines("0347", "p0_residue", base / "p0-residue-bench.txt", {})
+            if "picture" in r["scenario"]]
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -2469,7 +2488,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0293, p0295, p0296, p0297, p0298, p0299, p0301, p0302, p0303, p0304, p0305,
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
-           p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342]
+           p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0347]
 
 
 # ---------------------------------------------------------------- merge
