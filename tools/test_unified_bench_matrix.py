@@ -1,0 +1,103 @@
+"""Unit tests for tools/unified_bench_matrix.py (records 0337 and 0344)."""
+
+from __future__ import annotations
+
+import io
+import tempfile
+import unittest
+from contextlib import redirect_stderr
+from pathlib import Path
+
+from tools import unified_bench_matrix as matrix
+
+
+def row(record: str, status: str = "meets", explanation: str = "", **extra) -> dict:
+    r = matrix.row(record, "xlsx", "set", "scenario", "", 1.0, 1.2, [1.2], matrix.SINGLE,
+                   f"series:{record}", "parsed", explanation=explanation)
+    r["status"] = status
+    r.update(extra)
+    return r
+
+
+class EvidenceCoverage(unittest.TestCase):
+    def evidence(self, names: list[str], empty_dirs: tuple[str, ...] = ()) -> dict:
+        with tempfile.TemporaryDirectory() as tmp:
+            res = Path(tmp)
+            for name in names:
+                path = res / name
+                if "." in name:
+                    path.write_text("{}", encoding="utf-8")
+                else:
+                    path.mkdir()
+                    (path / "run-1.json").write_text("{}", encoding="utf-8")
+            for name in empty_dirs:
+                (res / name).mkdir()
+            return matrix.evidence_records(res)
+
+    def test_entries_belong_to_the_record_their_name_starts_with(self):
+        found = self.evidence(["0328", "0255-python-overhead.json", "0251a-docx-element-writes",
+                               "0209-xls-batch.json", "notes"], empty_dirs=("0343",))
+        # Records before 0249 are outside the matrix; an empty directory is no evidence.
+        self.assertEqual(found, {"0251a": ["0251a-docx-element-writes"],
+                                 "0255": ["0255-python-overhead.json"], "0328": ["0328"]})
+
+    def test_evidence_without_rows_fails(self):
+        problems = matrix.coverage_problems([row("0328")], {}, {"0328": ["0328"], "0342": ["0342"]})
+        self.assertEqual(len(problems), 1)
+        self.assertIn("record 0342", problems[0])
+        self.assertIn("contributes no rows", problems[0])
+
+    def test_an_exemption_needs_a_reason_and_must_not_go_stale(self):
+        evidence = {"0339": ["0339"], "0328": ["0328"]}
+        ok = {"evidence_without_rows": [{"record": "0339", "reason": "a probe, not a measurement"}]}
+        self.assertEqual(matrix.coverage_problems([row("0328")], ok, evidence), [])
+        no_reason = {"evidence_without_rows": [{"record": "0339", "reason": " "}]}
+        self.assertIn("has no reason", matrix.coverage_problems([row("0328")], no_reason, evidence)[0])
+        has_rows = {"evidence_without_rows": [{"record": "0328", "reason": "x"}]}
+        problems = matrix.coverage_problems([row("0328")], has_rows, evidence)
+        self.assertTrue(any("contributes rows" in p for p in problems))
+        gone = {"evidence_without_rows": [{"record": "0400", "reason": "x"}]}
+        problems = matrix.coverage_problems([row("0328")], gone, evidence)
+        self.assertTrue(any("has no evidence" in p for p in problems))
+
+
+class MissDispositions(unittest.TestCase):
+    def test_explicit_and_worded_dispositions(self):
+        self.assertEqual(matrix.disposition(row("0338", "miss", "x", disposition="residual")), "residual")
+        self.assertEqual(matrix.disposition(row("0338", "miss", "Follow-up 0338-P1.")), "follow-up")
+        self.assertEqual(matrix.disposition(row("0335", "miss", "cold handle; F6")), "follow-up")
+        self.assertEqual(matrix.disposition(row("0338", "miss", "a fixed per-call cost")), "")
+        with self.assertRaises(SystemExit):
+            matrix.disposition(row("0338", "miss", "x", disposition="later"))
+
+
+class Committed(unittest.TestCase):
+    def test_committed_outputs_are_current_and_complete(self):
+        """`--check`: outputs regenerate byte for byte, every open miss has a
+        disposition, every record's evidence contributes rows, and every
+        output stays below 1 MiB."""
+        err = io.StringIO()
+        with redirect_stderr(err):
+            rc = matrix.main(["--check"])
+        self.assertEqual(rc, 0, err.getvalue())
+
+    def test_audit_records_contribute_rows(self):
+        rows, _, _, _, _ = matrix.build()
+        records = {r["record"] for r in rows}
+        for rec in ("0307", "0308", "0314", "0316", "0317", "0318", "0323", "0324", "0325",
+                    "0327", "0328", "0329", "0330", "0333", "0335", "0336", "0338", "0342"):
+            self.assertIn(rec, records)
+
+    def test_the_two_audit_misses_have_follow_ups(self):
+        rows, _, _, _, _ = matrix.build()
+        wanted = {("0327", "sheet_features:xls"), ("0327", "sheet_features:ods"),
+                  ("0338", "p0_residue:xlsx:set_run_bold")}
+        hits = [r for r in rows if (r["record"], r["series"]) in wanted]
+        self.assertEqual(len(hits), 3)
+        for r in hits:
+            self.assertEqual(r["status"], "miss")
+            self.assertEqual(matrix.disposition(r), "follow-up")
+
+
+if __name__ == "__main__":
+    unittest.main()
