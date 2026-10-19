@@ -2832,5 +2832,7 @@ gain the ADR 0034 §3 patch vocabulary over `litchi_ops::transaction::Patch`.
 | Python `Patch.{apply, inverse, is_noop}` | adopted (0347): the Rust `transaction::Patch` names; one Python `Patch` spans every Rust run of an `Edit` |
 | `litchi_numbers::table::relocation::Error::DuplicateTableName` | adopted (0347): a relocation into a sheet that already has a table of that name, refused before any rewrite |
 | Numbers `swap` of `sheet`s and `table`s | adopted (0347): two moves applied one at a time (four leaf steps across sheets) |
+| `litchi_xlsx::drawing::edit::Edit::replace_element_image` | adopted (0347): `replace_image` for a picture element the caller already read; `replace_image` delegates to it |
+| `litchi_rtf::Error::UnsupportedCodePage` | adopted (0347): an `\ansicpg` with no exact codec (10001, 10007); `unsupported_capability` in the unified layer |
 
 See [0347](unified-ops/0347-numbers-swap-python-patch-xlsx-picture.md).

@@ -1077,15 +1077,15 @@ const NOT_OPENED: &[(&str, &str, Refusal, &str)] = &[
     ),
     (
         "rtf/test10001Encoding.rtf",
-        "corrupt_file",
+        "unsupported_capability",
         Refusal::Gap,
-        "\\ansicpg10001 (Mac Japanese) is not a supported code page; the refusal should be typed unsupported, not corrupt",
+        "\\ansicpg10001 (Mac Japanese) has no exact codec; refused as unsupported (record 0347)",
     ),
     (
         "rtf/test10007Encoding.rtf",
-        "corrupt_file",
+        "unsupported_capability",
         Refusal::Gap,
-        "\\ansicpg10007 (Mac Cyrillic) is not a supported code page; the refusal should be typed unsupported, not corrupt",
+        "\\ansicpg10007 (Mac Cyrillic) has no exact codec; refused as unsupported (record 0347)",
     ),
 ];
 
