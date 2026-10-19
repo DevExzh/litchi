@@ -50,8 +50,8 @@ impl ImageAdjustment {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NonFinite`] for NaN or infinity and
-    /// [`Error::OutOfRange`] outside the inclusive `-1.0..=1.0` domain.
+    /// Returns [`Error::AdjustmentNonFinite`] for NaN or infinity and
+    /// [`Error::AdjustmentOutOfRange`] outside the inclusive `-1.0..=1.0` domain.
     #[must_use = "use the validated adjustment or handle its validation error"]
     pub fn new(value: f32) -> Result<Self> {
         if !value.is_finite() {
