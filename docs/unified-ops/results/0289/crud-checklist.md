@@ -31,7 +31,7 @@ Evidence: `crud-adr0008.tsv`.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | docx | 44 | 352 | 352 | 0 | 0 | 78 | 66 | 8 | 44 | ok | ok | ok |
 | xlsx | 26 | 206 | 206 | 0 | 0 | 65 | 25 | 2 | 20 | ok | ok | ok |
-| pptx | 37 | 299 | 299 | 0 | 0 | 65 | 53 | 2 | 42 | ok | ok | ok |
+| pptx | 37 | 308 | 308 | 0 | 0 | 65 | 44 | 2 | 42 | ok | ok | ok |
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 | ok | ok | ok |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 | ok | ok | ok |
 | xls | 26 | 158 | 158 | 0 | 0 | 130 | 18 | 2 | 14 | ok | ok | ok |
@@ -145,7 +145,7 @@ Evidence: `crud-adr0008.tsv`.
 
 ## pptx
 
-- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `libreoffice-core/oox/qa/unit/data/import-mce.pptx`, `poi/test-data/slideshow/EmbeddedAudio.pptx`, `poi/test-data/slideshow/EmbeddedVideo.pptx`, `create() + add slide`, `create() + add slide + add shape`, `ooxml/pptx/shapes.pptx + add picture`, `create() + add slide + add table`, `ooxml/pptx/shapes.pptx + add picture + add tr`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `create() + add slide + add shape + add paragraph`, `create() + add slide + add shape + add run`, `ooxml/pptx/shapes.pptx + add comment`, `create() + add slide + add video`, `create() + add slide + add audio`, `create() + add slide + add media`, `create() + add slide + add shape + add hyperlink`, `ooxml/pptx/shapes.pptx + add picture + add col`, `create() + add slide + add smartart + add node`
+- fixtures: `create()`, `seed`, `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx`, `ooxml/pptx/shape-glow-effect.pptx`, `ooxml/pptx/shapes.pptx`, `ooxml/pptx/radar-chart.pptx`, `libreoffice-core/oox/qa/unit/data/tdf131082.pptx`, `ooxml/pptx/connectorConnection.pptx`, `ooxml/pptx/smartart-composite-infer-right.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx`, `libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx`, `ooxml/pptx/sample.pptx`, `unified-ops/0294/modern-comments.pptx`, `libreoffice-core/oox/qa/unit/data/import-mce.pptx`, `poi/test-data/slideshow/EmbeddedAudio.pptx`, `poi/test-data/slideshow/EmbeddedVideo.pptx`, `create() + add slide`, `create() + add slide + add shape`, `create() + add slide + add placeholder`, `ooxml/pptx/shapes.pptx + add picture`, `create() + add slide + add table`, `ooxml/pptx/shapes.pptx + add picture + add tr`, `create() + add slide + add chart`, `create() + add slide + add smartart`, `create() + add slide + add shape + add paragraph`, `create() + add slide + add shape + add run`, `create() + add slide + add notes`, `ooxml/pptx/shapes.pptx + add comment`, `create() + add slide + add video`, `create() + add slide + add audio`, `create() + add slide + add media`, `unified-ops/0294/modern-comments.pptx + add modernComment`, `create() + add slide + add shape + add hyperlink`, `ooxml/pptx/shapes.pptx + add picture + add col`, `create() + add slide + add smartart + add node`
 - document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 - ADR 0008 atomic failure: ok, `create() + add slide` batch [set /slide[1] {"name":"Litchi"}, set /slide[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
 - ADR 0008 patch inverse: ok, `create() + add slide` set /slide[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 30414 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy refuses (owner-bound)
@@ -156,7 +156,7 @@ Evidence: `crud-adr0008.tsv`.
 | presentation | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| placeholder | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
+| placeholder | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | tr | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
@@ -169,7 +169,7 @@ Evidence: `crud-adr0008.tsv`.
 | paragraph | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | run | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | linebreak | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
-| notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| notes | ok | ok | ok | ok | ok | ok | n/a | no pair | no pair | ok | ok | ok | ok |
 | comment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | video | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 | audio | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
@@ -180,8 +180,8 @@ Evidence: `crud-adr0008.tsv`.
 | slideMaster | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | slideLayout | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | theme | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
-| modernComment | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
-| reply | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
+| modernComment | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| reply | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | hyperlink | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | animation | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | series | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |

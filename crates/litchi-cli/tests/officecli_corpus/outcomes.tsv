@@ -2563,7 +2563,7 @@
 34	set	pptx	-	ok	-	placeholder
 36	set	pptx	-	ok	-	placeholder
 39	set	pptx	-	ok	-	slide
-46	add	pptx	slide	warned	title	-
+46	add	pptx	slide	ok	translated:D4	-
 47	set	pptx	-	warned	background	slide
 48	set	pptx	-	ok	-	shape
 61	add	pptx	shape	ok	-	-
@@ -2591,7 +2591,7 @@
 61	add	pptx	shape	ok	-	-
 63	add	pptx	animation	unsupported_element	-	-
 68	set	pptx	-	ok	-	slide
-74	add	pptx	slide	warned	title	-
+74	add	pptx	slide	ok	translated:D4	-
 75	set	pptx	-	warned	background	slide
 76	set	pptx	-	ok	-	shape
 87	add	pptx	shape	ok	-	-
@@ -2615,7 +2615,7 @@
 87	add	pptx	shape	ok	-	-
 94	add	pptx	animation	unsupported_element	-	-
 100	set	pptx	-	ok	-	slide
-107	add	pptx	slide	warned	title	-
+107	add	pptx	slide	ok	translated:D4	-
 108	set	pptx	-	warned	background	slide
 109	set	pptx	-	ok	-	shape
 118	add	pptx	shape	ok	-	-
@@ -2631,7 +2631,7 @@
 118	add	pptx	shape	ok	-	-
 123	add	pptx	animation	unsupported_element	-	-
 128	set	pptx	-	ok	-	slide
-136	add	pptx	slide	warned	title	-
+136	add	pptx	slide	ok	translated:D4	-
 137	set	pptx	-	warned	background	slide
 138	set	pptx	-	ok	-	shape
 148	add	pptx	shape	ok	-	-
@@ -2649,7 +2649,7 @@
 163	add	pptx	shape	ok	-	-
 165	add	pptx	animation	unsupported_element	-	-
 168	set	pptx	-	ok	-	slide
-176	add	pptx	slide	warned	title	-
+176	add	pptx	slide	ok	translated:D4	-
 177	set	pptx	-	warned	background	slide
 178	set	pptx	-	ok	-	shape
 181	add	pptx	shape	ok	-	-
@@ -2663,7 +2663,7 @@
 205	add	pptx	shape	ok	-	-
 207	add	pptx	animation	unsupported_element	-	-
 210	set	pptx	-	ok	-	slide
-216	add	pptx	slide	warned	title	-
+216	add	pptx	slide	ok	translated:D4	-
 217	set	pptx	-	warned	background	slide
 218	set	pptx	-	ok	-	shape
 221	add	pptx	shape	ok	-	-
@@ -5692,16 +5692,16 @@
 66	set	pptx	-	warned	background	slide
 67	set	pptx	-	ok	-	placeholder
 68	set	pptx	-	ok	-	placeholder
-71	add	pptx	slide	warned	title	-
+71	add	pptx	slide	ok	translated:D4	-
 72	set	pptx	-	warned	background	slide
 73	set	pptx	-	ok	-	shape
 74	add	pptx	video	file_not_found	src;skipped:volume,autoplay	-
-81	add	pptx	slide	warned	title	-
+81	add	pptx	slide	ok	translated:D4	-
 82	set	pptx	-	warned	background	slide
 83	set	pptx	-	ok	-	shape
 84	add	pptx	shape	warned	line,linewidth	-
 89	add	pptx	chart	ok	-	-
-98	add	pptx	slide	warned	title	-
+98	add	pptx	slide	ok	translated:D4	-
 99	set	pptx	-	warned	background	slide
 100	set	pptx	-	ok	-	shape
 103	add	pptx	video	file_not_found	src;skipped:volume,autoplay,loop,trimStart,trimEnd	-

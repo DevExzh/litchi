@@ -973,6 +973,20 @@ const RECIPES: &[Recipe] = &[
         props: &[("author", "Ada"), ("text", "Check")],
         start: false,
     },
+    // Record 0346: a modern comment needs its author and, with no clock,
+    // its creation stamp.
+    Recipe {
+        format: "pptx",
+        element: "modernComment",
+        fixture: "unified-ops/0294/modern-comments.pptx",
+        parent: "/slide[1]",
+        props: &[
+            ("author", "Ada"),
+            ("text", "Check"),
+            ("created", "2026-10-19T09:30:00Z"),
+        ],
+        start: false,
+    },
     Recipe {
         format: "xlsb",
         element: "namedrange",
