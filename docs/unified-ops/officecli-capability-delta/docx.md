@@ -32,44 +32,44 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | bookmark | `id` | string | --g | --g | supported | — |  |  |  |
 | bookmarkEnd | `id` | number | a-g |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
 | bookmarkEnd | `name` | string | a-- |  | element gap | gap | P1 | deferred-P1 0332 (docx-breadth) | 0339-F2 (deferred-P1) |
-| chart-axis | `axisFont` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `axisMax` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `axisMin` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `axisNumFmt` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `axisOrientation` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `axisTitle` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `format` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `labelOffset` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `labelRotation` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `logBase` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `majorGridlines` | bool | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisFont` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisMax` | number | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisMin` | number | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisNumFmt` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisOrientation` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `axisTitle` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `format` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `labelOffset` | number | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `labelRotation` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `logBase` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `majorGridlines` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
 | chart-axis | `max` | number | -sg | -sg | supported | supported |  |  |  |
 | chart-axis | `min` | number | -sg | -sg | supported | supported |  |  |  |
-| chart-axis | `minorGridlines` | bool | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-axis | `tickLabelSkip` | number | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `minorGridlines` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `tickLabelSkip` | number | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
 | chart-axis | `title` | string | -sg | -sg | supported | supported |  |  |  |
-| chart-axis | `visible` | bool | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-axis | `visible` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
 | chart-axis | `role` | string |  | --g | litchi-only | — |  |  |  |
-| chart-series | `categories` | string | asg | --g | supported | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `categoriesRef` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `color` | color | asg | -sg | supported | partial | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `dataLabels.numFmt` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `dataLabels.separator` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `errBars` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `invertIfNeg` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `lineDash` | enum | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `lineWidth` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `marker` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `markerSize` | number | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `markerColor` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `name` | string | asg | -sg | supported | partial | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `nameRef` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `scatterStyle` | string | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `secondaryAxis` | bool | --g |  | unlisted | — | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `smooth` | string | -sg |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `values` | string | asg | -sg | supported | partial | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `bubbleSize` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
-| chart-series | `bubbleSizeRef` | string | a-g |  | unlisted | gap | P1 | planned 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `categories` | string | asg | --g | supported | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `categoriesRef` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `color` | color | asg | -sg | supported | partial | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `dataLabels.numFmt` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `dataLabels.separator` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `errBars` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `invertIfNeg` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `lineDash` | enum | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `lineWidth` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `marker` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `markerSize` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `markerColor` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `name` | string | asg | -sg | supported | partial | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `nameRef` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `scatterStyle` | string | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `secondaryAxis` | bool | --g |  | unlisted | — | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `smooth` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `values` | string | asg | -sg | supported | partial | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `bubbleSize` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
+| chart-series | `bubbleSizeRef` | string | a-g |  | unlisted | gap | P1 | deferred-P1 0335 (docx-picture-comment-follow-ups) |  |
 | chart | `dispUnits` | string | asg |  | unlisted | gap | P1 | deferred-P1 0332 (docx-breadth) |  |
 | chart | `seriesCount` | number | --g | --g | supported | — |  |  |  |
 | chart | `radarstyle` | string | as- | asg | supported | supported |  |  |  |
