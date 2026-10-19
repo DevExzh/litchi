@@ -284,6 +284,9 @@ pub struct Edit {
     keynote: Option<crate::format::iwork::keynote::Run>,
     /// The match count of the last `find=` set (record 0273).
     matched: Option<usize>,
+    /// Coalesced items whose change a native run reported at its commit,
+    /// by item index (record 0348): their staging returned `false`.
+    reported: Vec<(usize, bool)>,
 }
 impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -384,6 +387,7 @@ impl File {
                 #[cfg(feature = "keynote")]
                 keynote: None,
                 matched: None,
+                reported: Vec::new(),
             };
             let value = f(&mut edit);
             if let Some(error) = edit.failure {
@@ -2685,7 +2689,7 @@ impl Edit {
         if let Some(run) = self.shapes.take() {
             let index = run.first_index();
             let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
+                let (base, commit, reported) = run.commit()?;
                 let (step, ()) = wrap_pptx(&base, commit, ())?;
                 let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
                 if bytes > self.limits.max_snapshot_bytes() {
@@ -2699,6 +2703,10 @@ impl Edit {
                 self.steps
                     .try_reserve(1)
                     .map_err(|source| Error::Allocation { source })?;
+                self.reported
+                    .try_reserve(reported.len())
+                    .map_err(|source| Error::Allocation { source })?;
+                self.reported.extend(reported);
                 self.current = step.after.clone();
                 self.steps.push(step);
                 self.snapshot_bytes = bytes;
@@ -2848,11 +2856,14 @@ impl Edit {
         let operations = self.operations;
         let before = self.current.clone();
         let bytes = self.snapshot_bytes;
+        let reported = self.reported.len();
         let result = operation(self).and_then(|value| {
             self.check()?;
             self.flush_pending()?;
             Ok((value, changed(&self.steps[start..])?))
         });
+        // The isolated command's change is its steps' (record 0348).
+        self.reported.truncate(reported);
         let result = match self.failure.take() {
             Some(error) => Err(error),
             None => result,
@@ -2929,6 +2940,13 @@ impl Edit {
     /// The match count of the last `find=` set, taken (record 0273).
     pub(crate) fn take_matched(&mut self) -> Option<usize> {
         self.matched.take()
+    }
+
+    /// The changes native runs reported at their commits, by item index,
+    /// taken (record 0348): the items' staging returned `false`. Flush the
+    /// pending run first to include it.
+    pub(crate) fn take_reported(&mut self) -> Vec<(usize, bool)> {
+        std::mem::take(&mut self.reported)
     }
 
     /// A `set` whose properties name `find` (record 0273): one native commit

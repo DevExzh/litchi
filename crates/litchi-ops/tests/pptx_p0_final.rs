@@ -964,3 +964,126 @@ fn source_owned_notes_keep_the_ordinary_writer() {
     assert_eq!(changes, [true, true]);
     assert_eq!(after.to_bytes().unwrap(), sequential(&source, &items));
 }
+
+// Record 0348: a cell plan's change is the leaf's report from its batched
+// staging; the table is indexed, not read, before planning.
+
+/// Each item's change and the file after it, applied one `set` at a time.
+fn sequential_changes(file: &File, items: &Plan) -> (Vec<bool>, Vec<u8>) {
+    let mut current = file.clone();
+    let mut changes = Vec::new();
+    for (path, props) in items {
+        let commit = current
+            .edit(|edit| edit.set(path.as_str(), props.clone()))
+            .unwrap();
+        changes.push(commit.diagnostics.changed());
+        current = commit.file;
+    }
+    (changes, current.to_bytes().unwrap())
+}
+
+#[test]
+fn cell_batch_changes_are_the_items_own() {
+    let bytes = table_deck(4);
+    for file in files(&bytes) {
+        let first: Plan = vec![
+            (cell(1, 1), litchi_ops::Props::new().with("fill", "FFEECC")),
+            (
+                format!("{}/paragraph[1]", cell(2, 2)),
+                litchi_ops::Props::new().with("align", "center"),
+            ),
+            (
+                format!("{}/paragraph[1]/run[1]", cell(3, 3)),
+                litchi_ops::Props::new().with("bold", true),
+            ),
+        ];
+        let (after, ..) = batch(&file, &first);
+        // Repeats of the first batch (no change) between new changes.
+        let items: Plan = first
+            .iter()
+            .cloned()
+            .chain([
+                (cell(1, 2), litchi_ops::Props::new().with("fill", "FFEECC")),
+                (
+                    format!("{}/paragraph[1]", cell(4, 4)),
+                    litchi_ops::Props::new().with("align", "center"),
+                ),
+                (cell(4, 1), litchi_ops::Props::new().with("text", "r3c0")),
+                (cell(4, 2), litchi_ops::Props::new().with("text", "new")),
+            ])
+            .collect();
+        let (expected, sequential) = sequential_changes(&after, &items);
+        assert_eq!(
+            expected,
+            [false, false, false, true, true, false, true],
+            "the fixture"
+        );
+        let (batched, changes, commits) = batch(&after, &items);
+        assert_eq!(changes, expected);
+        assert_eq!(commits, 1);
+        assert_eq!(batched.to_bytes().unwrap(), sequential);
+    }
+}
+
+#[test]
+fn cell_batch_misses_fail_as_the_item_alone() {
+    let bytes = table_deck(2);
+    for file in files(&bytes) {
+        for path in [
+            "/slide[1]/table[1]/tr[3]/tc[1]".to_owned(),
+            "/slide[1]/table[1]/tr[1]/tc[3]".to_owned(),
+            "/slide[1]/table[2]/tr[1]/tc[1]".to_owned(),
+            format!("{}/paragraph[2]", cell(1, 1)),
+            format!("{}/paragraph[1]/run[2]", cell(1, 1)),
+        ] {
+            let alone = file
+                .set(path.as_str(), litchi_ops::Props::new().with("bold", true))
+                .expect_err("a miss fails alone");
+            let items: Vec<litchi_ops::BatchItem<'static>> = [cell(2, 2), path.clone()]
+                .into_iter()
+                .map(|path| {
+                    let mut item = litchi_ops::BatchItem::new("set");
+                    item.path = Some(path.into());
+                    item.props = Some(litchi_ops::Props::new().with("bold", true));
+                    item
+                })
+                .collect();
+            let error = file
+                .batch(items, litchi_ops::BatchMode::Atomic)
+                .expect_err("a miss fails the batch");
+            assert_eq!(error.code(), alone.code(), "{path}");
+            assert_eq!(error.item(), Some(1), "{path}");
+        }
+    }
+}
+
+#[test]
+fn notes_batches_past_one_chunk_equal_the_items() {
+    let bytes = presentation::bytes();
+    let [_, eager] = files(&bytes);
+    let mut file = eager
+        .add("/slide[1]", NewNode::new("notes").prop("text", "n0"))
+        .unwrap()
+        .file;
+    for index in 1..300 {
+        file = file
+            .add(
+                "/slide[1]/notes",
+                NewNode::new("paragraph").prop("text", format!("n{index}")),
+            )
+            .unwrap()
+            .file;
+    }
+    let items: Plan = (1..=300)
+        .map(|paragraph| {
+            (
+                format!("/slide[1]/notes/paragraph[{paragraph}]"),
+                litchi_ops::Props::new().with("align", "right"),
+            )
+        })
+        .collect();
+    let (after, changes, commits) = batch(&file, &items);
+    assert_eq!(commits, 1);
+    assert!(changes.iter().all(|changed| *changed));
+    assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+}

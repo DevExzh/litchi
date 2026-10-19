@@ -403,19 +403,28 @@ pub(crate) fn stage_text_properties(
             limit: max_text_bytes,
         });
     }
-    stage_admitted_text_edits(xml, edits, max_output_bytes)
+    stage_admitted_text_edits(xml, edits, max_output_bytes, None)
 }
 
 /// Stage several already bounded batches of text formatting edits, applied
 /// in order, in one scene read and one read-back (record 0333). Each chunk
 /// keeps the limits of [`stage_text_properties`]; the chunk count is bounded
 /// by the scene's shape limit and the total by 100,000 edits.
+///
+/// With `changes`, it is cleared and then receives, for each edit in order,
+/// whether that edit changed the bytes of its target element as the earlier
+/// edits left them (record 0348), as one edit applied after the other
+/// reports it.
 pub(crate) fn stage_text_property_chunks(
     xml: &[u8],
     chunks: &[&[TextEdit<'_>]],
     max_text_bytes: usize,
     max_output_bytes: usize,
+    mut changes: Option<&mut Vec<bool>>,
 ) -> Result<(Option<Vec<u8>>, usize)> {
+    if let Some(changes) = changes.as_deref_mut() {
+        changes.clear();
+    }
     if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
         return Err(Error::Limit {
             resource: "opened-presentation text property chunks",
@@ -462,16 +471,37 @@ pub(crate) fn stage_text_property_chunks(
     for chunk in chunks {
         edits.extend_from_slice(chunk);
     }
-    stage_admitted_text_edits(xml, &edits, max_output_bytes)
+    stage_admitted_text_edits(xml, &edits, max_output_bytes, changes)
 }
 
 /// The staging of admitted text formatting edits: one scene read, the
 /// edited elements rewritten in order, one splice and one read-back.
+///
+/// With `changes`, each edit's change (its element's bytes differ after it)
+/// is appended in order (record 0348).
 fn stage_admitted_text_edits(
     xml: &[u8],
     edits: &[TextEdit<'_>],
     max_output_bytes: usize,
+    mut changes: Option<&mut Vec<bool>>,
 ) -> Result<(Option<Vec<u8>>, usize)> {
+    if let Some(changes) = changes.as_deref_mut() {
+        changes
+            .try_reserve_exact(edits.len())
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation text property changes",
+                source,
+            })?;
+    }
+    // Marks the current edit (the last entry) changed.
+    let mark = |changes: &mut Option<&mut Vec<bool>>| {
+        if let Some(last) = changes
+            .as_deref_mut()
+            .and_then(|changes| changes.last_mut())
+        {
+            *last = true;
+        }
+    };
     let original = crate::shape::Scene::read(xml)?;
     if original.is_rewritten() {
         return Err(Error::UnsafeEdit {
@@ -499,6 +529,9 @@ fn stage_admitted_text_edits(
         std::collections::HashMap::new();
     let mut changed = 0;
     for edit in edits {
+        if let Some(changes) = changes.as_deref_mut() {
+            changes.push(false);
+        }
         let index = shape_position(edit.target).get();
         let shape = original.at(index)?;
         let slot = match slots.get(&index) {
@@ -574,6 +607,7 @@ fn stage_admitted_text_edits(
                 if rewritten.as_slice() != current {
                     cells.rewritten.insert((row, column), rewritten);
                     changed += 1;
+                    mark(&mut changes);
                 }
                 continue;
             },
@@ -619,6 +653,7 @@ fn stage_admitted_text_edits(
                         if rewritten.as_slice() != current {
                             located.rewritten.insert(paragraph, rewritten);
                             changed += 1;
+                            mark(&mut changes);
                         }
                         continue;
                     },
@@ -638,6 +673,7 @@ fn stage_admitted_text_edits(
         if replacement != *element {
             elements[slot].2 = replacement;
             changed += 1;
+            mark(&mut changes);
         }
     }
     if changed == 0 {
