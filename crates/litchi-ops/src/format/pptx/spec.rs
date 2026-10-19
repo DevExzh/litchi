@@ -840,29 +840,40 @@ props_values! {
     }
 }
 
-props_values! {
-    /// A modern threaded comment, with replies as child nodes.
-    MODERN_COMMENT_PROPS {
+props! {
+    /// A modern threaded comment, with replies as child nodes. `initials`,
+    /// `resolved` (the thread's `resolved` status) and `parent` (a reply's
+    /// thread; never set on a thread, add only) follow OfficeCLI's
+    /// `ModernCommentToNode` (record 0346); the native GUID `id` is raw.
+    MODERN_COMMENT_PROPS, ModernCommentKey {
         Text = "text": ValueType::Text,
         Author = "author": ValueType::Text,
+        Initials = "initials": ValueType::Text,
         Created = "created": ValueType::Text,
         StartDate = "startDate": ValueType::Text,
         DueDate = "dueDate": ValueType::Text,
         Title = "title": ValueType::Text,
         Status = "status": ValueType::Token(&MODERN_STATUS),
+        Resolved = "resolved": ValueType::Bool,
         Progress = "progress": ValueType::Number,
         X = "x": POSITION,
         Y = "y": POSITION,
+        Parent = "parent": ValueType::Text,
+        Id = "id": ValueType::Text; raw,
     }
 }
 
-props_values! {
-    /// A reply in a modern threaded comment.
-    REPLY_PROPS {
+props! {
+    /// A reply in a modern threaded comment; `parent` is its thread's path
+    /// (record 0346), and the native GUID `id` is raw.
+    REPLY_PROPS, ReplyKey {
         Text = "text": ValueType::Text,
         Author = "author": ValueType::Text,
+        Initials = "initials": ValueType::Text,
         Created = "created": ValueType::Text,
         Status = "status": ValueType::Token(&MODERN_STATUS),
+        Parent = "parent": ValueType::Text,
+        Id = "id": ValueType::Text; raw,
     }
 }
 
@@ -2042,17 +2053,62 @@ pub(crate) const PARAGRAPH_PROP_ALIASES: &[crate::registry::PropAlias] =
     &PARAGRAPH_WRITE_TABLE.prop_aliases();
 pub(crate) const RUN_PROP_ALIASES: &[crate::registry::PropAlias] = &RUN_WRITE_TABLE.prop_aliases();
 
+/// The placeholder's capability rows: the shape's, with `add` only for the
+/// keys a new placeholder takes, `phType` and `text` (record 0346).
 const fn placeholder_capability_props() -> [PropSpec; SHAPE_WRITE_COUNT] {
     let mut props = SHAPE_WRITE_TABLE.readable();
     let mut index = 0;
     while index < props.len() {
         let mut access = props[index].access;
-        access.add = false;
+        access.add = const_eq(props[index].name, "phType") || const_eq(props[index].name, "text");
         props[index].access = access;
         index += 1;
     }
     props
 }
+
+const fn const_eq(left: &str, right: &str) -> bool {
+    let (left, right) = (left.as_bytes(), right.as_bytes());
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < left.len() {
+        if left[index] != right[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+/// A new placeholder's keys (record 0346): its type, required, and text.
+#[derive(Clone, Copy)]
+pub(super) enum PlaceholderSetter {
+    Kind,
+    Text,
+}
+pub(super) const PLACEHOLDER_ADD_TABLE: crate::registry::Table<PlaceholderSetter, 2, 1> =
+    crate::registry::Table::new(
+        [
+            crate::registry::Entry {
+                spec: PropSpec::new("phType", ValueType::Token(&PLACEHOLDER_TYPE)),
+                access: crate::registry::Access::Add(PlaceholderSetter::Kind),
+                constraint: crate::registry::Constraint::None,
+                clear: false,
+            },
+            crate::registry::Entry {
+                spec: PropSpec::new("text", ValueType::Text),
+                access: crate::registry::Access::Add(PlaceholderSetter::Text),
+                constraint: crate::registry::Constraint::None,
+                clear: false,
+            },
+        ],
+        [crate::registry::Alias {
+            name: "type",
+            entry: 0,
+        }],
+    );
 const PLACEHOLDER_CAPABILITY_PROPS_ARRAY: [PropSpec; SHAPE_WRITE_COUNT] =
     placeholder_capability_props();
 pub(crate) const PLACEHOLDER_CAPABILITY_PROPS: &[PropSpec] = &PLACEHOLDER_CAPABILITY_PROPS_ARRAY;
@@ -2066,8 +2122,14 @@ pub(super) enum SlideProperty {
     Notes,
     /// The slide's direct transition, OfficeCLI's shorthand (record 0269).
     Transition,
+    /// OfficeCLI's `title` shorthand on add: the title placeholder's text
+    /// (record 0346).
+    Title,
+    /// OfficeCLI's `text` shorthand on add: the body placeholder's text
+    /// (record 0346).
+    Text,
 }
-const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 2;
+const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 4;
 const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
     let mut entries = [Entry::read(SLIDE_PROPS[0]); SLIDE_WRITE_COUNT];
@@ -2076,9 +2138,10 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
         entries[index] = Entry::read(SLIDE_PROPS[index]);
         index += 1;
     }
+    // Settable since record 0346: the slide's layout relationship.
     entries[0] = Entry {
         spec: SLIDE_PROPS[0],
-        access: Access::Add(SlideProperty::Layout),
+        access: Access::SetAndAdd(SlideProperty::Layout),
         constraint: Constraint::NotEmpty,
         clear: false,
     };
@@ -2110,17 +2173,31 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
         constraint: Constraint::None,
         clear: true,
     };
+    // Add only, as OfficeCLI: afterwards the placeholders hold the text.
+    entries[SLIDE_PROPS.len() + 2] = Entry {
+        spec: write_only("title", ValueType::Text),
+        access: Access::Add(SlideProperty::Title),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries[SLIDE_PROPS.len() + 3] = Entry {
+        spec: write_only("text", ValueType::Text),
+        access: Access::Add(SlideProperty::Text),
+        constraint: Constraint::None,
+        clear: false,
+    };
     entries
 }
 pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<SlideProperty, SLIDE_WRITE_COUNT, 0> =
     crate::registry::Table::new(slide_write_entries(), []);
 
-/// Speaker-notes `text` (set; null clears the text).
+/// Speaker-notes `text` (set and, since record 0346, add; null clears the
+/// text).
 const fn notes_write_entries() -> [crate::registry::Entry<()>; NOTES_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
     [Entry {
         spec: NOTES_PROPS[0],
-        access: Access::Set(()),
+        access: Access::SetAndAdd(()),
         constraint: Constraint::None,
         clear: true,
     }]
@@ -2138,21 +2215,27 @@ pub(super) enum CommentSetter {
     Date,
     X,
     Y,
+    /// The reading direction of the text (`add` only, record 0346):
+    /// `rtl` prefixes a right-to-left mark, as OfficeCLI does, since
+    /// `p:cm` has no direction attribute.
+    Direction,
 }
-const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMMENT_PROPS.len()] {
+const COMMENT_WRITE_COUNT: usize = COMMENT_PROPS.len() + 1;
+const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMMENT_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
-    let mut entries = [Entry::read(COMMENT_PROPS[0]); COMMENT_PROPS.len()];
+    let mut entries = [Entry::read(COMMENT_PROPS[0]); COMMENT_WRITE_COUNT];
     let mut index = 0;
     while index < COMMENT_PROPS.len() {
         let spec = COMMENT_PROPS[index];
+        // Author, initials and date are settable since record 0346.
         let access = if index == CommentKey::Text as usize {
             Some(Access::SetAndAdd(CommentSetter::Text))
         } else if index == CommentKey::Author as usize {
-            Some(Access::Add(CommentSetter::Author))
+            Some(Access::SetAndAdd(CommentSetter::Author))
         } else if index == CommentKey::Initials as usize {
-            Some(Access::Add(CommentSetter::Initials))
+            Some(Access::SetAndAdd(CommentSetter::Initials))
         } else if index == CommentKey::Date as usize {
-            Some(Access::Add(CommentSetter::Date))
+            Some(Access::SetAndAdd(CommentSetter::Date))
         } else if index == CommentKey::X as usize {
             Some(Access::SetAndAdd(CommentSetter::X))
         } else if index == CommentKey::Y as usize {
@@ -2175,14 +2258,116 @@ const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMM
         };
         index += 1;
     }
+    entries[COMMENT_PROPS.len()] = Entry {
+        spec: write_only("direction", ValueType::Token(&DIRECTION)),
+        access: Access::Add(CommentSetter::Direction),
+        constraint: Constraint::None,
+        clear: false,
+    };
     entries
 }
 pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
     CommentSetter,
-    { COMMENT_PROPS.len() },
-    0,
-> = crate::registry::Table::new(comment_write_entries(), []);
+    COMMENT_WRITE_COUNT,
+    1,
+> = crate::registry::Table::new(
+    comment_write_entries(),
+    [crate::registry::Alias {
+        name: "dir",
+        entry: COMMENT_PROPS.len(),
+    }],
+);
 pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
+
+/// Modern comment and reply assignments (record 0346).
+#[derive(Clone, Copy)]
+pub(super) enum ModernSetter {
+    Text,
+    Author,
+    Initials,
+    Created,
+    /// The thread's resolution (threads only).
+    Resolved,
+    /// The thread a new comment replies to (`add` only).
+    Parent,
+}
+const fn modern_comment_write_entries()
+-> [crate::registry::Entry<ModernSetter>; MODERN_COMMENT_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(MODERN_COMMENT_PROPS[0]); MODERN_COMMENT_PROPS.len()];
+    let mut index = 0;
+    while index < MODERN_COMMENT_PROPS.len() {
+        let spec = MODERN_COMMENT_PROPS[index];
+        let access = match ModernCommentKey::ALL[index] {
+            ModernCommentKey::Text => Some(Access::SetAndAdd(ModernSetter::Text)),
+            ModernCommentKey::Author => Some(Access::SetAndAdd(ModernSetter::Author)),
+            ModernCommentKey::Initials => Some(Access::SetAndAdd(ModernSetter::Initials)),
+            ModernCommentKey::Created => Some(Access::SetAndAdd(ModernSetter::Created)),
+            ModernCommentKey::Resolved => Some(Access::SetAndAdd(ModernSetter::Resolved)),
+            ModernCommentKey::Parent => Some(Access::Add(ModernSetter::Parent)),
+            _ => None,
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if matches!(
+                    ModernCommentKey::ALL[index],
+                    ModernCommentKey::Author | ModernCommentKey::Parent
+                ) {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const MODERN_COMMENT_WRITE_TABLE: crate::registry::Table<
+    ModernSetter,
+    { MODERN_COMMENT_PROPS.len() },
+    0,
+> = crate::registry::Table::new(modern_comment_write_entries(), []);
+pub(crate) const MODERN_COMMENT_CAPABILITY_PROPS: &[PropSpec] =
+    &MODERN_COMMENT_WRITE_TABLE.readable();
+
+const fn reply_write_entries() -> [crate::registry::Entry<ModernSetter>; REPLY_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(REPLY_PROPS[0]); REPLY_PROPS.len()];
+    let mut index = 0;
+    while index < REPLY_PROPS.len() {
+        let spec = REPLY_PROPS[index];
+        let setter = match ReplyKey::ALL[index] {
+            ReplyKey::Text => Some(ModernSetter::Text),
+            ReplyKey::Author => Some(ModernSetter::Author),
+            ReplyKey::Initials => Some(ModernSetter::Initials),
+            ReplyKey::Created => Some(ModernSetter::Created),
+            _ => None,
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: Access::Set(setter),
+                constraint: if matches!(ReplyKey::ALL[index], ReplyKey::Author) {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const REPLY_WRITE_TABLE: crate::registry::Table<ModernSetter, { REPLY_PROPS.len() }, 0> =
+    crate::registry::Table::new(reply_write_entries(), []);
+pub(crate) const REPLY_CAPABILITY_PROPS: &[PropSpec] = &REPLY_WRITE_TABLE.readable();
 
 /// Picture insertion assignments (`add` only).
 #[derive(Clone, Copy)]

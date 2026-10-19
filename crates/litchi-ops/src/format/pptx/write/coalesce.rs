@@ -12,6 +12,13 @@
 //! A plan overlapping an earlier plan of the run (the same shape's text,
 //! the same paragraph or run) closes the run first, so each plan's change
 //! is judged against the text it formats.
+//!
+//! Record 0346 (record 0333 F3) adds paragraph `text`, table cells (their
+//! text, formatting, fill, anchor and insets), the paragraphs and runs of
+//! cell bodies, and the paragraphs and runs of the speaker notes. Notes
+//! pages are separate parts the source-backed slide edit does not stage, so
+//! notes plans join a run on eager owners only; a source owner's notes
+//! writes keep the ordinary writer, which promotes it.
 
 use super::text::{self, TextValues};
 use super::{Commit, Editable, Pptx, Target, admit_shape_props, allocation, error};
@@ -27,6 +34,7 @@ use litchi_core::selector::{Path, Predicate};
 use litchi_pptx::opened::{TextEdit, TextTarget};
 use litchi_pptx::shape::owned::{Handle, Scene};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// One direct shape or placeholder assignment admitted for a coalesced run.
 pub(crate) struct Plan {
@@ -37,6 +45,9 @@ pub(crate) struct Plan {
     format: Option<Box<Format>>,
     changed: bool,
     staged_bytes: usize,
+    /// Whether the target is a text body of the slide's notes page (record
+    /// 0346), which a separate native call edits.
+    notes: bool,
 }
 
 /// A formatting plan's native target and admitted assignments.
@@ -55,24 +66,97 @@ enum Scope {
     Paragraph(usize),
     /// One run child, by paragraph and child index.
     Run(usize, usize),
+    /// One table cell, by row and column (record 0346).
+    Cell(usize, usize),
+    /// One paragraph of a table cell's body.
+    CellParagraph(usize, usize, usize),
+    /// One run child of a table cell's paragraph.
+    CellRun(usize, usize, usize, usize),
 }
 
-impl Scope {
-    /// Whether two plans of one shape touch the same text.
-    fn overlaps(self, other: Self) -> bool {
-        match (self, other) {
-            (Self::Shape, _) | (_, Self::Shape) => true,
-            (Self::Paragraph(left), Self::Paragraph(right))
-            | (Self::Paragraph(left), Self::Run(right, _))
-            | (Self::Run(left, _), Self::Paragraph(right)) => left == right,
-            (Self::Run(left, a), Self::Run(right, b)) => left == right && a == b,
+/// The scopes a run's plans of one shape touch, indexed so an overlap test
+/// costs O(1) however many cells or paragraphs of the shape a batch
+/// formats (record 0346).
+#[derive(Default)]
+struct Touched {
+    shape: bool,
+    paragraphs: std::collections::HashSet<usize>,
+    run_paragraphs: std::collections::HashSet<usize>,
+    runs: std::collections::HashSet<(usize, usize)>,
+    cells: std::collections::HashSet<(usize, usize)>,
+    cell_texts: std::collections::HashSet<(usize, usize)>,
+    cell_paragraphs: std::collections::HashSet<(usize, usize, usize)>,
+    cell_run_paragraphs: std::collections::HashSet<(usize, usize, usize)>,
+    cell_runs: std::collections::HashSet<(usize, usize, usize, usize)>,
+}
+
+impl Touched {
+    /// Whether `scope` overlaps a scope already touched, as
+    /// [`Scope::overlaps`] judges a pair.
+    fn overlaps(&self, scope: Scope) -> bool {
+        if self.shape {
+            return true;
         }
+        match scope {
+            Scope::Shape => {
+                !(self.paragraphs.is_empty()
+                    && self.runs.is_empty()
+                    && self.cells.is_empty()
+                    && self.cell_texts.is_empty())
+            },
+            Scope::Paragraph(p) => self.paragraphs.contains(&p) || self.run_paragraphs.contains(&p),
+            Scope::Run(p, r) => self.paragraphs.contains(&p) || self.runs.contains(&(p, r)),
+            Scope::Cell(row, column) => {
+                self.cells.contains(&(row, column)) || self.cell_texts.contains(&(row, column))
+            },
+            Scope::CellParagraph(row, column, p) => {
+                self.cells.contains(&(row, column))
+                    || self.cell_paragraphs.contains(&(row, column, p))
+                    || self.cell_run_paragraphs.contains(&(row, column, p))
+            },
+            Scope::CellRun(row, column, p, r) => {
+                self.cells.contains(&(row, column))
+                    || self.cell_paragraphs.contains(&(row, column, p))
+                    || self.cell_runs.contains(&(row, column, p, r))
+            },
+        }
+    }
+
+    fn insert(&mut self, scope: Scope) -> Result<()> {
+        fn add<T: std::hash::Hash + Eq>(
+            set: &mut std::collections::HashSet<T>,
+            value: T,
+        ) -> Result<()> {
+            set.try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            set.insert(value);
+            Ok(())
+        }
+        match scope {
+            Scope::Shape => self.shape = true,
+            Scope::Paragraph(p) => add(&mut self.paragraphs, p)?,
+            Scope::Run(p, r) => {
+                add(&mut self.run_paragraphs, p)?;
+                add(&mut self.runs, (p, r))?;
+            },
+            Scope::Cell(row, column) => add(&mut self.cells, (row, column))?,
+            Scope::CellParagraph(row, column, p) => {
+                add(&mut self.cell_texts, (row, column))?;
+                add(&mut self.cell_paragraphs, (row, column, p))?;
+            },
+            Scope::CellRun(row, column, p, r) => {
+                add(&mut self.cell_texts, (row, column))?;
+                add(&mut self.cell_run_paragraphs, (row, column, p))?;
+                add(&mut self.cell_runs, (row, column, p, r))?;
+            },
+        }
+        Ok(())
     }
 }
 
 impl Plan {
-    fn key(&self) -> (usize, usize) {
-        (self.target.slide, self.target.position)
+    fn key(&self) -> (usize, usize, bool) {
+        (self.target.slide, self.target.position, self.notes)
     }
 
     fn scope(&self) -> Scope {
@@ -108,6 +192,25 @@ struct CachedScene {
     scene: Scene,
     shapes: Box<[usize]>,
     placeholders: Box<[usize]>,
+    /// The scene positions of the slide's root tables, in `table[M]` order
+    /// (record 0346).
+    tables: Box<[usize]>,
+    /// Each table read so far, by scene position: its cells' properties
+    /// and bodies, read once per run (record 0346).
+    cells: HashMap<usize, Arc<Cells>>,
+    /// The notes page's body placeholder: its notes-scene position and
+    /// body; `Some(None)` when the slide has none (record 0346).
+    notes: Option<Option<(usize, Arc<litchi_drawingml::text::body::Body>)>>,
+}
+
+/// One table's cells, by row and position in the row.
+pub(crate) struct Cells {
+    rows: Vec<
+        Vec<(
+            litchi_pptx::table::CellProperties,
+            Option<litchi_drawingml::text::body::Body>,
+        )>,
+    >,
 }
 
 #[allow(
@@ -126,7 +229,7 @@ pub(crate) struct Run {
     edit: NativeEdit,
     items: Vec<Item>,
     /// The scopes each shape's plans touch.
-    seen: HashMap<(usize, usize), Vec<Scope>>,
+    seen: HashMap<(usize, usize, bool), Touched>,
     staged_bytes: usize,
     target_count: usize,
     max_staged_bytes: usize,
@@ -217,7 +320,7 @@ impl Run {
         let scope = plan.scope();
         self.seen
             .get(&plan.key())
-            .is_some_and(|scopes| scopes.iter().any(|seen| seen.overlaps(scope)))
+            .is_some_and(|touched| touched.overlaps(scope))
     }
 
     pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
@@ -248,11 +351,7 @@ impl Run {
         let charge = plan.charge();
         let key = plan.key();
         let scope = plan.scope();
-        let scopes = self.seen.entry(key).or_default();
-        scopes
-            .try_reserve(1)
-            .map_err(|source| TransactionError::Allocation { source })?;
-        scopes.push(scope);
+        self.seen.entry(key).or_default().insert(scope)?;
         self.staged_bytes = self.staged_bytes.saturating_add(charge);
         self.target_count = self.target_count.saturating_add(1);
         self.items.push(Item { plan, index });
@@ -297,7 +396,7 @@ fn shape_plan(
         return Ok(None);
     };
     let Some((slide, kind, ordinal, text)) = direct_path(path.path()) else {
-        return Ok(None);
+        return story_plan(file, path, props, limits, scene_cache);
     };
     if let Some(text) = text {
         return text_plan(file, slide, kind, ordinal, text, props, limits, scene_cache);
@@ -427,6 +526,7 @@ fn shape_plan(
         format: None,
         changed,
         staged_bytes,
+        notes: false,
     }))
 }
 
@@ -466,12 +566,14 @@ fn text_plan(
     if !values.coalescible() {
         return Ok(None);
     }
-    match (step, values.text()) {
-        // Paragraph text rebuilds the paragraph's runs; a line break in run
-        // text is refused by the ordinary writer.
-        (TextStep::Paragraph(_), Some(_)) => return Ok(None),
-        (TextStep::Run(..), Some(text)) if text.contains(['\n', '\r']) => return Ok(None),
-        _ => {},
+    // A line break in run text is refused by the ordinary writer.
+    // Paragraph text rebuilds the paragraph's runs (record 0346).
+    if matches!(step, TextStep::Run(..))
+        && values
+            .text()
+            .is_some_and(|text| text.contains(['\n', '\r']))
+    {
+        return Ok(None);
     }
     let scope = match step {
         TextStep::Paragraph(paragraph) => Scope::Paragraph(paragraph),
@@ -553,7 +655,7 @@ fn format_plan(
                     paragraph: Position::new(index),
                 },
                 Scope::Paragraph(index),
-                values.paragraph_changed(paragraph),
+                paragraph_changed(&values, paragraph),
             )
         },
         Scope::Run(paragraph_index, ordinal) => {
@@ -579,6 +681,8 @@ fn format_plan(
                 values.run_changed(run),
             )
         },
+        // Cell scopes are planned by `story_plan`.
+        Scope::Cell(..) | Scope::CellParagraph(..) | Scope::CellRun(..) => return Ok(None),
     };
     Ok(Some(Plan {
         target: Target {
@@ -595,6 +699,313 @@ fn format_plan(
         })),
         changed,
         staged_bytes,
+        notes: false,
+    }))
+}
+
+/// Whether `values` change a paragraph, its text included (record 0346).
+fn paragraph_changed(
+    values: &TextValues,
+    paragraph: &litchi_drawingml::text::body::Paragraph,
+) -> bool {
+    values.paragraph_changed(paragraph)
+        || values.text().is_some_and(|text| text != paragraph.text())
+}
+
+/// A cell or notes path (record 0346): zero-based ordinals.
+#[derive(Clone, Copy)]
+struct StoryPath {
+    slide: usize,
+    /// `(table, row, cell)` of a table path; `None` for the notes page.
+    cell: Option<(usize, usize, usize)>,
+    paragraph: Option<usize>,
+    run: Option<usize>,
+}
+
+impl StoryPath {
+    const fn notes(&self) -> bool {
+        self.cell.is_none()
+    }
+}
+
+/// An absolute, all-ordinal table-cell path (`/slide[N]/table[M]/tr[R]/
+/// tc[C]`, optionally `/paragraph[K]` and `/run[J]`) or notes path
+/// (`/slide[N]/notes/paragraph[K]`, optionally `/run[J]`).
+fn story_path(path: &Path<'_>) -> Option<StoryPath> {
+    if !path.is_absolute() {
+        return None;
+    }
+    let steps = path.steps();
+    let [slide, rest @ ..] = steps else {
+        return None;
+    };
+    let slide = index_of(slide, &["slide"])?;
+    let (cell, text) = match rest {
+        [notes, text @ ..]
+            if notes.name().eq_ignore_ascii_case("notes") && notes.predicates().is_empty() =>
+        {
+            (None, text)
+        },
+        [table, row, cell, text @ ..] => (
+            Some((
+                index_of(table, &["table"])?,
+                index_of(row, &["tr"])?,
+                index_of(cell, &["tc"])?,
+            )),
+            text,
+        ),
+        _ => return None,
+    };
+    let (paragraph, run) = match text {
+        [] if cell.is_some() => (None, None),
+        [paragraph] => (
+            Some(index_of(paragraph, &["paragraph", "p", "para"])?),
+            None,
+        ),
+        [paragraph, run] => (
+            Some(index_of(paragraph, &["paragraph", "p", "para"])?),
+            Some(index_of(run, &["run", "r"])?),
+        ),
+        _ => return None,
+    };
+    Some(StoryPath {
+        slide,
+        cell,
+        paragraph,
+        run,
+    })
+}
+
+/// A formatting plan of a table cell, a cell paragraph or run, or a notes
+/// paragraph or run (record 0346). Tables and the notes body are read once
+/// per run and slide (the run's base is immutable); anything the plan
+/// cannot judge falls back to the ordinary writer.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one admission, resolution and judgement per story leaf"
+)]
+fn story_plan(
+    file: &Pptx,
+    path: &crate::path::PathArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+    scene_cache: &mut Option<(usize, CachedScene)>,
+) -> Result<Option<Plan>> {
+    use crate::format::pptx::spec::CELL_WRITE_TABLE;
+    let Some(story) = story_path(path.path()) else {
+        return Ok(None);
+    };
+    let notes = story.notes();
+    if notes && !file.edits_eagerly() {
+        return Ok(None);
+    }
+    let table = match (story.paragraph, story.run) {
+        (None, _) => text::admit_for(&CELL_WRITE_TABLE, props, Operation::Set, limits),
+        (Some(_), None) => text::admit_for(&PARAGRAPH_WRITE_TABLE, props, Operation::Set, limits),
+        (Some(_), Some(_)) => text::admit_for(&RUN_WRITE_TABLE, props, Operation::Set, limits),
+    };
+    let Ok(values) = table else {
+        return Ok(None);
+    };
+    let admitted = match (story.paragraph, story.run) {
+        (None, _) => values.cell_coalescible(),
+        (Some(_), None) => values.coalescible(),
+        (Some(_), Some(_)) => {
+            values.coalescible()
+                && !values
+                    .text()
+                    .is_some_and(|text| text.contains(['\n', '\r']))
+        },
+    };
+    if !admitted {
+        return Ok(None);
+    }
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    let staged_bytes = values.charge();
+    bound(
+        LimitKind::StagedBytes,
+        staged_bytes,
+        limits.max_staged_bytes(),
+    )?;
+    if scene_cache
+        .as_ref()
+        .is_none_or(|(cached_slide, _)| *cached_slide != story.slide)
+    {
+        let Some(scene) = file.slide_scene(story.slide)? else {
+            return Ok(None);
+        };
+        *scene_cache = Some((story.slide, cache_scene(scene)?));
+    }
+    let Some((_, cached)) = scene_cache.as_mut() else {
+        return Err(error(
+            Code::InternalError,
+            "PPTX shape scene cache was lost during admission",
+        ));
+    };
+    // The paragraph and listed run a text step names, and the run's child
+    // index, in `body`.
+    let locate = |body: &litchi_drawingml::text::body::Body| -> Option<(usize, Option<usize>)> {
+        let paragraph = story.paragraph?;
+        let item = body.paragraphs.get(paragraph)?;
+        match story.run {
+            None => Some((paragraph, None)),
+            Some(ordinal) => item
+                .runs
+                .iter()
+                .enumerate()
+                .filter(|(_, run)| super::super::text::listed_run(run) == Some(Kind::Run))
+                .nth(ordinal)
+                .map(|(index, _)| (paragraph, Some(index))),
+        }
+    };
+    let judge =
+        |body: &litchi_drawingml::text::body::Body, paragraph: usize, run: Option<usize>| {
+            let item = &body.paragraphs[paragraph];
+            match run {
+                None => paragraph_changed(&values, item),
+                Some(run) => values.run_changed(&item.runs[run]),
+            }
+        };
+    let (shape, target, scope, changed) = match story.cell {
+        None => {
+            if cached.notes.is_none() {
+                let body = match file.slide_notes_scene(story.slide)? {
+                    None => None,
+                    Some(scene) => {
+                        let found = scene.roots().find(|handle| {
+                            handle
+                                .view()
+                                .common()
+                                .placeholder()
+                                .is_some_and(|placeholder| placeholder.kind() == Some("body"))
+                        });
+                        match found {
+                            Some(handle) => match handle.view().text_body() {
+                                Ok(Some(body)) => {
+                                    Some((handle.position().get(), Arc::new(body.clone())))
+                                },
+                                _ => None,
+                            },
+                            None => None,
+                        }
+                    },
+                };
+                cached.notes = Some(body);
+            }
+            let Some(Some((position, body))) = &cached.notes else {
+                return Ok(None);
+            };
+            let Some((paragraph, run)) = locate(body) else {
+                return Ok(None);
+            };
+            let shape = Position::new(*position);
+            let changed = judge(body, paragraph, run);
+            let (target, scope) = match run {
+                None => (
+                    TextTarget::Paragraph {
+                        shape,
+                        paragraph: Position::new(paragraph),
+                    },
+                    Scope::Paragraph(paragraph),
+                ),
+                Some(run) => (
+                    TextTarget::Run {
+                        shape,
+                        paragraph: Position::new(paragraph),
+                        run: Position::new(run),
+                    },
+                    Scope::Run(paragraph, run),
+                ),
+            };
+            (shape, target, scope, changed)
+        },
+        Some((table, row, column)) => {
+            let Some(&frame) = cached.tables.get(table) else {
+                return Ok(None);
+            };
+            let cells = match cached.cells.get(&frame) {
+                Some(cells) => Arc::clone(cells),
+                None => {
+                    let Some(cells) =
+                        file.table_cells(story.slide, frame, || read_cells(cached, frame))?
+                    else {
+                        return Ok(None);
+                    };
+                    cached.cells.try_reserve(1).map_err(allocation)?;
+                    cached.cells.insert(frame, Arc::clone(&cells));
+                    cells
+                },
+            };
+            let Some((properties, body)) = cells.rows.get(row).and_then(|row| row.get(column))
+            else {
+                return Ok(None);
+            };
+            let shape = Position::new(frame);
+            let (row_at, column_at) = (Position::new(row), Position::new(column));
+            match story.paragraph {
+                None => (
+                    shape,
+                    TextTarget::Cell {
+                        shape,
+                        row: row_at,
+                        column: column_at,
+                    },
+                    Scope::Cell(row, column),
+                    values.cell_changed(properties, body.as_ref()),
+                ),
+                Some(_) => {
+                    let Some(body) = body else {
+                        return Ok(None);
+                    };
+                    let Some((paragraph, run)) = locate(body) else {
+                        return Ok(None);
+                    };
+                    let changed = judge(body, paragraph, run);
+                    match run {
+                        None => (
+                            shape,
+                            TextTarget::CellParagraph {
+                                shape,
+                                row: row_at,
+                                column: column_at,
+                                paragraph: Position::new(paragraph),
+                            },
+                            Scope::CellParagraph(row, column, paragraph),
+                            changed,
+                        ),
+                        Some(run) => (
+                            shape,
+                            TextTarget::CellRun {
+                                shape,
+                                row: row_at,
+                                column: column_at,
+                                paragraph: Position::new(paragraph),
+                                run: Position::new(run),
+                            },
+                            Scope::CellRun(row, column, paragraph, run),
+                            changed,
+                        ),
+                    }
+                },
+            }
+        },
+    };
+    Ok(Some(Plan {
+        target: Target {
+            slot: true,
+            slide: story.slide,
+            position: shape.get(),
+            bounds: None,
+        },
+        text: None,
+        format: Some(Box::new(Format {
+            target,
+            scope,
+            values,
+        })),
+        changed,
+        staged_bytes,
+        notes,
     }))
 }
 
@@ -681,11 +1092,34 @@ fn cache_scene(scene: Scene) -> Result<CachedScene> {
             placeholders.push(handle.position().get());
         }
     }
+    let mut tables = Vec::new();
+    for handle in scene.roots() {
+        if steps::tree_kind(&handle) == Some(Kind::Table) {
+            tables.try_reserve(1).map_err(allocation)?;
+            tables.push(handle.position().get());
+        }
+    }
     Ok(CachedScene {
         scene,
         shapes: shapes.into_boxed_slice(),
         placeholders: placeholders.into_boxed_slice(),
+        tables: tables.into_boxed_slice(),
+        cells: HashMap::new(),
+        notes: None,
     })
+}
+
+/// Read every cell of the table at scene position `position` once.
+fn read_cells(cached: &CachedScene, position: usize) -> Result<Option<Arc<Cells>>> {
+    let Some(handle) = cached
+        .scene
+        .shape(Position::new(position))
+        .map_err(|_| error(Code::InternalError, "cached PPTX table position is invalid"))?
+    else {
+        return Ok(None);
+    };
+    let out = handle.table()?.cell_contents()?;
+    Ok(Some(Arc::new(Cells { rows: out })))
 }
 
 fn direct_handle(cached: &CachedScene, kind: DirectKind, ordinal: usize) -> Result<Option<Handle>> {
@@ -730,7 +1164,13 @@ fn stage_all(edit: &mut NativeEdit, items: &[Item]) -> Result<usize> {
     for run in items.chunk_by(|left, right| {
         left.plan.target.slide == right.plan.target.slide
             && left.plan.format.is_some() == right.plan.format.is_some()
+            && left.plan.notes == right.plan.notes
     }) {
+        if run[0].plan.notes {
+            operations =
+                operations.saturating_add(stage_notes(edit, run[0].plan.target.slide, run)?);
+            continue;
+        }
         let kind = if run[0].plan.format.is_some() {
             BatchKind::Format
         } else if run.iter().any(|item| item.plan.target.bounds.is_some()) {
@@ -868,7 +1308,56 @@ fn stage_batch(
     }
 }
 
+/// One notes page's formatting plans, through the eager editor's notes
+/// text verb in 256-edit chunks (record 0346).
+fn stage_notes(edit: &mut NativeEdit, slide: usize, items: &[Item]) -> Result<usize> {
+    let NativeEdit::Eager(edit) = edit else {
+        return Err(Error::new(
+            Code::InternalError,
+            "PPTX notes formatting joined a source-backed run",
+        )
+        .with_format(FileFormat::Pptx));
+    };
+    let mut edits = Vec::new();
+    edits.try_reserve_exact(items.len()).map_err(allocation)?;
+    for item in items {
+        let format = item
+            .plan
+            .format
+            .as_ref()
+            .ok_or_else(|| Error::new(Code::InternalError, "PPTX notes batch lost a plan"))?;
+        edits.push(TextEdit::new(format.target, format.values.properties()));
+    }
+    let mut operations = 0_usize;
+    for chunk in edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS) {
+        operations = operations.saturating_add(
+            edit.set_notes_text_properties(slide, chunk)
+                .map_err(native_error)?,
+        );
+    }
+    Ok(operations)
+}
+
 fn stage_one(edit: &mut NativeEdit, plan: &Plan) -> Result<()> {
+    if plan.notes {
+        let Some(format) = &plan.format else {
+            return Err(Error::new(
+                Code::InternalError,
+                "PPTX notes plan lost its format",
+            ));
+        };
+        let NativeEdit::Eager(edit) = edit else {
+            return Err(Error::new(
+                Code::InternalError,
+                "PPTX notes formatting joined a source-backed run",
+            ));
+        };
+        let edits = [TextEdit::new(format.target, format.values.properties())];
+        return edit
+            .set_notes_text_properties(plan.target.slide, &edits)
+            .map(|_| ())
+            .map_err(native_error);
+    }
     if let Some(format) = &plan.format {
         let edits = [TextEdit::new(format.target, format.values.properties())];
         return match edit {
@@ -955,7 +1444,7 @@ fn commit_native(
         NativeEdit::Eager(edit) => {
             let (target, patch) = edit.commit().map_err(native_error)?.into_parts();
             let changed = !patch.is_noop();
-            let target = Editable::Eager(std::sync::Arc::new(target));
+            let target = Editable::Eager(Arc::new(target));
             let after = if changed {
                 match &target {
                     Editable::Eager(package) => base.adopt_eager(package.clone()),

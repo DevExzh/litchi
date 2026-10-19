@@ -25,7 +25,11 @@ pub(super) fn accepts(target: &TargetArg<'_>, props: &Props<'_>) -> bool {
                 .any(|(key, _)| key.as_str().eq_ignore_ascii_case("notes")))
 }
 
-fn admitted_text(props: &Props<'_>, key: &'static str, limits: &SemanticLimits) -> Result<String> {
+pub(super) fn admitted_text(
+    props: &Props<'_>,
+    key: &'static str,
+    limits: &SemanticLimits,
+) -> Result<String> {
     let mut text = None;
     for (name, value) in props.iter() {
         if !name.as_str().eq_ignore_ascii_case(key) {

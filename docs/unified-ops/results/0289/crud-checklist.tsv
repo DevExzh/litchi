@@ -965,9 +965,9 @@ pptx	placeholder	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/un
 pptx	placeholder	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
 pptx	placeholder	query	supported		ok matches in create()
 pptx	placeholder	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
-pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[2]/shape[2] {"font":"Litchi"}
-pptx	placeholder	add	n/a	add not offered for this element	-
-pptx	placeholder	remove	supported		ok `ooxml/pptx/shapes.pptx + add picture` /slide[2]/shape[2]
+pptx	placeholder	set	supported		ok `create() + add slide + add placeholder` /slide[1]/shape[1] {"x":"12pt"}
+pptx	placeholder	add	supported		ok /slide[1]/shape[1] on `create() + add slide` under /slide[1] {"phType":"title","text":"Litchi"}
+pptx	placeholder	remove	supported		ok `create() + add slide + add placeholder` /slide[1]/shape[1]
 pptx	placeholder	move	format-verb		refused unsupported_type
 pptx	placeholder	swap	format-verb		refused unsupported_type
 pptx	placeholder	edit	supported		ok tx.set
@@ -1065,10 +1065,10 @@ pptx	connector	edit	n/a	edit not offered for this element	-
 pptx	connector	batch	n/a	batch not offered for this element	-
 pptx	connector	create	supported		ok format
 pptx	connector	save	supported		ok format
-pptx	smartart	get	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
-pptx	smartart	find	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	get	supported		ok 7 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	find	supported		ok 7 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
 pptx	smartart	query	supported		ok matches in ooxml/pptx/smartart-composite-infer-right.pptx
-pptx	smartart	view	supported		ok 6 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
+pptx	smartart	view	supported		ok 7 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]
 pptx	smartart	set	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1] {"text":"Litchi"}
 pptx	smartart	add	supported		ok /slide[1]/smartart[1] on `create() + add slide` under /slide[1] {"layout":"process","text":"Plan\nBuild\nShip"}
 pptx	smartart	remove	supported		ok `create() + add slide + add smartart` /slide[1]/smartart[1]
@@ -1078,10 +1078,10 @@ pptx	smartart	edit	supported		ok tx.set
 pptx	smartart	batch	supported		ok set item
 pptx	smartart	create	supported		ok format
 pptx	smartart	save	supported		ok format
-pptx	ole	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
-pptx	ole	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	get	supported		ok 6 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	find	supported		ok 6 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/ole.pptx
-pptx	ole	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
+pptx	ole	view	supported		ok 6 instances, first `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
 pptx	ole	set	n/a	set not offered for this element	-
 pptx	ole	add	n/a	add not offered for this element	-
 pptx	ole	remove	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/ole.pptx` /slide[1]/ole[1]
@@ -1117,25 +1117,25 @@ pptx	run	edit	supported		ok tx.set
 pptx	run	batch	supported		ok set item
 pptx	run	create	supported		ok format
 pptx	run	save	supported		ok format
-pptx	linebreak	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
-pptx	linebreak	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	get	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	find	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
 pptx	linebreak	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx
-pptx	linebreak	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
+pptx	linebreak	view	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx` /slidemaster[1]/slidelayout[1]/shape[1]/paragraph[1]/linebreak[1]
 pptx	linebreak	set	n/a	set not offered for this element	-
 pptx	linebreak	add	n/a	add not offered for this element	-
-pptx	linebreak	remove	supported		ok `unified-ops/0294/modern-comments.pptx` /slide[1]/shape[3]/paragraph[1]/linebreak[1]
+pptx	linebreak	remove	supported		ok `unified-ops/0294/modern-comments.pptx + add modernComment` /slide[1]/shape[3]/paragraph[1]/linebreak[1]
 pptx	linebreak	move	format-verb		unreached
 pptx	linebreak	swap	format-verb		unreached
 pptx	linebreak	edit	n/a	edit not offered for this element	-
 pptx	linebreak	batch	n/a	batch not offered for this element	-
 pptx	linebreak	create	supported		ok format
 pptx	linebreak	save	supported		ok format
-pptx	notes	get	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
-pptx	notes	find	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	get	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	find	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
 pptx	notes	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
-pptx	notes	view	supported		ok 2 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
-pptx	notes	set	supported		ok `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes {"text":"Litchi"}
-pptx	notes	add	n/a	add not offered for this element	-
+pptx	notes	view	supported		ok 3 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/notes
+pptx	notes	set	supported		ok `unified-ops/0294/modern-comments.pptx + add modernComment` /slide[1]/notes {"text":"Litchi"}
+pptx	notes	add	supported		ok /slide[1]/notes on `create() + add slide` under /slide[1] {}
 pptx	notes	remove	n/a	remove not offered for this element	-
 pptx	notes	move	format-verb		unreached
 pptx	notes	swap	format-verb		unreached
@@ -1143,10 +1143,10 @@ pptx	notes	edit	supported		ok tx.set
 pptx	notes	batch	supported		ok set item
 pptx	notes	create	supported		ok format
 pptx	notes	save	supported		ok format
-pptx	comment	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
-pptx	comment	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	get	supported		ok 7 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	find	supported		ok 7 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx
-pptx	comment	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
+pptx	comment	view	supported		ok 7 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` /slide[1]/comment[1]
 pptx	comment	set	supported		ok `ooxml/pptx/shapes.pptx + add comment` /slide[1]/comment[1] {"text":"Litchi"}
 pptx	comment	add	supported		ok /slide[1]/comment[1] on `ooxml/pptx/shapes.pptx` under /slide[1] {"author":"Ada","text":"Check"}
 pptx	comment	remove	supported		ok `ooxml/pptx/shapes.pptx + add comment` /slide[1]/comment[1]
@@ -1273,30 +1273,30 @@ pptx	theme	edit	supported		ok tx.set
 pptx	theme	batch	supported		ok set item
 pptx	theme	create	supported		ok format
 pptx	theme	save	supported		ok format
-pptx	modernComment	get	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
-pptx	modernComment	find	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	get	supported		ok 6 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	find	supported		ok 6 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
 pptx	modernComment	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
-pptx	modernComment	view	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
-pptx	modernComment	set	n/a	set not offered for this element	-
-pptx	modernComment	add	n/a	add not offered for this element	-
-pptx	modernComment	remove	supported		ok `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	view	supported		ok 6 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]
+pptx	modernComment	set	supported		ok `unified-ops/0294/modern-comments.pptx + add modernComment` /slide[1]/moderncomment[1] {"text":"Litchi"}
+pptx	modernComment	add	supported		ok /slide[1]/moderncomment[3] on `unified-ops/0294/modern-comments.pptx` under /slide[1] {"author":"Ada","text":"Check","created":"2026-10-19T09:30:00Z"}
+pptx	modernComment	remove	supported		ok `unified-ops/0294/modern-comments.pptx + add modernComment` /slide[1]/moderncomment[1]
 pptx	modernComment	move	format-verb		refused unsupported_type
 pptx	modernComment	swap	format-verb		refused unsupported_type
-pptx	modernComment	edit	n/a	edit not offered for this element	-
-pptx	modernComment	batch	n/a	batch not offered for this element	-
+pptx	modernComment	edit	supported		ok tx.set
+pptx	modernComment	batch	supported		ok set item
 pptx	modernComment	create	supported		ok format
 pptx	modernComment	save	supported		ok format
-pptx	reply	get	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
-pptx	reply	find	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	get	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	find	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
 pptx	reply	query	supported		ok matches in unified-ops/0294/modern-comments.pptx
-pptx	reply	view	supported		ok 1 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
-pptx	reply	set	n/a	set not offered for this element	-
+pptx	reply	view	supported		ok 2 instances, first `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	set	supported		ok `unified-ops/0294/modern-comments.pptx + add modernComment` /slide[1]/moderncomment[1]/reply[1] {"text":"Litchi"}
 pptx	reply	add	n/a	add not offered for this element	-
-pptx	reply	remove	supported		ok `unified-ops/0294/modern-comments.pptx` /slide[1]/moderncomment[1]/reply[1]
+pptx	reply	remove	supported		ok `unified-ops/0294/modern-comments.pptx + add modernComment` /slide[1]/moderncomment[1]/reply[1]
 pptx	reply	move	format-verb		unreached
 pptx	reply	swap	format-verb		unreached
-pptx	reply	edit	n/a	edit not offered for this element	-
-pptx	reply	batch	n/a	batch not offered for this element	-
+pptx	reply	edit	supported		ok tx.set
+pptx	reply	batch	supported		ok set item
 pptx	reply	create	supported		ok format
 pptx	reply	save	supported		ok format
 pptx	hyperlink	get	supported		ok 2 instances, first `create() + add slide + add shape + add hyperlink` /slide[1]/shape[1]/paragraph[1]/run[1]/hyperlink

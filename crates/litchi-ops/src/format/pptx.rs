@@ -69,6 +69,7 @@ mod remove;
 mod rows;
 mod scenes;
 mod shape_add;
+mod slide_text;
 mod smartart;
 mod spec;
 mod steps;
@@ -122,6 +123,9 @@ pub(crate) const SETTABLE: &[&str] = &[
     "run",
     "notes",
     "comment",
+    // Modern comment threads and replies (record 0346).
+    "modernComment",
+    "reply",
     // Table row height (record 0333).
     "tr",
     // Table name and style switches (record 0342).
@@ -151,6 +155,11 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     // Pictures (`src`) and legacy comments (record 0252).
     "picture",
     "comment",
+    // Modern comment threads and replies (`parent`), speaker notes and
+    // placeholders (record 0346).
+    "modernComment",
+    "notes",
+    "placeholder",
     // Paragraphs and runs of shape, cell and notes bodies, tables and table
     // rows (record 0333).
     "paragraph",
@@ -202,6 +211,9 @@ pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::s
         "tc" => CELL_CAPABILITY_PROPS,
         "notes" => NOTES_CAPABILITY_PROPS,
         "comment" => COMMENT_CAPABILITY_PROPS,
+        // Modern comment add and set, reply set (record 0346).
+        "modernComment" => spec::MODERN_COMMENT_CAPABILITY_PROPS,
+        "reply" => spec::REPLY_CAPABILITY_PROPS,
         "picture" => PICTURE_CAPABILITY_PROPS,
         "group" => GROUP_CAPABILITY_PROPS,
         "chart" => CHART_CAPABILITY_PROPS,
@@ -276,6 +288,10 @@ struct PptxState {
     /// transaction's admission check then skips a second capture of the
     /// package (record 0333).
     admitted: OnceLock<()>,
+    /// The last table a coalesced cell batch read on this handle: its slide,
+    /// scene position and cells (record 0346), so a batch's first plan and
+    /// its run read the table once.
+    cells: Mutex<Option<(usize, usize, Arc<write::coalesce::Cells>)>>,
 }
 
 struct EagerSlide {
@@ -438,6 +454,7 @@ impl Pptx {
             revision: None,
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
+            cells: Mutex::new(None),
         }))
         .with_origin(self.origin())
     }
@@ -481,6 +498,7 @@ impl Pptx {
             revision: None,
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
+            cells: Mutex::new(None),
         }))
     }
 
@@ -524,6 +542,7 @@ impl Pptx {
             revision: Some(revision),
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
+            cells: Mutex::new(None),
         }))
         .with_signature(self.signature())
         .with_origin(self.origin());
@@ -929,6 +948,39 @@ impl Pptx {
             let _ = self.0.admitted.set(());
         }
         Ok(owner)
+    }
+
+    /// The cells of the table at scene position `frame` of slide `slide`,
+    /// read once per handle (record 0346).
+    fn table_cells(
+        &self,
+        slide: usize,
+        frame: usize,
+        read: impl FnOnce() -> Result<Option<Arc<write::coalesce::Cells>>>,
+    ) -> Result<Option<Arc<write::coalesce::Cells>>> {
+        let mut cached = self
+            .0
+            .cells
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((at_slide, at_frame, cells)) = cached.as_ref()
+            && (*at_slide, *at_frame) == (slide, frame)
+        {
+            return Ok(Some(Arc::clone(cells)));
+        }
+        let cells = read()?;
+        *cached = cells
+            .as_ref()
+            .map(|cells| (slide, frame, Arc::clone(cells)));
+        Ok(cells)
+    }
+
+    /// Whether [`Self::editable_owner`] hands out the eager package (record
+    /// 0346): coalesced notes formatting needs the eager editor.
+    fn edits_eagerly(&self) -> bool {
+        self.0.revision.is_none()
+            && (matches!(self.0.owner, PptxOwner::Eager(_))
+                || self.0.signature() == Signature::RemovalAuthorized)
     }
 
     /// Acquire the retained owner for an immediately following native edit.

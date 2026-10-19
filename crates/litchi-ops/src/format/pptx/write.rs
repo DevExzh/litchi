@@ -221,6 +221,10 @@ impl Pptx {
             };
             return self.set_comment(comment.slide, comment.index, &props, limits);
         }
+        // Modern comment threads and replies (record 0346).
+        if let Some(commit) = self.try_set_modern_comment(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_theme(&target, &props, limits)? {
             return Ok(commit);
         }
@@ -480,6 +484,18 @@ struct Target {
     slide: usize,
     position: usize,
     bounds: Option<(i64, i64, i64, i64)>,
+}
+
+/// The text of a new notes page (record 0346): its `text`, empty when the
+/// call assigns none.
+pub(in crate::format::pptx) fn notes_add_text(
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<String> {
+    if props.iter().next().is_none() {
+        return Ok(String::new());
+    }
+    notes::admitted_text(props, "text", limits)
 }
 
 /// Slide-grouped body edits: rich formatting for every target, and the text

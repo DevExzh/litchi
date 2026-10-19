@@ -4,14 +4,17 @@ mod comments;
 mod links;
 mod masters;
 mod media;
+mod modern_comments;
 mod notes;
 mod picture;
+mod placeholders;
 mod smartart;
 mod table;
 mod text;
 mod theme;
 
 pub use media::MediaFile;
+pub use modern_comments::ModernCommentChange;
 pub use smartart::SmartArtParts;
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};

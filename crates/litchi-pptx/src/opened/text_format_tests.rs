@@ -649,6 +649,29 @@ fn row_cell_counts_match_the_row_reader() -> Result<()> {
 }
 
 #[test]
+fn cell_contents_match_the_cell_readers() -> Result<()> {
+    let package = deck()?;
+    let xml = slide_xml(&package)?;
+    let scene = crate::shape::owned::Scene::read(xml)?;
+    let handle = scene
+        .shape(1_usize)
+        .map_err(|_| Error::Invalid("selector".into()))?
+        .expect("table frame");
+    let table = handle.table()?;
+    let mut expected = Vec::new();
+    for row in table.rows()? {
+        let mut cells = Vec::new();
+        for cell in row.cells()? {
+            cells.push((cell.properties()?, cell.text_body()?));
+        }
+        expected.push(cells);
+    }
+    assert_eq!(table.cell_contents()?, expected);
+    assert!(expected[0][0].1.is_some());
+    Ok(())
+}
+
+#[test]
 fn chunked_text_edits_equal_one_call_per_chunk() -> Result<()> {
     let package = deck()?;
     let bold = TextProperties::default().with_bold(Some(true));
@@ -683,5 +706,49 @@ fn chunked_text_edits_equal_one_call_per_chunk() -> Result<()> {
             .set_text_property_chunks(0usize, &[&too_many])
             .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn batched_paragraph_and_cell_edits_equal_one_edit_at_a_time() -> Result<()> {
+    // Record 0346: paragraph, run and cell edits of one shape are staged on
+    // their own spans and spliced once; the result is the sequential one.
+    let package = deck()?;
+    let paragraph = |index: usize| TextTarget::Paragraph {
+        shape: at(0),
+        paragraph: at(index),
+    };
+    let cell = |row: usize, column: usize| TextTarget::CellParagraph {
+        shape: at(1),
+        row: at(row),
+        column: at(column),
+        paragraph: at(0),
+    };
+    let edits = [
+        TextEdit::new(run(0, 0), TextProperties::default().with_bold(Some(true))),
+        TextEdit::new(
+            paragraph(0),
+            TextProperties::default().with_align(Some(Alignment::Center)),
+        ),
+        // A whole-shape edit after the paragraph edits sees them.
+        TextEdit::new(
+            TextTarget::Shape { shape: at(0) },
+            TextProperties::default().with_italic(Some(true)),
+        ),
+        TextEdit::new(run(0, 0), TextProperties::default().with_size(Some(2_000))),
+        TextEdit::new(cell(0, 0), TextProperties::default().with_bold(Some(true))),
+        TextEdit::new(cell(1, 1), TextProperties::default().with_text("changed")),
+        TextEdit::new(
+            cell(0, 0),
+            TextProperties::default().with_italic(Some(true)),
+        ),
+    ];
+    let (batched, changed) = apply(&package, &edits)?;
+    assert_eq!(changed, edits.len());
+    let mut sequential = package;
+    for edit in &edits {
+        sequential = apply(&sequential, std::slice::from_ref(edit))?.0;
+    }
+    assert_eq!(slide_xml(&batched)?, slide_xml(&sequential)?);
     Ok(())
 }

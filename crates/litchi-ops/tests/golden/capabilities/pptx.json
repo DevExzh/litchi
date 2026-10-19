@@ -404,7 +404,7 @@
         "layout": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "layoutType": {
@@ -435,6 +435,18 @@
           "type": "string",
           "add": false,
           "set": true,
+          "get": false
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
           "get": false
         }
       },
@@ -805,7 +817,7 @@
         "ph"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -850,7 +862,7 @@
             "picture",
             "sldImg"
           ],
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1097,7 +1109,7 @@
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": false
         },
@@ -3380,7 +3392,7 @@
       "element": "notes",
       "parent": "slide",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -3400,7 +3412,7 @@
       "properties": {
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         }
@@ -3439,13 +3451,13 @@
         "author": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "initials": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "index": {
@@ -3457,7 +3469,7 @@
         "date": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "x": {
@@ -3471,6 +3483,16 @@
           "add": true,
           "set": true,
           "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -4290,8 +4312,8 @@
         "threadedcomment"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -4310,20 +4332,26 @@
       "properties": {
         "text": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "author": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": true,
+          "set": true,
           "get": true
         },
         "created": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "startDate": {
@@ -4355,6 +4383,12 @@
           "set": false,
           "get": true
         },
+        "resolved": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
         "progress": {
           "type": "number",
           "add": false,
@@ -4370,6 +4404,12 @@
         "y": {
           "type": "length",
           "add": false,
+          "set": false,
+          "get": true
+        },
+        "parent": {
+          "type": "string",
+          "add": true,
           "set": false,
           "get": true
         }
@@ -4388,7 +4428,7 @@
       "parent": "modernComment",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -4402,19 +4442,25 @@
         "text": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "author": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": false,
+          "set": true,
           "get": true
         },
         "created": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "status": {
@@ -4424,6 +4470,12 @@
             "resolved",
             "closed"
           ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "parent": {
+          "type": "string",
           "add": false,
           "set": false,
           "get": true

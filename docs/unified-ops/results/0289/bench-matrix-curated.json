@@ -2760,6 +2760,12 @@
    "series": "v1_closure:docx:set_row_header_height_exact",
    "explanation": "Record 0342 §6: row path resolution builds the table's rows (4.4 µs, against 0.3 µs for /body/tbl[1], the bench's attribution leg), and the element path proof then walks them. Follow-up 0342-P1.",
    "disposition": "follow-up"
+  },
+  {
+   "record": "0346",
+   "series": "pptx_p0_final:cell_.*_batch/eager/.*/cold",
+   "explanation": "Record 0346 §6: a fresh handle reads every cell's properties and text body once (about 5 µs per cell) to judge each item's change before staging, which the leaf leg does not, plus the first edit's admission on a fresh eager handle (≈ 0.35 ms); warm batches are 1.06–1.15×. Follow-up 0346-P1: per-edit change flags from set_text_property_chunks.",
+   "disposition": "follow-up"
   }
  ],
  "evidence_without_rows": [

@@ -487,6 +487,16 @@ fn stage_admitted_text_edits(
     // for every edit.
     let mut elements: Vec<(usize, Range<usize>, Vec<u8>)> = Vec::new();
     let mut slots: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    // A table frame's cells, located once and rewritten in place, so a
+    // batch of cell edits is proportional to the table plus the edited
+    // cells rather than reparsing the frame per edit (record 0346).
+    let mut tables: std::collections::HashMap<usize, TableCells> = std::collections::HashMap::new();
+    // A shape's paragraphs, located once, for paragraph and run edits that
+    // touch nothing outside their paragraph (record 0346): a batch of them
+    // on one body (the notes page's, a long text box's) is proportional to
+    // the body plus the edited paragraphs.
+    let mut bodies: std::collections::HashMap<usize, ShapeParagraphs> =
+        std::collections::HashMap::new();
     let mut changed = 0;
     for edit in edits {
         let index = shape_position(edit.target).get();
@@ -523,13 +533,29 @@ fn stage_admitted_text_edits(
                         reason: "a table cell edit requires a table graphic frame",
                     });
                 }
-                rewrite_cell_frame(element, row, column, |cell| match edit.target {
+                if !tables.contains_key(&slot) {
+                    let cells = TableCells::locate(element)?;
+                    tables.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "opened-presentation text property tables",
+                        source,
+                    })?;
+                    tables.insert(slot, cells);
+                }
+                let Some(cells) = tables.get_mut(&slot) else {
+                    unreachable!("the table's cells were just located")
+                };
+                let current = cells.cell(element, row, column)?;
+                let rewritten = match edit.target {
                     TextTarget::CellParagraph { paragraph, .. } => {
-                        rewrite_cell_paragraph(cell, paragraph.get(), &edit.properties)
+                        rewrite_cell_paragraph(current, paragraph.get(), &edit.properties)
                     },
-                    TextTarget::CellRun { paragraph, run, .. } => {
-                        rewrite_cell_run(cell, paragraph.get(), run.get(), None, &edit.properties)
-                    },
+                    TextTarget::CellRun { paragraph, run, .. } => rewrite_cell_run(
+                        current,
+                        paragraph.get(),
+                        run.get(),
+                        None,
+                        &edit.properties,
+                    ),
                     TextTarget::CellRunSpan {
                         paragraph,
                         run,
@@ -537,14 +563,19 @@ fn stage_admitted_text_edits(
                         end,
                         ..
                     } => rewrite_cell_run(
-                        cell,
+                        current,
                         paragraph.get(),
                         run.get(),
                         Some(start..end),
                         &edit.properties,
                     ),
-                    _ => rewrite_cell(cell, &edit.properties),
-                })?
+                    _ => rewrite_cell(current, &edit.properties),
+                }?;
+                if rewritten.as_slice() != current {
+                    cells.rewritten.insert((row, column), rewritten);
+                    changed += 1;
+                }
+                continue;
             },
             None => {
                 if is_table || edit.properties.has_cell_properties() {
@@ -553,9 +584,57 @@ fn stage_admitted_text_edits(
                         reason: "text formatting requires a shape text body; fill applies to table cells",
                     });
                 }
-                rewrite_shape(element, edit.target, &edit.properties)?
+                let local = match edit.target {
+                    TextTarget::Paragraph { paragraph, .. } => Some((paragraph.get(), None, None)),
+                    TextTarget::Run { paragraph, run, .. } => {
+                        Some((paragraph.get(), Some(run.get()), None))
+                    },
+                    TextTarget::RunSpan {
+                        paragraph,
+                        run,
+                        start,
+                        end,
+                        ..
+                    } => Some((paragraph.get(), Some(run.get()), Some(start..end))),
+                    _ => None,
+                }
+                .filter(|_| {
+                    edit.properties.has_body_properties() && !edit.properties.has_shape_properties()
+                });
+                match local {
+                    Some((paragraph, run, span)) => {
+                        if !bodies.contains_key(&slot) {
+                            let located = ShapeParagraphs::locate(element)?;
+                            bodies.try_reserve(1).map_err(|source| Error::Allocation {
+                                resource: "opened-presentation text property bodies",
+                                source,
+                            })?;
+                            bodies.insert(slot, located);
+                        }
+                        let Some(located) = bodies.get_mut(&slot) else {
+                            unreachable!("the shape's paragraphs were just located")
+                        };
+                        let current = located.paragraph(element, paragraph)?;
+                        let rewritten = rewrite_paragraph(current, run, span, &edit.properties)?;
+                        if rewritten.as_slice() != current {
+                            located.rewritten.insert(paragraph, rewritten);
+                            changed += 1;
+                        }
+                        continue;
+                    },
+                    None => {
+                        // A whole-shape edit sees the paragraph edits before it.
+                        if let Some(located) = bodies.remove(&slot)
+                            && !located.rewritten.is_empty()
+                        {
+                            elements[slot].2 = located.splice(&elements[slot].2)?;
+                        }
+                        rewrite_shape(&elements[slot].2, edit.target, &edit.properties)?
+                    },
+                }
             },
         };
+        let element = &elements[slot].2;
         if replacement != *element {
             elements[slot].2 = replacement;
             changed += 1;
@@ -563,6 +642,16 @@ fn stage_admitted_text_edits(
     }
     if changed == 0 {
         return Ok((None, 0));
+    }
+    for (slot, cells) in tables {
+        if !cells.rewritten.is_empty() {
+            elements[slot].2 = cells.splice(&elements[slot].2)?;
+        }
+    }
+    for (slot, located) in bodies {
+        if !located.rewritten.is_empty() {
+            elements[slot].2 = located.splice(&elements[slot].2)?;
+        }
     }
     elements.sort_unstable_by_key(|(_, span, _)| span.start);
     if elements
@@ -1778,6 +1867,116 @@ fn descend(xml: &[u8], node: &Node, local: &[u8]) -> Result<Node> {
 }
 
 /// Rewrite a `p:graphicFrame` holding an `a:tbl` for one cell.
+/// A shape's `a:p` elements, located once (record 0346), and the
+/// paragraphs a batch has rewritten so far.
+struct ShapeParagraphs {
+    /// The paragraph spans in the shape element.
+    spans: Vec<Range<usize>>,
+    /// The rewritten paragraphs, by position.
+    rewritten: std::collections::HashMap<usize, Vec<u8>>,
+}
+
+impl ShapeParagraphs {
+    fn locate(shape: &[u8]) -> Result<Self> {
+        let node = root(shape)?;
+        let kids = children(shape, &node)?;
+        let body = child(shape, &kids, b"txBody").ok_or(Error::UnsafeEdit {
+            operation: "set_text_properties",
+            reason: "the shape has no text body",
+        })?;
+        let spans = children(shape, body)?
+            .into_iter()
+            .filter(|kid| kid.local(shape) == b"p")
+            .map(|paragraph| paragraph.span)
+            .collect();
+        Ok(Self {
+            spans,
+            rewritten: std::collections::HashMap::new(),
+        })
+    }
+
+    /// The current bytes of the paragraph at `index`.
+    fn paragraph<'a>(&'a self, shape: &'a [u8], index: usize) -> Result<&'a [u8]> {
+        let span = self.spans.get(index).ok_or(Error::IndexOutOfBounds {
+            index,
+            len: self.spans.len(),
+        })?;
+        Ok(self
+            .rewritten
+            .get(&index)
+            .map_or(&shape[span.clone()], Vec::as_slice))
+    }
+
+    /// The shape with every rewritten paragraph spliced in.
+    fn splice(&self, shape: &[u8]) -> Result<Vec<u8>> {
+        let mut splices = Splices::new();
+        for (&index, bytes) in &self.rewritten {
+            splices.replace(self.spans[index].clone(), bytes.clone());
+        }
+        splices.apply(shape)
+    }
+}
+
+/// A table frame's `a:tc` elements, located once (record 0346), and the
+/// cells a batch has rewritten so far.
+struct TableCells {
+    /// The cell spans in the frame, by row and position in the row.
+    spans: Vec<Vec<Range<usize>>>,
+    /// The rewritten cells, by row and position.
+    rewritten: std::collections::HashMap<(usize, usize), Vec<u8>>,
+}
+
+impl TableCells {
+    fn locate(frame: &[u8]) -> Result<Self> {
+        let node = root(frame)?;
+        let graphic = descend(frame, &node, b"graphic")?;
+        let data = descend(frame, &graphic, b"graphicData")?;
+        let table = descend(frame, &data, b"tbl")?;
+        let mut spans = Vec::new();
+        for tr in children(frame, &table)?
+            .into_iter()
+            .filter(|kid| kid.local(frame) == b"tr")
+        {
+            spans.push(
+                children(frame, &tr)?
+                    .into_iter()
+                    .filter(|kid| kid.local(frame) == b"tc")
+                    .map(|tc| tc.span)
+                    .collect(),
+            );
+        }
+        Ok(Self {
+            spans,
+            rewritten: std::collections::HashMap::new(),
+        })
+    }
+
+    /// The current bytes of the cell at `row`, `column`.
+    fn cell<'a>(&'a self, frame: &'a [u8], row: usize, column: usize) -> Result<&'a [u8]> {
+        let cells = self.spans.get(row).ok_or(Error::IndexOutOfBounds {
+            index: row,
+            len: self.spans.len(),
+        })?;
+        let span = cells.get(column).ok_or(Error::IndexOutOfBounds {
+            index: column,
+            len: cells.len(),
+        })?;
+        Ok(self
+            .rewritten
+            .get(&(row, column))
+            .map_or(&frame[span.clone()], Vec::as_slice))
+    }
+
+    /// The frame with every rewritten cell spliced in.
+    fn splice(&self, frame: &[u8]) -> Result<Vec<u8>> {
+        let mut splices = Splices::new();
+        for (&(row, column), bytes) in &self.rewritten {
+            splices.replace(self.spans[row][column].clone(), bytes.clone());
+        }
+        splices.apply(frame)
+    }
+}
+
 fn rewrite_cell_frame(
     frame: &[u8],
     row: usize,

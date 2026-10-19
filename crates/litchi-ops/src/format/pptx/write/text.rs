@@ -118,6 +118,39 @@ impl TextValues {
             && self.geometry.is_none()
     }
 
+    /// Whether a coalesced run can stage these table-cell assignments
+    /// (record 0346): [`Self::coalescible`]'s and the cell's fill, anchor and
+    /// insets, which [`Self::cell_changed`] judges.
+    pub(in crate::format::pptx) fn cell_coalescible(&self) -> bool {
+        !self.is_empty() && self.shape_fill.is_none() && self.geometry.is_none()
+    }
+
+    /// Whether the assignments change a table cell: its local properties,
+    /// its text or any paragraph's formatting (record 0346).
+    pub(in crate::format::pptx) fn cell_changed(
+        &self,
+        properties: &litchi_pptx::table::CellProperties,
+        body: Option<&litchi_drawingml::text::body::Body>,
+    ) -> bool {
+        let text = body.map(litchi_drawingml::text::body::Body::text);
+        self.fill.is_some_and(|value| value != properties.fill)
+            || self.valign.is_some_and(|value| value != properties.anchor)
+            || self
+                .margins
+                .iter()
+                .zip(properties.margins)
+                .any(|(wanted, current)| wanted.is_some_and(|value| value != current))
+            || self
+                .text
+                .as_deref()
+                .is_some_and(|wanted| text.as_deref() != Some(wanted))
+            || body.is_some_and(|body| {
+                body.paragraphs
+                    .iter()
+                    .any(|paragraph| self.paragraph_changed(paragraph))
+            })
+    }
+
     /// Whether the assignments change a run, compared with the local
     /// properties the reader gives.
     pub(in crate::format::pptx) fn run_changed(

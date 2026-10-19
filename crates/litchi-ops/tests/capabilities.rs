@@ -859,7 +859,17 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
         ),
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
-        "comment" => matches!(property, "text" | "x" | "y"),
+        // Modern comment threads and replies (record 0346).
+        "modernComment" => matches!(
+            property,
+            "text" | "author" | "initials" | "created" | "resolved"
+        ),
+        "reply" => matches!(property, "text" | "author" | "initials" | "created"),
+        // Author, initials and date since record 0346.
+        "comment" => matches!(
+            property,
+            "text" | "x" | "y" | "author" | "initials" | "date"
+        ),
         // Table rows (record 0333).
         "tr" => property == "height",
         _ => false,
@@ -912,11 +922,13 @@ fn pptx_write_only(element: &str, property: &str) -> bool {
             property,
             "fill" | "valign" | "padding.left" | "padding.right" | "padding.top" | "padding.bottom"
         ),
-        "slide" => matches!(property, "notes" | "transition"),
+        "slide" => matches!(property, "notes" | "transition" | "title" | "text"),
         "shape" | "placeholder" => matches!(property, "fill" | "geometry"),
         "picture" => property == "src",
         "tr" => property != "height" && pptx_row_add(property),
         "table" => property == "data",
+        // A comment's reading direction, on add (record 0346).
+        "comment" => property == "direction",
         _ => false,
     }
 }
@@ -976,7 +988,8 @@ fn pptx_reports_selection_and_structural_writes() {
                 text_write
                     || shape_geometry_write
                     || pptx_text_format_set(element.name(), property.name())
-                    || (element.name() == "slide" && matches!(property.name(), "name" | "hidden"))
+                    || (element.name() == "slide"
+                        && matches!(property.name(), "name" | "hidden" | "layout"))
                     // Record 0342: a table-level set.
                     || (element.name() == "table"
                         && matches!(
@@ -993,7 +1006,14 @@ fn pptx_reports_selection_and_structural_writes() {
                 property.name()
             );
             let slide_add = element.name() == "slide"
-                && matches!(property.name(), "layout" | "name" | "hidden");
+                && matches!(
+                    property.name(),
+                    "layout" | "name" | "hidden" | "title" | "text"
+                );
+            // Record 0346: notes and placeholders on add.
+            let notes_add = element.name() == "notes" && property.name() == "text";
+            let placeholder_add =
+                element.name() == "placeholder" && matches!(property.name(), "phType" | "text");
             let shape_add = element.name() == "shape" && pptx_shape_add(property.name());
             let picture_add = element.name() == "picture"
                 && matches!(
@@ -1003,7 +1023,12 @@ fn pptx_reports_selection_and_structural_writes() {
             let comment_add = element.name() == "comment"
                 && matches!(
                     property.name(),
-                    "text" | "author" | "initials" | "date" | "x" | "y"
+                    "text" | "author" | "initials" | "date" | "x" | "y" | "direction"
+                );
+            let modern_add = element.name() == "modernComment"
+                && matches!(
+                    property.name(),
+                    "text" | "author" | "initials" | "created" | "resolved" | "parent"
                 );
             assert_eq!(
                 property.add(),
@@ -1011,6 +1036,9 @@ fn pptx_reports_selection_and_structural_writes() {
                     || shape_add
                     || picture_add
                     || comment_add
+                    || modern_add
+                    || notes_add
+                    || placeholder_add
                     || pptx_text_add(element.name(), property.name()),
                 "{} / {}",
                 element.name(),
@@ -1046,7 +1074,10 @@ fn pptx_reports_selection_and_structural_writes() {
     for property in slide.properties() {
         assert_eq!(
             property.add(),
-            matches!(property.name(), "layout" | "name" | "hidden"),
+            matches!(
+                property.name(),
+                "layout" | "name" | "hidden" | "title" | "text"
+            ),
             "{}",
             property.name()
         );
@@ -1059,10 +1090,16 @@ fn pptx_reports_selection_and_structural_writes() {
         assert_eq!(property.add(), add, "{}", property.name());
     }
     let placeholder = caps.element("placeholder").unwrap();
-    assert!(!placeholder.operations().add);
+    // Placeholder insertion (record 0346).
+    assert!(placeholder.operations().add);
     assert!(placeholder.operations().remove);
     for property in placeholder.properties() {
-        assert!(!property.add(), "{}", property.name());
+        assert_eq!(
+            property.add(),
+            matches!(property.name(), "phType" | "text"),
+            "{}",
+            property.name()
+        );
         assert_eq!(
             property.set(),
             matches!(property.name(), "text" | "x" | "y" | "width" | "height")
@@ -1376,7 +1413,8 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
             || pptx_text_format_set("shape", property.name());
         assert_eq!(property.set(), set, "{}", property.name());
     }
-    assert!(!source_caps.element("placeholder").unwrap().operations().add);
+    // Placeholder insertion follows shape insertion (record 0346).
+    assert!(source_caps.element("placeholder").unwrap().operations().add);
     assert!(
         source_caps
             .element("placeholder")
@@ -1385,7 +1423,12 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
             .remove
     );
     for property in source_caps.element("placeholder").unwrap().properties() {
-        assert!(!property.add(), "{}", property.name());
+        assert_eq!(
+            property.add(),
+            matches!(property.name(), "phType" | "text"),
+            "{}",
+            property.name()
+        );
         assert_eq!(
             property.set(),
             matches!(property.name(), "text" | "x" | "y" | "width" | "height")
@@ -1490,7 +1533,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
         assert_eq!(property.set(), set, "{}", property.name());
     }
     assert!(eager_caps.element("shape").unwrap().operations().remove);
-    assert!(!eager_caps.element("placeholder").unwrap().operations().add);
+    assert!(eager_caps.element("placeholder").unwrap().operations().add);
     assert!(
         eager_caps
             .element("placeholder")
@@ -1499,7 +1542,12 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
             .remove
     );
     for property in eager_caps.element("placeholder").unwrap().properties() {
-        assert!(!property.add(), "{}", property.name());
+        assert_eq!(
+            property.add(),
+            matches!(property.name(), "phType" | "text"),
+            "{}",
+            property.name()
+        );
         assert_eq!(
             property.set(),
             matches!(property.name(), "text" | "x" | "y" | "width" | "height")

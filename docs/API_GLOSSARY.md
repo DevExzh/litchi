@@ -2860,3 +2860,24 @@ gain the ADR 0034 §3 patch vocabulary over `litchi_ops::transaction::Patch`.
 | `litchi_rtf::Error::UnsupportedCodePage` | adopted (0347): an `\ansicpg` with no exact codec (10001, 10007); `unsupported_capability` in the unified layer |
 
 See [0347](unified-ops/0347-numbers-swap-python-patch-xlsx-picture.md).
+
+## PPTX P0 closure: comments, modern comments, notes, placeholders, slides (record 0346)
+
+No new transaction family: every verb lives on the primary `opened::Edit`,
+beside the record 0252 and 0333 positional comment verbs. Comment and
+reply identities stay native (the modern-comment `id` is read through the
+raw query surface only).
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::opened::Edit::{set_comment_date_at, set_comment_author_at}` | adopted (0346), positional siblings of `set_comment_at`; re-attribution renames an author only when the comment is their only one, otherwise moves the comment to an author of that name and initials at the author's next index |
+| `litchi_ops` PPTX `comment` `author`/`initials`/`date` set, `direction` (alias `dir`) on add | adopted (0346) |
+| `litchi_pptx::opened::Edit::{add_modern_comment_text, add_modern_comment_reply_text, set_modern_comment_at}`, `opened::ModernCommentChange` | adopted (0346), positional siblings of `remove_modern_comment_at`; new identities are GUIDs derived from the edit's inputs, unique in the comment graph (no clock or random source) |
+| `litchi_pptx::presentation::modern_comments::{Comment, Reply}::author_initials` | adopted (0346), beside `author_name` |
+| `litchi_ops` PPTX `modernComment` add (`text`, `author`, `initials`, `created`, `resolved`, `parent`) and set; `reply` set; reads `initials`, `resolved`, `parent`; raw `id` | adopted (0346); `created` is required on add (no clock) |
+| `litchi_pptx::opened::Edit::{add_placeholder, put_placeholder_text}` | adopted (0346): a placeholder bound to the layout slot of its type (a title adopts the layout's title-family type; other types the slot's index, else the smallest free one); `put_` fills the slide's matching placeholder or adds one, OfficeCLI's slide `title`/`text` shorthand |
+| `litchi_pptx::opened::Edit::set_slide_layout` | adopted (0346): retargets the slide's layout relationship to the layout of that exact name; shapes are kept |
+| `litchi_pptx::table::Table::cell_contents` | adopted (0346): every cell's properties and text body, by row; a table without namespace declarations resolves its scope once |
+| `litchi_ops` PPTX `placeholder` add (`phType`, alias `type`; `text`), returning the canonical `/slide[N]/shape[K]`; `notes` add (`text`); slide `title`/`text` on add and `layout` set | adopted (0346) |
+
+See [0346](unified-ops/0346-pptx-p0-final.md).
