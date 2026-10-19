@@ -268,13 +268,10 @@ fn every_format_has_one_answer_for_its_reads() {
                     Verb::Set | Verb::Edit | Verb::Batch => true,
                     Verb::Add => !writes.addable.is_empty(),
                     Verb::Remove => !writes.removable.is_empty(),
-                    Verb::Move => !writes.movable.is_empty(),
                     // Pages exchanges paragraphs (record 0299); Keynote
-                    // slides, paragraphs and drawables (record 0298).
-                    Verb::Swap => {
-                        matches!(format, FileFormat::Pages | FileFormat::Keynote)
-                            && !writes.movable.is_empty()
-                    },
+                    // slides, paragraphs and drawables (record 0298);
+                    // Numbers sheets and tables (record 0347).
+                    Verb::Move | Verb::Swap => !writes.movable.is_empty(),
                     _ => false,
                 });
             #[cfg(not(feature = "iwork-adapter"))]

@@ -876,6 +876,87 @@ class PropsTests(WriteAssertions):
 
 
 # ---------------------------------------------------------------------------
+# Patches (record 0347)
+# ---------------------------------------------------------------------------
+
+
+class PatchTests(WriteAssertions):
+    """``Commit.patch``: ``apply``, ``inverse`` and ``is_noop``, as Rust's
+    ``transaction::Patch``."""
+
+    def assertRoundTrip(self, source, commit):
+        """The patch replays onto ``source``, its inverse restores it, and
+        both refuse any other File."""
+        before, after = source.to_bytes(), commit.file.to_bytes()
+        patch = commit.patch
+        self.assertIsInstance(patch, L.Patch)
+        self.assertFalse(patch.is_noop())
+        self.assertEqual(patch.apply(source).to_bytes(), after)
+        self.assertEqual(patch.inverse().apply(commit.file).to_bytes(), before)
+        self.assertEqual(patch.inverse().inverse().apply(source).to_bytes(), after)
+        for stale, target in ((patch, commit.file), (patch.inverse(), source)):
+            error = raised(lambda stale=stale, target=target: stale.apply(target))
+            self.assertIsInstance(error, L.LitchiError)
+            self.assertEqual(error.code, "invalid_input")
+        self.assertUnchanged(source, before)
+        self.assertUnchanged(commit.file, after)
+
+    def test_an_edit_patch_spans_every_run(self):
+        # `add` and the reads close a run: this edit runs three Rust
+        # transactions, and its one Patch replays and undoes all three.
+        file = docx_with("A")
+        with file.edit() as tx:
+            path = tx.add("/body", "paragraph", {"text": "B"})
+            tx.set(path, {"align": "center"})
+            self.assertEqual(tx.get("/body/p[2]", 0)["text"], "B")
+            tx.swap("/body/p[1]", "/body/p[2]")
+        commit = tx.commit()
+        self.assertEqual(texts(commit.file, "/body")[:2], ["B", "A"])
+        self.assertRoundTrip(file, commit)
+        self.assertRegex(repr(commit.patch), r"<Patch: noop=False>")
+
+    def test_closure_batch_and_apply_patches(self):
+        file = docx_with("A", "B")
+        self.assertRoundTrip(file, file.edit(lambda tx: tx.set("/body/p[1]", {"align": "right"})))
+        self.assertRoundTrip(
+            file,
+            file.batch([
+                {"command": "set", "path": "/body/p[1]/r[1]", "props": {"bold": True}},
+                {"command": "remove", "path": "/body/p[2]"},
+            ]),
+        )
+        self.assertRoundTrip(
+            file, file.apply({"command": "set", "path": "/body/p[2]/r[1]", "props": {"italic": True}})
+        )
+
+    def test_a_noop_patch(self):
+        file = docx_with("A")
+        commit = file.edit(lambda tx: None)
+        self.assertFalse(commit.changed)
+        self.assertTrue(commit.patch.is_noop())
+        self.assertTrue(commit.patch.inverse().is_noop())
+        self.assertEqual(commit.patch.apply(file).to_bytes(), file.to_bytes())
+
+    def test_a_closed_file_refuses_a_patch(self):
+        file = docx_with("A")
+        commit = file.edit(lambda tx: tx.set("/body/p[1]", {"align": "right"}))
+        source = L.open_bytes(file.to_bytes())
+        source.close()
+        error = raised(lambda: commit.patch.apply(source))
+        self.assertIsInstance(error, L.LitchiError)
+
+    def test_a_numbers_swap_patch(self):
+        # Record 0347: a Numbers sheet swap, and its inverse.
+        workbook = L.create("numbers")
+        workbook, _ = workbook.add("/", "sheet", {"name": "Second"})
+        commit = workbook.edit(lambda tx: tx.swap("/sheet[1]", "/sheet[2]"))
+        self.assertEqual(commit.file.get("/sheet[1]", 0)["format"]["name"], "Second")
+        self.assertRoundTrip(workbook, commit)
+        with self.assertRaises(L.UnsupportedError):
+            workbook.swap("/sheet[1]/table[1]/row[1]", "/sheet[1]/table[1]/row[2]")
+
+
+# ---------------------------------------------------------------------------
 # Batches
 # ---------------------------------------------------------------------------
 

@@ -583,6 +583,12 @@ fn row_unsupported_operations_are_unsupported_capability() {
         litchi_doc::Error::UnsupportedEncryption(litchi_doc::EncryptionKind::XorObfuscation),
         Code::UnsupportedCapability,
     );
+    // An `\ansicpg` without an exact codec (record 0347).
+    #[cfg(feature = "rtf")]
+    assert_code(
+        litchi_rtf::Error::UnsupportedCodePage(10001),
+        Code::UnsupportedCapability,
+    );
 }
 
 // Row: `Locked` read/edit, `Signed` edit, `ProtectionDenied` ->
