@@ -184,7 +184,7 @@ Element gap rows:
 | rtf | 0 | 11 | 1 | 0 | 5 | 0 |
 | xlsx | 0 | 2 | 4 | 0 | 1 | 0 |
 | xlsb | 0 | 3 | 4 | 0 | 1 | 0 |
-| xls | 7 | 0 | 4 | 0 | 1 | 0 |
+| xls | 0 | 7 | 4 | 0 | 1 | 0 |
 | pptx | 0 | 0 | 3 | 0 | 2 | 0 |
 | ppt | 0 | 6 | 3 | 0 | 2 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -196,7 +196,7 @@ Element gap rows:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 0 | 2 | 3 | 0 | 2 | 0 |
-| ods | 7 | 0 | 4 | 0 | 1 | 0 |
+| ods | 0 | 7 | 4 | 0 | 1 | 0 |
 | odt | 0 | 9 | 1 | 0 | 5 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -210,7 +210,7 @@ Property gap rows:
 | rtf | 0 | 880 | 35 | 0 | 19 | 0 |
 | xlsx | 0 | 285 | 79 | 0 | 1 | 0 |
 | xlsb | 0 | 391 | 79 | 0 | 1 | 0 |
-| xls | 189 | 219 | 79 | 0 | 1 | 0 |
+| xls | 0 | 408 | 79 | 0 | 1 | 0 |
 | pptx | 16 | 430 | 57 | 0 | 12 | 0 |
 | ppt | 0 | 609 | 58 | 0 | 12 | 0 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -222,7 +222,7 @@ Property gap rows:
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 0 | 603 | 58 | 0 | 12 | 0 |
-| ods | 189 | 247 | 79 | 0 | 1 | 0 |
+| ods | 0 | 436 | 79 | 0 | 1 | 0 |
 | odt | 0 | 880 | 35 | 0 | 19 | 0 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -232,7 +232,7 @@ All gap rows by tier:
 | Tier | planned | deferred-P1 | deferred-P2 | wontfix | out-of-scope | none |
 |---|---:|---:|---:|---:|---:|---:|
 | P0 | 26 | 0 | 0 | 0 | 4 | 0 |
-| P1 | 426 | 6023 | 0 | 0 | 55 | 0 |
+| P1 | 34 | 6415 | 0 | 0 | 55 | 0 |
 | P2 | 0 | 0 | 659 | 0 | 87 | 0 |
 
 Entries (rows counts this table's element and property rows; a gap element's
@@ -246,8 +246,8 @@ properties share its entry unless an entry names the property):
 | odp-family | deferred | 0328 | 666 | `delta:odp:*` | ODP is outside the v1 boundary (tier 3); record 0328 owns the ODT/ODP/RTF wave |
 | ppt-family | deferred | 0323 | 676 | `delta:ppt:*` | PPT is outside the v1 boundary; record 0323 lists its element follow-ups |
 | xlsb-family | deferred | 0322 | 477 | `delta:xlsb:*` | XLSB is outside the v1 boundary; record 0322 lists its worksheet-feature follow-ups |
-| xls-parity | planned | WP10 | 196 | `delta:xls:*` | XLS element parity: the gap element families and their properties (audit WP10, record 0327) |
-| ods-parity | planned | WP11 | 196 | `delta:ods:*` | ODS element parity: the gap element families and their properties (audit WP11, record 0327) |
+| xls-parity | deferred | 0327/0316 | 196 | `delta:xls:*` | XLS element parity (audit WP10): the gap element families and their properties (chart, chart series and axes, run, table, detected table), deferred to P1 because XLS is outside the v1 boundary (record 0344; owner memo 0331 item 25); follow-ups: record 0327 §4 (typed refusals of the XLS feature nodes), record 0316 (XLS structural follow-ups) and record 0339 F5 (detected tables) |
+| ods-parity | deferred | 0327 | 196 | `delta:ods:*` | ODS element parity (audit WP11): the gap element families and their properties (chart, chart series and axes, run, table, detected table), deferred to P1 because ODS is outside the v1 boundary (record 0344; owner memo 0331 item 25); follow-ups: record 0327 §4 (typed refusals of the ODS feature nodes) and record 0339 F5 (detected tables) |
 | spreadsheet-p2-families | deferred | 0327 | 166 | `delta:xls:pivottable`, `delta:xls:slicer`, `delta:xls:sparkline`, `delta:xls:ole`, `delta:ods:pivottable`, `delta:ods:slicer`, `delta:ods:sparkline`, `delta:ods:ole` | §13 P2 families (pivot tables, slicers, sparklines, OLE) stay out of the XLS and ODS parity work packages |
 | xls-breadth | deferred | 0327 | 219 | `delta:xls:*.*` | XLS property breadth of supported elements; XLS is outside the v1 boundary |
 | ods-breadth | deferred | 0327 | 247 | `delta:ods:*.*` | ODS property breadth of supported elements; ODS is outside the v1 boundary |
@@ -722,9 +722,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | cell | supported |  |  |  |
 | cellis | conditionalFormatting | supported |  |  |  |
 | cfextended | conditionalFormatting | supported |  |  |  |
-| chart-axis | axis | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart-series | series | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
-| chart | chart | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| chart-axis | axis | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) |
+| chart-series | series | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) |
+| chart | chart | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) |
 | colbreak | colbreak | supported |  |  |  |
 | colorscale | conditionalFormatting | supported |  |  |  |
 | column | column | supported |  |  |  |
@@ -733,7 +733,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | gap | P1 | planned WP10 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
+| detectedtable |  | gap | P1 | deferred-P1 0327/0316 (xls-parity) | WP10 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -747,13 +747,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
-| run | run | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| run | run | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) |
 | shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
 | slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| sort |  | out of scope | P1 | planned WP10 (xls-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
+| sort |  | out of scope | P1 | deferred-P1 0327/0316 (xls-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
 | sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | M1-extended (R6b) |
-| table | table | gap | P1 | planned WP10 (xls-parity) | M1-extended (R6b) |
+| table | table | gap | P1 | deferred-P1 0327/0316 (xls-parity) | M1-extended (R6b) |
 | topn | conditionalFormatting | supported |  |  |  |
 | uniquevalues | conditionalFormatting | supported |  |  |  |
 | validation | dataValidation | supported |  |  |  |
@@ -1244,9 +1244,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | cell | supported |  |  |  |
 | cellis | conditionalFormatting | supported |  |  |  |
 | cfextended | conditionalFormatting | supported |  |  |  |
-| chart-axis | axis | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| chart-series | series | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
-| chart | chart | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| chart-axis | axis | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
+| chart-series | series | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
+| chart | chart | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
 | colbreak | colbreak | supported |  |  |  |
 | colorscale | conditionalFormatting | supported |  |  |  |
 | column | column | supported |  |  |  |
@@ -1255,7 +1255,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | containstext | conditionalFormatting | supported |  |  |  |
 | databar | conditionalFormatting | supported |  |  |  |
 | dateoccurring | conditionalFormatting | supported |  |  |  |
-| detectedtable |  | gap | P1 | planned WP11 (ods-parity) | WP11 (record 0339 F5): header-row table detection in queries |
+| detectedtable |  | gap | P1 | deferred-P1 0327 (ods-parity) | WP11 (record 0339 F5): header-row table detection in queries |
 | duplicatevalues | conditionalFormatting | supported |  |  |  |
 | formulacf | conditionalFormatting | supported |  |  |  |
 | hyperlink | hyperlink | supported |  |  |  |
@@ -1269,13 +1269,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | raw |  | out of scope | P1 | out-of-scope 0336 (raw-layer) | the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12) |
 | row | row | supported |  |  |  |
 | rowbreak | rowbreak | supported |  |  |  |
-| run | run | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| run | run | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
 | shape | shape | supported |  |  |  |
 | sheet | sheet | supported |  |  |  |
 | slicer | slicer | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | none: OpenDocument has no slicer element |
-| sort |  | out of scope | P1 | planned WP11 (ods-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
+| sort |  | out of scope | P1 | deferred-P1 0327 (ods-parity) | a set-only action that reorders rows, not an element (design §13 P1: sort) |
 | sparkline | sparkline | gap | P2 | deferred-P2 0327 (spreadsheet-p2-families) | ODS adapter follow-up (record 0277) |
-| table | table | gap | P1 | planned WP11 (ods-parity) | ODS adapter follow-up (record 0277) |
+| table | table | gap | P1 | deferred-P1 0327 (ods-parity) | ODS adapter follow-up (record 0277) |
 | topn | conditionalFormatting | supported |  |  |  |
 | uniquevalues | conditionalFormatting | supported |  |  |  |
 | validation | dataValidation | supported |  |  |  |

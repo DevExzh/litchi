@@ -27,3 +27,21 @@ Source: the coordinator's definition-of-done audit (2026-10-17, §7), the
 
 The questions most likely to change behaviour if overridden are 2, 3, 4,
 7 (Q3, regex) and 12.
+
+## Second-audit additions (record 0344)
+
+Source: the second definition-of-done audit (2026-10-18, §12.2 items 3
+and 4). Items 14–24 are record 0343's (the API deferrals D1–D11); these
+continue the numbering after them. Each is in effect as the adopted
+default, like the items above.
+
+| # | Decision | Adopted default | Record |
+|---|---|---|---|
+| 25 | XLS and ODS element parity (audit WP10/WP11): implement it in v1, or defer it | Deferred. The 392 P1 capability-delta rows still `planned` (XLS 196, ODS 196: chart, chart series and axes, run, table and detected-table families with their properties) are `deferred-P1`, because both formats are outside the v1 boundary (`policy.p0Formats` = docx, xlsx, pptx). Their follow-ups name records 0327 and 0316 (XLS) and 0327 (ODS). No P0 row changed: the delta keeps 26 P0 rows `planned` (DOCX, PPTX) and 4 out-of-scope | 0344, 0327, 0316 |
+| 26 | `litchi::sheet::text` against design §16.4 ("re-homed behind `import` semantics in M4") | Kept, as documented non-Office tooling: its CSV, TSV, PRN, SYLK, DIF and fixed-width readers and writers open none of the 21 formats, and `File::import` (record 0266) covers only CSV/TSV into a workbook; deleting it drops those capabilities and deprecation is not allowed. The follow-up is to move it into a leaf crate and align its names with ADR 0034 | 0334 §2 item 2 |
+| 27 | The property-level gap enumeration: does every OfficeCLI property Litchi does not read need a `capabilities()` row? | No. The generated capability delta (`officecli-capability-delta.md` and its per-format pages) is the property-level gap list: its 3,220 `unlisted` property-read rows (5 P0: DOCX `comment.anchoredTo`; PPTX `modernComment.initials`/`resolved`/`parent`/`id`; 62 P2, the rest P1) each carry a disposition, and `--check` fails on a row without one. `capabilities()` lists elements, operations and the property gaps the registry knows; it does not mirror OfficeCLI's vocabulary | 0332, 0339, 0344 |
+| 28 | The bench misses explained as residuals | Accepted. `results/0289/bench-matrix.md` lists 142 open misses: 85 name a follow-up, 57 are explained residuals (the 54 of record 0337, inherent to the comparison or kept by an earlier owner decision, plus record 0338's correctly rounded JSON number parse and record 0329's Keynote layout noise). Under 0248 D5 (item 1) a residual stands only with this acceptance; a residual the owner rejects becomes a follow-up | 0337, 0344 |
+| 29 | `Box<dyn>` in the `litchi-core::sheet` traits (goal constraint 2: no `Box<dyn Trait>` on a public or per-operation path) | A recorded exception: `litchi-ops` implements the pre-existing object-safe `litchi-core::sheet` traits, which return `Box<dyn CoreWorksheet>`/`Box<dyn CoreCell>` (`calc.rs`, `view/workbook.rs`, `format/{xlsx,xlsb,xls}`; 72 occurrences), so the evaluate path builds one box per cell. Replacing them with static dispatch is a separate change (size L) | audit §1 item 8c |
+
+Of these, 25 and 27 decide whether the parity layer of design §14 counts
+as met; 29 is the only one that touches a goal constraint.
