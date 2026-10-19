@@ -454,6 +454,9 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
                     return invalid("flat ODP has text outside its root element");
                 }
             },
+            // The five predefined entities and character references are
+            // plain XML (quick-xml reports them as references, record 0341).
+            Event::GeneralRef(reference) if is_plain_reference(&reference) => {},
             Event::DocType(_) | Event::GeneralRef(_) => {
                 return invalid("DOCTYPE and custom entities are not allowed in flat ODP");
             },
@@ -629,6 +632,7 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                     notes = Some(&page[start..end]);
                 }
             },
+            Event::GeneralRef(reference) if is_plain_reference(&reference) => {},
             Event::DocType(_) | Event::GeneralRef(_) => {
                 return invalid("DOCTYPE and custom entities are not allowed in flat ODP pages");
             },
@@ -641,6 +645,23 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
         }
     }
     Ok(notes)
+}
+
+/// Whether an entity reference is one of XML's five predefined entities or
+/// a character reference to an XML 1.0 character, which need no document
+/// type (as `litchi-odf-common`'s package validation admits them).
+fn is_plain_reference(reference: &quick_xml::events::BytesRef<'_>) -> bool {
+    matches!(
+        reference.as_ref(),
+        b"amp" | b"lt" | b"gt" | b"apos" | b"quot"
+    ) || (reference.is_char_ref()
+        && reference
+            .resolve_char_ref()
+            .ok()
+            .flatten()
+            .is_some_and(|character| {
+                matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)
+            }))
 }
 
 fn is_modeled_direct_page_child(namespace: Option<&[u8]>, local: &[u8]) -> bool {
