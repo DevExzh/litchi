@@ -57,40 +57,40 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `font.size` | font-size | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `font.color` | color | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `fill` | color | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
-| cell | `fillPattern` | enum | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| cell | `fillBg` | color | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
+| cell | `fillPattern` | enum | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| cell | `fillBg` | color | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
 | cell | `strike` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `underline` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `locked` | bool | as- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
-| cell | `protection.locked` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| cell | `protection.hidden` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
+| cell | `protection.locked` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| cell | `protection.hidden` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
 | cell | `numFmtId` | number | --g |  | raw-only | — | P1 | out-of-scope (native-selection) | ADR 0034: native selection requires explicit raw admission |
-| cell | `phonetic` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| cell | `quotePrefix` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
+| cell | `phonetic` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| cell | `quotePrefix` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
 | cell | `alignment.horizontal` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `alignment.vertical` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `alignment.wrapText` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `alignment.readingOrder` | enum | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `merge` | string | as- | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `ref` | string | a-- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
-| cell | `link` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| cell | `tooltip` | string | as- |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| cell | `display` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| cell | `link` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| cell | `tooltip` | string | as- |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| cell | `display` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | cell | `type` | enum | asg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `runs` | string | a-- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `clear` | bool | as- | -s- | write-only | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `shift` | string | a-- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `arrayformula` | string | as- | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `cachedValue` | string | --g | --g | supported | — |  |  |  |
-| cell | `computedValue` | string | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M4 follow-up: project computed values in cell views |
+| cell | `computedValue` | string | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M4 follow-up: project computed values in cell views → 0266 |
 | cell | `evaluated` | bool | --g | --g | supported | — |  |  |  |
 | cell | `alignment.indent` | number | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `alignment.shrinkToFit` | bool | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `alignment.textRotation` | number | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
-| cell | `border.diagonal` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| cell | `border.diagonal.color` | color | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| cell | `border.diagonalDown` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| cell | `border.diagonalUp` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
+| cell | `border.diagonal` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| cell | `border.diagonal.color` | color | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| cell | `border.diagonalDown` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| cell | `border.diagonalUp` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
 | cell | `border` | string | as- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `border.all` | string | as- | -s- | write-only | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `border.top` | string | asg | -sg | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
@@ -101,11 +101,11 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | cell | `arrayref` | string | --g | --g | supported | — |  |  |  |
 | cell | `mergeAnchor` | bool | --g | --g | supported | — |  |  |  |
 | cell | `empty` | bool | --g | --g | supported | — |  |  |  |
-| cell | `richtext` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| cell | `subscript` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| cell | `superscript` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
+| cell | `richtext` | bool | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| cell | `subscript` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| cell | `superscript` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
 | cell | `image` | string | as- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
-| cell | `alt` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| cell | `alt` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | cell | `image.contentType` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `image.fileSize` | int | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | cell | `border.left.color` | color |  | -sg | litchi-only | litchi-only |  |  |  |
@@ -406,7 +406,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | column | `hidden` | bool | asg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | column | `outline` | int | -s- | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | column | `collapsed` | bool | -sg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
-| column | `numberformat` | string | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| column | `numberformat` | string | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | column | `customWidth` | bool | --g | --g | supported | — |  |  |  |
 | column | `autofit` | bool | -s- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | comment | `ref` | string | asg | asg | supported | supported |  |  |  |
@@ -713,18 +713,18 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | namedrange | `name` | string | asg | a-g | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | namedrange | `ref` | string | asg | asg | supported | supported |  |  |  |
 | namedrange | `scope` | string | asg | a-g | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
-| namedrange | `comment` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| namedrange | `volatile` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) |
-| ole | `anchor` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `shapeId` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `contentType` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
+| namedrange | `comment` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| namedrange | `volatile` | bool | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4d) → 0322 |
+| ole | `anchor` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `shapeId` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `contentType` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `fileSize` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `objectType` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `preview` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `progId` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `src` | string | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `oleKind` | enum | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| ole | `embedExt` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | pagebreak | `row` | int | a-- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | pagebreak | `col` | string | a-- | asg | supported | supported |  |  |  |
 | pagebreak | `manual` | bool |  | asg | litchi-only | litchi-only |  |  |  |
@@ -768,45 +768,45 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | picture | `fileSize` | number | --g | --g | supported | — |  |  |  |
 | picture | `relId` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | picture | `src` | string | as- | a-- | write-only | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
-| pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `style` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `rows` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `cols` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `filters` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `values` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `location` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
+| pivottable | `source` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `position` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `style` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `rows` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `cols` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `filters` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `values` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `aggregate` | string | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `showDataAs` | string | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `topN` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `sort` | enum | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `layout` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `labelFilter` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `calculatedField` | string | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `blankRows` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `grandTotals` | enum | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `subtotals` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `showColStripes` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `showDrill` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `cacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `fieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `dataFieldCount` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `dataField{N}` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `location` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `collapsedFields` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| pivottable | `sortByField` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | range | `merge` | bool | -sg | -sg | supported | supported |  |  |  |
 | range | `font.bold` | bool | -s- | -s- | write-only | supported |  |  |  |
 | range | `fill` | color | -s- | -s- | write-only | supported |  |  |  |
@@ -850,14 +850,14 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | rowbreak | `manual` | bool | -s- | asg | supported | supported |  |  |  |
 | rowbreak | `min` | int | -s- | asg | supported | supported |  |  |  |
 | rowbreak | `max` | int | -s- | asg | supported | supported |  |  |  |
-| run | `subscript` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| run | `superscript` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| run | `bold` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| run | `color` | color | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| run | `font` | string | as- |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| run | `italic` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| run | `size` | font-size | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| run | `text` | string | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| run | `subscript` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| run | `superscript` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| run | `bold` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| run | `color` | color | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| run | `font` | string | as- |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| run | `italic` | bool | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| run | `size` | font-size | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| run | `text` | string | asg |  | element gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | shape | `hyperlink` | string | a-g | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | shape | `reflection` | string | asg | --- | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | shape | `anchor` | string | a-- | a-- | write-only | supported |  |  |  |
@@ -890,16 +890,16 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | shape | `valign` | string | asg | a-g | supported | partial | P1 | deferred-P1 0322 (xlsb-family) |  |
 | shape | `alt` | string |  | asg | litchi-only | litchi-only |  |  |  |
 | sheet | `name` | string | asg | asg | supported | supported |  |  |  |
-| sheet | `autoFilter` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
-| sheet | `tabColor` | color | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| sheet | `autoFilter` | string | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sheet | `tabColor` | color | asg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | sheet | `hidden` | bool | asg | asg | supported | supported |  |  |  |
-| sheet | `freeze` | string | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| sheet | `freeze` | string | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | sheet | `direction` | enum | -sg |  | unlisted | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
-| sheet | `zoom` | number | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| sheet | `zoom` | number | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | sheet | `gridlines` | bool | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `headings` | bool | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `visibility` | enum | --g | asg | supported | litchi-only |  |  |  |
-| sheet | `protect` | bool | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| sheet | `protect` | bool | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | sheet | `password` | string | -s- |  | write-only | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `passwordHash` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `protection.algorithm` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
@@ -911,7 +911,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sheet | `orientation` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `paperSize` | number | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `fitToPage` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
-| sheet | `printArea` | string | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| sheet | `printArea` | string | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | sheet | `margin.top` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `margin.bottom` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `margin.left` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
@@ -923,36 +923,36 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | sheet | `sort` | string | -sg |  | unlisted | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `rowBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | sheet | `colBreaks` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
-| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `field` | string | a-g |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `caption` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `itemCount` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| slicer | `cache` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `type` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `location` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `color` | color | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
-| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) |
+| slicer | `pivotTable` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `field` | string | a-g |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `caption` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `name` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `rowHeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `columnCount` | number | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `pivotCacheId` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `itemCount` | number | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| slicer | `cache` | string | --g |  | element gap | — | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `type` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `dataRange` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `location` | string | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `color` | color | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `negativeColor` | color | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `markers` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `highPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `lowPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `firstPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `lastPoint` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `negative` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `markersColor` | color | a-- |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `lineWeight` | number | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
+| sparkline | `dateAxis` | bool | asg |  | element gap | gap | P2 | deferred-P2 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | table | `ref` | string | asg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | table | `displayName` | string | asg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | table | `headerRow` | bool | asg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
@@ -1069,7 +1069,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | workbook | `defaultFontSize` | length | --- |  | write-only | — |  |  |  |
 | workbook | `author` | string | -sg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | workbook | `title` | string | -sg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
-| workbook | `calc.mode` | enum | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| workbook | `calc.mode` | enum | -sg |  | gap | gap | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | workbook | `calc.iterate` | bool | -sg |  | unlisted | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | workbook | `calc.iterateCount` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | workbook | `calc.iterateDelta` | number | -sg |  | unlisted | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
@@ -1083,7 +1083,7 @@ The statuses, tiers and dispositions are explained in [`officecli-capability-del
 | workbook | `keywords` | string | -sg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | workbook | `revisionNumber` | string | -sg | --g | supported | gap | P1 | deferred-P1 0322 (xlsb-family) |  |
 | workbook | `activeTab` | number | --g | --g | supported | — |  |  |  |
-| workbook | `firstSheet` | number | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) |
+| workbook | `firstSheet` | number | --g |  | gap | — | P1 | deferred-P1 0322 (xlsb-family) | M1-extended (R4x) → 0322 |
 | workbook | `calc.fullCalcOnLoad` | bool | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | workbook | `calc.refMode` | string | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
 | workbook | `workbook.backupFile` | bool | --g |  | unlisted | — | P1 | deferred-P1 0322 (xlsb-family) |  |
