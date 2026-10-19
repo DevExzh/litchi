@@ -27,18 +27,60 @@ use crate::props::Props;
 use crate::registry::Operation;
 use crate::value::Scalar;
 
-/// The grid widths of a table entry, one per `w:gridCol`.
+/// The grid widths of a table entry, one per `w:gridCol` of its
+/// `w:tblGrid`. Only the table's start is read: the scan stops at the
+/// grid's end or the first row, so resolving a column does not parse the
+/// table's properties or rows.
 pub(super) fn grid(block: &Block) -> Result<Vec<Option<u32>>> {
-    let Some(table) = block.indexed()?.table() else {
-        return Ok(Vec::new());
-    };
-    Ok(table
-        .properties()?
-        .grid
-        .unwrap_or_default()
-        .into_iter()
-        .map(|width| width.and_then(|width| u32::try_from(width.0).ok()))
-        .collect())
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+    let indexed = block.indexed()?;
+    let mut reader = quick_xml::Reader::from_reader(indexed.xml_bytes());
+    let mut depth = 0usize;
+    let mut in_grid = false;
+    let mut widths = Vec::new();
+    loop {
+        let event = reader.read_event().map_err(|_| {
+            Error::new(Code::CorruptFile, "a DOCX table is not well-formed")
+                .with_format(FileFormat::Docx)
+        })?;
+        let (element, empty) = match event {
+            Event::Start(element) => (element, false),
+            Event::Empty(element) => (element, true),
+            Event::End(_) => {
+                depth = depth.saturating_sub(1);
+                if in_grid && depth == 1 {
+                    return Ok(widths);
+                }
+                continue;
+            },
+            Event::Eof => return Ok(widths),
+            _ => continue,
+        };
+        let local = element.local_name();
+        match (depth, local.as_ref()) {
+            (1, b"tblGrid") if empty => return Ok(widths),
+            (1, b"tblGrid") => in_grid = true,
+            (1, b"tr") => return Ok(widths),
+            (2, b"gridCol") if in_grid => widths.push(
+                element
+                    .unchecked_attributes()
+                    .filter_map(std::result::Result::ok)
+                    .find(|attribute| attribute.key.local_name().as_ref() == b"w")
+                    .and_then(|attribute| {
+                        std::str::from_utf8(&attribute.value)
+                            .ok()?
+                            .trim()
+                            .parse()
+                            .ok()
+                    }),
+            ),
+            _ => {},
+        }
+        if !empty {
+            depth += 1;
+        }
+    }
 }
 
 /// The column `select` names under the table node `parent`.

@@ -207,12 +207,13 @@ impl Docx {
                     }
                 };
                 let comment = new_comment(node.props())?;
-                // A reply names an existing comment (OfficeCLI refuses
-                // `parentId` without one, record 0345).
+                // The comments before the edit, read on this (warm) handle:
+                // a reply names one of them (OfficeCLI refuses `parentId`
+                // without one, record 0345), and the leaf appends the new
+                // comment after them, so their count is its ordinal.
+                let existing = super::nav::comments(self)?;
                 if let Some(parent) = reply_parent(node.props())
-                    && !super::nav::comments(self)?
-                        .iter()
-                        .any(|existing| existing.id() == parent)
+                    && !existing.iter().any(|comment| comment.id() == parent)
                 {
                     return Err(Error::new(
                         Code::InvalidValue,
@@ -226,14 +227,11 @@ impl Docx {
                 let WorkEdit::Eager(eager) = &mut edit else {
                     return Err(refusal("comments need the owning package editor"));
                 };
-                let id = eager
+                eager
                     .add_comment_at(&paragraph, range, &comment)
                     .map_err(Error::from)?;
                 let commit = edit.commit(self)?;
-                let ordinal = super::nav::comments(commit.file())?
-                    .iter()
-                    .position(|comment| comment.id() == id)
-                    .ok_or_else(|| refusal("the new comment is not in the comments part"))?;
+                let ordinal = existing.len();
                 Ok((commit, comment_path(ordinal)))
             },
             (NewKind::Run, Kind::Paragraph) => {

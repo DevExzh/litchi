@@ -144,7 +144,10 @@ pub(super) fn comments(docx: &Docx) -> Result<Vec<litchi_docx::comment::Comment>
 /// reads as empty, so a comment's other properties stay readable.
 pub(super) fn comments_extended(
     docx: &Docx,
-) -> Result<Vec<litchi_docx::modern_comments::Extended>> {
+) -> Result<Arc<[litchi_docx::modern_comments::Extended]>> {
+    if let Some(entries) = docx.parts().comment_threads.get() {
+        return Ok(Arc::clone(entries));
+    }
     let result = match docx.owner() {
         DocxOwner::Eager(package) => {
             Ok(package.document()?.comments_extended().unwrap_or_default())
@@ -154,7 +157,10 @@ pub(super) fn comments_extended(
             Ok(package.comments_extended().unwrap_or_default())
         },
     };
-    docx.owner().finish(result)
+    let entries: Arc<[_]> = docx.owner().finish(result)?.into();
+    Ok(Arc::clone(
+        docx.parts().comment_threads.get_or_init(|| entries),
+    ))
 }
 
 /// What a container selection picked.

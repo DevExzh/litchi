@@ -1008,31 +1008,45 @@ fn comment_thread(
 /// The path of the paragraph comment `id` is anchored to, as OfficeCLI's
 /// `FindCommentAnchorPath` finds it: the paragraph holding its range start,
 /// or failing that its reference (a point comment), anywhere in the main
-/// story's body, tables and content controls (record 0345).
+/// story's body, tables and content controls (record 0345). One walk of
+/// the story finds every comment's anchor; the handle keeps the map.
 pub(super) fn comment_anchor(docx: &super::Docx, id: u32) -> Result<Option<String>> {
-    let body = super::nav::load_body(docx)?;
-    for marker in [
-        b"commentRangeStart".as_slice(),
-        b"commentReference".as_slice(),
-    ] {
-        if let Some(path) = anchor_in(&body, "/body", marker, id)? {
-            return Ok(Some(path));
-        }
+    if let Some(anchors) = docx.parts().comment_anchors.get() {
+        return Ok(anchors.get(&id).cloned());
     }
-    Ok(None)
+    let body = super::nav::load_body(docx)?;
+    let mut starts = std::collections::HashMap::new();
+    let mut references = std::collections::HashMap::new();
+    let finders = [
+        memchr::memmem::Finder::new(b"commentRangeStart"),
+        memchr::memmem::Finder::new(b"commentReference"),
+    ];
+    anchors_in(&body, "/body", &finders, &mut starts, &mut references)?;
+    for (id, path) in references {
+        starts.entry(id).or_insert(path);
+    }
+    let anchors = docx
+        .parts()
+        .comment_anchors
+        .get_or_init(|| Arc::new(starts));
+    Ok(anchors.get(&id).cloned())
 }
 
-fn anchor_in(
+/// Record, for every comment id, the first paragraph of `blocks` (in
+/// document order) holding its range start and its reference.
+fn anchors_in(
     blocks: &litchi_docx::Blocks,
     prefix: &str,
-    marker: &[u8],
-    id: u32,
-) -> Result<Option<String>> {
+    finders: &[memchr::memmem::Finder<'_>; 2],
+    starts: &mut std::collections::HashMap<u32, String>,
+    references: &mut std::collections::HashMap<u32, String>,
+) -> Result<()> {
     for block in blocks.iter() {
         let Some(kind) = Kind::of_block(block.kind()) else {
             continue;
         };
-        if !holds(block.xml_bytes(), marker) {
+        let xml = block.xml_bytes();
+        if finders.iter().all(|finder| finder.find(xml).is_none()) {
             continue;
         }
         let step = format!(
@@ -1042,8 +1056,13 @@ fn anchor_in(
         );
         match kind {
             Kind::Paragraph | Kind::Equation => {
-                if marks(block.xml_bytes(), marker, id) {
-                    return Ok(Some(step));
+                for (marker, map) in [
+                    (finders[0].needle(), &mut *starts),
+                    (finders[1].needle(), &mut *references),
+                ] {
+                    for id in marker_ids(xml, marker) {
+                        map.entry(id).or_insert_with(|| step.clone());
+                    }
                 }
             },
             Kind::Table => {
@@ -1052,39 +1071,32 @@ fn anchor_in(
                     for (cell_index, cell) in row.cells()?.iter().enumerate() {
                         let cell_prefix =
                             format!("{step}/tr[{}]/tc[{}]", row_index + 1, cell_index + 1);
-                        if let Some(found) = anchor_in(&cell.blocks()?, &cell_prefix, marker, id)? {
-                            return Ok(Some(found));
-                        }
+                        anchors_in(&cell.blocks()?, &cell_prefix, finders, starts, references)?;
                     }
                 }
             },
             Kind::Sdt => {
-                if let Some(control) = block.content_control()
-                    && let Some(found) = anchor_in(&control.blocks()?, &step, marker, id)?
-                {
-                    return Ok(Some(found));
+                if let Some(control) = block.content_control() {
+                    anchors_in(&control.blocks()?, &step, finders, starts, references)?;
                 }
             },
             _ => {},
         }
     }
-    Ok(None)
+    Ok(())
 }
 
-fn holds(xml: &[u8], marker: &[u8]) -> bool {
-    xml.windows(marker.len()).any(|window| window == marker)
-}
-
-/// Whether `xml` holds a `marker` element whose `id` is `id`.
-fn marks(xml: &[u8], marker: &[u8], id: u32) -> bool {
+/// The `id` of every `marker` element of `xml`, in document order.
+fn marker_ids(xml: &[u8], marker: &[u8]) -> Vec<u32> {
     use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
     let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut ids = Vec::new();
     loop {
         match reader.read_event() {
             Ok(
                 quick_xml::events::Event::Start(element) | quick_xml::events::Event::Empty(element),
             ) if element.local_name().as_ref() == marker => {
-                let found = element
+                if let Some(id) = element
                     .unchecked_attributes()
                     .filter_map(std::result::Result::ok)
                     .find(|attribute| attribute.key.local_name().as_ref() == b"id")
@@ -1094,12 +1106,12 @@ fn marks(xml: &[u8], marker: &[u8], id: u32) -> bool {
                             .trim()
                             .parse::<u32>()
                             .ok()
-                    });
-                if found == Some(id) {
-                    return true;
+                    })
+                {
+                    ids.push(id);
                 }
             },
-            Ok(quick_xml::events::Event::Eof) | Err(_) => return false,
+            Ok(quick_xml::events::Event::Eof) | Err(_) => return ids,
             _ => {},
         }
     }

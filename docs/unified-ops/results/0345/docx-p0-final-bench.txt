@@ -1,0 +1,37 @@
+# examples/docx_p0_final_bench.rs (record 0345), release, taskset -c 13, LITCHI_BENCH_ATTRIBUTION=1
+# built from the working tree on top of da390a887e with: cargo build --release -p litchi-ops --features docx --example docx_p0_final_bench
+# binary sha256: 2775edb6d0678a3ba58f4476074660e1bf86ce0fb15fa49c197df61c1ea83b2a
+# host: shared 32-core, load average 6.4-7.3; ABBA, 41 rounds after 5 warm-ups, medians
+## trial 1
+docx set hyperlink tooltip: native 197411 ns, unified 210151 ns, ratio 1.065
+docx add cell: native 205411 ns, unified 211001 ns, ratio 1.027
+docx add column: native 210811 ns, unified 206121 ns, ratio 0.978
+docx set column width: native 205091 ns, unified 200771 ns, ratio 0.979
+resolve /body/tbl[1] vs /body/tbl[1]/col[1]: native 310 ns, unified 1330 ns, ratio 4.290
+leaf document() vs document().comments(): native 710 ns, unified 3200 ns, ratio 4.507
+view format: /body/p[2] vs /comments/comment[1]: native 3110 ns, unified 7090 ns, ratio 2.280
+add plain comment: leaf vs unified: native 223111 ns, unified 229721 ns, ratio 1.030
+docx add comment reply: native 231881 ns, unified 237292 ns, ratio 1.023
+docx set comment done: native 117851 ns, unified 121961 ns, ratio 1.035
+## trial 2
+docx set hyperlink tooltip: native 195091 ns, unified 207911 ns, ratio 1.066
+docx add cell: native 196091 ns, unified 206211 ns, ratio 1.052
+docx add column: native 201041 ns, unified 202751 ns, ratio 1.009
+docx set column width: native 193901 ns, unified 196591 ns, ratio 1.014
+resolve /body/tbl[1] vs /body/tbl[1]/col[1]: native 310 ns, unified 1310 ns, ratio 4.226
+leaf document() vs document().comments(): native 700 ns, unified 3130 ns, ratio 4.471
+view format: /body/p[2] vs /comments/comment[1]: native 3050 ns, unified 6930 ns, ratio 2.272
+add plain comment: leaf vs unified: native 219991 ns, unified 224011 ns, ratio 1.018
+docx add comment reply: native 225751 ns, unified 231961 ns, ratio 1.028
+docx set comment done: native 116390 ns, unified 120361 ns, ratio 1.034
+## trial 3
+docx set hyperlink tooltip: native 196781 ns, unified 209381 ns, ratio 1.064
+docx add cell: native 204141 ns, unified 206571 ns, ratio 1.012
+docx add column: native 202251 ns, unified 205211 ns, ratio 1.015
+docx set column width: native 196671 ns, unified 199841 ns, ratio 1.016
+resolve /body/tbl[1] vs /body/tbl[1]/col[1]: native 310 ns, unified 1320 ns, ratio 4.258
+leaf document() vs document().comments(): native 700 ns, unified 3180 ns, ratio 4.543
+view format: /body/p[2] vs /comments/comment[1]: native 3090 ns, unified 6950 ns, ratio 2.249
+add plain comment: leaf vs unified: native 221831 ns, unified 226991 ns, ratio 1.023
+docx add comment reply: native 227101 ns, unified 233081 ns, ratio 1.026
+docx set comment done: native 119111 ns, unified 122710 ns, ratio 1.030

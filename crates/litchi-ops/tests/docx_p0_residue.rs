@@ -204,22 +204,22 @@ fn comments_are_set() {
     }
 }
 
+/// Record 0345 writes replies and resolution (`docx_p0_final.rs`); what
+/// stays refused: a reply parent on `set`, a value of the wrong type, an
+/// empty author and the identity.
 #[test]
 fn comment_replies_and_bad_values_are_refused() {
     let file = with_comment();
     let before = file.to_bytes().unwrap();
-    for key in ["parentId", "done", "resolved"] {
+    let error = file
+        .set("/comments/comment[1]", props! { "parentId" => "1" })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedProperty, "{error}");
+    for key in ["done", "resolved"] {
         let error = file
-            .set("/comments/comment[1]", props! { key => "1" })
+            .set("/comments/comment[1]", props! { key => "maybe" })
             .unwrap_err();
-        assert_eq!(error.code(), Code::UnsupportedCapability, "{error}");
-        let error = file
-            .add(
-                "/body/p[2]",
-                NewNode::new("comment").prop("author", "Bo").prop(key, "1"),
-            )
-            .unwrap_err();
-        assert_eq!(error.code(), Code::UnsupportedCapability, "{error}");
+        assert_eq!(error.code(), Code::InvalidValue, "{error}");
     }
     let error = file
         .set("/comments/comment[1]", props! { "author" => "" })
