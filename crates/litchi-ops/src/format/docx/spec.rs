@@ -1894,16 +1894,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             },
             GapSpec {
                 subject: Subject::Operation {
-                    verb: "set",
-                    element: "table/row",
-                    context: "table-properties",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "M2 (DOCX table properties)",
-                reason: "table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated",
-            },
-            GapSpec {
-                subject: Subject::Operation {
                     verb: "swap",
                     element: "paragraph/run",
                     context: "complex-leaf-content",

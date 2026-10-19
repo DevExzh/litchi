@@ -25,8 +25,8 @@ row has no disposition.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `46e6d325a787279ca00a54d8b48056001f33a76ff09888aea3a0354ad4c37020` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `d70d91b416cd5c25d0c05ab0142f7ecd246f95f3ed05432855a83a2c27452082` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `321e24e3519397ead587d3d45e3113873beeb2b5127dda95e61b2836d018ae53` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `8e24343865c059fe8830a90947ed7ae2ba4d72f0b1ec958c45f3342f00d2c32c` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `a8794b7a359f3e62b36fdfca6c40f915341dd41d290414906c254b25da1e517e` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `8bca53917a3663c9a1ef54ab3900b3c15cd60ecaff906c886c5fd6a4410e560d` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `9be3d35e7a6a55cd66b74d818d30f476efbba4778a3a10de1a74850bf1a457a0` |
@@ -267,13 +267,12 @@ properties share its entry unless an entry names the property):
 
 ## Milestone follow-ups
 
-780 follow-ups in the registry and capability goldens (95 distinct texts) name only a milestone or a step of one (`M2 (validate)`, `M1-extended (R4x)`). `tools/officecli_dispositions.json` (`followUps`) maps each to the record or work package that owns it now; the tables above show the id after the text (`M2 (validate) → 0336`). `--check` fails on a milestone-only follow-up without a current id and on a map entry that maps none (audit WP13, record 0344).
+776 follow-ups in the registry and capability goldens (94 distinct texts) name only a milestone or a step of one (`M2 (validate)`, `M1-extended (R4x)`). `tools/officecli_dispositions.json` (`followUps`) maps each to the record or work package that owns it now; the tables above show the id after the text (`M2 (validate) → 0336`). `--check` fails on a milestone-only follow-up without a current id and on a map entry that maps none (audit WP13, record 0344).
 
 | Map entry | Follow-ups | Formats | Golden follow-ups | Current id | Now |
 |---|---|---|---:|---|---|
 | validate-views | `M2 (validate)` | doc, docx, keynote, numbers, odb, odc, odf, odg, odi, odm, odp, ods, odt, oth, pages, ppt, pptx, rtf, xls, xlsb, xlsx | 138 | 0336 | `validate` landed in record 0336 (structural checks); the issues and forms views it would feed are still refused and their text predates it (record 0336 F4: schema validation) |
 | docx-batch-integration | `M2 (batch command and transfer families)` | docx | 24 | 0336 | batch items for reads and the raw, dump and validate commands: record 0336 F2 (the batch channel and transaction steps) |
-| docx-table-properties | `M2 (DOCX table properties)` | docx | 4 | 0342 | record 0342 implemented the table `style`/border and row property sets; this operation-gap entry predates it, and the DOCX lane reconciles its wording |
 | docx-mixed-fanout | `M2 (homogeneous mutation fanout)` | docx | 4 | 0332 | a paragraph/run union target is refused before staging: P1 breadth under record 0332 |
 | docx-unlocated-objects | `R4x` | docx | 36 | 0332 | legacy form fields, embedded objects and the other DOCX objects without a located reader: P1/P2 breadth under record 0332 (`docx-breadth`) |
 | ooxml-encrypted-edits | `M2 (DOCX encryption-profile-preserving native edits)`, `M2 (XLSX encryption-profile-preserving native edits)` | docx, xlsx | 20 | 0332 | native edits keep an encrypted package's profile only through `SaveOptions::reencrypt`: P1 breadth under record 0332 |
@@ -376,7 +375,6 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `move` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `swap` | `paragraph/run` | `managed-transaction` | paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
 | `swap` | `paragraph/run` | `nested-or-unproven-selection` | only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors | L-DOCX-W3 |
-| `set` | `table/row` | `table-properties` | table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated | M2 (DOCX table properties) → 0342 |
 | `swap` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `create` | `document` | `strict-conformance` | the DOCX creator emits Transitional packages and refuses a Strict conformance request rather than silently downgrading it | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `document` | `noncore-initial-metadata` | initial metadata outside the DOCX core-properties part is not representable by the creator and is refused rather than dropped | CreateOptions::metadata (DOCX core properties) |

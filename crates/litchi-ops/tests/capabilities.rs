@@ -470,8 +470,9 @@ fn docx_write_context_gaps_are_explicit() {
         .collect();
     assert_eq!(
         operation_gaps.len(),
-        // Record 0345 closed the cell-insertion gap.
-        26 + if cfg!(feature = "encryption") { 8 } else { 0 }
+        // Record 0345 closed the cell-insertion gap and deleted the stale
+        // table-properties gap (record 0342 sets tables and rows).
+        25 + if cfg!(feature = "encryption") { 8 } else { 0 }
     );
 
     let subjects: Vec<_> = operation_gaps.iter().map(|gap| gap.subject()).collect();

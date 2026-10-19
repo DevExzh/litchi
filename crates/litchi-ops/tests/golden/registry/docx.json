@@ -8447,15 +8447,6 @@
     },
     {
       "subject": "operation",
-      "verb": "set",
-      "element": "table/row",
-      "context": "table-properties",
-      "code": "unsupported_capability",
-      "followUp": "M2 (DOCX table properties)",
-      "reason": "table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated"
-    },
-    {
-      "subject": "operation",
       "verb": "swap",
       "element": "paragraph/run",
       "context": "complex-leaf-content",

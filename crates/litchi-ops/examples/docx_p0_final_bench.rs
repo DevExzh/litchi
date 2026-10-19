@@ -208,7 +208,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Attribution: path resolution alone.
     if std::env::var_os("LITCHI_BENCH_ATTRIBUTION").is_some() {
         pair(
-            "resolve /body/tbl[1] vs /body/tbl[1]/col[1]",
+            "docx resolve /body/tbl[1] vs /body/tbl[1]/col[1]",
             Box::new(|| {
                 black_box(file.get("/body/tbl[1]")?);
                 Ok(())
@@ -219,7 +219,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
         )?;
         pair(
-            "leaf document() vs document().comments()",
+            "docx leaf document() vs document().comments()",
             Box::new(|| {
                 black_box(package.document()?);
                 Ok(())
@@ -232,7 +232,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // A comment's view now reads its commentsExtended entry and walks
         // the body for its anchor; the paragraph view is the reference.
         pair(
-            "view format: /body/p[2] vs /comments/comment[1]",
+            "docx view format: /body/p[2] vs /comments/comment[1]",
             Box::new(|| {
                 let node = file.get("/body/p[2]")?;
                 black_box(node.view().format()?.into_iter().count());
@@ -250,7 +250,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .prop("text", "Reply")
         };
         pair(
-            "add plain comment: leaf vs unified",
+            "docx add plain comment",
             Box::new(|| {
                 let mut edit = package.edit()?;
                 edit.add_comment_at(&second, None, &NewComment::new("Grace", "Reply"))?;
