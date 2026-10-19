@@ -141,6 +141,7 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
             cells: std::sync::Mutex::new(None),
+            notes: std::sync::Mutex::new(None),
         }))
         .with_origin(self.origin())
     }

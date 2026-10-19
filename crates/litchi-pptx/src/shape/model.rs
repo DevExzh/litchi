@@ -648,6 +648,40 @@ impl<'a> Common<'a> {
         Ok(Some(text_reader::read_with_options(xml, scope, limits)?))
     }
 
+    /// The paragraphs and text runs of [`Self::text_body`], from one pass
+    /// over the body when it can, without decoding its properties and text
+    /// (record 0348); `None` without a body.
+    ///
+    /// The pass reads structure only: a value the text-body reader would
+    /// refuse is not refused here.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::text_body`] (for competing bodies, and for a body the pass
+    /// leaves to the reader).
+    pub fn text_index(self) -> Result<Option<BodyTextIndex>> {
+        if self.record.text_body_invalid {
+            return Err(Error::Invalid(
+                "shape contains duplicate direct text bodies".into(),
+            ));
+        }
+        let Some(span) = self.record.text_body else {
+            return Ok(None);
+        };
+        let range = span.range(self.xml.len())?;
+        let scope = self.namespace_scope(range.start)?;
+        let xml = self
+            .xml
+            .get(range)
+            .ok_or_else(|| Error::Invalid("shape text body span became invalid".into()))?;
+        if let Some(index) = crate::table::shape::scan_body_text_index(xml, scope)? {
+            return Ok(Some(BodyTextIndex(index)));
+        }
+        self.text_body()?
+            .map(|body| crate::table::CellTextIndex::from_body(&body).map(BodyTextIndex))
+            .transpose()
+    }
+
     /// Resolve the namespaces inherited by a direct child body.
     fn namespace_scope(self, offset: usize) -> Result<NamespaceResolver> {
         if self.record.inherits_root_namespaces {
@@ -1090,5 +1124,26 @@ impl std::fmt::Debug for Common<'_> {
             .field("position", &self.index)
             .field("kind", &self.record.kind)
             .finish_non_exhaustive()
+    }
+}
+
+/// The paragraphs and text runs of a shape's text body (record 0348); see
+/// [`Common::text_index`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BodyTextIndex(crate::table::CellTextIndex);
+
+impl BodyTextIndex {
+    /// The number of paragraphs.
+    #[must_use]
+    pub fn paragraph_count(&self) -> usize {
+        self.0.paragraph_count(0, 0).unwrap_or(0)
+    }
+
+    /// The position among its paragraph's run children (`a:r`, `a:br`,
+    /// `a:fld`) of the `ordinal`-th text run (zero-based) of paragraph
+    /// `paragraph`; `None` when there is no such run.
+    #[must_use]
+    pub fn text_run(&self, paragraph: usize, ordinal: usize) -> Option<usize> {
+        self.0.text_run(0, 0, paragraph, ordinal)
     }
 }

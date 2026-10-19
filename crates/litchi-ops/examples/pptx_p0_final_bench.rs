@@ -18,7 +18,8 @@
 //! - `notes_format_batch/eager/<N>`: N `set /slide[1]/notes/paragraph[i]
 //!   {align}` against one `set_notes_text_property_chunks` call staging
 //!   256-edit chunks in one notes-part pass (record 0348; record 0346 made
-//!   one `set_notes_text_properties` call per chunk);
+//!   one `set_notes_text_properties` call per chunk), `cold` on a fresh
+//!   handle per batch and `warm` on one (record 0348);
 //! - single operations on the eager owner (budget 10%): `comment_date_set`,
 //!   `comment_author_set`, `modern_comment_add`, `modern_comment_set`,
 //!   `modern_reply_add`, `placeholder_add`, `notes_add`,
@@ -482,11 +483,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .file
         };
         let same = same_parts(&leaf_once()?.to_bytes()?, &unified().to_bytes()?);
+        // A handle memoizes the notes body a batch reads (record 0348): the
+        // cold leg batches on a fresh handle each time, opened outside the
+        // clock; the warm leg reuses one handle.
+        let rounds = rounds_for(n);
+        let mut fresh: Vec<litchi_ops::File> = (0..2 * (WARMUP + rounds))
+            .map(|_| eager(&bytes))
+            .collect::<Result<_, _>>()?;
         report(
-            &name,
+            &format!("{name}/cold"),
             same,
             paired(
-                rounds_for(n),
+                rounds,
+                || drop(black_box(leaf_once().expect("leaf"))),
+                || {
+                    let file = fresh.pop().expect("a fresh handle");
+                    drop(black_box(
+                        file.batch(items.clone(), BatchMode::Atomic)
+                            .expect("batch")
+                            .file,
+                    ));
+                },
+            ),
+        );
+        report(
+            &format!("{name}/warm"),
+            same,
+            paired(
+                rounds,
                 || drop(black_box(leaf_once().expect("leaf"))),
                 || drop(black_box(unified())),
             ),

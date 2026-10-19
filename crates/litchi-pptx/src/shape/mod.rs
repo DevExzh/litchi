@@ -38,9 +38,9 @@ mod model;
 mod reader;
 
 pub use model::{
-    Auto, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group, NonVisual, Ole,
-    PLACEHOLDER_TYPE_EXTENSION_URI, Picture, Placeholder, PlaceholderTypeExtension, Shape, Shapes,
-    Span, Table, Unknown,
+    Auto, BodyTextIndex, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group,
+    NonVisual, Ole, PLACEHOLDER_TYPE_EXTENSION_URI, Picture, Placeholder, PlaceholderTypeExtension,
+    Shape, Shapes, Span, Table, Unknown,
 };
 pub use reader::{Key, Limits, LookupError, Scene};
 

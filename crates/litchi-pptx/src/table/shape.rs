@@ -466,9 +466,24 @@ struct CellTextScan {
     nodes: usize,
     /// Whether the fragment's table has started.
     tabled: bool,
+    /// Whether the fragment is one text body, scanned as one cell.
+    body: bool,
 }
 
 impl CellTextScan {
+    /// A scan of one text body element, taken as the one cell of one row.
+    fn body() -> Result<Self> {
+        let mut scan = Self {
+            stack: vec![Mark::Table, Mark::Row, Mark::Cell],
+            tabled: true,
+            body: true,
+            ..Self::default()
+        };
+        scan.index.open_row()?;
+        scan.index.open_cell()?;
+        Ok(scan)
+    }
+
     fn start(&mut self, namespace: Namespaced, local: &[u8], empty: bool) -> Result<Step> {
         self.nodes += 1;
         if self.nodes > MAX_NODES || namespace == Namespaced::MarkupCompatibility {
@@ -560,7 +575,18 @@ impl CellTextScan {
         Step::Next
     }
 
-    fn finish(self) -> Option<CellTextIndex> {
+    fn finish(mut self) -> Option<CellTextIndex> {
+        if self.body {
+            // The body's own element closed; the cell it fills ends here.
+            if self.stack != [Mark::Table, Mark::Row, Mark::Cell]
+                || !matches!(self.index.cells.last(), Some(Some(_)))
+            {
+                return None;
+            }
+            self.stack.clear();
+            self.index.close_cell();
+            self.index.close_row();
+        }
         (self.tabled
             && self.stack.is_empty()
             && self.index.rows.len() <= MAX_ROWS
@@ -591,8 +617,29 @@ fn scan_cell_text_fragment(
     if xml.len() > MAX_XML_BYTES || memchr::memmem::find(xml, b"AlternateContent").is_some() {
         return Ok(None);
     }
-    let mut scope = context.resolver()?;
-    let mut scan = CellTextScan::default();
+    scan_text_fragment(xml, context.resolver()?, CellTextScan::default())
+}
+
+/// The paragraphs and text runs of the text body element `xml` (a shape's
+/// `p:txBody`), whose root inherits `scope`, as one cell at row 0 and
+/// column 0 (record 0348); `None` when the body holds markup the pass does
+/// not vouch for.
+pub(crate) fn scan_body_text_index(
+    xml: &[u8],
+    scope: NamespaceResolver,
+) -> Result<Option<CellTextIndex>> {
+    if xml.len() > MAX_XML_BYTES || memchr::memmem::find(xml, b"AlternateContent").is_some() {
+        return Ok(None);
+    }
+    scan_text_fragment(xml, scope, CellTextScan::body()?)
+}
+
+/// One pass of `scan` over `xml`, whose root inherits `scope`.
+fn scan_text_fragment(
+    xml: &[u8],
+    mut scope: NamespaceResolver,
+    mut scan: CellTextScan,
+) -> Result<Option<CellTextIndex>> {
     // Declarations on the root start tag only: one namespace scope for every
     // descendant, so each prefix is resolved once and the tags are found
     // without a namespace reader (the fragment is a span of a part the
@@ -826,6 +873,27 @@ impl CellTextIndex {
     fn cell(&self, row: usize, column: usize) -> Option<&Option<std::ops::Range<usize>>> {
         let cells = self.rows.get(row)?;
         self.cells.get(cells.clone())?.get(column)
+    }
+
+    /// The index of one text body as the one cell of one row (record
+    /// 0348).
+    pub(crate) fn from_body(body: &litchi_drawingml::text::body::Body) -> Result<Self> {
+        let mut index = Self::default();
+        index.open_row()?;
+        index.open_cell()?;
+        index.open_body();
+        for paragraph in &body.paragraphs {
+            index.open_paragraph()?;
+            for (position, run) in paragraph.runs.iter().enumerate() {
+                if run.is_text() {
+                    index.push_text_run(position)?;
+                }
+            }
+            index.close_paragraph();
+        }
+        index.close_cell();
+        index.close_row();
+        Ok(index)
     }
 
     /// The index of contents [`Table::cell_contents`] read.

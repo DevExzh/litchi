@@ -292,6 +292,11 @@ struct PptxState {
     /// scene position and cells (record 0346), so a batch's first plan and
     /// its run read the table once.
     cells: Mutex<Option<(usize, usize, Arc<write::coalesce::Cells>)>>,
+    /// The notes body the last coalesced notes batch read on this handle:
+    /// its slide and the body placeholder's notes-scene position and body,
+    /// `None` when the slide has none (record 0348), so a batch's first plan
+    /// and its run read the notes page once.
+    notes: Mutex<Option<(usize, write::coalesce::NotesBody)>>,
 }
 
 struct EagerSlide {
@@ -455,6 +460,7 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
             cells: Mutex::new(None),
+            notes: Mutex::new(None),
         }))
         .with_origin(self.origin())
     }
@@ -499,6 +505,7 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
             cells: Mutex::new(None),
+            notes: Mutex::new(None),
         }))
     }
 
@@ -543,6 +550,7 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             admitted: OnceLock::new(),
             cells: Mutex::new(None),
+            notes: Mutex::new(None),
         }))
         .with_signature(self.signature())
         .with_origin(self.origin());
@@ -973,6 +981,28 @@ impl Pptx {
             .as_ref()
             .map(|cells| (slide, frame, Arc::clone(cells)));
         Ok(cells)
+    }
+
+    /// The notes body of slide `slide` for coalesced notes plans, read once
+    /// per handle (record 0348).
+    fn notes_body(
+        &self,
+        slide: usize,
+        read: impl FnOnce() -> Result<write::coalesce::NotesBody>,
+    ) -> Result<write::coalesce::NotesBody> {
+        let mut cached = self
+            .0
+            .notes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((at_slide, body)) = cached.as_ref()
+            && *at_slide == slide
+        {
+            return Ok(body.clone());
+        }
+        let body = read()?;
+        *cached = Some((slide, body.clone()));
+        Ok(body)
     }
 
     /// Whether [`Self::editable_owner`] hands out the eager package (record

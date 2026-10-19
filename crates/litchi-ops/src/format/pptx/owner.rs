@@ -436,6 +436,44 @@ impl Pptx {
         })
     }
 
+    /// [`Self::slide_notes_scene`] of an eager owner, read from the notes
+    /// graph snapshot the native notes editor stages on (record 0348); the
+    /// outer `None` when this does not apply (a source owner, a revision, or
+    /// a notes page holding markup compatibility), so the caller reads the
+    /// notes page as [`Self::slide_notes_scene`] does.
+    pub(super) fn eager_notes_scene(&self, position: usize) -> Result<Option<Option<Scene>>> {
+        if self.0.revision.is_some() {
+            return Ok(None);
+        }
+        let PptxOwner::Eager(package) = &self.0.owner else {
+            return Ok(None);
+        };
+        self.finish(|| {
+            let Some(target) = self
+                .eager_catalog(package)?
+                .get(position)
+                .map(|slide| slide.target.clone())
+            else {
+                return Ok(Some(None));
+            };
+            let Some(graph) = package.notes_snapshot()? else {
+                return Ok(Some(None));
+            };
+            let Some(note) = graph
+                .slides()
+                .iter()
+                .find(|note| note.owner() == target.as_str())
+            else {
+                return Ok(Some(None));
+            };
+            let xml = note.xml();
+            if memchr::memmem::find(xml, b"AlternateContent").is_some() {
+                return Ok(None);
+            }
+            Ok(Some(Some(Scene::read(xml.to_vec())?)))
+        })
+    }
+
     /// The shape scene of the selected slide's notes page, when it has one
     /// (record 0285: find reads its shapes' text bodies).
     pub(super) fn slide_notes_scene(&self, position: usize) -> Result<Option<Scene>> {

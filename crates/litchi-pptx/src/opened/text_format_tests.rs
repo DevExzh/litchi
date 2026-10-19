@@ -860,8 +860,9 @@ fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
             paragraph(0),
             TextProperties::default().with_italic(Some(true)),
         ),
-        // Unchanged after the first chunk.
         TextEdit::new(notes_run, TextProperties::default().with_bold(Some(true))),
+        TextEdit::new(paragraph(0), TextProperties::default().with_text("one two")),
+        // Unchanged after the edit before it.
         TextEdit::new(paragraph(0), TextProperties::default().with_text("one two")),
     ];
     let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(2).collect();
@@ -881,6 +882,19 @@ fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
         changed
     );
     assert_eq!(notes_xml(&chunked.commit()?.into_package())?, expected);
+    // Each edit's change, as one call per edit applied in order reports it.
+    let mut sequential = package.edit()?;
+    let mut changes = Vec::new();
+    for edit in &edits {
+        changes
+            .push(sequential.set_notes_text_properties(0usize, std::slice::from_ref(edit))? == 1);
+    }
+    assert_eq!(changes.last(), Some(&false));
+    let mut reported = package.edit()?;
+    assert_eq!(
+        reported.set_notes_text_property_chunks_per_edit(0usize, &chunks)?,
+        changes
+    );
     // A slide without notes refuses.
     let mut edit = deck()?.edit()?;
     assert!(
@@ -891,11 +905,11 @@ fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
 }
 
 #[test]
-fn cell_text_indexes_of_the_corpus_equal_the_cell_reader() -> Result<()> {
+fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
     // Record 0348: every table of the tracked PPTX corpus.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
     let mut pending = vec![root];
-    let (mut tables, mut scanned) = (0usize, 0usize);
+    let (mut tables, mut scanned, mut bodies) = (0usize, 0usize, 0usize);
     while let Some(directory) = pending.pop() {
         for entry in std::fs::read_dir(&directory)? {
             let path = entry?.path();
@@ -922,6 +936,24 @@ fn cell_text_indexes_of_the_corpus_equal_the_cell_reader() -> Result<()> {
                     let Ok(Some(handle)) = scene.shape(position) else {
                         continue;
                     };
+                    let common = handle.view().common();
+                    if let Ok(Some(body)) = common.text_body() {
+                        bodies += 1;
+                        let expected = crate::table::CellTextIndex::from_body(&body)?;
+                        let index = common.text_index()?.expect("a body");
+                        assert_eq!(index.paragraph_count(), body.paragraphs.len());
+                        for (paragraph, item) in body.paragraphs.iter().enumerate() {
+                            let runs = item.runs.iter().filter(|run| run.is_text()).count();
+                            for ordinal in 0..=runs {
+                                assert_eq!(
+                                    index.text_run(paragraph, ordinal),
+                                    expected.text_run(0, 0, paragraph, ordinal),
+                                    "{} {position}",
+                                    path.display()
+                                );
+                            }
+                        }
+                    }
                     let Ok(table) = handle.table() else {
                         continue;
                     };
@@ -941,7 +973,10 @@ fn cell_text_indexes_of_the_corpus_equal_the_cell_reader() -> Result<()> {
             }
         }
     }
-    assert!(tables >= 5 && scanned >= 5, "{tables} {scanned}");
+    assert!(
+        tables >= 5 && scanned >= 5 && bodies >= 100,
+        "{tables} {scanned} {bodies}"
+    );
     Ok(())
 }
 

@@ -1212,7 +1212,33 @@ impl Edit {
         slide: impl Into<crate::slide::Selector<'s>>,
         chunks: &[&[super::TextEdit<'_>]],
     ) -> Result<usize> {
-        let selected_slide = self.resolve_slide(slide.into())?;
+        self.notes_text_property_chunks(slide.into(), chunks, None)
+    }
+
+    /// [`Self::set_notes_text_property_chunks`], returning each edit's
+    /// change in order (record 0348), as
+    /// [`Self::set_text_property_chunks_per_edit`] does for a slide.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_notes_text_property_chunks`].
+    pub fn set_notes_text_property_chunks_per_edit<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        chunks: &[&[super::TextEdit<'_>]],
+    ) -> Result<Vec<bool>> {
+        let mut changes = Vec::new();
+        self.notes_text_property_chunks(slide.into(), chunks, Some(&mut changes))?;
+        Ok(changes)
+    }
+
+    fn notes_text_property_chunks(
+        &mut self,
+        slide: crate::slide::Selector<'_>,
+        chunks: &[&[super::TextEdit<'_>]],
+        changes: Option<&mut Vec<bool>>,
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide)?;
         let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
         let Some(note) = source.as_ref().and_then(|source| {
             source
@@ -1232,7 +1258,7 @@ impl Edit {
             chunks,
             self.source.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
-            None,
+            changes,
         )?;
         if let Some(xml) = xml {
             self.working.get_part_mut(&part_name)?.set_blob(xml);

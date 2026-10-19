@@ -204,8 +204,13 @@ struct CachedScene {
     cells: HashMap<usize, Arc<Cells>>,
     /// The notes page's body placeholder: its notes-scene position and
     /// body; `Some(None)` when the slide has none (record 0346).
-    notes: Option<Option<(usize, Arc<litchi_drawingml::text::body::Body>)>>,
+    notes: Option<NotesBody>,
 }
+
+/// A notes page's body placeholder: its notes-scene position and the
+/// paragraphs and text runs of its body; `None` when the slide has none
+/// (records 0346, 0348).
+pub(crate) type NotesBody = Option<(usize, Arc<litchi_pptx::shape::BodyTextIndex>)>;
 
 /// One table's cells, by row and position in the row: the paragraphs and
 /// text runs plans address (record 0348). Their properties and text are not
@@ -851,64 +856,29 @@ fn story_plan(
             "PPTX shape scene cache was lost during admission",
         ));
     };
-    // The paragraph and listed run a text step names, and the run's child
-    // index, in `body`.
-    let locate = |body: &litchi_drawingml::text::body::Body| -> Option<(usize, Option<usize>)> {
-        let paragraph = story.paragraph?;
-        let item = body.paragraphs.get(paragraph)?;
-        match story.run {
-            None => Some((paragraph, None)),
-            Some(ordinal) => item
-                .runs
-                .iter()
-                .enumerate()
-                .filter(|(_, run)| super::super::text::listed_run(run) == Some(Kind::Run))
-                .nth(ordinal)
-                .map(|(index, _)| (paragraph, Some(index))),
-        }
-    };
-    let judge =
-        |body: &litchi_drawingml::text::body::Body, paragraph: usize, run: Option<usize>| {
-            let item = &body.paragraphs[paragraph];
-            match run {
-                None => paragraph_changed(&values, item),
-                Some(run) => values.run_changed(&item.runs[run]),
-            }
-        };
     let (shape, target, scope, changed) = match story.cell {
         None => {
             if cached.notes.is_none() {
-                let body = match file.slide_notes_scene(story.slide)? {
-                    None => None,
-                    Some(scene) => {
-                        let found = scene.roots().find(|handle| {
-                            handle
-                                .view()
-                                .common()
-                                .placeholder()
-                                .is_some_and(|placeholder| placeholder.kind() == Some("body"))
-                        });
-                        match found {
-                            Some(handle) => match handle.view().text_body() {
-                                Ok(Some(body)) => {
-                                    Some((handle.position().get(), Arc::new(body.clone())))
-                                },
-                                _ => None,
-                            },
-                            None => None,
-                        }
-                    },
-                };
+                let body = file.notes_body(story.slide, || read_notes(file, story.slide))?;
                 cached.notes = Some(body);
             }
-            let Some(Some((position, body))) = &cached.notes else {
+            let Some(Some((position, index))) = &cached.notes else {
                 return Ok(None);
             };
-            let Some((paragraph, run)) = locate(body) else {
+            // The paragraph and listed run the text step names, and the
+            // run's child index; the leaf reports the change (record 0348).
+            let Some(paragraph) = story.paragraph.filter(|p| *p < index.paragraph_count()) else {
                 return Ok(None);
+            };
+            let run = match story.run {
+                None => None,
+                Some(ordinal) => match index.text_run(paragraph, ordinal) {
+                    Some(run) => Some(run),
+                    None => return Ok(None),
+                },
             };
             let shape = Position::new(*position);
-            let changed = judge(body, paragraph, run);
+            let changed = false;
             let (target, scope) = match run {
                 None => (
                     TextTarget::Paragraph {
@@ -1020,7 +990,7 @@ fn story_plan(
             values,
         })),
         changed,
-        reported: story.cell.is_some(),
+        reported: true,
         staged_bytes,
         notes,
     }))
@@ -1126,6 +1096,35 @@ fn cache_scene(scene: Scene) -> Result<CachedScene> {
     })
 }
 
+/// Read slide `slide`'s notes body placeholder (record 0346).
+fn read_notes(file: &Pptx, slide: usize) -> Result<NotesBody> {
+    // An eager owner's notes page is read from the graph snapshot the
+    // native notes editor stages on (record 0348).
+    let scene = match file.eager_notes_scene(slide)? {
+        Some(scene) => scene,
+        None => file.slide_notes_scene(slide)?,
+    };
+    Ok(match scene {
+        None => None,
+        Some(scene) => {
+            let found = scene.roots().find(|handle| {
+                handle
+                    .view()
+                    .common()
+                    .placeholder()
+                    .is_some_and(|placeholder| placeholder.kind() == Some("body"))
+            });
+            match found {
+                Some(handle) => match handle.view().common().text_index() {
+                    Ok(Some(index)) => Some((handle.position().get(), Arc::new(index))),
+                    _ => None,
+                },
+                None => None,
+            }
+        },
+    })
+}
+
 /// Read every cell of the table at scene position `position` once.
 fn read_cells(cached: &CachedScene, position: usize) -> Result<Option<Arc<Cells>>> {
     let Some(handle) = cached
@@ -1188,8 +1187,12 @@ fn stage_all(
             && left.plan.notes == right.plan.notes
     }) {
         if run[0].plan.notes {
-            operations =
-                operations.saturating_add(stage_notes(edit, run[0].plan.target.slide, run)?);
+            operations = operations.saturating_add(stage_notes(
+                edit,
+                run[0].plan.target.slide,
+                run,
+                changes,
+            )?);
             continue;
         }
         let kind = if run[0].plan.format.is_some() {
@@ -1367,7 +1370,12 @@ fn stage_batch(
 /// One notes page's formatting plans, through the eager editor's notes
 /// text verb in 256-edit chunks (record 0346), staged in one pass over the
 /// notes part (record 0348).
-fn stage_notes(edit: &mut NativeEdit, slide: usize, items: &[Item]) -> Result<usize> {
+fn stage_notes(
+    edit: &mut NativeEdit,
+    slide: usize,
+    items: &[Item],
+    changes: &mut Vec<(usize, bool)>,
+) -> Result<usize> {
     let NativeEdit::Eager(edit) = edit else {
         return Err(Error::new(
             Code::InternalError,
@@ -1394,8 +1402,26 @@ fn stage_notes(edit: &mut NativeEdit, slide: usize, items: &[Item]) -> Result<us
         )
         .map_err(allocation)?;
     chunks.extend(edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS));
-    edit.set_notes_text_property_chunks(slide, &chunks)
-        .map_err(native_error)
+    // The leaf reports each edit's change (record 0348).
+    let flags = edit
+        .set_notes_text_property_chunks_per_edit(slide, &chunks)
+        .map_err(native_error)?;
+    if flags.len() != items.len() {
+        return Err(Error::new(
+            Code::InternalError,
+            "PPTX notes batch lost an edit's change",
+        )
+        .with_format(FileFormat::Pptx));
+    }
+    changes.try_reserve(items.len()).map_err(allocation)?;
+    changes.extend(
+        items
+            .iter()
+            .zip(&flags)
+            .filter(|(item, _)| item.plan.reported)
+            .map(|(item, changed)| (item.index, *changed)),
+    );
+    Ok(flags.iter().filter(|changed| **changed).count())
 }
 
 fn stage_one(edit: &mut NativeEdit, plan: &Plan) -> Result<()> {

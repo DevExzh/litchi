@@ -1087,3 +1087,65 @@ fn notes_batches_past_one_chunk_equal_the_items() {
     assert!(changes.iter().all(|changed| *changed));
     assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
 }
+
+#[test]
+fn notes_batch_changes_and_misses_are_the_items_own() {
+    let bytes = presentation::bytes();
+    let [_, eager] = files(&bytes);
+    let mut file = eager
+        .add("/slide[1]", NewNode::new("notes").prop("text", "one"))
+        .unwrap()
+        .file;
+    file = file
+        .add(
+            "/slide[1]/notes",
+            NewNode::new("paragraph").prop("text", "two"),
+        )
+        .unwrap()
+        .file;
+    let notes = |path: &str| format!("/slide[1]/notes/{path}");
+    let first: Plan = vec![(
+        notes("paragraph[1]"),
+        litchi_ops::Props::new().with("align", "right"),
+    )];
+    let (after, ..) = batch(&file, &first);
+    let items: Plan = vec![
+        // A repeat: no change.
+        (
+            notes("paragraph[1]"),
+            litchi_ops::Props::new().with("align", "right"),
+        ),
+        (
+            notes("paragraph[2]/run[1]"),
+            litchi_ops::Props::new().with("bold", true),
+        ),
+        (
+            notes("paragraph[2]"),
+            litchi_ops::Props::new().with("text", "two"),
+        ),
+    ];
+    let (expected, sequential) = sequential_changes(&after, &items);
+    assert_eq!(expected.first(), Some(&false));
+    let (batched, changes, _) = batch(&after, &items);
+    assert_eq!(changes, expected);
+    assert_eq!(batched.to_bytes().unwrap(), sequential);
+    for path in [notes("paragraph[3]"), notes("paragraph[1]/run[2]")] {
+        let alone = after
+            .set(path.as_str(), litchi_ops::Props::new().with("bold", true))
+            .expect_err("a miss fails alone");
+        let items: Vec<litchi_ops::BatchItem<'static>> = [notes("paragraph[1]"), path.clone()]
+            .into_iter()
+            .map(|path| {
+                let mut item = litchi_ops::BatchItem::new("set");
+                item.path = Some(path.into());
+                item.props = Some(litchi_ops::Props::new().with("bold", true));
+                item
+            })
+            .collect();
+        let error = after
+            .batch(items, litchi_ops::BatchMode::Atomic)
+            .expect_err("a miss fails the batch");
+        assert_eq!(error.code(), alone.code(), "{path}");
+        assert_eq!(error.item(), Some(1), "{path}");
+    }
+}
