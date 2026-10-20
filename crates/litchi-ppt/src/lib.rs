@@ -288,9 +288,8 @@ pub use named_shows::{NamedShow, NamedShows};
 pub use outline_text::OutlineTextBody;
 pub use picture_bullets::{
     MAX_PICTURE_BULLET_INDEX, PictureBullet, PictureBulletChange, PictureBulletChangeKind,
-    PictureBulletCollection, PictureBulletCommit, PictureBulletLimits, PictureBulletPackageLimits,
-    PictureBulletPatch, PictureBulletRevision, PictureBulletSnapshot, PictureBulletTransaction,
-    PictureBulletType,
+    PictureBulletCollection, PictureBulletLimits, PictureBulletPackageLimits,
+    PictureBulletRevision, PictureBulletSnapshot, PictureBulletType,
 };
 pub use placeholder_atom::{
     AtomPlaceholderSize, PlaceholderAtom, PlaceholderContext, PlaceholderEntry, PlaceholderKind,

@@ -5621,13 +5621,49 @@
           "name": "Transaction",
           "scope": "litchi_ppt::document_structure",
           "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::picture_bullets::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "PictureBulletTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
         "litchi_ppt::package::metadata",
         "litchi_ppt::font",
-        "litchi_ppt::broadcast"
+        "litchi_ppt::broadcast",
+        "litchi_ppt::picture_bullets"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -6017,13 +6053,49 @@
           "name": "Transaction",
           "scope": "litchi_ppt::document_structure",
           "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::picture_bullets::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "PictureBulletTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
         "litchi_ppt::package::metadata",
         "litchi_ppt::font",
-        "litchi_ppt::broadcast"
+        "litchi_ppt::broadcast",
+        "litchi_ppt::picture_bullets"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
