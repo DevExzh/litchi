@@ -209,7 +209,7 @@ fn edits_are_source_checked_and_preserve_opaque_table_bytes() {
 #[test]
 fn no_op_and_failed_edits_are_atomic() {
     let (fib, table) = source();
-    let snapshot = Snapshot::parse_with_limits(&fib, &table, Limits::default()).unwrap();
+    let snapshot = Snapshot::parse_with_options(&fib, &table, None, Limits::default()).unwrap();
     let no_op = snapshot.edit().commit().unwrap();
     assert!(!no_op.changed());
     assert_eq!(no_op.snapshot().table_stream(), table.as_slice());

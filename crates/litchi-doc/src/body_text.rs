@@ -99,21 +99,21 @@ impl OpenOptions {
 
     /// Selects limits for strict tracked-revision ownership and parsing.
     #[must_use]
-    pub const fn with_revision_limits(mut self, revision_limits: Limits) -> Self {
+    pub const fn revision_limits(mut self, revision_limits: Limits) -> Self {
         self.revision_limits = revision_limits;
         self
     }
 
     /// Selects staged operation and replacement-payload limits.
     #[must_use]
-    pub const fn with_transaction_limits(mut self, transaction_limits: TransactionLimits) -> Self {
+    pub const fn transaction_limits(mut self, transaction_limits: TransactionLimits) -> Self {
         self.transaction_limits = transaction_limits;
         self
     }
 
     /// Selects the explicit policy for changed publication of protected DOCs.
     #[must_use]
-    pub fn with_protection_policy(mut self, protection_policy: ProtectionPolicy) -> Self {
+    pub fn protection_policy(mut self, protection_policy: ProtectionPolicy) -> Self {
         self.protection_policy = protection_policy;
         self
     }
@@ -979,15 +979,15 @@ impl Snapshot {
         Self::from_bytes_with_options(
             input,
             OpenOptions::default()
-                .with_revision_limits(limits)
-                .with_transaction_limits(transaction_limits)
-                .with_protection_policy(protection_policy),
+                .revision_limits(limits)
+                .transaction_limits(transaction_limits)
+                .protection_policy(protection_policy),
         )
     }
 
     fn open_with_options(input: impl Into<Vec<u8>>, options: OpenOptions) -> Result<Self> {
         let bytes = input.into();
-        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
+        crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(
             bytes.len(),
             options.source_limits,
         )
@@ -1001,7 +1001,7 @@ impl Snapshot {
                 |ole| crate::package::preflight_declared_streams(ole, source_limits).map(|_| ()),
             )
             .map_err(Error::Invalid)?;
-        crate::raw::Package::validate_ole_file(&mut ole, source_limits).map_err(Error::Invalid)?;
+        crate::raw::Reader::validate_ole_file(&mut ole, source_limits).map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             fingerprint_cache: OnceLock::new(),
@@ -1091,7 +1091,7 @@ impl Snapshot {
         mut cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
         let bytes = input.into();
-        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)
+        crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)
             .map_err(Error::Invalid)?;
         let mut ole = observe_phase(
             &mut observer,
@@ -1117,7 +1117,7 @@ impl Snapshot {
             &mut observer,
             DiagnosticPhase::PublicReaderValidation,
             || {
-                crate::raw::Package::validate_ole_file(&mut ole, source_limits)
+                crate::raw::Reader::validate_ole_file(&mut ole, source_limits)
                     .map_err(Error::Invalid)
             },
         )?;
@@ -1287,27 +1287,23 @@ impl Snapshot {
         Edit::new(self.clone())
     }
 
-    /// Starts a staged transaction under an additional caller-selected
-    /// transaction profile.  Every dimension is intersected with the source
-    /// snapshot's retained policy, so applying a looser profile can never
-    /// discard a stricter ingress or edit bound already attached to the
-    /// source.
-    pub fn edit_with_limits(&self, transaction_limits: TransactionLimits) -> Result<Edit> {
-        let mut edit = Edit::new(self.clone())?;
-        edit.source.transaction_limits =
-            edit.source.transaction_limits.intersect(transaction_limits);
-        edit.editor
-            .set_retained_render_limit(edit.source.transaction_limits.max_retained_render_bytes());
-        Ok(edit)
-    }
-
-    /// Alias for [`Self::edit`].
+    /// Starts a staged transaction under the transaction profile of
+    /// `options`. Every dimension is intersected with the source snapshot's
+    /// retained policy, so a looser profile can never discard a stricter
+    /// ingress or edit bound already attached to the source.
     ///
     /// # Errors
     ///
-    /// Returns the same failure as [`Self::edit`].
-    pub fn transaction(&self) -> Result<Edit> {
-        self.edit()
+    /// Returns [`Error::Invalid`] if the retained source no longer validates.
+    pub fn edit_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
+        let mut edit = Edit::new(self.clone())?;
+        edit.source.transaction_limits = edit
+            .source
+            .transaction_limits
+            .intersect(options.transaction_limits_value());
+        edit.editor
+            .set_retained_render_limit(edit.source.transaction_limits.max_retained_render_bytes());
+        Ok(edit)
     }
 
     /// Starts a bounded disjoint composition for this exact artifact.
@@ -1695,7 +1691,7 @@ impl Snapshot {
 
     fn editor(&self) -> Result<RevisionEditor> {
         let source_limits = self.source_limits;
-        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
+        crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(
             self.source.len(),
             source_limits,
         )
@@ -1806,7 +1802,7 @@ impl Edit {
     /// transaction's protection policy and retained-render ceiling.
     fn reopen_editor(&self, bytes: Vec<u8>) -> Result<RevisionEditor> {
         let source_limits = self.source.source_limits;
-        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)
+        crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)
             .map_err(Error::Invalid)?;
         let (mut editor, _ole) = RevisionEditor::open_with_ole_file_with_policy_and_admission(
             bytes,
@@ -2870,9 +2866,9 @@ impl Edit {
                 bytes,
                 OpenOptions::default()
                     .source_limits(self.source.source_limits)
-                    .with_revision_limits(self.source.limits)
-                    .with_transaction_limits(self.source.transaction_limits)
-                    .with_protection_policy(self.source.protection_policy.clone()),
+                    .revision_limits(self.source.limits)
+                    .transaction_limits(self.source.transaction_limits)
+                    .protection_policy(self.source.protection_policy.clone()),
             )?
         };
         let patch = Patch::new(
@@ -2901,7 +2897,7 @@ impl Edit {
             self.editor
                 .authorize_rendered(&bytes)
                 .map_err(map_protection_error)?;
-            crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
+            crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(
                 bytes.len(),
                 self.source.source_limits,
             )
@@ -3320,9 +3316,9 @@ impl Patch {
             self.after.bytes().to_vec(),
             OpenOptions::default()
                 .source_limits(source_limits)
-                .with_revision_limits(limits)
-                .with_transaction_limits(transaction_limits)
-                .with_protection_policy(source.protection_policy.clone()),
+                .revision_limits(limits)
+                .transaction_limits(transaction_limits)
+                .protection_policy(source.protection_policy.clone()),
         )
     }
 
@@ -6378,7 +6374,7 @@ mod tests {
             doc_with_opaque_stream(&["alpha"]),
             OpenOptions::default()
                 .source_limits(source_limits)
-                .with_revision_limits(strict_limits),
+                .revision_limits(strict_limits),
         );
 
         assert!(matches!(
@@ -6406,7 +6402,7 @@ mod tests {
             doc_with_opaque_stream(&["alpha"]),
             OpenOptions::default()
                 .source_limits(source_limits)
-                .with_revision_limits(strict_limits),
+                .revision_limits(strict_limits),
         );
 
         assert!(matches!(
@@ -6435,7 +6431,7 @@ mod tests {
             doc_with_opaque_stream(&["alpha"]),
             OpenOptions::default()
                 .source_limits(source_limits)
-                .with_revision_limits(strict_limits),
+                .revision_limits(strict_limits),
         )
         .map_err(|error| error.to_string());
 
@@ -7153,7 +7149,7 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "formatted")
             .expect("formatted empty paragraph accepts insertion");
         let commit = edit.commit().expect("formatted empty commit");
-        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("formatted candidate opens");
         let document = package.document().expect("formatted candidate document");
         let paragraph = document
@@ -7229,7 +7225,7 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "inside")
             .expect("bookmark-protected empty insertion");
         let commit = edit.commit().expect("bookmark commit");
-        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("bookmark candidate opens");
         let bookmark = package
             .document()
@@ -7317,12 +7313,12 @@ mod tests {
         let (_strict_editor, mut ole) =
             RevisionEditor::open_with_ole_file(source.clone(), Limits::default())
                 .expect("physical DOC context should open");
-        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
+        crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(
             source.len(),
             crate::package::SourceLimits::default(),
         )
         .expect("public package preflight should pass");
-        crate::raw::Package::validate_ole_file(&mut ole, crate::package::SourceLimits::default())
+        crate::raw::Reader::validate_ole_file(&mut ole, crate::package::SourceLimits::default())
             .expect("public reader should validate the shared context");
 
         let source = Snapshot::from_bytes(source).expect("source should open");
@@ -7334,7 +7330,7 @@ mod tests {
             commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
             "alpha expanded"
         );
-        let mut public = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut public = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("changed candidate should pass the public package gate");
         assert_eq!(
             public
@@ -7444,7 +7440,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(texts, ["alpha expanded", "bravo", "c"]);
 
-        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("CFB reopens");
         let document = package.document().expect("DOC reopens");
         let paragraphs = document.paragraphs().expect("paragraphs read back");
@@ -7519,7 +7515,7 @@ mod tests {
             ["alpha", "bravo"]
         );
         let mut inverse_package =
-            crate::raw::Package::from_reader(Cursor::new(semantic_inverse.finish()))
+            crate::raw::Reader::from_reader(Cursor::new(semantic_inverse.finish()))
                 .expect("durable inverse CFB reopens");
         let inverse_document = inverse_package
             .document()
@@ -7730,7 +7726,7 @@ mod tests {
         edit.set_embedded_display_as_icon(77, !before)
             .expect("resource metadata edit");
         let commit = edit.commit().expect("resource root commit");
-        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("resource CFB reopens");
         package.document().expect("resource DOC reopens");
         let changed =
@@ -8138,7 +8134,7 @@ mod tests {
                 "placeholder"
             );
             let mut restored_package =
-                crate::raw::Package::from_reader(Cursor::new(durable_restored.finish()))
+                crate::raw::Reader::from_reader(Cursor::new(durable_restored.finish()))
                     .expect("durable inverse CFB");
             assert_eq!(
                 restored_package

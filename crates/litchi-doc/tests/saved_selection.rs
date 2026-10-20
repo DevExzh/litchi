@@ -11,7 +11,7 @@ use litchi_doc::body_text::{Error, Projection, Refusal, Snapshot};
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::tracked_revision::Limits;
-use litchi_doc::{SavedSelection, SelectionGeometry, SelectionStyle, raw::Package};
+use litchi_doc::{SavedSelection, SelectionGeometry, SelectionStyle, raw::Reader};
 use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
@@ -217,7 +217,7 @@ fn fib_range_requires_exact_size_and_deferred_errors_are_cached() {
 
     let bytes = document_with_selsf(&source[..35], 35);
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package
         .document()
         .expect("document open despite optional error");
@@ -235,7 +235,7 @@ fn document_accessor_returns_selection_and_enforces_main_text_bound() {
     let mut valid = record(0);
     set_cps(&mut valid, 0, 1, 0);
     let bytes = document_with_selsf(&valid, 36);
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let selection = document
         .saved_selection()
@@ -248,7 +248,7 @@ fn document_accessor_returns_selection_and_enforces_main_text_bound() {
     let mut outside = record(0);
     set_cps(&mut outside, i32::MAX, i32::MAX, i32::MAX);
     let bytes = document_with_selsf(&outside, 36);
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let first = document
         .saved_selection()
@@ -262,7 +262,7 @@ fn document_accessor_returns_selection_and_enforces_main_text_bound() {
     let mut outside_lim = record(0);
     set_cps(&mut outside_lim, 0, i32::MAX, 0);
     let bytes = document_with_selsf(&outside_lim, 36);
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let first = document
         .saved_selection()

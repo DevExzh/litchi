@@ -28,7 +28,7 @@ use litchi_cfb::{OleFile, OleFileLimits};
 use litchi_crypto::ooxml::{self, IntegrityStatus, Kind, Limits as CryptoLimits, Mode};
 use litchi_crypto::spaces;
 use litchi_doc::{
-    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Package as DocPackage,
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Reader as DocReader,
 };
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_opc::{OpcError, OpcPackage, SourceBackedPackage, SourceLimits};
@@ -1139,14 +1139,17 @@ fn validate_encrypted_doc(
     Ok(())
 }
 
-fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<&[u8]>>> {
+fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<&[u8]>>> {
     let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
     let limits = DocSourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES as usize)?
         .max_entry_bytes(MAX_INPUT_BYTES as usize)?
         .max_aggregate_bytes(MAX_INPUT_BYTES as usize)?
         .build()?;
-    Ok(DocPackage::from_ole_file_with_limits(ole, limits)?)
+    Ok(DocReader::from_ole_file_with_options(
+        ole,
+        OpenOptions::default().source_limits(limits),
+    )?)
 }
 
 fn read_crypto(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {

@@ -75,21 +75,6 @@ impl Snapshot {
         )
     }
 
-    /// Parse with custom resource limits and LCID-derived ANSI decoding.
-    pub fn parse_with_limits(
-        fib: &FileInformationBlock,
-        table_stream: &[u8],
-        limits: Limits,
-    ) -> PackageResult<Self> {
-        Self::parse_with_options_and_policy(
-            fib,
-            table_stream,
-            None,
-            limits,
-            ProtectionPolicy::default(),
-        )
-    }
-
     /// Parse with explicit ANSI decoding and resource limits.
     pub fn parse_with_options(
         fib: &FileInformationBlock,

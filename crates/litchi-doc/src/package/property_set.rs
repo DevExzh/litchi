@@ -3,7 +3,7 @@
 //! The OLE property-set grammar and typed PID owners live in
 //! `litchi-ole-common`. This module only supplies the DOC package boundary:
 //! host validation, owned source bytes, and source-checked whole-package
-//! commits. A generic `raw::Package<R>` cannot safely mutate in place because its
+//! commits. A generic `raw::Reader<R>` cannot safely mutate in place because its
 //! reader is owned by the parsed CFB file and the original artifact bytes are
 //! not recoverable from that API.
 
@@ -108,23 +108,8 @@ impl Snapshot {
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
 
-    /// Reads `_PID_HLINKS` using caller-supplied DOC field context.
-    ///
-    /// A property-set snapshot does not own WordDocument/Table streams, so it
-    /// cannot infer field associations on its own. Pass the parsed field table
-    /// from the same source artifact to discover
-    /// [`crate::HyperlinkAssociation::FieldCandidates`]. A numeric match is
-    /// never a proven field association until the caller selects it with
-    /// [`crate::UserDefinedHyperlink::resolve_field`].
-    pub fn user_defined_hyperlinks(
-        &self,
-        fields: Option<&crate::FieldsTable>,
-    ) -> Result<Option<UserDefinedHyperlinks>> {
-        self.user_defined_hyperlinks_with_limits(fields, Limits::default())
-    }
-
     /// Reads `_PID_HLINKS` with explicit typed-overlay limits.
-    pub fn user_defined_hyperlinks_with_limits(
+    pub fn user_defined_hyperlinks(
         &self,
         fields: Option<&crate::FieldsTable>,
         limits: Limits,
@@ -132,9 +117,7 @@ impl Snapshot {
         let Some(section) = self.user_defined_properties()? else {
             return Ok(None);
         };
-        crate::user_defined_hyperlinks::from_user_defined_section_with_limits(
-            &section, fields, limits,
-        )
+        crate::user_defined_hyperlinks::from_user_defined_section(&section, fields, limits)
     }
 
     /// Starts an isolated, source-checked property-set transaction.
@@ -259,26 +242,8 @@ impl Transaction {
         })
     }
 
-    /// Edits the opaque PKCS#7 signature and certificate-store payloads
-    /// atomically. ASN.1 content form and certificate trust remain outside
-    /// this inert storage owner.
-    ///
-    /// The nested transaction rewrites only those payloads and preserves
-    /// producer-specific gaps and padding. Its closure never receives a
-    /// cryptographic verifier or a VBA execution context.
-    pub fn edit_vba_signature<F>(&mut self, edit: F) -> Result<bool>
-    where
-        F: FnOnce(&mut vba_signature::Edit) -> std::result::Result<(), vba_signature::Error>,
-    {
-        self.edit_vba_signature_with_limits(vba_signature::Limits::default(), edit)
-    }
-
     /// Edits the opaque VBA signature using explicit nested-blob limits.
-    pub fn edit_vba_signature_with_limits<F>(
-        &mut self,
-        limits: vba_signature::Limits,
-        edit: F,
-    ) -> Result<bool>
+    pub fn edit_vba_signature<F>(&mut self, limits: vba_signature::Limits, edit: F) -> Result<bool>
     where
         F: FnOnce(&mut vba_signature::Edit) -> std::result::Result<(), vba_signature::Error>,
     {
@@ -408,22 +373,8 @@ impl Transaction {
         Ok(true)
     }
 
-    /// Replaces `_PID_HLINKS` atomically through the shared typed owner.
-    ///
-    /// Only caller-resolved field entries are serialized in the MS-DOC section
-    /// 2.4.7 story/index order. All other entries remain inert and stable
-    /// relative to one another. A changed value containing unresolved field
-    /// candidates is refused; an exact raw no-op preserves it. This
-    /// transaction never writes PIDDSI `0x15`.
-    pub fn put_user_defined_hyperlinks(
-        &mut self,
-        hyperlinks: &UserDefinedHyperlinks,
-    ) -> std::result::Result<bool, MutationError> {
-        self.put_user_defined_hyperlinks_with_limits(hyperlinks, Limits::default())
-    }
-
     /// Replaces `_PID_HLINKS` with explicit shared typed-overlay limits.
-    pub fn put_user_defined_hyperlinks_with_limits(
+    pub fn put_user_defined_hyperlinks(
         &mut self,
         hyperlinks: &UserDefinedHyperlinks,
         limits: Limits,

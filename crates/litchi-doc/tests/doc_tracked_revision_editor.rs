@@ -34,7 +34,7 @@
 
 use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::tracked_revision::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
 use std::io::Cursor;
@@ -116,7 +116,7 @@ fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
             .all(|r| r.author != "Alice" && r.author != "Existing")
     );
     let bytes = editor.finish().unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let text = package.document().unwrap().text().unwrap().to_string();
     assert!(text.contains("new kept old tail"));
     assert_eq!(deletion.author, "Existing");
@@ -148,7 +148,7 @@ fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
         .unwrap();
     editor.reject(insertion_index).unwrap();
     let bytes = editor.finish().unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let text = package.document().unwrap().text().unwrap().to_string();
     assert!(!text.contains("old"));
     assert!(!text.contains("temporary"));
@@ -361,7 +361,7 @@ fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
 }
 
 fn public_text(bytes: &[u8]) -> Option<String> {
-    let mut package = Package::from_reader(Cursor::new(bytes.to_vec())).ok()?;
+    let mut package = Reader::from_reader(Cursor::new(bytes.to_vec())).ok()?;
     let document = package.document().ok()?;
     document.text().ok().map(|text| text.to_string())
 }
@@ -381,7 +381,7 @@ fn unreadable_fixtures_remain_refused_at_open() {
 }
 
 fn saved_selection_cps(bytes: &[u8]) -> (u32, u32, u32) {
-    let mut package = Package::from_reader(Cursor::new(bytes.to_vec())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.to_vec())).unwrap();
     let document = package.document().unwrap();
     let selection = document.saved_selection().unwrap().unwrap();
     (

@@ -36,7 +36,7 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::Limits;
 use litchi_doc::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
-use litchi_doc::{Editor, WriteOptions, raw::Package};
+use litchi_doc::{Editor, WriteOptions, raw::Reader};
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -120,7 +120,7 @@ fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
     assert!(!ole.exists(&["ObjectPool", "_22"]));
     assert!(ole.exists(&["ObjectPool", "_11"]));
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text().unwrap().contains("before embedded objects"));
 }
@@ -164,7 +164,7 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
                             .iter()
                             .any(|value| value.storage_id == id)
                     );
-                    let mut package = Package::from_reader(Cursor::new(output)).unwrap();
+                    let mut package = Reader::from_reader(Cursor::new(output)).unwrap();
                     assert!(!package.document().unwrap().text().unwrap().is_empty());
                     supported += 1;
                 },

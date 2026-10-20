@@ -63,7 +63,7 @@ fn mixed_runs() -> Package {
 /// assertion reads the edited file, not the edit's own model.
 fn reopen(package: &Package) -> litchi_doc::Document {
     let bytes = package.to_bytes().unwrap();
-    let mut raw = litchi_doc::raw::Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut raw = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes)).unwrap();
     raw.document().unwrap()
 }
 

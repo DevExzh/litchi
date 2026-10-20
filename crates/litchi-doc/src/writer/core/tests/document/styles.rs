@@ -53,7 +53,7 @@ fn writes_custom_styles_into_document_stylesheet() {
 
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = crate::raw::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let stylesheet = document.stylesheet().unwrap();
     assert_eq!(stylesheet.styles().len(), 18);
@@ -126,7 +126,7 @@ fn writes_revision_marked_style_and_author_table() {
 
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = crate::raw::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(document.revision_authors(), ["Unknown", "Style Editor"]);
     let stylesheet = document.stylesheet().unwrap();

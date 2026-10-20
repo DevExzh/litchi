@@ -609,7 +609,7 @@ mod transaction_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::raw::Package;
+    use crate::raw::Reader;
     use std::path::PathBuf;
 
     #[test]
@@ -715,7 +715,7 @@ mod tests {
             "test-data/ole/doc/FloatingPictures.doc",
         ];
         for path in cases {
-            let mut package = Package::open(fixture(path)).unwrap();
+            let mut package = Reader::open(fixture(path)).unwrap();
             let document = package.document().unwrap();
             let smart_tags = document
                 .smart_tags()

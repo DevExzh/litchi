@@ -58,40 +58,40 @@ impl EditOptions {
 
     /// Select strict tracked-revision parsing limits.
     #[must_use]
-    pub const fn with_revision_limits(mut self, limits: Limits) -> Self {
+    pub const fn revision_limits(mut self, limits: Limits) -> Self {
         self.revision_limits = limits;
         self
     }
 
     /// Select finite staged-operation and replacement limits.
     #[must_use]
-    pub const fn with_transaction_limits(mut self, limits: body_text::TransactionLimits) -> Self {
+    pub const fn transaction_limits(mut self, limits: body_text::TransactionLimits) -> Self {
         self.transaction_limits = limits;
         self
     }
 
     /// Select the explicit policy for changed protected-source publication.
     #[must_use]
-    pub fn with_protection_policy(mut self, policy: ProtectionPolicy) -> Self {
+    pub fn protection_policy(mut self, policy: ProtectionPolicy) -> Self {
         self.protection_policy = policy;
         self
     }
 
     /// Return the tracked-revision limits.
     #[must_use]
-    pub const fn revision_limits(&self) -> Limits {
+    pub const fn revision_limits_value(&self) -> Limits {
         self.revision_limits
     }
 
     /// Return the transaction limits.
     #[must_use]
-    pub const fn transaction_limits(&self) -> body_text::TransactionLimits {
+    pub const fn transaction_limits_value(&self) -> body_text::TransactionLimits {
         self.transaction_limits
     }
 
     /// Return the protected-publication policy.
     #[must_use]
-    pub fn protection_policy(&self) -> ProtectionPolicy {
+    pub fn protection_policy_value(&self) -> ProtectionPolicy {
         self.protection_policy.clone()
     }
 }
@@ -300,7 +300,7 @@ impl Patch {
 
     /// Effective body transaction limits retained by this edit.
     #[must_use]
-    pub const fn transaction_limits(&self) -> body_text::TransactionLimits {
+    pub const fn transaction_limits_value(&self) -> body_text::TransactionLimits {
         self.inner.before().transaction_limits()
     }
 
@@ -467,9 +467,9 @@ impl Edit {
         let source = package.body_source(
             body_text::OpenOptions::default()
                 .source_limits(package.source_limits())
-                .with_revision_limits(options.revision_limits)
-                .with_transaction_limits(options.transaction_limits)
-                .with_protection_policy(options.protection_policy),
+                .revision_limits(options.revision_limits)
+                .transaction_limits(options.transaction_limits)
+                .protection_policy(options.protection_policy),
         )?;
         let inner = source.edit().map_err(Error::from)?;
         Ok(Self { package, inner })
@@ -810,9 +810,9 @@ impl Package {
             bytes,
             body_text::OpenOptions::default()
                 .source_limits(self.source_limits())
-                .with_revision_limits(profile.revision_limits)
-                .with_transaction_limits(profile.transaction_limits)
-                .with_protection_policy(profile.protection_policy),
+                .revision_limits(profile.revision_limits)
+                .transaction_limits(profile.transaction_limits)
+                .protection_policy(profile.protection_policy),
         )
         .map_err(Error::from)?;
         let next = patch.inner.apply(&source).map_err(Error::from)?;
@@ -1017,7 +1017,7 @@ mod tests {
         assert_eq!(commit(&source.clone(), EditOptions::default()), first);
         assert!(std::sync::Arc::ptr_eq(&shared, &held(&source).unwrap()));
         // Other options open their own snapshot.
-        let wide = EditOptions::default().with_transaction_limits(TransactionLimits::new(
+        let wide = EditOptions::default().transaction_limits(TransactionLimits::new(
             300,
             1024 * 1024,
             4 * 1024 * 1024,
@@ -1034,7 +1034,7 @@ mod tests {
         let source = package_with_paragraphs(257);
         let transaction_limits = TransactionLimits::new(300, 1024 * 1024, 4 * 1024 * 1024);
         let mut edit = source
-            .edit_with_options(EditOptions::default().with_transaction_limits(transaction_limits))
+            .edit_with_options(EditOptions::default().transaction_limits(transaction_limits))
             .expect("wide edit");
         for position in 0..257 {
             edit.replace_paragraph(Position::new(position), "after")
@@ -1061,7 +1061,7 @@ mod tests {
         let source = package_with_paragraphs(3);
         let wide_limits = TransactionLimits::new(3, 1024 * 1024, 4 * 1024 * 1024);
         let mut wide_edit = source
-            .edit_with_options(EditOptions::default().with_transaction_limits(wide_limits))
+            .edit_with_options(EditOptions::default().transaction_limits(wide_limits))
             .expect("wide edit");
         for position in 0..3 {
             wide_edit
@@ -1073,7 +1073,7 @@ mod tests {
         let narrow_limits = TransactionLimits::new(2, 1024 * 1024, 4 * 1024 * 1024)
             .with_max_retained_render_bytes(1);
         let narrow = source
-            .edit_with_options(EditOptions::default().with_transaction_limits(narrow_limits))
+            .edit_with_options(EditOptions::default().transaction_limits(narrow_limits))
             .expect("narrow edit")
             .commit()
             .expect("narrow no-op commit")
@@ -1081,7 +1081,7 @@ mod tests {
         let applied = narrow
             .apply(&wide_patch)
             .expect("wide patch on narrow source");
-        let wider_options = EditOptions::default().with_transaction_limits(
+        let wider_options = EditOptions::default().transaction_limits(
             TransactionLimits::new(99, 4 * 1024 * 1024, 16 * 1024 * 1024)
                 .with_max_retained_render_bytes(4 * 1024 * 1024),
         );
@@ -1136,7 +1136,7 @@ mod tests {
         .expect("authorization");
         let policy = ProtectionPolicy::allow_protected(authorization);
         let mut edit = source
-            .edit_with_options(EditOptions::default().with_protection_policy(policy))
+            .edit_with_options(EditOptions::default().protection_policy(policy))
             .expect("authorized edit");
         edit.replace_paragraph(Position::new(0), "after")
             .expect("protected replacement");

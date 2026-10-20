@@ -167,51 +167,11 @@ impl Transaction {
             .map_err(TransactionError::Invalid)
     }
 
-    /// Clone-edits one managed OLEDS presentation stream.
-    ///
-    /// The callback is applied to a bounded shared-owner transaction. The DOC
-    /// candidate is replaced only after the stream and the resulting DOC
-    /// object references validate successfully.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the storage or presentation is missing or
-    /// malformed, the callback rejects the edit, the OLEDS limits are
-    /// exceeded, or the candidate DOC cannot be validated.
+    /// Clone-edits one presentation under explicit OLEDS limits.
     pub fn update_presentation<F>(
         &mut self,
         storage_id: u32,
         index: usize,
-        edit: F,
-    ) -> Result<(), TransactionError>
-    where
-        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
-    {
-        self.editor
-            .update_presentation(storage_id, index, edit)
-            .map_err(TransactionError::Invalid)
-    }
-
-    /// Clone-edits a presentation selected by a DOC object reference.
-    pub fn update_presentation_for<F>(
-        &mut self,
-        reference: &Reference,
-        index: usize,
-        edit: F,
-    ) -> Result<(), TransactionError>
-    where
-        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
-    {
-        self.editor
-            .update_presentation_for(reference, index, edit)
-            .map_err(TransactionError::Invalid)
-    }
-
-    /// Clone-edits one presentation under explicit OLEDS limits.
-    pub fn update_presentation_with_limits<F>(
-        &mut self,
-        storage_id: u32,
-        index: usize,
         limits: ole_streams::Limits,
         edit: F,
     ) -> Result<(), TransactionError>
@@ -219,12 +179,12 @@ impl Transaction {
         F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
-            .update_presentation_with_limits(storage_id, index, limits, edit)
+            .update_presentation(storage_id, index, limits, edit)
             .map_err(TransactionError::Invalid)
     }
 
     /// Clone-edits a reference-selected presentation under explicit limits.
-    pub fn update_presentation_for_with_limits<F>(
+    pub fn update_presentation_for<F>(
         &mut self,
         reference: &Reference,
         index: usize,
@@ -235,7 +195,7 @@ impl Transaction {
         F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
-            .update_presentation_for_with_limits(reference, index, limits, edit)
+            .update_presentation_for(reference, index, limits, edit)
             .map_err(TransactionError::Invalid)
     }
 
@@ -263,32 +223,8 @@ impl Transaction {
             .map_err(TransactionError::Invalid)
     }
 
-    /// Clone-edits one managed OLEDS native-data stream.
-    pub fn update_native<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
-    where
-        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
-    {
-        self.editor
-            .update_native(storage_id, edit)
-            .map_err(TransactionError::Invalid)
-    }
-
-    /// Clone-edits native data selected by a DOC object reference.
-    pub fn update_native_for<F>(
-        &mut self,
-        reference: &Reference,
-        edit: F,
-    ) -> Result<(), TransactionError>
-    where
-        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
-    {
-        self.editor
-            .update_native_for(reference, edit)
-            .map_err(TransactionError::Invalid)
-    }
-
     /// Clone-edits one native-data stream under explicit OLEDS limits.
-    pub fn update_native_with_limits<F>(
+    pub fn update_native<F>(
         &mut self,
         storage_id: u32,
         limits: ole_streams::Limits,
@@ -298,12 +234,12 @@ impl Transaction {
         F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
-            .update_native_with_limits(storage_id, limits, edit)
+            .update_native(storage_id, limits, edit)
             .map_err(TransactionError::Invalid)
     }
 
     /// Clone-edits reference-selected native data under explicit limits.
-    pub fn update_native_for_with_limits<F>(
+    pub fn update_native_for<F>(
         &mut self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -313,7 +249,7 @@ impl Transaction {
         F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
-            .update_native_for_with_limits(reference, limits, edit)
+            .update_native_for(reference, limits, edit)
             .map_err(TransactionError::Invalid)
     }
 

@@ -10,7 +10,7 @@
 
 use litchi_core::Position;
 use litchi_doc::body_text::{Projection, Snapshot, Story};
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::writer::Builder;
 use litchi_doc::{CpRange, Document, Element, Paragraph, StoryBlockKind, Table};
 use std::io::Cursor;
@@ -21,12 +21,12 @@ fn fixture_directory() -> PathBuf {
 }
 
 fn open(name: &str) -> Document {
-    let mut package = Package::open(fixture_directory().join(name)).expect("DOC fixture opens");
+    let mut package = Reader::open(fixture_directory().join(name)).expect("DOC fixture opens");
     package.document().unwrap()
 }
 
 fn open_bytes(bytes: Vec<u8>) -> Document {
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
     package.document().unwrap()
 }
 
@@ -41,7 +41,7 @@ fn corpus() -> Vec<(String, Document)> {
     let documents = names
         .into_iter()
         .filter_map(|name| {
-            let mut package = Package::open(fixture_directory().join(&name)).ok()?;
+            let mut package = Reader::open(fixture_directory().join(&name)).ok()?;
             let document = package.document().ok()?;
             Some((name, document))
         })

@@ -36,7 +36,7 @@ use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::{Info, Limits};
 use litchi_doc::writer::Picture;
-use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, raw::Package};
+use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, raw::Reader};
 use litchi_ole_common::object::{Edit as ObjectEditor, Limits as ObjectLimits, Target, Targets};
 use std::io::Cursor;
 
@@ -145,7 +145,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .collect::<Vec<_>>(),
         vec![reference.storage_id]
     );
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text().unwrap().contains("native equation follows"));
     #[cfg(feature = "formula")]

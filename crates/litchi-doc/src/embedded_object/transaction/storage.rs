@@ -94,47 +94,19 @@ fn missing_stream() -> PackageError {
 }
 
 impl Editor {
-    /// Returns one managed object's inert OLEDS presentation stream.
-    ///
-    /// The DOC field and `ObjectPool` storage are resolved by the DOC owner;
-    /// the selected stream is then parsed by the shared bounded OLEDS owner.
-    /// No presentation data is rendered or activated.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the storage is not referenced, the stream index
-    /// or payload is malformed, or the selected OLEDS limits are exceeded.
-    pub fn presentation(
-        &self,
-        storage_id: u32,
-        index: usize,
-    ) -> Result<Option<presentation::Snapshot>> {
-        let reference = reference_for_storage_id(self, storage_id)?;
-        self.presentation_for(&reference, index)
-    }
-
     /// Returns one managed object's OLEDS presentation under explicit limits.
-    pub fn presentation_with_limits(
+    pub fn presentation(
         &self,
         storage_id: u32,
         index: usize,
         limits: ole_streams::Limits,
     ) -> Result<Option<presentation::Snapshot>> {
         let reference = reference_for_storage_id(self, storage_id)?;
-        self.presentation_for_with_limits(&reference, index, limits)
-    }
-
-    /// Returns one managed object's presentation selected by its DOC reference.
-    pub fn presentation_for(
-        &self,
-        reference: &Reference,
-        index: usize,
-    ) -> Result<Option<presentation::Snapshot>> {
-        self.presentation_for_with_limits(reference, index, ole_streams::Limits::default())
+        self.presentation_for(&reference, index, limits)
     }
 
     /// Returns one DOC-reference-selected presentation under explicit limits.
-    pub fn presentation_for_with_limits(
+    pub fn presentation_for(
         &self,
         reference: &Reference,
         index: usize,
@@ -145,32 +117,18 @@ impl Editor {
             .map_err(PackageError::from)
     }
 
-    /// Returns all managed OLEDS presentations in numeric order.
-    pub fn presentations(&self, storage_id: u32) -> Result<Vec<(usize, presentation::Snapshot)>> {
-        let reference = reference_for_storage_id(self, storage_id)?;
-        self.presentations_for(&reference)
-    }
-
     /// Returns all managed presentations under explicit limits.
-    pub fn presentations_with_limits(
+    pub fn presentations(
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
     ) -> Result<Vec<(usize, presentation::Snapshot)>> {
         let reference = reference_for_storage_id(self, storage_id)?;
-        self.presentations_for_with_limits(&reference, limits)
-    }
-
-    /// Returns all presentations selected by a DOC object reference.
-    pub fn presentations_for(
-        &self,
-        reference: &Reference,
-    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
-        self.presentations_for_with_limits(reference, ole_streams::Limits::default())
+        self.presentations_for(&reference, limits)
     }
 
     /// Returns all DOC-reference-selected presentations under explicit limits.
-    pub fn presentations_for_with_limits(
+    pub fn presentations_for(
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -180,29 +138,18 @@ impl Editor {
             .map_err(PackageError::from)
     }
 
-    /// Returns one managed object's inert OLEDS native-data stream.
-    pub fn native(&self, storage_id: u32) -> Result<Option<native::Snapshot>> {
-        let reference = reference_for_storage_id(self, storage_id)?;
-        self.native_for(&reference)
-    }
-
     /// Returns one managed object's native-data stream under explicit limits.
-    pub fn native_with_limits(
+    pub fn native(
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
     ) -> Result<Option<native::Snapshot>> {
         let reference = reference_for_storage_id(self, storage_id)?;
-        self.native_for_with_limits(&reference, limits)
-    }
-
-    /// Returns native data selected by a DOC object reference.
-    pub fn native_for(&self, reference: &Reference) -> Result<Option<native::Snapshot>> {
-        self.native_for_with_limits(reference, ole_streams::Limits::default())
+        self.native_for(&reference, limits)
     }
 
     /// Returns DOC-reference-selected native data under explicit limits.
-    pub fn native_for_with_limits(
+    pub fn native_for(
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -246,35 +193,8 @@ impl Editor {
         Ok(())
     }
 
-    /// Atomically edits one managed OLEDS presentation stream.
-    pub fn update_presentation<F>(&mut self, storage_id: u32, index: usize, edit: F) -> Result<()>
-    where
-        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
-    {
-        let reference = reference_for_storage_id(self, storage_id)?;
-        self.update_presentation_for(&reference, index, edit)
-    }
-
-    /// Atomically edits a DOC-reference-selected OLEDS presentation stream.
-    pub fn update_presentation_for<F>(
-        &mut self,
-        reference: &Reference,
-        index: usize,
-        edit: F,
-    ) -> Result<()>
-    where
-        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
-    {
-        self.update_presentation_for_with_limits(
-            reference,
-            index,
-            ole_streams::Limits::default(),
-            edit,
-        )
-    }
-
     /// Atomically edits a presentation under explicit OLEDS limits.
-    pub fn update_presentation_with_limits<F>(
+    pub fn update_presentation<F>(
         &mut self,
         storage_id: u32,
         index: usize,
@@ -285,11 +205,11 @@ impl Editor {
         F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
-        self.update_presentation_for_with_limits(&reference, index, limits, edit)
+        self.update_presentation_for(&reference, index, limits, edit)
     }
 
     /// Atomically edits a DOC-reference-selected presentation under limits.
-    pub fn update_presentation_for_with_limits<F>(
+    pub fn update_presentation_for<F>(
         &mut self,
         reference: &Reference,
         index: usize,
@@ -311,7 +231,7 @@ impl Editor {
             .update_presentation(&key, index, limits, edit)
             .map_err(PackageError::from)?;
         let replacement = candidate
-            .presentation_for_with_limits(reference, index, limits)?
+            .presentation_for(reference, index, limits)?
             .ok_or_else(missing_stream)?;
         if source.bytes() == replacement.bytes() {
             return Ok(());
@@ -361,25 +281,8 @@ impl Editor {
         Ok(())
     }
 
-    /// Atomically edits one managed OLEDS native-data stream.
-    pub fn update_native<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
-    where
-        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
-    {
-        let reference = reference_for_storage_id(self, storage_id)?;
-        self.update_native_for(&reference, edit)
-    }
-
-    /// Atomically edits native data selected by a DOC object reference.
-    pub fn update_native_for<F>(&mut self, reference: &Reference, edit: F) -> Result<()>
-    where
-        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
-    {
-        self.update_native_for_with_limits(reference, ole_streams::Limits::default(), edit)
-    }
-
     /// Atomically edits native data under explicit OLEDS limits.
-    pub fn update_native_with_limits<F>(
+    pub fn update_native<F>(
         &mut self,
         storage_id: u32,
         limits: ole_streams::Limits,
@@ -389,11 +292,11 @@ impl Editor {
         F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
-        self.update_native_for_with_limits(&reference, limits, edit)
+        self.update_native_for(&reference, limits, edit)
     }
 
     /// Atomically edits DOC-reference-selected native data under limits.
-    pub fn update_native_for_with_limits<F>(
+    pub fn update_native_for<F>(
         &mut self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -414,7 +317,7 @@ impl Editor {
             .update_native(&key, limits, edit)
             .map_err(PackageError::from)?;
         let replacement = candidate
-            .native_for_with_limits(reference, limits)?
+            .native_for(reference, limits)?
             .ok_or_else(missing_stream)?;
         if source.bytes() == replacement.bytes() {
             return Ok(());

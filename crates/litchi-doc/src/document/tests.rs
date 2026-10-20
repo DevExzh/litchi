@@ -4,7 +4,7 @@
 mod lazy_auxiliary_tests {
     use crate::builder::Builder;
     use crate::parts::fib::FileInformationBlock;
-    use crate::raw::Package;
+    use crate::raw::Reader;
     use crate::tracked_revision::Limits;
     use litchi_ole_common::object::{Edit as PackageEditor, Targets};
     use std::io::Cursor;
@@ -45,7 +45,7 @@ mod lazy_auxiliary_tests {
             .expect("malformed optional pointers");
         let bytes = package.finish().expect("fixture package finish");
 
-        let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+        let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
         let document = package
             .document()
             .expect("unrelated document open must not parse optional tables");
@@ -135,7 +135,7 @@ mod lazy_auxiliary_tests {
         package.put_stream(&word_path, word).expect("PGP pointer");
         let bytes = package.finish().expect("fixture package finish");
 
-        let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+        let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
         let document = package.document().expect("document open");
         let source = document
             .0
@@ -188,7 +188,7 @@ mod owned_mtef_tests {
 
 use crate::package::Error as PackageError;
 use crate::parts::fib::WORD_97_NFIB;
-use crate::raw::Package;
+use crate::raw::Reader;
 use crate::{Builder, Image, ImageError};
 use std::io::Cursor;
 use std::path::Path;
@@ -206,7 +206,7 @@ fn test_extract_png_image_from_doc() {
         .join("doc")
         .join("PngPicture.doc");
 
-    let mut pkg = Package::open(&doc_path).expect("open doc");
+    let mut pkg = Reader::open(&doc_path).expect("open doc");
     let doc = pkg.document().expect("load document");
     const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -234,7 +234,7 @@ fn opened_document_exposes_versioned_document_properties() {
     writer.add_paragraph("Body").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().expect("load document");
     let properties = document
         .document_properties()
@@ -266,7 +266,7 @@ fn test_image_data_with_invalid_offset() {
         .join("doc")
         .join("PngPicture.doc");
 
-    let mut pkg = Package::open(&doc_path).expect("open doc");
+    let mut pkg = Reader::open(&doc_path).expect("open doc");
     let doc = pkg.document().expect("load document");
 
     let img = Image::new(u32::MAX);
@@ -283,7 +283,7 @@ fn test_image_data_with_invalid_offset() {
 fn word_6_documents_report_their_version_not_a_missing_stream() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/doc/word6-no-table-stream.doc");
-    let mut package = Package::open(&path).expect("the CFB container opens");
+    let mut package = Reader::open(&path).expect("the CFB container opens");
 
     match package.document() {
         Err(PackageError::UnsupportedVersion { nfib, name }) => {

@@ -8,7 +8,7 @@
 //! M1 L-DOC-R4: the font table (`SttbfFfn`) and `font_name(ftc)`.
 
 use litchi_core::Position;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::writer::{Builder, CharacterFormatting, ParagraphFormatting};
 use litchi_doc::{Document, Error, FontFamily};
 use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
@@ -26,12 +26,12 @@ fn poi_fixture(name: &str) -> PathBuf {
 }
 
 fn open_poi(name: &str) -> Document {
-    let mut package = Package::open(poi_fixture(name)).expect("DOC fixture opens");
+    let mut package = Reader::open(poi_fixture(name)).expect("DOC fixture opens");
     package.document().expect("DOC fixture document")
 }
 
 fn open_bytes(bytes: Vec<u8>) -> Document {
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
     package.document().expect("DOC document")
 }
 
@@ -47,7 +47,7 @@ fn corpus_font_tables_name_every_run_font() {
     names.sort();
     let mut tables = 0;
     for name in names {
-        let Ok(mut package) = Package::open(fixture_directory().join(&name)) else {
+        let Ok(mut package) = Reader::open(fixture_directory().join(&name)) else {
             continue;
         };
         let Ok(document) = package.document() else {

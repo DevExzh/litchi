@@ -68,7 +68,7 @@ fn property_blob() -> Vec<u8> {
 fn doc_facade_discovers_unsigned_signature_state() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut doc =
-        litchi_doc::raw::Package::open(root.join("test-data/ole/doc/documentProperties.doc"))
+        litchi_doc::raw::Reader::open(root.join("test-data/ole/doc/documentProperties.doc"))
             .unwrap();
     assert!(doc.signatures().unwrap().is_empty());
 }
@@ -122,7 +122,7 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
     writer.write_to(&mut output).unwrap();
 
     let bytes = common::with_valid_word97_dop(output.into_inner());
-    let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     let package_signature = package.vba_signature().unwrap().unwrap();
     assert_eq!(package_signature.info().signature(), [1, 2, 3]);
 
@@ -132,7 +132,13 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
     assert_eq!(signature.info().signature(), [1, 2, 3]);
 
     let mut no_op = source.transaction().unwrap();
-    assert!(!no_op.edit_vba_signature(|_| Ok(())).unwrap());
+    assert!(
+        !no_op
+            .edit_vba_signature(litchi_ole_common::vba_signature::Limits::default(), |_| Ok(
+                ()
+            ))
+            .unwrap()
+    );
     let no_op_commit = no_op.commit().unwrap();
     assert!(!no_op_commit.changed());
     assert_eq!(no_op_commit.snapshot().bytes(), source.bytes());
@@ -140,7 +146,10 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
     let mut transaction = source.transaction().unwrap();
     assert!(
         transaction
-            .edit_vba_signature(|edit| edit.set_signature([9, 8]).map(|_| ()))
+            .edit_vba_signature(
+                litchi_ole_common::vba_signature::Limits::default(),
+                |edit| edit.set_signature([9, 8]).map(|_| ())
+            )
             .unwrap()
     );
     let commit = transaction.commit().unwrap();

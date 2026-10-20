@@ -27877,7 +27877,7 @@ fn verify_semantic_doc(
         }
     }
 
-    let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(bytes))?;
+    let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes))?;
     let document = package.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != count {
@@ -28547,7 +28547,7 @@ fn run_semantic_doc(
     let selected = shape.doc_paragraph_count() / 2;
     let expected_paragraph_count = if case == Case::DocSemanticParagraphCount {
         let mut oracle_package =
-            litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+            litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
         let oracle_document = oracle_package.document()?;
         let oracle_paragraphs = oracle_document.paragraphs()?;
         let expected = oracle_paragraphs.len();
@@ -28577,7 +28577,7 @@ fn run_semantic_doc(
             Case::DocSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(owned))?;
+                let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(owned))?;
                 let document = package.document()?;
                 let duration = started.elapsed();
                 verify_semantic_doc(&corpus.archive, shape, None)?;
@@ -28586,7 +28586,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticListParagraphs => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraphs = document.paragraphs()?;
@@ -28602,7 +28602,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticParagraphCount => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let count = document.paragraph_count()?;
@@ -28619,7 +28619,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticOneParagraph => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraph = document
@@ -28639,7 +28639,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticOneParagraphAt => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraph = document
@@ -28657,7 +28657,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticFullText => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let text = document.text()?;

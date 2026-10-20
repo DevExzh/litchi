@@ -38,7 +38,7 @@ use litchi_doc::{
     FieldType, FieldsTable, HyperlinkAssociation, UserDefinedHyperlinks,
     package::property_set::Snapshot,
     parts::protection::{ProtectionAuthorization, ProtectionPolicy},
-    raw::Package,
+    raw::Reader,
     user_defined_hyperlinks::{Hyperlink, Hyperlinks, Limits},
 };
 use litchi_ole_common::property_set::user_defined::{Edit, LinkBase, Properties};
@@ -87,7 +87,7 @@ fn hyperlink_fixture() -> PathBuf {
 fn snapshot_with_real_hyperlink_field() -> (Snapshot, FieldsTable) {
     let path = hyperlink_fixture();
     let bytes = std::fs::read(&path).unwrap();
-    let mut package = Package::open(path).unwrap();
+    let mut package = Reader::open(path).unwrap();
     let fields = package
         .document()
         .unwrap()
@@ -143,7 +143,7 @@ fn resolve_all(hyperlinks: &mut UserDefinedHyperlinks) {
 fn immutable_authoring_collection_recontexts_replaces_and_round_trips() {
     let (snapshot, fields) = snapshot_with_real_hyperlink_field();
     let index = match snapshot
-        .user_defined_hyperlinks(Some(&fields))
+        .user_defined_hyperlinks(Some(&fields), Limits::default())
         .unwrap()
         .unwrap()
         .entries()[0]
@@ -173,12 +173,12 @@ fn immutable_authoring_collection_recontexts_replaces_and_round_trips() {
     let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
-            .put_user_defined_hyperlinks(&hyperlinks)
+            .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
             .unwrap()
     );
     let committed = transaction.commit().unwrap().into_parts().0;
     let mut readback = committed
-        .user_defined_hyperlinks(Some(&fields))
+        .user_defined_hyperlinks(Some(&fields), Limits::default())
         .unwrap()
         .unwrap();
     assert_eq!(
@@ -211,11 +211,15 @@ fn immutable_authoring_collection_recontexts_replaces_and_round_trips() {
     );
     resolve_all(&mut readback);
     let mut transaction = committed.transaction_with_policy(fixture_policy()).unwrap();
-    assert!(transaction.put_user_defined_hyperlinks(&readback).unwrap());
+    assert!(
+        transaction
+            .put_user_defined_hyperlinks(&readback, Limits::default())
+            .unwrap()
+    );
     let committed = transaction.commit().unwrap().into_parts().0;
     assert_eq!(
         committed
-            .user_defined_hyperlinks(Some(&fields))
+            .user_defined_hyperlinks(Some(&fields), Limits::default())
             .unwrap()
             .unwrap()
             .entries()[0]
@@ -230,11 +234,11 @@ fn contextualized_reads_use_real_plcf_fields_and_explicit_limits() {
     let limits = Limits::builder().max_links(1).build().unwrap();
 
     let default = snapshot
-        .user_defined_hyperlinks(Some(&fields))
+        .user_defined_hyperlinks(Some(&fields), Limits::default())
         .unwrap()
         .unwrap();
     let explicit = snapshot
-        .user_defined_hyperlinks_with_limits(Some(&fields), limits)
+        .user_defined_hyperlinks(Some(&fields), limits)
         .unwrap()
         .unwrap();
     assert_eq!(default.entries().len(), 1);
@@ -249,22 +253,22 @@ fn contextualized_reads_use_real_plcf_fields_and_explicit_limits() {
             if candidates.iter().any(|candidate| candidate.field.field_type == FieldType::Hyperlink)
     ));
 
-    let mut package = Package::open(hyperlink_fixture()).unwrap();
-    assert!(package.user_defined_hyperlinks().unwrap().is_none());
-    let mut package = Package::open(hyperlink_fixture()).unwrap();
+    let mut package = Reader::open(hyperlink_fixture()).unwrap();
     assert!(
         package
-            .user_defined_hyperlinks_with_limits(limits)
+            .user_defined_hyperlinks(Limits::default())
             .unwrap()
             .is_none()
     );
+    let mut package = Reader::open(hyperlink_fixture()).unwrap();
+    assert!(package.user_defined_hyperlinks(limits).unwrap().is_none());
 }
 
 #[test]
 fn unresolved_candidates_refuse_changed_mutation_without_staging_or_commit_side_effects() {
     let (snapshot, fields) = snapshot_with_real_hyperlink_field();
     let unresolved = snapshot
-        .user_defined_hyperlinks(Some(&fields))
+        .user_defined_hyperlinks(Some(&fields), Limits::default())
         .unwrap()
         .unwrap();
     assert!(matches!(
@@ -275,7 +279,7 @@ fn unresolved_candidates_refuse_changed_mutation_without_staging_or_commit_side_
     let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
     assert!(
         !transaction
-            .put_user_defined_hyperlinks(&unresolved)
+            .put_user_defined_hyperlinks(&unresolved, Limits::default())
             .unwrap()
     );
     assert!(!transaction.is_changed());
@@ -289,7 +293,7 @@ fn unresolved_candidates_refuse_changed_mutation_without_staging_or_commit_side_
         .unwrap();
     assert!(
         transaction
-            .put_user_defined_hyperlinks_with_limits(&unresolved, Limits::default())
+            .put_user_defined_hyperlinks(&unresolved, Limits::default())
             .is_err()
     );
     assert!(!transaction.is_changed());
@@ -300,7 +304,7 @@ fn unresolved_candidates_refuse_changed_mutation_without_staging_or_commit_side_
         .unwrap();
     assert!(
         transaction
-            .put_user_defined_hyperlinks(&unresolved)
+            .put_user_defined_hyperlinks(&unresolved, Limits::default())
             .is_err()
     );
     assert!(!transaction.is_changed());
@@ -316,20 +320,16 @@ fn overlay_limits_reject_reads_and_resolved_puts_without_mutation() {
 
     assert!(
         snapshot
-            .user_defined_hyperlinks_with_limits(Some(&fields), too_small)
+            .user_defined_hyperlinks(Some(&fields), too_small)
             .is_err()
     );
     assert_eq!(snapshot.bytes(), snapshot.clone().into_bytes());
 
-    let mut package = Package::from_reader(Cursor::new(snapshot.bytes().to_vec())).unwrap();
-    assert!(
-        package
-            .user_defined_hyperlinks_with_limits(too_small)
-            .is_err()
-    );
+    let mut package = Reader::from_reader(Cursor::new(snapshot.bytes().to_vec())).unwrap();
+    assert!(package.user_defined_hyperlinks(too_small).is_err());
 
     let mut hyperlinks = snapshot
-        .user_defined_hyperlinks(Some(&fields))
+        .user_defined_hyperlinks(Some(&fields), Limits::default())
         .unwrap()
         .unwrap();
     let (story, index) = match hyperlinks.entries()[0].association() {
@@ -345,7 +345,7 @@ fn overlay_limits_reject_reads_and_resolved_puts_without_mutation() {
     let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
-            .put_user_defined_hyperlinks_with_limits(&hyperlinks, too_small)
+            .put_user_defined_hyperlinks(&hyperlinks, too_small)
             .is_err()
     );
     assert!(!transaction.is_changed());
@@ -356,7 +356,7 @@ fn overlay_limits_reject_reads_and_resolved_puts_without_mutation() {
 fn resolved_metadata_creates_a_codepage_for_a_missing_user_defined_section() {
     let (contextualized, fields) = snapshot_with_real_hyperlink_field();
     let mut hyperlinks = contextualized
-        .user_defined_hyperlinks(Some(&fields))
+        .user_defined_hyperlinks(Some(&fields), Limits::default())
         .unwrap()
         .unwrap();
     let (story, index) = match hyperlinks.entries()[0].association() {
@@ -379,7 +379,7 @@ fn resolved_metadata_creates_a_codepage_for_a_missing_user_defined_section() {
     let mut transaction = source.transaction_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
-            .put_user_defined_hyperlinks_with_limits(&hyperlinks, Limits::default())
+            .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
             .unwrap()
     );
     let committed = transaction.commit().unwrap().into_parts().0;
@@ -387,7 +387,7 @@ fn resolved_metadata_creates_a_codepage_for_a_missing_user_defined_section() {
     assert_eq!(section.page(), Some(CodePage::WINDOWS_1252));
     assert_eq!(
         committed
-            .user_defined_hyperlinks_with_limits(Some(&fields), Limits::default())
+            .user_defined_hyperlinks(Some(&fields), Limits::default())
             .unwrap()
             .unwrap()
             .entries()
@@ -418,7 +418,7 @@ fn stored_hash_mismatch_is_inert_and_an_exact_noop_preserves_it() {
     let corrupted = transaction.commit().unwrap().into_parts().0;
 
     let hyperlinks = corrupted
-        .user_defined_hyperlinks(Some(&fields))
+        .user_defined_hyperlinks(Some(&fields), Limits::default())
         .unwrap()
         .unwrap();
     let entry = &hyperlinks.entries()[0];
@@ -428,7 +428,7 @@ fn stored_hash_mismatch_is_inert_and_an_exact_noop_preserves_it() {
     let mut transaction = corrupted.transaction_with_policy(fixture_policy()).unwrap();
     assert!(
         !transaction
-            .put_user_defined_hyperlinks(&hyperlinks)
+            .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
             .unwrap()
     );
     assert!(!transaction.is_changed());
@@ -440,7 +440,10 @@ fn stored_hash_mismatch_is_inert_and_an_exact_noop_preserves_it() {
 #[test]
 fn inert_hyperlinks_keep_source_order_and_no_op_commits_exact_bytes() {
     let snapshot = seeded();
-    let hyperlinks = snapshot.user_defined_hyperlinks(None).unwrap().unwrap();
+    let hyperlinks = snapshot
+        .user_defined_hyperlinks(None, Limits::default())
+        .unwrap()
+        .unwrap();
     let entries = hyperlinks.entries();
 
     assert_eq!(
@@ -466,7 +469,7 @@ fn inert_hyperlinks_keep_source_order_and_no_op_commits_exact_bytes() {
     let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
     assert!(
         !transaction
-            .put_user_defined_hyperlinks(&hyperlinks)
+            .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
             .unwrap()
     );
     assert!(!transaction.is_changed());
@@ -489,12 +492,22 @@ fn removing_hyperlinks_is_targeted_and_rollback_recovers_the_exact_source() {
     // Dropping the staged transaction is the rollback; the source snapshot
     // keeps its exact bytes and property.
     drop(rollback_transaction);
-    assert!(snapshot.user_defined_hyperlinks(None).unwrap().is_some());
+    assert!(
+        snapshot
+            .user_defined_hyperlinks(None, Limits::default())
+            .unwrap()
+            .is_some()
+    );
 
     let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
     assert!(transaction.remove_user_defined_hyperlinks().unwrap());
     let (committed, _) = transaction.commit().unwrap().into_parts();
-    assert!(committed.user_defined_hyperlinks(None).unwrap().is_none());
+    assert!(
+        committed
+            .user_defined_hyperlinks(None, Limits::default())
+            .unwrap()
+            .is_none()
+    );
 
     let section = committed.user_defined_properties().unwrap().unwrap();
     assert_eq!(

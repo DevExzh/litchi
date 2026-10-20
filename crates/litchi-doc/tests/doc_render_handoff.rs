@@ -18,7 +18,7 @@ use litchi_doc::body_text::{
     Edit, Error, Projection, Refusal, Snapshot, SubEditJoinFailure, TransactionLimits,
 };
 use litchi_doc::builder::Builder;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::tracked_revision::Limits;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -151,8 +151,8 @@ fn sequential_reference_output(bytes: &[u8], position: Position, replacements: &
 fn assert_public_reopens(bytes: &[u8]) {
     let parsed = Snapshot::parse(bytes).expect("strict DOC snapshot should reopen");
     assert_eq!(parsed.bytes(), bytes);
-    let mut package = Package::from_reader(Cursor::new(bytes.to_vec()))
-        .expect("public DOC package should reopen");
+    let mut package =
+        Reader::from_reader(Cursor::new(bytes.to_vec())).expect("public DOC package should reopen");
     package
         .document()
         .expect("public DOC reader should validate the candidate");

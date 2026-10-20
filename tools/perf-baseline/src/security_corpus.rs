@@ -38,7 +38,7 @@ use litchi_core::{
     OwnedSource, ReadAt, Resource,
 };
 use litchi_doc::{
-    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Package as DocPackage,
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Reader as DocReader,
 };
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
@@ -475,11 +475,11 @@ fn security_object_limits() -> ObjectLimits {
     }
 }
 
-fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<Vec<u8>>>, Box<dyn Error>> {
+fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<Vec<u8>>>, Box<dyn Error>> {
     let ole = OleFile::open_with_limits(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
-    Ok(DocPackage::from_ole_file_with_limits(
+    Ok(DocReader::from_ole_file_with_options(
         ole,
-        security_doc_limits()?,
+        OpenOptions::default().source_limits(security_doc_limits()?),
     )?)
 }
 

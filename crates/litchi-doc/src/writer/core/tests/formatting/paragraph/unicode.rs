@@ -37,7 +37,7 @@ fn supplementary_unicode_uses_utf16_code_unit_character_positions() {
 
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = crate::raw::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
 
     let paragraphs = document.paragraphs().unwrap();

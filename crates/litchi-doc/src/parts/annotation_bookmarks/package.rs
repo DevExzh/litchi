@@ -104,8 +104,8 @@ impl Editor {
     pub fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
         Self::open_bounded(
             bytes,
-            options.revision_limits(),
-            options.protection_policy(),
+            options.revision_limits_value(),
+            options.protection_policy_value(),
         )
     }
 

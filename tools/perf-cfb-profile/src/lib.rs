@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use litchi_core::Position;
 use litchi_doc::body_text::{Error as BodyError, Projection, Refusal, Snapshot, TransactionLimits};
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::tracked_revision::Limits;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -545,7 +545,7 @@ fn final_paragraph_matches(result: &CaseResult, edits: EditCount) -> Result<bool
 }
 
 fn public_reader_reopens(result: &CaseResult) -> Result<bool, BoxError> {
-    let mut package = Package::from_reader(Cursor::new(result.output.clone()))?;
+    let mut package = Reader::from_reader(Cursor::new(result.output.clone()))?;
     package.document()?;
     Ok(true)
 }

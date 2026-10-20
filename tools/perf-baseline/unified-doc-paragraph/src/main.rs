@@ -83,7 +83,9 @@ fn native_once(bytes: &[u8], position: usize, replacement: &str) -> Result<Snaps
 /// and source-owner promotion.
 fn native_facade_policy_once(bytes: &[u8], position: usize, replacement: &str) -> Result<Snapshot> {
     let snapshot = Snapshot::from_bytes_with_options(bytes.to_vec(), facade_body_open_options())?;
-    let mut edit = snapshot.edit_with_limits(facade_body_transaction_limits())?;
+    let mut edit = snapshot.edit_with_options(
+        litchi_doc::EditOptions::default().transaction_limits(facade_body_transaction_limits()),
+    )?;
     edit.replace_paragraph(Position::new(position), replacement)?;
     let commit = edit.commit()?;
     Ok(commit.into_parts().0)
@@ -111,10 +113,10 @@ fn native_explicit_default_once(
 fn native_reader_context(
     bytes: &[u8],
 ) -> Result<(
-    litchi_doc::raw::Package<Cursor<Vec<u8>>>,
+    litchi_doc::raw::Reader<Cursor<Vec<u8>>>,
     litchi_doc::Document,
 )> {
-    let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(bytes.to_vec()))?;
+    let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes.to_vec()))?;
     let document = package.document()?;
     Ok((package, document))
 }
@@ -122,7 +124,7 @@ fn native_reader_context(
 fn facade_body_open_options() -> BodyOpenOptions {
     BodyOpenOptions::default()
         .source_limits(litchi_doc::SourceLimits::default())
-        .with_transaction_limits(
+        .transaction_limits(
             BodyTransactionLimits::new(isize::MAX as usize, usize::MAX, usize::MAX)
                 .with_max_retained_render_bytes(usize::MAX),
         )

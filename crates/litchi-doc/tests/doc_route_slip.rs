@@ -40,7 +40,7 @@ use litchi_doc::route_slip::{
     DeliveryOption, EditKind, Editor, Metadata, NarrowString, Protection, Recipient,
     RecipientSelectionError, RecipientSelector, Snapshot, TransactionError, parse, to_bytes,
 };
-use litchi_doc::{Builder, raw::Package};
+use litchi_doc::{Builder, raw::Reader};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
@@ -101,7 +101,7 @@ fn package_editor_round_trips_document_facade_and_exact_fib_payload() {
     assert_eq!(parse_bytes_from_fib(&bytes), source);
     assert_ne!(bytes, original);
 
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(document.route_slip().unwrap(), Some(&source));
     assert_eq!(route_payload(&bytes), to_bytes(&source).unwrap());
@@ -140,7 +140,7 @@ fn lifecycle_edits_are_snapshot_based_and_clear_the_fib_range() {
     let completed = editor.complete().unwrap();
     assert!(completed.patch().after().metadata().is_none());
     let bytes = editor.finish().unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(package.document().unwrap().route_slip().unwrap().is_none());
 
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
