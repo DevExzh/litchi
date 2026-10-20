@@ -295,9 +295,13 @@ impl Extension {
             Self::Unknown(value) if value.xml.is_empty() => {
                 Err(invalid("opaque settings extension cannot be empty"))
             },
-            Self::Unknown(value) if value.xml.len() > MAX_OPAQUE_BYTES => Err(invalid(format!(
-                "opaque settings extension exceeds {MAX_OPAQUE_BYTES} bytes"
-            ))),
+            Self::Unknown(value) if value.xml.len() > MAX_OPAQUE_BYTES => {
+                Err(crate::Error::SettingsLimit {
+                    kind: crate::settings::LimitKind::OpaqueExtensionBytes,
+                    actual: value.xml.len(),
+                    maximum: MAX_OPAQUE_BYTES,
+                })
+            },
             Self::ChartTrackingRefBased(_)
             | Self::ConflictMode(_)
             | Self::DiscardImageEditingData(_)
@@ -589,9 +593,11 @@ impl Extensions {
 
 fn validate_extensions_with_addition(values: &[Extension], value: &Extension) -> Result<()> {
     if values.len() >= MAX_EXTENSIONS {
-        return Err(invalid(format!(
-            "Word settings extension count exceeds {MAX_EXTENSIONS}"
-        )));
+        return Err(crate::Error::SettingsLimit {
+            kind: crate::settings::LimitKind::Extensions,
+            actual: (values.len()).saturating_add(1),
+            maximum: MAX_EXTENSIONS,
+        });
     }
     if values.iter().any(|existing| same_kind(existing, value)) {
         return Err(invalid("duplicate typed Word settings extension"));

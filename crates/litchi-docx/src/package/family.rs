@@ -81,7 +81,27 @@ impl Package {
 /// Declare a package-level family's `Patch`, `Commit`, `Diagnostics`,
 /// `Error`, `Result` and `LimitKind` over the shared graph patch.
 macro_rules! graph_family {
+    // A family whose budgets are the package's open limits.
     ($what:literal) => {
+        crate::package::family::graph_family!($what, own_limits);
+
+        #[doc = concat!(
+            "The configured budgets of the ", $what, " family. It has none of its ",
+            "own yet: the package's open limits bound every part it reads."
+        )]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
+        pub enum LimitKind {}
+
+        impl std::fmt::Display for LimitKind {
+            fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match *self {}
+            }
+        }
+
+    };
+    // A family that declares its own `LimitKind`.
+    ($what:literal, own_limits) => {
         #[doc = concat!(
             "A replayable ", $what, " change: the exact before and after state of ",
             "every part and relationship the edit changed. Apply it with the ",
@@ -121,20 +141,6 @@ macro_rules! graph_family {
 
         #[doc = concat!("Result of the ", $what, " family.")]
         pub(crate) type Result<T> = std::result::Result<T, Error>;
-
-        #[doc = concat!(
-            "The configured budgets of the ", $what, " family. It has none of its ",
-            "own yet: the package's open limits bound every part it reads."
-        )]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[non_exhaustive]
-        pub enum LimitKind {}
-
-        impl std::fmt::Display for LimitKind {
-            fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match *self {}
-            }
-        }
 
         #[allow(dead_code, reason = "a family with its own publication path commits without staging")]
         fn commit_staged(staged: crate::package::family::Staged) -> Result<Commit> {

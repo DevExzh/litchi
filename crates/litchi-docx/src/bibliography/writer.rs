@@ -475,7 +475,11 @@ pub(crate) fn add_source_xml(
     match root.local_name.as_str() {
         "Sources" => {
             if count_sources(&root) >= MAX_STORE_SOURCES {
-                return Err(invalid("bibliography source count limit exceeded"));
+                return Err(Error::BibliographyLimit {
+                    kind: crate::bibliography::LimitKind::SourceCount,
+                    actual: (count_sources(&root)).saturating_add(1),
+                    maximum: MAX_STORE_SOURCES,
+                });
             }
             root.children.push(source.to_node());
         },

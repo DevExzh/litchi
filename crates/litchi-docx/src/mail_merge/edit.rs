@@ -10,7 +10,9 @@
 use super::{Conformance, Recipients, Settings, Source};
 use crate::package::family::{graph_edit, graph_family};
 
-graph_family!("mail-merge");
+graph_family!("mail-merge", own_limits);
+
+pub use super::limit::LimitKind;
 graph_edit!("mail-merge", edit_mail_merge, apply_mail_merge);
 
 impl Edit {

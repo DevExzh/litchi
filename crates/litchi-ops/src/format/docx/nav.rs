@@ -60,16 +60,17 @@ thread_local! {
 pub(super) fn load_body(docx: &Docx) -> Result<Blocks> {
     #[cfg(test)]
     BODY_LOADS.with(|loads| loads.set(loads.get() + 1));
-    Ok(match docx.owner() {
-        DocxOwner::Eager(package) => {
-            if let Some(blocks) = docx.cached_body() {
-                return Ok(blocks.clone());
-            }
-            let blocks = package.document()?.body_blocks()?;
-            docx.cache_body(blocks).clone()
-        },
+    if let Some(blocks) = docx.cached_body() {
+        return Ok(blocks.clone());
+    }
+    // The handle's package is immutable, so its body index is too; a
+    // source-backed owner's source fence is checked where the operation
+    // finishes (record 0355a: one body index per batch base).
+    let blocks = match docx.owner() {
+        DocxOwner::Eager(package) => package.document()?.body_blocks()?,
         DocxOwner::Source(package) => package.document()?.body_blocks()?,
-    })
+    };
+    Ok(docx.cache_body(blocks).clone())
 }
 
 /// The body's node, with its block index read.

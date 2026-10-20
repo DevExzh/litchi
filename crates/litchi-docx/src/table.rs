@@ -277,7 +277,6 @@ impl Table {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    #[cfg(test)]
     pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
@@ -510,7 +509,6 @@ impl Row {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    #[cfg(test)]
     pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
@@ -720,7 +718,6 @@ impl Cell {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    #[cfg(test)]
     pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,

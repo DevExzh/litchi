@@ -232,7 +232,7 @@ fn managed_document_read_retains_budgeted_part_data_and_supports_selective_queri
             .unwrap()
             .revisions(),
         Err(Error::RevisionLimit {
-            resource: "source bytes",
+            kind: litchi_docx::revision::LimitKind::SourceBytes,
             ..
         })
     ));
@@ -470,7 +470,9 @@ fn managed_document_variables_check_cancellation_before_relationship_metadata() 
     cancellation_source.cancel();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_document_variables_commit_to_stream(&mut output, &commit),
+        package
+            .apply_document_variables(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(OpcError::Cancelled))
     ));
     assert!(output.is_empty());
@@ -508,7 +510,11 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
 
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert!(!output.is_empty());
     drop(commit);

@@ -111,7 +111,10 @@ fn removes_first_middle_last_and_the_only_paragraph_exactly() {
         (2, vec!["alpha", "beta"]),
     ] {
         let package = open(bytes(&fixture(document(&["alpha", "beta", "gamma"]))));
-        let mut edit = package.edit_plain_paragraph_removal().unwrap();
+        let mut edit = package
+            .plain_paragraph_removal_snapshot()
+            .unwrap()
+            .removal_edit();
         edit.remove_plain_paragraph(Position::new(position))
             .unwrap();
         let commit = edit.commit();
@@ -120,13 +123,17 @@ fn removes_first_middle_last_and_the_only_paragraph_exactly() {
         assert!(commit.effect_report().removed_bytes > 0);
         let mut output = Vec::new();
         package
-            .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_removal(&commit.patch().clone().into())
+            .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
             .unwrap();
         assert_eq!(reopened_texts(output), expected);
     }
 
     let package = open(bytes(&fixture(document(&["only"]))));
-    let mut edit = package.edit_plain_paragraph_removal().unwrap();
+    let mut edit = package
+        .plain_paragraph_removal_snapshot()
+        .unwrap()
+        .removal_edit();
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
     let commit = edit.commit();
     assert_eq!(commit.projected().paragraph_count(), 0);
@@ -144,29 +151,44 @@ fn publication_raw_copies_others_and_both_inverse_paths_restore_exact_artifact()
     let source = bytes(&fixture(document(&["one", "two", "three"])));
     let retained_range = payload_range(&source, UNUSED);
     let package = open(source.clone());
-    let mut edit = package.edit_plain_paragraph_removal().unwrap();
+    let mut edit = package
+        .plain_paragraph_removal_snapshot()
+        .unwrap()
+        .removal_edit();
     edit.remove_plain_paragraph(Position::new(1)).unwrap();
     let commit = edit.commit();
     let mut output = Vec::new();
     let publication = package
-        .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_removal(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     assert_eq!(
         &output[payload_range(&output, UNUSED)],
         &source[retained_range]
     );
 
-    let inverse_wire = publication.inverse_patch().to_bytes().unwrap();
+    let inverse_wire = publication
+        .patch()
+        .inverse()
+        .durable()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
     let inverse = Patch::from_bytes(&inverse_wire).unwrap();
     let mut durable_restored = Vec::new();
     open(output.clone())
-        .publish_plain_paragraph_removal_patch_to_stream(&mut durable_restored, &inverse)
+        .apply_plain_paragraph_removal(&inverse.clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut durable_restored)?))
         .unwrap();
     assert_eq!(durable_restored, source);
 
     let mut exact_restored = Vec::new();
     open(output)
-        .publish_plain_paragraph_removal_inverse_to_stream(&mut exact_restored, &publication)
+        .apply_plain_paragraph_removal(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact_restored)?))
         .unwrap();
     assert_eq!(exact_restored, source);
 }
@@ -204,7 +226,11 @@ fn durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound() {
     let mut stale_output = Vec::new();
     assert!(matches!(
         open(foreign_bytes)
-            .publish_plain_paragraph_removal_patch_to_stream(&mut stale_output, &durable),
+            .apply_plain_paragraph_removal(&durable.clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut stale_output)?;
+                Ok(committed)
+            }),
         Err(Error::PatchConflict)
     ));
     assert!(stale_output.is_empty());
@@ -241,7 +267,7 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
     assert!(matches!(
         edit.remove_plain_paragraph(Position::new(0)),
         Err(Error::Limit {
-            resource: "operations",
+            kind: source_backed::paragraph_copy::LimitKind::Operations,
             ..
         })
     ));
@@ -255,7 +281,7 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
             )
             .plain_paragraph_removal_snapshot(),
         Err(Error::Limit {
-            resource: "paragraphs",
+            kind: source_backed::paragraph_copy::LimitKind::Paragraphs,
             ..
         })
     ));
@@ -269,7 +295,7 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
     assert!(matches!(
         edit.remove_plain_paragraph(Position::new(0)),
         Err(Error::Limit {
-            resource: "output bytes",
+            kind: source_backed::paragraph_copy::LimitKind::OutputBytes,
             ..
         })
     ));
@@ -287,7 +313,7 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
     assert!(matches!(
         edit.commit().patch().to_bytes(),
         Err(Error::Limit {
-            resource: "durable patch bytes",
+            kind: source_backed::paragraph_copy::LimitKind::DurablePatchBytes,
             ..
         })
     ));
@@ -297,14 +323,19 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
 fn empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing() {
     let source = bytes(&fixture(document(&["only"])));
     let package = open(source.clone());
-    let commit = package.edit_plain_paragraph_removal().unwrap().commit();
+    let commit = package
+        .plain_paragraph_removal_snapshot()
+        .unwrap()
+        .removal_edit()
+        .commit();
     assert!(commit.patch().is_noop());
     assert!(commit.effect_report().is_noop());
     let wire = commit.patch().to_bytes().unwrap();
     assert_eq!(Patch::from_bytes(&wire).unwrap().to_bytes().unwrap(), wire);
     let mut output = Vec::new();
     package
-        .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_removal(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
 
@@ -380,14 +411,21 @@ fn changed_live_source_version_is_rejected_before_publication_output() {
     });
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_plain_paragraph_removal().unwrap();
+    let mut edit = package
+        .plain_paragraph_removal_snapshot()
+        .unwrap()
+        .removal_edit();
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
     let commit = edit.commit();
     source.revision.fetch_add(1, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(
         package
-            .publish_plain_paragraph_removal_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_removal(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut output)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(output.is_empty());

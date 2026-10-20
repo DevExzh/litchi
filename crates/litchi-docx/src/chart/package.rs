@@ -5,7 +5,7 @@
 //! OPC relationship graph loading and deterministic snapshot storage.
 
 use super::codec::{
-    add_total, document_references, invalid, is_chart_rel, limit, ownership, relationship_target,
+    add_total, document_references, invalid, is_chart_rel, ownership, relationship_target,
     require_content_type, scan_chart_xml, validate_companion_xml, validate_graph_value,
     validate_id, validate_leaf_path,
 };
@@ -33,7 +33,11 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
     }
     let (conformance, references) = document_references(document.blob())?;
     if references.len() > MAX_CHARTS {
-        return Err(limit("chart count"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::Count,
+            actual: references.len(),
+            maximum: MAX_CHARTS,
+        });
     }
     let reference_set: BTreeSet<_> = references.iter().cloned().collect();
     if reference_set.len() != references.len() {
@@ -81,10 +85,14 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
             &mut total,
             chart_part.blob().len(),
             super::model::MAX_CHART_XML,
-            "chart bytes",
+            crate::chart::LimitKind::Bytes,
         )?;
         if chart_part.rels().iter().count() > MAX_RELATIONSHIPS {
-            return Err(limit("chart relationship count"));
+            return Err(Error::ChartLimit {
+                kind: crate::chart::LimitKind::RelationshipCount,
+                actual: chart_part.rels().iter().count(),
+                maximum: MAX_RELATIONSHIPS,
+            });
         }
         let mut styles = Vec::new();
         let mut color_styles = Vec::new();
@@ -101,7 +109,11 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
             match child.reltype() {
                 STYLE_REL => {
                     if styles.len() >= MAX_COMPANIONS {
-                        return Err(limit("chart-style count"));
+                        return Err(Error::ChartLimit {
+                            kind: crate::chart::LimitKind::ChartStyleCount,
+                            actual: (styles.len()).saturating_add(1),
+                            maximum: MAX_COMPANIONS,
+                        });
                     }
                     let resource = load_companion(
                         package,
@@ -119,7 +131,11 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
                 },
                 COLOR_STYLE_REL => {
                     if color_styles.len() >= MAX_COMPANIONS {
-                        return Err(limit("chart-color-style count"));
+                        return Err(Error::ChartLimit {
+                            kind: crate::chart::LimitKind::ChartColorStyleCount,
+                            actual: (color_styles.len()).saturating_add(1),
+                            maximum: MAX_COMPANIONS,
+                        });
                     }
                     let resource = load_companion(
                         package,
@@ -162,7 +178,7 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
                         &mut total,
                         part.blob().len(),
                         MAX_WORKBOOK_BYTES,
-                        "embedded workbook bytes",
+                        crate::chart::LimitKind::EmbeddedWorkbookBytes,
                     )?;
                     workbook = Some(EmbeddedWorkbook {
                         relationship_id: child.r_id().to_owned(),
@@ -351,7 +367,7 @@ fn load_companion(
         total,
         part.blob().len(),
         MAX_COMPANION_XML,
-        "chart companion bytes",
+        crate::chart::LimitKind::CompanionBytes,
     )?;
     Ok(Companion {
         relationship_id: relationship.r_id().to_owned(),

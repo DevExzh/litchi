@@ -807,13 +807,6 @@ impl SourceBackedSvgAttachmentBatchSnapshot {
     }
 }
 
-/// A source-backed one-picture edit. It is a compatibility wrapper over the
-/// batch implementation and therefore retains the same atomic projection.
-pub struct SourceBackedSvgAttachmentEdit<'a> {
-    batch: SourceBackedSvgAttachmentBatchEdit<'a>,
-    selector: PictureSelector,
-}
-
 #[derive(Clone)]
 enum BatchOperation {
     Attach {
@@ -857,7 +850,7 @@ pub struct SvgAttachmentCommitDiagnostics {
 }
 
 impl SvgAttachmentCommitDiagnostics {
-    const fn new(operations: usize, selected_pictures: usize, changed: bool) -> Self {
+    pub(crate) const fn new(operations: usize, selected_pictures: usize, changed: bool) -> Self {
         Self {
             operations,
             selected_pictures,
@@ -901,93 +894,6 @@ pub struct SourceBackedSvgAttachmentBatchCommit {
     snapshot: SourceBackedSvgAttachmentBatchSnapshot,
     patch: SourceBackedSvgAttachmentBatchPatch,
     diagnostics: SvgAttachmentCommitDiagnostics,
-}
-
-/// Physical publication evidence for a changed SVG batch.
-///
-/// The publication retains the exact pre-edit source artifact and the
-/// fingerprint of the emitted artifact.  A reopened package must match both
-/// the fingerprint and the target semantic batch before the original bytes
-/// can be restored.
-pub struct SourceBackedSvgAttachmentBatchPublication {
-    snapshot: SourceBackedSvgAttachmentBatchSnapshot,
-    original_snapshot: SourceBackedSvgAttachmentBatchSnapshot,
-    original_artifact: SourceArtifact,
-    published_fingerprint: SourceArtifactFingerprint,
-}
-
-/// Exact-source reversible attach/detach patch.
-#[derive(Clone)]
-pub struct SourceBackedSvgAttachmentPatch {
-    before: SourceBackedSvgAttachmentSnapshot,
-    after: SourceBackedSvgAttachmentSnapshot,
-}
-
-/// A checked SVG lifecycle commit ready for package publication.
-pub struct SourceBackedSvgAttachmentCommit {
-    snapshot: SourceBackedSvgAttachmentSnapshot,
-    patch: SourceBackedSvgAttachmentPatch,
-    diagnostics: SvgAttachmentCommitDiagnostics,
-}
-
-/// Physical publication evidence for a changed single-picture SVG edit.
-pub struct SourceBackedSvgAttachmentPublication {
-    snapshot: SourceBackedSvgAttachmentSnapshot,
-    original_snapshot: SourceBackedSvgAttachmentSnapshot,
-    original_artifact: SourceArtifact,
-    published_fingerprint: SourceArtifactFingerprint,
-}
-
-impl SourceBackedSvgAttachmentEdit<'_> {
-    /// Exact immutable source snapshot used by this edit.
-    #[must_use]
-    pub fn source(&self) -> SourceBackedSvgAttachmentSnapshot {
-        self.batch
-            .source
-            .picture(self.selector)
-            .expect("single-picture batch always contains its selector")
-    }
-
-    /// Attach one borrowed opaque SVG payload using package-allocated IDs.
-    pub fn attach_svg<'a>(&mut self, input: impl Into<SvgInput<'a>>) -> Result<bool> {
-        self.batch.attach_svg(self.selector, input)
-    }
-
-    /// Attach one advanced request after all identity and payload checks.
-    pub fn attach(&mut self, request: &SourceBackedSvgAttachmentReplacement) -> Result<bool> {
-        self.batch.attach(self.selector, request)
-    }
-
-    /// Detach the selected embedded SVG owner while retaining the raster.
-    pub fn detach_svg(&mut self) -> Result<bool> {
-        self.batch.detach_svg(self.selector)
-    }
-
-    /// Validate the changed closure and freeze this edit into a commit.
-    pub fn commit(self) -> Result<SourceBackedSvgAttachmentCommit> {
-        let batch_commit = self.batch.commit()?;
-        let before = batch_commit
-            .patch
-            .before
-            .picture(self.selector)
-            .ok_or_else(|| Error::Invalid("single-picture batch selector disappeared".into()))?;
-        let after = batch_commit
-            .patch
-            .after
-            .picture(self.selector)
-            .ok_or_else(|| Error::Invalid("single-picture batch target disappeared".into()))?;
-        let patch = SourceBackedSvgAttachmentPatch { before, after };
-        Ok(SourceBackedSvgAttachmentCommit {
-            snapshot: patch.after.clone(),
-            patch,
-            diagnostics: batch_commit.diagnostics(),
-        })
-    }
-
-    /// Explicit alias for callers that want the fallible commit spelling.
-    pub fn commit_checked(self) -> Result<SourceBackedSvgAttachmentCommit> {
-        self.commit()
-    }
 }
 
 impl SourceBackedSvgAttachmentBatchEdit<'_> {
@@ -1646,6 +1552,16 @@ impl SourceBackedSvgAttachmentBatchPatch {
         same_batch_state(&self.before, &self.after)
     }
 
+    /// The number of selected pictures whose state the patch changes.
+    pub(crate) fn changed_pictures(&self) -> usize {
+        self.before
+            .states
+            .iter()
+            .zip(self.after.states.iter())
+            .filter(|(left, right)| !same_state_core(left, right))
+            .count()
+    }
+
     /// Return the exact in-memory inverse.
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -1683,112 +1599,6 @@ impl SourceBackedSvgAttachmentBatchCommit {
     /// Exact-source reversible batch patch.
     #[must_use]
     pub const fn patch(&self) -> &SourceBackedSvgAttachmentBatchPatch {
-        &self.patch
-    }
-
-    /// Return content-free facts about this commit.
-    #[must_use]
-    pub const fn diagnostics(&self) -> SvgAttachmentCommitDiagnostics {
-        self.diagnostics
-    }
-}
-
-impl SourceBackedSvgAttachmentBatchPublication {
-    /// Borrow the semantic batch represented by the emitted artifact.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgAttachmentBatchSnapshot {
-        &self.snapshot
-    }
-
-    pub(crate) const fn original_snapshot(&self) -> &SourceBackedSvgAttachmentBatchSnapshot {
-        &self.original_snapshot
-    }
-
-    pub(crate) const fn original_artifact(&self) -> &SourceArtifact {
-        &self.original_artifact
-    }
-
-    pub(crate) const fn published_fingerprint(&self) -> SourceArtifactFingerprint {
-        self.published_fingerprint
-    }
-}
-
-impl SourceBackedSvgAttachmentPublication {
-    /// Borrow the semantic picture represented by the emitted artifact.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.snapshot
-    }
-
-    pub(crate) const fn original_snapshot(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.original_snapshot
-    }
-
-    pub(crate) const fn original_artifact(&self) -> &SourceArtifact {
-        &self.original_artifact
-    }
-
-    pub(crate) const fn published_fingerprint(&self) -> SourceArtifactFingerprint {
-        self.published_fingerprint
-    }
-}
-
-impl SourceBackedSvgAttachmentPatch {
-    /// Source snapshot required by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.before
-    }
-
-    /// Target snapshot produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.after
-    }
-
-    /// Whether this patch leaves story and graph state unchanged.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        same_state(&self.before.state, &self.after.state)
-    }
-
-    /// Return the exact in-memory inverse.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-        }
-    }
-
-    /// Apply this patch only to the exact captured source state.
-    pub fn apply(
-        &self,
-        source: &SourceBackedSvgAttachmentSnapshot,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
-        if !same_source(&source.state, &self.before.state) {
-            return Err(Error::Invalid(
-                "SVG lifecycle patch source is stale or foreign".into(),
-            ));
-        }
-        Ok(if !self.is_noop() {
-            self.after.clone()
-        } else {
-            source.clone()
-        })
-    }
-}
-
-impl SourceBackedSvgAttachmentCommit {
-    /// Candidate target snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.snapshot
-    }
-
-    /// Exact-source reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSvgAttachmentPatch {
         &self.patch
     }
 
@@ -1870,21 +1680,11 @@ impl super::Package {
         Ok(views)
     }
 
-    /// Begin an exact-source attach/detach edit on a direct main-story
-    /// picture.
-    pub fn edit_svg_attachment(
-        &self,
-        selector: impl Into<PictureSelector>,
-    ) -> Result<SourceBackedSvgAttachmentEdit<'_>> {
-        self.physical_package()?.check_execution()?;
-        let selector = selector.into();
-        let batch = self.edit_svg_attachments([selector])?;
-        Ok(SourceBackedSvgAttachmentEdit { batch, selector })
-    }
-
-    /// Begin one atomic source-backed edit spanning selected direct
+    /// Begin one atomic record-level edit spanning selected direct
     /// main-story pictures. The source drawing and relationship inventory are
-    /// captured once, even when many selectors are supplied.
+    /// captured once, even when many selectors are supplied. Its commit is a
+    /// detached batch snapshot and patch; [`Self::edit_svg`] commits to a
+    /// new package, and [`Self::apply_svg`] replays a batch patch.
     pub fn edit_svg_attachments<I, S>(
         &self,
         selectors: I,
@@ -1947,207 +1747,52 @@ impl super::Package {
         })
     }
 
-    /// Alias using the explicit batch noun for downstream callers.
-    pub fn edit_svg_attachment_batch<I, S>(
+    /// Check an SVG batch patch against this package and return the
+    /// current and target batches (record 0355a).
+    pub(crate) fn svg_batch_target(
         &self,
-        selectors: I,
-    ) -> Result<SourceBackedSvgAttachmentBatchEdit<'_>>
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<PictureSelector>,
-    {
-        self.edit_svg_attachments(selectors)
-    }
-
-    /// Compatibility alias for the picture-specific operation name.
-    pub fn edit_svg_picture(
-        &self,
-        selector: impl Into<PictureSelector>,
-    ) -> Result<SourceBackedSvgAttachmentEdit<'_>> {
-        self.edit_svg_attachment(selector)
-    }
-
-    /// Publish one checked SVG attach/detach commit atomically.
-    pub fn publish_svg_attachment_commit_to_stream<W: std::io::Write>(
-        &self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentCommit,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
-        Ok(self
-            .publish_svg_attachment_commit_with_publication_to_stream(writer, commit)?
-            .snapshot
-            .clone())
-    }
-
-    /// Publish one checked SVG commit and retain exact physical inverse
-    /// authorization for the emitted artifact.
-    pub fn publish_svg_attachment_commit_with_publication_to_stream<W: std::io::Write>(
-        &self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentCommit,
-    ) -> Result<SourceBackedSvgAttachmentPublication> {
+        patch: &SourceBackedSvgAttachmentBatchPatch,
+    ) -> Result<(
+        SourceBackedSvgAttachmentBatchSnapshot,
+        SourceBackedSvgAttachmentBatchSnapshot,
+    )> {
         self.physical_package()?.check_execution()?;
-        let current = capture_picture(self, commit.patch.before.state.selector)?;
-        if !same_source(&current, &commit.patch.before.state) {
-            return Err(Error::Invalid(
-                "SVG lifecycle commit source is stale or foreign".into(),
-            ));
-        }
-        let target = commit.patch.apply(&current_snapshot(&current))?;
-        let original_snapshot = current_snapshot(&current);
-        let original_artifact = self.physical_package()?.source_artifact();
-        let before = SourceBackedSvgAttachmentBatchSnapshot {
-            states: vec![current.clone()],
-            story: current.xml.clone(),
-            context: None,
-        };
-        let expected = SourceBackedSvgAttachmentBatchSnapshot {
-            states: vec![target.state.clone()],
-            story: target.state.xml.clone(),
-            context: None,
-        };
-        let published_fingerprint = if target_state_changed(&current, &target.state) {
-            let plan = build_batch_topology_plan(self.physical_package()?, &before, &expected)?;
-            publish_checked_topology(
-                self.physical_package()?.clone(),
-                writer,
-                plan,
-                &before,
-                &expected,
-            )?
-        } else {
-            publish_exact_source_with_fingerprint(self.physical_package()?.clone(), writer)?
-        };
-        Ok(SourceBackedSvgAttachmentPublication {
-            snapshot: target,
-            original_snapshot,
-            original_artifact,
-            published_fingerprint,
-        })
-    }
-
-    /// Publish one checked multi-picture SVG batch atomically.
-    pub fn publish_svg_attachment_batch_commit_to_stream<W: std::io::Write>(
-        &self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentBatchCommit,
-    ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
-        Ok(self
-            .publish_svg_attachment_batch_commit_with_publication_to_stream(writer, commit)?
-            .snapshot
-            .clone())
-    }
-
-    /// Publish one checked SVG batch and retain exact physical inverse
-    /// authorization for the emitted artifact.
-    pub fn publish_svg_attachment_batch_commit_with_publication_to_stream<W: std::io::Write>(
-        &self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentBatchCommit,
-    ) -> Result<SourceBackedSvgAttachmentBatchPublication> {
-        self.physical_package()?.check_execution()?;
-        let selectors = commit
-            .patch
+        let selectors = patch
             .before
             .states
             .iter()
             .map(|state| state.selector)
             .collect::<Vec<_>>();
         let current = capture_batch(self, selectors)?;
-        if !same_batch_source(&current, &commit.patch.before) {
-            return Err(Error::Invalid(
-                "SVG lifecycle batch commit source is stale or foreign".into(),
-            ));
-        }
-        let target = commit.patch.apply(&current)?;
-        let original_snapshot = current.clone();
-        let original_artifact = self.physical_package()?.source_artifact();
-        let published_fingerprint = if !same_batch_state(&current, &target) {
+        let target = patch.apply(&current)?;
+        if !same_batch_state(&current, &target) {
+            // Validate the effective candidate now, so a refusal precedes
+            // any output.
             let plan = build_batch_topology_plan(self.physical_package()?, &current, &target)?;
-            publish_checked_topology(
-                self.physical_package()?.clone(),
-                writer,
-                plan,
-                &current,
-                &target,
-            )?
-        } else {
-            publish_exact_source_with_fingerprint(self.physical_package()?.clone(), writer)?
-        };
-        Ok(SourceBackedSvgAttachmentBatchPublication {
-            snapshot: target,
-            original_snapshot,
-            original_artifact,
-            published_fingerprint,
-        })
-    }
-
-    /// Restore the exact source artifact retained by a published single edit.
-    /// The reopened package must match both its physical fingerprint and the
-    /// published semantic target before any output is accepted.
-    pub fn publish_svg_attachment_inverse_to_stream<W: std::io::Write>(
-        &self,
-        writer: W,
-        publication: &SourceBackedSvgAttachmentPublication,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
-        self.physical_package()?.check_execution()?;
-        let current = capture_picture(self, publication.snapshot.selector())?;
-        if !same_state(&current, &publication.snapshot.state)
-            || self.physical_package()?.source_artifact().fingerprint()?
-                != publication.published_fingerprint()
-        {
-            return Err(Error::Invalid(
-                "SVG lifecycle inverse publication source is stale or foreign".into(),
-            ));
+            let prepared = self.physical_package()?.clone().prepare_topology(plan)?;
+            prepared.with_candidate(|candidate| {
+                Ok(validate_effective_candidate(candidate, &current, &target))
+            })??;
         }
-        publication.original_artifact().write_to(writer)?;
-        Ok(publication.original_snapshot().clone())
+        Ok((current, target))
     }
 
-    /// Restore the exact source artifact retained by a published SVG batch.
-    /// The reopened package must match both its physical fingerprint and the
-    /// published semantic target before any output is accepted.
-    pub fn publish_svg_attachment_batch_inverse_to_stream<W: std::io::Write>(
+    /// Write this package with an SVG batch change (record 0355a).
+    pub(crate) fn write_svg_batch(
         &self,
-        writer: W,
-        publication: &SourceBackedSvgAttachmentBatchPublication,
-    ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
-        self.physical_package()?.check_execution()?;
-        let selectors = publication
-            .snapshot
-            .states
-            .iter()
-            .map(|state| state.selector)
-            .collect::<Vec<_>>();
-        let current = capture_batch(self, selectors)?;
-        if !same_batch_state(&current, &publication.snapshot)
-            || self.physical_package()?.source_artifact().fingerprint()?
-                != publication.published_fingerprint()
-        {
-            return Err(Error::Invalid(
-                "SVG lifecycle batch inverse publication source is stale or foreign".into(),
-            ));
-        }
-        publication.original_artifact().write_to(writer)?;
-        Ok(publication.original_snapshot().clone())
-    }
-
-    /// Alias using the explicit batch noun for downstream callers.
-    pub fn publish_svg_lifecycle_batch_commit_to_stream<W: std::io::Write>(
-        &self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentBatchCommit,
-    ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
-        self.publish_svg_attachment_batch_commit_to_stream(writer, commit)
-    }
-
-    /// Compatibility alias for publication callers using lifecycle wording.
-    pub fn publish_svg_lifecycle_commit_to_stream<W: std::io::Write>(
-        &self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentCommit,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
-        self.publish_svg_attachment_commit_to_stream(writer, commit)
+        writer: &mut dyn std::io::Write,
+        current: &SourceBackedSvgAttachmentBatchSnapshot,
+        target: &SourceBackedSvgAttachmentBatchSnapshot,
+    ) -> Result<()> {
+        let plan = build_batch_topology_plan(self.physical_package()?, current, target)?;
+        publish_checked_topology(
+            self.physical_package()?.clone(),
+            writer,
+            plan,
+            current,
+            target,
+        )?;
+        Ok(())
     }
 }
 
@@ -2171,20 +1816,6 @@ fn publish_checked_topology<W: std::io::Write>(
         hasher: Sha256::new(),
     };
     prepared.publish_to_stream(&mut output)?;
-    Ok(SourceArtifactFingerprint::from_sha256(
-        output.hasher.finalize().into(),
-    ))
-}
-
-fn publish_exact_source_with_fingerprint<W: std::io::Write>(
-    package: litchi_opc::SourceBackedPackage,
-    writer: W,
-) -> Result<SourceArtifactFingerprint> {
-    let mut output = super::FingerprintingWriter {
-        inner: writer,
-        hasher: Sha256::new(),
-    };
-    package.write_topology_to_stream(&mut output, SourceTopologyPlan::new())?;
     Ok(SourceArtifactFingerprint::from_sha256(
         output.hasher.finalize().into(),
     ))
@@ -2583,12 +2214,6 @@ fn sort_content_type_fingerprints(values: &mut [ContentTypeFingerprint]) {
     });
 }
 
-fn current_snapshot(state: &SnapshotState) -> SourceBackedSvgAttachmentSnapshot {
-    SourceBackedSvgAttachmentSnapshot {
-        state: state.clone(),
-    }
-}
-
 fn capture_inventory(package: &super::Package) -> Result<Vec<SnapshotState>> {
     let inventory_version = package.physical_package()?.source_version()?;
     let main = package.physical_package()?.main_document_part()?;
@@ -2714,47 +2339,6 @@ fn capture_batch(
         story: StoryPayload::Original(source),
         context: Some(context),
     })
-}
-
-fn capture_picture(package: &super::Package, selector: PictureSelector) -> Result<SnapshotState> {
-    let capture_version = package.physical_package()?.source_version()?;
-    if selector.drawing != 0 {
-        return Err(Error::OutOfBounds {
-            object: "DOCX main-story drawing",
-            index: selector.drawing,
-            len: 1,
-        });
-    }
-    let main = package.physical_package()?.main_document_part()?;
-    let source = main.source_xml()?;
-    let scan_source = source.clone();
-    let drawing = scan_story(
-        scan_source.bytes(),
-        package.physical_package()?.read_limits(),
-    )?;
-    let picture = drawing.picture(selector.picture)?;
-    let identities = identity_inventory(package, &main)?;
-    let closure = closure_inventory(package)?;
-    let budget = package_budget(package)?;
-    let state = capture_from_picture(
-        package,
-        main.partname().clone(),
-        source,
-        picture,
-        selector,
-        identities.0,
-        identities.1,
-        closure.0,
-        closure.1,
-        budget,
-        drawing.relationship_dialect(),
-    )?;
-    if package.physical_package()?.source_version()? != capture_version {
-        return Err(Error::Invalid(
-            "DOCX SVG picture source changed during capture".into(),
-        ));
-    }
-    Ok(state)
 }
 
 fn capture_from_picture(
@@ -3593,19 +3177,6 @@ fn push_qname(output: &mut Vec<u8>, prefix: &[u8], local: &[u8]) {
     output.extend_from_slice(local);
 }
 
-fn same_source(left: &SnapshotState, right: &SnapshotState) -> bool {
-    same_source_core(left, right)
-        && same_bytes(left.xml.as_bytes(), right.xml.as_bytes())
-        && (Arc::ptr_eq(
-            &left.relationship_fingerprint,
-            &right.relationship_fingerprint,
-        ) || left.relationship_fingerprint == right.relationship_fingerprint)
-        && (Arc::ptr_eq(
-            &left.content_type_fingerprint,
-            &right.content_type_fingerprint,
-        ) || left.content_type_fingerprint == right.content_type_fingerprint)
-}
-
 fn same_source_core(left: &SnapshotState, right: &SnapshotState) -> bool {
     same_identity(left, right)
 }
@@ -3615,10 +3186,6 @@ fn same_identity(left: &SnapshotState, right: &SnapshotState) -> bool {
         && left.selector == right.selector
         && left.lineage == right.lineage
         && left.source_version == right.source_version
-}
-
-fn same_state(left: &SnapshotState, right: &SnapshotState) -> bool {
-    same_state_core(left, right) && same_bytes(left.xml.as_bytes(), right.xml.as_bytes())
 }
 
 fn same_state_core(left: &SnapshotState, right: &SnapshotState) -> bool {
@@ -3676,10 +3243,6 @@ fn same_batch_state(
             .iter()
             .zip(right_batch.states.iter())
             .all(|(left, right)| same_state_core(left, right))
-}
-
-fn target_state_changed(left: &SnapshotState, right: &SnapshotState) -> bool {
-    !same_state(left, right)
 }
 
 fn same_attachment(left: &Option<AttachmentState>, right: &Option<AttachmentState>) -> bool {

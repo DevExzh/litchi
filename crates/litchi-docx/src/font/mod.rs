@@ -10,6 +10,7 @@
 
 mod codec;
 mod edit;
+mod limit;
 mod model;
 pub mod open_type;
 mod package;

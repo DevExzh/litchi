@@ -22,6 +22,60 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use soapberry_zip::office::StreamingArchiveWriter;
 
+/// Record 0355a: a detached main-document commit replays onto a
+/// source-backed package (`Package::apply`), and its inverse patch restores
+/// the main document; there is no separate publication product any more.
+#[allow(dead_code, reason = "shared shim with the document-edit tests")]
+struct Published {
+    patch: litchi_docx::document::Patch,
+    snapshot: litchi_docx::document::Snapshot,
+}
+
+#[allow(dead_code, reason = "shared shim with the document-edit tests")]
+impl Published {
+    fn snapshot(&self) -> &litchi_docx::document::Snapshot {
+        &self.snapshot
+    }
+}
+
+trait PublishDocument {
+    fn publish_with_inverse(
+        &self,
+        writer: impl io::Write,
+        commit: &litchi_docx::document::snapshot::Commit,
+    ) -> Result<Published, TransactionError>;
+    fn publish_inverse(
+        &self,
+        writer: impl io::Write,
+        publication: &Published,
+    ) -> Result<litchi_docx::document::Snapshot, TransactionError>;
+}
+
+impl PublishDocument for source_backed::Package {
+    fn publish_with_inverse(
+        &self,
+        writer: impl io::Write,
+        commit: &litchi_docx::document::snapshot::Commit,
+    ) -> Result<Published, TransactionError> {
+        let applied = self.apply_document(commit.patch())?;
+        applied.package().write_to(writer)?;
+        Ok(Published {
+            patch: applied.patch().clone(),
+            snapshot: commit.snapshot().clone(),
+        })
+    }
+
+    fn publish_inverse(
+        &self,
+        writer: impl io::Write,
+        publication: &Published,
+    ) -> Result<litchi_docx::document::Snapshot, TransactionError> {
+        let restored = self.apply(&publication.patch.inverse())?;
+        restored.write_to(writer)?;
+        restored.document_snapshot()
+    }
+}
+
 const MAIN: &str = "word/document.xml";
 const MEDIA: &str = "word/media/image1.png";
 const OPAQUE: &str = "word/opaque.bin";
@@ -259,7 +313,11 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
     }
     let mut batch_output = Vec::new();
     batch_package
-        .publish_document_commit_to_stream(&mut batch_output, &batch_commit)
+        .apply(batch_commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut batch_output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     drop(batch_package);
     drop(batch_commit);
@@ -279,7 +337,11 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
     assert_eq!(batch_xml, scalar_commit.snapshot().xml_bytes());
     let mut scalar_output = Vec::new();
     scalar_package
-        .publish_document_commit_to_stream(&mut scalar_output, &scalar_commit)
+        .apply(scalar_commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut scalar_output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     drop(scalar_package);
     assert_eq!(batch_output, scalar_output);
@@ -309,9 +371,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     edit.replace_body_paragraph_texts(&replacements()).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    let publication = package
-        .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
-        .unwrap();
+    let publication = package.publish_with_inverse(&mut output, &commit).unwrap();
     drop(package);
     drop(commit);
     drop(snapshot);
@@ -320,7 +380,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     let (inverse_budget, _inverse_cancel, reopened) = managed(output.clone());
     let mut restored = Vec::new();
     let restored_snapshot = reopened
-        .publish_document_inverse_to_stream(&mut restored, &publication)
+        .publish_inverse(&mut restored, &publication)
         .unwrap();
     drop(reopened);
     assert_eq!(restored, source);
@@ -345,7 +405,10 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     let commit = edit.commit().unwrap();
     mutable.bump_revision();
     let mut refused_output = Vec::new();
-    let result = package.publish_document_commit_to_stream(&mut refused_output, &commit);
+    let result = package.apply(commit.patch()).and_then(|committed| {
+        committed.write_to(&mut refused_output)?;
+        committed.document_snapshot()
+    });
     drop(package);
     assert!(matches!(
         result,
@@ -375,7 +438,11 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     assert_eq!(commit.snapshot().xml_bytes().as_ptr(), source_ptr);
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     drop(package);
     assert_eq!(output, source);
@@ -396,7 +463,11 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     assert_eq!(commit.snapshot().xml_bytes().as_ptr(), source_ptr);
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     drop(package);
     assert_eq!(output, source);
@@ -421,7 +492,11 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
     let first_xml = first_commit.snapshot().xml_bytes().to_vec();
     let mut first_output = Vec::new();
     first_package
-        .publish_document_commit_to_stream(&mut first_output, &first_commit)
+        .apply(first_commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut first_output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     drop(first_package);
 
@@ -435,7 +510,11 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
     let second_commit = second_edit.commit().unwrap();
     let mut second_output = Vec::new();
     second_package
-        .publish_document_commit_to_stream(&mut second_output, &second_commit)
+        .apply(second_commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut second_output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     drop(second_package);
 
@@ -631,7 +710,11 @@ fn managed_signed_batch_noop_is_exact_and_change_is_refused() {
     assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     drop(package);
     assert_eq!(output, source);
@@ -779,9 +862,7 @@ fn managed_bulk_controls_publish_reopen_and_restore_the_exact_archive() {
     .unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    let publication = package
-        .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
-        .unwrap();
+    let publication = package.publish_with_inverse(&mut output, &commit).unwrap();
     drop((package, commit, snapshot));
     let (inverse_budget, _inverse_cancel, reopened) = managed(output);
     let current = reopened.document_snapshot().unwrap();
@@ -796,7 +877,7 @@ fn managed_bulk_controls_publish_reopen_and_restore_the_exact_archive() {
     drop(current);
     let mut restored = Vec::new();
     let restored_snapshot = reopened
-        .publish_document_inverse_to_stream(&mut restored, &publication)
+        .publish_inverse(&mut restored, &publication)
         .unwrap();
     assert_eq!(restored, source);
     drop((reopened, restored_snapshot, publication));
