@@ -18,7 +18,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use content::{ContentCommit, ContentEdit, ContentEditor};
+pub use content::{Draft, DraftEditor};
 pub use model::{Catalog, Selector};
 pub use snapshot::{Edit, OwnedEditor, Snapshot};
 pub use transaction::Editor;
