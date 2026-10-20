@@ -1,5 +1,10 @@
 //! Shared DOC fixture normalization for integration tests.
 
+#![allow(
+    dead_code,
+    reason = "each integration test binary uses a subset of the shared fixtures"
+)]
+
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
@@ -201,4 +206,39 @@ pub(crate) fn with_valid_word97_dop(bytes: Vec<u8>) -> Vec<u8> {
     package
         .finish()
         .expect("normalized DOC fixture publication")
+}
+
+/// A Builder-authored DOC package with one body paragraph, so package-level
+/// edit families can open it as a complete DOC.
+pub(crate) fn authored_document(text: &str) -> Vec<u8> {
+    let mut writer = Builder::new();
+    writer.add_paragraph(text).expect("fixture paragraph");
+    let mut output = Cursor::new(Vec::new());
+    writer
+        .build()
+        .expect("fixture document")
+        .write_to(&mut output)
+        .expect("fixture bytes");
+    output.into_inner()
+}
+
+/// [`authored_document`] marked as a template (`FibBase.fDot`), preserving
+/// every other stream and byte.
+pub(crate) fn authored_template(text: &str) -> Vec<u8> {
+    let word_path = ["WordDocument".to_string()];
+    let mut package = ObjectEditor::open(
+        authored_document(text),
+        Targets::default(),
+        Limits::default(),
+    )
+    .expect("DOC fixture object editor");
+    let mut word = package
+        .stream(&word_path)
+        .expect("WordDocument stream")
+        .to_vec();
+    word[10] |= 0x01;
+    package
+        .put_stream(&word_path, word)
+        .expect("template WordDocument stream");
+    package.finish().expect("template DOC fixture publication")
 }

@@ -135,9 +135,8 @@ pub mod bookmark;
 /// Contextual Word caption and `AutoCaption` metadata.
 pub mod captions {
     pub use crate::parts::captions::{
-        AutoEntry, AutoTable, Commit, Definition, Editor, Format, Heading, Info, LabelTable,
-        Location, Numbering, PackageCommit, PackageSnapshot, Separator, Snapshot, Tables,
-        Transaction, TransactionError,
+        AutoEntry, AutoTable, Commit, Definition, Diagnostics, Edit, Error, Format, Heading, Info,
+        LabelTable, LimitKind, Location, Numbering, Patch, Result, Separator, Tables, record,
     };
 }
 pub mod comment;
@@ -164,6 +163,7 @@ mod plcf;
 pub mod revision;
 /// Layered route-slip lifecycle and protection metadata.
 pub mod route_slip;
+mod scoped;
 pub mod section;
 pub mod shape;
 pub mod table;
@@ -223,11 +223,9 @@ pub use parts::auto_summary::{AutoSummaryRange, DocumentAutoSummary};
 pub use parts::chp::CharacterConditionalFormatting;
 pub use parts::command_bars::{
     Action, AllocatedCommand, AllocatedCommands, CommandBars, CommandId, CommandString,
-    CommandStrings, Control, Customization, CustomizationData, Editor as CommandBarsEditor, Entry,
-    KeyMap, KeyMapKind, KeyMaps, MacroCommand, MacroCommands, MacroName, MacroNames, Operation,
-    PackageCommit as CommandBarsPackageCommit, PackageSnapshot as CommandBarsPackageSnapshot,
-    Snapshot as CommandBarsSnapshot, Toolbar, ToolbarDelta, ToolbarWrapper, Transaction,
-    TransactionError, XString,
+    CommandStrings, Control, Customization, CustomizationData, Entry, KeyMap, KeyMapKind, KeyMaps,
+    MacroCommand, MacroCommands, MacroName, MacroNames, Operation, Toolbar, ToolbarDelta,
+    ToolbarWrapper, XString,
 };
 pub use parts::document_properties::{
     CompatibilityOptions60, DocumentProperties, DocumentPropertiesBase, DocumentPropertyVersion,
@@ -263,12 +261,9 @@ pub use parts::dofr::{
 };
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
-    Attachment, Commit as EnvelopeCommit, Editor as EnvelopeEditor, Envelope,
-    FIB_INDEX as MSO_ENVELOPE_FIB_INDEX, FollowUpStatus, Importance, MSO_ENVELOPE_CLSID, Message,
-    PackageCommit as EnvelopePackageCommit, PackageSnapshot as EnvelopePackageSnapshot,
-    Patch as EnvelopePatch, Payload, PropertyValue, RecipientCollection, RecipientProperties,
-    RecipientProperty, SecurityFlags, Sensitivity, Snapshot as EnvelopeSnapshot, Text,
-    Transaction as EnvelopeTransaction, TransactionError as EnvelopeTransactionError, Version,
+    Attachment, Envelope, FIB_INDEX as MSO_ENVELOPE_FIB_INDEX, FollowUpStatus, Importance,
+    MSO_ENVELOPE_CLSID, Message, Payload, PropertyValue, RecipientCollection, RecipientProperties,
+    RecipientProperty, SecurityFlags, Sensitivity, Text, Version,
 };
 pub use parts::fields::BarcodeField;
 pub use parts::fields::BidiOutlineField;
@@ -381,14 +376,12 @@ pub use parts::styles::{
     StyleSheetHeader,
 };
 pub use parts::subdocuments::{
-    Collection, Commit as SubdocumentCommit, FileNameKey, FileNameKeyError, FileNameMetadata,
-    FileNameSelector as SubdocumentFileNameSelector, Kind, Name, Patch as SubdocumentPatch,
+    Collection, FileNameKey, FileNameKeyError, FileNameMetadata,
+    FileNameSelector as SubdocumentFileNameSelector, Kind, Name,
     PatchError as SubdocumentPatchError, Reference,
     ReferenceSelector as SubdocumentReferenceSelector, SelectionError as SubdocumentSelectionError,
-    Snapshot as SubdocumentSnapshot, SourceContext as SubdocumentSourceContext,
-    SourceRanges as SubdocumentSourceRanges, TablePatch as SubdocumentTablePatch,
-    TableRange as SubdocumentTableRange, Transaction as SubdocumentTransaction,
-    TransactionError as SubdocumentTransactionError,
+    SourceContext as SubdocumentSourceContext, SourceRanges as SubdocumentSourceRanges,
+    TablePatch as SubdocumentTablePatch, TableRange as SubdocumentTableRange,
 };
 pub use parts::table_char_cache::{TableCharEntry, TableCharInfo, TableCharacterCache};
 pub use parts::tap::TableStyleCondition;

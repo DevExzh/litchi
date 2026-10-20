@@ -36,11 +36,12 @@
 
 use litchi_cfb::OleFile;
 use litchi_doc::parts::fib::FileInformationBlock;
+use litchi_doc::route_slip::record::{Error as RecordError, Snapshot};
 use litchi_doc::route_slip::{
-    DeliveryOption, EditKind, Editor, Metadata, NarrowString, Protection, Recipient,
-    RecipientSelectionError, RecipientSelector, Snapshot, TransactionError, parse, to_bytes,
+    DeliveryOption, EditKind, Error, Metadata, NarrowString, Protection, Recipient,
+    RecipientSelectionError, RecipientSelector, parse, to_bytes,
 };
-use litchi_doc::{Builder, raw::Reader};
+use litchi_doc::{Builder, Package, raw::Reader};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
@@ -87,61 +88,86 @@ fn route_payload(bytes: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-fn package_editor_round_trips_document_facade_and_exact_fib_payload() {
+fn package_edit_round_trips_document_facade_and_exact_fib_payload() {
     let original = base_doc();
-    let mut editor = Editor::open(original.clone()).unwrap();
-    assert!(editor.metadata().is_none());
+    let package = Package::from_bytes(&original).unwrap();
+    let mut edit = package.edit_route_slip().unwrap();
+    assert!(edit.metadata().is_none());
 
     let source = route(Protection::Off);
-    let created = editor.set(source.clone()).unwrap();
-    assert!(created.patch().before().metadata().is_none());
-    assert_eq!(created.patch().after().metadata(), Some(&source));
+    edit.set(source.clone()).unwrap();
+    assert_eq!(edit.metadata(), Some(&source));
 
-    let bytes = editor.finish().unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().before_bytes(), original.as_slice());
+    let bytes = commit.patch().after_bytes().to_vec();
+    assert_eq!(commit.package().to_bytes().unwrap(), bytes);
     assert_eq!(parse_bytes_from_fib(&bytes), source);
     assert_ne!(bytes, original);
 
-    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
-    let document = package.document().unwrap();
+    let mut reader = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let document = reader.document().unwrap();
     assert_eq!(document.route_slip().unwrap(), Some(&source));
     assert_eq!(route_payload(&bytes), to_bytes(&source).unwrap());
+
+    // The patch replays onto its source and its inverse restores it.
+    let replayed = package.apply_route_slip(commit.patch()).unwrap();
+    assert_eq!(replayed.package().to_bytes().unwrap(), bytes);
+    let restored = commit
+        .package()
+        .apply_route_slip(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), original);
+    assert!(matches!(
+        commit.package().apply_route_slip(commit.patch()),
+        Err(Error::PatchConflict)
+    ));
+}
+
+#[test]
+fn unchanged_commit_publishes_the_source_package() {
+    let original = base_doc();
+    let package = Package::from_bytes(&original).unwrap();
+    let commit = package.edit_route_slip().unwrap().commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().to_bytes().unwrap(), original);
 }
 
 #[test]
 fn lifecycle_edits_are_snapshot_based_and_clear_the_fib_range() {
-    let mut editor = Editor::open(base_doc()).unwrap();
-    editor.set(route(Protection::Off)).unwrap();
+    let package = Package::from_bytes(&base_doc()).unwrap();
+    let mut edit = package.edit_route_slip().unwrap();
+    edit.set(route(Protection::Off)).unwrap();
 
-    editor.set_stage(RecipientSelector::Name(b"Bob")).unwrap();
-    assert_eq!(editor.metadata().unwrap().stage, 1);
+    edit.set_stage(RecipientSelector::Name(b"Bob")).unwrap();
+    assert_eq!(edit.metadata().unwrap().stage, 1);
 
     let added = recipient(b"Carol");
-    editor.add_recipient(added.clone()).unwrap();
-    assert_eq!(editor.metadata().unwrap().recipients.last(), Some(&added));
+    edit.add_recipient(added.clone()).unwrap();
+    assert_eq!(edit.metadata().unwrap().recipients.last(), Some(&added));
 
-    editor.advance_stage().unwrap();
-    assert_eq!(editor.metadata().unwrap().stage, 2);
-    assert!(editor.advance_stage().is_err());
-    editor.set_stage(RecipientSelector::Index(0)).unwrap();
-    editor.advance_stage().unwrap();
-    assert_eq!(editor.metadata().unwrap().stage, 1);
+    edit.advance_stage().unwrap();
+    assert_eq!(edit.metadata().unwrap().stage, 2);
+    assert!(edit.advance_stage().is_err());
+    edit.set_stage(RecipientSelector::Index(0)).unwrap();
+    edit.advance_stage().unwrap();
+    assert_eq!(edit.metadata().unwrap().stage, 1);
 
-    editor
-        .replace_recipient(RecipientSelector::Current, recipient(b"Bobby"))
+    edit.replace_recipient(RecipientSelector::Current, recipient(b"Bobby"))
         .unwrap();
-    editor
-        .remove_recipient(RecipientSelector::Index(0))
-        .unwrap();
+    edit.remove_recipient(RecipientSelector::Index(0)).unwrap();
     assert_eq!(
-        editor.metadata().unwrap().recipients[0].name.as_bytes(),
+        edit.metadata().unwrap().recipients[0].name.as_bytes(),
         b"Bobby"
     );
 
-    let completed = editor.complete().unwrap();
-    assert!(completed.patch().after().metadata().is_none());
-    let bytes = editor.finish().unwrap();
-    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
-    assert!(package.document().unwrap().route_slip().unwrap().is_none());
+    edit.complete().unwrap();
+    assert!(edit.metadata().is_none());
+    let bytes = edit.commit().unwrap().patch().after_bytes().to_vec();
+    let mut reader = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
+    assert!(reader.document().unwrap().route_slip().unwrap().is_none());
 
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
@@ -151,43 +177,41 @@ fn lifecycle_edits_are_snapshot_based_and_clear_the_fib_range() {
 
 #[test]
 fn protected_package_lifecycle_edit_is_rejected_atomically() {
-    let mut editor = Editor::open(base_doc()).unwrap();
-    editor.set(route(Protection::Annotation)).unwrap();
-    let before = editor.snapshot().unwrap();
+    let package = Package::from_bytes(&base_doc()).unwrap();
+    let mut edit = package.edit_route_slip().unwrap();
+    edit.set(route(Protection::Annotation)).unwrap();
+    let before = edit.route_slip().clone();
 
-    let error = editor.clear().unwrap_err();
+    let error = edit.clear().unwrap_err();
     assert!(error.to_string().contains("protected"));
-    assert_eq!(editor.snapshot().unwrap(), before);
+    assert_eq!(edit.route_slip(), &before);
 }
 
 #[test]
-fn selectors_are_typed_and_protected_transactions_roll_back() {
+fn selectors_are_typed_and_protected_edits_leave_the_source_unchanged() {
     let mut duplicate = route(Protection::Off);
     duplicate.recipients[1].name = NarrowString::new(b"Alice".to_vec());
     let snapshot = Snapshot::new(duplicate).unwrap();
-    let mut transaction = snapshot.edit();
+    let mut edit = snapshot.edit();
 
-    let error = transaction
+    let error = edit
         .set_stage(RecipientSelector::Name(b"Alice"))
         .unwrap_err();
     assert!(matches!(
         error,
-        TransactionError::Selection(RecipientSelectionError::AmbiguousName { .. })
+        RecordError::Selection(RecipientSelectionError::AmbiguousName { .. })
     ));
-    let error = transaction
-        .set_stage(RecipientSelector::Index(99))
-        .unwrap_err();
+    let error = edit.set_stage(RecipientSelector::Index(99)).unwrap_err();
     assert!(matches!(
         error,
-        TransactionError::Selection(RecipientSelectionError::IndexOutOfBounds { .. })
+        RecordError::Selection(RecipientSelectionError::IndexOutOfBounds { .. })
     ));
 
-    transaction.set_stage(RecipientSelector::Index(1)).unwrap();
-    // Dropping the transaction is the rollback; the source never changed.
-    drop(transaction);
-    let transaction = snapshot.edit();
-    assert_eq!(transaction.snapshot(), &snapshot);
-    assert!(!transaction.is_changed());
+    edit.set_stage(RecipientSelector::Index(1)).unwrap();
+    // Dropping the edit discards it; the source never changed.
+    drop(edit);
+    let edit = snapshot.edit();
+    assert_eq!(edit.staged(), &snapshot);
 
     let protected = Snapshot::new(route(Protection::Annotation)).unwrap();
     let mut protected_edit = protected.edit();
@@ -196,9 +220,9 @@ fn selectors_are_typed_and_protected_transactions_roll_back() {
         .unwrap_err();
     assert!(matches!(
         error,
-        TransactionError::Protected(Protection::Annotation)
+        RecordError::Protected(Protection::Annotation)
     ));
-    assert_eq!(protected_edit.snapshot(), &protected);
+    assert_eq!(protected_edit.staged(), &protected);
 
     assert!(Protection::Off.allows(EditKind::Content));
     assert!(Protection::RevisionMark.allows(EditKind::Revision));
@@ -212,13 +236,9 @@ fn failed_removal_does_not_change_a_single_recipient_snapshot() {
     let mut value = route(Protection::Off);
     value.recipients.truncate(1);
     let snapshot = Snapshot::new(value).unwrap();
-    let mut transaction = snapshot.edit();
-    assert!(
-        transaction
-            .remove_recipient(RecipientSelector::Current)
-            .is_err()
-    );
-    assert_eq!(transaction.snapshot(), &snapshot);
+    let mut edit = snapshot.edit();
+    assert!(edit.remove_recipient(RecipientSelector::Current).is_err());
+    assert_eq!(edit.staged(), &snapshot);
 }
 
 fn parse_bytes_from_fib(bytes: &[u8]) -> Metadata {

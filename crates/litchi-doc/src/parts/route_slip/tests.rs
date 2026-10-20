@@ -1,6 +1,8 @@
+use super::package::Editor;
+use super::record::{Error as TransactionError, Snapshot};
 use super::{
-    DeliveryOption, Editor, Metadata, NarrowString, Protection, Recipient, RecipientSelector,
-    Snapshot, TransactionError, parse, parse_bytes, to_bytes,
+    DeliveryOption, Metadata, NarrowString, Protection, Recipient, RecipientSelector, parse,
+    parse_bytes, to_bytes,
 };
 use crate::parts::fib::FileInformationBlock;
 use litchi_cfb::OleWriter;
@@ -141,24 +143,24 @@ fn selectors_reject_ambiguous_names_and_out_of_bounds_indices() {
 }
 
 #[test]
-fn transaction_rollback_and_commit_produce_reversible_semantic_patch() {
+fn dropped_edit_and_commit_produce_reversible_semantic_patch() {
     let source = Snapshot::new(editable_sample()).unwrap();
     let mut transaction = source.edit();
     transaction.set_stage(RecipientSelector::Index(0)).unwrap();
-    assert!(transaction.is_changed());
-    // Dropping a transaction is the rollback; a fresh one starts unchanged.
+    assert_ne!(transaction.staged(), &source);
+    // Dropping an edit discards it; a fresh one starts from the source.
     drop(transaction);
     let mut transaction = source.edit();
-    assert!(!transaction.is_changed());
+    assert_eq!(transaction.staged(), &source);
 
     transaction.set_stage(RecipientSelector::Index(1)).unwrap();
     let committed = transaction.commit().unwrap();
-    assert_eq!(committed.snapshot().metadata().unwrap().stage, 1);
+    assert_eq!(committed.package().metadata().unwrap().stage, 1);
     assert_eq!(
         committed
             .patch()
             .inverse()
-            .apply(committed.snapshot())
+            .apply(committed.package())
             .unwrap(),
         source
     );

@@ -1,10 +1,15 @@
 //! FIB/table-stream package integration for command-bar records.
 
+#![allow(
+    dead_code,
+    reason = "the byte-level editor keeps its record-level API for its unit tests; the package family drives a subset"
+)]
+
 use super::codec;
 use super::model::CommandBars;
 use super::transaction::{
-    Commit as TransactionCommit, Error as TransactionError, Snapshot as TransactionSnapshot,
-    Transaction,
+    Edit as RecordEdit, Error as TransactionError, Patch as RecordPatch,
+    Snapshot as TransactionSnapshot,
 };
 use super::validation;
 use crate::package::{Error as PackageError, Result};
@@ -57,7 +62,7 @@ pub fn write(
 
 /// An immutable DOC package snapshot carrying its command-bar metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Vec<u8>,
     command_bars: TransactionSnapshot,
 }
@@ -72,59 +77,59 @@ impl Snapshot {
 
     /// Returns the immutable semantic command-bar snapshot.
     #[must_use]
-    pub fn command_bars(&self) -> &TransactionSnapshot {
+    pub(crate) fn command_bars(&self) -> &TransactionSnapshot {
         &self.command_bars
     }
 
     /// Returns the rendered package bytes.
-    pub fn finish(&self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(&self) -> Result<Vec<u8>> {
         Ok(self.bytes.clone())
     }
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.command_bars.edit()
     }
 }
 
 /// A package commit containing semantic and reversible OLE byte patches.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: TransactionCommit,
+    patch: RecordPatch,
     package_patch: PackagePatch,
 }
 
 impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The reversible semantic command-bar patch.
     #[must_use]
-    pub fn patch(&self) -> &TransactionCommit {
+    pub(crate) fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     /// The reversible whole-CFB byte patch.
     #[must_use]
-    pub fn package_patch(&self) -> &PackagePatch {
+    pub(crate) fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 
     /// Splits the package snapshot, semantic patch, and CFB byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, TransactionCommit, PackagePatch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch, PackagePatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
 
 /// Transactional DOC package editor for the `fcCmds/lcbCmds` range.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
     original: TransactionSnapshot,
@@ -136,19 +141,19 @@ pub struct Editor {
 
 impl Editor {
     /// Opens an unencrypted Word 97+ package from CFB bytes.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
         Self::open_bounded(bytes, Limits::default(), ProtectionPolicy::default())
     }
 
     /// Opens a package with an explicit policy for changed protected content.
-    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+    pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
         Self::open_bounded(bytes, Limits::default(), policy)
     }
 
     /// Opens a package under one edit profile: its revision limits bound the
     /// compound-file parse and its protection policy governs changed
     /// protected content.
-    pub fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
+    pub(crate) fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
         Self::open_bounded(
             bytes,
             options.revision_limits_value(),
@@ -193,29 +198,29 @@ impl Editor {
 
     /// Returns the current immutable semantic command-bar snapshot.
     #[must_use]
-    pub fn command_bars(&self) -> &TransactionSnapshot {
+    pub(crate) fn command_bars(&self) -> &TransactionSnapshot {
         &self.command_bars
     }
 
     /// Whether this editor has published a changed package state.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.command_bars.edit()
     }
 
     /// Sets or replaces the complete command-bar range atomically.
-    pub fn set(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
+    pub(crate) fn set(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
         self.install(TransactionSnapshot::new(Some(command_bars))?)
     }
 
     /// Replaces existing command-bar metadata, rejecting an absent range.
-    pub fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
+    pub(crate) fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
         if !self.command_bars.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing command-bar metadata".into(),
@@ -225,31 +230,31 @@ impl Editor {
     }
 
     /// Applies and publishes a semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
+    pub(crate) fn apply(&mut self, transaction: RecordEdit) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
-        if commit.before() != &self.command_bars {
+        if commit.patch().before() != &self.command_bars {
             return Err(PackageError::InvalidFormat(
                 "command-bar transaction snapshot conflict".into(),
             ));
         }
-        self.install(commit.snapshot().clone())
+        self.install(commit.package().clone())
     }
 
     /// Clears the command-bar FIB range while preserving its old table bytes.
-    pub fn clear(&mut self) -> Result<Commit> {
+    pub(crate) fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear();
         self.apply(transaction)
     }
 
     /// Captures the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
         Ok(Snapshot::new(bytes, self.command_bars.clone()))
     }
 
     /// Finishes the edit and returns rendered DOC bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -257,11 +262,11 @@ impl Editor {
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        let patch = TransactionCommit::new(self.original, self.command_bars.clone());
+        let patch = RecordPatch::new(self.original, self.command_bars.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         let package_patch = PackagePatch::new(object_commit.into_parts().1, self.protection);
@@ -273,7 +278,7 @@ impl Editor {
     }
 
     fn install(&mut self, snapshot: TransactionSnapshot) -> Result<Commit> {
-        let patch = TransactionCommit::new(self.command_bars.clone(), snapshot.clone());
+        let patch = RecordPatch::new(self.command_bars.clone(), snapshot.clone());
         if patch.is_noop() {
             let package_patch = self
                 .package

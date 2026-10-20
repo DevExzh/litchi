@@ -777,21 +777,29 @@ impl Package {
     /// exact bytes through the existing body-text owner; dropping the returned
     /// edit is the rollback operation.
     pub fn edit(&self) -> Result<Edit> {
-        let options = self
-            .edit_profile
+        Edit::from_package_with_options(self.clone(), self.retained_edit_options())
+    }
+
+    /// The edit options this package retains from the edit that produced it
+    /// (the defaults for a freshly opened package).
+    pub(crate) fn retained_edit_options(&self) -> EditOptions {
+        self.edit_profile
             .as_ref()
             .map(EditProfile::options)
-            .unwrap_or_default();
-        Edit::from_package_with_options(self.clone(), options)
+            .unwrap_or_default()
+    }
+
+    /// `options` constrained by the edit profile this package retains.
+    pub(crate) fn constrained_edit_options(&self, options: EditOptions) -> EditOptions {
+        match self.edit_profile.as_ref() {
+            Some(profile) => profile.constrain_options(options),
+            None => options,
+        }
     }
 
     /// Start a primary transaction under one explicit edit profile.
     pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
-        let options = match self.edit_profile.as_ref() {
-            Some(profile) => profile.constrain_options(options),
-            None => options,
-        };
-        Edit::from_package_with_options(self.clone(), options)
+        Edit::from_package_with_options(self.clone(), self.constrained_edit_options(options))
     }
 
     /// Apply a canonical exact-source patch without mutating this package.
