@@ -335,27 +335,9 @@ pub fn load_external_links(package: &OpcPackage) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
-/// Store an initial external-link catalog on a workbook with no existing
-/// external-link owner. Every target remains an inert OPC relationship.
-pub fn store_external_links(
-    package: &mut OpcPackage,
-    links: &[Link],
-    conformance: Conformance,
-) -> Result<Vec<Entry>> {
-    let before = load_external_links(package)?;
-    if !before.is_empty() {
-        return Err(invalid(
-            "workbook already contains external links; use a transaction to edit the catalog",
-        ));
-    }
-    let entries = allocate_entries(package, links)?;
-    validation::entries(&entries, conformance)?;
-    apply_entries(package, &[], &entries, conformance)?;
-    load_external_links(package)
-}
-
 /// Add one external link to the workbook and return its physical entry.
-pub fn add_external_link(
+#[cfg(test)]
+pub(crate) fn add_external_link(
     package: &mut OpcPackage,
     link: Link,
     conformance: Conformance,
@@ -377,7 +359,8 @@ pub fn add_external_link(
 
 /// Replace one external link while retaining its workbook relationship and
 /// part identity.
-pub fn replace_external_link(
+#[cfg(test)]
+pub(crate) fn replace_external_link(
     package: &mut OpcPackage,
     index: usize,
     link: Link,
@@ -398,7 +381,11 @@ pub fn replace_external_link(
 }
 
 /// Remove one external link and its unreferenced owned part.
-pub fn remove_external_link(package: &mut OpcPackage, index: usize) -> Result<Option<Entry>> {
+#[cfg(test)]
+pub(crate) fn remove_external_link(
+    package: &mut OpcPackage,
+    index: usize,
+) -> Result<Option<Entry>> {
     let before = load_external_links(package)?;
     if index >= before.len() {
         return Ok(None);
@@ -662,6 +649,7 @@ fn update_target_relationships(
     Ok(())
 }
 
+#[cfg(test)]
 fn allocate_entries(package: &OpcPackage, links: &[Link]) -> Result<Vec<Entry>> {
     let workbook = package.main_document_part()?;
     let mut relationship_number = 1u32;

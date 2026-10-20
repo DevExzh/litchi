@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_xlsx::{
-    Error, REFRESH_INTERVALS_NAMESPACE, RefreshInterval, RefreshIntervals, TypeRefreshIntervals,
-    apply_rich_value_refresh_patch, edit_rich_value_refresh, load_rich_value_refresh,
-    parse_refresh_intervals, write_refresh_intervals,
+    Error, Package, REFRESH_INTERVALS_NAMESPACE, RefreshInterval, RefreshIntervals,
+    TypeRefreshIntervals, load_rich_value_refresh, parse_refresh_intervals,
+    write_refresh_intervals,
 };
 
 const RICH_DATA_2: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2";
@@ -27,8 +27,21 @@ fn types_xml() -> Vec<u8> {
     .into_bytes()
 }
 
+/// A complete workbook graph to add the rich-value parts to.
+fn workbook() -> OpcPackage {
+    Package::new().unwrap().into_plain_opc()
+}
+
+fn adopt(package: OpcPackage) -> Package {
+    Package::from_opc(package).unwrap()
+}
+
+fn plain(package: Package) -> OpcPackage {
+    package.into_plain_opc()
+}
+
 fn package() -> OpcPackage {
-    let mut package = OpcPackage::new();
+    let mut package = workbook();
     let types_name = PackURI::new("/xl/richValueTypes.xml").unwrap();
     let mut types = BlobPart::new(
         types_name.clone(),
@@ -148,14 +161,18 @@ fn owner_scanner_rejects_duplicate_or_stray_refresh_contexts_atomically() {
 }
 
 fn assert_rejected_owner(xml: String) {
-    let mut package = package_from_xml(xml);
+    let package = package_from_xml(xml);
     let before = package
         .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
         .unwrap()
         .blob()
         .to_vec();
     assert!(load_rich_value_refresh(&package).is_err());
-    assert!(edit_rich_value_refresh(&mut package).is_err());
+    assert!(
+        Package::from_opc(package.clone())
+            .and_then(|package| package.edit_rich_value_refresh())
+            .is_err()
+    );
     assert_eq!(
         package
             .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
@@ -166,7 +183,7 @@ fn assert_rejected_owner(xml: String) {
 }
 
 fn package_from_xml(xml: String) -> OpcPackage {
-    let mut package = OpcPackage::new();
+    let mut package = workbook();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/richValueTypes.xml").unwrap(),
@@ -190,7 +207,7 @@ fn snapshot_and_noop_are_rich_types_scoped_and_source_shared() {
     // refresh metadata target merely because it has a similarly named node.
     package
         .try_add_part(Box::new(BlobPart::new(
-            PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+            PackURI::new("/xl/worksheet-like.xml").unwrap(),
             "application/xml".into(),
             format!(
                 r#"<worksheet xmlns="{SPREADSHEETML}"><refreshIntervals xmlns="{REFRESH_INTERVALS_NAMESPACE}"/></worksheet>"#
@@ -200,29 +217,29 @@ fn snapshot_and_noop_are_rich_types_scoped_and_source_shared() {
         .unwrap();
     let before = load_rich_value_refresh(&package).unwrap();
     let source = before.source_arc().unwrap();
-    let commit = edit_rich_value_refresh(&mut package)
+    let commit = adopt(package)
+        .edit_rich_value_refresh()
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!commit.changed());
-    assert!(Arc::ptr_eq(
-        &source,
-        &commit.snapshot().source_arc().unwrap()
-    ));
+    assert!(!commit.diagnostics().changed());
+    let after = load_rich_value_refresh(&plain(commit.into_package())).unwrap();
+    assert!(Arc::ptr_eq(&source, &after.source_arc().unwrap()));
 }
 
 #[test]
 fn add_remove_and_inverse_preserve_unknown_extension_bytes_and_relationships() {
-    let mut package = package();
+    let package = package();
     let original = package
         .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
         .unwrap()
         .blob()
         .to_vec();
-    let mut transaction = edit_rich_value_refresh(&mut package).unwrap();
+    let mut transaction = adopt(package).edit_rich_value_refresh().unwrap();
     assert!(transaction.add(1, interval_int(99, 120)).unwrap());
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
+    let package = plain(commit.package().clone());
     let changed = package
         .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
         .unwrap()
@@ -244,7 +261,13 @@ fn add_remove_and_inverse_preserve_unknown_extension_bytes_and_relationships() {
             .windows(b"resourceIdInt=\"99\"".len())
             .any(|window| window == b"resourceIdInt=\"99\"")
     );
-    assert_eq!(commit.snapshot().types()[1].intervals().unwrap().len(), 1);
+    assert_eq!(
+        load_rich_value_refresh(&package).unwrap().types()[1]
+            .intervals()
+            .unwrap()
+            .len(),
+        1
+    );
     assert_eq!(
         commit.patch().before().types()[0]
             .intervals()
@@ -253,7 +276,13 @@ fn add_remove_and_inverse_preserve_unknown_extension_bytes_and_relationships() {
         2
     );
 
-    apply_rich_value_refresh_patch(&mut package, &commit.patch().inverse()).unwrap();
+    let package = plain(
+        commit
+            .package()
+            .apply_rich_value_refresh(&commit.patch().inverse())
+            .unwrap()
+            .into_package(),
+    );
     assert_eq!(
         package
             .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
@@ -262,11 +291,12 @@ fn add_remove_and_inverse_preserve_unknown_extension_bytes_and_relationships() {
         original.as_slice()
     );
 
-    let mut transaction = edit_rich_value_refresh(&mut package).unwrap();
+    let mut transaction = adopt(package).edit_rich_value_refresh().unwrap();
     let removed = transaction.remove(0, 0).unwrap().unwrap();
     assert_eq!(removed.resource_id_int(), Some(7));
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
+    let package = plain(commit.package().clone());
     assert!(
         String::from_utf8_lossy(
             package
@@ -276,7 +306,13 @@ fn add_remove_and_inverse_preserve_unknown_extension_bytes_and_relationships() {
         )
         .contains("resourceIdStr=\"a&amp;b\"")
     );
-    commit.patch().inverse().apply(&mut package).unwrap();
+    let package = plain(
+        commit
+            .package()
+            .apply_rich_value_refresh(&commit.patch().inverse())
+            .unwrap()
+            .into_package(),
+    );
     assert_eq!(
         package
             .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
@@ -288,14 +324,14 @@ fn add_remove_and_inverse_preserve_unknown_extension_bytes_and_relationships() {
 
 #[test]
 fn stale_incoming_relationship_and_missing_extension_refuse_atomically() {
-    let mut source_package = package();
+    let source_package = package();
     let before = source_package
         .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
         .unwrap()
         .blob()
         .to_vec();
     let patch = {
-        let mut transaction = edit_rich_value_refresh(&mut source_package).unwrap();
+        let mut transaction = adopt(source_package).edit_rich_value_refresh().unwrap();
         transaction.add(1, interval_int(4, 10)).unwrap();
         transaction.commit().unwrap().patch().clone()
     };
@@ -306,7 +342,7 @@ fn stale_incoming_relationship_and_missing_extension_refuse_atomically() {
         .rels_mut()
         .remove("rIdTypes");
     assert!(matches!(
-        patch.apply(&mut stale),
+        adopt(stale.clone()).apply_rich_value_refresh(&patch),
         Err(Error::PatchConflict { .. })
     ));
     assert_eq!(
@@ -317,13 +353,13 @@ fn stale_incoming_relationship_and_missing_extension_refuse_atomically() {
         before.as_slice()
     );
 
-    let mut no_owner = package_without_extension_owner();
+    let no_owner = package_without_extension_owner();
     let original = no_owner
         .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())
         .unwrap()
         .blob()
         .to_vec();
-    let mut transaction = edit_rich_value_refresh(&mut no_owner).unwrap();
+    let mut transaction = adopt(no_owner.clone()).edit_rich_value_refresh().unwrap();
     transaction.add(0, interval_int(8, 10)).unwrap();
     let error = transaction.commit();
     assert!(error.is_err());
@@ -337,7 +373,7 @@ fn stale_incoming_relationship_and_missing_extension_refuse_atomically() {
 }
 
 fn package_without_extension_owner() -> OpcPackage {
-    let mut package = OpcPackage::new();
+    let mut package = workbook();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/richValueTypes.xml").unwrap(),

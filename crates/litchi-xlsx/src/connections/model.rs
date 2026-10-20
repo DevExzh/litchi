@@ -2,7 +2,7 @@
 
 use super::codec::bounded;
 use super::{codec, invalid};
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use std::collections::{HashMap, HashSet};
 
 // XML namespaces and package limits are kept with the typed owner so every layer

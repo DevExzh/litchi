@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part as OpcPart};
 
-use crate::error::{Error, Result, invalid};
+use crate::error::{Result, invalid};
 
 use super::MAX_INTERVALS;
 use super::codec;
@@ -209,17 +209,24 @@ fn push_incoming(values: &mut Vec<RelationshipState>, value: RelationshipState) 
     Ok(())
 }
 
-/// Failure-atomic edits over one rich-value types owner.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+crate::record::record_family!("rich-value refresh-interval");
+
+crate::record::no_limits!("rich-value refresh-interval");
+
+/// A staged, failure-atomic edit of the rich-value types owner's refresh
+/// intervals of one [`crate::Package`]. Dropping it discards it;
+/// [`Self::commit`] publishes a new package.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     draft: Vec<TypeRefreshIntervals>,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a source-bound transaction.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+impl Edit {
+    /// Start a source-bound edit.
+    fn start(target: crate::record::Source) -> Result<Self> {
+        let before = Snapshot::load(&target)?;
         Ok(Self {
             draft: before.types.clone(),
             target,
@@ -227,7 +234,7 @@ impl<'a> Transaction<'a> {
         })
     }
 
-    /// Exact immutable source captured at transaction start.
+    /// Exact immutable source captured when the edit started.
     #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
@@ -313,30 +320,42 @@ impl<'a> Transaction<'a> {
         self.set(type_index, None)
     }
 
-    /// Whether staged typed metadata differs from the source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.draft.clone_from(&self.before.types);
+    }
+
+    fn changed(&self) -> bool {
         self.before.types != self.draft
     }
 
-    /// Validate and atomically publish the staged owner edit.
+    /// Validate and publish the staged owner edit as a new package. An
+    /// unchanged edit returns the source package.
     ///
     /// Adding a payload requires an existing source `x:ext` owner.  The
     /// owner URI is opaque producer metadata, so a missing owner cannot be
-    /// safely synthesized; that form returns an error without changing the
-    /// package.
+    /// safely synthesized; that form returns an error and publishes nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`], [`Error::PatchConflict`] and the
+    /// publication's validation errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            return Ok(Commit::new(
-                self.before.clone(),
-                Patch::new(self.before.clone(), self.before.clone()),
-                false,
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
+            let patch = Patch::new(self.before.clone(), self.before.clone());
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
             ));
         }
         if self.target.is_signed() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load(self.target)?;
+        let current = Snapshot::load(&self.target)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "rich-value refreshIntervals source closure".to_owned(),
@@ -350,7 +369,7 @@ impl<'a> Transaction<'a> {
             .ok_or_else(|| invalid("rich-value types part is required for a changed edit"))?;
         let inspection = codec::inspect(source.bytes.as_slice())?;
         let output = codec::rewrite(source.bytes.as_slice(), &inspection, &self.draft)?;
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         candidate
             .get_part_mut(&source.name)?
             .set_blob_shared(Arc::new(output));
@@ -361,8 +380,11 @@ impl<'a> Transaction<'a> {
             ));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 }
 
@@ -392,7 +414,7 @@ impl Patch {
 
     /// Whether this patch is an exact source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -406,14 +428,14 @@ impl Patch {
     }
 
     /// Apply atomically after checking the complete owner relationship closure.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "rich-value refreshIntervals source closure".to_owned(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() {
@@ -440,53 +462,41 @@ impl Patch {
     }
 }
 
-/// A successfully staged refresh metadata publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
+    }
+
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
+    }
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
+impl crate::Package {
+    /// Start an edit of the rich-value types' refresh intervals.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the validation errors of the rich-value types owner.
+    pub fn edit_rich_value_refresh(&self) -> Result<Edit> {
+        Edit::start(crate::record::Source::new(self, "edit_rich_value_refresh")?)
     }
 
-    /// Whether the typed metadata changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Resulting source-bound snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    /// Apply an exact rich-value refresh-interval patch to a new package;
+    /// this one is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_rich_value_refresh(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_rich_value_refresh")
     }
 }
 
 /// Load rich-value refresh metadata from an OPC package.
 pub fn load(package: &OpcPackage) -> Result<Snapshot> {
     Snapshot::load(package)
-}
-
-/// Start a source-bound rich-value refresh transaction.
-pub fn edit(package: &mut OpcPackage) -> Result<Transaction<'_>> {
-    Transaction::new(package)
-}
-
-/// Apply an exact source-bound rich-value refresh patch.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
-    patch.apply(package)
 }

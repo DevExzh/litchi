@@ -2,7 +2,7 @@
 
 use super::invalid;
 use super::model::{CONTENT_TYPE, MAX_PART_BYTES, REL, STRICT_REL, XmlMapConformance, XmlMapInfo};
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use litchi_opc::{OpcPackage, PackURI};
 
 /// Discovers and parses the single Custom XML Maps part related to the workbook.
@@ -32,7 +32,7 @@ pub fn load_from_package_with_conformance(
 /// the package, so a signed package is refused with a boxed
 /// [`crate::Error::Signed`] before anything is changed: remove the signature
 /// explicitly first ([`OpcPackage::unsign`]).
-pub fn store_in_package(
+pub(crate) fn store_in_package(
     package: &mut OpcPackage,
     value: &XmlMapInfo,
     conformance: XmlMapConformance,
@@ -117,7 +117,7 @@ pub(super) fn store_xml_in_package(
 /// or not. Removing the part changes the package, so a signed package is
 /// refused with a boxed [`crate::Error::Signed`]: remove the signature
 /// explicitly first ([`OpcPackage::unsign`]).
-pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     let workbook_uri = main_workbook_uri(package)?;
     let Some(existing) = xml_maps_relationship(package, &workbook_uri)? else {
         validate_xml_maps_graph(package, &workbook_uri, None)?;
@@ -294,7 +294,7 @@ fn next_xml_maps_part_name(package: &OpcPackage) -> Result<PackURI> {
         } else {
             format!("/xl/xmlMaps{suffix}.xml")
         };
-        let candidate = PackURI::new(&name)?;
+        let candidate = PackURI::new(&name).map_err(invalid)?;
         match package.get_part(&candidate) {
             Ok(_) => {},
             Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),

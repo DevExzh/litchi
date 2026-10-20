@@ -69,6 +69,11 @@ fn package(conformance: OleObjectConformance) -> (OpcPackage, PackURI) {
         )
         .into_bytes(),
     )));
+    crate::record::adopt_worksheet(
+        &mut package,
+        &uri,
+        conformance == OleObjectConformance::Strict,
+    );
     (package, uri)
 }
 
@@ -337,7 +342,7 @@ fn no_op_is_byte_exact_and_invalid_edits_are_staged_atomically() {
     assert_eq!(transaction.objects().cloned(), staged);
     let commit = transaction.commit().unwrap();
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert_eq!(package.get_part(&uri).unwrap().blob(), source.as_slice());
 }
 

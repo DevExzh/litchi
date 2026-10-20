@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part as OpcPart};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::named_sheet_view::{CONTENT_TYPE, RELATIONSHIP};
 use crate::sheet_view::parse_worksheet_views;
 
@@ -271,17 +271,24 @@ fn named_part<'a>(package: &'a OpcPackage, worksheet: &PackURI) -> Result<Option
     Ok(found)
 }
 
-/// Failure-atomic edits over one worksheet's source-bound icon metadata.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+crate::record::record_family!("data-type-icon");
+
+crate::record::no_limits!("data-type-icon");
+
+/// A staged, failure-atomic edit of one worksheet's source-bound
+/// data-type-icon metadata of one [`crate::Package`]. Dropping it discards
+/// it; [`Self::commit`] publishes a new package.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     worksheet_views: Vec<Option<ShowDataTypeIcons>>,
     custom_sheet_views: Vec<Option<ShowDataTypeIcons>>,
 }
 
-impl<'a> Transaction<'a> {
-    pub fn new(target: &'a mut OpcPackage, worksheet: &PackURI) -> Result<Self> {
-        let before = Snapshot::load(target, worksheet)?;
+impl Edit {
+    fn start(target: crate::record::Source, worksheet: &PackURI) -> Result<Self> {
+        let before = Snapshot::load(&target, worksheet)?;
         Ok(Self {
             worksheet_views: before.worksheet_views.clone(),
             custom_sheet_views: before.custom_sheet_views.clone(),
@@ -337,30 +344,49 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.worksheet_views
+            .clone_from(&self.before.worksheet_views);
+        self.custom_sheet_views
+            .clone_from(&self.before.custom_sheet_views);
+    }
+
+    fn changed(&self) -> bool {
         self.before.worksheet_views != self.worksheet_views
             || self.before.custom_sheet_views != self.custom_sheet_views
     }
 
+    /// Validate and publish the staged metadata as a new package. An
+    /// unchanged edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`], [`Error::PatchConflict`] and the
+    /// publication's validation errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            return Ok(Commit::new(
-                self.before.clone(),
-                Patch::new(self.before.clone(), self.before.clone()),
-                false,
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published snapshot.
+    fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
+            let patch = Patch::new(self.before.clone(), self.before.clone());
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
             ));
         }
         if self.target.is_signed() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load(self.target, &self.before.worksheet)?;
+        let current = Snapshot::load(&self.target, &self.before.worksheet)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "data-type-icon source closure".to_owned(),
             });
         }
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         if self.before.worksheet_views != self.worksheet_views {
             let output = rewrite_worksheet(&self.before, &self.worksheet_views)?;
             candidate
@@ -391,8 +417,8 @@ impl<'a> Transaction<'a> {
             ));
         }
         let patch = Patch::new(self.before, after.clone());
-        *self.target = candidate;
-        Ok(Commit::new(after, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((Commit::new(package, patch, Diagnostics::new(true)), after))
     }
 }
 
@@ -432,19 +458,48 @@ fn rewrite_named(
     Ok(output)
 }
 
-/// Start a source-bound transaction for one worksheet.
-pub fn edit<'a>(target: &'a mut OpcPackage, worksheet: &PackURI) -> Result<Transaction<'a>> {
+impl crate::Package {
+    /// Start an edit of one worksheet's data-type-icon metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, a `NotFound` refusal for a selector that matches no sheet,
+    /// [`Error::NotWorksheet`] for a chart or dialog sheet, and the
+    /// validation errors of the metadata.
+    pub fn edit_data_type_icons<'a>(
+        &self,
+        sheet: impl Into<crate::workbook::Selector<'a>>,
+    ) -> Result<Edit> {
+        let target = crate::record::Source::new(self, "edit_data_type_icons")?;
+        let worksheet = self.worksheet_part(sheet, "edit_data_type_icons")?;
+        Edit::start(target, &worksheet)
+    }
+
+    /// Apply an exact data-type-icon patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_data_type_icons(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_data_type_icons")
+    }
+}
+
+crate::record::raw_test_route!(edit_data_type_icons, worksheet: &PackURI => crate::record::sheet_of);
+
+/// The raw-graph test route for one worksheet.
+#[cfg(test)]
+pub(crate) fn edit<'a>(target: &'a mut OpcPackage, worksheet: &PackURI) -> Result<Transaction<'a>> {
     Transaction::new(target, worksheet)
 }
 
 /// Load the source-bound metadata for one worksheet.
 pub fn load(target: &OpcPackage, worksheet: &PackURI) -> Result<Snapshot> {
     Snapshot::load(target, worksheet)
-}
-
-/// Apply an exact source-checked patch atomically.
-pub fn apply_patch(patch: &Patch, target: &mut OpcPackage) -> Result<()> {
-    patch.apply(target)
 }
 
 /// An exact source-checked reversible edit.
@@ -469,8 +524,9 @@ impl Patch {
         &self.after
     }
 
+    /// Whether the patch changes nothing.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -482,14 +538,14 @@ impl Patch {
         }
     }
 
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target, &self.before.worksheet)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "data-type-icon source closure".to_owned(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() {
@@ -516,39 +572,12 @@ impl Patch {
     }
 }
 
-/// A committed transaction and its reversible patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
     }
 
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
     }
 }

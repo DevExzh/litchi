@@ -7,7 +7,7 @@ use super::model::{
     STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
 };
 use super::{codec, invalid};
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use crate::error::{Error as XlsxError, Result as XlsxResult};
 use litchi_core::Resource;
 use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
@@ -24,7 +24,6 @@ const QUERY_TABLE_RELATIONSHIP: &str =
 const STRICT_QUERY_TABLE_RELATIONSHIP: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable";
 
-type SheetError = Box<dyn std::error::Error + Send + Sync>;
 type GraphResult<T> = std::result::Result<T, GraphError>;
 
 #[derive(Debug)]
@@ -45,24 +44,11 @@ impl From<litchi_opc::OpcError> for GraphError {
     }
 }
 
-impl From<SheetError> for GraphError {
-    fn from(error: SheetError) -> Self {
-        Self::Invalid(error.to_string())
-    }
-}
-
 impl GraphError {
     fn into_xlsx(self) -> XlsxError {
         match self {
             Self::Host(error) => error,
             Self::Invalid(error) => XlsxError::Invalid(error),
-        }
-    }
-
-    fn into_sheet(self) -> SheetError {
-        match self {
-            Self::Host(error) => Box::new(error),
-            Self::Invalid(error) => invalid(error),
         }
     }
 }
@@ -71,154 +57,6 @@ macro_rules! graph_invalid {
     ($value:expr $(,)?) => {
         GraphError::Invalid($value.to_string())
     };
-}
-
-/// Store or replace the workbook's connections part.
-///
-/// Storing always writes the part, so a signed package is refused with a
-/// boxed [`XlsxError::Signed`] before anything is changed, even when the
-/// serialized connections equal the stored ones: remove the signature
-/// explicitly first ([`OpcPackage::unsign`]).
-pub fn store_in_package(package: &mut OpcPackage, value: &Connections, strict: bool) -> Result<()> {
-    store_in_package_with_query_table_validator(package, value, strict, query_table_connection_id)
-}
-
-/// Store connections while allowing the migration host to retain its complete
-/// query-table parser for cross-part validation.
-#[doc(hidden)]
-pub fn store_in_package_with_query_table_validator<F>(
-    package: &mut OpcPackage,
-    value: &Connections,
-    strict: bool,
-    query_table_connection_id: F,
-) -> Result<()>
-where
-    F: Fn(&[u8]) -> Result<u32>,
-{
-    let xml = value.to_xml(strict)?;
-    validate_query_table_connection_ids(package, value, query_table_connection_id)?;
-    // Validate the existing graph after the caller-supplied query-table
-    // callback has established the value-level reference invariant. This
-    // preserves the callback's diagnostic precedence while rejecting foreign
-    // recognized edges and orphan/wrong-content-type parts before mutation.
-    validate_graph(package)?;
-    let workbook_name = package.main_document_part()?.partname().clone();
-    let existing = {
-        let workbook = package.get_part(&workbook_name)?;
-        let mut found = workbook.rels().iter().filter(|relationship| {
-            matches!(
-                relationship.reltype(),
-                CONNECTIONS_RELATIONSHIP | STRICT_CONNECTIONS_RELATIONSHIP
-            )
-        });
-        let first = found
-            .next()
-            .map(|relationship| {
-                if relationship.is_external() || target_has_suffix(relationship) {
-                    return Err(invalid(
-                        "connections relationship must target an internal part URI",
-                    ));
-                }
-                Ok((
-                    relationship.r_id().to_string(),
-                    relationship.target_partname()?,
-                ))
-            })
-            .transpose()?;
-        if found.next().is_some() {
-            return Err(invalid("workbook has multiple connections relationships"));
-        }
-        first
-    };
-    if let Some((_, part_name)) = existing {
-        let part = package.get_part(&part_name)?;
-        if part.content_type() != CONNECTIONS_CONTENT_TYPE {
-            return Err(invalid(
-                "existing connections part has invalid content type",
-            ));
-        }
-        crate::signature_policy::ensure_unsigned(package)?;
-        package.get_part_mut(&part_name)?.set_blob(xml);
-    } else {
-        let part_name = next_connections_part_name(package)?;
-        let relationship_id = next_connections_relationship_id(package, &workbook_name)?;
-        crate::signature_policy::ensure_unsigned(package)?;
-        package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
-            part_name.clone(),
-            CONNECTIONS_CONTENT_TYPE.into(),
-            xml,
-        )))?;
-        package
-            .get_part_mut(&workbook_name)?
-            .rels_mut()
-            .add_relationship(
-                if strict {
-                    STRICT_CONNECTIONS_RELATIONSHIP
-                } else {
-                    CONNECTIONS_RELATIONSHIP
-                }
-                .into(),
-                part_name.relative_ref(workbook_name.base_uri()),
-                relationship_id,
-                false,
-            );
-    }
-    Ok(())
-}
-
-/// Remove the workbook's connections relationship and its unreferenced part.
-///
-/// A workbook without connections is left untouched and returns `false`,
-/// signed or not. Removing the part changes the package, so a signed package
-/// is refused with a boxed [`XlsxError::Signed`]: remove the signature
-/// explicitly first ([`OpcPackage::unsign`]).
-pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
-    // Refuse to repair or partially remove an invalid graph. In particular,
-    // this keeps orphan query-table parts and foreign recognized edges from
-    // being hidden by deleting only the workbook owner.
-    validate_graph(package)?;
-    if package
-        .iter_parts()
-        .any(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
-    {
-        return Err(invalid(
-            "cannot remove connections while query-table parts remain",
-        ));
-    }
-    let workbook_name = package.main_document_part()?.partname().clone();
-    let relationship = package
-        .get_part(&workbook_name)?
-        .rels()
-        .iter()
-        .find(|relationship| {
-            matches!(
-                relationship.reltype(),
-                CONNECTIONS_RELATIONSHIP | STRICT_CONNECTIONS_RELATIONSHIP
-            )
-        })
-        .map(|relationship| {
-            if relationship.is_external() || target_has_suffix(relationship) {
-                return Err(invalid(
-                    "connections relationship must target an internal part URI",
-                ));
-            }
-            Ok(relationship
-                .target_partname()
-                .map(|part_name| (relationship.r_id().to_string(), part_name))?)
-        })
-        .transpose()?;
-    let Some((relationship_id, part_name)) = relationship else {
-        return Ok(false);
-    };
-    crate::signature_policy::ensure_unsigned(package)?;
-    package
-        .get_part_mut(&workbook_name)?
-        .rels_mut()
-        .remove(&relationship_id);
-    if !package_part_is_referenced(package, &part_name) {
-        package.remove_part(&part_name);
-    }
-    Ok(true)
 }
 
 fn validate_query_table_connection_ids<F>(
@@ -451,7 +289,7 @@ fn next_connections_part_name(package: &OpcPackage) -> Result<PackURI> {
         } else {
             format!("/xl/connections{suffix}.xml")
         };
-        let candidate = PackURI::new(&name)?;
+        let candidate = PackURI::new(&name).map_err(invalid)?;
         match package.get_part(&candidate) {
             Ok(_) => {},
             Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),
@@ -491,7 +329,7 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<Connections>> {
     load_from_package_with_parser(package, &|xml| {
         Connections::parse(xml).map_err(GraphError::from)
     })
-    .map_err(GraphError::into_sheet)
+    .map_err(GraphError::into_xlsx)
 }
 
 fn load_from_package_with_parser<P>(
@@ -547,7 +385,7 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
         &|xml| Connections::parse(xml).map_err(GraphError::from),
         &|xml| query_table_connection_id(xml).map_err(GraphError::from),
     )
-    .map_err(GraphError::into_sheet)
+    .map_err(GraphError::into_xlsx)
 }
 
 fn validate_graph_with_parsers<CP, QP>(
@@ -1014,17 +852,50 @@ fn detect_conformance(xml: &[u8]) -> Conformance {
     }
 }
 
-/// Failure-atomic edits over the workbook's inert connection catalog.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+crate::record::record_family!("connections");
+
+crate::record::no_limits!("connections");
+
+/// A staged, failure-atomic edit of the workbook's inert connection catalog
+/// of one [`crate::Package`].
+///
+/// Starting one reads the connection graph and copies no payload. Dropping
+/// the edit discards it; [`Self::commit`] publishes a new package.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     draft: Option<Connections>,
     strict: bool,
 }
 
-impl<'a> Transaction<'a> {
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+impl crate::Package {
+    /// Start an edit of the workbook's connection catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the validation errors of the connection graph.
+    pub fn edit_connections(&self) -> Result<Edit> {
+        Edit::start(crate::record::Source::new(self, "edit_connections")?)
+    }
+
+    /// Apply an exact connections patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_connections(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_connections")
+    }
+}
+
+impl Edit {
+    fn start(target: crate::record::Source) -> Result<Self> {
+        let before = Snapshot::load(&target)?;
         let strict = before.conformance.strict();
         Ok(Self {
             draft: before.connections.clone(),
@@ -1034,18 +905,21 @@ impl<'a> Transaction<'a> {
         })
     }
 
+    /// The source snapshot captured when the edit started.
     #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
+    /// The staged connection catalog, if any.
     #[must_use]
     pub fn connections(&self) -> Option<&Connections> {
         self.draft.as_ref()
     }
 
+    /// Replace the complete catalog; `None` removes the connections part.
     pub fn replace(&mut self, value: Option<Connections>) -> Result<bool> {
-        validate_draft(self.target, value.as_ref())?;
+        validate_draft(&self.target, value.as_ref())?;
         if self.draft == value {
             return Ok(false);
         }
@@ -1053,6 +927,7 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
+    /// Edit one connection in place; its ID is immutable.
     pub fn edit(
         &mut self,
         id: u32,
@@ -1069,9 +944,9 @@ impl<'a> Transaction<'a> {
             .ok_or_else(|| invalid(format!("connection ID {id} was not found")))?;
         edit(connection)?;
         if connection.id != id {
-            return Err(invalid("connection ID is immutable inside a transaction"));
+            return Err(invalid("connection ID is immutable inside an edit"));
         }
-        validate_draft(self.target, Some(&draft))?;
+        validate_draft(&self.target, Some(&draft))?;
         if self.draft.as_ref() == Some(&draft) {
             return Ok(false);
         }
@@ -1079,6 +954,7 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
+    /// Add a connection or replace the one with the same ID.
     pub fn set(&mut self, connection: Connection) -> Result<bool> {
         let mut draft = self.draft.clone().unwrap_or(Connections {
             connections: Vec::new(),
@@ -1095,11 +971,13 @@ impl<'a> Transaction<'a> {
         } else {
             draft.add(connection)?;
         }
-        validate_draft(self.target, Some(&draft))?;
+        validate_draft(&self.target, Some(&draft))?;
         self.draft = Some(draft);
         Ok(true)
     }
 
+    /// Remove one connection and return it; removing the last one removes
+    /// the connections part.
     pub fn remove(&mut self, id: u32) -> Result<Option<Connection>> {
         let mut draft = self
             .draft
@@ -1114,38 +992,54 @@ impl<'a> Transaction<'a> {
         };
         let removed = draft.connections.remove(index);
         if draft.connections.is_empty() {
-            validate_draft(self.target, None)?;
+            validate_draft(&self.target, None)?;
             self.draft = None;
         } else {
-            validate_draft(self.target, Some(&draft))?;
+            validate_draft(&self.target, Some(&draft))?;
             self.draft = Some(draft);
         }
         Ok(Some(removed))
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.draft.clone_from(&self.before.connections);
+    }
+
+    fn changed(&self) -> bool {
         self.before.connections.as_ref() != self.draft.as_ref()
     }
 
-    /// Validate and atomically publish the staged connections.
+    /// Validate and publish the staged connections as a new package.
     ///
-    /// A transaction without a change publishes nothing, so a signed package
+    /// An unchanged edit returns the source package, so a signed package
     /// keeps its signature byte for byte. A changed commit over a signed
-    /// package is refused with a boxed [`XlsxError::Signed`] and leaves it
-    /// untouched: remove the signature explicitly first
-    /// ([`OpcPackage::unsign`]).
+    /// package is refused with [`Error::Signed`]: remove the signature
+    /// explicitly first ([`crate::Package::unsign`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`], a stale-source error and the publication's
+    /// validation errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published snapshot.
+    fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
+            ));
         }
-        crate::signature_policy::ensure_unsigned(self.target)?;
-        let current = Snapshot::load(self.target)?;
+        crate::signature_policy::ensure_unsigned(&self.target)?;
+        let current = Snapshot::load(&self.target)?;
         if !current.same_source(&self.before) {
-            return Err(invalid("connections transaction source is stale"));
+            return Err(invalid("connections edit source is stale"));
         }
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         apply_connections(
             &mut candidate,
             self.before.connections.as_ref(),
@@ -1161,12 +1055,15 @@ impl<'a> Transaction<'a> {
             return Err(invalid("connection publication changed the staged model"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 }
 
-/// A reversible source-checked package edit.
+/// A reversible source-checked connections edit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Patch {
     before: Snapshot,
@@ -1178,21 +1075,25 @@ impl Patch {
         Self { before, after }
     }
 
+    /// Source state required before application.
     #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
+    /// Exact state produced by application.
     #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
+    /// Whether the patch changes nothing.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
+    /// The reverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
@@ -1205,16 +1106,14 @@ impl Patch {
     ///
     /// An empty patch publishes nothing and keeps a signed target exactly as
     /// it was. Any other patch changes the target, so a signed target is
-    /// refused up front with a boxed [`XlsxError::Signed`] (it used to be
-    /// changed in memory and refused only when saved): remove its signature
-    /// explicitly first ([`OpcPackage::unsign`]). The inverse never restores
-    /// a signature.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    /// refused up front with [`Error::Signed`]. The inverse never restores a
+    /// signature.
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(invalid("connections patch source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         crate::signature_policy::ensure_unsigned(target)?;
@@ -1229,42 +1128,17 @@ impl Patch {
     }
 }
 
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
     }
 
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
     }
 }
+
+crate::record::raw_test_route!(edit_connections);
 
 fn validate_draft(package: &OpcPackage, value: Option<&Connections>) -> Result<()> {
     if let Some(value) = value {

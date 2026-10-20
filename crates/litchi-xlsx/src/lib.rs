@@ -216,12 +216,7 @@ pub use data_consolidation::{
     DataConsolidation, Function, RangeReference, Reference, ReferenceSource, References,
     parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
 };
-pub use data_type_icons::{
-    Commit as DataTypeIconsCommit, Patch as DataTypeIconsPatch, SHOW_DATA_TYPE_ICONS_NAMESPACE,
-    ShowDataTypeIcons, Snapshot as DataTypeIconsSnapshot, Transaction as DataTypeIconsTransaction,
-    apply_patch as apply_data_type_icons_patch, edit as edit_data_type_icons,
-    load as load_data_type_icons,
-};
+pub use data_type_icons::{SHOW_DATA_TYPE_ICONS_NAMESPACE, ShowDataTypeIcons};
 pub use data_validation::{
     Collection, Conformance, ListSource, Range, Source, Sqref, Validation, ValidationErrorStyle,
     ValidationImeMode, ValidationOperator, ValidationType, parse_data_validation_collections,
@@ -265,7 +260,7 @@ pub use named_sheet_view::{
 pub use ole_objects::{
     Aspect, OleObject, OleObjectAnchor, OleObjectConformance, OleObjectMarker, OleObjectProperties,
     OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate, OleObjects,
-    load_ole_objects, parse_ole_objects, store_ole_objects, write_ole_objects,
+    load_ole_objects, parse_ole_objects, write_ole_objects,
 };
 pub use open_options::OpenOptions;
 pub use outline::{Outline, OutlineAt};
@@ -318,21 +313,16 @@ pub use query_table::{
     write_query_table,
 };
 pub use revisions::{
-    Commit as RevisionCommit, Patch as RevisionPatch, RevisionAttribute,
-    RevisionAttributeNamespace, RevisionConformance, RevisionHeader, RevisionHeaderProperties,
-    RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord, RevisionRecordKind,
-    RevisionUser, RevisionUsers, RevisionXmlElement, Revisions, Snapshot as RevisionSnapshot,
-    Transaction as RevisionTransaction, load_workbook_revisions, parse_revision_headers,
-    parse_revision_log, parse_revision_users, remove_workbook_revisions, store_workbook_revisions,
+    RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
+    RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
+    RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, Revisions,
+    load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
     write_revision_headers, write_revision_log, write_revision_users,
 };
 pub use rich_values::codec::{parse_feature_property_bags, write_feature_property_bags};
 pub use rich_values::package::load as load_rich_values;
 pub use rich_values::refresh_intervals::{
-    Commit as RichValueRefreshCommit, Patch as RichValueRefreshPatch, REFRESH_INTERVALS_NAMESPACE,
-    RefreshInterval, RefreshIntervals, Snapshot as RichValueRefreshSnapshot,
-    Transaction as RichValueRefreshTransaction, TypeRefreshIntervals,
-    apply_patch as apply_rich_value_refresh_patch, edit as edit_rich_value_refresh,
+    REFRESH_INTERVALS_NAMESPACE, RefreshInterval, RefreshIntervals, TypeRefreshIntervals,
     load as load_rich_value_refresh, parse_refresh_intervals, write_refresh_intervals,
 };
 pub use row::{Height, HeightAt, Row, Rows};

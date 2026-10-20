@@ -269,7 +269,7 @@ fn source_transaction_has_exact_noop_and_inverse_restore() {
     assert!(!noop.set_worksheet_view(0, None).unwrap());
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.changed());
-    assert!(noop_commit.patch().is_empty());
+    assert!(noop_commit.patch().is_noop());
     assert!(Arc::ptr_eq(&source, &noop_commit.snapshot().source_arc()));
 
     let mut edit = super::edit(&mut package, &worksheet).unwrap();
@@ -279,7 +279,7 @@ fn source_transaction_has_exact_noop_and_inverse_restore() {
     );
     let commit = edit.commit().unwrap();
     assert!(commit.changed());
-    assert!(!commit.patch().is_empty());
+    assert!(!commit.patch().is_noop());
     assert!(!commit.snapshot().worksheet_views()[0].unwrap().visible());
     let changed_xml = package.get_part(&worksheet).unwrap().blob().to_vec();
     assert!(

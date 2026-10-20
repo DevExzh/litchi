@@ -118,7 +118,8 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>
 /// was. Storing changes the package, so a signed package is refused with
 /// [`crate::Error::Signed`]: remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
-pub fn store_workbook_revisions(
+#[cfg(test)]
+pub(crate) fn store_workbook_revisions(
     package: &mut OpcPackage,
     value: &Revisions,
     conformance: RevisionConformance,
@@ -246,23 +247,6 @@ pub(crate) fn replace_workbook_revisions(
         },
     }
     Ok(())
-}
-
-/// Remove the complete workbook revision owner atomically.
-///
-/// A package without revisions is left untouched and returns `false`, signed
-/// or not. Removing an owner changes the package, so a signed package is
-/// refused with [`crate::Error::Signed`]: remove the signature explicitly
-/// first ([`OpcPackage::unsign`]).
-pub fn remove_workbook_revisions(package: &mut OpcPackage) -> Result<bool> {
-    let mut candidate = package.clone();
-    let Some(value) = load_workbook_revisions(&candidate)? else {
-        return Ok(false);
-    };
-    remove_workbook_revisions_inner(&mut candidate, &value)?;
-    validate_graph(&candidate)?;
-    *package = candidate;
-    Ok(true)
 }
 
 fn remove_workbook_revisions_inner(package: &mut OpcPackage, value: &Revisions) -> Result<()> {

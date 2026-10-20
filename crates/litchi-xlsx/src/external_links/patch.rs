@@ -4,7 +4,7 @@ use litchi_opc::OpcPackage;
 
 use super::package::apply_entries;
 use super::snapshot::Snapshot;
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 /// A reversible replacement of the workbook's external-link graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,7 +32,7 @@ impl Patch {
 
     /// Whether this patch is an exact source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -47,14 +47,14 @@ impl Patch {
 
     /// Apply atomically after checking the workbook owner and every owned
     /// external-link part.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: self.before.workbook_part_name().to_owned(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
 
@@ -76,44 +76,16 @@ impl Patch {
     }
 }
 
-/// Successful publication of one external-link transaction.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
+crate::record::record_family!("external-link");
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
+crate::record::no_limits!("external-link");
+
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
     }
 
-    /// Whether the workbook external-link owner changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Resulting immutable source snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
     }
 }

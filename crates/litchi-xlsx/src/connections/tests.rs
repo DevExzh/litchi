@@ -215,7 +215,7 @@ fn bounded_serializer_rejects_oversized_output_before_appending() {
         .unwrap_err();
     assert_eq!(
         error.to_string(),
-        "serialized connections part exceeds 16 MiB"
+        "invalid XLSX structure: serialized connections part exceeds 16 MiB"
     );
     assert!(output.bytes.is_empty());
 }
@@ -620,7 +620,7 @@ fn transaction_noop_and_stale_failure_are_source_checked() {
     assert!(!transaction.edit(1, |_connection| Ok(())).unwrap());
     let commit = transaction.commit().unwrap();
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert_eq!(Snapshot::load(&package).unwrap(), before);
 
     let patch = {

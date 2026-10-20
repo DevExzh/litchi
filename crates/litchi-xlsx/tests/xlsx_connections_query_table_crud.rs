@@ -1,9 +1,7 @@
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
-use litchi_xlsx::connections::{
-    Connection, Connections, CredentialsMethod, load_from_package, store_in_package,
-};
+use litchi_xlsx::Package;
+use litchi_xlsx::connections::{Connection, Connections, CredentialsMethod, load_from_package};
 use litchi_xlsx::query_table::{Conformance, Field, Refresh, Table};
 use litchi_xlsx::{
     add_worksheet_query_table, find_worksheet_query_table, load_worksheet_query_tables,
@@ -42,24 +40,20 @@ fn connection(id: u32, name: &str) -> Connection {
 }
 
 fn package() -> (OpcPackage, PackURI) {
-    let mut package = OpcPackage::new();
-    let workbook_name = PackURI::new("/xl/workbook.xml").unwrap();
-    let worksheet_name = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
-    let mut workbook = BlobPart::new(
-        workbook_name.clone(),
-        ct::SML_SHEET_MAIN.into(),
-        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
-            .to_vec(),
-    );
-    workbook.relate_to("worksheets/sheet1.xml", rt::WORKSHEET);
-    package.add_part(Box::new(workbook));
-    package.add_part(Box::new(BlobPart::new(
-        worksheet_name.clone(),
-        ct::SML_WORKSHEET.into(),
-        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec(),
-    )));
-    package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
-    (package, worksheet_name)
+    (
+        Package::new().unwrap().into_plain_opc(),
+        PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+    )
+}
+
+/// Store `connections` through the connections family.
+fn store_connections(package: &mut OpcPackage, connections: &Connections) {
+    let mut edit = Package::from_opc(package.clone())
+        .unwrap()
+        .edit_connections()
+        .unwrap();
+    edit.replace(Some(connections.clone())).unwrap();
+    *package = edit.commit().unwrap().into_package().into_plain_opc();
 }
 
 fn table(name: &str, connection_id: u32) -> Table {
@@ -87,7 +81,7 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
         connections: vec![connection(1, "first"), connection(2, "second")],
     };
     connections.reorder(&[2, 1]).unwrap();
-    store_in_package(&mut package, &connections, false).unwrap();
+    store_connections(&mut package, &connections);
     assert_eq!(
         load_from_package(&package).unwrap().unwrap().connections[0].id,
         2
@@ -146,14 +140,12 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
 #[test]
 fn missing_connection_and_bad_reorder_are_atomic() {
     let (mut package, worksheet) = package();
-    store_in_package(
+    store_connections(
         &mut package,
         &Connections {
             connections: vec![connection(1, "only")],
         },
-        false,
-    )
-    .unwrap();
+    );
     assert!(
         add_worksheet_query_table(
             &mut package,
@@ -187,14 +179,12 @@ fn missing_connection_and_bad_reorder_are_atomic() {
 #[test]
 fn removal_preserves_a_query_table_target_shared_by_another_part() {
     let (mut package, worksheet) = package();
-    store_in_package(
+    store_connections(
         &mut package,
         &Connections {
             connections: vec![connection(1, "only")],
         },
-        false,
-    )
-    .unwrap();
+    );
     let added = add_worksheet_query_table(
         &mut package,
         &worksheet,

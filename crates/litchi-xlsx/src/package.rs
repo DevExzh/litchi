@@ -636,6 +636,27 @@ impl Package {
         self.save_encrypted(path, password, mode)
     }
 
+    /// The part name of the worksheet `sheet` selects, for a staged edit of
+    /// `operation`: a selector that matches no sheet is a `NotFound` refusal,
+    /// and a chart or dialog sheet is [`crate::Error::NotWorksheet`].
+    pub(crate) fn worksheet_part<'a>(
+        &self,
+        sheet: impl Into<crate::workbook::Selector<'a>>,
+        operation: &'static str,
+    ) -> Result<PackURI> {
+        let worksheet = self.workbook.sheet(sheet)?.ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::NotFound,
+            operation,
+            "the worksheet selector matches no sheet",
+        ))?;
+        if worksheet.kind() != crate::workbook::WorksheetKind::Worksheet {
+            return Err(crate::Error::NotWorksheet {
+                sheet: worksheet.name().to_owned(),
+            });
+        }
+        Ok(worksheet.part_uri().clone())
+    }
+
     /// A new package publishing `opc`, validated as a complete workbook,
     /// under this package's policies (leniency, limits and encryption
     /// provenance) and sharing its style lineage. This package is unchanged.

@@ -5,6 +5,12 @@
 //! `showDataTypeIconsCustomSheetView` belongs to a Named Sheet View.  This
 //! module only parses and edits that metadata.  It never computes or displays
 //! an icon and never performs a refresh or other external action.
+//!
+//! [`crate::Package::edit_data_type_icons`] starts an [`Edit`] of one
+//! worksheet's metadata; [`Edit::commit`] returns a [`Commit`] holding the
+//! new package, the exact [`Patch`] and the [`Diagnostics`], and
+//! [`crate::Package::apply_data_type_icons`] replays a patch. The source
+//! package never changes.
 
 pub(crate) mod codec;
 mod model;
@@ -13,7 +19,9 @@ mod package;
 mod tests;
 
 pub use model::ShowDataTypeIcons;
-pub use package::{Commit, Patch, Snapshot, Transaction, apply_patch, edit, load};
+#[cfg(test)]
+pub(crate) use package::edit;
+pub use package::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapshot, load};
 
 pub const SHOW_DATA_TYPE_ICONS_NAMESPACE: &str =
     "http://schemas.microsoft.com/office/spreadsheetml/2023/showDataTypeIcons";
@@ -45,6 +53,6 @@ pub(crate) const MAX_PART_BYTES: usize = 32 * 1024 * 1024;
 pub(crate) const MAX_DEPTH: usize = 256;
 pub(crate) const MAX_NODES: usize = 100_000;
 
-pub(crate) fn invalid(value: impl Into<String>) -> crate::Error {
-    crate::Error::Invalid(value.into())
+pub(crate) fn invalid(value: impl Into<String>) -> Error {
+    Error::Invalid(value.into())
 }

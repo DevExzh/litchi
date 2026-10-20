@@ -1,9 +1,7 @@
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_xlsx::connections::{
-    Connection, Connections, CredentialsMethod, load_from_package, store_in_package,
-};
+use litchi_xlsx::Package;
+use litchi_xlsx::connections::{Connection, Connections, CredentialsMethod, load_from_package};
 
 fn connection(id: u32) -> Connection {
     Connection {
@@ -37,16 +35,13 @@ fn connection(id: u32) -> Connection {
 }
 
 fn package() -> OpcPackage {
-    let mut package = OpcPackage::new();
-    let workbook = PackURI::new("/xl/workbook.xml").unwrap();
-    package.add_part(Box::new(BlobPart::new(
-        workbook,
-        ct::SML_SHEET_MAIN.into(),
-        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
-            .to_vec(),
-    )));
-    package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
-    package
+    Package::new().unwrap().into_plain_opc()
+}
+
+fn store(package: OpcPackage, value: Connections) -> litchi_xlsx::Result<OpcPackage> {
+    let mut edit = Package::from_opc(package)?.edit_connections()?;
+    edit.replace(Some(value))?;
+    Ok(edit.commit()?.into_package().into_plain_opc())
 }
 
 #[test]
@@ -54,12 +49,10 @@ fn standalone_connections_api_uses_the_canonical_owner() {
     let value = Connections {
         connections: vec![connection(7)],
     };
-    let mut package = package();
-
     fn accepts_canonical_owner(_: &Connections) {}
     accepts_canonical_owner(&value);
 
-    store_in_package(&mut package, &value, false).unwrap();
+    let package = store(package(), value).unwrap();
     let forwarded = load_from_package(&package).unwrap().unwrap();
     let canonical = load_from_package(&package).unwrap().unwrap();
     assert_eq!(forwarded, canonical);
@@ -75,14 +68,20 @@ fn standalone_adapter_retains_query_table_reference_validation() {
         br#"<queryTable xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="Q" connectionId="99"/>"#.to_vec(),
     )));
 
-    let error = store_in_package(
-        &mut package,
-        &Connections {
+    let error = store(
+        package.clone(),
+        Connections {
             connections: vec![connection(7)],
         },
-        false,
     )
     .unwrap_err();
-    assert!(error.to_string().contains("missing connection ID 99"));
+    // The edit starts from a validated graph, so the orphan query table is
+    // refused before the staged catalog's reference check runs.
+    assert!(
+        error
+            .to_string()
+            .contains("query-table parts require a workbook connections part"),
+        "{error}"
+    );
     assert!(load_from_package(&package).unwrap().is_none());
 }

@@ -1,5 +1,6 @@
 //! Regression tests for the layered external-link owner.
 
+use super::package::{add_external_link, remove_external_link, replace_external_link};
 use super::*;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};

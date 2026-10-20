@@ -4,29 +4,34 @@ use litchi_opc::OpcPackage;
 
 use super::model::{AlternateUrls, Link};
 use super::package::apply_entries;
-use super::patch::{Commit, Patch};
+use super::patch::{Commit, Diagnostics, Patch};
 use super::snapshot::{Snapshot, next_part_uri};
 use super::validation;
 use crate::error::{Result, invalid};
 
-/// A typed transaction over the workbook's external-link catalog.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+/// A staged, source-bound edit of the workbook's external-link catalog of
+/// one [`crate::Package`]. Dropping it discards it; [`Self::commit`]
+/// publishes a new package.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     draft: Vec<super::package::Entry>,
     next_relationship_id: String,
     next_part_uri: litchi_opc::PackURI,
+    first_part_uri: litchi_opc::PackURI,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction after validating and capturing the workbook graph.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
-        let next_part_uri = next_part_uri(target)?;
+impl Edit {
+    /// Start an edit after validating and capturing the workbook graph.
+    fn start(target: crate::record::Source) -> Result<Self> {
+        let before = Snapshot::load(&target)?;
+        let next_part_uri = next_part_uri(&target)?;
         Ok(Self {
             target,
             draft: before.entries().to_vec(),
             next_relationship_id: before.next_relationship_id().to_owned(),
+            first_part_uri: next_part_uri.clone(),
             next_part_uri,
             before,
         })
@@ -111,7 +116,7 @@ impl<'a> Transaction<'a> {
         }
         self.next_relationship_id = next_relationship_id_after(&relationship_id);
         let part_uri = self.next_part_uri.clone();
-        self.next_part_uri = next_part_uri_after(&part_uri, self.target)?;
+        self.next_part_uri = next_part_uri_after(&part_uri, &self.target)?;
         let index = self.draft.len();
         let wire_index =
             u32::try_from(index).map_err(|_source| invalid("external-link index exceeds u32"))?;
@@ -139,20 +144,41 @@ impl<'a> Transaction<'a> {
         Ok(Some(removed))
     }
 
-    /// Whether staged entries differ from the captured source graph.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn changed(&self) -> bool {
         self.before.entries() != self.draft.as_slice()
     }
 
-    /// Validate and atomically publish the staged graph.
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.draft = self.before.entries().to_vec();
+        self.before
+            .next_relationship_id()
+            .clone_into(&mut self.next_relationship_id);
+        self.next_part_uri.clone_from(&self.first_part_uri);
+    }
+
+    /// Validate and publish the staged graph as a new package. An unchanged
+    /// edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when the source changed and
+    /// the publication's validation errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published snapshot.
+    pub(super) fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
+            ));
         }
 
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         let current = Snapshot::load(&candidate)?;
         if !current.same_source(&self.before) {
             return Err(crate::error::Error::PatchConflict {
@@ -172,10 +198,39 @@ impl<'a> Transaction<'a> {
             ));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 }
+
+impl crate::Package {
+    /// Start an edit of the workbook's external-link catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the validation errors of the external-link graph.
+    pub fn edit_external_links(&self) -> Result<Edit> {
+        Edit::start(crate::record::Source::new(self, "edit_external_links")?)
+    }
+
+    /// Apply an exact external-link patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when this package is not the
+    /// patch's before state and [`crate::Error::Signed`] for a changed patch
+    /// of a signed workbook.
+    pub fn apply_external_links(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_external_links")
+    }
+}
+
+crate::record::raw_test_route!(edit_external_links);
 
 fn next_relationship_id_after(current: &str) -> String {
     let number = current

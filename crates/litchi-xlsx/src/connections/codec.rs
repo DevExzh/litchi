@@ -9,7 +9,7 @@ use super::model::{
     TextImportProperties, TextQualifier, WebQueryProperties, WebTableSelector, validate,
 };
 use super::namespace::{NamespaceContext, NamespaceDecl, NamespaceLimits};
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use crate::error::{Error as XlsxError, Result as XlsxResult};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -1829,7 +1829,7 @@ en!(parse_qualifier,qualifier_str,TextQualifier,"doubleQuote"=>TextQualifier::Do
 en!(parse_parameter_type,parameter_str,ParameterType,"prompt"=>ParameterType::Prompt,"value"=>ParameterType::Value,"cell"=>ParameterType::Cell);
 en!(parse_field,field_str,TextFieldType,"general"=>TextFieldType::General,"text"=>TextFieldType::Text,"MDY"=>TextFieldType::MonthDayYear,"DMY"=>TextFieldType::DayMonthYear,"YMD"=>TextFieldType::YearMonthDay,"MYD"=>TextFieldType::MonthYearDay,"DYM"=>TextFieldType::DayYearMonth,"YDM"=>TextFieldType::YearDayMonth,"skip"=>TextFieldType::Skip,"EMD"=>TextFieldType::EastAsianYearMonthDay);
 
-fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
+fn xml_error(e: impl std::fmt::Display) -> crate::Error {
     invalid(e.to_string())
 }
 
@@ -4380,7 +4380,10 @@ mod tests {
             }],
         )
         .unwrap_err();
-        assert_eq!(error.to_string(), "connection source output exceeds 16 MiB");
+        assert_eq!(
+            error.to_string(),
+            "invalid XLSX structure: connection source output exceeds 16 MiB"
+        );
     }
 
     #[test]

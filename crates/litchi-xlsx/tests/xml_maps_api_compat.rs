@@ -1,4 +1,4 @@
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+use litchi_xlsx::Result;
 use litchi_xlsx::xml_maps::{
     DataBinding, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema, XmlSchema,
     parse_map_info, parse_xml_map_info, serialize_map_info, serialize_xml_map_info,
@@ -50,7 +50,7 @@ fn legacy_types_struct_literals_and_inherent_methods_remain_usable() -> Result<(
 }
 
 #[test]
-fn xlsx_adapters_retain_the_boxed_error_result_surface() -> Result<()> {
+fn xlsx_adapters_return_the_typed_crate_result() -> Result<()> {
     let _: fn(&[u8]) -> Result<XmlMapInfo> = XmlMapInfo::parse;
     let _: fn(&XmlMapInfo, bool) -> Result<Vec<u8>> = XmlMapInfo::to_xml;
     let _: fn(&[u8]) -> Result<XmlMapInfo> = parse_xml_map_info;

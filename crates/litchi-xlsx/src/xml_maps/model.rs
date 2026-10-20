@@ -1,6 +1,6 @@
 //! XLSX-owned compatibility model for `SpreadsheetML` Custom XML Maps.
 
-use crate::BoxedResult as Result;
+use crate::error::Result;
 
 use super::invalid;
 

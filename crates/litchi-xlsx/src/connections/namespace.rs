@@ -1,7 +1,7 @@
 //! Persistent, bounded namespace environments for source and typed XML trees.
 
 use super::invalid;
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,

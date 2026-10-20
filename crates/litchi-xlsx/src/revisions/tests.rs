@@ -72,17 +72,13 @@ fn value() -> Revisions {
 }
 fn package() -> OpcPackage {
     let mut p = OpcPackage::new();
-    p.rels_mut().add_relationship(
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument".into(),
-        "xl/workbook.xml".into(),
-        "rId1".into(),
-        false,
-    );
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     p.add_part(Box::new(BlobPart::new(
-        PackURI::new("/xl/workbook.xml").unwrap(),
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".into(),
-        Vec::new(),
+        worksheet.clone(),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml".into(),
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec(),
     )));
+    crate::record::adopt_worksheet(&mut p, &worksheet, false);
     p
 }
 #[test]
@@ -181,7 +177,7 @@ fn transaction_noop_preserves_package_bytes() {
     assert!(!transaction.replace(staged).unwrap());
     let commit = transaction.commit().unwrap();
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert_eq!(owner_bytes(&package), before);
 }
 

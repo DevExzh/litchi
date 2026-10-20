@@ -354,7 +354,13 @@ impl PartPatch {
             return Ok(package.clone());
         }
         package.workbook_ref().ensure_mutation_allowed(operation)?;
-        let source = package.opc();
+        let target = self.apply_graph(package.opc())?;
+        package.derive(target)
+    }
+
+    /// Replay onto a copy of the OPC graph `source`, refusing a graph that is
+    /// not the patch's before state; `source` is unchanged.
+    pub(crate) fn apply_graph(&self, source: &OpcPackage) -> Result<OpcPackage> {
         if let Some((before, _)) = &self.root
             && relationships(source.rels()) != *before
         {
@@ -393,7 +399,7 @@ impl PartPatch {
         if let Some((_, after)) = &self.manifests {
             after.restore(&mut target)?;
         }
-        package.derive(target)
+        Ok(target)
     }
 }
 

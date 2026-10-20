@@ -2,7 +2,7 @@
 
 use litchi_opc::OpcPackage;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 use super::package::{replace_workbook_revisions, restore_snapshot_source};
 use super::snapshot::Snapshot;
@@ -33,7 +33,7 @@ impl Patch {
 
     /// Whether this patch preserves the exact source owner.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -52,14 +52,14 @@ impl Patch {
     /// it was. Any other patch changes the target, so a signed target is
     /// refused with [`Error::Signed`]: remove its signature explicitly first
     /// ([`OpcPackage::unsign`]). The inverse never restores a signature.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: self.before.workbook_part_name().to_owned(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         crate::signature_policy::ensure_unsigned(target)?;
@@ -84,44 +84,16 @@ impl Patch {
     }
 }
 
-/// Successful publication of one revision transaction.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
+crate::record::record_family!("revision");
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
+crate::record::no_limits!("revision");
+
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
     }
 
-    /// Whether the revision owner changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Resulting immutable source snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
     }
 }

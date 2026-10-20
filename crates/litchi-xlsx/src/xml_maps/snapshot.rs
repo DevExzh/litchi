@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use litchi_opc::{OpcError, OpcPackage, PackURI, Part, TargetMode};
 
 use super::model::{REL, STRICT_REL, XmlMapConformance, XmlMapInfo};

@@ -39,7 +39,10 @@ impl Source {
 
     /// Validate `staged` as a complete workbook and publish it as a new
     /// package under the source's policies.
+    /// A changed graph of a signed package is refused with
+    /// [`crate::Error::Signed`] (ADR 0006).
     pub(crate) fn publish(&self, staged: OpcPackage) -> Result<Package> {
+        crate::signature_policy::ensure_unsigned(self.package.opc())?;
         self.package.derive(staged)
     }
 }
@@ -64,16 +67,20 @@ pub(crate) trait Record: Clone {
 
 /// Replay `patch` onto `package` and publish the result as a new package;
 /// `package` is unchanged. A no-op patch whose source state matches returns
-/// `package` itself.
+/// `package` itself; a changed patch of a signed package is refused with
+/// [`crate::Error::Signed`] before its source state is checked.
 pub(crate) fn replay<P: Record>(
     package: &Package,
     patch: &P,
     operation: &'static str,
 ) -> Result<litchi_core::edit::Commit<Package, P>> {
     package.workbook_ref().ensure_mutation_allowed(operation)?;
+    let changed = !patch.is_noop();
+    if changed {
+        crate::signature_policy::ensure_unsigned(package.opc())?;
+    }
     let mut candidate = package.opc().clone();
     patch.apply_to(&mut candidate)?;
-    let changed = !patch.is_noop();
     let after = if changed {
         package.derive(candidate)?
     } else {
@@ -99,6 +106,92 @@ macro_rules! record_family {
 }
 
 pub(crate) use record_family;
+
+/// The typed budgets of a record family that has none of its own: its fixed
+/// bounds are still reported as `Error::Invalid` (record 0360 gap).
+macro_rules! no_limits {
+    ($what:literal) => {
+        #[doc = concat!("The typed budgets of the ", $what, " family.")]
+        ///
+        /// The family has none yet: its fixed bounds are reported as
+        /// `Error::Invalid`, so this enum has no variant.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum LimitKind {}
+    };
+}
+
+pub(crate) use no_limits;
+
+/// A raw-graph route over a record family's `Edit`, for the unit tests that
+/// author bare graphs: `Transaction::new(&mut graph, ..)` adopts the graph as
+/// a package, starts `Package::$entry(..)`, and `commit` writes the
+/// published graph back. The family's `Edit` provides
+/// `fn publish(self) -> Result<(Commit, Snapshot)>`.
+macro_rules! raw_test_route {
+    ($entry:ident $(, $arg:ident : $ty:ty => $map:expr)*) => {
+        #[cfg(test)]
+        pub(crate) struct Transaction<'a> {
+            target: crate::record::TestTarget<'a>,
+            edit: Edit,
+        }
+
+        #[cfg(test)]
+        impl<'a> Transaction<'a> {
+            pub(crate) fn new(
+                target: impl Into<crate::record::TestTarget<'a>>,
+                $($arg: $ty,)*
+            ) -> crate::error::Result<Self> {
+                let target = target.into();
+                let package = target.package()?;
+                let edit = package.$entry($(($map)(&package, $arg)?),*)?;
+                Ok(Self { target, edit })
+            }
+
+            pub(crate) fn commit(
+                self,
+            ) -> crate::error::Result<crate::record::RawCommit<Snapshot, Patch>> {
+                let (commit, snapshot) = self.edit.publish()?;
+                let changed = commit.diagnostics().changed();
+                let (package, patch) = commit.into_parts();
+                self.target.store(package);
+                Ok(crate::record::RawCommit {
+                    snapshot,
+                    patch,
+                    changed,
+                })
+            }
+        }
+
+        #[cfg(test)]
+        impl std::ops::Deref for Transaction<'_> {
+            type Target = Edit;
+
+            fn deref(&self) -> &Edit {
+                &self.edit
+            }
+        }
+
+        #[cfg(test)]
+        impl std::ops::DerefMut for Transaction<'_> {
+            fn deref_mut(&mut self) -> &mut Edit {
+                &mut self.edit
+            }
+        }
+    };
+}
+
+pub(crate) use raw_test_route;
+
+/// The catalog position of the sheet whose part is `part`, for the raw test
+/// routes of worksheet-scoped families.
+#[cfg(test)]
+pub(crate) fn sheet_of(package: &Package, part: &litchi_opc::PackURI) -> Result<usize> {
+    package
+        .workbook_ref()
+        .sheets()
+        .position(|sheet| sheet.part_uri().is_equivalent_to(part))
+        .ok_or_else(|| crate::error::invalid("no sheet owns the worksheet part"))
+}
 
 /// A commit of a record edit run directly over a raw OPC graph, for the
 /// unit tests that author bare graphs: the published graph is written back
@@ -164,4 +257,54 @@ impl<'a> From<&'a mut Package> for TestTarget<'a> {
     fn from(package: &'a mut Package) -> Self {
         Self::Package(package)
     }
+}
+
+/// Make a bare graph holding the worksheet part `worksheet` a complete
+/// workbook for the raw test routes: add a workbook part (in the Strict
+/// namespace when `strict`) whose only sheet is that worksheet, and the
+/// package's main-document relationship.
+#[cfg(test)]
+pub(crate) fn adopt_worksheet(
+    package: &mut OpcPackage,
+    worksheet: &litchi_opc::PackURI,
+    strict: bool,
+) {
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+    let (main, relationships, office, sheet) = if strict {
+        (
+            "http://purl.oclc.org/ooxml/spreadsheetml/main",
+            "http://purl.oclc.org/ooxml/officeDocument/relationships",
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument",
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet",
+        )
+    } else {
+        (
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            rt::OFFICE_DOCUMENT,
+            rt::WORKSHEET,
+        )
+    };
+    let workbook = litchi_opc::PackURI::new("/xl/workbook.xml").expect("static part name");
+    let mut part = litchi_opc::BlobPart::new(
+        workbook.clone(),
+        ct::SML_SHEET_MAIN.into(),
+        format!(
+            "<workbook xmlns=\"{main}\" xmlns:r=\"{relationships}\"><sheets><sheet name=\"Sheet1\" sheetId=\"1\" r:id=\"rIdSheet1\"/></sheets></workbook>"
+        )
+        .into_bytes(),
+    );
+    litchi_opc::Part::rels_mut(&mut part).add_relationship(
+        sheet.into(),
+        worksheet.relative_ref(workbook.base_uri()),
+        "rIdSheet1".into(),
+        false,
+    );
+    package.add_part(Box::new(part));
+    package.rels_mut().add_relationship(
+        office.into(),
+        "xl/workbook.xml".into(),
+        "rIdWorkbook".into(),
+        false,
+    );
 }

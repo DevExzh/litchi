@@ -6,26 +6,48 @@ use crate::error::{Result, invalid};
 
 use super::model::{RevisionHeader, RevisionLogPart, RevisionRecord, RevisionUser, Revisions};
 use super::package::replace_workbook_revisions;
-use super::patch::{Commit, Patch};
+use super::patch::{Commit, Diagnostics, Patch};
 use super::snapshot::Snapshot;
 use super::validation;
 
-/// Failure-atomic edits over the workbook revision owner.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+/// The configuration of a revision edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    conformance: Option<super::model::RevisionConformance>,
+}
+
+impl EditOptions {
+    /// Write a newly created revision owner in `conformance` instead of the
+    /// existing owner's conformance (Transitional when the workbook has no
+    /// revision owner).
+    #[must_use]
+    pub const fn conformance(mut self, conformance: super::model::RevisionConformance) -> Self {
+        self.conformance = Some(conformance);
+        self
+    }
+}
+
+/// A staged, failure-atomic edit of the workbook revision owner of one
+/// [`crate::Package`]. Dropping it discards it; [`Self::commit`] publishes a
+/// new package.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     draft: Option<Revisions>,
     conformance: super::model::RevisionConformance,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction from the package's main workbook.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+impl Edit {
+    /// Start an edit from the package's main workbook.
+    fn start(target: crate::record::Source, options: EditOptions) -> Result<Self> {
+        let before = Snapshot::load(&target)?;
         let draft = before.revisions().cloned();
-        let conformance = before
-            .conformance()
-            .unwrap_or(super::model::RevisionConformance::Transitional);
+        let conformance = options.conformance.unwrap_or_else(|| {
+            before
+                .conformance()
+                .unwrap_or(super::model::RevisionConformance::Transitional)
+        });
         Ok(Self {
             target,
             before,
@@ -265,35 +287,117 @@ impl<'a> Transaction<'a> {
         Ok(Some(removed))
     }
 
-    /// Whether staged semantics differ from the source semantics.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.draft = self.before.revisions().cloned();
+    }
+
+    fn changed(&self) -> bool {
         self.before.revisions() != self.draft.as_ref()
     }
 
     /// Validate and publish the staged owner atomically.
     ///
-    /// A transaction without a change publishes nothing, so a signed package
-    /// keeps its signature byte for byte. A changed commit over a signed
-    /// package is refused with [`crate::Error::Signed`] and leaves it
-    /// untouched: remove the signature explicitly first
-    /// ([`OpcPackage::unsign`]).
+    /// An edit without a change returns the source package, so a signed
+    /// package keeps its signature byte for byte. A changed commit over a
+    /// signed package is refused with [`crate::Error::Signed`]: remove the
+    /// signature explicitly first ([`crate::Package::unsign`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Signed`] and the publication's validation
+    /// errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published snapshot.
+    pub(super) fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
+            ));
         }
-        crate::signature_policy::ensure_unsigned(self.target)?;
-        let mut candidate = self.target.clone();
+        crate::signature_policy::ensure_unsigned(&self.target)?;
+        let mut candidate = OpcPackage::clone(&self.target);
         replace_workbook_revisions(&mut candidate, self.draft.as_ref(), self.conformance)?;
         let snapshot = Snapshot::load(&candidate)?;
-        if snapshot.revisions() != self.draft.as_ref() {
+        if !same_model(snapshot.revisions(), self.draft.as_ref()) {
             return Err(invalid(
                 "revision package publication changed the staged model",
             ));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
+}
+
+impl crate::Package {
+    /// Start an edit of the workbook's revision metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the validation errors of the revision metadata graph.
+    pub fn edit_revisions(&self) -> Result<Edit> {
+        self.edit_revisions_with_options(EditOptions::default())
+    }
+
+    /// Start a revision edit with explicit options.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::edit_revisions`].
+    pub fn edit_revisions_with_options(&self, options: EditOptions) -> Result<Edit> {
+        Edit::start(crate::record::Source::new(self, "edit_revisions")?, options)
+    }
+
+    /// Apply an exact revision metadata patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when this package is not the
+    /// patch's before state and [`crate::Error::Signed`] for a changed patch
+    /// of a signed workbook.
+    pub fn apply_revisions(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_revisions")
+    }
+}
+
+crate::record::raw_test_route!(edit_revisions);
+
+/// Whether two revision owners are equal up to the order of XML attributes,
+/// which the writer serializes canonically.
+fn same_model(left: Option<&Revisions>, right: Option<&Revisions>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => left == right || canonical(left) == canonical(right),
+        _ => false,
+    }
+}
+
+fn canonical(value: &Revisions) -> Revisions {
+    fn element(value: &mut super::model::RevisionXmlElement) {
+        value.attributes.sort_by(|left, right| {
+            (&left.namespace, &left.name).cmp(&(&right.namespace, &right.name))
+        });
+        value.children.iter_mut().for_each(element);
+    }
+    let mut value = value.clone();
+    for log in &mut value.logs {
+        for record in &mut log.log.records {
+            record.attributes.sort_by(|left, right| {
+                (&left.namespace, &left.name).cmp(&(&right.namespace, &right.name))
+            });
+            record.children.iter_mut().for_each(element);
+        }
+    }
+    value
 }

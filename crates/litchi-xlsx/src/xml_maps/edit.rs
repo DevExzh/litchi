@@ -1,45 +1,51 @@
 //! Failure-atomic, source-bound edits for workbook Custom XML Maps.
 
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use litchi_opc::OpcPackage;
 
 use super::codec;
 use super::invalid;
 use super::model::{XmlMap, XmlMapConformance, XmlMapInfo, XmlMapSchema};
 use super::package;
-use super::patch::{Commit, Patch};
+use super::patch::{Commit, Diagnostics, Patch};
 use super::snapshot::Snapshot;
 
-/// A typed transaction over the workbook's single Custom XML Maps owner.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+/// The configuration of a Custom XML Maps edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    conformance: Option<XmlMapConformance>,
+}
+
+impl EditOptions {
+    /// Publish in `conformance` instead of the existing owner's source
+    /// conformance.
+    #[must_use]
+    pub const fn conformance(mut self, conformance: XmlMapConformance) -> Self {
+        self.conformance = Some(conformance);
+        self
+    }
+}
+
+/// A staged, source-bound edit of the workbook's single Custom XML Maps
+/// owner of one [`crate::Package`]. Dropping it discards it;
+/// [`Self::commit`] publishes a new package.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     draft: Option<XmlMapInfo>,
     conformance: XmlMapConformance,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction after validating and capturing the workbook graph.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+impl Edit {
+    fn start(target: crate::record::Source, options: EditOptions) -> Result<Self> {
+        let before = Snapshot::load(&target)?;
         Ok(Self {
             target,
             draft: before.info().cloned(),
-            conformance: before.conformance(),
+            conformance: options.conformance.unwrap_or_else(|| before.conformance()),
             before,
         })
-    }
-
-    /// Start a transaction and select the conformance for newly published XML.
-    /// Existing owners are retained in their source conformance by [`Self::new`]
-    /// unless this explicit constructor is used.
-    pub fn new_with_conformance(
-        target: &'a mut OpcPackage,
-        conformance: XmlMapConformance,
-    ) -> Result<Self> {
-        let mut transaction = Self::new(target)?;
-        transaction.conformance = conformance;
-        Ok(transaction)
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
@@ -148,7 +154,7 @@ impl<'a> Transaction<'a> {
         })
     }
 
-    /// Remove one schema by ID, retaining the transaction on validation failure.
+    /// Remove one schema by ID, retaining the edit on validation failure.
     pub fn remove_schema(&mut self, id: &str) -> Result<Option<XmlMapSchema>> {
         let mut draft = self.draft.clone().ok_or_else(|| {
             invalid("cannot remove a schema from an absent custom XML maps owner")
@@ -191,7 +197,7 @@ impl<'a> Transaction<'a> {
         })
     }
 
-    /// Remove one map by ID, retaining the transaction on validation failure.
+    /// Remove one map by ID, retaining the edit on validation failure.
     pub fn remove_map(&mut self, id: u32) -> Result<Option<XmlMap>> {
         let mut draft = self
             .draft
@@ -211,33 +217,48 @@ impl<'a> Transaction<'a> {
         Ok(self.draft.take())
     }
 
-    /// Whether staged semantics or publication conformance differ from source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    /// Discard every staged change, keeping the publication conformance.
+    pub fn reset(&mut self) {
+        self.draft = self.before.info().cloned();
+    }
+
+    fn changed(&self) -> bool {
         self.before.info() != self.draft.as_ref()
             || (self.draft.is_some() && self.before.conformance() != self.conformance)
     }
 
-    /// Validate and atomically publish the staged owner.
+    /// Validate and publish the staged owner as a new package.
     ///
-    /// A transaction without a change publishes nothing, so a signed package
-    /// keeps its signature byte for byte. A changed commit over a signed
-    /// package is refused with a boxed [`crate::Error::Signed`] and leaves it
-    /// untouched: remove the signature explicitly first
-    /// ([`OpcPackage::unsign`]).
+    /// An edit without a change returns the source package, so a signed
+    /// package keeps its signature byte for byte. A changed commit over a
+    /// signed package is refused with [`crate::Error::Signed`]: remove the
+    /// signature explicitly first ([`crate::Package::unsign`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Signed`], a stale-source error and the
+    /// publication's validation errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published snapshot.
+    pub(super) fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
+            ));
         }
-        crate::signature_policy::ensure_unsigned(self.target)?;
+        crate::signature_policy::ensure_unsigned(&self.target)?;
 
-        let current = Snapshot::load(self.target)?;
+        let current = Snapshot::load(&self.target)?;
         if !current.same_source(&self.before) {
-            return Err(invalid("custom XML maps transaction source is stale"));
+            return Err(invalid("custom XML maps edit source is stale"));
         }
 
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         match (self.before.info(), self.draft.as_ref()) {
             (Some(before), Some(after)) => {
                 let source = self
@@ -271,10 +292,48 @@ impl<'a> Transaction<'a> {
             ));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 }
+
+impl crate::Package {
+    /// Start an edit of the workbook's Custom XML Maps.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the validation errors of the Custom XML Maps graph.
+    pub fn edit_xml_maps(&self) -> Result<Edit> {
+        self.edit_xml_maps_with_options(EditOptions::default())
+    }
+
+    /// Start a Custom XML Maps edit with explicit options.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::edit_xml_maps`].
+    pub fn edit_xml_maps_with_options(&self, options: EditOptions) -> Result<Edit> {
+        Edit::start(crate::record::Source::new(self, "edit_xml_maps")?, options)
+    }
+
+    /// Apply an exact Custom XML Maps patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when this package is not the
+    /// patch's before state and [`crate::Error::Signed`] for a changed patch
+    /// of a signed workbook.
+    pub fn apply_xml_maps(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_xml_maps")
+    }
+}
+
+crate::record::raw_test_route!(edit_xml_maps);
 
 fn validate_draft(value: Option<&XmlMapInfo>, conformance: XmlMapConformance) -> Result<()> {
     if let Some(value) = value {
