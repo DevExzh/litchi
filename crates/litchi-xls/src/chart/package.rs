@@ -45,18 +45,25 @@ const UNSUPPORTED_AUTHORING_REASON: &str = "fresh and replacement XLS chart auth
 const UNSUPPORTED_EMBEDDED_MUTATION_REASON: &str = "embedded XLS chart mutation requires complete MsoDrawing/Continue, Obj/Continue, chart-substream, and OfficeArt drawing-group ownership";
 
 pub(crate) fn unsupported_authoring<T>() -> Result<T> {
-    Err(litchi_ograph::Error::UnsupportedAuthoring {
-        reason: UNSUPPORTED_AUTHORING_REASON,
-    }
-    .into())
+    Err(
+        litchi_ograph::Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "author",
+            UNSUPPORTED_AUTHORING_REASON,
+        ))
+        .into(),
+    )
 }
 
 pub(crate) fn unsupported_embedded_mutation<T>() -> Result<T> {
-    Err(litchi_ograph::Error::UnsupportedMutation {
-        operation: "embedded XLS chart drawing",
-        reason: UNSUPPORTED_EMBEDDED_MUTATION_REASON,
-    }
-    .into())
+    Err(
+        litchi_ograph::Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "embedded XLS chart drawing",
+            UNSUPPORTED_EMBEDDED_MUTATION_REASON,
+        ))
+        .into(),
+    )
 }
 
 /// Transactional editor for existing BIFF8 chart substreams.
@@ -289,7 +296,7 @@ impl Editor {
     /// Refuses fresh embedded-chart authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -300,7 +307,7 @@ impl Editor {
     /// Refuses fresh embedded-chart authoring at a checked raw host location.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -364,7 +371,7 @@ impl Editor {
     /// Refuses fresh chart-sheet authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -375,7 +382,7 @@ impl Editor {
     /// Refuses fresh chart-sheet authoring at a checked raw tab index.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -475,7 +482,7 @@ impl Editor {
     /// Refuses replacement authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -486,7 +493,7 @@ impl Editor {
     /// Refuses replacement authoring at a checked low-level host location.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// [`litchi_ograph::Error::Refused`] through [`Error::Graph`].
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -498,7 +505,7 @@ impl Editor {
     ///
     /// Embedded charts participate in the worksheet `OfficeArt` drawing graph;
     /// until that complete ownership is modeled, the editor returns
-    /// [`litchi_ograph::Error::UnsupportedMutation`] without mutation.
+    /// [`litchi_ograph::Error::Refused`] without mutation.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -733,7 +740,7 @@ const GENERATED_SHEET_NAME: &str = "Sheet1";
 
 /// Refuses fresh standalone BIFF8 chart-workbook authoring.
 ///
-/// This public entry point returns [`litchi_ograph::Error::UnsupportedAuthoring`]
+/// This public entry point returns [`litchi_ograph::Error::Refused`]
 /// through [`Error::Graph`] until the complete Office-compatible chart
 /// grammar is implemented.
 /// # Errors

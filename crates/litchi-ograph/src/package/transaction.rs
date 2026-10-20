@@ -10,12 +10,12 @@ use super::{Snapshot, codec, patch};
 /// reachable here. The transaction never recalculates formulas, follows links,
 /// renders a chart, or activates an OLE object.
 #[derive(Debug)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
-    editor: chart::Editor,
+    editor: chart::Edit,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Result<Self> {
         let chart = codec::read_chart(&source)?;
         Ok(Self {
@@ -40,12 +40,6 @@ impl Transaction {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.editor.is_empty()
-    }
-
-    /// Whether the package will differ after a successful commit.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Replace one existing Graph cache value without evaluating its source.
@@ -74,22 +68,24 @@ impl Transaction {
         let Self { source, editor } = self;
         let chart_commit = editor.commit()?;
         let chart_patch = chart_commit.patch().clone();
-        if chart_patch.is_empty() {
+        if chart_patch.is_noop() {
             let patch = patch::Patch::new(source.source_arc(), source.source_arc(), chart_patch);
-            return Ok(patch::Commit::new(source.clone(), patch, false));
+            return Ok(patch::Commit::new(
+                source.clone(),
+                patch,
+                patch::Diagnostics::UNCHANGED,
+            ));
         }
 
-        let chart = chart_commit.into_chart();
+        let chart = chart_commit.into_package();
         let stream = chart.encode()?;
         let bytes = codec::replace_chart(&source, stream.as_bytes())?;
-        let snapshot = Snapshot::from_bytes_with_limits(bytes, source.limits())?;
+        let snapshot = Snapshot::from_bytes(bytes, source.limits())?;
         let patch = patch::Patch::new(source.source_arc(), snapshot.source_arc(), chart_patch);
-        Ok(patch::Commit::new(snapshot, patch, true))
-    }
-
-    /// Discard staged operations and recover the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        Ok(patch::Commit::new(
+            snapshot,
+            patch,
+            patch::Diagnostics::CHANGED,
+        ))
     }
 }

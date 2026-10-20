@@ -118,19 +118,8 @@ pub struct Package {
 }
 
 impl Package {
-    /// Builds a bounded standalone Graph package from a fresh, fully proven
-    /// chart model.
-    ///
-    /// The package contains the required `Workbook` stream with workbook
-    /// globals followed by one Graph chart sheet. The CFB container and the
-    /// Workbook stream are revalidated before this method returns, so callers
-    /// never receive a self-consistent but unowned chart payload.
-    pub fn from_chart(chart: chart::Chart) -> Result<Self> {
-        Self::from_chart_with_limits(chart, Limits::default())
-    }
-
     /// Builds a standalone Graph package under explicit resource bounds.
-    pub fn from_chart_with_limits(chart: chart::Chart, limits: Limits) -> Result<Self> {
+    pub fn from_chart(chart: chart::Model, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         let chart = chart.finish_graph_authoring()?;
         let chart_stream = chart.encode_with(limits)?.into_bytes();
@@ -187,11 +176,6 @@ impl Package {
     #[must_use]
     pub fn snapshot(self) -> super::snapshot::Snapshot {
         super::snapshot::Snapshot::from_package(self)
-    }
-
-    /// Starts a source-checked transaction over the standalone Graph chart.
-    pub fn edit(self) -> Result<super::transaction::Transaction> {
-        self.snapshot().edit()
     }
 
     pub(super) fn into_snapshot_parts(self) -> (Vec<u8>, Topology, WorkbookLayout, Limits) {

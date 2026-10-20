@@ -240,7 +240,7 @@ mod chart_tests {
         fn assert_unsupported(error: Error) {
             assert!(matches!(
                 error,
-                Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { .. })
+                Error::Graph(litchi_ograph::Error::Refused(_))
             ));
         }
 
@@ -280,7 +280,7 @@ mod chart_tests {
                     index: 0,
                 })
                 .expect_err("embedded removal must be refused"),
-            Error::Graph(litchi_ograph::Error::UnsupportedMutation { .. })
+            Error::Graph(litchi_ograph::Error::Refused(_))
         ));
         assert_eq!(removed.finish().unwrap(), original);
     }
@@ -613,9 +613,7 @@ mod chart_tests {
                 Role::Values,
                 formula,
             ),
-            Err(Error::Graph(
-                litchi_ograph::Error::UnsupportedMutation { .. }
-            ))
+            Err(Error::Graph(litchi_ograph::Error::Refused(_)))
         ));
         assert_eq!(editor.finish().unwrap(), original);
     }

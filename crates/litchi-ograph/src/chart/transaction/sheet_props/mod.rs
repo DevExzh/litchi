@@ -1,4 +1,4 @@
-//! Transactional edits for the fixed-size `[MS-OGRAPH]` `ShtProps` record.
+//! Source-checked edits for the fixed-size `[MS-OGRAPH]` `ShtProps` record.
 //!
 //! The editor changes only the existing four-byte payload.  The empty
 //! `PlotArea` record is part of the source identity but is never inserted,

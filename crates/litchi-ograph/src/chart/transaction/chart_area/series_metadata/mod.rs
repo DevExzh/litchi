@@ -10,7 +10,7 @@ mod codec;
 mod model;
 mod validation;
 
-pub use model::{Change, Commit, Metadata, Patch, Snapshot, Transaction};
+pub use model::{Change, Commit, Diagnostics, Edit, Metadata, Patch, Snapshot};
 
 #[cfg(test)]
 mod tests;

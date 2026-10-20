@@ -41,8 +41,9 @@ fn workbook() -> Vec<u8> {
 
 fn assert_unsupported<T>(result: Result<T, Error>) {
     match result {
-        Err(Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { reason })) => {
-            assert!(!reason.is_empty());
+        Err(Error::Graph(litchi_ograph::Error::Refused(refusal))) => {
+            assert_eq!(refusal.operation(), "author");
+            assert!(!refusal.reason().is_empty());
         },
         Err(error) => panic!("expected typed unsupported-authoring error, found {error}"),
         Ok(_) => panic!("incomplete chart authoring unexpectedly succeeded"),
@@ -51,9 +52,9 @@ fn assert_unsupported<T>(result: Result<T, Error>) {
 
 fn assert_unsupported_mutation<T>(result: Result<T, Error>) {
     match result {
-        Err(Error::Graph(litchi_ograph::Error::UnsupportedMutation { operation, reason })) => {
-            assert!(!operation.is_empty());
-            assert!(!reason.is_empty());
+        Err(Error::Graph(litchi_ograph::Error::Refused(refusal))) => {
+            assert!(!refusal.operation().is_empty());
+            assert!(!refusal.reason().is_empty());
         },
         Err(error) => panic!("expected typed unsupported-mutation error, found {error}"),
         Ok(_) => panic!("unsafe embedded chart mutation unexpectedly succeeded"),
