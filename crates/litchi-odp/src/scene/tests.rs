@@ -342,12 +342,15 @@ fn references_and_overlaps_are_refused() {
     )
     .unwrap_err();
     assert!(
-        matches!(&error, litchi_core::Error::Unsupported(message) if message.contains("text:a")),
+        matches!(&error, litchi_core::Error::Refused(_)),
         "{error:?}"
     );
     let error = plan(&xml, &scene, &[Change::RemovePage { page: 1 }]).unwrap_err();
     assert!(
-        matches!(error, litchi_core::Error::Unsupported(_)),
+        matches!(
+            error,
+            litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+        ),
         "{error:?}"
     );
     let error = plan(
@@ -641,7 +644,10 @@ fn formatting_no_ops_and_refusals() {
             properties: edit(|properties| properties.bold = Some(true)),
         }],
     );
-    assert!(matches!(refused, Err(litchi_core::Error::Unsupported(_))));
+    assert!(matches!(
+        refused,
+        Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
+    ));
 }
 
 /// A styled page whose one text box holds a link and a page-number field.

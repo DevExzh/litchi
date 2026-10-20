@@ -12,7 +12,7 @@
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 use std::io;
@@ -106,7 +106,7 @@ impl File {
                 })
             },
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -240,7 +240,7 @@ impl File {
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| commit.after.into_file()),
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -333,7 +333,7 @@ impl File {
                 .remove(_target.into_target()?)
                 .map(|commit| commit.after.into_file()),
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -429,7 +429,7 @@ impl File {
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| commit.after.into_file()),
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -578,7 +578,7 @@ impl File {
                 .set(_target.into_target()?, _props)
                 .map(|commit| commit.after.into_file()),
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -634,7 +634,7 @@ impl File {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         )),
         allow(
@@ -657,7 +657,7 @@ impl File {
                 Ok(counted.bytes)
             },
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -769,7 +769,7 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 pub(crate) struct Counted<W> {
@@ -789,7 +789,7 @@ pub(crate) struct Counted<W> {
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 impl<W: Write> Write for Counted<W> {

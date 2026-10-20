@@ -245,7 +245,7 @@ fn every_format_has_one_answer_for_its_reads() {
             // The object formats edit through their leaves; what a leaf
             // lacks is an element-level gap, never a verb refusal (record
             // 0292).
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             let object_edit = crate::read::Adapter::of(format)
                 .and_then(crate::format::odf_tree::writes)
                 .is_some()
@@ -259,7 +259,7 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
-            #[cfg(not(feature = "odf-objects"))]
+            #[cfg(not(odf_objects))]
             let object_edit = false;
             #[cfg(feature = "iwork-adapter")]
             let iwork_edit = crate::read::Adapter::of(format)

@@ -29,7 +29,7 @@ fn refuses_transition_edit_that_would_change_an_inheriting_page() -> Result<()> 
         let mut edit = source.edit();
         assert!(matches!(
             edit.set_page_transition(0, Some(transition)),
-            Err(litchi_core::Error::Unsupported(_))
+            Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
         ));
         let unchanged = edit.commit()?;
         assert!(!unchanged.diagnostics().changed());

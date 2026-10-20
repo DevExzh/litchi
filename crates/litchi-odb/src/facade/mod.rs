@@ -619,9 +619,13 @@ impl Database {
     ) -> Result<()> {
         match self.protection_decision(operation) {
             crate::ProtectionDecision::Supported => Ok(()),
-            crate::ProtectionDecision::Refused(reason) => Err(Error::Unsupported(format!(
-                "ODB protected-package operation is refused: {reason:?}"
-            ))),
+            crate::ProtectionDecision::Refused(_reason) => {
+                Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "odb.facade",
+                    "ODB protected-package operation is refused",
+                )))
+            },
         }
     }
 

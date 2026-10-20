@@ -66,7 +66,7 @@ macro_rules! dispatch {
             Node::Ods($inner) => $body,
             #[cfg(feature = "odp")]
             Node::Odp($inner) => $body,
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Node::Object($inner) => $body,
             #[cfg(feature = "iwork-adapter")]
             Node::Iwork($inner) => $body,
@@ -84,7 +84,7 @@ macro_rules! dispatch {
                 feature = "odt",
                 feature = "ods",
                 feature = "odp",
-                feature = "odf-objects",
+                odf_objects,
                 feature = "iwork-adapter",
                 test,
                 feature = "test-support"
@@ -152,7 +152,7 @@ pub(crate) use view::Project;
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 pub(crate) use view::Source;
@@ -219,7 +219,7 @@ pub enum Node<'f> {
     Odp(crate::format::odp::Node<'f>),
     /// An OpenDocument drawing, chart, image, database or formula node
     /// (object-tree adapter, record 0282).
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     Object(crate::format::odf_tree::Node<'f>),
     /// An Apple Pages, Keynote or Numbers node (iWork object-tree adapter,
     /// record 0296).
@@ -242,7 +242,7 @@ pub enum Node<'f> {
         feature = "odt",
         feature = "ods",
         feature = "odp",
-        feature = "odf-objects",
+        odf_objects,
         feature = "iwork-adapter",
         test,
         feature = "test-support"

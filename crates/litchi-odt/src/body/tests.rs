@@ -602,7 +602,10 @@ fn region_text_replaces_header_and_footer_paragraphs() {
         let mut edit = package.edit();
         // The first header holds a page-number field: refused, not dropped.
         let refused = edit.set_region_text(&regions[0], "x");
-        assert!(matches!(refused, Err(litchi_core::Error::Unsupported(_))));
+        assert!(matches!(
+            refused,
+            Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
+        ));
         let mut edit = package.edit();
         edit.set_region_text(&regions[1], "New even\ttop").unwrap();
         edit.set_region_text(&regions[2], "New  bottom").unwrap();

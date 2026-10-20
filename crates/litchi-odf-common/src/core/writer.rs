@@ -30,16 +30,20 @@ const LOEXT_NAMESPACE: &[u8] =
 
 fn ensure_source_manifest_rewritable(source: &OwnedPackage) -> Result<()> {
     if source.has_zip_encrypted_entries() {
-        return Err(Error::Unsupported(
-            "ZIP-encrypted ODF entries cannot be copied by the package writer".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odf-common.core.writer",
+            "ZIP-encrypted ODF entries cannot be copied by the package writer",
+        )));
     }
     let has_canonical_manifest = source.has_file(MANIFEST_PATH)?;
     let has_legacy_manifest = source.has_file("manifest.xml")?;
     if has_canonical_manifest && has_legacy_manifest {
-        return Err(Error::Unsupported(
-            "ODF source contains both canonical and legacy manifest members".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odf-common.core.writer",
+            "ODF source contains both canonical and legacy manifest members",
+        )));
     }
     let package = source.package()?;
     let manifest_bytes = source
@@ -52,10 +56,11 @@ fn ensure_source_manifest_rewritable(source: &OwnedPackage) -> Result<()> {
         .values()
         .any(|entry| entry.size.is_some() && entry.encryption.is_none())
     {
-        return Err(Error::Unsupported(
-            "ODF unencrypted manifest:size metadata cannot be preserved by the package writer"
-                .to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "odf-common.core.writer",
+            "ODF unencrypted manifest:size metadata cannot be preserved by the package writer",
+        )));
     }
     Ok(())
 }
@@ -73,14 +78,18 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let ResolveResult::Bound(Namespace(uri)) = namespace else {
-                    return Err(Error::Unsupported(
-                        "ODF manifest contains unsupported non-manifest metadata".to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odf-common.core.writer",
+                        "ODF manifest contains unsupported non-manifest metadata",
+                    )));
                 };
                 if uri != MANIFEST_NAMESPACE {
-                    return Err(Error::Unsupported(
-                        "ODF manifest contains unsupported non-manifest metadata".to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odf-common.core.writer",
+                        "ODF manifest contains unsupported non-manifest metadata",
+                    )));
                 }
                 let element_name = element.local_name();
                 if !matches!(
@@ -92,9 +101,11 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
                         | b"start-key-generation"
                         | b"key-derivation"
                 ) {
-                    return Err(Error::Unsupported(
-                        "ODF manifest contains unsupported element metadata".to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "odf-common.core.writer",
+                        "ODF manifest contains unsupported element metadata",
+                    )));
                 }
                 let mut full_path = None;
                 let mut has_version = false;
@@ -175,25 +186,30 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
                         _ => false,
                     };
                     if !allowed {
-                        return Err(Error::Unsupported(
-                            "ODF manifest contains unsupported metadata".to_string(),
-                        ));
+                        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedOperation,
+                            "odf-common.core.writer",
+                            "ODF manifest contains unsupported metadata",
+                        )));
                     }
                 }
                 if element_name.as_ref() == b"file-entry"
                     && has_version
                     && full_path.as_deref() != Some("/")
                 {
-                    return Err(Error::Unsupported(
-                        "ODF manifest version metadata is only supported on the root entry"
-                            .to_string(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odf-common.core.writer",
+                        "ODF manifest version metadata is only supported on the root entry",
+                    )));
                 }
             },
             Event::DocType(_) | Event::GeneralRef(_) => {
-                return Err(Error::Unsupported(
-                    "ODF manifest contains unsupported DTD or entity metadata".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odf-common.core.writer",
+                    "ODF manifest contains unsupported DTD or entity metadata",
+                )));
             },
             Event::Eof => break,
             _ => {},

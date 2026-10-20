@@ -42,10 +42,11 @@ pub(crate) fn apply(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Op
     let (_, odf) = source_metadata(source)?;
     let current = CoreMetadata::from(odf);
     if !unsupported_equal(&current, metadata) {
-        return Err(Error::Unsupported(
-            "ODP metadata edits support title, author, subject, description and keywords only"
-                .to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odp.authoring.metadata",
+            "ODP metadata edits support title, author, subject, description and keywords only",
+        )));
     }
     if supported_equal(&current, metadata) {
         return Ok(None);
@@ -101,9 +102,11 @@ fn publish_one(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Vec<u8>
             _ => patched,
         };
         let (range, fragment) = element_splice(xml, &patched).ok_or_else(|| {
-            Error::Unsupported(
-                "the ODP meta.xml change does not align with one element".to_string(),
-            )
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.authoring.metadata",
+                "the ODP meta.xml change does not align with one element",
+            ))
         })?;
         let fragment = if fragment.is_empty() {
             AuthoredXmlFragment::deletion()

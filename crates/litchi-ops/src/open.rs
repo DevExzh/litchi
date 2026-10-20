@@ -445,7 +445,7 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
     feature = "ods",
     feature = "odp",
     feature = "odt",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
@@ -456,7 +456,7 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
         File::Odt(odt) | File::Oth(odt) | File::Odm(odt) => {
             odt.with_origin(Some(origin)).into_file()
         },
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         File::Odg(tree) | File::Odc(tree) | File::Odi(tree) | File::Odb(tree) | File::Odf(tree) => {
             tree.with_origin(Some(origin)).into_file()
         },
@@ -629,12 +629,7 @@ pub(crate) fn ooxml_from_eager_package_with_origin(
 }
 
 /// Build the eager handle for an ODF package detection prepared.
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 fn odf_from_prepared(
     prepared: litchi_odf_common::PreparedPackage,
     options: &OpenOptions,
@@ -646,7 +641,7 @@ fn odf_from_prepared(
         FileFormat::Oth => File::Oth(crate::format::odt::Odt::from_prepared(prepared, options)?),
         #[cfg(feature = "odm")]
         FileFormat::Odm => File::Odm(crate::format::odt::Odt::from_prepared(prepared, options)?),
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         FileFormat::Odg | FileFormat::Odc | FileFormat::Odi | FileFormat::Odb | FileFormat::Odf
             if crate::read::Adapter::of(prepared.format()).is_some() =>
         {
@@ -662,12 +657,7 @@ fn odf_from_prepared(
 
 /// Refuse a flat (single XML document) OpenDocument input: the read
 /// handles open packaged ODF only, as the facade's did.
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 fn flat_odf_unsupported(format: FileFormat) -> Error {
     Error::new(
         crate::Code::UnsupportedCapability,

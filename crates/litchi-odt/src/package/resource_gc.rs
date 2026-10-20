@@ -197,9 +197,11 @@ impl EmbeddedResourceGcPlan {
             return invalid("ODT embedded-resource GC plan source does not match");
         }
         if !self.is_applicable() {
-            return Err(Error::Unsupported(
-                "ODT embedded-resource GC plan contains a typed refusal".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.package.resource_gc",
+                "ODT embedded-resource GC plan contains a typed refusal",
+            )));
         }
         let package = source.document()?.transaction_package().clone();
         let bytes = self.apply_to_package(&package)?;

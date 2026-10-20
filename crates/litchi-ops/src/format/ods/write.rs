@@ -173,7 +173,8 @@ pub(super) fn leaf(error: litchi_core::Error, code: Code) -> Error {
     match error {
         litchi_core::Error::InvalidFormat(_)
         | litchi_core::Error::ParseError(_)
-        | litchi_core::Error::Unsupported(_) => core_error(error).caused_by_argument(code),
+        | litchi_core::Error::Unsupported(_)
+        | litchi_core::Error::Refused(_) => core_error(error).caused_by_argument(code),
         other => core_error(other),
     }
 }

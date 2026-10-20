@@ -322,7 +322,10 @@ fn refuses_inert_dr3d_shape_authoring() {
         0,
         litchi_odg::shape::Shape::new(litchi_odg::shape::ShapeKind::ThreeDimensionalCube),
     );
-    assert!(matches!(result, Err(litchi_core::Error::Unsupported(_))));
+    assert!(matches!(
+        result,
+        Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
+    ));
 }
 
 #[test]
@@ -519,7 +522,7 @@ fn refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity()
     let mut edit = drawing.edit();
     assert!(matches!(
         edit.set_shape_transform(0, 2, "rotate (15)"),
-        Err(litchi_core::Error::Unsupported(_))
+        Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
     ));
     assert_eq!(
         edit.commit().unwrap().package().as_bytes(),
@@ -531,7 +534,7 @@ fn refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity()
     let mut edit = enhanced.edit();
     assert!(matches!(
         edit.add_shape(0, detached_copy),
-        Err(litchi_core::Error::Unsupported(_))
+        Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
     ));
 
     let transfer = enhanced.prepare_shape_transfer(0, 0).unwrap();

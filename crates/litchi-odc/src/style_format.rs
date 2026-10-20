@@ -537,9 +537,11 @@ fn checked_replacements(
             }
         } else if let Some(after) = change.after.as_ref() {
             let prefix = properties.chart_prefix.as_deref().ok_or_else(|| {
-                Error::Unsupported(
-                    "cannot add chart formatting without a lossless chart namespace prefix".into(),
-                )
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odc.style_format",
+                    "cannot add chart formatting without a lossless chart namespace prefix",
+                ))
             })?;
             let lexical = encode_value(change.property, after, limits)?;
             let offset = insertion_offset(&xml.as_bytes()[properties.tag.clone()])?;

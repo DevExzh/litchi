@@ -166,7 +166,7 @@ fn map_reference_error(error: Error) -> EvaluationResult<Result<ParsedReferenceT
             Err(EvaluationFailure::Allocation { resource, source })
         },
         Error::InvalidFormat(_) => Ok(Err(ScalarError::Reference)),
-        Error::Unsupported(_) => Err(EvaluationFailure::Unsupported(
+        Error::Unsupported(_) | Error::Refused(_) => Err(EvaluationFailure::Unsupported(
             super::super::UnsupportedKind::Reference,
         )),
         Error::SourceChanged { expected, observed } => {
@@ -796,7 +796,11 @@ mod tests {
 
     #[test]
     fn typed_parser_failures_do_not_become_formula_errors() {
-        let unsupported = map_reference_error(Error::Unsupported("host reference".into()));
+        let unsupported = map_reference_error(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.codec.formula.evaluation.lookup.indirect",
+            "host reference",
+        )));
         assert!(matches!(
             unsupported,
             Err(EvaluationFailure::Unsupported(

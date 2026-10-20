@@ -1637,12 +1637,7 @@ fn edit_refusals_classify_by_kind_alone() {
 // Record 0358 (W6): ODF refusals classify by kind alone, a patch made for
 // another base is the caller's input, and a changed write of a signed
 // package is protected.
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 #[test]
 fn odf_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
     use litchi_core::edit::RefusalKind;

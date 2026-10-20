@@ -13,12 +13,7 @@ pub(super) enum Container {
         format: FileFormat,
         package: Box<litchi_opc::OpcPackage>,
     },
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     Odf { bytes: Vec<u8> },
 }
 
@@ -39,12 +34,7 @@ impl Container {
             }
         }
         if is_odf(format) {
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             {
                 let bytes = file.to_bytes()?;
                 if !bytes.starts_with(b"PK") {
@@ -72,12 +62,7 @@ impl Container {
                 parts.sort_unstable_by(|left, right| left.name.cmp(&right.name));
                 Ok(parts)
             },
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf { bytes } => {
                 let archive = litchi_odf_common::package::Archive::new(bytes)?;
                 let manifest = litchi_odf_common::package::read_manifest(&archive).ok();
@@ -115,12 +100,7 @@ impl Container {
                     bytes: part.blob().to_vec(),
                 })
             },
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf { bytes } => {
                 let archive = litchi_odf_common::package::Archive::new(bytes)?;
                 let member = odf_member(&archive, spec)?;
@@ -204,12 +184,7 @@ pub(super) fn open_opc(bytes: Vec<u8>) -> Result<litchi_opc::OpcPackage> {
 }
 
 /// The ODF member `spec` names: `/content.xml`, or an alias.
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 fn odf_member(archive: &litchi_odf_common::package::Archive<'_>, spec: &str) -> Result<String> {
     let Some(name) = spec.strip_prefix('/') else {
         return Err(Error::new(Code::InvalidPath, "a part name starts with '/'"));

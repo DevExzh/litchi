@@ -22,11 +22,9 @@ use std::{
 };
 
 mod lexical;
-mod source_backed;
 mod transaction;
 
-pub use source_backed::{SourceCommit, SourceEdit, SourcePatch, SourceSnapshot};
-pub(crate) use transaction::Patch;
+pub(crate) use transaction::admit_target;
 pub use transaction::{
     CachedCell, CachedRow, CachedTable, CachedValue, Edit, LinkSpec, SheetSelector,
 };
@@ -124,7 +122,7 @@ impl From<Error> for CoreError {
                 scope: Arc::from("ods-dde"),
             }),
             Error::ExecutionLimit(limit) => CoreError::ResourceLimit(limit),
-            Error::Cancelled => CoreError::Unsupported("ODS DDE operation cancelled".to_string()),
+            Error::Cancelled => CoreError::Other("ODS DDE operation cancelled".to_string()),
             Error::InvalidXml(message) => CoreError::InvalidFormat(message),
             Error::InvalidStructure(message) => CoreError::InvalidFormat(message),
             Error::PositionOverflow => {
@@ -1038,6 +1036,11 @@ impl Snapshot {
 
     #[must_use]
     pub fn source_xml(&self) -> &str {
+        &self.content
+    }
+
+    /// The retained `content.xml`, shared.
+    pub(crate) fn content_arc(&self) -> &Arc<str> {
         &self.content
     }
 

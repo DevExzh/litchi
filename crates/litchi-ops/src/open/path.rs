@@ -16,7 +16,7 @@ use std::path::Path;
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter",
     all(
         any(unix, windows),
@@ -48,7 +48,7 @@ use crate::{File, OpenOptions};
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter",
     all(
         any(unix, windows),
@@ -134,7 +134,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "ods",
             feature = "odp",
             feature = "odt",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         ))]
         let file = if matches!(
@@ -247,7 +247,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "ods",
         feature = "odp",
         feature = "odt",
-        feature = "odf-objects",
+        odf_objects,
         feature = "iwork-adapter"
     ))]
     let opened = if matches!(
@@ -314,7 +314,7 @@ mod zip {
         feature = "ods",
         feature = "odp",
         feature = "odt",
-        feature = "odf-objects"
+        odf_objects
     ))]
     use crate::detect::detected::ensure_path_source_current;
     use crate::detect::tail::ZipTail;
@@ -335,12 +335,7 @@ mod zip {
         tail: &T,
     ) -> Result<File> {
         // 1. An ordinary ODF package: an ODF `mimetype` and no OPC catalog.
-        #[cfg(any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        ))]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
         let odf = {
             let mime = litchi_odf_common::detect::packaged_mime_read_at(
                 source.as_ref(),
@@ -360,12 +355,7 @@ mod zip {
                 None => None,
             }
         };
-        #[cfg(not(any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        )))]
+        #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
         let odf: Option<(FileFormat, Option<bool>)> = None;
 
         if let Some((format, Some(false))) = odf {
@@ -482,12 +472,7 @@ mod zip {
 
     /// Adopt the positional owner of an ODF package of `format`.
     #[cfg_attr(
-        not(any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        )),
+        not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)),
         allow(
             unused_variables,
             clippy::needless_pass_by_value,
@@ -563,7 +548,7 @@ mod zip {
             // The other packaged ODF formats (record 0282) have no
             // source-backed owner: their packages are read whole once and
             // adopted through the detection-prepared byte route.
-            #[cfg(any(feature = "odt", feature = "odf-objects"))]
+            #[cfg(any(feature = "odt", odf_objects))]
             other => {
                 let _ = (error, length);
                 let bytes = super::super::read_whole_source(
@@ -583,7 +568,7 @@ mod zip {
                     super::stable_origin(path)?,
                 ))
             },
-            #[cfg(not(any(feature = "odt", feature = "odf-objects")))]
+            #[cfg(not(any(feature = "odt", odf_objects)))]
             other => {
                 let _ = (error, path, length);
                 Err(super::super::not_enabled(other))

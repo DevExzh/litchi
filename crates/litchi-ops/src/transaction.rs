@@ -135,7 +135,7 @@ enum Leaf {
     Ods(Box<crate::format::ods::write::Patch>),
     #[cfg(feature = "odp")]
     Odp(Box<crate::format::odp::write::Patch>),
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     Object(Box<crate::format::odf_tree::write::Patch>),
     #[cfg(feature = "iwork-adapter")]
     Iwork(Box<crate::format::iwork::write::Patch>),
@@ -271,7 +271,7 @@ pub struct Edit {
     #[cfg(feature = "ods")]
     ods_cells: Option<crate::format::ods::write::coalesce::Run>,
     /// Coalesced object-format sets (record 0288).
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     odf_tree: Option<crate::format::odf_tree::coalesce::Run>,
     /// Coalesced Numbers cell values and formulas (record 0297).
     #[cfg(feature = "numbers")]
@@ -378,7 +378,7 @@ impl File {
                 odp: None,
                 #[cfg(feature = "ods")]
                 ods_cells: None,
-                #[cfg(feature = "odf-objects")]
+                #[cfg(odf_objects)]
                 odf_tree: None,
                 #[cfg(feature = "numbers")]
                 numbers_cells: None,
@@ -551,7 +551,7 @@ impl Edit {
                 feature = "ods",
                 feature = "odt",
                 feature = "odp",
-                feature = "odf-objects",
+                odf_objects,
                 feature = "iwork-adapter"
             ))]
             let limits = self.limits;
@@ -606,7 +606,7 @@ impl Edit {
                     wrap_odt(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
 
-                #[cfg(feature = "odf-objects")]
+                #[cfg(odf_objects)]
                 File::Odg(handle)
                 | File::Odc(handle)
                 | File::Odi(handle)
@@ -649,7 +649,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         ))]
         let limits = self.limits;
@@ -701,7 +701,7 @@ impl Edit {
                 wrap_odt(handle, commit, path)
             },
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             File::Odg(handle)
             | File::Odc(handle)
             | File::Odi(handle)
@@ -754,7 +754,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         ))]
         let limits = self.limits;
@@ -807,7 +807,7 @@ impl Edit {
                 wrap_odt(handle, commit, path)
             },
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             File::Odg(handle)
             | File::Odc(handle)
             | File::Odi(handle)
@@ -892,7 +892,7 @@ impl Edit {
                 feature = "ods",
                 feature = "odt",
                 feature = "odp",
-                feature = "odf-objects",
+                odf_objects,
                 feature = "iwork-adapter"
             ))]
             let limits = self.limits;
@@ -948,7 +948,7 @@ impl Edit {
                     (),
                 ),
 
-                #[cfg(feature = "odf-objects")]
+                #[cfg(odf_objects)]
                 File::Odg(handle)
                 | File::Odc(handle)
                 | File::Odi(handle)
@@ -1180,7 +1180,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         ))]
         let limits = self.limits;
@@ -1240,7 +1240,7 @@ impl Edit {
                 (),
             ),
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             File::Odg(handle)
             | File::Odc(handle)
             | File::Odi(handle)
@@ -1287,7 +1287,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         ))]
         let limits = self.limits;
@@ -1341,7 +1341,7 @@ impl Edit {
                 (),
             ),
 
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             File::Odg(handle)
             | File::Odc(handle)
             | File::Odi(handle)
@@ -2366,7 +2366,7 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(true));
         }
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         if let Some(handle) = self.current.odf_tree() {
             // Sets resolve against the pending run's base: the run holds
             // only sets that change no address and read no pending value.
@@ -2806,7 +2806,7 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         if let Some(run) = self.odf_tree.take() {
             let index = run.first_index();
             let limits = self.limits;
@@ -3423,7 +3423,7 @@ fn wrap_ods<T>(
     ))
 }
 
-#[cfg(feature = "odf-objects")]
+#[cfg(odf_objects)]
 fn wrap_object<T>(
     _before: &crate::format::odf_tree::OdfTree,
     commit: crate::format::odf_tree::write::Commit,
@@ -3566,7 +3566,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
         }
         return Ok(!before.same_content(after)?);
     }
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     if let (Some(before), Some(after)) = (first.before.odf_tree(), last.after.odf_tree()) {
         if let [
             Step {
@@ -3680,7 +3680,7 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         (File::Odt(left), File::Odt(right))
         | (File::Oth(left), File::Oth(right))
         | (File::Odm(left), File::Odm(right)) => left.same_snapshot(right),
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         (File::Odg(left), File::Odg(right))
         | (File::Odc(left), File::Odc(right))
         | (File::Odi(left), File::Odi(right))
@@ -3752,7 +3752,7 @@ fn admit(file: &File) -> Result<()> {
         File::Ods(handle) => handle.admit_edit(),
         #[cfg(feature = "odt")]
         File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => handle.admit_edit(),
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         File::Odg(handle)
         | File::Odc(handle)
         | File::Odi(handle)
@@ -3799,7 +3799,7 @@ fn check_source(file: &File) -> Result<()> {
         File::Ods(handle) => handle.check_source(),
         #[cfg(feature = "odt")]
         File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => handle.check_source(),
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         File::Odg(handle)
         | File::Odc(handle)
         | File::Odi(handle)
