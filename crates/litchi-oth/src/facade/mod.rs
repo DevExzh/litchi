@@ -347,13 +347,21 @@ impl Package {
         self.package.tolerance_report()
     }
 
-    /// Applies a patch to its exact source package.
+    /// Replay a patch onto this exact package; the commit publishes the
+    /// patch's target package with the patch and its change flag.
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not the patch's source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, litchi_odf_common::Error> {
-        Ok(patch.apply(self)?)
+    /// Returns [`litchi_odf_common::Error::PatchConflict`] when this package
+    /// is not the patch's source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, litchi_odf_common::Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(litchi_odf_common::Error::patch_conflict(
+                "oth.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically saves the package bytes to `path` (sibling temporary file
@@ -3189,6 +3197,16 @@ impl Diagnostics {
 }
 
 impl Commit {
+    pub(crate) fn replayed(snapshot: Package, patch: Patch) -> Self {
+        Self {
+            diagnostics: Diagnostics {
+                changed: !patch.is_noop(),
+            },
+            snapshot,
+            patch,
+        }
+    }
+
     fn unchanged(snapshot: Package) -> Self {
         Self {
             patch: Patch {

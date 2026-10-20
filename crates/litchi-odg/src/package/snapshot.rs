@@ -783,8 +783,18 @@ impl Package {
     ///
     /// Returns an error when this package is not byte-identical to the patch
     /// source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, OdfError> {
-        Ok(patch.apply(self)?)
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, OdfError> {
+        if !patch.is_applicable_to(self) {
+            return Err(OdfError::patch_conflict(
+                "odg.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit {
+            snapshot: patch.apply(self)?,
+            changed: !patch.is_noop(),
+            patch: patch.clone(),
+        })
     }
 
     /// Atomically replaces `path` with this package (full durability).
@@ -1356,14 +1366,16 @@ impl Package {
         // allocating one large fragment at a time before discovering the cap.
         let xml = close_transfer_fragment_namespaces(raw_xml, &source_namespaces)?;
         validate_transfer_fragment_namespaces(&xml)?;
-        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+        compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
+            .map_err(Error::from)?;
         let styles = style_sources.keys().cloned().collect::<Vec<_>>();
         let mut style_definitions = BTreeMap::new();
         for (style_name, definition) in style_sources {
             let definition_xml =
                 close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
             validate_transfer_fragment_namespaces(&definition_xml)?;
-            compact_xml::validate(definition_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(definition_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             style_definitions.insert(
                 style_name.clone(),
                 TransferStyle {
@@ -1379,7 +1391,8 @@ impl Package {
             let resource_xml =
                 close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
             validate_transfer_fragment_namespaces(&resource_xml)?;
-            compact_xml::validate(resource_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(resource_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             style_resources.insert(
                 key,
                 TransferStyleResource {
@@ -1463,7 +1476,8 @@ impl Package {
                 let control_xml =
                     close_transfer_fragment_namespaces(raw_control_xml, &source_namespaces)?;
                 validate_transfer_fragment_namespaces(&control_xml)?;
-                compact_xml::validate(control_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(control_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 Ok(TransferControl {
                     control,
                     xml: control_xml,
@@ -1960,7 +1974,8 @@ impl Edit {
             // here, before editing, so a noncompact producer file is refused
             // atomically instead of being changed and failing publication
             // later.
-            compact_xml::validate(styles.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(styles.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             let matches = parse_style_definitions(styles)?
                 .iter()
                 .filter(|definition| {
@@ -4064,7 +4079,8 @@ impl Edit {
         } else {
             requires_package_projection = self.requires_package_projection;
             ensure_compact_rewrite_source(&self.source)?;
-            compact_xml::validate(self.content.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(self.content.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             rebuild(
                 &self.source,
                 &self.content,
@@ -10174,7 +10190,8 @@ fn ensure_compact_rewrite_source(source: &Package) -> Result<()> {
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"));
         if is_xml && path != "META-INF/manifest.xml" {
-            compact_xml::validate(&archive.get_file(&path)?).map_err(Error::from)?;
+            compact_xml::validate(&archive.get_file(&path)?, compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
     }
     Ok(())

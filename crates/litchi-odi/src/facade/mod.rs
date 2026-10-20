@@ -318,8 +318,20 @@ impl Package {
     ///
     /// Returns an error when this package differs byte-for-byte from the
     /// patch's source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "odi.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit {
+            package: patch.apply(self)?,
+            diagnostics: Diagnostics {
+                changed: !patch.is_noop(),
+            },
+            patch: patch.clone(),
+        })
     }
 }
 
@@ -709,7 +721,8 @@ impl Edit<'_> {
     /// compact publication boundary before it is staged.
     pub fn set_styles_xml(&mut self, value: Option<String>) -> Result<()> {
         if let Some(xml) = &value {
-            compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
         let before = self.source.image.styles_xml().map(str::to_owned);
         if before == value {

@@ -264,7 +264,7 @@ fn metadata_edits() {
     let metadata = after.document().unwrap().metadata().unwrap();
     assert_eq!(metadata.title.as_deref(), Some("A & B"));
     let restored = after.apply_metadata(&patch.inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), package.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), package.as_bytes());
 }
 
 #[test]

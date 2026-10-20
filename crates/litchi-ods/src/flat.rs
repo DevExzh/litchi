@@ -472,7 +472,7 @@ fn ensure_compact_or_unchanged(before: &str, after: &str, max_bytes: usize) -> R
 fn ensure_compact(xml: &str, max_bytes: usize) -> Result<()> {
     let max_bytes = max_bytes.min(compact_xml::HARD_MAX_BYTES);
     let limits = CompactLimits::new(max_bytes, MAX_XML_DEPTH).map_err(Error::from)?;
-    compact_xml::validate_with_limits(xml.as_bytes(), limits).map_err(Error::from)
+    compact_xml::validate(xml.as_bytes(), limits).map_err(Error::from)
 }
 
 fn clone_string_fallible(value: &str) -> Result<String> {

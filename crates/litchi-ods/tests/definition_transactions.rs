@@ -32,7 +32,10 @@ fn definition_patch_round_trips_inverse_and_exact_source() -> litchi_core::Resul
         ["Second", "First"]
     );
     let spreadsheet = Package::from_bytes(commit.snapshot().as_bytes())?.workbook()?;
-    litchi_odf_common::compact_xml::validate(spreadsheet.content_xml().as_bytes())?;
+    litchi_odf_common::compact_xml::validate(
+        spreadsheet.content_xml().as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )?;
 
     let restored = commit.patch().inverse().apply(commit.snapshot())?;
     assert_eq!(restored.snapshot().as_bytes(), source);

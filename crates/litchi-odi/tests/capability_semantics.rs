@@ -156,6 +156,7 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

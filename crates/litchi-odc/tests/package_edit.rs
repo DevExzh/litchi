@@ -83,7 +83,7 @@ fn package_axis_transaction_is_atomic_exact_source_checked_and_reversible() {
     assert!(stale.apply(commit.patch()).is_err());
 
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
 }
 
 #[test]
@@ -143,6 +143,7 @@ fn package_edit_preserves_auxiliary_payloads_refuses_signatures_and_splices_pret
             .package()
             .apply(&pretty_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         pretty_chart.as_bytes()
     );
@@ -187,5 +188,5 @@ fn explicit_chart_replacement_publishes_full_typed_definition_and_is_reversible(
     assert!(!commit.package().chart().content_xml().contains('\n'));
 
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
 }

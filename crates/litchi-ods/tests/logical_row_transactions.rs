@@ -100,22 +100,26 @@ fn sequential_batch_splits_repeats_moves_rows_and_is_durable() -> Result<()> {
     assert!(content.contains("<t:table-column t:number-columns-repeated=\"2\""));
     assert!(content.contains("t:visibility=\"collapse\""));
     assert_eq!(
-        snapshot.apply(commit.patch())?.as_bytes(),
+        snapshot.apply(commit.patch())?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let wire = commit.patch().to_deterministic_json()?;
     let decoded = Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&decoded)?.as_bytes(),
+        snapshot.apply(&decoded)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse_wire = decoded.inverse().to_deterministic_json()?;
     let inverse = Patch::from_deterministic_json(&inverse_wire, snapshot.limits())?;
-    assert_eq!(commit.package().apply(&inverse)?.as_bytes(), source);
+    assert_eq!(
+        commit.package().apply(&inverse)?.into_package().as_bytes(),
+        source
+    );
     assert_eq!(
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );

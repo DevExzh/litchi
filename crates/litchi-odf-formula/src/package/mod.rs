@@ -60,9 +60,9 @@ impl Archive {
     /// Read and validate a Formula-family package from owned bytes under the
     /// default source limits.
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_owned(OwnedPackage::from_bytes_with_limits(
+        Self::from_owned(OwnedPackage::from_bytes_with_options(
             bytes,
-            SourceLimits::default(),
+            litchi_odf_common::OpenOptions::new().source_limits(SourceLimits::default()),
         )?)
     }
 

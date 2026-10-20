@@ -1259,7 +1259,7 @@ fn setting_schema_string_controls_uses_numeric_refs_and_inverse_preserves_values
     }
 
     let restored = changed.apply(&commit.patch().inverse())?;
-    assert_eq!(restored.as_bytes(), source.as_slice());
+    assert_eq!(restored.into_package().as_bytes(), source.as_slice());
     Ok(())
 }
 
@@ -1498,7 +1498,7 @@ fn compressed_late_content_replacement_uses_content_xml_ranges() -> Result<()> {
             .any(|window| window == b"min-numerator-digits=\"2\"")
     );
     let restored = commit.package().apply(&commit.patch().inverse())?;
-    assert_eq!(restored.as_bytes(), source.as_slice());
+    assert_eq!(restored.into_package().as_bytes(), source.as_slice());
     Ok(())
 }
 
@@ -1721,7 +1721,7 @@ fn public_patch_inverse_and_stale_source_checks_are_exact() -> Result<()> {
     let commit = edit.commit()?;
     let inverse = commit.patch().inverse();
     let restored = commit.package().apply(&inverse)?;
-    assert_eq!(restored.as_bytes(), snapshot.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), snapshot.as_bytes());
 
     let mut unrelated = snapshot.edit()?;
     unrelated.set_cell_style("Sheet1", 0, 0, "Cell")?;

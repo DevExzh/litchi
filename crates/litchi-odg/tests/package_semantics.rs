@@ -159,14 +159,21 @@ fn package_edit_is_source_checked_reversible_and_compact() {
     let output = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let archive = output.package().unwrap();
     for path in ["content.xml", "META-INF/manifest.xml"] {
-        compact_xml::validate(&archive.get_file(path).unwrap()).unwrap();
+        compact_xml::validate(
+            &archive.get_file(path).unwrap(),
+            compact_xml::Limits::default(),
+        )
+        .unwrap();
     }
     assert!(!commit.package().content_xml().contains(">\r\n<"));
     assert!(commit.patch().is_applicable_to(&drawing));
     let reapplied = drawing.apply(commit.patch()).unwrap();
-    assert_eq!(reapplied.as_bytes(), commit.package().as_bytes());
+    assert_eq!(
+        reapplied.into_package().as_bytes(),
+        commit.package().as_bytes()
+    );
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), drawing.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), drawing.as_bytes());
 }
 
 #[test]
@@ -208,7 +215,7 @@ fn package_shape_name_edit_is_source_checked_reversible_and_compact() {
     assert!(!commit.patch().is_applicable_to(&different));
     assert!(different.apply(commit.patch()).is_err());
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), drawing.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), drawing.as_bytes());
 }
 
 #[test]
@@ -287,7 +294,7 @@ fn package_layer_edit_is_declared_source_checked_and_reversible() {
     assert_eq!(change.before(), "Foreground");
     assert_eq!(change.after(), "Background");
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), drawing.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), drawing.as_bytes());
 
     let mut invalid = drawing.edit();
     assert!(invalid.set_shape_layer(0, 0, "Missing").is_err());

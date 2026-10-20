@@ -84,11 +84,8 @@ impl Package {
     ) -> std::result::Result<Self, OdfError> {
         let password = zeroize::Zeroizing::new(password.into());
         let file = std::fs::File::open(path)?;
-        let package = OwnedPackage::from_reader_with_limits_and_password(
-            file,
-            options.source_limits_value(),
-            password.as_str(),
-        )?;
+        let package =
+            OwnedPackage::from_reader_with_password_and_options(file, password.as_str(), options)?;
         Ok(Self::from_owned(package)?)
     }
 
@@ -110,7 +107,7 @@ impl Package {
         reader: impl std::io::Read,
         options: litchi_odf_common::OpenOptions,
     ) -> std::result::Result<Self, OdfError> {
-        let package = OwnedPackage::from_reader_with_limits(reader, options.source_limits_value())?;
+        let package = OwnedPackage::from_reader_with_options(reader, options)?;
         Ok(Self::from_owned(package)?)
     }
 
@@ -163,11 +160,8 @@ impl Package {
         options: litchi_odf_common::OpenOptions,
     ) -> std::result::Result<Self, OdfError> {
         let password = zeroize::Zeroizing::new(password.into());
-        let package = OwnedPackage::from_reader_with_limits_and_password(
-            bytes,
-            options.source_limits_value(),
-            password.as_str(),
-        )?;
+        let package =
+            OwnedPackage::from_reader_with_password_and_options(bytes, password.as_str(), options)?;
         Ok(Self::from_owned(package)?)
     }
 

@@ -55,7 +55,7 @@ fn independent_recursive_grammar_satisfies_parse_package_and_reopen_properties()
         };
         let expression = grammar.expression(3);
         let xml = format!(r#"<math xmlns="{NS}">{declaration}{expression}</math>"#);
-        let parsed = codec::parse(&xml).unwrap_or_else(|error| {
+        let parsed = codec::parse(&xml, codec::Limits::default()).unwrap_or_else(|error| {
             panic!("independently generated XML case {case} failed: {error}: {xml}")
         });
         codec::validate(&parsed).expect("independent grammar must satisfy the checked projection");
@@ -151,8 +151,8 @@ fn arbitrary_byte_stream_fuzz_corpus_is_panic_free_and_repeatable() {
         let package_second = open(bytes.clone()).is_ok();
         assert_eq!(package_first, package_second, "package fuzz case {case}");
         if let Ok(xml) = std::str::from_utf8(&bytes) {
-            let parse_first = codec::parse(xml).is_ok();
-            let parse_second = codec::parse(xml).is_ok();
+            let parse_first = codec::parse(xml, codec::Limits::default()).is_ok();
+            let parse_second = codec::parse(xml, codec::Limits::default()).is_ok();
             assert_eq!(parse_first, parse_second, "XML fuzz case {case}");
             let formula_first = create(xml).is_ok();
             let formula_second = create(xml).is_ok();
@@ -192,13 +192,18 @@ fn second_changed_libreoffice_package_reopens_with_auxiliary_payloads_exact() {
         &opaque
     );
     assert_eq!(
-        source.apply(&durable).expect("durable replay").as_bytes(),
+        source
+            .apply(&durable)
+            .expect("durable replay")
+            .into_package()
+            .as_bytes(),
         reopened.as_bytes()
     );
     assert_eq!(
         reopened
             .apply(&durable.inverse())
             .expect("inverse")
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

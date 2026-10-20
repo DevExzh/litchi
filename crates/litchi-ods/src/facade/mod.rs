@@ -144,7 +144,10 @@ impl Workbook {
         // different ODF family still follows the historical package owner so
         // its MIME error is reported at the same boundary; rejected probes
         // recover the original allocation for the ordinary parser.
-        match litchi_odf_common::detect::prepared_or_original(bytes) {
+        match litchi_odf_common::detect::prepared_or_original(
+            bytes,
+            litchi_odf_common::SourceLimits::default(),
+        ) {
             Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Ods => {
                 Self::from_package(crate::package::Archive::from_prepared_package(prepared)?)
             },
@@ -1428,8 +1431,9 @@ mod tests {
             Workbook::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
         assert!(spreadsheet.tolerance_report().is_clean());
         assert_eq!(spreadsheet.tolerance_report().total(), 0);
-        let prepared = litchi_odf_common::detect::prepared(bytes)
-            .expect("test fixture or operation should succeed");
+        let prepared =
+            litchi_odf_common::detect::prepared(bytes, litchi_odf_common::SourceLimits::default())
+                .expect("test fixture or operation should succeed");
         let spreadsheet = crate::Package::from_prepared_package(prepared)
             .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())

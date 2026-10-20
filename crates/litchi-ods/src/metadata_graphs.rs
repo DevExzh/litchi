@@ -241,7 +241,11 @@ impl Edit {
     fn require_compact_graph(&self, path: &str) -> Result<()> {
         let package = self.package()?;
         let bytes = package.package().get_file(path)?;
-        litchi_odf_common::compact_xml::validate(&bytes).map_err(Error::from)
+        litchi_odf_common::compact_xml::validate(
+            &bytes,
+            litchi_odf_common::compact_xml::Limits::default(),
+        )
+        .map_err(Error::from)
     }
 }
 
@@ -350,10 +354,18 @@ fn check_position(position: Position, length: usize) -> Result<()> {
 fn validate_authored_xml(bytes: &[u8], graph_path: Option<&str>) -> Result<()> {
     let package = Archive::from_bytes(bytes.to_vec())?;
     let manifest = package.package().get_file("META-INF/manifest.xml")?;
-    litchi_odf_common::compact_xml::validate(&manifest).map_err(Error::from)?;
+    litchi_odf_common::compact_xml::validate(
+        &manifest,
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(Error::from)?;
     if let Some(path) = graph_path {
         let graph = package.package().get_file(path)?;
-        litchi_odf_common::compact_xml::validate(&graph).map_err(Error::from)?;
+        litchi_odf_common::compact_xml::validate(
+            &graph,
+            litchi_odf_common::compact_xml::Limits::default(),
+        )
+        .map_err(Error::from)?;
     }
     Ok(())
 }

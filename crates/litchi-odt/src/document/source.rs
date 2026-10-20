@@ -151,10 +151,7 @@ impl SourceBackedDocument {
         source: Arc<dyn ReadAt>,
         options: OpenOptions,
     ) -> std::result::Result<Self, OdfError> {
-        let package = SourceBackedPackage::from_read_at_with_limits(
-            Arc::clone(&source),
-            options.source_limits_value(),
-        )?;
+        let package = SourceBackedPackage::from_read_at_with_options(Arc::clone(&source), options)?;
         Self::from_package(source, package, options.semantic_limits_value())
     }
 
@@ -184,10 +181,10 @@ impl SourceBackedDocument {
         // SourceBackedPackage takes ownership into Zeroizing before any
         // archive work.  This also keeps encrypted payloads lazy.
         let mut password = Zeroizing::new(password.into());
-        let package = SourceBackedPackage::from_read_at_with_limits_and_password(
+        let package = SourceBackedPackage::from_read_at_with_password_and_options(
             Arc::clone(&source),
-            options.source_limits_value(),
             std::mem::take(&mut *password),
+            options,
         )?;
         Self::from_package(source, package, options.semantic_limits_value())
     }

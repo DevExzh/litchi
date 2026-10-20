@@ -342,16 +342,18 @@ mod zip {
             feature = "odf-objects"
         ))]
         let odf = {
-            let mime = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
+            let mime = litchi_odf_common::detect::packaged_mime_read_at(
+                source.as_ref(),
+                litchi_odf_common::detect::Limits::default(),
+            )?;
             ensure_path_source_current(source.as_ref(), version)?;
             match mime {
                 Some(format) => {
-                    let catalog =
-                        litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
-                            source.as_ref(),
-                            litchi_odf_common::detect::CatalogProbeLimits::default()
-                                .with_neutral_input_budget(super::super::NEUTRAL_MAX_INPUT_BYTES),
-                        )?;
+                    let catalog = litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(
+                        source.as_ref(),
+                        litchi_odf_common::detect::CatalogProbeLimits::default()
+                            .with_neutral_input_budget(super::super::NEUTRAL_MAX_INPUT_BYTES),
+                    )?;
                     ensure_path_source_current(source.as_ref(), version)?;
                     Some((format, catalog))
                 },
@@ -569,7 +571,10 @@ mod zip {
                     version,
                     super::super::input_ceiling(options),
                 )?;
-                let file = match litchi_odf_common::detect::prepared_or_original(bytes) {
+                let file = match litchi_odf_common::detect::prepared_or_original(
+                    bytes,
+                    litchi_odf_common::SourceLimits::default(),
+                ) {
                     Ok(prepared) => super::super::odf_from_prepared(prepared, options)?,
                     Err(_) => return Err(super::super::not_enabled(other)),
                 };

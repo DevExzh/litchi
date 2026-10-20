@@ -384,7 +384,11 @@ fn parse(bytes: &[u8]) -> Result<Vec<FlatPage>> {
     // non-flat classification.
     let xml = std::str::from_utf8(bytes).map_err(|_error| invalid("flat ODG is not UTF-8"))?;
     validate_raw_events(xml)?;
-    if litchi_odf_common::detect::flat(bytes) != Some(FileFormat::Odg) {
+    if litchi_odf_common::detect::flat(bytes, litchi_odf_common::detect::Limits::default())
+        .ok()
+        .flatten()
+        != Some(FileFormat::Odg)
+    {
         return Err(invalid("input is not a flat ODG document"));
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());

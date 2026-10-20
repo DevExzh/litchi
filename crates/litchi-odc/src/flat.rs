@@ -1185,7 +1185,10 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
         ));
     }
     if root_kind == RootKind::Flat
-        && litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odc)
+        && litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+            != Some(FileFormat::Odc)
     {
         return Err(invalid_error("input is not a flat ODC document"));
     }

@@ -397,8 +397,17 @@ impl Package {
     pub fn apply(
         &self,
         patch: &crate::transaction::Patch,
-    ) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    ) -> std::result::Result<crate::transaction::Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "odm.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(crate::transaction::Commit::replayed(
+            patch.apply(self)?,
+            patch.clone(),
+        ))
     }
 
     /// Creates explicit bounded undo/redo history at this package.

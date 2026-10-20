@@ -9,25 +9,15 @@ use quick_xml::reader::NsReader;
 use super::Limits;
 use crate::model::{Attribute, Content, Element, MATHML_NAMESPACE};
 
-/// Parse bounded `MathML` markup into an inert element tree.
+/// Parse bounded `MathML` markup into an inert element tree under
+/// caller-selected finite limits ([`Limits::default`] for the defaults).
 ///
 /// # Errors
 ///
 /// Returns an error when the markup is not well-formed, when the root is not
-/// a `math` element in the `MathML` namespace, or when a safety limit on
-/// depth, node count, attribute count or size, or text size is exceeded.
-///
-pub fn parse(xml: &str) -> Result<Element> {
-    parse_with_limits(xml, Limits::default())
-}
-
-/// Parse inert `MathML` using caller-selected finite limits.
-///
-/// # Errors
-///
-/// Returns an error for malformed markup, an invalid root, or any exceeded
-/// byte, depth, element, attribute, or text ceiling.
-pub fn parse_with_limits(xml: &str, limits: Limits) -> Result<Element> {
+/// a `math` element in the `MathML` namespace, or when a byte, depth, node,
+/// attribute or text ceiling of `limits` is exceeded.
+pub fn parse(xml: &str, limits: Limits) -> Result<Element> {
     parse_internal(xml, limits, true)
 }
 

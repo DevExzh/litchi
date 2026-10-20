@@ -201,13 +201,16 @@ impl SourceBackedSpreadsheet {
         let package = match password {
             Some(password) => {
                 let mut password = Zeroizing::new(password);
-                SourceBackedPackage::from_read_at_with_limits_and_password(
+                SourceBackedPackage::from_read_at_with_password_and_options(
                     Arc::clone(&source),
-                    limits,
                     std::mem::take(&mut *password),
+                    OpenOptions::new().source_limits(limits),
                 )?
             },
-            None => SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?,
+            None => SourceBackedPackage::from_read_at_with_options(
+                Arc::clone(&source),
+                OpenOptions::new().source_limits(limits),
+            )?,
         };
         check_semantic_part_sizes(&package, options.semantic_limits_value())?;
         Ok(Self::from_package(source, package)?)

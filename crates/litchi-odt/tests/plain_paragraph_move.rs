@@ -106,7 +106,11 @@ fn patch_is_exact_deterministic_reversible_and_stale_checked() {
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -114,6 +118,7 @@ fn patch_is_exact_deterministic_reversible_and_stale_checked() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

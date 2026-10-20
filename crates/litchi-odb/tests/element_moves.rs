@@ -40,7 +40,7 @@ fn query_moves_keep_bytes_and_invert() {
     );
     assert_eq!(commit.package().database().content_xml(), expected);
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.database().content_xml(), content);
+    assert_eq!(restored.into_package().database().content_xml(), content);
 
     // Back to the front, through the other branch.
     let mut edit = commit.package().edit();
@@ -123,5 +123,5 @@ fn producer_query_moves_keep_every_other_byte() {
     assert_eq!(after.len(), source.len());
     assert!(after.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"));
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), bytes.as_slice());
+    assert_eq!(restored.into_package().as_bytes(), bytes.as_slice());
 }

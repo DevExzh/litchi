@@ -48,10 +48,13 @@ fn round_trip(package: &Package) {
     let mut edit = package.edit_metadata();
     edit.set(Field::Subject, Some("S")).unwrap();
     let (after, patch) = edit.commit().unwrap().into_parts();
-    let restored = after.apply_metadata(&patch.inverse()).unwrap();
+    let restored = after
+        .apply_metadata(&patch.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.as_bytes(), package.as_bytes());
     assert_eq!(
-        package.apply_metadata(&patch).unwrap().as_bytes(),
+        package.apply_metadata(&patch).unwrap().package().as_bytes(),
         after.as_bytes()
     );
     assert!(after.apply_metadata(&patch).is_err());

@@ -286,10 +286,10 @@ impl Package {
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
-        let owned = litchi_odf_common::OwnedPackage::from_reader_with_limits_and_password(
+        let owned = litchi_odf_common::OwnedPackage::from_reader_with_password_and_options(
             std::fs::File::open(path)?,
-            options.source_limits_value(),
             password.as_str(),
+            options,
         )?;
         Self::from_opened(Archive::from_owned_package(owned)?, true, options)
     }
@@ -318,13 +318,15 @@ impl Package {
         // Let the prepared detector perform the local MIME probe exactly
         // once; a matching ODS result transfers its indexed archive and a
         // rejected probe recovers the allocation for the ordinary owner.
-        let archive =
-            match litchi_odf_common::detect::prepared_or_original_with_limits(bytes, limits) {
-                Ok(prepared) => Archive::from_prepared_package(prepared)?,
-                Err(bytes) => Archive::from_owned_package(
-                    litchi_odf_common::OwnedPackage::from_bytes_with_limits(bytes, limits)?,
+        let archive = match litchi_odf_common::detect::prepared_or_original(bytes, limits) {
+            Ok(prepared) => Archive::from_prepared_package(prepared)?,
+            Err(bytes) => Archive::from_owned_package(
+                litchi_odf_common::OwnedPackage::from_bytes_with_options(
+                    bytes,
+                    OpenOptions::new().source_limits(limits),
                 )?,
-            };
+            )?,
+        };
         Self::from_opened(archive, false, options)
     }
 
@@ -354,10 +356,10 @@ impl Package {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let owned = litchi_odf_common::OwnedPackage::from_bytes_with_limits_and_password(
+        let owned = litchi_odf_common::OwnedPackage::from_bytes_with_password_and_options(
             copy_bytes(bytes)?,
-            limits,
             password.as_str(),
+            OpenOptions::new().source_limits(limits),
         )?;
         Self::from_opened(Archive::from_owned_package(owned)?, true, options)
     }
@@ -381,10 +383,7 @@ impl Package {
         reader: impl std::io::Read,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let owned = litchi_odf_common::OwnedPackage::from_reader_with_limits(
-            reader,
-            options.source_limits_value(),
-        )?;
+        let owned = litchi_odf_common::OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_opened(Archive::from_owned_package(owned)?, false, options)
     }
 
@@ -557,11 +556,12 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not byte-identical to the patch
-    /// source, or when the default security policy refuses a changed write on
-    /// a signed, encrypted or protected source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?.into_package())
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source, or an error when the default
+    /// security policy refuses a changed write on a signed, encrypted or
+    /// protected source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+        self.apply_with_security(patch, SecurityWritePolicy::default())
     }
 
     /// Apply a primary-transaction patch under an explicit
@@ -574,8 +574,14 @@ impl Package {
         &self,
         patch: &Patch,
         policy: SecurityWritePolicy,
-    ) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply_with_security(self, policy)?.into_package())
+    ) -> std::result::Result<Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "ods.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(patch.apply_with_security(self, policy)?)
     }
 
     /// Atomically replace `path` with this package (full durability).
@@ -1425,8 +1431,11 @@ impl Edit {
         update(&mut edit)?;
         for (index, chart) in edit.charts().iter().enumerate() {
             if before.get(index) != Some(chart) {
-                litchi_odf_common::compact_xml::validate(chart.content_xml().as_bytes())
-                    .map_err(CoreError::from)?;
+                litchi_odf_common::compact_xml::validate(
+                    chart.content_xml().as_bytes(),
+                    litchi_odf_common::compact_xml::Limits::default(),
+                )
+                .map_err(CoreError::from)?;
             }
         }
         let commit = edit.commit()?;
@@ -3005,16 +3014,6 @@ impl Patch {
         Self::from_semantic(semantic, limits)
     }
 
-    /// Apply only to the exact immutable package that authorized this patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale source bytes, security refusal, bounds, malformed target, or
-    /// complete facade readback failure.
-    pub(crate) fn apply(&self, snapshot: &Package) -> Result<Commit> {
-        self.apply_with_security(snapshot, SecurityWritePolicy::default())
-    }
-
     /// Apply under an explicit signature/encryption write policy.
     ///
     /// # Errors
@@ -3965,7 +3964,11 @@ fn validate_authored_parts(
             // Prolog whitespace (a producer's newline after the declaration)
             // is not authored content.
             let bytes = crate::package::compact_prolog_bytes(&file.bytes);
-            litchi_odf_common::compact_xml::validate(&bytes).map_err(CoreError::from)?;
+            litchi_odf_common::compact_xml::validate(
+                &bytes,
+                litchi_odf_common::compact_xml::Limits::default(),
+            )
+            .map_err(CoreError::from)?;
         }
     }
     // An unchanged manifest is the producer's (LibreOffice indents it); only
@@ -3977,7 +3980,11 @@ fn validate_authored_parts(
     }
     let package = Archive::from_bytes(target.to_vec())?;
     let manifest = package.package().get_file("META-INF/manifest.xml")?;
-    litchi_odf_common::compact_xml::validate(&manifest).map_err(CoreError::from)
+    litchi_odf_common::compact_xml::validate(
+        &manifest,
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(CoreError::from)
 }
 
 fn validate_media_type(media_type: &str) -> Result<()> {
@@ -4085,7 +4092,11 @@ fn validate_resource_size(length: usize, limits: Limits) -> Result<()> {
 fn validate_xml_resource(media_type: &str, bytes: &[u8]) -> Result<()> {
     validate_media_type(media_type)?;
     if is_xml_media_type(media_type) {
-        litchi_odf_common::compact_xml::validate(bytes).map_err(CoreError::from)?;
+        litchi_odf_common::compact_xml::validate(
+            bytes,
+            litchi_odf_common::compact_xml::Limits::default(),
+        )
+        .map_err(CoreError::from)?;
     }
     Ok(())
 }

@@ -113,6 +113,7 @@ fn opened_canonical_definition_edits_are_atomic_and_reversible() -> TestResult<(
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -253,6 +254,7 @@ fn noncanonical_chart_plot_and_series_attributes_use_checked_exact_spans() -> Te
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -261,7 +263,7 @@ fn noncanonical_chart_plot_and_series_attributes_use_checked_exact_spans() -> Te
     let decoded = Patch::from_bytes(&wire, source.chart().limits())?;
     assert_eq!(decoded.exact_changes().len(), 10);
     assert_eq!(
-        source.apply(&decoded)?.as_bytes(),
+        source.apply(&decoded)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     Ok(())
@@ -309,19 +311,20 @@ fn odf_1_4_coordinate_region_exact_edit_transfers_without_normalizing() -> TestR
     let destination = Package::from_bytes(&raw_negative_package(&destination_xml)?)?;
     let transfer = changed.patch().transfer_to(&destination)?;
     assert!(transfer.is_merged());
-    let transferred = destination.apply(
-        transfer
-            .patch()
-            .ok_or("missing coordinate-region transfer patch")?,
-    )?;
+    let transferred = destination
+        .apply(
+            transfer
+                .patch()
+                .ok_or("missing coordinate-region transfer patch")?,
+        )?
+        .into_package();
     assert!(
         transferred
             .chart()
             .content_xml()
             .contains("<!-- independently retained -->\n")
     );
-    assert!(transferred
-        .chart().content_xml()
+    assert!(transferred.chart().content_xml()
         .contains("<chart:coordinate-region svg:x=\"3cm\" svg:y=\"2cm\" svg:width=\"7cm\" svg:height=\"6cm\"/>"));
     Ok(())
 }
@@ -395,6 +398,7 @@ fn noncanonical_titles_footers_and_legends_have_controlled_exact_edits() -> Test
         changed
             .package()
             .apply(&changed.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -493,6 +497,7 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
         changed
             .package()
             .apply(&changed.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -501,7 +506,7 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
     let decoded = Patch::from_bytes(&wire, source.chart().limits())?;
     assert_eq!(decoded.exact_changes(), changed.patch().exact_changes());
     assert_eq!(
-        source.apply(&decoded)?.as_bytes(),
+        source.apply(&decoded)?.into_package().as_bytes(),
         changed.package().as_bytes()
     );
 
@@ -514,11 +519,13 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
     let independent = independent_edit.commit()?;
     let joined = changed.patch().join(independent.patch())?;
     assert!(joined.is_merged());
-    let joined_chart = source.apply(
-        joined
-            .patch()
-            .ok_or("missing embedded-vocabulary join patch")?,
-    )?;
+    let joined_chart = source
+        .apply(
+            joined
+                .patch()
+                .ok_or("missing embedded-vocabulary join patch")?,
+        )?
+        .into_package();
     assert!(
         joined_chart
             .chart()
@@ -540,11 +547,13 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
     let destination = Package::from_bytes(&raw_negative_package(&destination_xml)?)?;
     let transfer = changed.patch().transfer_to(&destination)?;
     assert!(transfer.is_merged());
-    let transferred = destination.apply(
-        transfer
-            .patch()
-            .ok_or("missing embedded-vocabulary transfer patch")?,
-    )?;
+    let transferred = destination
+        .apply(
+            transfer
+                .patch()
+                .ok_or("missing embedded-vocabulary transfer patch")?,
+        )?
+        .into_package();
     assert!(
         transferred
             .chart()
@@ -726,7 +735,7 @@ fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
     let merge = left.patch().join(right.patch())?;
     assert!(merge.is_merged());
     let merged_patch = merge.patch().ok_or("missing package patch")?;
-    let merged = source.apply(merged_patch)?;
+    let merged = source.apply(merged_patch)?.into_package();
     assert_eq!(merged.chart().resources().len(), 1);
     assert_eq!(
         merged.chart().definition()?.style_name.as_deref(),
@@ -736,9 +745,12 @@ fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
     let wire = merged_patch.to_bytes();
     assert_eq!(wire, merged_patch.to_bytes());
     let decoded = Patch::from_bytes(&wire, source.chart().limits())?;
-    assert_eq!(source.apply(&decoded)?.as_bytes(), merged.as_bytes());
     assert_eq!(
-        merged.apply(&decoded.inverse())?.as_bytes(),
+        source.apply(&decoded)?.into_package().as_bytes(),
+        merged.as_bytes()
+    );
+    assert_eq!(
+        merged.apply(&decoded.inverse())?.into_package().as_bytes(),
         source.as_bytes()
     );
     let mut trailing = wire.clone();
@@ -801,11 +813,13 @@ fn package_transfer_closes_chart_style_data_and_resource_dependencies() -> TestR
 
     let transfer = changed.patch().transfer_to(&destination)?;
     assert!(transfer.is_merged());
-    let transferred = destination.apply(
-        transfer
-            .patch()
-            .ok_or("missing transferred package patch")?,
-    )?;
+    let transferred = destination
+        .apply(
+            transfer
+                .patch()
+                .ok_or("missing transferred package patch")?,
+        )?
+        .into_package();
     let reopened = Package::from_bytes(transferred.as_bytes())?;
     let projected = reopened.chart().definition()?;
     assert_eq!(projected.style_name.as_deref(), Some("transferred"));

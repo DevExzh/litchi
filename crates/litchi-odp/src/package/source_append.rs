@@ -343,8 +343,7 @@ impl SourceBackedTailAppendEdit {
         title: impl Into<String>,
         body: impl Into<String>,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        let package =
-            SourceBackedPackage::from_read_at_with_limits(source, options.source_limits_value())?;
+        let package = SourceBackedPackage::from_read_at_with_options(source, options)?;
         let package = Arc::new(package);
         if package.mimetype()? != ODF_PRESENTATION {
             return Err(Error::InvalidFormat(format!(

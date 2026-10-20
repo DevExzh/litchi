@@ -82,7 +82,11 @@ fn compact_real_fodt_fixtures_expose_layout_objects_and_declarations() {
         REAL_LINKED_OBJECT,
         REAL_USER_FIELD,
     ] {
-        litchi_odf_common::compact_xml::validate(bytes).unwrap();
+        litchi_odf_common::compact_xml::validate(
+            bytes,
+            litchi_odf_common::compact_xml::Limits::default(),
+        )
+        .unwrap();
     }
 
     let layout = Document::from_bytes(REAL_DEFAULT_PAGE_LAYOUT)
@@ -117,7 +121,11 @@ fn compact_real_fodt_fixtures_expose_layout_objects_and_declarations() {
 
 #[test]
 fn compact_exact_fodt_exposes_inert_macro_metadata() {
-    litchi_odf_common::compact_xml::validate(EXACT_MACRO_METADATA.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        EXACT_MACRO_METADATA.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
     let scripts = Document::from_bytes(EXACT_MACRO_METADATA.as_bytes())
         .unwrap()
         .document_scripts()

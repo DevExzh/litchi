@@ -106,7 +106,10 @@ fn worksheet_patch_round_trips_cells_order_and_inverse() -> litchi_core::Result<
     })?;
     assert_eq!(stored.text, "value");
     let spreadsheet = Package::from_bytes(commit.snapshot().as_bytes())?.workbook()?;
-    litchi_odf_common::compact_xml::validate(spreadsheet.content_xml().as_bytes())?;
+    litchi_odf_common::compact_xml::validate(
+        spreadsheet.content_xml().as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )?;
 
     let restored = commit.patch().inverse().apply(commit.snapshot())?;
     assert_eq!(restored.snapshot().as_bytes(), source);

@@ -1283,7 +1283,12 @@ fn no_op_and_inverse_keep_the_exact_metadata_source_and_opaque_markup() {
 
     let inverse = Patch::from_bytes(&commit.patch().inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        commit.package().apply(&inverse).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }

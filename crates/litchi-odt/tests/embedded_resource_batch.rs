@@ -143,6 +143,7 @@ fn batch_publishes_media_rich_create_update_delete_once_and_replays_durably() {
             .package()
             .apply(&committed.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         setup.as_bytes()
     );

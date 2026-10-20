@@ -412,18 +412,73 @@ impl SourceLimitsBuilder {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SemanticLimitKind {
-    /// Bytes of the decoded `content.xml` part.
+    /// Bytes of the decoded `content.xml` part, and of the XML of a flat (single-file) document.
     ContentBytes,
     /// Bytes of the decoded `styles.xml` part.
     StylesBytes,
     /// Top-level semantic units of the projection: paragraphs and tables of
-    /// a text document, worksheets of a workbook, slides of a presentation.
+    /// a text document, worksheets of a workbook, slides of a presentation,
+    /// pages of a drawing.
     Units,
+    /// XML element nesting depth inspected by a flat-document or chart
+    /// reader.
+    Depth,
+    /// UTF-8 bytes of one staged replacement text (a flat paragraph, shape
+    /// or slide text, an image-map area text).
+    TextBytes,
+    /// Staged edits of one flat-document edit.
+    Edits,
+    /// Drawing shapes of a flat drawing.
+    Shapes,
+    /// Image frames of a flat image document.
+    Frames,
+    /// Image-map areas of a flat image document.
+    MapAreas,
+    /// Bytes of one published flat document.
+    OutputBytes,
+    /// Chart axes.
+    Axes,
+    /// Chart series.
+    Series,
+    /// Chart data points.
+    DataPoints,
+    /// Rows of a chart's cached data table.
+    CachedRows,
+    /// Cells of a chart's cached data table.
+    CachedCells,
+    /// Items of one chart cell-range address list.
+    RangeItems,
+    /// Package resources a chart references.
+    Resources,
+    /// Retained undo/redo steps of a chart history.
+    History,
+    /// Bytes of one chart scalar (a name, label or formula).
+    ScalarBytes,
 }
 
 impl SemanticLimitKind {
     /// Every semantic dimension, in declaration order.
-    pub const ALL: [Self; 3] = [Self::ContentBytes, Self::StylesBytes, Self::Units];
+    pub const ALL: [Self; 19] = [
+        Self::ContentBytes,
+        Self::StylesBytes,
+        Self::Units,
+        Self::Depth,
+        Self::TextBytes,
+        Self::Edits,
+        Self::Shapes,
+        Self::Frames,
+        Self::MapAreas,
+        Self::OutputBytes,
+        Self::Axes,
+        Self::Series,
+        Self::DataPoints,
+        Self::CachedRows,
+        Self::CachedCells,
+        Self::RangeItems,
+        Self::Resources,
+        Self::History,
+        Self::ScalarBytes,
+    ];
 
     /// The registered glossary noun of this dimension.
     #[must_use]
@@ -432,6 +487,78 @@ impl SemanticLimitKind {
             Self::ContentBytes => "content_bytes",
             Self::StylesBytes => "styles_bytes",
             Self::Units => "units",
+            Self::Depth => "depth",
+            Self::TextBytes => "text_bytes",
+            Self::Edits => "edits",
+            Self::Shapes => "shapes",
+            Self::Frames => "frames",
+            Self::MapAreas => "map_areas",
+            Self::OutputBytes => "output_bytes",
+            Self::Axes => "axes",
+            Self::Series => "series",
+            Self::DataPoints => "data_points",
+            Self::CachedRows => "cached_rows",
+            Self::CachedCells => "cached_cells",
+            Self::RangeItems => "range_items",
+            Self::Resources => "resources",
+            Self::History => "history",
+            Self::ScalarBytes => "scalar_bytes",
+        }
+    }
+
+    /// The common-core resource-limit scope naming this dimension.
+    pub(crate) const fn scope(self) -> &'static str {
+        match self {
+            Self::ContentBytes => "ODF semantic content_bytes",
+            Self::StylesBytes => "ODF semantic styles_bytes",
+            Self::Units => "ODF semantic units",
+            Self::Depth => "ODF semantic depth",
+            Self::TextBytes => "ODF semantic text_bytes",
+            Self::Edits => "ODF semantic edits",
+            Self::Shapes => "ODF semantic shapes",
+            Self::Frames => "ODF semantic frames",
+            Self::MapAreas => "ODF semantic map_areas",
+            Self::OutputBytes => "ODF semantic output_bytes",
+            Self::Axes => "ODF semantic axes",
+            Self::Series => "ODF semantic series",
+            Self::DataPoints => "ODF semantic data_points",
+            Self::CachedRows => "ODF semantic cached_rows",
+            Self::CachedCells => "ODF semantic cached_cells",
+            Self::RangeItems => "ODF semantic range_items",
+            Self::Resources => "ODF semantic resources",
+            Self::History => "ODF semantic history",
+            Self::ScalarBytes => "ODF semantic scalar_bytes",
+        }
+    }
+
+    /// Classify a common-core resource-limit scope raised for a semantic
+    /// dimension.
+    pub(crate) fn from_scope(scope: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.scope() == scope)
+    }
+
+    /// The common-core resource class of this dimension.
+    #[must_use]
+    pub(crate) const fn resource(self) -> litchi_core::Resource {
+        match self {
+            Self::ContentBytes | Self::StylesBytes | Self::TextBytes | Self::ScalarBytes => {
+                litchi_core::Resource::InputBytes
+            },
+            Self::Units
+            | Self::Edits
+            | Self::Shapes
+            | Self::Frames
+            | Self::MapAreas
+            | Self::Axes
+            | Self::Series
+            | Self::DataPoints
+            | Self::CachedRows
+            | Self::CachedCells
+            | Self::RangeItems
+            | Self::Resources
+            | Self::History => litchi_core::Resource::Objects,
+            Self::Depth => litchi_core::Resource::Depth,
+            Self::OutputBytes => litchi_core::Resource::OutputBytes,
         }
     }
 }
@@ -443,18 +570,38 @@ impl fmt::Display for SemanticLimitKind {
 }
 
 /// Checked limits applied when an ODF package is projected into its semantic
-/// model (`Document`, `Workbook` or `Presentation`).
+/// model (`Document`, `Workbook` or `Presentation`), when a flat
+/// (single-file) document is opened or edited, and when a chart is read.
 ///
 /// The decoded part dimensions are checked against the declared member sizes
 /// before the part is inflated, and `units` is checked once the projection's
-/// top-level units have been counted.  The defaults equal the hard ceilings
-/// the readers already enforced (256 MiB parts, 1,048,576 units), so a
-/// default open behaves exactly as before.
+/// top-level units have been counted. A flat document's XML is bounded by
+/// `content_bytes` (and by the source `input_bytes`); its nesting, staged
+/// edits and replacement text by `depth`, `edits` and `text_bytes`. The chart
+/// dimensions bound the ODC chart model. Each default is the most permissive
+/// bound an ODF reader enforced before the dimension became configurable, so
+/// a default open accepts everything it accepted before.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SemanticLimits {
     content_bytes: u64,
     styles_bytes: u64,
     units: u64,
+    depth: u64,
+    text_bytes: u64,
+    edits: u64,
+    shapes: u64,
+    frames: u64,
+    map_areas: u64,
+    output_bytes: u64,
+    axes: u64,
+    series: u64,
+    data_points: u64,
+    cached_rows: u64,
+    cached_cells: u64,
+    range_items: u64,
+    resources: u64,
+    history: u64,
+    scalar_bytes: u64,
 }
 
 impl SemanticLimits {
@@ -463,10 +610,46 @@ impl SemanticLimits {
         content_bytes: 256 * MIB,
         styles_bytes: 256 * MIB,
         units: 1_048_576,
+        depth: 4_096,
+        text_bytes: 16 * MIB,
+        edits: 1_024,
+        shapes: 1_000_000,
+        frames: 1_000_000,
+        map_areas: 100_000,
+        output_bytes: 256 * MIB,
+        axes: 16_777_216,
+        series: 16_777_216,
+        data_points: 16_777_216,
+        cached_rows: 16_777_216,
+        cached_cells: 16_777_216,
+        range_items: 16_777_216,
+        resources: 16_777_216,
+        history: 16_777_216,
+        scalar_bytes: 16 * MIB,
     };
 
-    /// The default profile, equal to [`Self::MAXIMUM`].
-    pub const DEFAULT: Self = Self::MAXIMUM;
+    /// The default profile.
+    pub const DEFAULT: Self = Self {
+        content_bytes: 256 * MIB,
+        styles_bytes: 256 * MIB,
+        units: 1_048_576,
+        depth: 4_096,
+        text_bytes: 16 * MIB,
+        edits: 1_024,
+        shapes: 1_000_000,
+        frames: 1_000_000,
+        map_areas: 100_000,
+        output_bytes: 256 * MIB,
+        axes: 16_384,
+        series: 65_536,
+        data_points: 16_777_216,
+        cached_rows: 16_777_216,
+        cached_cells: 16_777_216,
+        range_items: 65_536,
+        resources: 100_000,
+        history: 4_096,
+        scalar_bytes: 64 * 1024,
+    };
 
     /// Start a checked builder from [`Self::DEFAULT`].
     pub const fn builder() -> SemanticLimitsBuilder {
@@ -475,22 +658,118 @@ impl SemanticLimits {
         }
     }
 
-    /// Maximum decoded `content.xml` bytes.
+    /// The selected maximum of [`SemanticLimitKind::ContentBytes`].
     #[must_use]
     pub const fn max_content_bytes(self) -> u64 {
         self.content_bytes
     }
 
-    /// Maximum decoded `styles.xml` bytes.
+    /// The selected maximum of [`SemanticLimitKind::StylesBytes`].
     #[must_use]
     pub const fn max_styles_bytes(self) -> u64 {
         self.styles_bytes
     }
 
-    /// Maximum top-level semantic units of the projection.
+    /// The selected maximum of [`SemanticLimitKind::Units`].
     #[must_use]
     pub const fn max_units(self) -> u64 {
         self.units
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::Depth`].
+    #[must_use]
+    pub const fn max_depth(self) -> u64 {
+        self.depth
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::TextBytes`].
+    #[must_use]
+    pub const fn max_text_bytes(self) -> u64 {
+        self.text_bytes
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::Edits`].
+    #[must_use]
+    pub const fn max_edits(self) -> u64 {
+        self.edits
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::Shapes`].
+    #[must_use]
+    pub const fn max_shapes(self) -> u64 {
+        self.shapes
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::Frames`].
+    #[must_use]
+    pub const fn max_frames(self) -> u64 {
+        self.frames
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::MapAreas`].
+    #[must_use]
+    pub const fn max_map_areas(self) -> u64 {
+        self.map_areas
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::OutputBytes`].
+    #[must_use]
+    pub const fn max_output_bytes(self) -> u64 {
+        self.output_bytes
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::Axes`].
+    #[must_use]
+    pub const fn max_axes(self) -> u64 {
+        self.axes
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::Series`].
+    #[must_use]
+    pub const fn max_series(self) -> u64 {
+        self.series
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::DataPoints`].
+    #[must_use]
+    pub const fn max_data_points(self) -> u64 {
+        self.data_points
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::CachedRows`].
+    #[must_use]
+    pub const fn max_cached_rows(self) -> u64 {
+        self.cached_rows
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::CachedCells`].
+    #[must_use]
+    pub const fn max_cached_cells(self) -> u64 {
+        self.cached_cells
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::RangeItems`].
+    #[must_use]
+    pub const fn max_range_items(self) -> u64 {
+        self.range_items
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::Resources`].
+    #[must_use]
+    pub const fn max_resources(self) -> u64 {
+        self.resources
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::History`].
+    #[must_use]
+    pub const fn max_history(self) -> u64 {
+        self.history
+    }
+
+    /// The selected maximum of [`SemanticLimitKind::ScalarBytes`].
+    #[must_use]
+    pub const fn max_scalar_bytes(self) -> u64 {
+        self.scalar_bytes
     }
 
     /// Return the configured value of one dimension.
@@ -500,15 +779,37 @@ impl SemanticLimits {
             SemanticLimitKind::ContentBytes => self.content_bytes,
             SemanticLimitKind::StylesBytes => self.styles_bytes,
             SemanticLimitKind::Units => self.units,
+            SemanticLimitKind::Depth => self.depth,
+            SemanticLimitKind::TextBytes => self.text_bytes,
+            SemanticLimitKind::Edits => self.edits,
+            SemanticLimitKind::Shapes => self.shapes,
+            SemanticLimitKind::Frames => self.frames,
+            SemanticLimitKind::MapAreas => self.map_areas,
+            SemanticLimitKind::OutputBytes => self.output_bytes,
+            SemanticLimitKind::Axes => self.axes,
+            SemanticLimitKind::Series => self.series,
+            SemanticLimitKind::DataPoints => self.data_points,
+            SemanticLimitKind::CachedRows => self.cached_rows,
+            SemanticLimitKind::CachedCells => self.cached_cells,
+            SemanticLimitKind::RangeItems => self.range_items,
+            SemanticLimitKind::Resources => self.resources,
+            SemanticLimitKind::History => self.history,
+            SemanticLimitKind::ScalarBytes => self.scalar_bytes,
         }
     }
 
     /// Whether this profile is the default (no caller tightening).
     #[must_use]
     pub const fn is_default(self) -> bool {
-        self.content_bytes == Self::DEFAULT.content_bytes
-            && self.styles_bytes == Self::DEFAULT.styles_bytes
-            && self.units == Self::DEFAULT.units
+        let mut index = 0;
+        while index < SemanticLimitKind::ALL.len() {
+            let kind = SemanticLimitKind::ALL[index];
+            if self.value(kind) != Self::DEFAULT.value(kind) {
+                return false;
+            }
+            index += 1;
+        }
+        true
     }
 
     /// Check one observed value against this profile.
@@ -526,6 +827,48 @@ impl SemanticLimits {
             });
         }
         Ok(())
+    }
+
+    /// Check one observed `usize` count or size against this profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Limit`] when `observed` exceeds the dimension.
+    pub fn check_usize(self, kind: SemanticLimitKind, observed: usize) -> Result<(), crate::Error> {
+        self.check(kind, u64::try_from(observed).unwrap_or(u64::MAX))
+    }
+
+    /// Check one observed value against this profile for a reader that
+    /// returns the common-core result: an exceeded dimension is a
+    /// [`litchi_core::Error::ResourceLimit`] whose scope names the dimension,
+    /// which converting into [`crate::Error`] types back into
+    /// [`crate::Error::Limit`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the resource-limit failure when `observed` exceeds the
+    /// dimension.
+    pub fn check_core(self, kind: SemanticLimitKind, observed: usize) -> litchi_core::Result<()> {
+        let maximum = self.value(kind);
+        let observed = u64::try_from(observed).unwrap_or(u64::MAX);
+        if observed > maximum {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: kind.resource(),
+                    observed,
+                    limit: maximum,
+                    scope: kind.scope().into(),
+                },
+            ));
+        }
+        Ok(())
+    }
+
+    /// The selected maximum of one dimension as a `usize` (saturating on
+    /// targets whose `usize` is narrower than the value).
+    #[must_use]
+    pub fn usize_value(self, kind: SemanticLimitKind) -> usize {
+        usize::try_from(self.value(kind)).unwrap_or(usize::MAX)
     }
 }
 
@@ -555,7 +898,7 @@ fn checked_semantic(kind: SemanticLimitKind, value: u64) -> Result<u64, crate::E
 }
 
 impl SemanticLimitsBuilder {
-    /// Set the maximum decoded `content.xml` bytes.
+    /// Set the maximum of [`SemanticLimitKind::ContentBytes`].
     ///
     /// # Errors
     ///
@@ -565,7 +908,7 @@ impl SemanticLimitsBuilder {
         Ok(self)
     }
 
-    /// Set the maximum decoded `styles.xml` bytes.
+    /// Set the maximum of [`SemanticLimitKind::StylesBytes`].
     ///
     /// # Errors
     ///
@@ -575,13 +918,173 @@ impl SemanticLimitsBuilder {
         Ok(self)
     }
 
-    /// Set the maximum top-level semantic units.
+    /// Set the maximum of [`SemanticLimitKind::Units`].
     ///
     /// # Errors
     ///
     /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
     pub fn max_units(mut self, value: u64) -> Result<Self, crate::Error> {
         self.limits.units = checked_semantic(SemanticLimitKind::Units, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::Depth`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_depth(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.depth = checked_semantic(SemanticLimitKind::Depth, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::TextBytes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_text_bytes(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.text_bytes = checked_semantic(SemanticLimitKind::TextBytes, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::Edits`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_edits(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.edits = checked_semantic(SemanticLimitKind::Edits, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::Shapes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_shapes(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.shapes = checked_semantic(SemanticLimitKind::Shapes, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::Frames`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_frames(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.frames = checked_semantic(SemanticLimitKind::Frames, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::MapAreas`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_map_areas(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.map_areas = checked_semantic(SemanticLimitKind::MapAreas, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::OutputBytes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_output_bytes(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.output_bytes = checked_semantic(SemanticLimitKind::OutputBytes, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::Axes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_axes(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.axes = checked_semantic(SemanticLimitKind::Axes, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::Series`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_series(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.series = checked_semantic(SemanticLimitKind::Series, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::DataPoints`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_data_points(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.data_points = checked_semantic(SemanticLimitKind::DataPoints, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::CachedRows`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_cached_rows(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.cached_rows = checked_semantic(SemanticLimitKind::CachedRows, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::CachedCells`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_cached_cells(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.cached_cells = checked_semantic(SemanticLimitKind::CachedCells, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::RangeItems`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_range_items(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.range_items = checked_semantic(SemanticLimitKind::RangeItems, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::Resources`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_resources(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.resources = checked_semantic(SemanticLimitKind::Resources, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::History`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_history(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.history = checked_semantic(SemanticLimitKind::History, value)?;
+        Ok(self)
+    }
+
+    /// Set the maximum of [`SemanticLimitKind::ScalarBytes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidLimit`] outside `1..=MAXIMUM`.
+    pub fn max_scalar_bytes(mut self, value: u64) -> Result<Self, crate::Error> {
+        self.limits.scalar_bytes = checked_semantic(SemanticLimitKind::ScalarBytes, value)?;
         Ok(self)
     }
 

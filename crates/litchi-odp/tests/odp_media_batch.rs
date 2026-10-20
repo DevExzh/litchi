@@ -151,7 +151,7 @@ fn media_batch_replaces_adds_and_removes_with_untouched_member_preservation() {
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -159,6 +159,7 @@ fn media_batch_replaces_adds_and_removes_with_untouched_member_preservation() {
             .package()
             .apply(&durable.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

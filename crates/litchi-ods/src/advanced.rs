@@ -6107,7 +6107,11 @@ pub(crate) fn put_chart_object(
         "{}/content.xml",
         chart.object_path
     ))?;
-    litchi_odf_common::compact_xml::validate(chart.content_xml.as_bytes()).map_err(Error::from)?;
+    litchi_odf_common::compact_xml::validate(
+        chart.content_xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(Error::from)?;
     let child = format!(
         "<draw:frame xmlns:draw=\"{DRAW}\" xmlns:xlink=\"{XLINK}\" draw:name=\"{}\"><draw:object xlink:href=\"./{}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/></draw:frame>",
         escape_xml(&chart.name),

@@ -220,7 +220,7 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     assert_eq!(commit.package().as_bytes(), bytes.as_slice());
     let (published, patch) = commit.into_parts();
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
 

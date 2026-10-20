@@ -268,6 +268,7 @@ impl Edit {
         let content_xml = codec::replace(package.content_xml(), &self.draft)?;
         litchi_odf_common::compact_xml::validate(
             crate::package::compact_prolog(&content_xml).as_bytes(),
+            litchi_odf_common::compact_xml::Limits::default(),
         )
         .map_err(Error::from)?;
         let target_package = package.replace_content_xml(&content_xml)?;

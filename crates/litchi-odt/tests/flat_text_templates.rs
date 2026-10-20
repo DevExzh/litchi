@@ -349,11 +349,22 @@ fn common_template_mapping_and_neutral_detection_are_public() {
         Some(litchi_odt::detect::Format::Odt)
     );
     assert_eq!(
-        litchi_odt::detect::flat_mime(TEMPLATE_XML.as_bytes()).as_deref(),
+        litchi_odt::detect::flat_mime(
+            TEMPLATE_XML.as_bytes(),
+            litchi_odt::detect::Limits::default()
+        )
+        .ok()
+        .flatten()
+        .as_deref(),
         Some(ODF_TEXT_TEMPLATE)
     );
     assert_eq!(
-        litchi_odt::detect::flat(TEMPLATE_XML.as_bytes()),
+        litchi_odt::detect::flat(
+            TEMPLATE_XML.as_bytes(),
+            litchi_odt::detect::Limits::default()
+        )
+        .ok()
+        .flatten(),
         Some(litchi_odt::detect::Format::Odt)
     );
 }

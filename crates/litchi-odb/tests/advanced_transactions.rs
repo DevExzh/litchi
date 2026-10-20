@@ -100,7 +100,7 @@ fn independent_edits_join_deterministically_and_overlap_is_structured() {
     joined.join(beta_prepared).unwrap();
     joined.join(alpha_prepared).unwrap();
     let composed = Patch::compose(joined).unwrap();
-    let database = source.apply(&composed).unwrap();
+    let database = source.apply(&composed).unwrap().into_package();
     assert_eq!(
         database.database().catalog().unwrap().queries()[0].name(),
         "alpha"
@@ -148,6 +148,7 @@ fn three_way_plan_is_non_mutating_and_requires_explicit_resolution() {
     let merged = source.apply(&Patch::compose(selected).unwrap()).unwrap();
     assert_eq!(
         merged
+            .into_package()
             .database()
             .catalog()
             .unwrap()
@@ -722,6 +723,7 @@ fn typed_query_transfer_closes_tables_and_refuses_incomplete_sql_shapes() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         destination.as_bytes()
     );
@@ -926,6 +928,7 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
         received
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         destination.as_bytes()
     );
@@ -979,7 +982,7 @@ fn linked_component_transfer_remaps_exact_payload_and_remains_reversible() {
     joined.join(second).unwrap();
     joined.join(first).unwrap();
     let composed = destination.apply(&Patch::compose(joined).unwrap()).unwrap();
-    let package = OwnedPackage::from_bytes(composed.as_bytes().to_vec()).unwrap();
+    let package = OwnedPackage::from_bytes(composed.into_package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         package.get_file("reports/imported/content.xml").unwrap(),
         payload
@@ -1242,7 +1245,10 @@ fn durable_history_and_join_span_the_inert_database_root() {
             .join(patch.prepare(format!("{index:02}"), limits()).unwrap())
             .unwrap();
     }
-    let joined_database = source.apply(&Patch::compose(joined).unwrap()).unwrap();
+    let joined_database = source
+        .apply(&Patch::compose(joined).unwrap())
+        .unwrap()
+        .into_package();
     let catalog = joined_database.database().catalog().unwrap();
     assert!(catalog.table("joined-table").unwrap().is_some());
     assert!(catalog.query("joined-query").unwrap().is_some());
@@ -1519,7 +1525,8 @@ fn multiple_genuine_libreoffice_base_packages_survive_changed_full_reopen() {
             joined.join(second_prepared).unwrap();
             joined.join(first).unwrap();
             let composed_snapshot = database.apply(&Patch::compose(joined).unwrap()).unwrap();
-            let composed_database = Package::from_bytes(composed_snapshot.as_bytes()).unwrap();
+            let composed_database =
+                Package::from_bytes(composed_snapshot.into_package().as_bytes()).unwrap();
             let composed_catalog = composed_database.database().catalog().unwrap();
             assert!(composed_catalog.query(&query_name).unwrap().is_some());
             assert!(

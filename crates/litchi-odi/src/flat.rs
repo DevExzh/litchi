@@ -122,7 +122,11 @@ impl FlatImage {
         if bytes.len() > MAX_BYTES {
             return Err(invalid("flat ODI exceeds the input size limit"));
         }
-        if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odi) {
+        if litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+            != Some(FileFormat::Odi)
+        {
             return Err(invalid("input is not a flat ODI document"));
         }
         Self::from_root_bytes(bytes, Root::Flat)
@@ -201,11 +205,12 @@ impl FlatImage {
     /// Audits whether this exact flat XML can enter changed-byte publication.
     #[must_use]
     pub fn rewrite_capability(&self) -> crate::RewriteCapability {
-        let blockers = if compact_xml::validate(self.as_bytes()).is_ok() {
-            Vec::new()
-        } else {
-            vec![crate::RewriteBlocker::NonCompactXml]
-        };
+        let blockers =
+            if compact_xml::validate(self.as_bytes(), compact_xml::Limits::default()).is_ok() {
+                Vec::new()
+            } else {
+                vec![crate::RewriteBlocker::NonCompactXml]
+            };
         crate::RewriteCapability::new(blockers)
     }
 
@@ -676,7 +681,7 @@ impl FlatImageTransaction {
         if let Some(change) = &metadata_change {
             bytes = patch_flat_metadata(&bytes, change.after())?;
         }
-        compact_xml::validate(&bytes)?;
+        compact_xml::validate(&bytes, compact_xml::Limits::default())?;
         let snapshot = FlatImage::from_root_bytes(bytes, self.source.0.root)?;
         for change in &self.changes {
             let actual = snapshot

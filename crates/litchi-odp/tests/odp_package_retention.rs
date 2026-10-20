@@ -81,9 +81,12 @@ fn changed_publication_retains_new_index_and_patch_handoffs_do_not_rebuild_it() 
         target_identity
     );
 
-    let applied = source.apply(commit.patch()).unwrap();
+    let applied = source.apply(commit.patch()).unwrap().into_package();
     assert_eq!(applied.prepared_index_identity(), target_identity);
-    let restored = applied.apply(&commit.patch().inverse()).unwrap();
+    let restored = applied
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.prepared_index_identity(), source_identity);
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }

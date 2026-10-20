@@ -388,8 +388,11 @@ impl Edit {
             ),
             None => {
                 let content = super::package::replace_tables(package.content_xml(), &self.draft)?;
-                litchi_odf_common::compact_xml::validate(content.as_bytes())
-                    .map_err(Error::from)?;
+                litchi_odf_common::compact_xml::validate(
+                    content.as_bytes(),
+                    litchi_odf_common::compact_xml::Limits::default(),
+                )
+                .map_err(Error::from)?;
                 (package.replace_content_xml(&content)?, false)
             },
         };

@@ -402,8 +402,18 @@ impl Package {
     ///
     /// Returns an error when this package is not byte-identical to the patch
     /// source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, crate::Error> {
-        Ok(Self::from_chart(patch.apply(&self.chart)?))
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, crate::Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(crate::Error::patch_conflict(
+                "odc.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit {
+            package: Self::from_chart(patch.apply(&self.chart)?),
+            changed: !patch.is_noop(),
+            patch: patch.clone(),
+        })
     }
 
     /// Atomically replace `path` with this package (full durability).

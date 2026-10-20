@@ -125,10 +125,10 @@ fn package_content(
 ) -> Result<crate::package::Snapshot> {
     let compact_limits = compact_xml::Limits::new(limits.max_content_bytes(), limits.max_depth())
         .map_err(Error::from)?;
-    compact_xml::validate_with_limits(content_xml.as_bytes(), compact_limits)?;
+    compact_xml::validate(content_xml.as_bytes(), compact_limits)?;
     crate::codec::validate(content_xml)?;
     if let Some(styles) = styles_xml {
-        compact_xml::validate_with_limits(styles.as_bytes(), compact_limits)?;
+        compact_xml::validate(styles.as_bytes(), compact_limits)?;
         crate::codec::validate_styles(styles, limits)?;
     }
     let mut writer = PackageWriter::new_bounded(limits.max_package_bytes());

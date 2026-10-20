@@ -152,11 +152,16 @@ fn batch_transfer_is_source_bound_durable_and_reversible() {
 
     let patch = commit.patch();
     assert_eq!(
-        destination.apply(patch).unwrap().as_bytes(),
+        destination.apply(patch).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
-        commit.package().apply(&patch.inverse()).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
     assert!(commit.package().apply(patch).is_err());

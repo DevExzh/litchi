@@ -154,10 +154,10 @@ impl Package {
     ) -> std::result::Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
         let file = std::fs::File::open(path)?;
-        let package = crate::core::OwnedPackage::from_reader_with_limits_and_password(
+        let package = crate::core::OwnedPackage::from_reader_with_password_and_options(
             file,
-            options.source_limits_value(),
             password.as_str(),
+            options,
         )?;
         Self::from_owned_package_with_options(package, options)
     }
@@ -211,10 +211,10 @@ impl Package {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let package = crate::core::OwnedPackage::from_bytes_with_limits_and_password(
+        let package = crate::core::OwnedPackage::from_bytes_with_password_and_options(
             copy_input(bytes)?,
-            limits,
             password.as_str(),
+            OpenOptions::new().source_limits(limits),
         )?;
         Self::from_owned_package_with_options(package, options)
     }
@@ -238,10 +238,7 @@ impl Package {
         reader: impl std::io::Read,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = crate::core::OwnedPackage::from_reader_with_limits(
-            reader,
-            options.source_limits_value(),
-        )?;
+        let package = crate::core::OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_owned_package_with_options(package, options)
     }
 
@@ -290,10 +287,7 @@ impl Package {
         bytes: Vec<u8>,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = crate::core::OwnedPackage::from_bytes_with_limits(
-            bytes,
-            options.source_limits_value(),
-        )?;
+        let package = crate::core::OwnedPackage::from_bytes_with_options(bytes, options)?;
         Self::from_owned_package_with_options(package, options)
     }
 
@@ -366,10 +360,16 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not byte-identical to the patch
-    /// source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "odt.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically replace `path` with this package (full durability).
@@ -459,8 +459,9 @@ impl Package {
     pub fn apply_metadata(
         &self,
         patch: &crate::metadata::Patch,
-    ) -> std::result::Result<Self, PackageError> {
-        self.apply(patch.primary())
+    ) -> std::result::Result<crate::metadata::Commit, PackageError> {
+        let (package, primary) = self.apply(patch.primary())?.into_parts();
+        Ok(crate::metadata::Commit::replayed(package, primary))
     }
 
     /// Starts a bounded deterministic collection of independently prepared edits.
@@ -3124,6 +3125,14 @@ impl Diagnostics {
 }
 
 impl Commit {
+    pub(crate) fn replayed(package: Package, patch: Patch) -> Self {
+        Self {
+            package,
+            patch,
+            results: Vec::new(),
+        }
+    }
+
     fn new(
         before: Package,
         package: Package,
@@ -3230,6 +3239,13 @@ impl Patch {
     pub fn is_noop(&self) -> bool {
         Arc::ptr_eq(&self.before.bytes, &self.after.bytes)
             || self.before.as_bytes() == self.after.as_bytes()
+    }
+
+    /// Whether this patch was made from exactly `source`'s bytes.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
+        Arc::ptr_eq(&self.before.bytes, &source.bytes)
+            || source.as_bytes() == self.before.as_bytes()
     }
 
     /// Applies this patch only to the exact snapshot from which it was made.
@@ -6610,7 +6626,7 @@ fn audit_changed_xml_is_compact(
             let limits = litchi_odf_common::compact_xml::Limits::new(MAX_PACKAGE_BYTES, 4_096)
                 .map_err(CoreError::from)?;
             let validation_xml = numeric_reference_projection(&xml)?;
-            litchi_odf_common::compact_xml::validate_with_limits(&validation_xml, limits).map_err(
+            litchi_odf_common::compact_xml::validate(&validation_xml, limits).map_err(
                 |source| {
                     CoreError::InvalidFormat(format!(
                         "XML publication rejected for '{path}': {source}"

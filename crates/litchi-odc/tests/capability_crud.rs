@@ -165,7 +165,7 @@ fn package_styles_and_resource_crud_reopens_composes_and_reverses() {
     let second = second_edit.commit().unwrap();
     let composed = first.patch().compose(second.patch()).unwrap();
     assert_eq!(
-        source.apply(&composed).unwrap().as_bytes(),
+        source.apply(&composed).unwrap().into_package().as_bytes(),
         second.package().as_bytes()
     );
     assert_eq!(
@@ -173,6 +173,7 @@ fn package_styles_and_resource_crud_reopens_composes_and_reverses() {
             .package()
             .apply(&composed.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

@@ -154,8 +154,11 @@ fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
         assert_degraded_cells(owned.sheets(), &format!("{label}: from_bytes"));
     }
 
-    let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
-        .unwrap_or_else(|| panic!("{label}: package must prepare"));
+    let prepared = litchi_odf_common::detect::prepared(
+        bytes.to_vec(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap_or_else(|| panic!("{label}: package must prepare"));
     let adopted = Package::from_prepared_package(prepared)
         .unwrap()
         .workbook()

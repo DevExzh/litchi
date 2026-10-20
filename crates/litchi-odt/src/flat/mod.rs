@@ -490,7 +490,7 @@ impl Edit {
             self.source.limits.max_xml_depth,
         )
         .map_err(Error::from)?;
-        litchi_odf_common::compact_xml::validate_with_limits(candidate.as_bytes(), compact_limits)
+        litchi_odf_common::compact_xml::validate(candidate.as_bytes(), compact_limits)
             .map_err(Error::from)?;
         let document =
             Document::from_bytes_with_limits(candidate.into_bytes(), self.source.limits)?;

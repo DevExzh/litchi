@@ -303,7 +303,7 @@ fn owned_and_unified_link_commits_reopen_preserve_opaque_members_and_inverse()
     let unified_restored = unified_commit
         .package()
         .apply(&unified_commit.patch().inverse())?;
-    assert_eq!(unified_restored.as_bytes(), source);
+    assert_eq!(unified_restored.into_package().as_bytes(), source);
     Ok(())
 }
 

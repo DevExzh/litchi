@@ -324,7 +324,11 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
         feature = "odp",
         feature = "odf-objects"
     ))]
-    if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
+    if let Some(format) =
+        litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+    {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
 
@@ -372,7 +376,10 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
             feature = "odp",
             feature = "odf-objects"
         ))]
-        let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
+        let bytes = match litchi_odf_common::detect::prepared_or_original(
+            bytes,
+            litchi_odf_common::SourceLimits::default(),
+        ) {
             Ok(prepared) => {
                 let format = prepared.format();
                 return match format {
@@ -457,7 +464,11 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
         feature = "odp",
         feature = "odf-objects"
     ))]
-    if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
+    if let Some(format) =
+        litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+    {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
 
@@ -513,7 +524,12 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
             ),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
         ))]
-        let odf_mime = litchi_odf_common::detect::packaged_mime(&bytes);
+        let odf_mime = litchi_odf_common::detect::packaged_mime(
+            &bytes,
+            litchi_odf_common::detect::Limits::default(),
+        )
+        .ok()
+        .flatten();
         #[cfg(all(
             any(
                 feature = "odt",
@@ -524,7 +540,10 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
         ))]
         let normal_odf = odf_mime.is_some()
-            && litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(false);
+            && litchi_odf_common::detect::packaged_has_ooxml_catalog(
+                &bytes,
+                litchi_odf_common::detect::CatalogProbeLimits::default(),
+            ) == Some(false);
         #[cfg(all(
             not(any(
                 feature = "odt",
@@ -570,7 +589,10 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
             feature = "odp",
             feature = "odf-objects"
         ))]
-        let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
+        let bytes = match litchi_odf_common::detect::prepared_or_original(
+            bytes,
+            litchi_odf_common::SourceLimits::default(),
+        ) {
             Ok(prepared) => {
                 let format = prepared.format();
                 return match format {
@@ -824,9 +846,12 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     ))]
     {
         let catalog_limits = super::catalog_probe_limits(crate::opc::SourceLimits::default());
-        match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {
+        match litchi_odf_common::detect::packaged_mime_read_at(
+            source.as_ref(),
+            litchi_odf_common::detect::Limits::default(),
+        ) {
             Ok(Some(_odf_format)) => {
-                match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
+                match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(
                     source.as_ref(),
                     catalog_limits,
                 ) {

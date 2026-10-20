@@ -92,7 +92,11 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         vec![0x5a; 1024 * 1024]
     );
     assert_eq!(
-        snapshot.apply(commit.patch()).unwrap().as_bytes(),
+        snapshot
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -100,6 +104,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source_bytes
     );
@@ -125,7 +130,11 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         "Before\n"
     );
     assert_eq!(
-        snapshot.apply(commit.patch()).unwrap().as_bytes(),
+        snapshot
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -133,6 +142,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source_bytes
     );
@@ -166,7 +176,11 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             style_name.is_some()
         );
         assert_eq!(
-            snapshot.apply(commit.patch()).unwrap().as_bytes(),
+            snapshot
+                .apply(commit.patch())
+                .unwrap()
+                .into_package()
+                .as_bytes(),
             commit.package().as_bytes()
         );
         assert_eq!(
@@ -174,6 +188,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
                 .package()
                 .apply(&commit.patch().inverse())
                 .unwrap()
+                .into_package()
                 .as_bytes(),
             source_bytes
         );
@@ -212,7 +227,11 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         )]
     );
     assert_eq!(
-        snapshot.apply(commit.patch()).unwrap().as_bytes(),
+        snapshot
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -220,6 +239,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source_bytes
     );
@@ -260,7 +280,11 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             }
         );
         assert_eq!(
-            snapshot.apply(commit.patch()).unwrap().as_bytes(),
+            snapshot
+                .apply(commit.patch())
+                .unwrap()
+                .into_package()
+                .as_bytes(),
             commit.package().as_bytes()
         );
         assert_eq!(
@@ -268,6 +292,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
                 .package()
                 .apply(&commit.patch().inverse())
                 .unwrap()
+                .into_package()
                 .as_bytes(),
             source_bytes
         );
@@ -741,7 +766,11 @@ fn assert_all_package_xml_is_compact(bytes: &[u8]) {
     let archive = package.package().unwrap();
     for path in archive.files().unwrap() {
         if path.ends_with(".xml") || path.ends_with(".rdf") {
-            litchi_odf_common::compact_xml::validate(&archive.get_file(&path).unwrap()).unwrap();
+            litchi_odf_common::compact_xml::validate(
+                &archive.get_file(&path).unwrap(),
+                litchi_odf_common::compact_xml::Limits::default(),
+            )
+            .unwrap();
         }
     }
 }
@@ -769,6 +798,7 @@ fn packaged_transaction_is_source_checked_reversible_and_exact_for_noop() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         snapshot.as_bytes()
     );
@@ -838,6 +868,7 @@ fn rdf_transaction_preserves_a_real_producer_package_and_is_reversible() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         before.as_bytes()
     );
@@ -941,6 +972,7 @@ fn form_and_linked_resource_operations_commit_as_one_atomic_package() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         before.as_bytes()
     );
@@ -1018,6 +1050,7 @@ fn residual_semantic_families_share_one_reversible_transaction() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

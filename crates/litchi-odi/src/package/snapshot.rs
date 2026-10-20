@@ -340,7 +340,10 @@ impl Snapshot {
                 continue;
             }
             match inspected.get_file(path) {
-                Ok(bytes) => noncompact_xml |= compact_xml::validate(&bytes).is_err(),
+                Ok(bytes) => {
+                    noncompact_xml |=
+                        compact_xml::validate(&bytes, compact_xml::Limits::default()).is_err()
+                },
                 Err(_) => unreadable_xml = true,
             }
         }
@@ -377,7 +380,8 @@ impl Snapshot {
         writer.add_file("content.xml", content.as_bytes())?;
         match replacement_styles_xml {
             StylesReplacement::Set(styles_xml) => {
-                compact_xml::validate(styles_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(styles_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 writer.add_file("styles.xml", styles_xml.as_bytes())?;
             },
             StylesReplacement::Preserve => {
@@ -397,7 +401,8 @@ impl Snapshot {
             )?;
         }
         if let Some(meta_xml) = replacement_meta_xml {
-            compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(meta_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             writer.add_file("meta.xml", meta_xml.as_bytes())?;
         } else if self.0.package.package().has_file("meta.xml")? {
             writer.add_file("meta.xml", &self.0.package.package().get_file("meta.xml")?)?;
@@ -497,7 +502,8 @@ fn ensure_compact_rewrite_source(source: &Snapshot, files: &[String]) -> Result<
             .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
             && path != "META-INF/manifest.xml"
         {
-            compact_xml::validate(&archive.get_file(path)?).map_err(Error::from)?;
+            compact_xml::validate(&archive.get_file(path)?, compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
     }
     Ok(())

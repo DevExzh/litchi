@@ -76,7 +76,7 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     assert_eq!(commit.package().as_bytes(), package.as_bytes());
     let (published, patch) = commit.into_parts();
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
 }
@@ -93,11 +93,15 @@ fn a_real_edit_changes_bytes_and_its_patch_replays_on_the_source() {
     let (published, patch) = commit.into_parts();
     assert_eq!(published.image().frames()[0].name(), Some("Renamed"));
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
     assert_eq!(
-        published.apply(&patch.inverse()).unwrap().as_bytes(),
+        published
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         package.as_bytes()
     );
     assert!(published.apply(&patch).is_err());
@@ -196,7 +200,9 @@ fn caller_selected_limits_are_typed_at_every_ingress() {
 #[test]
 fn a_detected_prepared_package_is_adopted_without_a_second_open() {
     let package = Package::new().unwrap();
-    let prepared = litchi_odf_common::detect::prepared(package.as_bytes().to_vec()).unwrap();
+    let prepared =
+        litchi_odf_common::detect::prepared(package.as_bytes().to_vec(), SourceLimits::default())
+            .unwrap();
     assert_eq!(prepared.format(), litchi_core::FileFormat::Odi);
     assert_eq!(
         Package::from_prepared_package(prepared).unwrap().as_bytes(),

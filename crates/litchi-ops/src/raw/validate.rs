@@ -208,7 +208,12 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         | FileFormat::Odf => {
             let bytes = file.to_bytes()?;
             if bytes.starts_with(b"PK") {
-                litchi_odf_common::validate_package(&bytes).map_err(Error::Odf)?
+                litchi_odf_common::validate_package(
+                    &bytes,
+                    litchi_odf_common::OdfValidationLimits::default(),
+                    ValidationLimits::default(),
+                )
+                .map_err(Error::Odf)?
             } else {
                 flat_odf()?
             }

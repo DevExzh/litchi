@@ -54,10 +54,10 @@ fn unified_commit_diagnostics_attribute_noop_splice_and_replay() -> Result<()> {
     assert_eq!(diagnostics.operation_count(), 1);
     assert_ne!(commit.package().as_bytes(), snapshot.as_bytes());
 
-    let replay = snapshot.apply(commit.patch())?;
+    let replay = snapshot.apply(commit.patch())?.into_package();
     assert_eq!(replay.as_bytes(), commit.package().as_bytes());
     let restored = replay.apply(&commit.patch().inverse())?;
-    assert_eq!(restored.as_bytes(), snapshot.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), snapshot.as_bytes());
     Ok(())
 }
 

@@ -381,7 +381,9 @@ impl FlatDocument {
                     .map_err(map_execution_error)?,
             ),
         };
-        let mimetype = crate::detect::flat_mime(&bytes)
+        let mimetype = crate::detect::flat_mime(&bytes, crate::detect::Limits::default())
+            .ok()
+            .flatten()
             .ok_or_else(|| Error::InvalidFormat("invalid flat OpenDocument root".to_string()))?;
         let (family, template) = classify_mimetype(&mimetype).ok_or_else(|| {
             Error::InvalidFormat(format!("unsupported OpenDocument mimetype '{mimetype}'"))
@@ -928,9 +930,15 @@ impl FlatDocument {
                 scope: "flat OpenDocument edited output".into(),
             }));
         }
-        let mimetype = crate::detect::flat_mime(updated.as_bytes()).ok_or_else(|| {
-            Error::InvalidFormat("flat OpenDocument mutation changed its root MIME".to_string())
-        })?;
+        let mimetype =
+            crate::detect::flat_mime(updated.as_bytes(), crate::detect::Limits::default())
+                .ok()
+                .flatten()
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "flat OpenDocument mutation changed its root MIME".to_string(),
+                    )
+                })?;
         let (family, template) = classify_mimetype(&mimetype).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "unsupported OpenDocument mimetype '{mimetype}' after flat mutation"
