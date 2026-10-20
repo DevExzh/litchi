@@ -1,6 +1,18 @@
-//! Exact-markup formatting runs. Text and structural operations are barriers.
+//! Exact-markup formatting runs, and direct body-paragraph text sets
+//! (record 0355a). Structural operations are barriers.
+//!
+//! A body paragraph's ordinal is stable across text replacement, so `text`
+//! on a direct `/body/p[N]` path shares the run's native edit, resolved
+//! against the run's base. Replacing a paragraph's text rewrites its runs,
+//! so a later target inside such a paragraph, or any element-path target,
+//! closes the run and resolves against the published candidate.
 
-use super::{Assignment, Commit, Docx, Target, WorkEdit, admit_assignments, admit_targets};
+use std::collections::BTreeSet;
+
+use super::{
+    Assignment, Commit, Docx, Selection, Target, TargetKind, WorkEdit, WriteSelection,
+    admit_assignments, admit_targets,
+};
 use crate::registry::Operation;
 use crate::{Code, Error, Props, Result, TargetArg};
 
@@ -29,6 +41,9 @@ pub(crate) struct Run {
     edit: WorkEdit,
     items: Vec<Item>,
     last_target: Option<(Box<str>, Target)>,
+    /// Transaction positions of the body paragraphs whose text this run
+    /// replaced: their run ordinals no longer match the base.
+    texted: BTreeSet<usize>,
 }
 impl Docx {
     /// Formatting leaves paragraph/run ordinals unchanged. Only structural
@@ -79,6 +94,31 @@ impl Docx {
         })();
         self.owner().finish(result)
     }
+
+    /// A `text`-only set on a direct body paragraph `/body/p[N]`, the route [`Docx::set_file`] takes for one operation;
+    /// `None` sends anything else to the ordinary setter.
+    pub(crate) fn text_plan(
+        &self,
+        target: &TargetArg<'_>,
+        props: &Props<'_>,
+    ) -> Result<Option<Plan>> {
+        let Some(position) = self.direct_body_paragraph(target, props) else {
+            return Ok(None);
+        };
+        let result = admit_assignments(TargetKind::Paragraph, props).map(|assignments| {
+            Some(Plan {
+                target: Target {
+                    selection: Selection::Body(WriteSelection::Paragraph(position)),
+                    kind: TargetKind::Paragraph,
+                },
+                assignments: assignments
+                    .into_iter()
+                    .map(Assignment::into_owned)
+                    .collect(),
+            })
+        });
+        self.owner().finish(result)
+    }
 }
 fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
     let assignments = admit_assignments(target.kind, props)?;
@@ -117,7 +157,32 @@ impl Run {
             edit: WorkEdit::from(base.edit()?)?,
             items: Vec::new(),
             last_target: None,
+            texted: BTreeSet::new(),
         })
+    }
+    /// [`Docx::text_plan`] against the run's base.
+    pub(crate) fn text_plan(
+        &self,
+        target: &TargetArg<'_>,
+        props: &Props<'_>,
+    ) -> Result<Option<Plan>> {
+        self.base.text_plan(target, props)
+    }
+    /// Whether the run has replaced a paragraph's text, after which
+    /// targets planned against its base may be stale.
+    pub(crate) fn has_text(&self) -> bool {
+        !self.texted.is_empty()
+    }
+    /// Whether `plan`, resolved against the run's base, still names the
+    /// same content in the run's staged state.
+    pub(crate) fn admits(&self, plan: &Plan) -> bool {
+        match &plan.target.selection {
+            Selection::Body(WriteSelection::Paragraph(_)) => true,
+            Selection::Body(WriteSelection::Run { paragraph, .. }) => {
+                !self.texted.contains(&paragraph.get())
+            },
+            Selection::Element(_) => self.texted.is_empty(),
+        }
     }
     /// Formatting cannot change paragraph/run ordinals. Reuse only the last
     /// exact direct-path proof, scoped to this run, and keep the source fence.
@@ -174,6 +239,14 @@ impl Run {
             let before = self.projected().clone();
             plan.stage(&mut self.edit)?;
             let changed = before.xml_bytes() != self.projected().xml_bytes();
+            if let Selection::Body(WriteSelection::Paragraph(position)) = plan.target.selection
+                && plan
+                    .assignments
+                    .iter()
+                    .any(|assignment| assignment.key.as_str().eq_ignore_ascii_case("text"))
+            {
+                self.texted.insert(position.get());
+            }
             if let Some(spelling) = spelling {
                 if self
                     .last_target

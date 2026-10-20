@@ -136,7 +136,7 @@ impl Snapshot {
     pub fn plan_target_urls(&self, target_urls: &[&str]) -> Result<Plan> {
         if target_urls.len() > MAX_SELECTED_RELATIONSHIPS {
             return Err(Error::ExternalHyperlinkRedactionLimit {
-                resource: "target URL selectors",
+                kind: LimitKind::TargetUrlSelectors,
                 maximum: MAX_SELECTED_RELATIONSHIPS,
                 actual: target_urls.len(),
             });
@@ -145,14 +145,14 @@ impl Snapshot {
             total
                 .checked_add(target.len())
                 .ok_or(Error::ExternalHyperlinkRedactionLimit {
-                    resource: "target URL selector bytes",
+                    kind: LimitKind::TargetUrlSelectorBytes,
                     maximum: MAX_SELECTOR_BYTES,
                     actual: usize::MAX,
                 })
         })?;
         if selector_bytes > MAX_SELECTOR_BYTES {
             return Err(Error::ExternalHyperlinkRedactionLimit {
-                resource: "target URL selector bytes",
+                kind: LimitKind::TargetUrlSelectorBytes,
                 maximum: MAX_SELECTOR_BYTES,
                 actual: selector_bytes,
             });
@@ -207,7 +207,7 @@ impl Snapshot {
         }
         if selected_ids.len() > MAX_SELECTED_RELATIONSHIPS {
             return Err(Error::ExternalHyperlinkRedactionLimit {
-                resource: "selected relationships",
+                kind: LimitKind::SelectedRelationships,
                 maximum: MAX_SELECTED_RELATIONSHIPS,
                 actual: selected_ids.len(),
             });
@@ -422,7 +422,7 @@ fn build_inventory(
         .count();
     if external > limits.max_external_hyperlinks() {
         return Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "external hyperlink relationships",
+            kind: LimitKind::ExternalHyperlinkRelationships,
             maximum: limits.max_external_hyperlinks(),
             actual: external,
         });
@@ -606,4 +606,49 @@ fn unsafe_closure<T>(reason: &'static str) -> Result<T> {
         "external_hyperlink_redaction",
         reason,
     ))
+}
+
+/// The bounded resources of external-hyperlink redaction, carried by [`crate::Error::ExternalHyperlinkRedactionLimit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Changed story parts.
+    ChangedStoryParts,
+    /// External hyperlink relationships.
+    ExternalHyperlinkRelationships,
+    /// External story hyperlink relationships.
+    ExternalStoryHyperlinkRelationships,
+    /// Selected relationships.
+    SelectedRelationships,
+    /// Selected story hyperlink relationships.
+    SelectedStoryHyperlinkRelationships,
+    /// Target URL selector bytes.
+    TargetUrlSelectorBytes,
+    /// Target URL selectors.
+    TargetUrlSelectors,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ChangedStoryParts => "changed story parts",
+            Self::ExternalHyperlinkRelationships => "external hyperlink relationships",
+            Self::ExternalStoryHyperlinkRelationships => "external story hyperlink relationships",
+            Self::SelectedRelationships => "selected relationships",
+            Self::SelectedStoryHyperlinkRelationships => "selected story hyperlink relationships",
+            Self::TargetUrlSelectorBytes => "target URL selector bytes",
+            Self::TargetUrlSelectors => "target URL selectors",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }

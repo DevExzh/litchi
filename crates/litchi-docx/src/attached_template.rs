@@ -24,7 +24,10 @@ pub use crate::settings::AttachedTemplate;
 
 use crate::package::family::{graph_edit, graph_family};
 
-graph_family!("attached-template");
+graph_family!("attached-template", own_limits);
+
+/// The budgets of this family: the settings part it rewrites.
+pub use crate::settings::LimitKind;
 graph_edit!(
     "attached-template",
     edit_attached_template,

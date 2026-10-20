@@ -29,7 +29,9 @@ use super::transaction::Transaction as Draft;
 use super::{Catalog, Conformance, Entry, Name, raw};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("glossary");
+graph_family!("glossary", own_limits);
+
+pub use super::limit::LimitKind;
 
 /// A staged glossary change over one package snapshot. The source is never
 /// changed: [`Self::commit`] publishes a new package, and dropping the edit

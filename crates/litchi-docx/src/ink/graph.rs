@@ -5,6 +5,7 @@
 //! resource payload guards, and the reversible part additions/removals needed
 //! to publish an inverse without normalising unrelated package members.
 
+use crate::ink::LimitKind;
 use std::collections::HashSet;
 use std::{mem::size_of, sync::Arc};
 
@@ -134,7 +135,7 @@ fn charge_token_bytes(total: &mut usize, amount: usize, limits: Limits) -> Resul
     *total = total.saturating_add(amount);
     if *total > limits.stories.max_topology_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph publication token bytes",
+            kind: LimitKind::GraphPublicationTokenBytes,
             actual: *total,
             maximum: limits.stories.max_topology_bytes,
         });
@@ -529,7 +530,7 @@ fn owner_relationships<'a>(package: &'a OpcPackage, owner: &PackURI) -> Result<&
 fn selected_ids(ids: &[String], limits: Limits) -> Result<Vec<String>> {
     if ids.len() > limits.max_relationships {
         return Err(Error::InkLimit {
-            resource: "selected relationships",
+            kind: LimitKind::SelectedRelationships,
             actual: ids.len(),
             maximum: limits.max_relationships,
         });
@@ -633,7 +634,7 @@ fn count_incoming(
         return Ok(());
     };
     incoming[index] = incoming[index].checked_add(1).ok_or(Error::InkLimit {
-        resource: "remaining incoming relationships",
+        kind: LimitKind::RemainingIncomingRelationships,
         actual: usize::MAX,
         maximum: usize::MAX,
     })?;
@@ -706,19 +707,19 @@ fn cmp_ascii_case_insensitive(left: &str, right: &str) -> std::cmp::Ordering {
 fn check_payload(length: usize, limits: Limits, total: &mut usize) -> Result<()> {
     if length > limits.max_payload_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph target payload bytes",
+            kind: LimitKind::GraphTargetPayloadBytes,
             actual: length,
             maximum: limits.max_payload_bytes,
         });
     }
     *total = total.checked_add(length).ok_or(Error::InkLimit {
-        resource: "Ink graph target payload bytes",
+        kind: LimitKind::GraphTargetPayloadBytes,
         actual: usize::MAX,
         maximum: limits.max_total_payload_bytes,
     })?;
     if *total > limits.max_total_payload_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph target payload bytes",
+            kind: LimitKind::GraphTargetPayloadBytes,
             actual: *total,
             maximum: limits.max_total_payload_bytes,
         });
@@ -776,7 +777,7 @@ fn preflight_graph(package: &OpcPackage, limits: Limits) -> Result<usize> {
     let part_count = package.part_count();
     if part_count > limits.stories.max_package_parts {
         return Err(Error::InkLimit {
-            resource: "Ink graph package parts",
+            kind: LimitKind::GraphPackageParts,
             actual: part_count,
             maximum: limits.stories.max_package_parts,
         });
@@ -814,13 +815,13 @@ fn measure_owner(
     add_topology(topology, owner.len().saturating_add(8), limits)?;
     for relationship in relationships.iter() {
         *relationship_count = relationship_count.checked_add(1).ok_or(Error::InkLimit {
-            resource: "Ink graph relationships",
+            kind: LimitKind::GraphRelationships,
             actual: usize::MAX,
             maximum: limits.max_relationships,
         })?;
         if *relationship_count > limits.max_relationships {
             return Err(Error::InkLimit {
-                resource: "Ink graph relationships",
+                kind: LimitKind::GraphRelationships,
                 actual: *relationship_count,
                 maximum: limits.max_relationships,
             });
@@ -839,13 +840,13 @@ fn measure_owner(
 
 fn add_topology(total: &mut usize, amount: usize, limits: Limits) -> Result<()> {
     *total = total.checked_add(amount).ok_or(Error::InkLimit {
-        resource: "Ink graph topology bytes",
+        kind: LimitKind::GraphTopologyBytes,
         actual: usize::MAX,
         maximum: limits.stories.max_topology_bytes,
     })?;
     if *total > limits.stories.max_topology_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph topology bytes",
+            kind: LimitKind::GraphTopologyBytes,
             actual: *total,
             maximum: limits.stories.max_topology_bytes,
         });

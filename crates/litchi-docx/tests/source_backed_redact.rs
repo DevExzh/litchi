@@ -200,7 +200,8 @@ fn inventories_and_irreversibly_redacts_duplicate_target_ids_first_middle_last()
 
     let mut output = Vec::new();
     package
-        .publish_external_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_external_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert!(!contains_bytes(&output, b"https://remove.invalid/"));
     let reopened = OpcPackage::from_bytes(&output).unwrap();
@@ -246,7 +247,8 @@ fn zero_is_an_exact_noop_and_one_removes_the_only_link() {
     assert!(noop.patch().is_noop());
     let mut identical = Vec::new();
     package
-        .publish_external_hyperlink_redaction_to_stream(&mut identical, &noop)
+        .apply_external_hyperlink_redaction(&noop.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut identical))
         .unwrap();
     assert_eq!(identical, bytes);
 
@@ -258,7 +260,8 @@ fn zero_is_an_exact_noop_and_one_removes_the_only_link() {
         .unwrap();
     let mut output = Vec::new();
     package
-        .publish_external_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_external_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_bytes(&output).unwrap();
     let main = reopened.main_document_part().unwrap();
@@ -290,7 +293,7 @@ fn selection_bounds_unknown_targets_and_foreign_sources_refuse_before_output() {
     assert!(matches!(
         snapshot.plan_target_urls(&refs),
         Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "target URL selectors",
+            kind: litchi_docx::redact::LimitKind::TargetUrlSelectors,
             maximum: 64,
             actual: 65,
         })
@@ -303,7 +306,7 @@ fn selection_bounds_unknown_targets_and_foreign_sources_refuse_before_output() {
     assert!(matches!(
         snapshot.plan_target_urls(&[oversized.as_str()]),
         Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "target URL selector bytes",
+            kind: litchi_docx::redact::LimitKind::TargetUrlSelectorBytes,
             maximum: 262_144,
             actual: 262_145,
         })
@@ -322,7 +325,9 @@ fn selection_bounds_unknown_targets_and_foreign_sources_refuse_before_output() {
     let foreign = open(bytes);
     let mut output = Vec::new();
     assert!(matches!(
-        foreign.publish_external_hyperlink_redaction_to_stream(&mut output, &commit),
+        foreign
+            .apply_external_hyperlink_redaction(&commit.clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::ExternalHyperlinkRedactionConflict)
     ));
     assert!(output.is_empty());
@@ -348,7 +353,9 @@ fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
     let colliding = open_colliding(foreign);
     let mut output = Vec::new();
     assert!(matches!(
-        colliding.publish_external_hyperlink_redaction_to_stream(&mut output, &commit),
+        colliding
+            .apply_external_hyperlink_redaction(&commit.clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::ExternalHyperlinkRedactionConflict)
     ));
     assert!(output.is_empty());
@@ -406,7 +413,9 @@ fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
         maximum: 128,
     };
     assert!(matches!(
-        package.publish_external_hyperlink_redaction_to_stream(&mut sink, &commit),
+        package
+            .apply_external_hyperlink_redaction(&commit.clone().into())
+            .and_then(|committed| committed.package().write_to(&mut sink)),
         Err(Error::Opc(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);

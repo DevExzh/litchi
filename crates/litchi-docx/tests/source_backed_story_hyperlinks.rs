@@ -526,7 +526,8 @@ fn inventories_all_relationship_owned_story_kinds_and_redacts_them() {
     assert_eq!(commit.effect_report().unwrapped_hyperlinks(), 7);
     let mut output = Vec::new();
     package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_bytes(&output).unwrap();
     for name in [
@@ -585,7 +586,8 @@ fn empty_relationship_inventory_fails_closed_and_publishes_an_exact_noop() {
     assert!(commit.effect_report().is_noop());
     let mut output = Vec::new();
     package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, bytes);
 }
@@ -605,7 +607,9 @@ fn stale_and_foreign_commits_fail_before_output() {
     source.revision.fetch_add(1, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_story_hyperlink_redaction_to_stream(&mut output, &commit),
+        package
+            .apply_story_hyperlink_redaction(&commit.clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
             | Err(Error::ExternalHyperlinkRedactionConflict)
     ));
@@ -621,7 +625,9 @@ fn stale_and_foreign_commits_fail_before_output() {
         .unwrap();
     let mut output = Vec::new();
     assert!(matches!(
-        second.publish_story_hyperlink_redaction_to_stream(&mut output, &commit),
+        second
+            .apply_story_hyperlink_redaction(&commit.clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::ExternalHyperlinkRedactionConflict)
     ));
     assert!(output.is_empty());
@@ -640,7 +646,7 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
             )
             .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "selected story hyperlink relationships",
+            kind: litchi_docx::redact::LimitKind::SelectedStoryHyperlinkRelationships,
             maximum: 6,
             actual: 7,
         })
@@ -656,7 +662,7 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
             )
             .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "changed story parts",
+            kind: litchi_docx::redact::LimitKind::ChangedStoryParts,
             maximum: 6,
             actual: 7,
         })
@@ -675,7 +681,8 @@ fn exact_noop_copies_source_and_strict_fields_refuse_before_output() {
     assert!(commit.effect_report().is_noop());
     let mut output = Vec::new();
     package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, bytes);
 
@@ -880,7 +887,8 @@ fn foreign_identical_source_lineage_cannot_publish_a_noop_commit() {
     let mut output = Vec::new();
     assert!(
         second
-            .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+            .apply_story_hyperlink_redaction(&commit.clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output))
             .is_err()
     );
     assert!(output.is_empty());
@@ -899,7 +907,8 @@ fn empty_selector_copies_signed_source_exactly_despite_security_diagnostics() {
     assert!(!commit.report().is_complete());
     let mut output = Vec::new();
     package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, bytes);
 
@@ -914,7 +923,8 @@ fn empty_selector_copies_signed_source_exactly_despite_security_diagnostics() {
     assert!(!commit.report().is_complete());
     let mut output = Vec::new();
     package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, bytes);
 }
@@ -930,7 +940,8 @@ fn signed_exact_noop_is_byte_exact_and_changed_plan_has_empty_output() {
         .unwrap();
     let mut output = Vec::new();
     package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, bytes);
 

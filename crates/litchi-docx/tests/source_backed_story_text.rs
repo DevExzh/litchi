@@ -186,7 +186,11 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
 
     let mut published = Vec::new();
     let publication = package
-        .publish_story_text_commit_to_stream(&mut published, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut published)?;
+            Ok(committed)
+        })
         .unwrap();
     let reopened = open(&published);
     assert_eq!(
@@ -218,14 +222,20 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
     );
 
     let inverse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        open(&published).publish_story_text_inverse_to_stream(HostileWriter, &publication)
+        open(&published)
+            .apply_story_text(&publication.patch().inverse())
+            .and_then(|committed| {
+                committed.package().write_to(HostileWriter)?;
+                Ok(committed)
+            })
     }));
     assert!(inverse_result.is_ok());
     assert!(inverse_result.unwrap().is_err());
 
     let mut restored = Vec::new();
     open(&published)
-        .publish_story_text_inverse_to_stream(&mut restored, &publication)
+        .apply_story_text(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
 }
@@ -243,7 +253,8 @@ fn selected_story_noop_copies_the_complete_source_byte_for_byte() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_story_text_commit_to_stream(&mut output, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
 }
@@ -277,7 +288,7 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
             )
             .story_text_snapshot(StorySelector::Main),
         Err(source_backed::StoryTextError::Limit {
-            resource: "paragraphs",
+            kind: source_backed::story_text::LimitKind::Paragraphs,
             ..
         })
     ));
@@ -289,7 +300,7 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(depth_limited))
             .story_text_snapshot(StorySelector::Main),
         Err(source_backed::StoryTextError::Limit {
-            resource: "XML depth",
+            kind: source_backed::story_text::LimitKind::XmlDepth,
             ..
         })
     ));
@@ -303,7 +314,7 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(empty_depth))
             .story_text_snapshot(StorySelector::Main),
         Err(source_backed::StoryTextError::Limit {
-            resource: "XML depth",
+            kind: source_backed::story_text::LimitKind::XmlDepth,
             ..
         })
     ));
@@ -318,7 +329,7 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
     assert!(matches!(
         snapshot.extract_text(),
         Err(source_backed::StoryTextError::Limit {
-            resource: "story paragraph text",
+            kind: source_backed::story_text::LimitKind::ParagraphText,
             ..
         })
     ));
@@ -360,7 +371,11 @@ fn hostile_publication_writer_is_rejected_without_panicking() {
     let mut writer = HostileWriter;
     assert!(
         package
-            .publish_story_text_commit_to_stream(&mut writer, &commit)
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut writer)?;
+                Ok(committed)
+            })
             .is_err()
     );
 }
@@ -379,7 +394,8 @@ fn trailing_source_bytes_are_preserved_by_an_exact_noop() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_story_text_commit_to_stream(&mut output, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
 }

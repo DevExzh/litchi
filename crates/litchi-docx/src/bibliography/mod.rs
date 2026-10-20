@@ -39,6 +39,7 @@
 //! stored data so callers can make their own compatibility decisions.
 
 mod edit;
+mod limit;
 mod package;
 mod writer;
 

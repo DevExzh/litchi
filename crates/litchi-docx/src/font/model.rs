@@ -1113,7 +1113,11 @@ pub(in crate::font) fn validate_table_value(value: &Table, require_resources: bo
                         .checked_add(resource.data.len())
                         .ok_or_else(|| invalid("embedded-font size overflow"))?;
                     if total > MAX_ALL_FONTS {
-                        return Err(invalid("embedded fonts exceed total size limit"));
+                        return Err(Error::FontLimit {
+                            kind: crate::font::LimitKind::EmbeddedFontBytes,
+                            actual: total,
+                            maximum: MAX_ALL_FONTS,
+                        });
                     }
                 }
             }
@@ -1180,7 +1184,11 @@ pub(in crate::font) fn bounded(v: &str) -> Result<()> {
     if v.len() <= MAX_TEXT {
         Ok(())
     } else {
-        Err(invalid("font-table string limit exceeded"))
+        Err(Error::FontLimit {
+            kind: crate::font::LimitKind::StringBytes,
+            actual: v.len(),
+            maximum: MAX_TEXT,
+        })
     }
 }
 pub(in crate::font) fn validate_attr_name(value: &str) -> Result<()> {

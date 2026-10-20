@@ -468,12 +468,16 @@ fn prevalidate(
             return Err("diagnostic preflight commit is not changed".into());
         }
         let mut output = Vec::new();
-        let publication = package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+        let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+        publication.package().write_to(&mut output)?;
         let output_package = open_source_package(&output)?;
         let output_snapshot = output_package.section_layout_snapshot()?;
         verify_snapshot_shape(&output_snapshot, section_count, columns)?;
         let mut restored = Vec::new();
-        output_package.publish_section_layout_inverse_to_stream(&mut restored, &publication)?;
+        output_package
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored)?;
         if restored != source {
             return Err("diagnostic preflight inverse did not restore source bytes".into());
         }
@@ -500,7 +504,8 @@ fn validate_measured_commit(
     columns: u16,
 ) -> Result<(), Box<dyn Error>> {
     let mut output = Vec::new();
-    let publication = package.publish_section_layout_commit_to_stream(&mut output, commit)?;
+    let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+    publication.package().write_to(&mut output)?;
     if output != expected_output {
         return Err("measured publication differs from preflight output bytes".into());
     }
@@ -508,7 +513,10 @@ fn validate_measured_commit(
     let output_snapshot = output_package.section_layout_snapshot()?;
     verify_snapshot_shape(&output_snapshot, section_count, columns)?;
     let mut restored = Vec::new();
-    output_package.publish_section_layout_inverse_to_stream(&mut restored, &publication)?;
+    output_package
+        .apply_section_layout(&publication.patch().inverse())?
+        .package()
+        .write_to(&mut restored)?;
     if restored != source {
         return Err("measured inverse did not restore source bytes".into());
     }

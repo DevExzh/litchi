@@ -33,6 +33,7 @@ use std::sync::Arc;
 use crate::document::ParagraphHyperlinkAddress;
 
 mod edit;
+mod limit;
 mod source;
 
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
@@ -446,10 +447,11 @@ pub(crate) fn capture_with_policy(
 ) -> Result<StoryInventory> {
     let limits = limits.validate()?;
     if package.part_count() > limits.max_package_parts {
-        return Err(invalid(format!(
-            "DOCX package part count exceeds {}",
-            limits.max_package_parts
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::PackageParts,
+            actual: package.part_count(),
+            maximum: limits.max_package_parts,
+        });
     }
 
     let root = root_owner(package)?;
@@ -600,10 +602,11 @@ fn discover_owned(
             })?;
         relationships.push((kind, relationship));
         if relationships.len() > limits.max_relationships_per_owner {
-            return Err(invalid(format!(
-                "story '{}' relationship count exceeds {}",
-                owner, limits.max_relationships_per_owner
-            )));
+            return Err(crate::Error::StoryLimit {
+                kind: LimitKind::RelationshipsPerOwner,
+                actual: relationships.len(),
+                maximum: limits.max_relationships_per_owner,
+            });
         }
     }
     relationships.sort_unstable_by(|left, right| {
@@ -628,10 +631,11 @@ fn discover_owned(
             .checked_add(1)
             .ok_or_else(|| invalid("DOCX story relationship count overflow"))?;
         if *relationship_count > limits.max_total_relationships {
-            return Err(invalid(format!(
-                "DOCX story relationship count exceeds {}",
-                limits.max_total_relationships
-            )));
+            return Err(crate::Error::StoryLimit {
+                kind: LimitKind::Relationships,
+                actual: *relationship_count,
+                maximum: limits.max_total_relationships,
+            });
         }
         if relationship.is_external() {
             return Err(invalid(format!(
@@ -701,27 +705,29 @@ fn push_story(
     total_story_bytes: &mut usize,
 ) -> Result<()> {
     if stories.len() == limits.max_stories {
-        return Err(invalid(format!(
-            "DOCX story count exceeds {}",
-            limits.max_stories
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::Stories,
+            actual: (stories.len()).saturating_add(1),
+            maximum: limits.max_stories,
+        });
     }
     let length = part.blob().len();
     if enforce_story_bytes && length > limits.max_story_bytes {
-        return Err(invalid(format!(
-            "DOCX story '{}' has {length} bytes, exceeding {}",
-            part.partname(),
-            limits.max_story_bytes
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::StoryBytes,
+            actual: length,
+            maximum: limits.max_story_bytes,
+        });
     }
     *total_story_bytes = total_story_bytes
         .checked_add(length)
         .ok_or_else(|| invalid("DOCX aggregate story byte count overflow"))?;
     if enforce_story_bytes && *total_story_bytes > limits.max_total_story_bytes {
-        return Err(invalid(format!(
-            "DOCX aggregate story bytes exceed {}",
-            limits.max_total_story_bytes
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::TotalStoryBytes,
+            actual: *total_story_bytes,
+            maximum: limits.max_total_story_bytes,
+        });
     }
     // Main-only semantic readers still need the complete ownership topology
     // for stale-package detection, but must not parse unrelated story XML.
@@ -845,9 +851,11 @@ fn validate_root(
             .checked_add(1)
             .ok_or_else(|| invalid("Word story XML prolog event count overflow"))?;
         if events > max_events {
-            return Err(invalid(format!(
-                "Word story XML prolog exceeds {max_events} events"
-            )));
+            return Err(crate::Error::StoryLimit {
+                kind: LimitKind::PrologEvents,
+                actual: events,
+                maximum: max_events,
+            });
         }
         let event = reader
             .read_event()
@@ -919,9 +927,11 @@ fn encode_topology(stories: &[StoryPart], limit: usize) -> Result<Arc<[u8]>> {
         size = add_size(size, 1)?;
     }
     if size > limit {
-        return Err(invalid(format!(
-            "DOCX story topology exceeds {limit} bytes"
-        )));
+        return Err(crate::Error::StoryLimit {
+            kind: LimitKind::TopologyBytes,
+            actual: size,
+            maximum: limit,
+        });
     }
     let mut bytes = Vec::new();
     bytes

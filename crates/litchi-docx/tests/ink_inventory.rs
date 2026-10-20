@@ -365,7 +365,7 @@ fn distinct_payload_budget_and_external_targets_are_checked() {
             }))
             .ink(),
         Err(Error::InkLimit {
-            resource: "total payload bytes",
+            kind: litchi_docx::ink::LimitKind::TotalPayloadBytes,
             ..
         })
     ));
@@ -582,7 +582,7 @@ fn source_backed_payload_limit_refuses_before_decompression_and_releases_story_p
             }))
             .ink(),
         Err(Error::InkLimit {
-            resource: "payload bytes",
+            kind: litchi_docx::ink::LimitKind::PayloadBytes,
             ..
         })
     ));

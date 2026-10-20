@@ -7,6 +7,7 @@
     reason = "reader events are refined after each bounded validation step"
 )]
 
+use crate::ink::LimitKind;
 use std::collections::HashSet;
 use std::ops::Range;
 
@@ -104,7 +105,7 @@ pub(crate) fn capture(xml: &[u8], dialect: StoryDialect, limits: Limits) -> Resu
 pub(crate) fn reference_values(xml: &[u8], limits: Limits) -> Result<Vec<String>> {
     let limits = limits.validate()?;
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("story XML bytes", xml.len(), MAX_XML_BYTES));
+        return Err(limit(LimitKind::StoryXmlBytes, xml.len(), MAX_XML_BYTES));
     }
 
     let mut reader = reader(xml);
@@ -755,9 +756,9 @@ fn candidate_offsets(xml: &[u8], dialect: StoryDialect, limits: Limits) -> Resul
                 observe_node(&mut nodes, limits.max_xml_nodes)?;
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("XML depth", usize::MAX, limits.max_xml_depth))?;
+                    .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, limits.max_xml_depth))?;
                 if depth > limits.max_xml_depth {
-                    return Err(limit("XML depth", depth, limits.max_xml_depth));
+                    return Err(limit(LimitKind::XmlDepth, depth, limits.max_xml_depth));
                 }
                 if is_candidate(&namespace, &element, dialect) {
                     push_offset(
@@ -807,14 +808,23 @@ pub(crate) fn select_active_offsets(
     let marked_extra = offsets
         .len()
         .checked_mul(MAX_MCE_MARKER_BYTES_PER_ANCHOR)
-        .ok_or_else(|| limit("MCE marked XML bytes", usize::MAX, MAX_MCE_MARKED_BYTES))?;
-    let marked_bytes = xml
-        .len()
-        .checked_add(marked_extra)
-        .ok_or_else(|| limit("MCE marked XML bytes", usize::MAX, MAX_MCE_MARKED_BYTES))?;
+        .ok_or_else(|| {
+            limit(
+                LimitKind::MceMarkedXmlBytes,
+                usize::MAX,
+                MAX_MCE_MARKED_BYTES,
+            )
+        })?;
+    let marked_bytes = xml.len().checked_add(marked_extra).ok_or_else(|| {
+        limit(
+            LimitKind::MceMarkedXmlBytes,
+            usize::MAX,
+            MAX_MCE_MARKED_BYTES,
+        )
+    })?;
     if marked_bytes > MAX_MCE_MARKED_BYTES {
         return Err(limit(
-            "MCE marked XML bytes",
+            LimitKind::MceMarkedXmlBytes,
             marked_bytes,
             MAX_MCE_MARKED_BYTES,
         ));
@@ -833,7 +843,7 @@ pub(crate) fn select_active_offsets(
     let growth_factor = limits.max_xml_nodes.max(limits.max_xml_depth).max(8);
     let max_output_bytes = marked_bytes
         .checked_mul(growth_factor)
-        .ok_or_else(|| limit("MCE output bytes", usize::MAX, MAX_MCE_OUTPUT_BYTES))?
+        .ok_or_else(|| limit(LimitKind::MceOutputBytes, usize::MAX, MAX_MCE_OUTPUT_BYTES))?
         .min(MAX_MCE_OUTPUT_BYTES);
     let processing = MceLimits {
         max_input_bytes: marked_bytes,
@@ -1475,7 +1485,7 @@ fn collect_attributes(
             }
             if values.len() >= limits.max_relationships {
                 return Err(limit(
-                    "DOCX ink relationship reference values",
+                    LimitKind::RelationshipReferenceValues,
                     values.len().saturating_add(1),
                     limits.max_relationships,
                 ));
@@ -1518,9 +1528,9 @@ fn observe_envelope_start(
     observe_node(nodes, limits.max_xml_nodes)?;
     *depth = depth
         .checked_add(1)
-        .ok_or_else(|| limit("XML depth", usize::MAX, limits.max_xml_depth))?;
+        .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, limits.max_xml_depth))?;
     if *depth > limits.max_xml_depth {
-        return Err(limit("XML depth", *depth, limits.max_xml_depth));
+        return Err(limit(LimitKind::XmlDepth, *depth, limits.max_xml_depth));
     }
     if *root_seen && root_closed {
         return Err(invalid("DOCX story has more than one XML root"));
@@ -1555,9 +1565,9 @@ fn observe_envelope_empty(
     observe_node(nodes, limits.max_xml_nodes)?;
     let next_depth = depth
         .checked_add(1)
-        .ok_or_else(|| limit("XML depth", usize::MAX, limits.max_xml_depth))?;
+        .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, limits.max_xml_depth))?;
     if next_depth > limits.max_xml_depth {
-        return Err(limit("XML depth", next_depth, limits.max_xml_depth));
+        return Err(limit(LimitKind::XmlDepth, next_depth, limits.max_xml_depth));
     }
     if *depth == 0 {
         if *root_seen {
@@ -1575,7 +1585,7 @@ fn observe_envelope_empty(
 fn push_offset(offsets: &mut Vec<u32>, offset: usize, maximum: usize) -> Result<()> {
     if offsets.len() >= maximum {
         return Err(limit(
-            "DOCX ink host candidate anchors",
+            LimitKind::HostCandidateAnchors,
             offsets.len().saturating_add(1),
             maximum,
         ));
@@ -1594,9 +1604,9 @@ fn push_offset(offsets: &mut Vec<u32>, offset: usize, maximum: usize) -> Result<
 fn observe_node(nodes: &mut usize, maximum: usize) -> Result<()> {
     *nodes = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("XML nodes", usize::MAX, maximum))?;
+        .ok_or_else(|| limit(LimitKind::XmlNodes, usize::MAX, maximum))?;
     if *nodes > maximum {
-        return Err(limit("XML nodes", *nodes, maximum));
+        return Err(limit(LimitKind::XmlNodes, *nodes, maximum));
     }
     Ok(())
 }
@@ -1710,9 +1720,9 @@ fn invalid(message: &'static str) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
+fn limit(resource: LimitKind, actual: usize, maximum: usize) -> Error {
     Error::InkLimit {
-        resource,
+        kind: resource,
         actual,
         maximum,
     }

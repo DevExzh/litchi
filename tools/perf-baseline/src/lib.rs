@@ -11,6 +11,7 @@ mod cold_verified;
 mod corpus_manifest;
 pub mod docx_bounded_tail_append_compare;
 pub mod docx_edit_provider;
+mod docx_family_publication;
 pub mod docx_managed_edit;
 pub mod docx_managed_read_ahead;
 pub mod docx_owned_attribution;
@@ -49598,10 +49599,9 @@ fn publish_docx_source_edit<W: Write>(
         return Err("DOCX source edit produced unexpected commit diagnostics".into());
     }
     let materializations = usize::try_from(package.cache_diagnostics().successful_loads)?;
-    let published = package.publish_document_commit_to_stream(writer, &commit)?;
-    if published.xml_bytes() != commit.snapshot().xml_bytes() {
-        return Err("DOCX source edit published a different snapshot".into());
-    }
+    // Record 0355a: the detached commit replays onto the package, and the
+    // committed package is written; callers compare the output bytes.
+    package.apply(commit.patch())?.write_to(writer)?;
     Ok((materializations, commit))
 }
 
@@ -49778,7 +49778,7 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
 fn verify_docx_section_layout_controls(
     corpus: &Corpus,
     commit: &litchi_docx::section::layout::Commit,
-    publication: &litchi_docx::section::layout::Publication,
+    publication: &litchi_docx::source_backed::section_layout::Commit,
 ) -> Result<(), Box<dyn Error>> {
     let noop_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
@@ -49793,7 +49793,9 @@ fn verify_docx_section_layout_controls(
         return Err("DOCX section-layout no-op control produced a changed patch".into());
     }
     let mut noop_output = Vec::new();
-    noop_package.publish_section_layout_commit_to_stream(&mut noop_output, &noop)?;
+    noop_package
+        .apply_section_layout(&noop.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut noop_output))?;
     if noop_output != corpus.archive {
         return Err("DOCX section-layout no-op publication changed source bytes".into());
     }
@@ -49801,13 +49803,16 @@ fn verify_docx_section_layout_controls(
     let foreign = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         corpus.archive.clone(),
     )))?;
+    // Record 0355a: a detached record patch replays by content, so another
+    // package holding the same source bytes publishes the same artifact.
     let mut foreign_output = Vec::new();
-    if !matches!(
-        foreign.publish_section_layout_commit_to_stream(&mut foreign_output, commit),
-        Err(litchi_docx::Error::SectionLayoutForeignSource)
-    ) || !foreign_output.is_empty()
-    {
-        return Err("DOCX section-layout foreign-source refusal is not typed".into());
+    foreign
+        .apply_section_layout(&commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut foreign_output))?;
+    let mut expected_output = Vec::new();
+    publication.package().write_to(&mut expected_output)?;
+    if foreign_output != expected_output {
+        return Err("DOCX section-layout content replay differs from the commit".into());
     }
 
     let stale = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
@@ -49815,7 +49820,9 @@ fn verify_docx_section_layout_controls(
     )))?;
     let mut stale_output = Vec::new();
     if !matches!(
-        stale.publish_section_layout_inverse_to_stream(&mut stale_output, publication),
+        stale
+            .apply_section_layout(&publication.patch().inverse())
+            .and_then(|committed| committed.package().write_to(&mut stale_output)),
         Err(litchi_docx::Error::SectionLayoutStaleSource)
     ) || !stale_output.is_empty()
     {
@@ -49837,7 +49844,8 @@ fn verify_docx_section_layout_controls(
     }
     let mut signed_noop_output = Vec::new();
     signed_noop
-        .publish_section_layout_commit_to_stream(&mut signed_noop_output, &signed_noop_commit)?;
+        .apply_section_layout(&signed_noop_commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut signed_noop_output))?;
     if signed_noop_output != signed_archive {
         return Err("DOCX section-layout signed no-op changed source bytes".into());
     }
@@ -49859,7 +49867,9 @@ fn verify_docx_section_layout_controls(
     let signed_commit = signed_edit.commit()?;
     let mut signed_output = Vec::new();
     if !matches!(
-        signed.publish_section_layout_commit_to_stream(&mut signed_output, &signed_commit),
+        signed
+            .apply_section_layout(&signed_commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut signed_output)),
         Err(litchi_docx::Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -49905,7 +49915,9 @@ fn verify_docx_section_layout_controls(
         limit: 128,
     };
     if !matches!(
-        partial.publish_section_layout_commit_to_stream(&mut partial_sink, &partial_commit),
+        partial
+            .apply_section_layout(&partial_commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut partial_sink)),
         Err(litchi_docx::Error::Opc(OpcError::IncompleteOutput { .. }))
     ) || partial_sink.accepted != 128
     {
@@ -50249,8 +50261,11 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         return Err("DOCX section-layout expected commit is not changed".into());
     }
     let mut expected_output = Vec::new();
-    let expected_publication = expected_package
-        .publish_section_layout_commit_to_stream(&mut expected_output, &expected_commit)?;
+    let expected_publication =
+        expected_package.apply_section_layout(&expected_commit.patch().clone().into())?;
+    expected_publication
+        .package()
+        .write_to(&mut expected_output)?;
     verify_docx_section_layout_output(corpus, &expected_output, [3, 2, 2])?;
     verify_docx_section_layout_controls(corpus, &expected_commit, &expected_publication)?;
     let expected_digest = sha256_hex(&expected_output);
@@ -50509,7 +50524,8 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let before_publication_after_commit = package.cache_diagnostics();
 
         let publication_started = Instant::now();
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+        publication.package().write_to(&mut sink)?;
         std::hint::black_box(&publication);
         let publication_ns = elapsed_ns(publication_started.elapsed())?;
         let total_ns = preparation_ns
@@ -50588,13 +50604,6 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         {
             return Err("DOCX section-layout patch forward/inverse/stale oracle failed".into());
         }
-        if publication
-            .inverse_patch()
-            .apply(publication.snapshot())
-            .is_err()
-        {
-            return Err("DOCX section-layout publication inverse patch is not applicable".into());
-        }
         if sink.bytes != expected_output {
             return Err("DOCX section-layout publication differs from expected output".into());
         }
@@ -50603,7 +50612,10 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored_output = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
+        reopened
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored_output)?;
         if restored_output != corpus.archive {
             return Err("DOCX section-layout inverse publication did not restore source".into());
         }
@@ -61544,7 +61556,9 @@ mod tests {
         }))?;
         let commit = edit.commit()?;
         let mut output = Vec::new();
-        package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+        package
+            .apply_section_layout(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output))?;
         Ok(output)
     }
 
@@ -61607,7 +61621,8 @@ mod tests {
             .ok_or("DOCX section-layout diagnostic output ceiling overflows u64")?;
         let mut sink = super::CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+        publication.package().write_to(&mut sink)?;
         let publication_snapshot = docx_read_diagnostic_snapshot(&range_source, &provider_counter)?;
         snapshots.push(("publication", publication_snapshot));
         let provider_version_at_publication = range_source.version()?;
@@ -61620,7 +61635,10 @@ mod tests {
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored_output = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
+        reopened
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored_output)?;
         let inverse_source_restored = restored_output == corpus.archive;
         if !inverse_source_restored {
             return Err("DOCX section-layout diagnostic inverse did not restore source".into());

@@ -40,6 +40,7 @@ mod authoring;
 mod codec;
 mod graph;
 mod host;
+mod limit;
 mod model;
 pub(crate) mod package;
 mod placement;
@@ -60,20 +61,9 @@ pub use model::{Annotation, BrushProperty, Context, Limits, Location, Snapshot};
 pub use transaction::{Commit, Destination, Diagnostics, Edit, EditOptions, Patch};
 
 /// Error of the ink family: the crate error. Ink budget refusals are
-/// [`crate::Error::InkLimit`], which names the exceeded resource.
+/// [`crate::Error::InkLimit`], which carries the exceeded [`LimitKind`].
 pub type Error = crate::Error;
 
-/// Typed budget kinds of the ink family. Ink budgets are still reported
-/// through [`crate::Error::InkLimit`] by resource name, so this has no
-/// variants yet (record 0355 follow-up).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {}
-
-impl std::fmt::Display for LimitKind {
-    fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {}
-    }
-}
+pub use limit::LimitKind;
 
 pub(crate) const CONTENT_TYPE: &str = "application/inkml+xml";

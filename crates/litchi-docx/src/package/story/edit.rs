@@ -10,7 +10,9 @@
 use super::{StoryHyperlinkTextReplacement, StoryInventory};
 use crate::package::family::{graph_edit, graph_family};
 
-graph_family!("story");
+graph_family!("story", own_limits);
+
+pub use super::limit::LimitKind;
 graph_edit!("story", edit_stories, apply_stories);
 
 impl Edit {

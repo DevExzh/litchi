@@ -131,9 +131,11 @@ impl Settings {
                         Error::Invalid("Word web-settings XML nesting is too deep".into())
                     })?;
                     if depth > MAX_FRAMESET_NESTING {
-                        return Err(invalid(
-                            "Word web-settings XML nesting exceeds the safety limit",
-                        ));
+                        return Err(Error::WebLimit {
+                            kind: crate::web::LimitKind::SettingsXmlDepth,
+                            actual: depth,
+                            maximum: MAX_FRAMESET_NESTING,
+                        });
                     }
                     if depth == 1 {
                         conformance = Some(validate_root(&namespace, &element, saw_root)?);
@@ -174,9 +176,11 @@ impl Settings {
                         Error::Invalid("Word web-settings XML nesting is too deep".into())
                     })?;
                     if child_depth > MAX_FRAMESET_NESTING {
-                        return Err(invalid(
-                            "Word web-settings XML nesting exceeds the safety limit",
-                        ));
+                        return Err(Error::WebLimit {
+                            kind: crate::web::LimitKind::SettingsXmlDepth,
+                            actual: child_depth,
+                            maximum: MAX_FRAMESET_NESTING,
+                        });
                     }
                     if child_depth == 1 {
                         conformance = Some(validate_root(&namespace, &element, saw_root)?);
@@ -291,9 +295,11 @@ fn write_explicit_on_off(xml: &mut String, name: &str, value: Option<bool>) -> R
 
 fn write_frameset(xml: &mut String, frameset: &Frameset, nesting: usize) -> Result<()> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word web frameset nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::FramesetDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     xml.push_str("<w:frameset>");
     if let Some(value) = &frameset.size {
@@ -366,9 +372,11 @@ fn write_frameset_split_bar(xml: &mut String, split_bar: &SplitBar) -> Result<()
 
 fn write_html_div(xml: &mut String, div: &Div, nesting: usize) -> Result<()> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word HTML division nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::HtmlDivisionDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     write!(xml, "<w:div w:id=\"{}\">", div.id)?;
     write_explicit_on_off(xml, "blockQuote", div.block_quote)?;
@@ -656,9 +664,11 @@ fn parse_frameset(
     budget: &mut ParseBudget,
 ) -> Result<Frameset> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word web frameset nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::FramesetDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     let mut frameset = Frameset::default();
     loop {
@@ -768,9 +778,11 @@ fn parse_div_container(
     budget: &mut ParseBudget,
 ) -> Result<Vec<Div>> {
     if nesting > MAX_FRAMESET_NESTING {
-        return Err(Error::Invalid(
-            "Word HTML division nesting exceeds the supported safety limit".into(),
-        ));
+        return Err(Error::WebLimit {
+            kind: crate::web::LimitKind::HtmlDivisionDepth,
+            actual: nesting,
+            maximum: MAX_FRAMESET_NESTING,
+        });
     }
     let mut divs = Vec::new();
     loop {
@@ -1571,7 +1583,11 @@ fn skip_element(reader: &mut NsReader<&[u8]>, budget: &mut ParseBudget) -> Resul
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("Word web XML nesting is too deep".into()))?;
                 if depth > MAX_FRAMESET_NESTING {
-                    return Err(invalid("Word web XML nesting exceeds the safety limit"));
+                    return Err(Error::WebLimit {
+                        kind: crate::web::LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: MAX_FRAMESET_NESTING,
+                    });
                 }
             },
             Event::End(_) => {

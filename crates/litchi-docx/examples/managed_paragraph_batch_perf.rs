@@ -518,7 +518,10 @@ fn build_preflight(fixture: &Fixture, mode: EditMode) -> AnyResult<Preflight> {
     let forward_ok = forward.xml_bytes() == commit.snapshot().xml_bytes();
     let inverse_ok = inverse.xml_bytes() == patch.source().xml_bytes();
     let mut expected_output = Vec::new();
-    package.publish_document_commit_to_stream(&mut expected_output, &commit)?;
+    package.apply(commit.patch()).and_then(|committed| {
+        committed.write_to(&mut expected_output)?;
+        committed.document_snapshot()
+    })?;
     let expected_output_sha256 = sha256_hex(&expected_output);
     if !verify_output(fixture, &expected_output, &fixture.replacement_text)? {
         return Err("unmanaged preflight semantic oracle failed".into());
@@ -561,7 +564,10 @@ fn build_managed_preflight(
     drop(forward);
     drop(inverse);
     let mut output = Vec::with_capacity(expected_output.len());
-    let published = package.publish_document_commit_to_stream(&mut output, &commit)?;
+    let published = package.apply(commit.patch()).and_then(|committed| {
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    })?;
     drop(published);
     drop(commit);
     drop(patch);
@@ -671,7 +677,10 @@ fn run_sample(
     let budget_live = BudgetSnapshot::from_budget(&budget);
 
     let phase_started = Instant::now();
-    let published = package.publish_document_commit_to_stream(&mut output, &commit)?;
+    let published = package.apply(commit.patch()).and_then(|committed| {
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    })?;
     drop(published);
     let publish_ns = elapsed_ns(phase_started)?;
 

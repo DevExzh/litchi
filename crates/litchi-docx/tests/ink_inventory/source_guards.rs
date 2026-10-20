@@ -227,7 +227,7 @@ fn relationship_lexical_tokens_count_against_public_ink_topology_limit() {
     assert!(matches!(
         error,
         Error::InkLimit {
-            resource: "Ink graph publication token bytes",
+            kind: litchi_docx::ink::LimitKind::GraphPublicationTokenBytes,
             ..
         }
     ));
