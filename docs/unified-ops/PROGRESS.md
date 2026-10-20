@@ -923,6 +923,9 @@ Work packages, in waves of up to four agents:
 - Merged `w3-ppt` 0357b: block-hash commits (changed commit 0.970× the pre-0357a base; first commit on a never-hashed package 1.105×, paid once per package — reported to the owner); durable form and `join` for master and table-style verbs (`Refusal::JoinConflict`).
 - Merged `w2-pptx` 0356b: `SourceBackedPresentationEditor` retired (crate-private, banned); `source::cross_slide_copy` family; inventory counts `builder::*` drafts (PPTX owner rows 0). Noted for W8: a cross-copy patch replays only onto the same opened package, unlike DOCX section-layout patches.
 
+- Merged `w6-odf` 0358a: ODS `source_backed::{cells, dde, sheet_metadata}` and ODP `tail_append` families commit deferred owners (`write_to`/`save` on both owners, byte-identical to the old stream routes, time ≤1.032); every capability removed in 0358 has a tested package-level route (record §3); `odf-objects` builds alone; no string-carrying `Unsupported` in ODF. Residuals: ODP tail append +0.5 MiB peak heap (full owner open); ODT set 1.070 and flat ODT open 1.090 shown to be code-generation placement (same instruction counts; 1.014/1.032 with `codegen-units = 1`). Noted for W8: tail-append patches, like PPTX cross-copy, replay only onto shares of their own owners.
+- Trunk fix: `tools/perf-baseline` and `tools/native-resave` lock files gain litchi-ppt's `sha2` (record 0357b).
+
 ## Coordinator status (2026-10-19): code work for the definition of done complete
 The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;
