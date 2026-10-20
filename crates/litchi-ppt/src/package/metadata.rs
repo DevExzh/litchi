@@ -24,7 +24,7 @@
 //! })?;
 //! let (edited, patch) = edit.commit()?.into_parts();
 //! assert_eq!(edited.metadata()?.title.as_deref(), Some("Roadmap"));
-//! let reverted = edited.apply_metadata(&patch.inverse())?;
+//! let reverted = edited.apply_metadata(&patch.inverse())?.into_package();
 //! assert_eq!(reverted.to_bytes()?, package.to_bytes()?);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -339,15 +339,23 @@ impl Package {
     ///
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// source, and [`Error::Package`] when its result cannot be republished.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
         let bytes = self.to_bytes()?;
         if bytes.as_slice() != patch.before_bytes() {
             return Err(Error::PatchConflict);
         }
-        if patch.is_noop() {
-            return Ok(self.clone());
-        }
-        reopen(self, patch.after_bytes())
+        let package = if patch.is_noop() {
+            self.clone()
+        } else {
+            reopen(self, patch.after_bytes())?
+        };
+        Ok(Commit {
+            package,
+            diagnostics: Diagnostics {
+                changed: !patch.is_noop(),
+            },
+            patch: patch.clone(),
+        })
     }
 }
 

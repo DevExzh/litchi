@@ -79,9 +79,13 @@ fn assert_replaced(path: &str, slide: usize, shape: usize, text: &str) {
     let published = commit.package().to_bytes().unwrap();
     assert_eq!(texts(&Package::from_bytes(&published).unwrap()), expected);
     // Exact replay and exact inverse.
-    let replayed = source.apply(commit.patch()).unwrap();
+    let replayed = source.apply(commit.patch()).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), published);
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 }
 
@@ -184,7 +188,11 @@ fn outline_text_composes_with_staged_slide_structure() {
     expected[1][0] = "Second now".to_owned();
     expected.remove(2);
     assert_eq!(texts(commit.package()), expected);
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 

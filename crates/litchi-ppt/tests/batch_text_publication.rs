@@ -147,7 +147,10 @@ fn assert_exact_patch_round_trip(
     assert_eq!(patch.before(), source_bytes.as_slice());
     assert_eq!(patch.after(), target_bytes.as_slice());
 
-    let applied = source.apply(patch).expect("apply exact forward patch");
+    let applied = source
+        .apply(patch)
+        .expect("apply exact forward patch")
+        .into_package();
     assert_eq!(
         applied.to_bytes().expect("read applied bytes"),
         target_bytes,
@@ -156,7 +159,8 @@ fn assert_exact_patch_round_trip(
 
     let restored = target
         .apply(&patch.inverse())
-        .expect("apply exact inverse patch");
+        .expect("apply exact inverse patch")
+        .into_package();
     assert_eq!(
         restored.to_bytes().expect("read restored bytes"),
         source_bytes,

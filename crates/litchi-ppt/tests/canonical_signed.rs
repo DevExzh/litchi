@@ -322,11 +322,15 @@ fn assert_exact_noop(package: &Package, edit: litchi_ppt::Edit) {
 
     let inverse = commit.patch().inverse();
     assert!(inverse.is_noop());
-    let restored = package.apply(&inverse).expect("apply exact no-op inverse");
+    let restored = package
+        .apply(&inverse)
+        .expect("apply exact no-op inverse")
+        .into_package();
     assert_eq!(restored.to_bytes().expect("restored bytes"), before);
     let replayed = package
         .apply(commit.patch())
-        .expect("apply exact no-op patch");
+        .expect("apply exact no-op patch")
+        .into_package();
     assert_eq!(replayed.to_bytes().expect("replayed bytes"), before);
 }
 

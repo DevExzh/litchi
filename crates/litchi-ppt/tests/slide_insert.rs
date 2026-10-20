@@ -67,7 +67,12 @@ fn blank_slides_insert_at_every_position_of_powerpoint_decks() {
             );
             assert_eq!(source.to_bytes().unwrap(), source_bytes);
             assert_eq!(
-                source.apply(commit.patch()).unwrap().to_bytes().unwrap(),
+                source
+                    .apply(commit.patch())
+                    .unwrap()
+                    .into_package()
+                    .to_bytes()
+                    .unwrap(),
                 published
             );
             assert_eq!(
@@ -75,6 +80,7 @@ fn blank_slides_insert_at_every_position_of_powerpoint_decks() {
                     .package()
                     .apply(&commit.patch().inverse())
                     .unwrap()
+                    .into_package()
                     .to_bytes()
                     .unwrap(),
                 source_bytes

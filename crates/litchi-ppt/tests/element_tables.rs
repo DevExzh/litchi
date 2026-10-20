@@ -81,6 +81,7 @@ fn cell_text_changes_length_and_keeps_every_other_cell() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes

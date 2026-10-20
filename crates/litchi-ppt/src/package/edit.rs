@@ -731,7 +731,19 @@ impl Package {
     }
 
     /// Apply a primary exact-source patch without mutating this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    ///
+    /// The commit carries the published package, a copy of `patch` and its
+    /// diagnostics; an exact no-op patch publishes this package unchanged.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        let package = self.apply_package(patch)?;
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::new(!patch.is_noop(), patch.operation_count),
+        })
+    }
+
+    fn apply_package(&self, patch: &Patch) -> Result<Self> {
         if self.is_encrypted() {
             return Err(Error::Package(PackageError::EncryptionPolicy));
         }

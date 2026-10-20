@@ -92,6 +92,7 @@ fn add_creates_the_ppt10_tag_and_round_trips() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes

@@ -84,7 +84,12 @@ fn notes_text_changes_length_and_preserves_everything_else() {
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
 
     assert_eq!(
-        source.apply(commit.patch()).unwrap().to_bytes().unwrap(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         published
     );
     assert_eq!(
@@ -92,6 +97,7 @@ fn notes_text_changes_length_and_preserves_everything_else() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes

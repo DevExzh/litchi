@@ -147,9 +147,12 @@ fn patch_replay_inverse_and_wrong_source_refusal_are_exact() {
     .expect("stage exact-length text replacement");
     let commit = edit.commit().expect("commit edit");
 
-    let replayed = source
+    let replay = source
         .apply(commit.patch())
         .expect("replay patch on exact source");
+    assert!(replay.diagnostics().changed());
+    assert_eq!(replay.patch().after(), commit.patch().after());
+    let replayed = replay.into_package();
     assert_eq!(
         replayed.to_bytes().expect("replayed bytes"),
         commit.package().to_bytes().expect("target bytes")
@@ -158,7 +161,8 @@ fn patch_replay_inverse_and_wrong_source_refusal_are_exact() {
     let restored = commit
         .package()
         .apply(&commit.patch().inverse())
-        .expect("apply exact inverse");
+        .expect("apply exact inverse")
+        .into_package();
     assert_eq!(
         restored.to_bytes().expect("restored bytes"),
         source.to_bytes().expect("source bytes")
@@ -481,6 +485,7 @@ fn canonical_transfer_and_text_batch_reuse_native_closure() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         receiver.to_bytes().unwrap()
