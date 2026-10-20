@@ -4,7 +4,8 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::{Snapshot, apply_patch, load};
+use super::package::apply_patch;
+use super::{Snapshot, load};
 use crate::presentation::embedded::controls::{
     BINARY_CONTENT_TYPE, BINARY_RELATIONSHIP, CONTROL_RELATIONSHIP, DESCRIPTOR_CONTENT_TYPE, Limits,
 };

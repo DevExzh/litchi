@@ -36,8 +36,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::presentation::embedded::controls::{Limits, slide};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
-use litchi_pptx::presentation::embedded::controls::{Limits, slide};
 
 /// Repetitions per determinism assertion; 2^-128 accidental agreement.
 const REPEATS: usize = 128;
@@ -163,7 +163,7 @@ fn snapshot(package: &OpcPackage) -> slide::Snapshot {
 /// Capture against one build of the package and publish against an independent
 /// build of the same graph, the way a caller that keeps a patch across a reopen
 /// does.
-fn rename_across_two_builds(companions: bool) -> litchi_pptx::Result<slide::Snapshot> {
+fn rename_across_two_builds(companions: bool) -> crate::Result<slide::Snapshot> {
     let source = control_package(companions);
     let mut target = control_package(companions);
     let mut edit = snapshot(&source).edit();
@@ -173,7 +173,7 @@ fn rename_across_two_builds(companions: bool) -> litchi_pptx::Result<slide::Snap
         commit.diagnostics().changed(),
         "the rename changes the slide XML"
     );
-    slide::apply_patch(&mut target, commit.patch())
+    slide::package::apply_patch(&mut target, commit.patch())
 }
 
 #[test]
@@ -226,7 +226,7 @@ fn a_genuinely_different_package_is_still_refused() {
     edit.set_name(Some("Renamed".to_owned())).unwrap();
     let commit = edit.commit().unwrap();
     assert!(
-        slide::apply_patch(&mut target, commit.patch()).is_err(),
+        slide::package::apply_patch(&mut target, commit.patch()).is_err(),
         "a changed binary payload must still be refused"
     );
 }

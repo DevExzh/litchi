@@ -709,11 +709,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    let snapshot = ole::slide::load(opc, 0, &slide())?;
-                    let commit = snapshot.edit().commit()?;
-                    ole::slide::apply_commit(opc, commit).map(drop)
-                })
+                package.edit_slide_ole_objects_in_place(|edit| edit.update(0, |_| Ok(())))
             }),
         },
         Family {
