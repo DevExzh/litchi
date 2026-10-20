@@ -13,9 +13,9 @@ use litchi_keynote::{ChartSelector, Package as FocusedKeynotePackage, SlideSelec
 /// slide. This keeps listing proportional to the slide graph instead of
 /// selecting and decoding the focused package once per chart.
 pub(super) fn fill_focused_chart_arrangements(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
-    charts: &mut [KeynoteSlideChartInfo],
+    charts: &mut [SlideChartInfo],
     chart_positions: &[usize],
 ) -> Result<()> {
     if charts.is_empty() && chart_positions.is_empty() {
@@ -43,7 +43,7 @@ pub(super) fn fill_focused_chart_arrangements(
 }
 
 pub(super) fn focused_chart_arrangement_at(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     chart_count: usize,
     chart_position: usize,
@@ -62,7 +62,7 @@ pub(super) fn focused_chart_arrangement_at(
 }
 
 fn focused_chart_arrangements(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
 ) -> Result<Box<[ChartArrangement]>> {
     focused_chart_arrangement_package(editor)?
@@ -70,7 +70,7 @@ fn focused_chart_arrangements(
         .map_err(map_focused_chart_arrangement_error)
 }
 
-fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> {
+fn focused_chart_arrangement_package(editor: &Editor) -> Result<FocusedKeynotePackage> {
     let bytes = editor.to_bytes()?;
     FocusedKeynotePackage::from_bytes(&bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -89,12 +89,12 @@ fn map_focused_chart_arrangement_error(error: litchi_keynote::chart::arrangement
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_chart_arrangement_selector_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
@@ -176,7 +176,7 @@ mod tests {
         const CHART_COUNT: usize = 32;
         const TARGET_POSITION: usize = 17;
 
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         editor
             .add_slide_chart(
                 0,
@@ -222,7 +222,7 @@ mod tests {
             .unwrap();
         let mut candidate_bytes = Vec::new();
         changed.package().write_to(&mut candidate_bytes).unwrap();
-        let reopened = KeynoteEditor::from_bytes(&candidate_bytes).unwrap();
+        let reopened = Editor::from_bytes(&candidate_bytes).unwrap();
         let mut expected_listing = baseline_listing.clone();
         expected_listing[TARGET_POSITION].arrangement = replacement;
         assert_eq!(reopened.slide_charts(0).unwrap(), expected_listing);
@@ -237,7 +237,7 @@ mod tests {
     }
 
     fn set_focused_arrangement(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         chart_position: usize,
         arrangement: ChartArrangement,
     ) {
@@ -253,7 +253,7 @@ mod tests {
             .unwrap();
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes).unwrap();
-        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+        *editor = Editor::from_bytes(&bytes).unwrap();
     }
 
     fn data() -> ChartData {

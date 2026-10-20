@@ -23,7 +23,7 @@ use litchi_numbers::cell::data_format::{
     scientific::transaction as scientific_transaction,
     text::transaction as text_transaction,
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CachedScalar, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
@@ -45,12 +45,12 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn source() -> TestResult<Vec<u8>> {
@@ -447,11 +447,7 @@ fn duration_selectors_and_option_semantics_are_explicit() -> TestResult {
 fn duration_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestResult {
     let package = Package::from_bytes(&source()?)?;
     let before = package.exact_bytes();
-    for position in [
-        CellPosition::new(1, 0),
-        CellPosition::new(0, 2),
-        CellPosition::new(u32::MAX, u32::MAX),
-    ] {
+    for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_duration_format(0usize, 0usize, position),
             Err(Error::CellNotFound)
@@ -1060,7 +1056,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
     );
     assert!(
         cross_package
-            .table_cell_duration_format(0usize, 0usize, CellPosition::new(0, 2))?
+            .table_cell_duration_format(0usize, 0usize, At::new(0, 2))?
             .is_some()
     );
     let number_payload = fixture::format_payload_by_key(&cross_source, 2)?;
@@ -1091,7 +1087,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
     assert!(
         first_duration_cleared
             .package()
-            .table_cell_duration_format(0usize, 0usize, CellPosition::new(0, 2))?
+            .table_cell_duration_format(0usize, 0usize, At::new(0, 2))?
             .is_some()
     );
     assert!(
@@ -1104,7 +1100,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
 
     let both_durations_cleared = first_duration_cleared
         .package()
-        .edit_table_cell_duration_format(0usize, 0usize, CellPosition::new(0, 2))?
+        .edit_table_cell_duration_format(0usize, 0usize, At::new(0, 2))?
         .clear()
         .commit()?;
     let both_durations_cleared_bytes = both_durations_cleared.package().exact_bytes();

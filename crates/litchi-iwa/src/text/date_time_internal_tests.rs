@@ -1,5 +1,5 @@
 use crate::archive::RawMessage;
-use crate::pages::PagesEditor;
+use crate::pages;
 use crate::protobuf::tswp;
 use crate::wire::{
     parse_wire_fields, patch_fixed64_field, patch_varint_field, repeated_length_delimited_payloads,
@@ -25,7 +25,7 @@ fn settings(seconds: f64) -> Settings {
 }
 
 fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let pages = PagesEditor::create_with_text("Friday, July 17, 2026").unwrap();
+    let pages = pages::Editor::create_with_text("Friday, July 17, 2026").unwrap();
     let storage_id = pages.body_storage().unwrap().id;
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),

@@ -182,7 +182,7 @@ fn keynote(counts: &[usize]) -> Result<Vec<Case<'static>>> {
 /// added to a new document; one leaf `edit_table_cells` edit.
 #[cfg(feature = "numbers")]
 fn numbers(counts: &[usize]) -> Result<Vec<Case<'static>>> {
-    use litchi_numbers::table::CellPosition;
+    use litchi_numbers::table::At;
     use litchi_numbers::table::cells::{Change, Input};
     use litchi_numbers::{Package, SheetSelector, TableSelector};
     let max = counts.iter().copied().max().unwrap_or(0);
@@ -196,7 +196,7 @@ fn numbers(counts: &[usize]) -> Result<Vec<Case<'static>>> {
     package.write_to(&mut bytes)?;
     let native = leak(Package::from_bytes(&bytes)?);
     let file = leak(litchi_ops::open_bytes(bytes)?);
-    fn leaf(native: &Package, cells: &[(CellPosition, f64)]) -> Result<Package> {
+    fn leaf(native: &Package, cells: &[(At, f64)]) -> Result<Package> {
         Ok(native
             .edit_table_cells(SheetSelector::index(0), TableSelector::index(1))?
             .extend(
@@ -214,12 +214,12 @@ fn numbers(counts: &[usize]) -> Result<Vec<Case<'static>>> {
     }
     let mut cases = Vec::new();
     for &n in counts {
-        let cells: Vec<(CellPosition, String, f64)> = (0..n)
+        let cells: Vec<(At, String, f64)> = (0..n)
             .map(|i| {
                 let row = (i / 10 + 1) as u32;
                 let column = (i % 10 + 1) as u32;
                 (
-                    CellPosition::new(row, column),
+                    At::new(row, column),
                     format!("{}{}", char::from(b'A' + column as u8), row + 1),
                     i as f64,
                 )

@@ -1,6 +1,6 @@
 //! Create a Pages shape and apply a native horizontal Arrange flip from scratch.
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 use litchi_iwa_common::shape::path::Preset;
 
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("usage: create_pages_flipped_shape <output.pages>")?;
     let body = "This left-facing arrow was created entirely by litchi-iwa.";
-    let mut editor = PagesEditor::create_with_text(body)?;
+    let mut editor = pages::Editor::create_with_text(body)?;
     let arrow = editor.add_body_shape(
         body.encode_utf16().count(),
         "Horizontally Flipped",

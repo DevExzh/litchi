@@ -14,7 +14,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_protos::{tsd, tsk, tsp, tst};
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -423,17 +423,13 @@ fn focused_numbers_comment_reads_match_wire_oracle_by_selector_and_a1() -> TestR
         .table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .ok_or_else(|| io::Error::other("focused root comment is missing"))?;
     assert_metadata(&root, &expected);
 
     let named_root = package
-        .table_cell_comment(
-            fixture::SHEET_NAME,
-            fixture::TABLE_NAME,
-            CellPosition::from_a1("A1")?,
-        )?
+        .table_cell_comment(fixture::SHEET_NAME, fixture::TABLE_NAME, At::from_a1("A1")?)?
         .ok_or_else(|| io::Error::other("named A1 root comment is missing"))?;
     assert_eq!(named_root, root);
     let addressed_root = package
@@ -444,7 +440,7 @@ fn focused_numbers_comment_reads_match_wire_oracle_by_selector_and_a1() -> TestR
     let replies = package.table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     let reply_texts = replies.iter().map(|reply| reply.text()).collect::<Vec<_>>();
     assert_eq!(
@@ -473,7 +469,7 @@ fn focused_numbers_comment_reads_handle_absent_and_shared_roots() -> TestResult 
         absent_package.table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::from_a1("A1")?,
+            At::from_a1("A1")?,
         )?,
         None
     );

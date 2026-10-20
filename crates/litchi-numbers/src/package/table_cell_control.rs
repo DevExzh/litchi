@@ -18,7 +18,7 @@ use litchi_iwa_core::SnappyStream;
 
 use super::table_cell_control_native as native;
 use super::{Package, table_cell_pop_up_menu as popup};
-use crate::{CellPosition, SheetSelector, TableSelector, cell::data_format::control::CellControl};
+use crate::{At, SheetSelector, TableSelector, cell::data_format::control::CellControl};
 
 /// Content-redacted errors shared by every cell-control transaction.
 ///
@@ -294,7 +294,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Option<CellControl>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position)?;
         popup::read_cell_control(self, target)
@@ -305,7 +305,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Edit<'_>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position)?;
         let before = popup::read_cell_control(self, target)?;

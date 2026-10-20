@@ -7,7 +7,7 @@ use crate::charts::axis_style::{
 };
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl PagesEditor {
+impl Editor {
     /// Read whether Pages shows the minimum value label on a native body chart.
     pub fn body_chart_value_axis_minimum_label_visible(
         &self,
@@ -27,7 +27,7 @@ impl PagesEditor {
 }
 
 fn body_chart_value_axis_minimum_label_visible(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<Visibility> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -40,7 +40,7 @@ fn body_chart_value_axis_minimum_label_visible(
 }
 
 fn set_body_chart_value_axis_minimum_label_visible(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     visible: Visibility,
 ) -> Result<()> {
@@ -53,7 +53,7 @@ fn set_body_chart_value_axis_minimum_label_visible(
         "Pages",
         visible,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_value_axis_minimum_label_visible(drawable_object_id)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart value-axis minimum-label update failed validation".to_owned(),

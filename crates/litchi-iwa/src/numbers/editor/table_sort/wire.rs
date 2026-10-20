@@ -94,7 +94,7 @@ pub(super) fn delete_table_sort_column_wire(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::protobuf::tst::TableModelArchive;
     use prost::Message;
 
@@ -102,7 +102,7 @@ mod tests {
     const ROOT_GROUP_AFTER: [u8; 6] = [0xab, 0x06, 0x10, 0x02, 0xac, 0x06];
 
     fn table_model_source() -> Vec<u8> {
-        let editor = NumbersDocumentBuilder::new()
+        let editor = numbers::Builder::new()
             .table_dimensions(2, 3)
             .build()
             .expect("source-built Numbers table");

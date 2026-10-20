@@ -1,5 +1,5 @@
 use litchi_cfb::{OleWriter, SharedOleFile};
-use litchi_core::sheet::{Cell as CellTrait, CellValue, WorkbookTrait};
+use litchi_core::sheet::{Cell as CellTrait, CellValue, WorkbookTrait, Worksheet as _};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputOptions,
@@ -2906,8 +2906,7 @@ fn eager_text(workbook: &Reader<Cursor<Vec<u8>>>) -> String {
     let mut output = String::new();
     for worksheet_index in 0..workbook.worksheet_count() {
         let worksheet = workbook.worksheet_by_index(worksheet_index).unwrap();
-        let mut rows = worksheet.rows();
-        while let Some(row) = rows.next() {
+        for row in worksheet.rows() {
             let row = row.unwrap();
             for (column, cell) in row.iter().enumerate() {
                 if column != 0 {

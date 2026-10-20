@@ -21,7 +21,7 @@ use litchi_pages::{
     table::merge::transaction::LimitKind as BodyTableMergesLimitKind,
 };
 
-use super::super::PagesEditor;
+use super::super::Editor;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::{Error, IWorkPackage, Result};
 
@@ -36,7 +36,7 @@ const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
 const MAX_BODY_TABLES: usize = 4_096;
 
 /// Read merged-cell regions through the cached focused Pages owner.
-pub(super) fn regions_in_editor(editor: &PagesEditor, model_object_id: u64) -> Result<Vec<Region>> {
+pub(super) fn regions_in_editor(editor: &Editor, model_object_id: u64) -> Result<Vec<Region>> {
     if editor.package().exact_source_owner().is_none() {
         let (focused, table_position, _) =
             super::semantic::focused_body_table_source(editor, model_object_id)?;
@@ -71,10 +71,10 @@ pub(super) fn regions_in_editor(editor: &PagesEditor, model_object_id: u64) -> R
 ///
 /// This entry point is used by mutation adapters before constructing a
 /// focused writable package. It keeps the preadmission scan metadata-only and
-/// avoids the semantic `PagesEditor::tables` projection, which would decode
+/// avoids the semantic `Editor::tables` projection, which would decode
 /// complete table models before the focused transaction is admitted.
 pub(super) fn focused_table_position_for_mutation(
-    editor: &PagesEditor,
+    editor: &Editor,
     model_object_id: u64,
 ) -> Result<Option<usize>> {
     let (components, _) = editor

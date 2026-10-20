@@ -94,7 +94,7 @@ impl MovieObjectIds {
 pub(super) struct BodyMovieGraph {
     pub(super) archive_name: String,
     pub(super) attachment_id: u64,
-    pub(super) info: PagesMovieInfo,
+    pub(super) info: MovieInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) data_references: Vec<(u64, u64)>,
@@ -138,7 +138,7 @@ pub(super) fn movie_style_id(package: &IWorkPackage, root: &PagesDocumentRootFac
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no movie style preset".to_owned()))
 }
 
-pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInfo>> {
+pub(super) fn body_movie_infos(editor: &Editor) -> Result<Vec<MovieInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -228,10 +228,7 @@ fn movie_is_discoverable(source: &[u8], drawable_object_id: u64) -> Result<bool>
     Ok(flags.audio_only() != Some(true) && flags.is_live_video() != Some(true))
 }
 
-pub(super) fn body_movie_graph(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<BodyMovieGraph> {
+pub(super) fn body_movie_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyMovieGraph> {
     let info = body_movie_infos(editor)?
         .into_iter()
         .find(|movie| movie.drawable_object_id == drawable_object_id)
@@ -474,7 +471,7 @@ fn movie_info(
     archive_name: &str,
     identifier: u64,
     anchor_character_index: u32,
-) -> Result<PagesMovieInfo> {
+) -> Result<MovieInfo> {
     let movie: tsd::MovieArchive =
         decode_typed_package_object(package, identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
     if movie.audio_only == Some(true) || movie.is_live_video == Some(true) {
@@ -504,7 +501,7 @@ fn movie_info(
             .identifier,
     )?;
     let playback = movie_playback_settings(package, archive_name, identifier, "Pages movie")?;
-    Ok(PagesMovieInfo {
+    Ok(MovieInfo {
         drawable_object_id: identifier,
         anchor_character_index,
         movie_data_identifier,

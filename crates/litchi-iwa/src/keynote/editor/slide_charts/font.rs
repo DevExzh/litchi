@@ -8,7 +8,7 @@ use crate::charts::font::{
 };
 use crate::charts::{ChartFont, ChartFontSize};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the uniform effective font used by one slide chart.
     pub fn slide_chart_font(
         &self,
@@ -40,7 +40,7 @@ impl KeynoteEditor {
             "Keynote",
             &font,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_font(slide_index, drawable_object_id)? != font {
             return Err(Error::InvalidFormat(
                 "Keynote chart font update failed validation".to_owned(),
@@ -66,7 +66,7 @@ impl KeynoteEditor {
         )? {
             return Ok(false);
         }
-        *self = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        *self = Editor::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 
@@ -101,7 +101,7 @@ impl KeynoteEditor {
             "Keynote",
             size,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_font_size(slide_index, drawable_object_id)? != size {
             return Err(Error::InvalidFormat(
                 "Keynote chart font-size update failed validation".to_owned(),
@@ -127,7 +127,7 @@ impl KeynoteEditor {
         )? {
             return Ok(false);
         }
-        *self = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        *self = Editor::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 }
@@ -136,12 +136,12 @@ impl KeynoteEditor {
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_chart_font_crud_and_copy_on_write() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,

@@ -9,7 +9,7 @@ use litchi_numbers::table::cells::Input;
 use litchi_numbers::table::topology::{
     ColumnDeletion, ColumnInsertion, Error, RowDeletion, RowInsertion, Unsupported,
 };
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -73,7 +73,7 @@ fn filled() -> TestResult<Package> {
     ] {
         package = package
             .edit_table_cells(0, 0)?
-            .set(CellPosition::new(row, column), input)
+            .set(At::new(row, column), input)
             .map_err(|error| format!("stage ({row}, {column}): {error:?}"))?
             .commit()
             .map_err(|error| format!("commit ({row}, {column}): {error:?}"))?
@@ -113,7 +113,7 @@ fn rows_insert_and_remove_on_a_created_workbook() -> TestResult {
     // The inserted row takes values like any other.
     let written = inserted
         .edit_table_cells(0, 0)?
-        .set(CellPosition::new(2, 0), Input::Text("new".into()))?
+        .set(At::new(2, 0), Input::Text("new".into()))?
         .commit()?
         .into_package();
     assert_eq!(
@@ -121,7 +121,7 @@ fn rows_insert_and_remove_on_a_created_workbook() -> TestResult {
             .tables()
             .next()
             .unwrap()
-            .get(CellPosition::new(2, 0)),
+            .get(At::new(2, 0)),
         Some(&Value::Text("new".into()))
     );
     // The inverse restores the source byte for byte; the patch applies only

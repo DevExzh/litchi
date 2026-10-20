@@ -8,7 +8,7 @@ use crate::charts::category_labels::{
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the complete category-label menu state for one slide chart.
     pub fn slide_chart_category_label_layout(
         &self,
@@ -30,7 +30,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_category_label_layout(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Layout> {
@@ -44,7 +44,7 @@ fn slide_chart_category_label_layout(
 }
 
 fn set_slide_chart_category_label_layout(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     layout: Layout,
@@ -58,7 +58,7 @@ fn set_slide_chart_category_label_layout(
         "Keynote",
         layout,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_category_label_layout(slide_index, drawable_object_id)? != layout {
         return Err(Error::InvalidFormat(
             "Keynote chart category-label layout update failed validation".to_owned(),
@@ -72,13 +72,13 @@ fn set_slide_chart_category_label_layout(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::chart::category_labels::{Frequency, Interval};
 
     #[test]
     fn scratch_presentation_supports_category_label_layout_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
@@ -116,7 +116,7 @@ mod tests {
         editor
             .set_slide_chart_category_label_layout(0, chart.drawable_object_id, customized)
             .unwrap();
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_category_label_layout(0, chart.drawable_object_id)

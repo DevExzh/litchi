@@ -16,6 +16,8 @@ pub(crate) mod mode;
 #[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]
 pub(crate) mod presentation;
 #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
+pub mod sheet;
+#[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
 mod workbook;
 
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]

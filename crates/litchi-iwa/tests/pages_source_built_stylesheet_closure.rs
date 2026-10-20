@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::pages::{self};
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, SnappyStream};
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_protos::{tss, tst};
@@ -331,7 +331,7 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
         "{label} dimensions changed"
     );
 
-    let editor = PagesEditor::from_bytes(source).map_err(|error| {
+    let editor = pages::Editor::from_bytes(source).map_err(|error| {
         io::Error::other(format!("{label} legacy package parse failed: {error:?}"))
     })?;
     let body_text = editor
@@ -351,7 +351,7 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
         "{label} legacy no-op changed bytes"
     );
 
-    let reopened = PagesEditor::from_bytes(source)?;
+    let reopened = pages::Editor::from_bytes(source)?;
     assert_eq!(
         reopened.body_text()?,
         body_text,
@@ -371,12 +371,12 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
 
 #[test]
 fn source_built_pages_table_retains_numbers_stylesheet_closure() -> TestResult {
-    let pages = PagesDocumentBuilder::new()
+    let pages = pages::Builder::new()
         .body_text("Body text")
         .body_table("Imported Numbers table", 5, 4)
         .build()?;
     let source = pages.to_bytes()?;
-    let model_object_id = PagesEditor::from_bytes(&source)?
+    let model_object_id = pages::Editor::from_bytes(&source)?
         .tables()?
         .first()
         .ok_or_else(|| io::Error::other("source-built table is missing after initial build"))?
@@ -384,7 +384,7 @@ fn source_built_pages_table_retains_numbers_stylesheet_closure() -> TestResult {
 
     assert_stylesheet_closure(&source, model_object_id)?;
 
-    let reopened = PagesEditor::from_bytes(&source)?;
+    let reopened = pages::Editor::from_bytes(&source)?;
     let reopened_model_object_id = reopened
         .tables()?
         .first()

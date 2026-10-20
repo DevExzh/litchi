@@ -21,7 +21,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use litchi_numbers::cell::data_format::duration::{Duration, Style, Unit, UnitRange, Units};
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = concat!(
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output = PathBuf::from(required_argument(&mut arguments, "missing output path")?);
     let sheet = parse_selector(required_text(&mut arguments, "missing sheet selector")?)?;
     let table = parse_selector(required_text(&mut arguments, "missing table selector")?)?;
-    let position = CellPosition::from_a1(&required_text(&mut arguments, "missing cell address")?)
+    let position = At::from_a1(&required_text(&mut arguments, "missing cell address")?)
         .map_err(|error| invalid_input(format!("invalid A1 address: {error}")))?;
     // Keep the format arguments separate from the optional publication flag;
     // this makes `--inverse` unambiguous even though `set custom` has two

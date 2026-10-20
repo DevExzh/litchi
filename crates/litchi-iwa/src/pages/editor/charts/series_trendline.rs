@@ -8,7 +8,7 @@ use crate::charts::series_trendline::{
 };
 use crate::charts::{ChartSeriesTrendline, Index};
 
-impl PagesEditor {
+impl Editor {
     /// Read every body chart series' trendline in native series order.
     pub fn body_chart_series_trendlines(
         &self,
@@ -59,7 +59,7 @@ impl PagesEditor {
 }
 
 fn body_chart_series_trendlines(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesTrendline>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -80,7 +80,7 @@ fn body_chart_series_trendlines(
 }
 
 fn set_body_chart_series_trendlines(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     trendlines: &[ChartSeriesTrendline],
 ) -> Result<()> {
@@ -117,7 +117,7 @@ fn set_body_chart_series_trendlines(
         "Pages",
         &expected,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_trendlines(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart series trendline update failed validation".to_owned(),

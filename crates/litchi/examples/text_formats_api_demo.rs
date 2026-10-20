@@ -7,6 +7,7 @@
 
 use std::fs::File;
 
+use litchi::sheet::Worksheet as _;
 use litchi::sheet::text::formats::{read_dif, read_fixed_width, read_sylk};
 use litchi::sheet::text::{TextConfig, TextWorkbook};
 use litchi::sheet::{CellValue, WorkbookTrait};

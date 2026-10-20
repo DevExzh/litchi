@@ -10,7 +10,7 @@ use crate::charts::axis_style::{
 use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 
-impl NumbersEditor {
+impl Editor {
     /// Read whether Numbers shows minor tick marks for one native sheet-chart axis.
     pub fn sheet_chart_axis_minor_tick_marks_visible(
         &self,
@@ -61,7 +61,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_axis_minor_tick_marks_visible(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -77,7 +77,7 @@ fn sheet_chart_axis_minor_tick_marks_visible(
 }
 
 fn set_sheet_chart_axis_minor_tick_marks_visible(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -93,7 +93,7 @@ fn set_sheet_chart_axis_minor_tick_marks_visible(
         axis,
         visible,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_minor_tick_marks_visible(sheet_id, drawable_object_id, axis)?
         != visible
     {
@@ -106,7 +106,7 @@ fn set_sheet_chart_axis_minor_tick_marks_visible(
 }
 
 fn sheet_chart_axis_tick_mark_location(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -122,7 +122,7 @@ fn sheet_chart_axis_tick_mark_location(
 }
 
 fn set_sheet_chart_axis_tick_mark_location(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -138,7 +138,7 @@ fn set_sheet_chart_axis_tick_mark_location(
         axis,
         location,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_tick_mark_location(sheet_id, drawable_object_id, axis)? != location
     {
         return Err(Error::InvalidFormat(

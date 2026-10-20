@@ -3,7 +3,7 @@
 use super::cell::TextCell;
 use super::iterators::{TextCellIterator, TextRowIterator};
 use super::parser::TextParser;
-use crate::sheet::{Cell, CellIterator, CellValue, Result as SheetResult, RowIterator, Worksheet};
+use crate::sheet::{CellValue, Result as SheetResult, Worksheet};
 use std::borrow::Cow;
 use std::io::{Read, Seek};
 
@@ -49,6 +49,10 @@ impl TextWorksheet {
 }
 
 impl Worksheet for TextWorksheet {
+    type Cell<'a> = TextCell;
+    type Cells<'a> = TextCellIterator<'a>;
+    type Rows<'a> = TextRowIterator<'a>;
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -65,28 +69,28 @@ impl Worksheet for TextWorksheet {
         self.dimensions
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn Cell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> SheetResult<TextCell> {
         if row < 1 || column < 1 {
-            return Ok(Box::new(TextCell::new(row, column, CellValue::Empty)));
+            return Ok(TextCell::new(row, column, CellValue::Empty));
         }
 
         let row_idx = (row - 1) as usize;
         let col_idx = (column - 1) as usize;
 
         if row_idx >= self.data.len() {
-            return Ok(Box::new(TextCell::new(row, column, CellValue::Empty)));
+            return Ok(TextCell::new(row, column, CellValue::Empty));
         }
 
         let row_data = &self.data[row_idx];
         if col_idx >= row_data.len() {
-            Ok(Box::new(TextCell::new(row, column, CellValue::Empty)))
+            Ok(TextCell::new(row, column, CellValue::Empty))
         } else {
             let value = row_data[col_idx].clone();
-            Ok(Box::new(TextCell::new(row, column, value)))
+            Ok(TextCell::new(row, column, value))
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn Cell + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<TextCell> {
         // Parse coordinate like "A1", "B2", etc.
         let (col_str, row_str) = coordinate.split_at(
             coordinate
@@ -115,12 +119,12 @@ impl Worksheet for TextWorksheet {
         self.cell(row_num, col_num)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(TextCellIterator::new(&self.data))
+    fn cells(&self) -> TextCellIterator<'_> {
+        TextCellIterator::new(&self.data)
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(TextRowIterator::new(&self.data))
+    fn rows(&self) -> TextRowIterator<'_> {
+        TextRowIterator::new(&self.data)
     }
 
     fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {

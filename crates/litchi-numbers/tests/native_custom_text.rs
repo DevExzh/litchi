@@ -16,7 +16,7 @@ use litchi_numbers::cell::{
     data_format::custom::{Custom, Name, Text as CustomText},
 };
 use litchi_numbers::table::cells::Storage;
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 use prost::Message as _;
 
@@ -50,12 +50,12 @@ fn resaved_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/numbers/custom-text-native-resaved.numbers")
 }
 
-fn position() -> CellPosition {
-    CellPosition::new(1, 1)
+fn position() -> At {
+    At::new(1, 1)
 }
 
-fn marker_position() -> CellPosition {
-    CellPosition::new(1, 2)
+fn marker_position() -> At {
+    At::new(1, 2)
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {

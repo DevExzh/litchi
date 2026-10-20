@@ -1,4 +1,4 @@
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -8,6 +8,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(2)
         .unwrap_or_else(|| "Created from scratch with litchi-iwa".to_owned());
 
-    PagesEditor::create_with_text(body_text)?.save(output)?;
+    pages::Editor::create_with_text(body_text)?.save(output)?;
     Ok(())
 }

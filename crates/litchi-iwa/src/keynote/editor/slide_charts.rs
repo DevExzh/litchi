@@ -85,10 +85,7 @@ use litchi_keynote::{
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
-pub(super) fn focused_chart_catalog(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-) -> Result<ChartCatalog> {
+pub(super) fn focused_chart_catalog(editor: &Editor, slide_index: usize) -> Result<ChartCatalog> {
     let bytes = editor.to_bytes()?;
     let package = litchi_keynote::Package::from_bytes(&bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -106,7 +103,7 @@ pub(super) fn focused_chart_catalog(
 
 /// One native chart drawable owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteSlideChartInfo {
+pub struct SlideChartInfo {
     pub slide_index: usize,
     pub slide_id: u64,
     pub drawable_object_id: u64,
@@ -120,12 +117,12 @@ pub struct KeynoteSlideChartInfo {
 /// Result of removing a standalone Keynote chart and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideChart {
-    pub chart: KeynoteSlideChartInfo,
+    pub chart: SlideChartInfo,
 }
 
-impl KeynoteEditor {
+impl Editor {
     /// List charts owned directly by one slide in z-order.
-    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<KeynoteSlideChartInfo>> {
+    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<SlideChartInfo>> {
         let (mut charts, chart_positions) = self.slide_charts_without_arrangements(slide_index)?;
         arrangement::fill_focused_chart_arrangements(
             self,
@@ -139,7 +136,7 @@ impl KeynoteEditor {
     fn slide_charts_without_arrangements(
         &self,
         slide_index: usize,
-    ) -> Result<(Vec<KeynoteSlideChartInfo>, Vec<usize>)> {
+    ) -> Result<(Vec<SlideChartInfo>, Vec<usize>)> {
         let graph = ObjectGraph::read(self.package())?;
         let context = text_box_create::text_box_context(&graph, slide_index)?;
         let mut charts = Vec::new();
@@ -184,7 +181,7 @@ impl KeynoteEditor {
         data: ChartData,
         position: DrawablePoint,
         size: DrawableSize,
-    ) -> Result<KeynoteSlideChartInfo> {
+    ) -> Result<SlideChartInfo> {
         require_creatable_kind(kind)?;
         let geometry = chart_geometry("Keynote", position, size)?;
         let graph = ObjectGraph::read(self.package())?;
@@ -476,7 +473,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         selector: ChartSelector<'_>,
-    ) -> Result<KeynoteSlideChartInfo> {
+    ) -> Result<SlideChartInfo> {
         let source_drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         let source = chart_graph(self, slide_index, source_drawable_object_id)?;
         let source_style_ids =
@@ -782,7 +779,7 @@ fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> b
 }
 
 fn set_focused_slide_chart_data(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     chart_position: usize,
     data: ChartData,
@@ -813,7 +810,7 @@ fn set_focused_slide_chart_data(
                 "focused Keynote chart data package write failed: {error}"
             ))
         })?;
-    let verified = KeynoteEditor::from_bytes(&target_bytes)?;
+    let verified = Editor::from_bytes(&target_bytes)?;
     *editor = verified;
     Ok(())
 }
@@ -835,10 +832,7 @@ fn map_chart_selector_error(slide_index: usize, error: ChartSelectorError) -> Er
 }
 
 #[cfg(test)]
-pub(crate) fn chart_selector(
-    editor: &KeynoteEditor,
-    chart: &KeynoteSlideChartInfo,
-) -> ChartSelector<'static> {
+pub(crate) fn chart_selector(editor: &Editor, chart: &SlideChartInfo) -> ChartSelector<'static> {
     let index = editor
         .slide_charts(chart.slide_index)
         .expect("chart selector test catalog")

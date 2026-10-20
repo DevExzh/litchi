@@ -103,7 +103,7 @@ ALLOWED_SEMANTIC_MODULES: Mapping[tuple[str, ...], str] = {
         "Dimensions and their errors) behind the Numbers table facade"
     ),
     ("litchi_iwa_common", "table", "coordinate"): (
-        "checked cell coordinates and A1 ranges (CellPosition, CellRange)"
+        "checked cell coordinates and A1 ranges (At, Area)"
     ),
     ("litchi_iwa_common", "table", "cell", "value"): (
         "presence-preserving semantic cell values"

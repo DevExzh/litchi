@@ -6,7 +6,7 @@ use crate::charts::axis::{
     set_chart_category_axis_series_names_visible as set_native_chart_category_axis_series_names_visible,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read whether Pages shows series names on a native body chart category axis.
     pub fn body_chart_category_axis_series_names_visible(
         &self,
@@ -26,7 +26,7 @@ impl PagesEditor {
 }
 
 fn body_chart_category_axis_series_names_visible(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<bool> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -39,7 +39,7 @@ fn body_chart_category_axis_series_names_visible(
 }
 
 fn set_body_chart_category_axis_series_names_visible(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     visible: bool,
 ) -> Result<()> {
@@ -52,7 +52,7 @@ fn set_body_chart_category_axis_series_names_visible(
         "Pages",
         visible,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_category_axis_series_names_visible(drawable_object_id)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart category-axis series-names update failed validation".to_owned(),

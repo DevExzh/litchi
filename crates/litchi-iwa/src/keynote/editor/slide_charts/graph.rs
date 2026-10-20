@@ -9,14 +9,14 @@ pub(super) struct SlideChartGraph {
     pub(super) component_id: u64,
     pub(super) chart_count: usize,
     pub(super) chart_position: usize,
-    pub(super) info: KeynoteSlideChartInfo,
+    pub(super) info: SlideChartInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) private_preset_id: Option<u64>,
 }
 
 pub(super) fn chart_graph(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideChartGraph> {
@@ -336,7 +336,7 @@ pub(super) fn chart_graph(
         component_id,
         chart_count,
         chart_position,
-        info: KeynoteSlideChartInfo {
+        info: SlideChartInfo {
             slide_index,
             slide_id: context.slide_id,
             drawable_object_id,
@@ -382,13 +382,13 @@ mod tests {
 
     use super::*;
     use crate::archive::RawMessage;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
     use crate::protobuf::tsp::{ObjectUuidMapEntry, PackageMetadata};
     use crate::shapes::{DrawablePoint, DrawableSize};
 
-    fn chart_editor() -> (KeynoteEditor, u64) {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    fn chart_editor() -> (Editor, u64) {
+        let mut editor = keynote::Builder::new().build().unwrap();
         let data = ChartData::new(
             vec!["Series".to_owned()],
             vec!["Category".to_owned()],
@@ -442,7 +442,7 @@ mod tests {
         })
     }
 
-    fn graph_objects(editor: &KeynoteEditor, drawable_object_id: u64) -> (u64, Vec<u64>) {
+    fn graph_objects(editor: &Editor, drawable_object_id: u64) -> (u64, Vec<u64>) {
         let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
         (graph.component_id, graph.object_ids)
     }
@@ -463,7 +463,7 @@ mod tests {
         })
         .unwrap();
 
-        let malformed = KeynoteEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let malformed = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert!(chart_graph(&malformed, 0, drawable_object_id).is_err());
     }
 
@@ -494,7 +494,7 @@ mod tests {
         })
         .unwrap();
 
-        let malformed = KeynoteEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let malformed = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert!(chart_graph(&malformed, 0, drawable_object_id).is_err());
     }
 }

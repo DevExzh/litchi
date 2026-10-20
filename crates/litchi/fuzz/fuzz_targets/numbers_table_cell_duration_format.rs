@@ -20,7 +20,7 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, Error as PackageError,
+    At, Package, Error as PackageError,
     SheetSelector, TableSelector,
     cell::data_format::{
         Duration,
@@ -55,10 +55,10 @@ const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/number
 
 const FIRST_FORMAT_KEY: u32 = 1;
 const SECOND_FORMAT_KEY: u32 = 2;
-const FIXTURE_POSITION: CellPosition = CellPosition::new(0, 0);
-const FIXTURE_SIBLING_POSITION: CellPosition = CellPosition::new(0, 1);
+const FIXTURE_POSITION: At = At::new(0, 0);
+const FIXTURE_SIBLING_POSITION: At = At::new(0, 1);
 // B3 is a stable explicit Number cell in the checked-in native Numbers seed.
-const NATIVE_POSITION: CellPosition = CellPosition::new(2, 1);
+const NATIVE_POSITION: At = At::new(2, 1);
 
 const ALL_STYLES: [Style; 3] = [Style::Colon, Style::Abbreviated, Style::FullNames];
 const ALL_UNITS: [Unit; 6] = [
@@ -198,7 +198,7 @@ fn exercise_arbitrary_package(package: &Package, data: &[u8]) {
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_package(package: &Package, data: &[u8], position: CellPosition, fixture_source: bool) {
+fn exercise_package(package: &Package, data: &[u8], position: At, fixture_source: bool) {
     exercise_selector_reads(package, data, position);
     exercise_selector_errors(package, position);
 
@@ -224,7 +224,7 @@ fn exercise_package(package: &Package, data: &[u8], position: CellPosition, fixt
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPosition) {
+fn exercise_selector_reads(package: &Package, data: &[u8], position: At) {
     let random_position = random_position(data);
     observe_result(package.table_cell_duration_format(
         SheetSelector::index(usize::from(control(data, 0))),
@@ -246,7 +246,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition) {
+fn exercise_selector_errors(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
     let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) = package.table_cell_duration_format(
@@ -273,7 +273,7 @@ fn exercise_selector_errors(package: &Package, position: CellPosition) {
     if let Err(error) = package.table_cell_duration_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ) {
         observe_error(error);
     }
@@ -285,7 +285,7 @@ fn exercise_transaction(
     source_bytes: &[u8],
     before: Option<Duration>,
     requested: Duration,
-    position: CellPosition,
+    position: At,
     data: &[u8],
     fixture_source: bool,
 ) {
@@ -417,7 +417,7 @@ fn exercise_transaction(
     black_box((patch.before(), patch.after(), patch.path()));
 }
 
-fn exercise_wrong_family(package: &Package, position: CellPosition) {
+fn exercise_wrong_family(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
     let read = package.table_cell_duration_format(0usize, 0usize, position);
     assert!(
@@ -1102,8 +1102,8 @@ fn duration_from_bytes(data: &[u8]) -> Duration {
     Duration::new(style, units)
 }
 
-fn random_position(data: &[u8]) -> CellPosition {
-    CellPosition::new(
+fn random_position(data: &[u8]) -> At {
+    At::new(
         u32::from(control(data, 5) % 8),
         u32::from(control(data, 6) % 8),
     )

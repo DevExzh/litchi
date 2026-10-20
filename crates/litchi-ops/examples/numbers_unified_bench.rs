@@ -69,7 +69,7 @@ mod enabled {
 
     use litchi_numbers::cell::text_style::CharacterProperties;
     use litchi_numbers::formula::Expression;
-    use litchi_numbers::table::CellPosition;
+    use litchi_numbers::table::At;
     use litchi_numbers::table::cells::{Change, Input};
     use litchi_numbers::table::merge::Region;
     use litchi_numbers::table::topology::{
@@ -199,12 +199,12 @@ mod enabled {
     }
 
     /// The `BATCH` cells the batch scenario writes: rows 2.. of columns B..K.
-    fn batch_cells() -> Vec<(CellPosition, String, f64)> {
+    fn batch_cells() -> Vec<(At, String, f64)> {
         (0..BATCH)
             .map(|index| {
                 let row = (index / 10 + 1) as u32;
                 let column = (index % 10 + 1) as u32;
-                let position = CellPosition::new(row, column);
+                let position = At::new(row, column);
                 let a1 = format!("{}{}", char::from(b'A' + column as u8), row + 1);
                 (position, a1, index as f64)
             })
@@ -212,7 +212,7 @@ mod enabled {
     }
 
     #[inline(never)]
-    fn leaf_batch(package: &Package, cells: &[(CellPosition, String, f64)]) -> Package {
+    fn leaf_batch(package: &Package, cells: &[(At, String, f64)]) -> Package {
         let (sheet, table) = table();
         let changes = cells.iter().map(|(position, _, value)| {
             Change::set(*position, Input::number(*value).expect("finite"))
@@ -310,7 +310,7 @@ mod enabled {
                 .edit_table_cells(sheet, table)
                 .expect("edit")
                 .extend([Change::set(
-                    CellPosition::new(2, 1),
+                    At::new(2, 1),
                     Input::number(42.0).expect("finite"),
                 )])
                 .expect("stage")
@@ -404,7 +404,7 @@ mod enabled {
             package
                 .edit_table_cells(sheet, table)
                 .expect("edit")
-                .extend([Change::set_formula(CellPosition::new(2, 3), expression)])
+                .extend([Change::set_formula(At::new(2, 3), expression)])
                 .expect("stage")
                 .commit()
                 .expect("commit")
@@ -856,7 +856,7 @@ mod enabled {
             package
                 .edit_table_cell_text_style(sheet, table)
                 .expect("edit")
-                .set(CellPosition::new(2, 0), bold)
+                .set(At::new(2, 0), bold)
                 .expect("stage")
                 .commit()
                 .expect("commit")
@@ -992,7 +992,7 @@ mod enabled {
         ));
         let empty = {
             let table = comment_leaf.sheets()[0].tables().next().expect("table");
-            CellPosition::new(table.row_count() - 1, table.column_count() - 1)
+            At::new(table.row_count() - 1, table.column_count() - 1)
         };
         let empty_path = format!(
             "/sheet[1]/table[1]/{}{}",

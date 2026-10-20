@@ -6,7 +6,7 @@ use crate::charts::depth_3d::{
     chart_3d_depth as read_native_chart_3d_depth, set_chart_3d_depth as set_native_chart_3d_depth,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read one body chart's depth in Chart-inspector percent.
     pub fn body_chart_3d_depth(&self, drawable_object_id: u64) -> Result<Chart3dDepth> {
         let graph = body_chart_graph(self, drawable_object_id)?;
@@ -47,7 +47,7 @@ impl PagesEditor {
             graph.info.kind,
             depth,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_3d_depth(drawable_object_id)? != depth {
             return Err(Error::InvalidFormat(
                 "Pages chart 3D depth update failed validation".to_owned(),
@@ -70,12 +70,12 @@ fn require_3d_depth(kind: Kind, drawable_object_id: u64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_3d_chart_depth_crud() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,
@@ -98,7 +98,7 @@ mod tests {
         editor
             .set_body_chart_3d_depth(chart.drawable_object_id, depth)
             .unwrap();
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_3d_depth(chart.drawable_object_id)
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn two_dimensional_charts_reject_3d_depth_access() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,

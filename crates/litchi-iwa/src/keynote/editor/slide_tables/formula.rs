@@ -3,7 +3,7 @@
 use super::*;
 use litchi_keynote::slide::table::formula::{FormulaCachedValue, FormulaExpression};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read a cell's canonical formula source, including the leading equals sign.
     pub fn slide_table_formula(
         &self,
@@ -14,7 +14,7 @@ impl KeynoteEditor {
     ) -> Result<Option<String>> {
         let table = self.slide_table(slide_index, model_object_id)?;
         Ok(match table.get_cell(row, column) {
-            Some(KeynoteTableCellValue::Formula(formula)) => Some(formula.clone()),
+            Some(TableCellValue::Formula(formula)) => Some(formula.clone()),
             _ => None,
         })
     }

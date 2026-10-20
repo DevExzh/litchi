@@ -2,13 +2,13 @@
 
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_pages_movies <input.pages>")?;
-    let editor = PagesEditor::open(input)?;
+    let editor = pages::Editor::open(input)?;
     for (movie_index, movie) in editor.body_movies()?.iter().enumerate() {
         println!(
             "movie_index={movie_index} anchor={} drawable={} movie_data={} poster_data={} duration={:?} geometry={:?} original_size={:?} natural_size={:?}",

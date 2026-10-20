@@ -18,7 +18,7 @@ use litchi_numbers::cell::data_format::{
     percentage::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
     percentage::{DecimalPlaces, NegativeStyle, Percentage, ThousandsSeparator},
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 use prost::Message as _;
 
@@ -60,12 +60,12 @@ fn fixed_percentage(
     )
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn shared_source() -> TestResult<Vec<u8>> {
@@ -322,11 +322,7 @@ fn percentage_selectors_and_option_semantics_are_explicit() -> TestResult {
 fn percentage_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestResult {
     let package = Package::from_bytes(&shared_source()?)?;
     let before = package.exact_bytes();
-    let out_of_bounds = [
-        CellPosition::new(1, 0),
-        CellPosition::new(0, 2),
-        CellPosition::new(u32::MAX, u32::MAX),
-    ];
+    let out_of_bounds = [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)];
 
     for position in out_of_bounds {
         assert!(matches!(
@@ -1148,7 +1144,7 @@ fn percentage_checked_native_fixture_selects_by_name_and_refuses_number_family()
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
     let package = Package::open(path)?;
-    let position = CellPosition::new(2, 1);
+    let position = At::new(2, 1);
     let by_index = package.table_cell_percentage_format(0usize, 0usize, position);
     let by_name = package.table_cell_percentage_format(
         SheetSelector::name("Sheet 1"),

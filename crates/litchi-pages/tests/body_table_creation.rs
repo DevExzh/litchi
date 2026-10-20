@@ -65,9 +65,7 @@ fn tables_are_inserted_read_back_reopened_and_inverted() -> TestResult {
     let reopened = Package::from_bytes(&bytes(edited)?)?;
     let read = reopened.body_table_cells(BodyTableSelector::index(table))?;
     assert_eq!(
-        read.get(litchi_iwa_common::table::coordinate::CellPosition::new(
-            0, 0
-        )),
+        read.get(litchi_iwa_common::table::coordinate::At::new(0, 0)),
         Some(&ReadValue::Text("Item".into()))
     );
     // The template still reads as before.
@@ -122,9 +120,7 @@ fn every_corpus_document_inserts_a_table_or_refuses_typed() -> TestResult {
             assert_eq!(reopened.body_tables()?.len(), tables + 1);
             let read = reopened.body_table_cells(BodyTableSelector::index(commit.table().get()))?;
             assert_eq!(
-                read.get(litchi_iwa_common::table::coordinate::CellPosition::new(
-                    1, 0
-                )),
+                read.get(litchi_iwa_common::table::coordinate::At::new(1, 0)),
                 Some(&ReadValue::Text("x".into())),
                 "{}",
                 path.display()

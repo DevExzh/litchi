@@ -22,7 +22,7 @@ use litchi_numbers::cell::data_format::{
     scientific::transaction as scientific_transaction,
     text::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
@@ -47,12 +47,12 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn shared_source() -> TestResult<Vec<u8>> {
@@ -827,7 +827,7 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
         .join("../../test-data/iwork/numbers/basic.numbers");
     let package = Package::open(path)?;
     let source = package.exact_bytes();
-    let b2 = CellPosition::from_a1("B2")?;
+    let b2 = At::from_a1("B2")?;
     let b2_before = native_fixture_cell(&source, 1, 1)?;
     let b2_before = BncCell::parse(&b2_before)?;
     assert_eq!(b2_before.explicit_format_flags(), 0);
@@ -882,7 +882,7 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
         Some(Text)
     );
 
-    let b3 = CellPosition::from_a1("B3")?;
+    let b3 = At::from_a1("B3")?;
     assert!(matches!(
         package.table_cell_text_format(0usize, 0usize, b3),
         Err(Error::WrongFormatFamily { .. })
@@ -977,11 +977,7 @@ fn text_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
 fn text_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestResult {
     let package = Package::from_bytes(&shared_source()?)?;
     let before = package.exact_bytes();
-    for position in [
-        CellPosition::new(1, 0),
-        CellPosition::new(0, 2),
-        CellPosition::new(u32::MAX, u32::MAX),
-    ] {
+    for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_text_format(0usize, 0usize, position),
             Err(Error::CellNotFound)

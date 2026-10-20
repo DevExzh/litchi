@@ -691,7 +691,7 @@ boundary verification passes 927 tests.
 
 ## Numbers Custom-format raw-ID retirement (2026-09-06)
 
-The three production `NumbersEditor` Custom conveniences
+The three production `litchi_iwa::numbers::Editor` Custom conveniences
 (`table_cell_custom_format`, `set_table_cell_custom_format`, and
 `reset_table_cell_custom_format`) were removed. Existing-cell Custom reads
 and edits now use the focused selector-first `litchi_numbers::Package` APIs;
@@ -1227,7 +1227,7 @@ completeness remain under review before further media host API retirement.
 
 ## Keynote raw media lifecycle API retirement scope (2026-09-07)
 
-The current production slice removes the raw `KeynoteEditor`
+The current production slice removes the raw `litchi_iwa::keynote::Editor`
 `duplicate_slide_movie`/`duplicate_slide_audio` and corresponding remove APIs,
 their private helpers, the `RemovedKeynoteSlideMovie`/
 `RemovedKeynoteSlideAudio` exports, four obsolete examples, and orphaned build

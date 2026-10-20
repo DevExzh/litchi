@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 use litchi_numbers::table::topology::RowInsertion;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra argument".into());
     }
 
-    let mut editor = KeynoteEditor::open(input)?;
+    let mut editor = keynote::Editor::open(input)?;
     editor.insert_slide_table_row(slide_index, table_id, RowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())

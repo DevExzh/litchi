@@ -44,7 +44,7 @@ use crate::{
     formula::{CachedValue, Expression, Table},
 };
 
-use super::{CellPosition, CoordinateError, Dimensions};
+use super::{At, CoordinateError, Dimensions};
 
 pub use crate::package::table_cells::{DependencyKind, Error, LimitKind, Path};
 
@@ -205,14 +205,14 @@ impl fmt::Debug for Input {
 /// One explicit cell replacement or clear.
 #[derive(Clone, PartialEq)]
 pub struct Change {
-    position: CellPosition,
+    position: At,
     input: Option<Input>,
 }
 
 impl Change {
     /// Stage a scalar replacement at a checked zero-based position.
     #[must_use]
-    pub const fn set(position: CellPosition, input: Input) -> Self {
+    pub const fn set(position: At, input: Input) -> Self {
         Self {
             position,
             input: Some(input),
@@ -221,26 +221,26 @@ impl Change {
 
     /// Parse an A1 coordinate and stage a scalar replacement.
     pub fn set_a1(address: &str, input: Input) -> Result<Self, Error> {
-        let position = CellPosition::from_a1(address).map_err(map_coordinate_error)?;
+        let position = At::from_a1(address).map_err(map_coordinate_error)?;
         Ok(Self::set(position, input))
     }
 
     /// Stage a bounded formula at a checked zero-based position.
     #[must_use]
-    pub const fn set_formula(position: CellPosition, expression: Expression) -> Self {
+    pub const fn set_formula(position: At, expression: Expression) -> Self {
         Self::set(position, Input::formula(expression))
     }
 
     /// Parse an A1 coordinate and stage a bounded formula.
     pub fn set_formula_a1(address: &str, expression: Expression) -> Result<Self, Error> {
-        let position = CellPosition::from_a1(address).map_err(map_coordinate_error)?;
+        let position = At::from_a1(address).map_err(map_coordinate_error)?;
         Ok(Self::set_formula(position, expression))
     }
 
     /// Stage a bounded formula and typed display cache.
     #[must_use]
     pub const fn set_formula_cached(
-        position: CellPosition,
+        position: At,
         expression: Expression,
         cached: CachedValue,
     ) -> Self {
@@ -253,13 +253,13 @@ impl Change {
         expression: Expression,
         cached: CachedValue,
     ) -> Result<Self, Error> {
-        let position = CellPosition::from_a1(address).map_err(map_coordinate_error)?;
+        let position = At::from_a1(address).map_err(map_coordinate_error)?;
         Ok(Self::set_formula_cached(position, expression, cached))
     }
 
     /// Stage an explicit clear at a checked zero-based position.
     #[must_use]
-    pub const fn clear(position: CellPosition) -> Self {
+    pub const fn clear(position: At) -> Self {
         Self {
             position,
             input: None,
@@ -268,13 +268,13 @@ impl Change {
 
     /// Parse an A1 coordinate and stage an explicit clear.
     pub fn clear_a1(address: &str) -> Result<Self, Error> {
-        let position = CellPosition::from_a1(address).map_err(map_coordinate_error)?;
+        let position = At::from_a1(address).map_err(map_coordinate_error)?;
         Ok(Self::clear(position))
     }
 
     /// Return the semantic target coordinate.
     #[must_use]
-    pub const fn position(&self) -> CellPosition {
+    pub const fn position(&self) -> At {
         self.position
     }
 
@@ -294,7 +294,7 @@ impl Change {
         self.input.as_ref()
     }
 
-    pub(crate) fn into_parts(self) -> (CellPosition, Option<Input>) {
+    pub(crate) fn into_parts(self) -> (At, Option<Input>) {
         (self.position, self.input)
     }
 }
@@ -351,14 +351,14 @@ impl fmt::Debug for Storage {
 /// One presence-preserving semantic cell result.
 #[derive(Clone, PartialEq)]
 pub struct State {
-    position: CellPosition,
+    position: At,
     storage: Storage,
 }
 
 impl State {
     /// Return the requested semantic coordinate.
     #[must_use]
-    pub const fn position(&self) -> CellPosition {
+    pub const fn position(&self) -> At {
         self.position
     }
 
@@ -368,7 +368,7 @@ impl State {
         &self.storage
     }
 
-    pub(crate) const fn new(position: CellPosition, storage: Storage) -> Self {
+    pub(crate) const fn new(position: At, storage: Storage) -> Self {
         Self { position, storage }
     }
 }
@@ -453,7 +453,7 @@ impl<'source> Edit<'source> {
     }
 
     /// Stage one scalar replacement.
-    pub fn set(self, position: CellPosition, input: Input) -> Result<Self, Error> {
+    pub fn set(self, position: At, input: Input) -> Result<Self, Error> {
         self.change(Change::set(position, input))
     }
 
@@ -463,11 +463,7 @@ impl<'source> Edit<'source> {
     }
 
     /// Stage one bounded formula replacement.
-    pub fn set_formula(
-        self,
-        position: CellPosition,
-        expression: Expression,
-    ) -> Result<Self, Error> {
+    pub fn set_formula(self, position: At, expression: Expression) -> Result<Self, Error> {
         self.change(Change::set_formula(position, expression))
     }
 
@@ -479,7 +475,7 @@ impl<'source> Edit<'source> {
     /// Stage one bounded formula replacement with a typed display cache.
     pub fn set_formula_cached(
         self,
-        position: CellPosition,
+        position: At,
         expression: Expression,
         cached: CachedValue,
     ) -> Result<Self, Error> {
@@ -497,7 +493,7 @@ impl<'source> Edit<'source> {
     }
 
     /// Stage one explicit clear.
-    pub fn clear(self, position: CellPosition) -> Result<Self, Error> {
+    pub fn clear(self, position: At) -> Result<Self, Error> {
         self.change(Change::clear(position))
     }
 
@@ -1630,14 +1626,14 @@ mod tests {
         for row in 0..4_096 {
             allocation_events = reserve_change_slot(&mut changes, allocation_events, Path::Package)
                 .expect("bounded staging allocation");
-            changes.push(Change::clear(CellPosition::new(row, 0)));
+            changes.push(Change::clear(At::new(row, 0)));
         }
         assert_eq!(changes.capacity(), 4_096);
         let prior_events = allocation_events;
 
         allocation_events = reserve_change_slot(&mut changes, allocation_events, Path::Package)
             .expect("bounded geometric staging allocation");
-        changes.push(Change::clear(CellPosition::new(4_096, 0)));
+        changes.push(Change::clear(At::new(4_096, 0)));
 
         let usage = StagingUsage {
             change_capacity: changes.capacity(),
@@ -1653,7 +1649,7 @@ mod tests {
         assert_send_sync::<Storage>();
         assert_send_sync::<State>();
 
-        let position = CellPosition::new(2, 1);
+        let position = At::new(2, 1);
         let missing = State::new(position, Storage::Missing);
         assert_eq!(missing.position(), position);
         assert!(missing.storage().is_missing());

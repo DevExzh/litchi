@@ -1,5 +1,5 @@
 use crate::archive::RawMessage;
-use crate::pages::PagesEditor;
+use crate::pages;
 use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::wire::{
@@ -17,7 +17,7 @@ use litchi_iwa_text::hyperlink::raw::object_id as native_object_id;
 use prost::Message;
 
 fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages
         .add_text_box(
             4,

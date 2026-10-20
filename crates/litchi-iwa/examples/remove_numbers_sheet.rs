@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 use litchi_numbers::SheetSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let sheet_index: usize = arguments.next().ok_or("missing sheet index")?.parse()?;
 
-    let mut editor = NumbersEditor::open(input)?;
+    let mut editor = numbers::Editor::open(input)?;
     editor.remove_sheet(SheetSelector::index(sheet_index))?;
     editor.save(output)?;
     Ok(())

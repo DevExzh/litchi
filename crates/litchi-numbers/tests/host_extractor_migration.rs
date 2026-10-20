@@ -11,7 +11,7 @@ use std::{error::Error, fs, path::PathBuf};
 use litchi_numbers::{
     Error as PackageError, Package,
     cell::Value,
-    table::{CellPosition, Dimensions},
+    table::{At, Dimensions},
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -35,7 +35,7 @@ fn table_dimensions(package: &Package) -> Result<Dimensions, Box<dyn Error>> {
 }
 
 fn assert_cell(package: &Package, address: &str, expected: &Value) -> Result<(), Box<dyn Error>> {
-    let position = CellPosition::from_a1(address)?;
+    let position = At::from_a1(address)?;
     let state = package.table_cell("Sheet 1", "shared-model", position)?;
     assert_eq!(
         state.storage(),
@@ -74,14 +74,14 @@ fn cell_value_native_fixture_reads_semantic_values_comments_and_exact_source()
     assert_cell(&package, "B6", &Value::Formula("=(B2+1)".to_owned()))?;
     assert_cell(&package, "B7", &Value::Formula("=(1/0)".to_owned()))?;
 
-    let missing = package.table_cell("Sheet 1", "shared-model", CellPosition::from_a1("B8")?)?;
+    let missing = package.table_cell("Sheet 1", "shared-model", At::from_a1("B8")?)?;
     assert!(matches!(
         missing.storage(),
         litchi_numbers::table::cells::Storage::Missing
     ));
 
     let comment = package
-        .table_cell_comment("Sheet 1", "shared-model", CellPosition::from_a1("B6")?)?
+        .table_cell_comment("Sheet 1", "shared-model", At::from_a1("B6")?)?
         .ok_or_else(|| std::io::Error::other("native B6 comment is missing"))?;
     assert_eq!(comment.text(), "Shared cell value control — 北京");
 
@@ -104,10 +104,10 @@ fn table_data_list_native_fixture_reads_shared_values_comments_and_exact_source(
     assert_cell(&package, "C10", &Value::Formula("=(1/0)".to_owned()))?;
 
     let b6 = package
-        .table_cell_comment("Sheet 1", "shared-model", CellPosition::from_a1("B6")?)?
+        .table_cell_comment("Sheet 1", "shared-model", At::from_a1("B6")?)?
         .ok_or_else(|| std::io::Error::other("native B6 comment is missing"))?;
     let b10 = package
-        .table_cell_comment("Sheet 1", "shared-model", CellPosition::from_a1("B10")?)?
+        .table_cell_comment("Sheet 1", "shared-model", At::from_a1("B10")?)?
         .ok_or_else(|| std::io::Error::other("native B10 comment is missing"))?;
     assert_eq!(b6.text(), "Shared cell value control — 北京");
     assert_eq!(b10.text(), "Sidecar value control — Café 北京");

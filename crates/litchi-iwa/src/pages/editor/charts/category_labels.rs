@@ -8,7 +8,7 @@ use crate::charts::category_labels::{
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read the complete category-label menu state for one body chart.
     pub fn body_chart_category_label_layout(&self, drawable_object_id: u64) -> Result<Layout> {
         body_chart_category_label_layout(self, drawable_object_id)
@@ -24,10 +24,7 @@ impl PagesEditor {
     }
 }
 
-fn body_chart_category_label_layout(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<Layout> {
+fn body_chart_category_label_layout(editor: &Editor, drawable_object_id: u64) -> Result<Layout> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_category_label_layout(
         editor.package(),
@@ -38,7 +35,7 @@ fn body_chart_category_label_layout(
 }
 
 fn set_body_chart_category_label_layout(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     layout: Layout,
 ) -> Result<()> {
@@ -51,7 +48,7 @@ fn set_body_chart_category_label_layout(
         "Pages",
         layout,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_category_label_layout(drawable_object_id)? != layout {
         return Err(Error::InvalidFormat(
             "Pages chart category-label layout update failed validation".to_owned(),
@@ -65,14 +62,14 @@ fn set_body_chart_category_label_layout(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::chart::category_labels::{Frequency, Interval};
 
     #[test]
     fn scratch_document_supports_category_label_layout_crud() {
         let body = "Category label layout";
-        let mut editor = PagesDocumentBuilder::new().body_text(body).build().unwrap();
+        let mut editor = pages::Builder::new().body_text(body).build().unwrap();
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
@@ -110,7 +107,7 @@ mod tests {
         editor
             .set_body_chart_category_label_layout(chart.drawable_object_id, customized)
             .unwrap();
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_category_label_layout(chart.drawable_object_id)

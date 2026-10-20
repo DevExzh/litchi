@@ -1,7 +1,7 @@
 //! Create overlapping Numbers shapes and move one to the front without a template.
 
 use litchi_iwa::DrawableLayerMove;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill};
 use litchi_iwa_common::shape::path::Preset;
 
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_numbers_stacked_shapes <output.numbers>")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Layered Shapes")
         .table_name("Data")
         .build()?;

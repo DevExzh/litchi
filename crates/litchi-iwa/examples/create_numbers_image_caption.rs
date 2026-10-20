@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
@@ -35,13 +35,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or("image path has no UTF-8 filename")?;
-    let mut editor = NumbersDocumentBuilder::new().sheet_name("Media").build()?;
+    let mut editor = numbers::Builder::new().sheet_name("Media").build()?;
     let sheet_id = editor.sheets()?[0].id();
     let created = editor.add_sheet_image(
         sheet_id,
         filename,
         &image,
-        NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+        numbers::SheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
     editor.set_sheet_image_title(sheet_id, created.drawable_object_id, &title)?;
     editor.set_sheet_image_caption(sheet_id, created.drawable_object_id, &caption)?;

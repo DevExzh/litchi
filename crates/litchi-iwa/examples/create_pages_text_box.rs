@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = PagesEditor::create_with_text("Multi-column text box")?;
+    let mut editor = pages::Editor::create_with_text("Multi-column text box")?;
     let anchor = editor.body_text()?.encode_utf16().count();
     let created = editor.add_text_box(
         anchor,

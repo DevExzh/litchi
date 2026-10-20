@@ -3,12 +3,12 @@
 use std::env;
 
 use litchi_iwa::charts::{ChartData, ChartPieStartAngle, ChartPieWedgeExplosion, Kind};
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = single_output_argument("usage: create_keynote_pie_chart <output.key>")?;
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Regional Revenue")
         .subtitle("Native pie chart built from typed IWA objects")
         .build()?;

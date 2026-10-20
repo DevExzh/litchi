@@ -8,7 +8,7 @@ use crate::charts::background_fill::{
 };
 use crate::shapes::{RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the effective color, gradient, or image background of one slide chart.
     pub fn slide_chart_background_fill(
         &self,
@@ -51,7 +51,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_background_fill(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<ShapeFill> {
@@ -65,7 +65,7 @@ fn slide_chart_background_fill(
 }
 
 fn set_slide_chart_background_fill(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     fill: &ShapeFill,
@@ -82,7 +82,7 @@ fn set_slide_chart_background_fill(
         "Keynote",
         fill,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if &verified.slide_chart_background_fill(slide_index, drawable_object_id)? != fill {
         return Err(Error::InvalidFormat(
             "Keynote chart background fill update failed validation".to_owned(),
@@ -93,7 +93,7 @@ fn set_slide_chart_background_fill(
 }
 
 fn set_slide_chart_background_image_fill(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     preferred_filename: &str,
@@ -119,7 +119,7 @@ fn set_slide_chart_background_image_fill(
         fill_size,
         tint,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_background_fill(slide_index, drawable_object_id)?
         != ShapeFill::Image(image.clone())
     {

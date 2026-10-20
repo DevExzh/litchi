@@ -4,7 +4,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::image::Options as ImageOptions;
 
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("image path must end in a UTF-8 file name")?;
     let image = fs::read(&image_path)?;
 
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Created from scratch")
         .subtitle("Native-style image duplication from typed IWA objects")
         .build()?;

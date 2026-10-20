@@ -8,7 +8,7 @@ use crate::charts::gaps::{
     set_chart_gap_spacing as set_native_chart_gap_spacing,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read the spacing between items and sets for one native sheet chart.
     pub fn sheet_chart_gap_spacing(
         &self,
@@ -30,7 +30,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_gap_spacing(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Spacing> {
@@ -44,7 +44,7 @@ fn sheet_chart_gap_spacing(
 }
 
 fn set_sheet_chart_gap_spacing(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     spacing: Spacing,
@@ -61,7 +61,7 @@ fn set_sheet_chart_gap_spacing(
         "Numbers",
         spacing,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_gap_spacing(sheet_id, drawable_object_id)? != spacing {
         return Err(Error::InvalidFormat(
             "Numbers chart gap update failed validation".to_owned(),

@@ -19,7 +19,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsp, tst};
 use litchi_numbers::cell::comment::CommentReplyIndex;
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -38,7 +38,7 @@ fn read_all(package: &Package, row: usize) -> TestResult<Vec<String>> {
     let replies = package.table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::try_from(row)?, 0),
+        At::new(u32::try_from(row)?, 0),
     )?;
     Ok(replies
         .iter()
@@ -51,7 +51,7 @@ fn read_one(package: &Package, row: usize, index: u32) -> TestResult<String> {
         .table_cell_comment_reply(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(u32::try_from(row)?, 0),
+            At::new(u32::try_from(row)?, 0),
             CommentReplyIndex::new(index),
         )?
         .text()
@@ -66,7 +66,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
         package.table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         None,
     );
@@ -74,7 +74,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new strict root",
     )?;
     assert_eq!(
@@ -83,7 +83,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -99,7 +99,7 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -135,7 +135,7 @@ fn root_comment_creation_populates_an_empty_author_storage_atomically() -> TestR
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new root with generated author",
     )?;
     let created = commit
@@ -143,7 +143,7 @@ fn root_comment_creation_populates_an_empty_author_storage_atomically() -> TestR
         .table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .ok_or_else(|| io::Error::other("generated root comment is missing"))?;
     assert_eq!(created.text(), "new root with generated author");
@@ -225,7 +225,7 @@ fn root_comment_creation_builds_a_missing_comment_list_atomically() -> TestResul
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new root with generated list",
     )?;
     assert_eq!(
@@ -234,7 +234,7 @@ fn root_comment_creation_builds_a_missing_comment_list_atomically() -> TestResul
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -319,7 +319,7 @@ fn root_comment_creation_builds_a_missing_author_storage_atomically() -> TestRes
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 0),
+        At::new(1, 0),
         "new root with generated author storage",
     )?;
     assert_eq!(
@@ -328,7 +328,7 @@ fn root_comment_creation_builds_a_missing_author_storage_atomically() -> TestRes
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -422,14 +422,14 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
         package.table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 1),
+            At::new(1, 1),
         )?,
         None,
     );
     let commit = package.set_table_cell_comment(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(1, 1),
+        At::new(1, 1),
         "new root in sparse slot",
     )?;
     assert_eq!(
@@ -438,7 +438,7 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
             .table_cell_comment(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 1),
+                At::new(1, 1),
             )?
             .as_ref()
             .map(|comment| comment.text()),
@@ -448,7 +448,7 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
         commit.package().table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         None,
     );
@@ -471,7 +471,7 @@ fn root_comment_creation_fails_closed_on_unsupported_graphs() -> TestResult {
         let result = package.set_table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
             "must not publish",
         );
         assert!(
@@ -576,7 +576,7 @@ fn assert_read_rejected(source: &[u8], label: &str) -> TestResult {
                     .table_cell_comment_replies(
                         SheetSelector::index(0),
                         TableSelector::index(0),
-                        CellPosition::new(0, 0),
+                        At::new(0, 0),
                     )
                     .is_err(),
                 "hostile reply source was accepted: {label}"
@@ -597,7 +597,7 @@ fn assert_edit_rejected_atomically(source: &[u8], label: &str) -> TestResult {
     let result = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "replacement",
     );
@@ -714,7 +714,7 @@ fn unknown_scalar_and_group_are_retained_or_rejected_without_source_mutation() -
     let result = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "unknown-preserving rewrite",
     );
@@ -771,7 +771,7 @@ fn semantic_and_physical_limits_reject_without_mutating_the_source() -> TestResu
         .edit_table_cell_comment_replies(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .append("x".repeat(16 * 1024))
         .commit();
@@ -802,7 +802,7 @@ fn reply_index_is_checked_and_duplicate_text_uses_source_ordinal() -> TestResult
             .table_cell_comment_reply(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
                 CommentReplyIndex::new(3),
             )
             .is_err()
@@ -833,7 +833,7 @@ fn collection_noop_is_exact_and_debug_redacts_reply_text() -> TestResult {
     let edit = package.edit_table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert!(!format!("{edit:?}").contains(&before));
     let commit = edit
@@ -857,7 +857,7 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
         .edit_table_cell_comment_replies(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .append("second reply")
         .commit()?;
@@ -883,7 +883,7 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
     let set = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "replaced reply",
     )?;
@@ -900,7 +900,7 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
     let directly_added = package.add_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         "directly appended reply",
     )?;
     assert_eq!(
@@ -930,7 +930,7 @@ fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> T
     let original = package.table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert_eq!(original.len(), 1);
     let original_reply = &original[0];
@@ -940,13 +940,13 @@ fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> T
     let appended = package.add_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         "metadata-preserving append",
     )?;
     let appended_replies = appended.package().table_cell_comment_replies(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert_eq!(appended.patch().before(), original.as_ref());
     assert_eq!(appended.patch().after(), appended_replies.as_ref());
@@ -965,14 +965,14 @@ fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> T
     let replaced = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "metadata-preserving replacement",
     )?;
     let replaced_reply = replaced.package().table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
     )?;
     assert_eq!(replaced.patch().before(), original.as_ref());
@@ -1017,7 +1017,7 @@ fn shared_root_edit_is_copy_on_write_and_preserves_sibling() -> TestResult {
     let commit = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "first-only",
     )?;
@@ -1056,7 +1056,7 @@ fn removing_the_last_reply_culls_the_unshared_reply_archive() -> TestResult {
     let commit = package.remove_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
     )?;
     assert!(read_all(commit.package(), 0)?.is_empty());
@@ -1077,14 +1077,14 @@ fn inverse_conflict_and_locality_are_exact_source_operations() -> TestResult {
     let first = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "first branch",
     )?;
     let second = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "second branch",
     )?;
@@ -1115,7 +1115,7 @@ fn missing_comment_root_reports_a_typed_error_without_source_mutation() -> TestR
         .table_cell_comment_reply(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
             CommentReplyIndex::new(0),
         )
         .expect_err("a cell without a root comment must reject an ordinal read");
@@ -1184,7 +1184,7 @@ fn graphs_without_field_info_mirrors_are_edited() -> TestResult {
     let commit = package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
         CommentReplyIndex::new(0),
         "replacement",
     )?;

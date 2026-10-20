@@ -28,7 +28,7 @@ use super::super::{
     table_headers, validate_numbers_application,
 };
 use super::{Comment, CommentReply, Error, Path, Target};
-use crate::{OpenOptions, SheetSelector, TableSelector, table::CellPosition};
+use crate::{OpenOptions, SheetSelector, TableSelector, table::At};
 
 const SHEET_MESSAGE_TYPE: u32 = 2;
 const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
@@ -46,7 +46,7 @@ impl Package {
         bytes: &[u8],
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Option<Comment>> {
         Self::__table_cell_comment_from_bytes_for_compatibility_with_options(
             bytes,
@@ -65,7 +65,7 @@ impl Package {
         options: OpenOptions,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Option<Comment>> {
         let options = Profile::from_options(options).map_err(map_package_error)?;
         let source = compatibility_package(bytes, options)?;
@@ -79,7 +79,7 @@ impl Package {
         bytes: &[u8],
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Box<[CommentReply]>> {
         Self::__table_cell_comment_replies_from_bytes_for_compatibility_with_options(
             bytes,
@@ -101,7 +101,7 @@ impl Package {
         options: OpenOptions,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Box<[CommentReply]>> {
         let options = Profile::from_options(options).map_err(map_package_error)?;
         let source = compatibility_package(bytes, options)?;
@@ -143,7 +143,7 @@ fn resolve_compatibility_comment(
     source: &Package,
     sheet: SheetSelector<'_>,
     table: TableSelector<'_>,
-    position: CellPosition,
+    position: At,
 ) -> Result<super::Located> {
     let sheet_position = resolve_sheet_position(source, sheet)?;
     let table_count = bounded_table_count(source, sheet_position)?;

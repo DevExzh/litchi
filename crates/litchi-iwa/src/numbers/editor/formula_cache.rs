@@ -28,7 +28,7 @@ struct CellKey {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct CellRange {
+struct Area {
     owner_id: u32,
     top: u32,
     left: u32,
@@ -36,7 +36,7 @@ struct CellRange {
     right: u32,
 }
 
-impl CellRange {
+impl Area {
     fn contains(self, cell: CellKey) -> bool {
         self.owner_id == cell.owner_id
             && (self.top..=self.bottom).contains(&cell.row)
@@ -47,7 +47,7 @@ impl CellRange {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum FormulaPrecedent {
     Cell(CellKey),
-    Range(CellRange),
+    Range(Area),
 }
 
 #[derive(Debug, Clone)]
@@ -63,7 +63,7 @@ struct DependencyGraph {
     table_to_owner: HashMap<u64, u32>,
     uuid_to_owner: HashMap<(u64, u64), u32>,
     direct_dependents: HashMap<CellKey, HashSet<CellKey>>,
-    range_dependents: Vec<(CellRange, CellKey)>,
+    range_dependents: Vec<(Area, CellKey)>,
     precedents: HashMap<CellKey, HashSet<FormulaPrecedent>>,
 }
 
@@ -235,7 +235,7 @@ impl DependencyGraph {
                     if let Some(reference) = &dependency.internal_range_reference {
                         graph.insert_range(
                             host,
-                            CellRange {
+                            Area {
                                 owner_id: reference.owner_id,
                                 top: reference.range.top_left_row,
                                 left: reference.range.top_left_column,
@@ -248,7 +248,7 @@ impl DependencyGraph {
                     {
                         graph.insert_range(
                             host,
-                            CellRange {
+                            Area {
                                 owner_id,
                                 top: reference.top_left_row,
                                 left: reference.top_left_column,
@@ -314,7 +314,7 @@ impl DependencyGraph {
                     })?;
                     graph.insert_range(
                         host,
-                        CellRange {
+                        Area {
                             owner_id: tile.to_owner_id,
                             top,
                             left,
@@ -397,7 +397,7 @@ impl DependencyGraph {
             .insert(FormulaPrecedent::Cell(precedent));
     }
 
-    fn insert_range(&mut self, host: CellKey, range: CellRange) -> Result<()> {
+    fn insert_range(&mut self, host: CellKey, range: Area) -> Result<()> {
         if range.top > range.bottom || range.left > range.right {
             return Err(Error::InvalidFormat(
                 "Numbers dependency range is inverted".to_owned(),
@@ -471,7 +471,7 @@ enum EvalScalar {
 enum EvalValue {
     Scalar(EvalScalar),
     Reference(CellKey),
-    Range(CellRange),
+    Range(Area),
 }
 
 pub(super) fn refresh_formula_caches_after_cell_write(
@@ -897,7 +897,7 @@ impl FormulaEvaluator<'_> {
         Ok(cell)
     }
 
-    fn range_between(&self, start: CellKey, end: CellKey) -> Result<CellRange> {
+    fn range_between(&self, start: CellKey, end: CellKey) -> Result<Area> {
         if start.owner_id != end.owner_id {
             return Err(Error::ParseError(
                 "Cannot refresh a formula with cross-owner range endpoints".to_owned(),
@@ -905,7 +905,7 @@ impl FormulaEvaluator<'_> {
         }
         self.validate_cell(start)?;
         self.validate_cell(end)?;
-        Ok(CellRange {
+        Ok(Area {
             owner_id: start.owner_id,
             top: start.row.min(end.row),
             left: start.column.min(end.column),
@@ -917,7 +917,7 @@ impl FormulaEvaluator<'_> {
     fn colon_tract_range(
         &self,
         node: &tsce::ast_node_array_archive::AstNodeArchive,
-    ) -> Result<CellRange> {
+    ) -> Result<Area> {
         let tract = node.ast_colon_tract.as_ref().ok_or_else(|| {
             Error::InvalidFormat("Numbers colon-tract formula has no range".to_owned())
         })?;
@@ -971,7 +971,7 @@ impl FormulaEvaluator<'_> {
                 "column",
             )?
         };
-        let range = CellRange {
+        let range = Area {
             owner_id,
             top: top.min(bottom),
             left: left.min(right),
