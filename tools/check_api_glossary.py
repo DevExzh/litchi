@@ -2,7 +2,11 @@
 """Check registered ADR 0034 vocabulary waves against Rust's public API.
 
 Rules live in api_glossary.json; each migration explicitly registers its bans
-and completed transaction families.
+and completed transaction families. A ban matches a name exactly, or as a
+prefix/suffix when it says so ("match"). Record 0351 adds two shape rules:
+"immutable_owners" lists owner types (a format's Package and projections)
+whose public methods must not take `&mut self`, and "family_methods" makes
+every registered family also expose the commit-triad accessors.
 Each profile builds its own feature-specific rustdoc JSON; --json/--profile
 checks an existing document instead. Names are matched exactly under a public
 path prefix, never by substring. A ban with recursive=false matches direct
@@ -26,6 +30,20 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "tools/api_glossary.json"
 FAMILY_NAMES = frozenset({"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind"})
+BAN_MATCHES = frozenset({"exact", "prefix", "suffix"})
+# Record 0351 family_methods: what each family type must (or must not) expose.
+# Rustdoc does not list a dependency's inherent methods, so a member that is a
+# re-export or alias of another crate's type (litchi_core::edit::Commit, a
+# shared ODF metadata family) is checked where it is defined: by that crate's
+# own profile, or for litchi_core::edit by its unit tests.
+FAMILY_METHODS = {
+    "Commit": frozenset({"package", "into_package", "patch", "diagnostics", "into_parts"}),
+    "Diagnostics": frozenset({"changed"}),
+    "Edit": frozenset({"commit"}),
+    "Patch": frozenset({"is_noop", "inverse"}),
+}
+FAMILY_FORBIDDEN = {"Edit": frozenset({"rollback", "is_changed", "snapshot"}),
+                    "Commit": frozenset({"snapshot", "into_snapshot", "is_changed"})}
 TYPE_KINDS = frozenset({"struct", "enum", "union", "type_alias"})
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z_0-9]*\Z")
 
@@ -45,11 +63,13 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
     seen = set()
     for profile in value["profiles"]:
         fields = {"id", "package", "default_features", "features", "banned_names", "families"}
-        optional = {"delegated_globs"}
+        optional = {"delegated_globs", "immutable_owners", "family_methods"}
         if (not isinstance(profile, dict) or not fields <= set(profile)
                 or set(profile) - (fields | optional)):
             raise ValueError("profile requires exactly " + ", ".join(sorted(fields))
-                             + ", with optional delegated_globs")
+                             + ", with optional " + ", ".join(sorted(optional)))
+        if "family_methods" in profile and type(profile["family_methods"]) is not bool:
+            raise ValueError("family_methods must be boolean")
         delegated = profile.get("delegated_globs", [])
         if not isinstance(delegated, list) or any(
             not isinstance(c, str) or not IDENTIFIER.fullmatch(c) for c in delegated
@@ -83,16 +103,18 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
         for ban in bans:
             required = {"name", "scope", "replacement"}
             if (not isinstance(ban, dict) or not required <= set(ban)
-                    or set(ban) - (required | {"recursive"})):
-                raise ValueError("ban requires name, scope and replacement, with optional recursive")
+                    or set(ban) - (required | {"recursive", "match"})):
+                raise ValueError("ban requires name, scope and replacement, with optional recursive and match")
             if "recursive" in ban and type(ban["recursive"]) is not bool:
                 raise ValueError("ban recursive must be boolean")
+            if "match" in ban and ban["match"] not in BAN_MATCHES:
+                raise ValueError("ban match must be exact, prefix or suffix")
             if not isinstance(ban["name"], str) or not IDENTIFIER.fullmatch(ban["name"]):
                 raise ValueError("banned name must be one Rust identifier")
             if not isinstance(ban["replacement"], str) or not ban["replacement"].strip():
                 raise ValueError("ban requires a nonempty replacement explanation")
             check_path(ban["scope"])
-            key = (ban["scope"], ban["name"])
+            key = (ban["scope"], ban["name"], ban.get("match", "exact"))
             if key in keys:
                 raise ValueError("duplicate banned name and scope")
             keys.add(key)
@@ -103,6 +125,13 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             check_path(family)
         if len(set(families)) != len(families):
             raise ValueError("duplicate family")
+        owners = profile.get("immutable_owners", [])
+        if not isinstance(owners, list):
+            raise ValueError("immutable_owners must be an array")
+        for owner in owners:
+            check_path(owner)
+        if len(set(owners)) != len(owners):
+            raise ValueError("duplicate immutable owner")
     return value["profiles"]
 
 
@@ -121,6 +150,29 @@ def referenced_types(value: Any):
     elif isinstance(value, list):
         for child in value:
             yield from referenced_types(child)
+
+
+def self_receiver(function: Any) -> str | None:
+    """The receiver of a rustdoc function item, or None for an associated fn."""
+    inputs = function.get("sig", {}).get("inputs") if isinstance(function, dict) else None
+    if not isinstance(inputs, list) or not inputs:
+        return None
+    first = inputs[0]
+    if not isinstance(first, list) or len(first) != 2 or first[0] != "self":
+        return None
+    reference = first[1].get("borrowed_ref") if isinstance(first[1], dict) else None
+    if isinstance(reference, dict):
+        return "&mut self" if reference.get("is_mutable") else "&self"
+    return "self"
+
+
+def ban_matches(ban: dict[str, Any], name: str) -> bool:
+    mode = ban.get("match", "exact")
+    if mode == "prefix":
+        return name.startswith(ban["name"]) and name != ban["name"]
+    if mode == "suffix":
+        return name.endswith(ban["name"]) and name != ban["name"]
+    return name == ban["name"]
 
 
 def field_ids(value: Any):
@@ -168,6 +220,10 @@ class Surface:
         self.crate_id = item["crate_id"]
         self.exports: dict[tuple[str, ...], str] = {}
         self.names: set[tuple[tuple[str, ...], str]] = set()
+        # Method receivers ("&mut self", "&self", "self") by caller-visible
+        # path, and dependency paths behind re-exports and type aliases.
+        self.receivers: dict[tuple[str, ...], str] = {}
+        self.foreign: dict[tuple[str, ...], tuple[str, ...]] = {}
         self.references: set[str] = set()
         self.walk(root, (crate,), frozenset(), exported=True)
         # Follow nominal types in signatures even if their defining module is
@@ -203,6 +259,7 @@ class Surface:
             if exported:
                 self.exports[path] = entry["kind"]
             self.names.add((path, path[-1]))
+            self.foreign[path] = tuple(entry["path"])
             return
         inner = item.get("inner", {})
         if len(inner) != 1:
@@ -250,6 +307,10 @@ class Surface:
         if exported:
             self.exports[path] = kind
         self.names.add((path, path[-1]))
+        if kind == "function":
+            receiver = self_receiver(data)
+            if receiver:
+                self.receivers[path] = receiver
         # Also diagnose nominal old types behind re-export aliases.
         if kind in TYPE_KINDS and item.get("name"):
             self.names.add((path, item["name"]))
@@ -261,6 +322,9 @@ class Surface:
             # through its nominal type. Preserve the caller-visible scope.
             target = data.get("type", {}).get("resolved_path", {}).get("id")
             if target is not None:
+                entry = self.paths.get(str(target))
+                if isinstance(entry, dict) and entry["crate_id"] != self.crate_id:
+                    self.foreign[path] = tuple(entry["path"])
                 self.walk(str(target), path, ancestors, exported=exported)
         if isinstance(data, dict):
             for referenced_id, spelling in referenced_types(data):
@@ -313,9 +377,25 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
             failures.add(f"missing API scope {ban['scope']} for banned name {ban['name']}")
             continue
         for path, name in surface.names:
-            if (path[:len(scope)] == scope and name == ban["name"]
+            if (path[:len(scope)] == scope and ban_matches(ban, name)
                     and (ban.get("recursive", True) or len(path) == len(scope) + 1)):
                 failures.add(f"{'::'.join(path)} exposes banned name {name}; {ban['replacement']}")
+    for owner in profile.get("immutable_owners", []):
+        path = tuple(owner.split("::"))
+        if surface.exports.get(path) not in TYPE_KINDS:
+            failures.add(f"missing immutable owner type {owner}")
+            continue
+        for method, receiver in surface.receivers.items():
+            if method[:-1] == path and receiver == "&mut self":
+                failures.add(f"{'::'.join(method)} takes &mut self on an immutable owner; "
+                             "stage it in an Edit that commits a new Package (record 0351)")
+    methods: dict[tuple[str, ...], set[str]] = {}
+    for method in surface.receivers:
+        methods.setdefault(method[:-1], set()).add(method[-1])
+    for path, kind in surface.exports.items():
+        # Associated functions have no receiver but still count as methods.
+        if kind == "function" and len(path) > 1:
+            methods.setdefault(path[:-1], set()).add(path[-1])
     for family in profile["families"]:
         path = tuple(family.split("::"))
         if surface.exports.get(path) != "module":
@@ -324,6 +404,19 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         for name in sorted(FAMILY_NAMES):
             if surface.exports.get(path + (name,)) not in TYPE_KINDS:
                 failures.add(f"{family} requires exported type {name}")
+        if not profile.get("family_methods", False):
+            continue
+        for name, required in sorted(FAMILY_METHODS.items()):
+            member = path + (name,)
+            if surface.exports.get(member) not in TYPE_KINDS:
+                continue
+            if member in surface.foreign:
+                continue
+            present = methods.get(member, set())
+            for method in sorted(required - present):
+                failures.add(f"{family}::{name} requires method {method} (record 0351)")
+            for method in sorted(FAMILY_FORBIDDEN.get(name, frozenset()) & present):
+                failures.add(f"{family}::{name} exposes forbidden method {method} (record 0351)")
     return sorted(failures)
 
 
@@ -376,9 +469,12 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
         bans = sum(len(p["banned_names"]) for p in profiles)
         families = sum(len(p["families"]) for p in profiles)
+        owners = sum(len(p.get("immutable_owners", [])) for p in profiles)
+        strict = sum(1 for p in profiles if p.get("family_methods"))
         print(
             f"API glossary: {len(profiles)} profiles, {bans} banned names, "
-            f"{families} transaction families checked"
+            f"{families} transaction families checked, {owners} immutable owners, "
+            f"family methods in {strict} profiles"
         )
         return 0
     except (ValueError, OSError, subprocess.CalledProcessError) as error:

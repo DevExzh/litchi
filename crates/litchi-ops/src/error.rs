@@ -1064,6 +1064,34 @@ impl Classify for ExecutionError {
     }
 }
 
+/// The one classification of the shared edit refusal (record 0351): every
+/// format's `Error::Refused(Refusal)` reports its kind's code, so the same
+/// refusal is the same code in every format.
+impl Classify for litchi_core::edit::Refusal {
+    fn classify(&self) -> Class {
+        self.kind().classify()
+    }
+}
+
+impl Classify for litchi_core::edit::RefusalKind {
+    fn classify(&self) -> Class {
+        use litchi_core::edit::RefusalKind;
+
+        Class::of(match self {
+            RefusalKind::UnsupportedOperation | RefusalKind::UnsupportedContent => {
+                Code::UnsupportedCapability
+            },
+            RefusalKind::UnsupportedTarget => Code::UnsupportedType,
+            RefusalKind::UnsupportedProperty => Code::UnsupportedProperty,
+            RefusalKind::InvalidValue => Code::InvalidValue,
+            RefusalKind::NotFound => Code::NotFound,
+            RefusalKind::Protected => Code::DocumentProtected,
+            // A kind added later is unsupported until it is classified.
+            _ => Code::UnsupportedCapability,
+        })
+    }
+}
+
 /// The grammar's own code decides: `invalid_path` or `invalid_selector` for
 /// syntax, `max_depth_exceeded` for the step and nesting limits. The grammar's
 /// corrective hint, when it has one, becomes the suggestion.

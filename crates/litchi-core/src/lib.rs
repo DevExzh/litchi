@@ -18,6 +18,7 @@ pub mod budget;
 pub mod canonical_json;
 pub mod detection;
 pub mod durability;
+pub mod edit;
 pub mod error;
 /// Runtime-neutral execution policy, cancellation, and resource charging.
 pub mod execution;
