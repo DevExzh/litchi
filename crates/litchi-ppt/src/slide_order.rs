@@ -356,6 +356,35 @@ impl fmt::Display for Refusal {
     }
 }
 
+impl Refusal {
+    /// The shared refusal class of this reason (record 0351 §2.4 rule 2);
+    /// unified callers classify by this kind alone.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+
+        match self {
+            Self::Signed => RefusalKind::Protected,
+            Self::SlideNotFound { .. } | Self::ElementNotFound { .. } => RefusalKind::NotFound,
+            Self::DuplicateShapeTextTarget { .. } | Self::InvalidElementValue { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::MissingMasterDependency { .. }
+            | Self::MismatchedMasterDependency { .. }
+            | Self::TransferTargetMismatch
+            | Self::UnsupportedSlideAdvance { .. }
+            | Self::UnsupportedSlideVisibility { .. }
+            | Self::UnsupportedSlideTransitionVisual { .. } => RefusalKind::UnsupportedTarget,
+            Self::UncommittedSlideDependency => RefusalKind::UnsupportedOperation,
+            Self::UnsupportedSource
+            | Self::RepairedUserEditChain
+            | Self::ReviewHistoryDependency
+            | Self::UnsupportedSlideDependency { .. }
+            | Self::UnsupportedElement { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 /// Error returned by the opened-presentation slide-order owner.
 #[derive(Debug)]
 pub enum Error {

@@ -173,6 +173,32 @@ impl fmt::Display for Refusal {
     }
 }
 
+impl Refusal {
+    /// The shared refusal class of this reason (record 0351 §2.4 rule 2);
+    /// unified callers classify by this kind alone.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+
+        match self {
+            Self::SlideNotFound { .. } | Self::ShapeNotFound => RefusalKind::NotFound,
+            Self::AmbiguousShape
+            | Self::NoAnchor
+            | Self::AmbiguousAnchor
+            | Self::NoTextbox
+            | Self::AmbiguousTextbox
+            | Self::NoTextAtom
+            | Self::MultipleTextAtoms
+            | Self::NoNotesPage => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedSource
+            | Self::IncompatibleEncoding
+            | Self::DependencyClosure
+            | Self::LengthChange
+            | Self::UnsupportedDependency => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 /// Error returned by the focused text-edit transaction.
 #[derive(Debug)]
 pub enum Error {

@@ -136,6 +136,11 @@ impl From<slide_order::Error> for Error {
     fn from(error: slide_order::Error) -> Self {
         match error {
             slide_order::Error::Refused(slide_order::Refusal::Signed) => Self::Signed,
+            // A transfer plan made against another receiving artifact is a
+            // patch for another base (record 0351 §2.4).
+            slide_order::Error::Refused(slide_order::Refusal::TransferTargetMismatch) => {
+                Self::PatchConflict
+            },
             error => Self::Native(error),
         }
     }
