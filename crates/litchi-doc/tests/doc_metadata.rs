@@ -233,7 +233,12 @@ fn metadata_transaction_creates_missing_streams_and_keeps_the_clsid() {
 
     // Replay, conflict and revert.
     assert_eq!(
-        package.apply_metadata(&patch).unwrap().to_bytes().unwrap(),
+        package
+            .apply_metadata(&patch)
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
         bytes
     );
     assert!(matches!(
@@ -244,6 +249,7 @@ fn metadata_transaction_creates_missing_streams_and_keeps_the_clsid() {
         edited
             .apply_metadata(&patch.inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         source

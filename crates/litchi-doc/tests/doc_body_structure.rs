@@ -328,7 +328,10 @@ fn structural_patches_invert_exactly() {
     assert_eq!(texts(&after), ["x", "c", "a"]);
     assert_eq!(patch.changes().len(), 3);
     let restored = after.apply(&patch.inverse()).unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), package.to_bytes().unwrap());
+    assert_eq!(
+        restored.package().to_bytes().unwrap(),
+        package.to_bytes().unwrap()
+    );
     // The durable envelope refuses the structural vocabulary explicitly.
     assert!(
         patch

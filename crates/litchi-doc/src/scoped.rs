@@ -157,7 +157,8 @@ impl Base {
         if is_signed(&self.bytes)? {
             return Err(Failure::Signed);
         }
-        let package = Package::from_bytes_with_options(&after, open_options(&self.package))?;
+        let package = Package::from_bytes_with_options(&after, open_options(&self.package))?
+            .with_edit_options(&self.options);
         Ok(Published {
             package,
             patch: BytePatch {
@@ -186,6 +187,14 @@ pub(crate) fn apply(package: &Package, patch: &BytePatch) -> Result<Published, F
     let base = Base::capture(package)?;
     if base.bytes() != patch.before() {
         return Err(Failure::PatchConflict);
+    }
+    if !patch.is_noop() {
+        // A replayed change is a write: the receiving package's protection
+        // policy authorizes it exactly as it authorizes a staged edit.
+        let protection = crate::package::property_set::classify_host(base.bytes())?;
+        base.options()
+            .protection_policy_value()
+            .authorize(protection)?;
     }
     base.publish(patch.after().to_vec())
 }

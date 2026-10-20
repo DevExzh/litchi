@@ -40,7 +40,10 @@ fn commit(source: &Package, edit: litchi_doc::Edit) -> Package {
     assert!(commit.diagnostics().changed());
     let (package, patch) = commit.into_parts();
     let restored = package.apply(&patch.inverse()).unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+    assert_eq!(
+        restored.package().to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
     package
 }
 

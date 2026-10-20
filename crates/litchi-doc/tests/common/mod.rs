@@ -242,3 +242,19 @@ pub(crate) fn authored_template(text: &str) -> Vec<u8> {
         .expect("template WordDocument stream");
     package.finish().expect("template DOC fixture publication")
 }
+
+/// `bytes` with the root stream `name` set to `data`, preserving every other
+/// stream and byte range.
+pub(crate) fn with_stream(bytes: Vec<u8>, name: &str, data: Vec<u8>) -> Vec<u8> {
+    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default())
+        .expect("DOC fixture object editor");
+    let path = [name.to_string()];
+    if package.stream(&path).is_some() {
+        package.put_stream(&path, data).expect("fixture stream");
+    } else {
+        package
+            .add_stream(path.to_vec(), data)
+            .expect("fixture stream");
+    }
+    package.finish().expect("fixture publication")
+}

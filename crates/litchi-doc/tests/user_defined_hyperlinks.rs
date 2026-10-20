@@ -35,8 +35,8 @@
 //! Public DOC transaction coverage for inert `_PID_HLINKS` metadata.
 
 use litchi_doc::{
-    FieldType, FieldsTable, HyperlinkAssociation, UserDefinedHyperlinks,
-    package::property_set::Snapshot,
+    EditOptions, FieldType, FieldsTable, HyperlinkAssociation, Package, UserDefinedHyperlinks,
+    package::property_set,
     parts::protection::{ProtectionAuthorization, ProtectionPolicy},
     raw::Reader,
     user_defined_hyperlinks::{Hyperlink, Hyperlinks, Limits},
@@ -48,10 +48,56 @@ use std::path::PathBuf;
 
 mod common;
 
-fn fixture() -> Snapshot {
+/// Property-set reads and edits of a whole package, as the tests use them.
+trait PropertySets {
+    fn edit_with_policy(
+        &self,
+        policy: ProtectionPolicy,
+    ) -> property_set::Result<property_set::Edit>;
+    fn user_defined_hyperlinks(
+        &self,
+        fields: Option<&FieldsTable>,
+        limits: Limits,
+    ) -> litchi_doc::Result<Option<UserDefinedHyperlinks>>;
+    fn user_defined_properties(
+        &self,
+    ) -> litchi_doc::Result<Option<litchi_ole_common::property_set::Section>>;
+    fn bytes(&self) -> Vec<u8>;
+}
+
+impl PropertySets for Package {
+    fn edit_with_policy(
+        &self,
+        policy: ProtectionPolicy,
+    ) -> property_set::Result<property_set::Edit> {
+        self.edit_property_sets_with_options(EditOptions::default().protection_policy(policy))
+    }
+
+    fn user_defined_hyperlinks(
+        &self,
+        fields: Option<&FieldsTable>,
+        limits: Limits,
+    ) -> litchi_doc::Result<Option<UserDefinedHyperlinks>> {
+        self.property_sets()
+            .unwrap()
+            .user_defined_hyperlinks(fields, limits)
+    }
+
+    fn user_defined_properties(
+        &self,
+    ) -> litchi_doc::Result<Option<litchi_ole_common::property_set::Section>> {
+        self.property_sets().unwrap().user_defined_properties()
+    }
+
+    fn bytes(&self) -> Vec<u8> {
+        self.to_bytes().unwrap()
+    }
+}
+
+fn fixture() -> Package {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let bytes = std::fs::read(root.join("test-data/ole/doc/documentProperties.doc")).unwrap();
-    Snapshot::from_bytes(common::with_valid_word97_dop(bytes)).unwrap()
+    Package::from_bytes(&common::with_valid_word97_dop(bytes)).unwrap()
 }
 
 fn fixture_policy() -> ProtectionPolicy {
@@ -60,9 +106,9 @@ fn fixture_policy() -> ProtectionPolicy {
     )
 }
 
-fn seeded() -> Snapshot {
+fn seeded() -> Package {
     let source = fixture();
-    let mut transaction = source.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = source.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .edit_user_defined_properties(|section| {
@@ -84,7 +130,7 @@ fn hyperlink_fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/doc/hyperlink.doc")
 }
 
-fn snapshot_with_real_hyperlink_field() -> (Snapshot, FieldsTable) {
+fn snapshot_with_real_hyperlink_field() -> (Package, FieldsTable) {
     let path = hyperlink_fixture();
     let bytes = std::fs::read(&path).unwrap();
     let mut package = Reader::open(path).unwrap();
@@ -109,8 +155,8 @@ fn snapshot_with_real_hyperlink_field() -> (Snapshot, FieldsTable) {
         .position(|marker| marker.position == hyperlink.start_cp)
         .unwrap();
 
-    let source = Snapshot::from_bytes(common::with_valid_word97_dop(bytes)).unwrap();
-    let mut transaction = source.transaction_with_policy(fixture_policy()).unwrap();
+    let source = Package::from_bytes(&common::with_valid_word97_dop(bytes)).unwrap();
+    let mut transaction = source.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .edit_user_defined_properties(|section| {
@@ -170,7 +216,7 @@ fn immutable_authoring_collection_recontexts_replaces_and_round_trips() {
     assert_eq!(hyperlinks.entries().len(), count);
     resolve_all(&mut hyperlinks);
 
-    let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = snapshot.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
@@ -210,7 +256,7 @@ fn immutable_authoring_collection_recontexts_replaces_and_round_trips() {
             .is_some()
     );
     resolve_all(&mut readback);
-    let mut transaction = committed.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = committed.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .put_user_defined_hyperlinks(&readback, Limits::default())
@@ -276,41 +322,34 @@ fn unresolved_candidates_refuse_changed_mutation_without_staging_or_commit_side_
         HyperlinkAssociation::FieldCandidates(_)
     ));
 
-    let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = snapshot.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         !transaction
             .put_user_defined_hyperlinks(&unresolved, Limits::default())
             .unwrap()
     );
-    assert!(!transaction.is_changed());
     let unchanged = transaction.commit().unwrap().into_parts().0;
 
-    let mut remove = unchanged.transaction_with_policy(fixture_policy()).unwrap();
+    let mut remove = unchanged.edit_with_policy(fixture_policy()).unwrap();
     assert!(remove.remove_user_defined_properties().unwrap());
     let without_property = remove.commit().unwrap().into_parts().0;
-    let mut transaction = without_property
-        .transaction_with_policy(fixture_policy())
-        .unwrap();
+    let mut transaction = without_property.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .put_user_defined_hyperlinks(&unresolved, Limits::default())
             .is_err()
     );
-    assert!(!transaction.is_changed());
     drop(transaction);
 
-    let mut transaction = without_property
-        .transaction_with_policy(fixture_policy())
-        .unwrap();
+    let mut transaction = without_property.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .put_user_defined_hyperlinks(&unresolved, Limits::default())
             .is_err()
     );
-    assert!(!transaction.is_changed());
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), without_property.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().bytes(), without_property.bytes());
 }
 
 #[test]
@@ -323,7 +362,7 @@ fn overlay_limits_reject_reads_and_resolved_puts_without_mutation() {
             .user_defined_hyperlinks(Some(&fields), too_small)
             .is_err()
     );
-    assert_eq!(snapshot.bytes(), snapshot.clone().into_bytes());
+    assert_eq!(snapshot.bytes(), snapshot.clone().to_bytes().unwrap());
 
     let mut package = Reader::from_reader(Cursor::new(snapshot.bytes().to_vec())).unwrap();
     assert!(package.user_defined_hyperlinks(too_small).is_err());
@@ -342,13 +381,12 @@ fn overlay_limits_reject_reads_and_resolved_puts_without_mutation() {
         .resolve_field(story, index)
         .unwrap();
 
-    let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = snapshot.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .put_user_defined_hyperlinks(&hyperlinks, too_small)
             .is_err()
     );
-    assert!(!transaction.is_changed());
     drop(transaction);
 }
 
@@ -369,14 +407,12 @@ fn resolved_metadata_creates_a_codepage_for_a_missing_user_defined_section() {
         .resolve_field(story, index)
         .unwrap();
 
-    let mut transaction = contextualized
-        .transaction_with_policy(fixture_policy())
-        .unwrap();
+    let mut transaction = contextualized.edit_with_policy(fixture_policy()).unwrap();
     assert!(transaction.remove_user_defined_properties().unwrap());
     let source = transaction.commit().unwrap().into_parts().0;
     assert!(source.user_defined_properties().unwrap().is_none());
 
-    let mut transaction = source.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = source.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
@@ -399,7 +435,7 @@ fn resolved_metadata_creates_a_codepage_for_a_missing_user_defined_section() {
 #[test]
 fn stored_hash_mismatch_is_inert_and_an_exact_noop_preserves_it() {
     let (snapshot, fields) = snapshot_with_real_hyperlink_field();
-    let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = snapshot.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         transaction
             .edit_user_defined_properties(|section| {
@@ -425,16 +461,15 @@ fn stored_hash_mismatch_is_inert_and_an_exact_noop_preserves_it() {
     assert!(!entry.hash_matches());
     assert_ne!(entry.stored_hash(), entry.calculated_hash());
 
-    let mut transaction = corrupted.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = corrupted.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         !transaction
             .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
             .unwrap()
     );
-    assert!(!transaction.is_changed());
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), corrupted.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().bytes(), corrupted.bytes());
 }
 
 #[test]
@@ -466,32 +501,26 @@ fn inert_hyperlinks_keep_source_order_and_no_op_commits_exact_bytes() {
         HyperlinkAssociation::UnassociatedApplicationData
     ));
 
-    let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = snapshot.edit_with_policy(fixture_policy()).unwrap();
     assert!(
         !transaction
             .put_user_defined_hyperlinks(&hyperlinks, Limits::default())
             .unwrap()
     );
-    assert!(!transaction.is_changed());
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), snapshot.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().bytes(), snapshot.bytes());
 }
 
 #[test]
-fn removing_hyperlinks_is_targeted_and_rollback_recovers_the_exact_source() {
+fn removing_hyperlinks_is_targeted_and_a_dropped_edit_keeps_the_exact_source() {
     let snapshot = seeded();
 
-    let mut rollback_transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
-    assert!(
-        rollback_transaction
-            .remove_user_defined_hyperlinks()
-            .unwrap()
-    );
-    assert!(rollback_transaction.is_changed());
-    // Dropping the staged transaction is the rollback; the source snapshot
+    let mut discarded = snapshot.edit_with_policy(fixture_policy()).unwrap();
+    assert!(discarded.remove_user_defined_hyperlinks().unwrap());
+    // Dropping the staged edit discards it; the source package
     // keeps its exact bytes and property.
-    drop(rollback_transaction);
+    drop(discarded);
     assert!(
         snapshot
             .user_defined_hyperlinks(None, Limits::default())
@@ -499,7 +528,7 @@ fn removing_hyperlinks_is_targeted_and_rollback_recovers_the_exact_source() {
             .is_some()
     );
 
-    let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
+    let mut transaction = snapshot.edit_with_policy(fixture_policy()).unwrap();
     assert!(transaction.remove_user_defined_hyperlinks().unwrap());
     let (committed, _) = transaction.commit().unwrap().into_parts();
     assert!(
@@ -520,7 +549,6 @@ fn removing_hyperlinks_is_targeted_and_rollback_recovers_the_exact_source() {
         "https://base.example/"
     );
 
-    let mut no_op = committed.transaction_with_policy(fixture_policy()).unwrap();
+    let mut no_op = committed.edit_with_policy(fixture_policy()).unwrap();
     assert!(!no_op.remove_user_defined_hyperlinks().unwrap());
-    assert!(!no_op.is_changed());
 }

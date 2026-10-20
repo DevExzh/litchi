@@ -362,82 +362,35 @@ impl Patch {
     }
 }
 
-/// A package-owned commit carrying the canonical publication triad.
-#[derive(Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
+/// A package-owned commit carrying the canonical publication triad: the
+/// published package, its reversible exact-source patch and content-free
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch, Diagnostics>;
+
+fn commit_from_body(source: Package, body_commit: body_text::PackageCommit) -> Result<Commit> {
+    let body_text::PackageCommit {
+        snapshot,
+        patch: body_patch,
+        validated,
+    } = body_commit;
+    let patch = Patch::from_body(body_patch);
+    let diagnostics = Diagnostics::from_patch(&patch.inner);
+    let package = match validated {
+        None => source,
+        Some(validated) => Package::from_validated_ole(
+            validated.ole,
+            validated.document,
+            snapshot.source_limits(),
+            source.leniency(),
+        )
+        .map_err(Error::Package)?,
+    };
+    Ok(Commit::new(
+        package.with_edit_profile(EditProfile::from_snapshot(&snapshot)),
+        patch,
+        diagnostics,
+    ))
 }
-
-impl fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("package", &self.package)
-            .field("patch", &self.patch)
-            .field("diagnostics", &self.diagnostics)
-            .finish()
-    }
-}
-
-impl Commit {
-    fn from_body(source: Package, body_commit: body_text::PackageCommit) -> Result<Self> {
-        let body_text::PackageCommit {
-            snapshot,
-            patch: body_patch,
-            validated,
-        } = body_commit;
-        let patch = Patch::from_body(body_patch);
-        let diagnostics = Diagnostics::from_patch(&patch.inner);
-        let package = match validated {
-            None => source,
-            Some(validated) => Package::from_validated_ole(
-                validated.ole,
-                validated.document,
-                snapshot.source_limits(),
-                source.leniency(),
-            )
-            .map_err(Error::Package)?,
-        };
-        Ok(Self {
-            package: package.with_edit_profile(EditProfile::from_snapshot(&snapshot)),
-            patch,
-            diagnostics,
-        })
-    }
-
-    /// Published immutable package snapshot.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume the commit and return its package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit into its package and reversible patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
-
 /// Primary immutable DOC package transaction.
 pub struct Edit {
     package: Package,
@@ -733,7 +686,7 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let package = self.package;
         let body_commit = self.inner.commit_with_package().map_err(Error::from)?;
-        Commit::from_body(package, body_commit)
+        commit_from_body(package, body_commit)
     }
 }
 
@@ -789,6 +742,16 @@ impl Package {
             .unwrap_or_default()
     }
 
+    /// This package retaining `options` as its edit profile, as a scoped
+    /// family commit publishes it.
+    pub(crate) fn with_edit_options(self, options: &EditOptions) -> Self {
+        self.with_edit_profile(EditProfile {
+            revision_limits: options.revision_limits,
+            transaction_limits: options.transaction_limits,
+            protection_policy: options.protection_policy.clone(),
+        })
+    }
+
     /// `options` constrained by the edit profile this package retains.
     pub(crate) fn constrained_edit_options(&self, options: EditOptions) -> EditOptions {
         match self.edit_profile.as_ref() {
@@ -803,7 +766,7 @@ impl Package {
     }
 
     /// Apply a canonical exact-source patch without mutating this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         let bytes = self.to_bytes().map_err(Error::Package)?;
         let profile = self.edit_profile.clone().unwrap_or_else(|| {
             let mut profile = EditProfile::from_patch(&patch.inner);
@@ -825,17 +788,23 @@ impl Package {
         .map_err(Error::from)?;
         let next = patch.inner.apply(&source).map_err(Error::from)?;
         let next_profile = EditProfile::from_snapshot(&next);
+        let diagnostics = Diagnostics::from_patch(&patch.inner);
         if next.bytes() == source.bytes() {
-            return Ok(self.clone().with_edit_profile(next_profile));
+            return Ok(Commit::new(
+                self.clone().with_edit_profile(next_profile),
+                patch.clone(),
+                diagnostics,
+            ));
         }
-        Package::from_bytes_with_options(
+        let package = Package::from_bytes_with_options(
             next.bytes(),
             OpenOptions::default()
                 .source_limits(next.source_limits())
                 .leniency(self.leniency()),
         )
-        .map_err(Error::Package)
-        .map(|package| package.with_edit_profile(next_profile))
+        .map_err(Error::Package)?
+        .with_edit_profile(next_profile);
+        Ok(Commit::new(package, patch.clone(), diagnostics))
     }
 }
 
@@ -950,7 +919,7 @@ mod tests {
             .package()
             .apply(&commit.patch().inverse())
             .expect("inverse");
-        assert_eq!(restored.to_bytes().unwrap(), source_bytes);
+        assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
     }
 
     #[test]
@@ -961,7 +930,7 @@ mod tests {
             .expect("no-op");
         let commit = edit.commit().expect("commit");
         assert_eq!(
-            commit.diagnostics(),
+            *commit.diagnostics(),
             Diagnostics {
                 changed: false,
                 operation_count: 0,
@@ -1054,9 +1023,12 @@ mod tests {
         let restored = changed
             .apply(&patch.inverse())
             .expect("inverse with retained profile");
-        assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+        assert_eq!(
+            restored.package().to_bytes().unwrap(),
+            source.to_bytes().unwrap()
+        );
 
-        let mut follow_up = restored.edit().expect("retained profile edit");
+        let mut follow_up = restored.package().edit().expect("retained profile edit");
         for position in 0..257 {
             follow_up
                 .replace_paragraph(Position::new(position), "again")
@@ -1094,6 +1066,7 @@ mod tests {
                 .with_max_retained_render_bytes(4 * 1024 * 1024),
         );
         let mut follow_up = applied
+            .package()
             .edit_with_options(wider_options)
             .expect("narrow retained profile edit");
         follow_up
@@ -1127,7 +1100,7 @@ mod tests {
         let reopened = crate::Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
         let applied = reopened.apply(&patch).expect("equal fresh source");
         assert_eq!(
-            applied.to_bytes().unwrap(),
+            applied.package().to_bytes().unwrap(),
             patch.after_bytes(),
             "exact bytes authorize a separately reopened source"
         );
@@ -1154,7 +1127,7 @@ mod tests {
             .package()
             .apply(&patch.inverse())
             .expect("authorized package can apply its inverse");
-        assert_eq!(restored.to_bytes().unwrap(), source_bytes);
+        assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
 
         let reopened = crate::Package::from_bytes(&source_bytes).expect("fresh source");
         let error = reopened
