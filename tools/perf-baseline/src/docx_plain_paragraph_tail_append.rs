@@ -729,10 +729,8 @@ fn build_candidate(
     let stale_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(stale_archive));
     let stale_package = source_backed::Package::from_read_at(stale_source)?;
     let stale_snapshot = stale_package.plain_paragraph_copy_snapshot_with_limits(limits)?;
-    let stale_source_refusal_verified = matches!(
-        durable.apply(&stale_snapshot),
-        Err(CopyError::PatchConflict)
-    );
+    let stale_source_refusal_verified =
+        matches!(durable.apply(&stale_snapshot), Err(CopyError::PatchConflict));
 
     let mut candidate_archive = Vec::new();
     let publication =

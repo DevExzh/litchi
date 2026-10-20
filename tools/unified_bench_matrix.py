@@ -43,7 +43,7 @@ Records 0285-0326 (record 0294 extended the tool to 0302; record 0306
 added the 0298, 0301, 0302, 0303, 0304 and 0306 parsers; record 0310 the
 0305, 0309, 0310, 0311, 0312 and 0313 parsers; records 0315, 0326, 0337 and 0340 their own;
 record 0344 those of 0307, 0308, 0314, 0316-0318, 0323-0325, 0328-0330,
-0333, 0335, 0336, 0338 and 0342; record 0348 its own) are collected only when their record file
+0333, 0335, 0336, 0338 and 0342; record 0348 and 0356 their own) are collected only when their record file
 is on this tree; the range ends at the highest record on the tree, and the
 Markdown lists every record of it, absent ones as "not on this tree", so
 the tool can be rerun unchanged after later merges.
@@ -2553,6 +2553,52 @@ def p0347():
     return out
 
 
+CONTRACT_0356 = {
+    "open": ("open", OPEN), "save": ("save", SINGLE), "save_twice": ("save", SINGLE),
+    "set": ("set", SINGLE), "set_save": ("set", SINGLE), "batch1k": ("batch", BATCH),
+}
+
+
+@needs("0356")
+def p0356():
+    """Record 0356 §5: the PPTX batch routes of record 0348 re-measured after
+    the record 0351 API contract (three runs each, superseding the 0348
+    rows), and pptx_contract_bench, one source built on the base tree and on
+    the branch, run A-B-B-A three times: after/before rows per scenario
+    (median of the after runs over the median of the before runs)."""
+    base = RES / "0356"
+    out = []
+    for series, glob in (("pptx_p0_final", "pptx-p0-final-bench-run*.jsonl"),
+                         ("pptx_p0", "pptx-p0-bench-run*.jsonl")):
+        paths = trials(base.glob(glob))
+        for scen, items in group_cases([load_jsonl(p) for p in paths], lambda r: r["scenario"]).items():
+            if "/" not in scen:
+                continue
+            family, owner, n, *handle = scen.split("/")
+            n = int(n)
+            state = f", {handle[0]} handle" if handle else ""
+            label = f"{family.replace('_', ' ')} ({owner} owner{state}; one File::batch vs one leaf edit)"
+            out.append(row("0356", "pptx", "batch", label, f"{n} ops",
+                           med(i["leaf_median_us"] for i in items),
+                           med(i["unified_median_us"] for i in items), [i["ratio"] for i in items],
+                           BATCH if n >= 1000 else SCALING, f"{series}:{scen}", src(paths)))
+    before = trials(base.glob("contract-before-run*.jsonl"))
+    after = trials(base.glob("contract-after-run*.jsonl"))
+    b_rows = [r for p in before for r in load_jsonl(p)]
+    srcs = src(list(before) + list(after))
+    for scen, a_items in group_cases([load_jsonl(p) for p in after], lambda r: r["scenario"]).items():
+        route, leg, fixture = scen.split("/")
+        op, _ = CONTRACT_0356[route]
+        b = med(r["median_us"] for r in b_rows if r["scenario"] == scen)
+        a = med(r["median_us"] for r in a_items)
+        if b is None:
+            continue
+        out.append(row("0356", "pptx", op, f"{route.replace('_', ' ')} ({fixture})", "",
+                       b, a, [a / b], regression("0356"), f"pptx_contract:{scen}", srcs,
+                       comparison=f"after/before ({leg} leg)"))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -2561,7 +2607,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348]
+           p0347, p0348, p0356]
 
 
 # ---------------------------------------------------------------- merge
